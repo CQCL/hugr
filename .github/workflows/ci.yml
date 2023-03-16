@@ -76,16 +76,17 @@ jobs:
         if: ${{ matrix.cache }}
         with:
           prefix-key: v0-rust-${{ matrix.rust }}
-      - name: Build
-        run: |
-          cargo build --verbose --no-default-features
-          cargo build --verbose --all-features
-      - name: Tests
-        run: |
-          cargo test --verbose --no-default-features
-          cargo test --verbose --all-features
-      - name: Build benchmarks
+      - name: Build with no features
+        run: cargo build --verbose --no-default-features
+      - name: Build with all features
+        run: cargo build --verbose --all-features
+      - name: Tests with no features
+        run: cargo test --verbose --no-default-features
+      - name: Tests with all features
+        run: cargo test --verbose --all-features
+      - name: Build benchmarks with no features
         if: ${{ matrix.bench }}
-        run: |
-          cargo bench --verbose --no-run --no-default-features
-          cargo bench --verbose --no-run --all-features
+        run: cargo bench --verbose --no-run --no-default-features
+      - name: Build benchmarks with all features
+        if: ${{ matrix.bench }}
+        run: cargo bench --verbose --no-run --all-features
