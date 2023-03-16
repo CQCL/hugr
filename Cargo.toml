@@ -1,0 +1,40 @@
+[package]
+name = "quantinuum-hugr"
+version = "0.1.0"
+license = "Apache-2.0"
+
+readme = "README.md"
+#documentation = "https://docs.rs/hugr/"
+repository = "https://github.com/CQCL/hugr"
+
+description = "Hierarchical Unified Graph Representation"
+#keywords = [] # TODO
+#categories = [] # TODO
+
+edition = "2021"
+rust-version = "1.68"
+
+[lib]
+# Using different names for the lib and for the package is supported, but may be confusing.
+# https://github.com/rust-lang/cargo/issues/6827
+# TODO: Should we rename one of them?
+name = "hugr"
+bench = false
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0.28"
+pyo3 = { version = "0.18.1", optional = true, features = [
+    "multiple-pymethods",
+] }
+
+[features]
+pyo3 = ["dep:pyo3"]
+
+[dev-dependencies]
+criterion = { version = "0.4.0", features = ["html_reports"] }
+rstest = "0.16.0"
+
+[[bench]]
+name = "bench_main"
+harness = false
