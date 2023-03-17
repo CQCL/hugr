@@ -7,6 +7,8 @@ hugr
 The Hierarchical Unified Graph Representation (HUGR, pronounced _hugger_) is the
 common representation of quantum circuits and operations in the Quantinuum
 ecosystem.
+It provides a high-fidelity representation of operations, that facilitates
+compilation and encodes runnable programs.
 
 ## Features
 

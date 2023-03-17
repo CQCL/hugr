@@ -24,9 +24,13 @@ path = "src/lib.rs"
 
 [dependencies]
 thiserror = "1.0.28"
+portgraph = { git = "http://github.com/zrho/portgraph"}
 pyo3 = { version = "0.18.1", optional = true, features = [
     "multiple-pymethods",
 ] }
+cgmath = "0.18.0"
+num-rational = "0.4.1"
+downcast-rs = "1.2.0"
 
 [features]
 pyo3 = ["dep:pyo3"]
