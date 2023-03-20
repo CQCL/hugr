@@ -1,8 +1,9 @@
 //! The Hugr data structure.
 #![allow(dead_code)]
 
-use portgraph::{Hierarchy, PortGraph, PortIndex, SecondaryMap};
+use portgraph::{Hierarchy, NodeIndex, PortGraph, PortIndex, SecondaryMap};
 
+use crate::ops::OpType;
 use crate::types::Type;
 
 /// The Hugr data structure.
@@ -12,7 +13,6 @@ pub struct Hugr {
     pub(crate) graph: PortGraph,
     hierarchy: Hierarchy,
 
-    //op_types: SecondaryMap<NodeIndex, Op>,
+    op_types: SecondaryMap<NodeIndex, OpType>,
     port_types: SecondaryMap<PortIndex, Type>,
-    // TODO: Node and port metadata
 }

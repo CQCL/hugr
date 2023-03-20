@@ -20,7 +20,7 @@ pub enum Type {
     ControlFlow,
     /// Data edges of a DDG region
     Dataflow(DataType),
-    /// A reference to a constant value definition, used in the module region.
+    /// A reference to a constant value definition, used in the module region
     Const(DataType),
     /// A strict ordering between nodes
     StateOrder,
@@ -28,11 +28,12 @@ pub enum Type {
 
 impl Default for Type {
     fn default() -> Self {
-        Self::ControlFlow
+        Self::StateOrder
     }
 }
 
-/// A function signature
+/// A function signature with dataflow types.
+/// This does not specify control flow ports nor state ordering
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct Signature {
@@ -41,7 +42,9 @@ pub struct Signature {
     /// Output of the function
     pub output: RowType,
     /// Constant data references used by the function
-    pub consts: RowType,
+    pub const_input: RowType,
+    /// Constant data references defined by the function
+    pub const_output: RowType,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -49,7 +52,10 @@ impl Signature {
     /// The number of wires in the signature
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.consts.is_empty() && self.input.is_empty() && self.output.is_empty()
+        self.const_input.is_empty()
+            && self.const_output.is_empty()
+            && self.input.is_empty()
+            && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear
@@ -64,18 +70,64 @@ impl Signature {
         self.input.purely_classical() && self.output.purely_classical()
     }
 }
+impl Signature {
+    /// Returns the linear part of the signature
+    #[inline(always)]
+    pub fn linear(&self) -> impl Iterator<Item = &DataType> {
+        debug_assert_eq!(
+            self.input
+                .iter()
+                .filter(|t| t.is_linear())
+                .collect::<Vec<_>>(),
+            self.output
+                .iter()
+                .filter(|t| t.is_linear())
+                .collect::<Vec<_>>()
+        );
+        self.input.iter().filter(|t| t.is_linear())
+    }
+}
 
 impl Signature {
     /// Create a new signature
     pub fn new(
         input: impl Into<RowType>,
         output: impl Into<RowType>,
-        consts: impl Into<RowType>,
+        const_input: impl Into<RowType>,
+        const_output: impl Into<RowType>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
-            consts: consts.into(),
+            const_input: const_input.into(),
+            const_output: const_output.into(),
+        }
+    }
+
+    /// Create a new signature with only linear dataflow inputs and outputs
+    pub fn new_linear(linear: impl Into<RowType>) -> Self {
+        let linear = linear.into();
+        Self {
+            input: linear.clone(),
+            output: linear,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new signature with only dataflow inputs and outputs
+    pub fn new_df(input: impl Into<RowType>, output: impl Into<RowType>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a new signature with only constant outputs
+    pub fn new_const(const_output: impl Into<RowType>) -> Self {
+        Self {
+            const_output: const_output.into(),
+            ..Default::default()
         }
     }
 }

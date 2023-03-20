@@ -6,7 +6,7 @@ use std::any::Any;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use super::Resource;
+use super::{Resource, Signature};
 use crate::macros::impl_box_clone;
 
 /// A type that represents concrete data.
@@ -22,8 +22,7 @@ pub enum DataType {
     Angle,
     Graph {
         resources: Resource,
-        input: RowType,
-        output: RowType,
+        signature: Signature,
     },
     Pair(Box<DataType>, Box<DataType>),
     List(Box<DataType>),
@@ -45,15 +44,13 @@ impl PartialEq for DataType {
             (
                 Self::Graph {
                     resources: l_resources,
-                    input: l_input,
-                    output: l_output,
+                    signature: l_signature,
                 },
                 Self::Graph {
                     resources: r_resources,
-                    input: r_input,
-                    output: r_output,
+                    signature: r_signature,
                 },
-            ) => l_resources == r_resources && l_input == r_input && l_output == r_output,
+            ) => l_resources == r_resources && l_signature == r_signature,
             (Self::Pair(l0, l1), Self::Pair(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::List(l0), Self::List(r0)) => l0 == r0,
             (Self::Resource(l0), Self::Resource(r0)) => l0 == r0,
@@ -128,6 +125,17 @@ impl RowType {
             .any(|typ| matches!(typ, DataType::Qubit | DataType::Money))
     }
 }
+impl RowType {
+    /// Iterator over the types in the row.
+    pub fn iter(&self) -> std::slice::Iter<DataType> {
+        self.0.iter()
+    }
+
+    /// Mutable iterator over the types in the row.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<DataType> {
+        self.0.iter_mut()
+    }
+}
 
 impl RowType {
     pub fn new(types: Vec<DataType>) -> Self {
@@ -135,8 +143,38 @@ impl RowType {
     }
 }
 
-impl From<Vec<DataType>> for RowType {
-    fn from(types: Vec<DataType>) -> Self {
-        Self::new(types)
+impl<T> From<T> for RowType
+where
+    T: Into<Vec<DataType>>,
+{
+    fn from(types: T) -> Self {
+        Self::new(types.into())
+    }
+}
+
+impl IntoIterator for RowType {
+    type Item = DataType;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a RowType {
+    type Item = &'a DataType;
+    type IntoIter = std::slice::Iter<'a, DataType>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut RowType {
+    type Item = &'a mut DataType;
+    type IntoIter = std::slice::IterMut<'a, DataType>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&mut self.0).into_iter()
     }
 }

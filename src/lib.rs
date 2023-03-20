@@ -11,8 +11,10 @@
 
 pub mod hugr;
 pub mod macros;
-//pub mod ops;
+pub mod ops;
 pub mod types;
+
+pub use hugr::Hugr;
 
 #[cfg(test)]
 mod test {
