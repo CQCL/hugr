@@ -2,12 +2,7 @@
 //!
 //! TODO: Better name than "leaf"?
 
-use downcast_rs::{impl_downcast, Downcast};
-use std::any::Any;
-
-use super::Op;
-use crate::hugr::Hugr;
-use crate::macros::impl_box_clone;
+use super::{CustomOp, Op, OpDef};
 use crate::types::{DataType, Signature};
 
 #[derive(Clone, Debug)]
@@ -16,7 +11,7 @@ pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that define it.
     CustomOp(Box<dyn CustomOp>),
     /// An externally-defined operation that can be downcasted by the extensions that define it.
-    Opdef(Box<dyn CustomOp>),
+    OpDef(OpDef),
 
     H,
     T,
@@ -51,7 +46,7 @@ impl PartialEq for LeafOp {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::CustomOp(l0), Self::CustomOp(r0)) => l0.eq(&**r0),
-            (Self::Opdef(l0), Self::Opdef(r0)) => l0.eq(&**r0),
+            (Self::OpDef(l0), Self::OpDef(r0)) => l0.eq(r0),
             (Self::Noop(l0), Self::Noop(r0)) => l0 == r0,
             (
                 Self::Copy {
@@ -131,14 +126,14 @@ impl Op for LeafOp {
             ),
             LeafOp::Xor => Signature::new_df([DataType::Bool, DataType::Bool], [DataType::Bool]),
             LeafOp::CustomOp(op) => op.signature(),
-            LeafOp::Opdef(op) => op.signature(),
+            LeafOp::OpDef(op) => op.signature(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
             LeafOp::CustomOp(op) => op.name(),
-            LeafOp::Opdef(op) => op.name(),
+            LeafOp::OpDef(op) => op.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -166,21 +161,3 @@ impl Op for LeafOp {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct ToHugrFail;
-pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any + Downcast {
-    // TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
-    fn to_hugr(&self) -> Result<Hugr, ToHugrFail> {
-        Err(ToHugrFail)
-    }
-
-    /// Check if two custom ops are equal, by downcasting and comparing the definitions.
-    fn eq(&self, other: &dyn CustomOp) -> bool {
-        let _ = other;
-        false
-    }
-}
-
-impl_downcast!(CustomOp);
-impl_box_clone!(CustomOp, CustomOpBoxClone);

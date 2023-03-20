@@ -1,8 +1,5 @@
 use super::Op;
-use crate::types::{AngleValue, DataType, Quat, Signature};
-
-#[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use crate::types::{DataType, Signature};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionOp {

@@ -1,4 +1,5 @@
 pub mod controlflow;
+pub mod custom;
 pub mod function;
 pub mod leaf;
 pub mod module;
@@ -6,13 +7,18 @@ pub mod module;
 use crate::types::Signature;
 
 pub use controlflow::ControlFlowOp;
+pub use custom::{CustomOp, OpDef};
 pub use function::FunctionOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
 
 /// A generic node operation
 pub trait Op {
+    /// The name of the operation.
     fn name(&self) -> &str;
+    /// The signature of the operation.
+    ///
+    /// TODO: Return a reference? It'll need some lazy_statics to make it work.
     fn signature(&self) -> Signature;
 }
 

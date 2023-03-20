@@ -160,21 +160,3 @@ impl IntoIterator for RowType {
         self.0.into_iter()
     }
 }
-
-impl<'a> IntoIterator for &'a RowType {
-    type Item = &'a DataType;
-    type IntoIter = std::slice::Iter<'a, DataType>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a mut RowType {
-    type Item = &'a mut DataType;
-    type IntoIter = std::slice::IterMut<'a, DataType>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        (&mut self.0).into_iter()
-    }
-}

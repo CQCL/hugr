@@ -14,7 +14,7 @@ pub mod macros;
 pub mod ops;
 pub mod types;
 
-pub use hugr::Hugr;
+pub use crate::hugr::Hugr;
 
 #[cfg(test)]
 mod test {
