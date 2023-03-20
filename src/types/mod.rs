@@ -35,11 +35,11 @@ impl Default for Type {
 /// A function signature with dataflow types. This does not specify control flow
 /// ports nor state ordering
 ///
-/// TODO: Here we split the input and output into two parts, one for value wires
-/// and one for constant definitions. This allows us to reuse the `RowType`
-/// type, but requires that the value ports come all before the constants. We
-/// could change this by redefining
-/// ```
+/// TODO: Here we split the input and output into two parts, one for value wires and
+/// one for constant definitions. This allows us to reuse the `RowType` type,
+/// but requires that the value ports come all before the constants. We could
+/// change this by redefining
+/// ```ignore
 /// enum RowTypeVariant {df: DataType, const: DataType}
 /// struct RowType(Vec<RowTypeVariant>);
 /// ```

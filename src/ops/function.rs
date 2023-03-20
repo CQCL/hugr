@@ -13,7 +13,7 @@ pub enum FunctionOp {
     /// Call a function directly.
     ///
     /// The first port is connected to the def/declare of the function being
-    /// called directly, with a ConstE<Graph> edge. The signature of the
+    /// called directly, with a `ConstE<Graph>` edge. The signature of the
     /// remaining ports matches the function being called.
     Call { signature: Signature },
     /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type

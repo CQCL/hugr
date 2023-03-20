@@ -96,6 +96,7 @@ impl LeafOp {
 
 impl Op for LeafOp {
     fn signature(&self) -> Signature {
+        // TODO: Missing [`DataType::Money`] inputs and outputs.
         match self {
             LeafOp::Noop(typ) => Signature::new_df([typ.clone()], [typ.clone()]),
             LeafOp::H
