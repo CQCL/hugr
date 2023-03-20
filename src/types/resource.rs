@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 /// A resource is a set of capabilities required to execute a graph.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Resource {
     resources: HashSet<ResourceValue>,
 }
@@ -30,7 +30,7 @@ impl Resource {
 ///
 /// TODO: The user should be able to define new custom resources, used on their
 /// operations.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ResourceValue {
     pub name: String,
 }

@@ -48,7 +48,7 @@ impl Op for FunctionOp {
             FunctionOp::IO { signature } => signature.clone(),
             FunctionOp::Call { signature } => {
                 let mut s = signature.clone();
-                s.const_input.0.insert(
+                s.const_input.types.insert(
                     0,
                     DataType::Graph {
                         resources: Default::default(),
@@ -59,7 +59,7 @@ impl Op for FunctionOp {
             }
             FunctionOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
-                s.input.0.insert(
+                s.input.types.insert(
                     0,
                     DataType::Graph {
                         resources: Default::default(),

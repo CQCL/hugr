@@ -11,7 +11,7 @@ use crate::macros::impl_box_clone;
 
 /// A type that represents concrete data.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum DataType {
     Variable(String), // TODO: How are variables represented?
@@ -37,6 +37,7 @@ pub enum DataType {
     Opaque(Box<dyn CustomType>),
 }
 
+/// Custom PartialEq implementation required to compare `DataType::Opaque` variants.
 impl PartialEq for DataType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -78,7 +79,8 @@ impl Default for DataType {
     }
 }
 
-pub trait CustomType: Send + Sync + std::fmt::Debug + CustomTypeBoxClone + Any + Downcast {
+#[typetag::serde]
+pub trait CustomType: Send + Sync + std::fmt::Debug + Any + Downcast + CustomTypeBoxClone {
     fn name(&self) -> &str;
 
     /// Check if two custom ops are equal, by downcasting and comparing the definitions.
@@ -95,51 +97,57 @@ pub trait CustomType: Send + Sync + std::fmt::Debug + CustomTypeBoxClone + Any +
 impl_downcast!(CustomType);
 impl_box_clone!(CustomType, CustomTypeBoxClone);
 
-/// List of types, used for function signatures
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+/// List of types, used for function signatures.
+#[derive(Clone, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass)]
-pub struct RowType(pub Vec<DataType>);
+#[non_exhaustive]
+pub struct RowType {
+    /// The datatypes in the row.
+    pub types: Vec<DataType>,
+}
 
 #[cfg_attr(feature = "pyo3", pymethods)]
 impl RowType {
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.types.len()
     }
 
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.types.is_empty()
     }
 
     #[inline(always)]
     pub fn purely_linear(&self) -> bool {
-        self.0.iter().all(|typ| typ.is_linear())
+        self.types.iter().all(|typ| typ.is_linear())
     }
 
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
         !self
-            .0
+            .types
             .iter()
             .any(|typ| matches!(typ, DataType::Qubit | DataType::Money))
     }
 }
 impl RowType {
     /// Iterator over the types in the row.
-    pub fn iter(&self) -> std::slice::Iter<DataType> {
-        self.0.iter()
+    pub fn iter(&self) -> impl Iterator<Item = &DataType> {
+        self.types.iter()
     }
 
     /// Mutable iterator over the types in the row.
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<DataType> {
-        self.0.iter_mut()
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut DataType> {
+        self.types.iter_mut()
     }
 }
 
 impl RowType {
-    pub fn new(types: Vec<DataType>) -> Self {
-        Self(types)
+    pub fn new(types: impl Into<Vec<DataType>>) -> Self {
+        Self {
+            types: types.into(),
+        }
     }
 }
 
@@ -157,6 +165,6 @@ impl IntoIterator for RowType {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.types.into_iter()
     }
 }

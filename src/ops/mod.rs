@@ -4,7 +4,7 @@ pub mod function;
 pub mod leaf;
 pub mod module;
 
-use crate::types::Signature;
+use crate::types::{Signature, SignatureDescription};
 
 pub use controlflow::ControlFlowOp;
 pub use custom::{CustomOp, OpDef};
@@ -16,10 +16,20 @@ pub use module::{ConstValue, ModuleOp};
 pub trait Op {
     /// The name of the operation.
     fn name(&self) -> &str;
+    /// The description of the operation.
+    fn description(&self) -> &str {
+        ""
+    }
     /// The signature of the operation.
     ///
     /// TODO: Return a reference? It'll need some lazy_statics to make it work.
     fn signature(&self) -> Signature;
+    /// Optional description of the ports in the signature.
+    ///
+    /// TODO: Implement where possible
+    fn signature_desc(&self) -> Option<&SignatureDescription> {
+        None
+    }
 }
 
 /// The concrete operation types for a node in the HUGR.

@@ -35,7 +35,7 @@ impl Default for Type {
 /// A function signature with dataflow types.
 /// This does not specify control flow ports nor state ordering
 #[cfg_attr(feature = "pyo3", pyclass)]
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Input of the function
     pub input: RowType,
@@ -129,5 +129,144 @@ impl Signature {
             const_output: const_output.into(),
             ..Default::default()
         }
+    }
+}
+
+/// Descriptive names for the ports in a [`Signature`].
+///
+/// This is a separate type from [`Signature`] as it is not normally used during the compiler operations.
+#[cfg_attr(feature = "pyo3", pyclass)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SignatureDescription {
+    /// Input of the function
+    pub input: Vec<String>,
+    /// Output of the function
+    pub output: Vec<String>,
+    /// Constant data references used by the function
+    pub const_input: Vec<String>,
+    /// Constant data references defined by the function
+    pub const_output: Vec<String>,
+}
+
+#[cfg_attr(feature = "pyo3", pymethods)]
+impl SignatureDescription {
+    /// The number of wires in the signature
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.const_input.is_empty()
+            && self.const_output.is_empty()
+            && self.input.is_empty()
+            && self.output.is_empty()
+    }
+}
+
+impl SignatureDescription {
+    /// Create a new signature
+    pub fn new(
+        input: impl Into<Vec<String>>,
+        output: impl Into<Vec<String>>,
+        const_input: impl Into<Vec<String>>,
+        const_output: impl Into<Vec<String>>,
+    ) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+            const_input: const_input.into(),
+            const_output: const_output.into(),
+        }
+    }
+
+    /// Create a new signature with only linear dataflow inputs and outputs
+    pub fn new_linear(linear: impl Into<Vec<String>>) -> Self {
+        let linear = linear.into();
+        Self {
+            input: linear.clone(),
+            output: linear,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new signature with only dataflow inputs and outputs
+    pub fn new_df(input: impl Into<Vec<String>>, output: impl Into<Vec<String>>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a new signature with only constant outputs
+    pub fn new_const(const_output: impl Into<Vec<String>>) -> Self {
+        Self {
+            const_output: const_output.into(),
+            ..Default::default()
+        }
+    }
+
+    /// Iterate over the input wires of the signature and their names.
+    ///
+    /// Unnamed wires are given an empty string name.
+    pub fn input_zip<'a>(
+        &'a self,
+        signature: &'a Signature,
+    ) -> impl Iterator<Item = (&String, &DataType)> {
+        self.input
+            .iter()
+            .chain(&EmptyStringIterator)
+            .zip(signature.input.iter())
+    }
+
+    /// Iterate over the output wires of the signature and their names.
+    ///
+    /// Unnamed wires are given an empty string name.
+    pub fn output_zip<'a>(
+        &'a self,
+        signature: &'a Signature,
+    ) -> impl Iterator<Item = (&String, &DataType)> {
+        self.output
+            .iter()
+            .chain(&EmptyStringIterator)
+            .zip(signature.output.iter())
+    }
+
+    /// Iterate over the constant input wires of the signature and their names.
+    ///
+    /// Unnamed wires are given an empty string name.
+
+    pub fn const_input_zip<'a>(
+        &'a self,
+        signature: &'a Signature,
+    ) -> impl Iterator<Item = (&String, &DataType)> {
+        self.const_input
+            .iter()
+            .chain(&EmptyStringIterator)
+            .zip(signature.const_input.iter())
+    }
+
+    /// Iterate over the constant output wires of the signature and their names.
+    ///
+    /// Unnamed wires are given an empty string name.
+    pub fn const_output_zip<'a>(
+        &'a self,
+        signature: &'a Signature,
+    ) -> impl Iterator<Item = (&String, &DataType)> {
+        self.const_output
+            .iter()
+            .chain(&EmptyStringIterator)
+            .zip(signature.const_output.iter())
+    }
+}
+
+/// An iterator that always returns the an empty string.
+struct EmptyStringIterator;
+
+/// A reference to an empty string. Used by [`EmptyStringIterator`].
+const EMPTY_STRING_REF: &String = &String::new();
+
+impl<'a> Iterator for &'a EmptyStringIterator {
+    type Item = &'a String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(EMPTY_STRING_REF)
     }
 }

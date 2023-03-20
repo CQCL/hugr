@@ -46,7 +46,7 @@ impl PartialEq for LeafOp {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::CustomOp(l0), Self::CustomOp(r0)) => l0.eq(&**r0),
-            (Self::OpDef(l0), Self::OpDef(r0)) => l0.eq(r0),
+            (Self::OpDef(l0), Self::OpDef(r0)) => PartialEq::eq(l0, r0),
             (Self::Noop(l0), Self::Noop(r0)) => l0 == r0,
             (
                 Self::Copy {
