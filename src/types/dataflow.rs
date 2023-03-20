@@ -10,7 +10,13 @@ use super::{Resource, Signature};
 use crate::macros::impl_box_clone;
 
 /// A type that represents concrete data.
-//#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
+///
+/// TODO: We define a flat enum for efficiency, but we could maybe split the
+/// linear types into a nested enum instead.
+///
+/// TODO: Derive pyclass
+///
+/// TODO: Complete missing types
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum DataType {
@@ -26,7 +32,6 @@ pub enum DataType {
     },
     Pair(Box<DataType>, Box<DataType>),
     List(Box<DataType>),
-    // TODO: Complete this list
 
     // Linear types
     Qubit,
@@ -79,6 +84,11 @@ impl Default for DataType {
     }
 }
 
+/// A custom defined type that can be downcasted by the extensions that know
+/// about it.
+///
+/// Note that any implementation of this trait must include the
+/// `#[typetag::serde]` attribute.
 #[typetag::serde]
 pub trait CustomType: Send + Sync + std::fmt::Debug + Any + Downcast + CustomTypeBoxClone {
     fn name(&self) -> &str;

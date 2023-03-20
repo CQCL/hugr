@@ -32,8 +32,18 @@ impl Default for Type {
     }
 }
 
-/// A function signature with dataflow types.
-/// This does not specify control flow ports nor state ordering
+/// A function signature with dataflow types. This does not specify control flow
+/// ports nor state ordering
+///
+/// TODO: Here we split the input and output into two parts, one for value wires
+/// and one for constant definitions. This allows us to reuse the `RowType`
+/// type, but requires that the value ports come all before the constants. We
+/// could change this by redefining
+/// ```
+/// enum RowTypeVariant {df: DataType, const: DataType}
+/// struct RowType(Vec<RowTypeVariant>);
+/// ```
+/// but that seems more annoying to work with.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
