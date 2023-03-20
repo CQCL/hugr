@@ -4,7 +4,7 @@ use crate::types::{AngleValue, DataType, Quat, Signature};
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ModuleOp {
     #[default]
     /// The root of a module
@@ -54,7 +54,7 @@ impl Op for ModuleOp {
 
 /// Value constants
 #[cfg_attr(feature = "pyo3", derive(FromPyObject))]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ConstValue {
     Bool(bool),

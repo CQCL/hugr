@@ -5,7 +5,7 @@
 use super::{CustomOp, Op, OpDef};
 use crate::types::{DataType, Signature};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that define it.

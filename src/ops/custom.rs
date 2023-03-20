@@ -11,6 +11,10 @@ use crate::macros::impl_box_clone;
 use crate::types::DataType;
 use crate::types::{Signature, SignatureDescription};
 
+/// Custom definition for an operation.
+///
+/// Note that any implementation of this trait must include the `#[typetag::serde]` attribute.
+#[typetag::serde]
 pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any + Downcast {
     /// Try to convert the custom op to a graph definition.
     ///
@@ -104,6 +108,7 @@ impl Op for OpDef {
     }
 }
 
+#[typetag::serde]
 impl CustomOp for OpDef {
     fn eq(&self, other: &dyn CustomOp) -> bool {
         if let Some(other) = other.downcast_ref::<Self>() {

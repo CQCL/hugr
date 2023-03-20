@@ -13,7 +13,7 @@ pub use resource::{Resource, ResourceValue};
 
 /// The wire types
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum Type {
     /// Control edges of a CFG region

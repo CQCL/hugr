@@ -2,7 +2,7 @@ use crate::types::Signature;
 
 use super::Op;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
     /// ɣ (gamma) node: conditional operation
     Conditional { signature: Signature },

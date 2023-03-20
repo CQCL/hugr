@@ -6,7 +6,7 @@ use num_rational::Rational64;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass(name = "Rational"))]
 pub struct Rational(pub Rational64);
 
@@ -16,7 +16,7 @@ impl From<Rational64> for Rational {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass(name = "Quaternion"))]
 pub struct Quat(pub cgmath::Quaternion<f64>);
 
@@ -27,7 +27,7 @@ impl From<cgmath::Quaternion<f64>> for Quat {
 }
 
 // angle is contained value * pi in radians
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", derive(FromPyObject))]
 pub enum AngleValue {
     F64(f64),

@@ -7,7 +7,7 @@ use crate::ops::OpType;
 use crate::types::Type;
 
 /// The Hugr data structure.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
     pub(crate) graph: PortGraph,

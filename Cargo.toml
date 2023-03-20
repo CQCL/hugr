@@ -24,12 +24,12 @@ path = "src/lib.rs"
 
 [dependencies]
 thiserror = "1.0.28"
-portgraph = { git = "http://github.com/zrho/portgraph" }
+portgraph = { git = "http://github.com/CQCL/portgraph", features = ["serde"] }
 pyo3 = { version = "0.18.1", optional = true, features = [
     "multiple-pymethods",
 ] }
-cgmath = "0.18.0"
-num-rational = "0.4.1"
+cgmath = { version = "0.18.0", features = ["serde"] }
+num-rational = { version = "0.4.1", features = ["serde"] }
 downcast-rs = "1.2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9.19"

@@ -35,7 +35,7 @@ pub trait Op {
 /// The concrete operation types for a node in the HUGR.
 ///
 /// TODO: Flatten the enum? It improves efficiency, but makes it harder to read.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {
     /// A module region node.

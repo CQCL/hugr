@@ -1,7 +1,7 @@
 use super::Op;
 use crate::types::{DataType, Signature};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
     /// An input/output node.
     ///
