@@ -1,25 +1,54 @@
 //! The Hugr data structure.
+//!
+//! TODO: metadata
 #![allow(dead_code)]
 
 use portgraph::{Hierarchy, NodeIndex, PortGraph, PortIndex, SecondaryMap};
 
-use crate::ops::OpType;
+use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::Type;
 
 /// The Hugr data structure.
-#[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
     pub(crate) graph: PortGraph,
     hierarchy: Hierarchy,
 
+    /// The single root node in the hierarchy.
+    /// It must correspond to a [`ModuleOp::Root`] node.
+    root: NodeIndex,
+
     op_types: SecondaryMap<NodeIndex, OpType>,
     port_types: SecondaryMap<PortIndex, Type>,
 }
 
+impl Default for Hugr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hugr {
-    /// TODO: metadata operations
+    /// Create a new Hugr, with a single root node.
+    pub fn new() -> Self {
+        let mut graph = PortGraph::default();
+        let hierarchy = Hierarchy::new();
+        let mut op_types = SecondaryMap::new();
+        let port_types = SecondaryMap::new();
+
+        let root = graph.add_node(0, 0);
+        op_types[root] = OpType::Module(ModuleOp::Root);
+
+        Self {
+            graph,
+            hierarchy,
+            root,
+            op_types,
+            port_types,
+        }
+    }
 
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
