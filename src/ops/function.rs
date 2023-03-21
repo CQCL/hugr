@@ -1,5 +1,5 @@
 use super::Op;
-use crate::types::{DataType, Signature};
+use crate::types::{Signature, SimpleType};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
@@ -19,7 +19,7 @@ pub enum FunctionOp {
     /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type
     CallIndirect { signature: Signature },
     /// Load a static constant in to the local dataflow graph
-    LoadConstant { datatype: DataType },
+    LoadConstant { datatype: SimpleType },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
 }
@@ -50,7 +50,7 @@ impl Op for FunctionOp {
                 let mut s = signature.clone();
                 s.const_input.types.insert(
                     0,
-                    DataType::Graph {
+                    SimpleType::Graph {
                         resources: Default::default(),
                         signature: signature.clone(),
                     },
@@ -61,7 +61,7 @@ impl Op for FunctionOp {
                 let mut s = signature.clone();
                 s.input.types.insert(
                     0,
-                    DataType::Graph {
+                    SimpleType::Graph {
                         resources: Default::default(),
                         signature: signature.clone(),
                     },

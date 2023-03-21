@@ -1,15 +1,15 @@
 //! Types used in the compiler
 
 pub mod angle;
-pub mod dataflow;
 pub mod resource;
+pub mod simple;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 pub use angle::{AngleValue, Quat, Rational};
-pub use dataflow::{DataType, RowType};
 pub use resource::{Resource, ResourceValue};
+pub use simple::{RowType, SimpleType};
 
 /// The wire types
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -19,9 +19,9 @@ pub enum Type {
     /// Control edges of a CFG region
     ControlFlow,
     /// Data edges of a DDG region
-    Dataflow(DataType),
+    Value(SimpleType),
     /// A reference to a constant value definition, used in the module region
-    Const(DataType),
+    Const(SimpleType),
     /// A strict ordering between nodes
     StateOrder,
 }
@@ -83,7 +83,7 @@ impl Signature {
 impl Signature {
     /// Returns the linear part of the signature
     #[inline(always)]
-    pub fn linear(&self) -> impl Iterator<Item = &DataType> {
+    pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
         debug_assert_eq!(
             self.input
                 .iter()
@@ -219,7 +219,7 @@ impl SignatureDescription {
     pub fn input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &DataType)> {
+    ) -> impl Iterator<Item = (&String, &SimpleType)> {
         self.input
             .iter()
             .chain(&EmptyStringIterator)
@@ -232,7 +232,7 @@ impl SignatureDescription {
     pub fn output_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &DataType)> {
+    ) -> impl Iterator<Item = (&String, &SimpleType)> {
         self.output
             .iter()
             .chain(&EmptyStringIterator)
@@ -246,7 +246,7 @@ impl SignatureDescription {
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &DataType)> {
+    ) -> impl Iterator<Item = (&String, &SimpleType)> {
         self.const_input
             .iter()
             .chain(&EmptyStringIterator)
@@ -259,7 +259,7 @@ impl SignatureDescription {
     pub fn const_output_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &DataType)> {
+    ) -> impl Iterator<Item = (&String, &SimpleType)> {
         self.const_output
             .iter()
             .chain(&EmptyStringIterator)

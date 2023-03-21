@@ -1,5 +1,5 @@
 use super::Op;
-use crate::types::{AngleValue, DataType, Quat, Signature};
+use crate::types::{AngleValue, Quat, Signature, SimpleType};
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
@@ -72,13 +72,13 @@ impl Default for ConstValue {
 
 impl ConstValue {
     /// Returns the datatype of the constant
-    pub fn constant_type(&self) -> DataType {
+    pub fn constant_type(&self) -> SimpleType {
         match self {
-            Self::Bool(_) => DataType::Bool,
-            Self::Int(_) => DataType::Int,
-            Self::F64(_) => DataType::F64,
-            Self::Angle(_) => DataType::Angle,
-            Self::Quat64(_) => DataType::Quat64,
+            Self::Bool(_) => SimpleType::Bool,
+            Self::Int(_) => SimpleType::Int,
+            Self::F64(_) => SimpleType::F64,
+            Self::Angle(_) => SimpleType::Angle,
+            Self::Quat64(_) => SimpleType::Quat64,
         }
     }
 }

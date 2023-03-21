@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use super::Op;
 use crate::hugr::Hugr;
 use crate::macros::impl_box_clone;
-use crate::types::DataType;
+use crate::types::SimpleType;
 use crate::types::{Signature, SignatureDescription};
 
 /// Custom definition for an operation.
@@ -38,8 +38,8 @@ impl_box_clone!(CustomOp, CustomOpBoxClone);
 pub struct OpDef {
     name: String,
     description: String,
-    inputs: Vec<(Option<String>, DataType)>,
-    outputs: Vec<(Option<String>, DataType)>,
+    inputs: Vec<(Option<String>, SimpleType)>,
+    outputs: Vec<(Option<String>, SimpleType)>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     misc: HashMap<String, serde_yaml::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

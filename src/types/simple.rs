@@ -19,7 +19,7 @@ use crate::macros::impl_box_clone;
 /// TODO: Complete missing types
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub enum DataType {
+pub enum SimpleType {
     Variable(String), // TODO: How are variables represented?
     Int,
     Bool,
@@ -30,8 +30,8 @@ pub enum DataType {
         resources: Resource,
         signature: Signature,
     },
-    Pair(Box<DataType>, Box<DataType>),
-    List(Box<DataType>),
+    Pair(Box<SimpleType>, Box<SimpleType>),
+    List(Box<SimpleType>),
 
     // Linear types
     Qubit,
@@ -43,7 +43,7 @@ pub enum DataType {
 }
 
 /// Custom PartialEq implementation required to compare `DataType::Opaque` variants.
-impl PartialEq for DataType {
+impl PartialEq for SimpleType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Variable(l0), Self::Variable(r0)) => l0 == r0,
@@ -66,9 +66,9 @@ impl PartialEq for DataType {
     }
 }
 
-impl Eq for DataType {}
+impl Eq for SimpleType {}
 
-impl DataType {
+impl SimpleType {
     pub fn is_linear(&self) -> bool {
         match self {
             Self::Qubit | Self::Money => true,
@@ -78,7 +78,7 @@ impl DataType {
     }
 }
 
-impl Default for DataType {
+impl Default for SimpleType {
     fn default() -> Self {
         Self::Qubit
     }
@@ -113,7 +113,7 @@ impl_box_clone!(CustomType, CustomTypeBoxClone);
 #[non_exhaustive]
 pub struct RowType {
     /// The datatypes in the row.
-    pub types: Vec<DataType>,
+    pub types: Vec<SimpleType>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -138,23 +138,23 @@ impl RowType {
         !self
             .types
             .iter()
-            .any(|typ| matches!(typ, DataType::Qubit | DataType::Money))
+            .any(|typ| matches!(typ, SimpleType::Qubit | SimpleType::Money))
     }
 }
 impl RowType {
     /// Iterator over the types in the row.
-    pub fn iter(&self) -> impl Iterator<Item = &DataType> {
+    pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
         self.types.iter()
     }
 
     /// Mutable iterator over the types in the row.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut DataType> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SimpleType> {
         self.types.iter_mut()
     }
 }
 
 impl RowType {
-    pub fn new(types: impl Into<Vec<DataType>>) -> Self {
+    pub fn new(types: impl Into<Vec<SimpleType>>) -> Self {
         Self {
             types: types.into(),
         }
@@ -163,7 +163,7 @@ impl RowType {
 
 impl<T> From<T> for RowType
 where
-    T: Into<Vec<DataType>>,
+    T: Into<Vec<SimpleType>>,
 {
     fn from(types: T) -> Self {
         Self::new(types.into())
@@ -171,7 +171,7 @@ where
 }
 
 impl IntoIterator for RowType {
-    type Item = DataType;
+    type Item = SimpleType;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
