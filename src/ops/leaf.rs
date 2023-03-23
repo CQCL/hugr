@@ -2,16 +2,24 @@
 //!
 //! TODO: Better name than "leaf"?
 
-use super::{CustomOp, Op, OpDef};
+use smol_str::SmolStr;
+
+use super::{CustomOp, Op};
 use crate::types::{Signature, SimpleType};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LeafOp {
-    /// A user-defined operation that can be downcasted by the extensions that define it.
-    CustomOp(Box<dyn CustomOp>),
-    /// An externally-defined operation that can be downcasted by the extensions that define it.
-    OpDef(OpDef),
+    /// A user-defined operation that can be downcasted by the extensions that
+    /// define it.
+    ///
+    /// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
+    /// but it adds atomic ops and a serialization-deserialization roundtrip
+    /// would still generate copies.
+    CustomOp {
+        id: SmolStr,
+        custom_op: Box<dyn CustomOp>,
+    },
 
     H,
     T,
@@ -45,8 +53,7 @@ pub enum LeafOp {
 impl PartialEq for LeafOp {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::CustomOp(l0), Self::CustomOp(r0)) => l0.eq(&**r0),
-            (Self::OpDef(l0), Self::OpDef(r0)) => PartialEq::eq(l0, r0),
+            (Self::CustomOp { id, .. }, Self::CustomOp { id: other_id, .. }) => id.eq(other_id),
             (Self::Noop(l0), Self::Noop(r0)) => l0 == r0,
             (
                 Self::Copy {
@@ -135,15 +142,13 @@ impl Op for LeafOp {
             LeafOp::Xor => {
                 Signature::new_df([SimpleType::Bool, SimpleType::Bool], [SimpleType::Bool])
             }
-            LeafOp::CustomOp(op) => op.signature(),
-            LeafOp::OpDef(op) => op.signature(),
+            LeafOp::CustomOp { custom_op, .. } => custom_op.signature(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
-            LeafOp::CustomOp(op) => op.name(),
-            LeafOp::OpDef(op) => op.name(),
+            LeafOp::CustomOp { id, .. } => id.as_str(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",

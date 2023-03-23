@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use portgraph::substitute::OpenGraph;
-use portgraph::{NodeIndex, PortGraph, PortIndex};
+use portgraph::{NodeIndex, PortIndex};
 use thiserror::Error;
 
 use crate::Hugr;
@@ -54,7 +54,7 @@ impl OpenHugr {
             dangling_inputs,
             dangling_outputs,
         } = self;
-        let graph = std::mem::replace(&mut hugr.graph, PortGraph::default());
+        let graph = std::mem::take(&mut hugr.graph);
         (
             OpenGraph {
                 graph,

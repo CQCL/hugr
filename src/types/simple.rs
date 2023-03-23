@@ -1,13 +1,13 @@
 //! Dataflow types
 
-use downcast_rs::{impl_downcast, Downcast};
-use std::any::Any;
-
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use super::{Resource, Signature};
-use crate::macros::impl_box_clone;
+use super::{
+    custom::{CustomType, CustomTypeTrait},
+    Signature,
+};
+use crate::resource::ResourceSet;
 
 /// A type that represents concrete data.
 ///
@@ -27,7 +27,7 @@ pub enum SimpleType {
     Quat64,
     Angle,
     Graph {
-        resources: Resource,
+        resources: ResourceSet,
         signature: Signature,
     },
     Pair(Box<SimpleType>, Box<SimpleType>),
@@ -37,9 +37,9 @@ pub enum SimpleType {
     Qubit,
     Money,
     //
-    Resource(Resource),
+    Resource(ResourceSet),
     /// An opaque operation that can be downcasted by the extensions that define it.
-    Opaque(Box<dyn CustomType>),
+    Opaque(CustomType),
 }
 
 /// Custom PartialEq implementation required to compare `DataType::Opaque` variants.
@@ -60,7 +60,7 @@ impl PartialEq for SimpleType {
             (Self::Pair(l0, l1), Self::Pair(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::List(l0), Self::List(r0)) => l0 == r0,
             (Self::Resource(l0), Self::Resource(r0)) => l0 == r0,
-            (Self::Opaque(l0), Self::Opaque(r0)) => l0.eq(&**r0),
+            (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -72,7 +72,7 @@ impl SimpleType {
     pub fn is_linear(&self) -> bool {
         match self {
             Self::Qubit | Self::Money => true,
-            Self::Opaque(op) => op.is_linear(),
+            Self::Opaque(opaque) => opaque.is_linear(),
             _ => false,
         }
     }
@@ -83,29 +83,6 @@ impl Default for SimpleType {
         Self::Qubit
     }
 }
-
-/// A custom defined type that can be downcasted by the extensions that know
-/// about it.
-///
-/// Note that any implementation of this trait must include the
-/// `#[typetag::serde]` attribute.
-#[typetag::serde]
-pub trait CustomType: Send + Sync + std::fmt::Debug + Any + Downcast + CustomTypeBoxClone {
-    fn name(&self) -> &str;
-
-    /// Check if two custom ops are equal, by downcasting and comparing the definitions.
-    fn eq(&self, other: &dyn CustomType) -> bool {
-        let _ = other;
-        false
-    }
-
-    fn is_linear(&self) -> bool {
-        false
-    }
-}
-
-impl_downcast!(CustomType);
-impl_box_clone!(CustomType, CustomTypeBoxClone);
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]

@@ -1,14 +1,14 @@
 //! Types used in the compiler
 
 pub mod angle;
-pub mod resource;
+pub mod custom;
 pub mod simple;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 pub use angle::{AngleValue, Quat, Rational};
-pub use resource::{Resource, ResourceValue};
+pub use custom::{CustomType, CustomTypeTrait};
 pub use simple::{RowType, SimpleType};
 
 /// The wire types
@@ -216,6 +216,8 @@ impl SignatureDescription {
     /// Iterate over the input wires of the signature and their names.
     ///
     /// Unnamed wires are given an empty string name.
+    ///
+    /// TODO: Return Option<&String> instead of &String for the description
     pub fn input_zip<'a>(
         &'a self,
         signature: &'a Signature,
@@ -242,7 +244,6 @@ impl SignatureDescription {
     /// Iterate over the constant input wires of the signature and their names.
     ///
     /// Unnamed wires are given an empty string name.
-
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,

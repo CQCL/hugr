@@ -12,11 +12,14 @@
 pub mod hugr;
 pub mod macros;
 pub mod ops;
+pub mod resource;
 pub mod rewrite;
 pub mod types;
 
 pub use crate::hugr::Hugr;
 pub use portgraph::{NodeIndex, PortIndex};
+pub use resource::Resource;
+pub use rewrite::{Rewrite, RewriteError};
 
 #[cfg(test)]
 mod test {
