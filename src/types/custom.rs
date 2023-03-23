@@ -1,7 +1,6 @@
-use crate::macros::impl_box_clone;
-use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
-use std::any::Any;
+
+use super::TypeRow;
 
 /// An opaque type element. Contains an unique identifier and a reference to its definition.
 ///
@@ -12,7 +11,21 @@ use std::any::Any;
 pub struct CustomType {
     /// Unique identifier of the opaque type.
     id: SmolStr,
-    custom_type: Box<dyn CustomTypeTrait>,
+    params: TypeRow,
+}
+
+impl CustomType {
+    pub fn new(id: SmolStr, params: TypeRow) -> Self {
+        Self { id, params }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn params(&self) -> &TypeRow {
+        &self.params
+    }
 }
 
 impl PartialEq for CustomType {
@@ -22,29 +35,3 @@ impl PartialEq for CustomType {
 }
 
 impl Eq for CustomType {}
-
-#[typetag::serde]
-impl CustomTypeTrait for CustomType {
-    fn is_linear(&self) -> bool {
-        self.custom_type.is_linear()
-    }
-}
-
-/// A custom defined type that can be downcasted by the extensions that know
-/// about it.
-///
-/// Note that any implementation of this trait must include the
-/// `#[typetag::serde]` attribute.
-///
-/// TODO: Is this trait necessary? Can't we just use a struct?
-#[typetag::serde]
-pub trait CustomTypeTrait:
-    Send + Sync + std::fmt::Debug + Any + Downcast + CustomTypeBoxClone
-{
-    fn is_linear(&self) -> bool {
-        false
-    }
-}
-
-impl_downcast!(CustomTypeTrait);
-impl_box_clone!(CustomTypeTrait, CustomTypeBoxClone);

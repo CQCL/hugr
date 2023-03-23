@@ -1,5 +1,5 @@
 use super::Op;
-use crate::types::{AngleValue, Quat, Signature, SimpleType};
+use crate::types::{ClassicType, Signature, SimpleType};
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
@@ -57,16 +57,13 @@ impl Op for ModuleOp {
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ConstValue {
-    Bool(bool),
+    Bit(bool),
     Int(i64),
-    F64(f64),
-    Angle(AngleValue),
-    Quat64(Quat),
 }
 
 impl Default for ConstValue {
     fn default() -> Self {
-        Self::Bool(false)
+        Self::Bit(false)
     }
 }
 
@@ -74,11 +71,8 @@ impl ConstValue {
     /// Returns the datatype of the constant
     pub fn constant_type(&self) -> SimpleType {
         match self {
-            Self::Bool(_) => SimpleType::Bool,
-            Self::Int(_) => SimpleType::Int,
-            Self::F64(_) => SimpleType::F64,
-            Self::Angle(_) => SimpleType::Angle,
-            Self::Quat64(_) => SimpleType::Quat64,
+            Self::Bit(_) => ClassicType::Bit.into(),
+            Self::Int(_) => ClassicType::Int.into(),
         }
     }
 }

@@ -5,7 +5,7 @@
 use smol_str::SmolStr;
 
 use super::{CustomOp, Op};
-use crate::types::{Signature, SimpleType};
+use crate::types::{ClassicType, QuantumType, Signature, SimpleType};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -34,19 +34,10 @@ pub enum LeafOp {
     Reset,
     Noop(SimpleType),
     Measure,
-    AngleAdd,
-    AngleMul,
-    AngleNeg,
-    QuatMul,
     Copy {
         n_copies: u32,
-        typ: SimpleType,
+        typ: ClassicType,
     },
-    RxF64,
-    RzF64,
-    TK1,
-    Rotation,
-    ToRotation,
     Xor,
 }
 
@@ -104,6 +95,8 @@ impl LeafOp {
 impl Op for LeafOp {
     fn signature(&self) -> Signature {
         // TODO: Missing [`DataType::Money`] inputs and outputs.
+        //
+        // TODO: Find a way to avoid the `into()`s ?
         match self {
             LeafOp::Noop(typ) => Signature::new_df([typ.clone()], [typ.clone()]),
             LeafOp::H
@@ -114,34 +107,21 @@ impl Op for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => Signature::new_linear([SimpleType::Qubit]),
+            | LeafOp::Z => Signature::new_linear([QuantumType::Qubit.into()]),
             LeafOp::CX | LeafOp::ZZMax => {
-                Signature::new_linear([SimpleType::Qubit, SimpleType::Qubit])
+                Signature::new_linear([QuantumType::Qubit.into(), QuantumType::Qubit.into()])
             }
-            LeafOp::Measure => Signature::new_linear([SimpleType::Qubit, SimpleType::Bool]),
-            LeafOp::AngleAdd | LeafOp::AngleMul => Signature::new_linear([SimpleType::Angle]),
-            LeafOp::QuatMul => Signature::new_linear([SimpleType::Quat64]),
-            LeafOp::AngleNeg => Signature::new_linear([SimpleType::Angle]),
+            LeafOp::Measure => {
+                Signature::new_linear([QuantumType::Qubit.into(), ClassicType::Bit.into()])
+            }
             LeafOp::Copy { n_copies, typ } => {
-                Signature::new_df([typ.clone()], vec![typ.clone(); *n_copies as usize])
+                let typ: SimpleType = typ.clone().into();
+                Signature::new_df([typ.clone()], vec![typ; *n_copies as usize])
             }
-            LeafOp::RxF64 | LeafOp::RzF64 => {
-                Signature::new_df([SimpleType::Qubit], [SimpleType::Angle])
-            }
-            LeafOp::TK1 => Signature::new_df(vec![SimpleType::Qubit], vec![SimpleType::Angle; 3]),
-            LeafOp::Rotation => Signature::new_df([SimpleType::Qubit], [SimpleType::Quat64]),
-            LeafOp::ToRotation => Signature::new_df(
-                [
-                    SimpleType::Angle,
-                    SimpleType::F64,
-                    SimpleType::F64,
-                    SimpleType::F64,
-                ],
-                [SimpleType::Quat64],
+            LeafOp::Xor => Signature::new_df(
+                [ClassicType::Bit.into(), ClassicType::Bit.into()],
+                [ClassicType::Bit.into()],
             ),
-            LeafOp::Xor => {
-                Signature::new_df([SimpleType::Bool, SimpleType::Bool], [SimpleType::Bool])
-            }
             LeafOp::CustomOp { custom_op, .. } => custom_op.signature(),
         }
     }
@@ -162,16 +142,7 @@ impl Op for LeafOp {
             LeafOp::Reset => "Reset",
             LeafOp::Noop(_) => "Noop",
             LeafOp::Measure => "Measure",
-            LeafOp::AngleAdd => "AngleAdd",
-            LeafOp::AngleMul => "AngleMul",
-            LeafOp::AngleNeg => "AngleNeg",
-            LeafOp::QuatMul => "QuatMul",
             LeafOp::Copy { .. } => "Copy",
-            LeafOp::RxF64 => "RxF64",
-            LeafOp::RzF64 => "RzF64",
-            LeafOp::TK1 => "TK1",
-            LeafOp::Rotation => "Rotation",
-            LeafOp::ToRotation => "ToRotation",
             LeafOp::Xor => "Xor",
         }
     }

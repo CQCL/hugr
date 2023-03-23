@@ -8,8 +8,10 @@ pub mod simple;
 use pyo3::prelude::*;
 
 pub use angle::{AngleValue, Quat, Rational};
-pub use custom::{CustomType, CustomTypeTrait};
-pub use simple::{RowType, SimpleType};
+pub use custom::CustomType;
+pub use simple::{ClassicType, QuantumType, SimpleType, TypeRow};
+
+use crate::resource::ResourceSet;
 
 /// The wire types
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -24,6 +26,8 @@ pub enum Type {
     Const(SimpleType),
     /// A strict ordering between nodes
     StateOrder,
+    // An edge specifying a resource set
+    Resource(ResourceSet),
 }
 
 impl Default for Type {
@@ -48,13 +52,13 @@ impl Default for Type {
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Input of the function
-    pub input: RowType,
+    pub input: TypeRow,
     /// Output of the function
-    pub output: RowType,
+    pub output: TypeRow,
     /// Constant data references used by the function
-    pub const_input: RowType,
+    pub const_input: TypeRow,
     /// Constant data references defined by the function
-    pub const_output: RowType,
+    pub const_output: TypeRow,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -101,10 +105,10 @@ impl Signature {
 impl Signature {
     /// Create a new signature
     pub fn new(
-        input: impl Into<RowType>,
-        output: impl Into<RowType>,
-        const_input: impl Into<RowType>,
-        const_output: impl Into<RowType>,
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+        const_input: impl Into<TypeRow>,
+        const_output: impl Into<TypeRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -114,8 +118,8 @@ impl Signature {
         }
     }
 
-    /// Create a new signature with only linear dataflow inputs and outputs
-    pub fn new_linear(linear: impl Into<RowType>) -> Self {
+    /// Create a new signature with the same input and output types
+    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self {
             input: linear.clone(),
@@ -125,7 +129,7 @@ impl Signature {
     }
 
     /// Create a new signature with only dataflow inputs and outputs
-    pub fn new_df(input: impl Into<RowType>, output: impl Into<RowType>) -> Self {
+    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
@@ -134,7 +138,7 @@ impl Signature {
     }
 
     /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<RowType>) -> Self {
+    pub fn new_const(const_output: impl Into<TypeRow>) -> Self {
         Self {
             const_output: const_output.into(),
             ..Default::default()

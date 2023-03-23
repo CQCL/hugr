@@ -17,11 +17,6 @@ use crate::types::{Signature, SignatureDescription};
 /// Note that any implementation of this trait must include the `#[typetag::serde]` attribute.
 #[typetag::serde]
 pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any + Downcast {
-    /// Get the an unique identifier of the custom op.
-    ///
-    /// This is used to compare two custom ops for equality.
-    fn name(&self) -> &SmolStr;
-
     /// Try to convert the custom op to a graph definition.
     ///
     /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
@@ -166,10 +161,6 @@ impl Op for OpDef {
 
 #[typetag::serde]
 impl CustomOp for OpDef {
-    fn name(&self) -> &SmolStr {
-        &self.name
-    }
-
     fn try_to_hugr(&self) -> Option<Hugr> {
         todo!()
     }

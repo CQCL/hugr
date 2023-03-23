@@ -2,48 +2,76 @@
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
+use smol_str::SmolStr;
 
-use super::{
-    custom::{CustomType, CustomTypeTrait},
-    Signature,
-};
+use super::{custom::CustomType, Signature};
 use crate::resource::ResourceSet;
 
 /// A type that represents concrete data.
 ///
-/// TODO: We define a flat enum for efficiency, but we could maybe split the
-/// linear types into a nested enum instead.
-///
 /// TODO: Derive pyclass
 ///
-/// TODO: Complete missing types
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// TODO: Compare performance vs flattening this into a single enum
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum SimpleType {
-    Variable(String), // TODO: How are variables represented?
+    Classic(ClassicType),
+    Quantum(QuantumType),
+}
+
+/// A type that represents concrete classical data.
+///
+/// TODO: Derive pyclass
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum ClassicType {
+    Variable(SmolStr),
+    Nat,
     Int,
-    Bool,
-    F64,
-    Quat64,
-    Angle,
+    #[default]
+    Bit,
     Graph {
         resources: ResourceSet,
         signature: Signature,
     },
-    Pair(Box<SimpleType>, Box<SimpleType>),
-    List(Box<SimpleType>),
-
-    // Linear types
-    Qubit,
-    Money,
-    //
-    Resource(ResourceSet),
+    Pair(Box<ClassicType>, Box<ClassicType>),
+    List(Box<ClassicType>),
+    Map(Box<ClassicType>, Box<ClassicType>),
+    Struct(TypeRow),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
 }
 
+/// A type that represents concrete quantum data.
+///
+/// TODO: Derive pyclass
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum QuantumType {
+    #[default]
+    Qubit,
+    Money,
+    Array(Box<QuantumType>, usize),
+}
+
+impl SimpleType {
+    pub fn is_linear(&self) -> bool {
+        matches!(self, Self::Quantum(_))
+    }
+
+    pub fn is_classical(&self) -> bool {
+        matches!(self, Self::Classic(_))
+    }
+}
+
+impl Default for SimpleType {
+    fn default() -> Self {
+        Self::Quantum(Default::default())
+    }
+}
+
 /// Custom PartialEq implementation required to compare `DataType::Opaque` variants.
-impl PartialEq for SimpleType {
+impl PartialEq for ClassicType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Variable(l0), Self::Variable(r0)) => l0 == r0,
@@ -59,28 +87,25 @@ impl PartialEq for SimpleType {
             ) => l_resources == r_resources && l_signature == r_signature,
             (Self::Pair(l0, l1), Self::Pair(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::List(l0), Self::List(r0)) => l0 == r0,
-            (Self::Resource(l0), Self::Resource(r0)) => l0 == r0,
+            (Self::Map(l0, l1), Self::Map(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Struct(l0), Self::Struct(r0)) => l0 == r0,
             (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
 }
 
-impl Eq for SimpleType {}
+impl Eq for ClassicType {}
 
-impl SimpleType {
-    pub fn is_linear(&self) -> bool {
-        match self {
-            Self::Qubit | Self::Money => true,
-            Self::Opaque(opaque) => opaque.is_linear(),
-            _ => false,
-        }
+impl From<ClassicType> for SimpleType {
+    fn from(typ: ClassicType) -> Self {
+        Self::Classic(typ)
     }
 }
 
-impl Default for SimpleType {
-    fn default() -> Self {
-        Self::Qubit
+impl From<QuantumType> for SimpleType {
+    fn from(typ: QuantumType) -> Self {
+        Self::Quantum(typ)
     }
 }
 
@@ -88,13 +113,13 @@ impl Default for SimpleType {
 #[derive(Clone, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
-pub struct RowType {
+pub struct TypeRow {
     /// The datatypes in the row.
     pub types: Vec<SimpleType>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl RowType {
+impl TypeRow {
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.types.len()
@@ -112,13 +137,10 @@ impl RowType {
 
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
-        !self
-            .types
-            .iter()
-            .any(|typ| matches!(typ, SimpleType::Qubit | SimpleType::Money))
+        !self.types.iter().all(SimpleType::is_classical)
     }
 }
-impl RowType {
+impl TypeRow {
     /// Iterator over the types in the row.
     pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
         self.types.iter()
@@ -130,7 +152,7 @@ impl RowType {
     }
 }
 
-impl RowType {
+impl TypeRow {
     pub fn new(types: impl Into<Vec<SimpleType>>) -> Self {
         Self {
             types: types.into(),
@@ -138,7 +160,7 @@ impl RowType {
     }
 }
 
-impl<T> From<T> for RowType
+impl<T> From<T> for TypeRow
 where
     T: Into<Vec<SimpleType>>,
 {
@@ -147,7 +169,7 @@ where
     }
 }
 
-impl IntoIterator for RowType {
+impl IntoIterator for TypeRow {
     type Item = SimpleType;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 

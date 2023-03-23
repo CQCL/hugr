@@ -1,5 +1,5 @@
 use super::Op;
-use crate::types::{Signature, SimpleType};
+use crate::types::{ClassicType, Signature, SimpleType};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
@@ -50,10 +50,11 @@ impl Op for FunctionOp {
                 let mut s = signature.clone();
                 s.const_input.types.insert(
                     0,
-                    SimpleType::Graph {
+                    ClassicType::Graph {
                         resources: Default::default(),
                         signature: signature.clone(),
-                    },
+                    }
+                    .into(),
                 );
                 s
             }
@@ -61,10 +62,11 @@ impl Op for FunctionOp {
                 let mut s = signature.clone();
                 s.input.types.insert(
                     0,
-                    SimpleType::Graph {
+                    ClassicType::Graph {
                         resources: Default::default(),
                         signature: signature.clone(),
-                    },
+                    }
+                    .into(),
                 );
                 s
             }
