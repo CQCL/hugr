@@ -30,10 +30,7 @@ pub enum ClassicType {
     Int,
     #[default]
     Bit,
-    Graph {
-        resources: ResourceSet,
-        signature: Signature,
-    },
+    Graph(Box<(ResourceSet, Signature)>),
     Pair(Box<ClassicType>, Box<ClassicType>),
     List(Box<ClassicType>),
     Map(Box<ClassicType>, Box<ClassicType>),
@@ -75,16 +72,7 @@ impl PartialEq for ClassicType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Variable(l0), Self::Variable(r0)) => l0 == r0,
-            (
-                Self::Graph {
-                    resources: l_resources,
-                    signature: l_signature,
-                },
-                Self::Graph {
-                    resources: r_resources,
-                    signature: r_signature,
-                },
-            ) => l_resources == r_resources && l_signature == r_signature,
+            (Self::Graph(l0), Self::Graph(r0)) => l0 == r0,
             (Self::Pair(l0, l1), Self::Pair(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::List(l0), Self::List(r0)) => l0 == r0,
             (Self::Map(l0, l1), Self::Map(r0, r1)) => l0 == r0 && l1 == r1,
