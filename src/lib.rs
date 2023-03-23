@@ -1,4 +1,5 @@
 //#![warn(missing_docs)] TODO: Re-enable this once the library is more mature
+//#![feature(rustc_attrs)]
 
 //! `hugr` is the Hierarchical Unified Graph Representation of quantum circuits
 //! and operations in the Quantinuum ecosystem.

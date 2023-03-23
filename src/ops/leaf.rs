@@ -15,7 +15,8 @@ pub enum LeafOp {
     ///
     /// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
     /// but it adds atomic ops and a serialization-deserialization roundtrip
-    /// would still generate copies.
+    /// would still generate copies. Maybe it can be complemented with a custom
+    /// deserializer that avoids the clones.
     CustomOp {
         id: SmolStr,
         custom_op: Box<dyn CustomOp>,
@@ -97,6 +98,9 @@ impl Op for LeafOp {
         // TODO: Missing [`DataType::Money`] inputs and outputs.
         //
         // TODO: Find a way to avoid the `into()`s ?
+        //
+        // TODO: Use references or Cow to avoid creating new vectors all the time.
+        // It may be difficult for the `CustomOp` case.
         match self {
             LeafOp::Noop(typ) => Signature::new_df([typ.clone()], [typ.clone()]),
             LeafOp::H

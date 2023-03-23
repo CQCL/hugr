@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ModuleOp {
     #[default]
-    /// The root of a module
+    /// The root of a module, parent of all other `ModuleOp`s
     Root,
     /// A function definition.
     /// Children nodes are the body of the definition

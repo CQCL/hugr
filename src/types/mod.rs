@@ -1,13 +1,11 @@
 //! Types used in the compiler
 
-pub mod angle;
 pub mod custom;
 pub mod simple;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-pub use angle::{AngleValue, Quat, Rational};
 pub use custom::CustomType;
 pub use simple::{ClassicType, QuantumType, SimpleType, TypeRow};
 

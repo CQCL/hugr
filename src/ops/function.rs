@@ -1,15 +1,13 @@
 use super::Op;
-use crate::types::{ClassicType, Signature, SimpleType};
+use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
-    /// An input/output node.
-    ///
-    /// The outputs of this node are the inputs to the function, and the inputs
-    /// are the outputs of the function. In a data dependency subgraph, a valid
-    /// ordering of operations can be achieved by topologically sorting the
-    /// nodes starting from the outputs of this node.
-    IO { signature: Signature },
+    /// An input node.
+    /// The outputs of this node are the inputs to the function.
+    Input { types: TypeRow },
+    /// An output node. The inputs are the outputs of the function.
+    Output { types: TypeRow },
     /// Call a function directly.
     ///
     /// The first port is connected to the def/declare of the function being
@@ -20,14 +18,18 @@ pub enum FunctionOp {
     CallIndirect { signature: Signature },
     /// Load a static constant in to the local dataflow graph
     LoadConstant { datatype: SimpleType },
+    /// Explicit discard, has a single `datatype` input, and a State output
+    /// connecting it to the Output node. All stateful operations with no
+    /// dataflow outputs should have such State edges.
+    Discard { datatype: SimpleType },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
 }
 
 impl Default for FunctionOp {
     fn default() -> Self {
-        FunctionOp::IO {
-            signature: Default::default(),
+        FunctionOp::Input {
+            types: Default::default(),
         }
     }
 }
@@ -35,17 +37,20 @@ impl Default for FunctionOp {
 impl Op for FunctionOp {
     fn name(&self) -> &str {
         match self {
-            FunctionOp::IO { .. } => "io",
+            FunctionOp::Input { .. } => "input",
+            FunctionOp::Output { .. } => "output",
             FunctionOp::Call { .. } => "call",
             FunctionOp::CallIndirect { .. } => "call_indirect",
             FunctionOp::LoadConstant { .. } => "load",
+            FunctionOp::Discard { .. } => "discard",
             FunctionOp::Nested { .. } => "nested",
         }
     }
 
     fn signature(&self) -> Signature {
         match self {
-            FunctionOp::IO { signature } => signature.clone(),
+            FunctionOp::Input { types } => Signature::new_df([], types.clone()),
+            FunctionOp::Output { types } => Signature::new_df(types.clone(), []),
             FunctionOp::Call { signature } => {
                 let mut s = signature.clone();
                 s.const_input.types.insert(
@@ -65,6 +70,7 @@ impl Op for FunctionOp {
             FunctionOp::LoadConstant { datatype } => {
                 Signature::new([datatype.clone()], [], [], [datatype.clone()])
             }
+            FunctionOp::Discard { datatype } => Signature::new_df([datatype.clone()], []),
             FunctionOp::Nested { signature } => signature.clone(),
         }
     }

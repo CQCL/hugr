@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use super::Op;
 use crate::hugr::Hugr;
 use crate::macros::impl_box_clone;
+use crate::resource::ResourceSet;
 use crate::types::SimpleType;
 use crate::types::{Signature, SignatureDescription};
 
@@ -20,7 +21,8 @@ pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any 
     /// Try to convert the custom op to a graph definition.
     ///
     /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
-    fn try_to_hugr(&self) -> Option<Hugr> {
+    fn try_to_hugr(&self, resources: ResourceSet) -> Option<Hugr> {
+        let _ = resources;
         None
     }
 
@@ -161,8 +163,8 @@ impl Op for OpDef {
 
 #[typetag::serde]
 impl CustomOp for OpDef {
-    fn try_to_hugr(&self) -> Option<Hugr> {
-        todo!()
+    fn try_to_hugr(&self, _resources: ResourceSet) -> Option<Hugr> {
+        todo!("Parse definition, check the available resources, and create a HUGR.")
     }
 
     fn eq(&self, other: &dyn CustomOp) -> bool {
