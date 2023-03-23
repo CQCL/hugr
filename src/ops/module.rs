@@ -47,7 +47,7 @@ impl Op for ModuleOp {
             ModuleOp::Declare { signature } => signature.clone(),
             ModuleOp::Struct { .. } => todo!(),
             ModuleOp::Alias { .. } => todo!(),
-            ModuleOp::Const(v) => Signature::new_const([v.constant_type()]),
+            ModuleOp::Const(v) => v.signature(),
         }
     }
 }
@@ -69,10 +69,12 @@ impl Default for ConstValue {
 
 impl ConstValue {
     /// Returns the datatype of the constant
-    pub fn constant_type(&self) -> SimpleType {
+    pub fn signature(&self) -> Signature {
+        static BIT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Bit)];
+        static INT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Int)];
         match self {
-            Self::Bit(_) => ClassicType::Bit.into(),
-            Self::Int(_) => ClassicType::Int.into(),
+            Self::Bit(_) => Signature::new_const(BIT_SIG),
+            Self::Int(_) => Signature::new_const(INT_SIG),
         }
     }
 }

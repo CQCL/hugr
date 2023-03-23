@@ -96,13 +96,19 @@ impl LeafOp {
 impl Op for LeafOp {
     fn signature(&self) -> Signature {
         // TODO: Missing [`DataType::Money`] inputs and outputs.
-        //
-        // TODO: Find a way to avoid the `into()`s ?
-        //
-        // TODO: Use references or Cow to avoid creating new vectors all the time.
-        // It may be difficult for the `CustomOp` case.
+
+        // Static signatures. The `TypeRow`s in the `Signature` use a
+        // copy-on-write strategy, so we can avoid unnecessary allocations.
+        const Q: SimpleType = SimpleType::Quantum(QuantumType::Qubit);
+        const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
+        static ROW_QUBIT: &[SimpleType] = &[Q];
+        static ROW_2QUBIT: &[SimpleType] = &[Q, Q];
+        static ROW_BIT: &[SimpleType] = &[B];
+        static ROW_2BIT: &[SimpleType] = &[B, B];
+        static ROW_QUBIT_BIT: &[SimpleType] = &[Q, B];
+
         match self {
-            LeafOp::Noop(typ) => Signature::new_df([typ.clone()], [typ.clone()]),
+            LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
             LeafOp::H
             | LeafOp::Reset
             | LeafOp::T
@@ -111,21 +117,14 @@ impl Op for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => Signature::new_linear([QuantumType::Qubit.into()]),
-            LeafOp::CX | LeafOp::ZZMax => {
-                Signature::new_linear([QuantumType::Qubit.into(), QuantumType::Qubit.into()])
-            }
-            LeafOp::Measure => {
-                Signature::new_linear([QuantumType::Qubit.into(), ClassicType::Bit.into()])
-            }
+            | LeafOp::Z => Signature::new_linear(ROW_QUBIT),
+            LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(ROW_2QUBIT),
+            LeafOp::Measure => Signature::new_linear(ROW_QUBIT_BIT),
             LeafOp::Copy { n_copies, typ } => {
                 let typ: SimpleType = typ.clone().into();
-                Signature::new_df([typ.clone()], vec![typ; *n_copies as usize])
+                Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
             }
-            LeafOp::Xor => Signature::new_df(
-                [ClassicType::Bit.into(), ClassicType::Bit.into()],
-                [ClassicType::Bit.into()],
-            ),
+            LeafOp::Xor => Signature::new_df(ROW_2BIT, ROW_BIT),
             LeafOp::CustomOp { custom_op, .. } => custom_op.signature(),
         }
     }

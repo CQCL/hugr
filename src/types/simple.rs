@@ -1,5 +1,7 @@
 //! Dataflow types
 
+use std::borrow::Cow;
+
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 use smol_str::SmolStr;
@@ -36,7 +38,7 @@ pub enum ClassicType {
     Pair(Box<(ClassicType, ClassicType)>),
     List(Box<ClassicType>),
     Map(Box<(ClassicType, ClassicType)>),
-    Struct(TypeRow),
+    Struct(Box<TypeRow>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(Box<CustomType>),
 }
@@ -82,12 +84,12 @@ impl From<QuantumType> for SimpleType {
 }
 
 /// List of types, used for function signatures.
-#[derive(Clone, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 pub struct TypeRow {
     /// The datatypes in the row.
-    pub types: Vec<SimpleType>,
+    pub types: Cow<'static, [SimpleType]>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -113,39 +115,34 @@ impl TypeRow {
     }
 }
 impl TypeRow {
+    pub fn new(types: impl Into<Cow<'static, [SimpleType]>>) -> Self {
+        Self {
+            types: types.into(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        static EMPTY: &[SimpleType] = &[];
+        Self::new(EMPTY)
+    }
+
     /// Iterator over the types in the row.
     pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
         self.types.iter()
     }
-
-    /// Mutable iterator over the types in the row.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut SimpleType> {
-        self.types.iter_mut()
-    }
 }
 
-impl TypeRow {
-    pub fn new(types: impl Into<Vec<SimpleType>>) -> Self {
-        Self {
-            types: types.into(),
-        }
+impl Default for TypeRow {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
 impl<T> From<T> for TypeRow
 where
-    T: Into<Vec<SimpleType>>,
+    T: Into<Cow<'static, [SimpleType]>>,
 {
     fn from(types: T) -> Self {
         Self::new(types.into())
-    }
-}
-
-impl IntoIterator for TypeRow {
-    type Item = SimpleType;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.types.into_iter()
     }
 }

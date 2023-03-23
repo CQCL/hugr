@@ -46,6 +46,9 @@ impl Default for Type {
 /// struct RowType(Vec<RowTypeVariant>);
 /// ```
 /// but that seems more annoying to work with.
+/// That would reduce the size of `OpType` by about 50%, so it's worth considering.
+///
+/// TODO: Option2 is using Cow here instead of in the TypeRow.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
