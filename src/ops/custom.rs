@@ -13,6 +13,48 @@ use crate::resource::ResourceSet;
 use crate::types::SimpleType;
 use crate::types::{Signature, SignatureDescription};
 
+/// A wrapped custom operation with fast equality checks.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct OpaqueOp {
+    pub id: SmolStr,
+    pub custom_op: Box<dyn CustomOp>,
+}
+
+impl PartialEq for OpaqueOp {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for OpaqueOp {}
+
+impl Op for OpaqueOp {
+    fn name(&self) -> &str {
+        &self.id
+    }
+
+    fn description(&self) -> &str {
+        self.custom_op.description()
+    }
+
+    fn signature(&self) -> Signature {
+        self.custom_op.signature()
+    }
+
+    fn signature_desc(&self) -> Option<&SignatureDescription> {
+        self.custom_op.signature_desc()
+    }
+}
+
+impl<T: CustomOp> From<T> for OpaqueOp {
+    fn from(op: T) -> Self {
+        Self {
+            id: op.name().into(),
+            custom_op: Box::new(op),
+        }
+    }
+}
+
 /// Custom definition for an operation.
 ///
 /// Note that any implementation of this trait must include the `#[typetag::serde]` attribute.
@@ -21,23 +63,20 @@ pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any 
     /// Try to convert the custom op to a graph definition.
     ///
     /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
-    fn try_to_hugr(&self, resources: ResourceSet) -> Option<Hugr> {
+    fn try_into_hugr(&self, resources: &ResourceSet) -> Option<Hugr> {
         let _ = resources;
         None
     }
 
-    /// Check if two custom ops are equal, by downcasting and comparing the definitions.
-    fn eq(&self, other: &dyn CustomOp) -> bool {
-        let _ = other;
-        false
-    }
+    /// List the resources required to execute this operation.
+    fn resources(&self) -> &ResourceSet;
 }
 
 impl_downcast!(CustomOp);
 impl_box_clone!(CustomOp, CustomOpBoxClone);
 
 /// Dynamically loaded operation definition.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
     /// Unique identifier of the operation.
     ///
@@ -55,6 +94,8 @@ pub struct OpDef {
     /// TODO: Define the format of this field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub def: Option<String>,
+    /// Resources required to execute this operation.
+    pub resource_reqs: ResourceSet,
 
     /// Signature of the operation.
     ///
@@ -101,19 +142,10 @@ impl OpDef {
             outputs: outputs.collect(),
             misc: HashMap::new(),
             def: None,
+            resource_reqs: ResourceSet::new(),
             signature: OnceCell::with_value(signature),
             port_names: OnceCell::with_value(port_names),
         }
-    }
-
-    /// Miscellaneous data associated with the operation.
-    pub fn misc(&self) -> &HashMap<String, serde_yaml::Value> {
-        &self.misc
-    }
-
-    /// Definition of the operation.
-    pub fn def(&self) -> Option<&str> {
-        self.def.as_deref()
     }
 }
 
@@ -163,15 +195,11 @@ impl Op for OpDef {
 
 #[typetag::serde]
 impl CustomOp for OpDef {
-    fn try_to_hugr(&self, _resources: ResourceSet) -> Option<Hugr> {
+    fn try_into_hugr(&self, _resources: &ResourceSet) -> Option<Hugr> {
         todo!("Parse definition, check the available resources, and create a HUGR.")
     }
 
-    fn eq(&self, other: &dyn CustomOp) -> bool {
-        if let Some(other) = other.downcast_ref::<Self>() {
-            self.name == other.name && self.signature == other.signature
-        } else {
-            false
-        }
+    fn resources(&self) -> &ResourceSet {
+        &self.resource_reqs
     }
 }

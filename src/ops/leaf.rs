@@ -2,26 +2,15 @@
 //!
 //! TODO: Better name than "leaf"?
 
-use smol_str::SmolStr;
-
-use super::{CustomOp, Op};
+use super::{Op, OpaqueOp};
 use crate::types::{ClassicType, QuantumType, Signature, SimpleType};
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
-    ///
-    /// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
-    /// but it adds atomic ops and a serialization-deserialization roundtrip
-    /// would still generate copies. Maybe it can be complemented with a custom
-    /// deserializer that avoids the clones.
-    CustomOp {
-        id: SmolStr,
-        custom_op: Box<dyn CustomOp>,
-    },
-
+    CustomOp(OpaqueOp),
     H,
     T,
     S,
@@ -40,26 +29,6 @@ pub enum LeafOp {
         typ: ClassicType,
     },
     Xor,
-}
-
-impl PartialEq for LeafOp {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::CustomOp { id, .. }, Self::CustomOp { id: other_id, .. }) => id.eq(other_id),
-            (Self::Noop(l0), Self::Noop(r0)) => l0 == r0,
-            (
-                Self::Copy {
-                    n_copies: l_n_copies,
-                    typ: l_typ,
-                },
-                Self::Copy {
-                    n_copies: r_n_copies,
-                    typ: r_typ,
-                },
-            ) => l_n_copies == r_n_copies && l_typ == r_typ,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
-        }
-    }
 }
 
 impl Default for LeafOp {
@@ -125,13 +94,13 @@ impl Op for LeafOp {
                 Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
             }
             LeafOp::Xor => Signature::new_df(ROW_2BIT, ROW_BIT),
-            LeafOp::CustomOp { custom_op, .. } => custom_op.signature(),
+            LeafOp::CustomOp(opaque) => opaque.signature(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
-            LeafOp::CustomOp { id, .. } => id.as_str(),
+            LeafOp::CustomOp(opaque) => opaque.id.as_str(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",

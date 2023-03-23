@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use smol_str::SmolStr;
 
-use crate::ops::OpDef;
+use crate::ops::{OpDef, CustomOp, OpaqueOp};
 use crate::types::custom::CustomType;
 
 /// A unique identifier for a resource.
@@ -21,10 +21,13 @@ pub type ResourceId = SmolStr;
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct Resource {
-    name: ResourceId,
-    resource_reqs: ResourceSet,
-    types: Vec<CustomType>,
-    operations: Vec<OpDef>,
+    pub name: ResourceId,
+    pub resource_reqs: ResourceSet,
+    pub types: Vec<CustomType>,
+    /// Operations with serializable definitions.
+    pub operations: Vec<OpDef>,
+    /// Opaque operations that do not expose their definitions.
+    pub opaque_operations: Vec<OpaqueOp>,
 }
 
 impl Resource {
@@ -37,6 +40,18 @@ impl Resource {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn add_type(&mut self, ty: CustomType) {
+        self.types.push(ty);
+    }
+
+    pub fn add_op(&mut self, op: OpDef) {
+        self.operations.push(op);
+    }
+
+    pub fn add_opaque_op(&mut self, op: OpaqueOp) {
+        self.opaque_operations.push(op);
     }
 }
 

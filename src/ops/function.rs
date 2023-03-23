@@ -49,7 +49,7 @@ impl Op for FunctionOp {
 
     fn signature(&self) -> Signature {
         match self {
-            FunctionOp::Input { types } => Signature::new_df(TypeRow::empty(), TypeRow::empty()), // TODO: TypeRow::empty()
+            FunctionOp::Input { types } => Signature::new_df(TypeRow::empty(), types.clone()),
             FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::empty()),
             FunctionOp::Call { signature } => {
                 let mut s = signature.clone();

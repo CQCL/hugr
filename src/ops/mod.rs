@@ -7,7 +7,7 @@ pub mod module;
 use crate::types::{Signature, SignatureDescription};
 
 pub use controlflow::ControlFlowOp;
-pub use custom::{CustomOp, OpDef};
+pub use custom::{OpaqueOp, CustomOp, OpDef};
 pub use function::FunctionOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
