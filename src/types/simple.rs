@@ -21,8 +21,10 @@ pub enum SimpleType {
 
 /// A type that represents concrete classical data.
 ///
+/// Uses `Box`es on most variants to reduce the memory footprint.
+///
 /// TODO: Derive pyclass
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ClassicType {
     Variable(SmolStr),
@@ -31,12 +33,12 @@ pub enum ClassicType {
     #[default]
     Bit,
     Graph(Box<(ResourceSet, Signature)>),
-    Pair(Box<ClassicType>, Box<ClassicType>),
+    Pair(Box<(ClassicType, ClassicType)>),
     List(Box<ClassicType>),
-    Map(Box<ClassicType>, Box<ClassicType>),
+    Map(Box<(ClassicType, ClassicType)>),
     Struct(TypeRow),
     /// An opaque operation that can be downcasted by the extensions that define it.
-    Opaque(CustomType),
+    Opaque(Box<CustomType>),
 }
 
 /// A type that represents concrete quantum data.
@@ -66,24 +68,6 @@ impl Default for SimpleType {
         Self::Quantum(Default::default())
     }
 }
-
-/// Custom PartialEq implementation required to compare `DataType::Opaque` variants.
-impl PartialEq for ClassicType {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Variable(l0), Self::Variable(r0)) => l0 == r0,
-            (Self::Graph(l0), Self::Graph(r0)) => l0 == r0,
-            (Self::Pair(l0, l1), Self::Pair(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::List(l0), Self::List(r0)) => l0 == r0,
-            (Self::Map(l0, l1), Self::Map(r0, r1)) => l0 == r0 && l1 == r1,
-            (Self::Struct(l0), Self::Struct(r0)) => l0 == r0,
-            (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
-        }
-    }
-}
-
-impl Eq for ClassicType {}
 
 impl From<ClassicType> for SimpleType {
     fn from(typ: ClassicType) -> Self {
