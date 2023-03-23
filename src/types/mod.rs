@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 
 pub use custom::CustomType;
 pub use simple::{ClassicType, QuantumType, SimpleType, TypeRow};
+use smol_str::SmolStr;
 
 use crate::resource::ResourceSet;
 
@@ -154,13 +155,13 @@ impl Signature {
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SignatureDescription {
     /// Input of the function
-    pub input: Vec<String>,
+    pub input: Vec<SmolStr>,
     /// Output of the function
-    pub output: Vec<String>,
+    pub output: Vec<SmolStr>,
     /// Constant data references used by the function
-    pub const_input: Vec<String>,
+    pub const_input: Vec<SmolStr>,
     /// Constant data references defined by the function
-    pub const_output: Vec<String>,
+    pub const_output: Vec<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -178,10 +179,10 @@ impl SignatureDescription {
 impl SignatureDescription {
     /// Create a new signature
     pub fn new(
-        input: impl Into<Vec<String>>,
-        output: impl Into<Vec<String>>,
-        const_input: impl Into<Vec<String>>,
-        const_output: impl Into<Vec<String>>,
+        input: impl Into<Vec<SmolStr>>,
+        output: impl Into<Vec<SmolStr>>,
+        const_input: impl Into<Vec<SmolStr>>,
+        const_output: impl Into<Vec<SmolStr>>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -192,7 +193,7 @@ impl SignatureDescription {
     }
 
     /// Create a new signature with only linear dataflow inputs and outputs
-    pub fn new_linear(linear: impl Into<Vec<String>>) -> Self {
+    pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
         Self {
             input: linear.clone(),
@@ -202,7 +203,7 @@ impl SignatureDescription {
     }
 
     /// Create a new signature with only dataflow inputs and outputs
-    pub fn new_df(input: impl Into<Vec<String>>, output: impl Into<Vec<String>>) -> Self {
+    pub fn new_df(input: impl Into<Vec<SmolStr>>, output: impl Into<Vec<SmolStr>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
@@ -211,7 +212,7 @@ impl SignatureDescription {
     }
 
     /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<Vec<String>>) -> Self {
+    pub fn new_const(const_output: impl Into<Vec<SmolStr>>) -> Self {
         Self {
             const_output: const_output.into(),
             ..Default::default()
@@ -226,7 +227,7 @@ impl SignatureDescription {
     pub fn input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
         self.input
             .iter()
             .chain(&EmptyStringIterator)
@@ -239,7 +240,7 @@ impl SignatureDescription {
     pub fn output_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
         self.output
             .iter()
             .chain(&EmptyStringIterator)
@@ -252,7 +253,7 @@ impl SignatureDescription {
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
         self.const_input
             .iter()
             .chain(&EmptyStringIterator)
@@ -265,7 +266,7 @@ impl SignatureDescription {
     pub fn const_output_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&String, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
         self.const_output
             .iter()
             .chain(&EmptyStringIterator)
@@ -277,10 +278,10 @@ impl SignatureDescription {
 struct EmptyStringIterator;
 
 /// A reference to an empty string. Used by [`EmptyStringIterator`].
-const EMPTY_STRING_REF: &String = &String::new();
+const EMPTY_STRING_REF: &SmolStr = &SmolStr::new_inline("");
 
 impl<'a> Iterator for &'a EmptyStringIterator {
-    type Item = &'a String;
+    type Item = &'a SmolStr;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(EMPTY_STRING_REF)

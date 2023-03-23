@@ -29,8 +29,8 @@ impl PartialEq for OpaqueOp {
 impl Eq for OpaqueOp {}
 
 impl Op for OpaqueOp {
-    fn name(&self) -> &str {
-        &self.id
+    fn name(&self) -> SmolStr {
+        self.id.clone()
     }
 
     fn description(&self) -> &str {
@@ -41,7 +41,7 @@ impl Op for OpaqueOp {
         self.custom_op.signature()
     }
 
-    fn signature_desc(&self) -> Option<&SignatureDescription> {
+    fn signature_desc(&self) -> Option<SignatureDescription> {
         self.custom_op.signature_desc()
     }
 }
@@ -49,7 +49,7 @@ impl Op for OpaqueOp {
 impl<T: CustomOp> From<T> for OpaqueOp {
     fn from(op: T) -> Self {
         Self {
-            id: op.name().into(),
+            id: op.name(),
             custom_op: Box::new(op),
         }
     }
@@ -57,7 +57,8 @@ impl<T: CustomOp> From<T> for OpaqueOp {
 
 /// Custom definition for an operation.
 ///
-/// Note that any implementation of this trait must include the `#[typetag::serde]` attribute.
+/// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// enable serialization.
 #[typetag::serde]
 pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any + Downcast {
     /// Try to convert the custom op to a graph definition.
@@ -84,8 +85,8 @@ pub struct OpDef {
     pub name: SmolStr,
     /// Human readable description of the operation.
     pub description: String,
-    inputs: Vec<(Option<String>, SimpleType)>,
-    outputs: Vec<(Option<String>, SimpleType)>,
+    inputs: Vec<(Option<SmolStr>, SimpleType)>,
+    outputs: Vec<(Option<SmolStr>, SimpleType)>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
@@ -150,8 +151,8 @@ impl OpDef {
 }
 
 impl Op for OpDef {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> SmolStr {
+        self.name.clone()
     }
 
     fn description(&self) -> &str {
@@ -176,20 +177,24 @@ impl Op for OpDef {
             .clone()
     }
 
-    fn signature_desc(&self) -> Option<&SignatureDescription> {
-        Some(self.port_names.get_or_init(|| {
-            let inputs = self
-                .inputs
-                .iter()
-                .map(|(n, _)| n.clone().unwrap_or_default())
-                .collect::<Vec<_>>();
-            let outputs = self
-                .outputs
-                .iter()
-                .map(|(n, _)| n.clone().unwrap_or_default())
-                .collect::<Vec<_>>();
-            SignatureDescription::new_df(inputs, outputs)
-        }))
+    fn signature_desc(&self) -> Option<SignatureDescription> {
+        Some(
+            self.port_names
+                .get_or_init(|| {
+                    let inputs = self
+                        .inputs
+                        .iter()
+                        .map(|(n, _)| n.clone().unwrap_or_default())
+                        .collect::<Vec<_>>();
+                    let outputs = self
+                        .outputs
+                        .iter()
+                        .map(|(n, _)| n.clone().unwrap_or_default())
+                        .collect::<Vec<_>>();
+                    SignatureDescription::new_df(inputs, outputs)
+                })
+                .clone(),
+        )
     }
 }
 

@@ -1,8 +1,13 @@
-use super::Op;
-use crate::types::{ClassicType, Signature, SimpleType};
+use std::any::Any;
 
-#[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use super::Op;
+use crate::{
+    macros::impl_box_clone,
+    types::{ClassicType, Signature, SignatureDescription, SimpleType, TypeRow},
+};
+
+use downcast_rs::{impl_downcast, Downcast};
+use smol_str::SmolStr;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ModuleOp {
@@ -29,7 +34,7 @@ pub enum ModuleOp {
 }
 
 impl Op for ModuleOp {
-    fn name(&self) -> &str {
+    fn name(&self) -> SmolStr {
         match self {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",
@@ -38,6 +43,7 @@ impl Op for ModuleOp {
             ModuleOp::Alias { .. } => "alias",
             ModuleOp::Const(_) => "const",
         }
+        .into()
     }
 
     fn signature(&self) -> Signature {
@@ -47,18 +53,31 @@ impl Op for ModuleOp {
             ModuleOp::Declare { signature } => signature.clone(),
             ModuleOp::Struct { .. } => todo!(),
             ModuleOp::Alias { .. } => todo!(),
-            ModuleOp::Const(v) => v.signature(),
+            ModuleOp::Const(v) => Signature::new_const(v.type_row()),
         }
     }
 }
 
 /// Value constants
-#[cfg_attr(feature = "pyo3", derive(FromPyObject))]
-#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+///
+/// TODO: Add more constants
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ConstValue {
     Bit(bool),
     Int(i64),
+    Opaque(SimpleType, Box<dyn CustomConst>),
+}
+
+impl PartialEq for ConstValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
+            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
+            _ => false,
+        }
+    }
 }
 
 impl Default for ConstValue {
@@ -69,12 +88,67 @@ impl Default for ConstValue {
 
 impl ConstValue {
     /// Returns the datatype of the constant
-    pub fn signature(&self) -> Signature {
+    pub fn type_row(&self) -> TypeRow {
         static BIT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Bit)];
         static INT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Int)];
         match self {
-            Self::Bit(_) => Signature::new_const(BIT_SIG),
-            Self::Int(_) => Signature::new_const(INT_SIG),
+            Self::Bit(_) => BIT_SIG.into(),
+            Self::Int(_) => INT_SIG.into(),
+            Self::Opaque(row, _) => TypeRow::new(vec![row.clone()]),
         }
     }
 }
+
+impl Op for ConstValue {
+    fn name(&self) -> SmolStr {
+        match self {
+            Self::Bit(v) => format!("const:bit:{v}"),
+            Self::Int(v) => format!("const:int:{v}"),
+            Self::Opaque(_, v) => format!("const:{}", v.name()),
+        }
+        .into()
+    }
+
+    fn description(&self) -> &str {
+        "Constant value"
+    }
+
+    fn signature(&self) -> Signature {
+        Signature::new_const(self.type_row())
+    }
+
+    fn signature_desc(&self) -> Option<SignatureDescription> {
+        Some(SignatureDescription::new_const([
+            "Constant value output".into()
+        ]))
+    }
+}
+
+impl<T: CustomConst> From<T> for ConstValue {
+    fn from(v: T) -> Self {
+        Self::Opaque(v.const_type(), Box::new(v))
+    }
+}
+
+/// Constant value for opaque [`SimpleType`]s.
+///
+// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// enable serialization.
+#[typetag::serde]
+pub trait CustomConst:
+    Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
+{
+    fn name(&self) -> SmolStr;
+
+    /// Returns the type of the constant.
+    fn const_type(&self) -> SimpleType;
+
+    /// Compare two constants for equality, using downcasting and comparing the definitions.
+    fn eq(&self, other: &dyn CustomConst) -> bool {
+        let _ = other;
+        false
+    }
+}
+
+impl_downcast!(CustomConst);
+impl_box_clone!(CustomConst, CustomConstBoxClone);

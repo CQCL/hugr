@@ -10,6 +10,7 @@
 //!   structures.
 //!
 
+pub mod extensions;
 pub mod hugr;
 pub mod macros;
 pub mod ops;

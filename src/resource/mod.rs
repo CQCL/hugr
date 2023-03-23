@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use smol_str::SmolStr;
 
-use crate::ops::{OpDef, CustomOp, OpaqueOp};
+use crate::ops::{OpDef, OpaqueOp};
 use crate::types::custom::CustomType;
 
 /// A unique identifier for a resource.

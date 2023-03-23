@@ -1,3 +1,5 @@
+use smol_str::SmolStr;
+
 use super::Op;
 use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
 
@@ -35,7 +37,7 @@ impl Default for FunctionOp {
 }
 
 impl Op for FunctionOp {
-    fn name(&self) -> &str {
+    fn name(&self) -> SmolStr {
         match self {
             FunctionOp::Input { .. } => "input",
             FunctionOp::Output { .. } => "output",
@@ -45,6 +47,7 @@ impl Op for FunctionOp {
             FunctionOp::Discard { .. } => "discard",
             FunctionOp::Nested { .. } => "nested",
         }
+        .into()
     }
 
     fn signature(&self) -> Signature {

@@ -7,15 +7,16 @@ pub mod module;
 use crate::types::{Signature, SignatureDescription};
 
 pub use controlflow::ControlFlowOp;
-pub use custom::{OpaqueOp, CustomOp, OpDef};
+pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use function::FunctionOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
+use smol_str::SmolStr;
 
 /// A generic node operation
 pub trait Op {
     /// The name of the operation.
-    fn name(&self) -> &str;
+    fn name(&self) -> SmolStr;
     /// The description of the operation.
     fn description(&self) -> &str {
         ""
@@ -27,7 +28,7 @@ pub trait Op {
     /// Optional description of the ports in the signature.
     ///
     /// TODO: Implement where possible
-    fn signature_desc(&self) -> Option<&SignatureDescription> {
+    fn signature_desc(&self) -> Option<SignatureDescription> {
         None
     }
 }
@@ -49,7 +50,7 @@ pub enum OpType {
 }
 
 impl Op for OpType {
-    fn name(&self) -> &str {
+    fn name(&self) -> SmolStr {
         match self {
             OpType::Module(op) => op.name(),
             OpType::ControlFlow(op) => op.name(),

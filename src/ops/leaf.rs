@@ -2,6 +2,8 @@
 //!
 //! TODO: Better name than "leaf"?
 
+use smol_str::SmolStr;
+
 use super::{Op, OpaqueOp};
 use crate::types::{ClassicType, QuantumType, Signature, SimpleType};
 
@@ -98,7 +100,7 @@ impl Op for LeafOp {
         }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> SmolStr {
         match self {
             LeafOp::CustomOp(opaque) => opaque.id.as_str(),
             LeafOp::H => "H",
@@ -117,5 +119,6 @@ impl Op for LeafOp {
             LeafOp::Copy { .. } => "Copy",
             LeafOp::Xor => "Xor",
         }
+        .into()
     }
 }

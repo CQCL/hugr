@@ -1,3 +1,5 @@
+use smol_str::SmolStr;
+
 use crate::types::Signature;
 
 use super::Op;
@@ -15,13 +17,14 @@ pub enum ControlFlowOp {
 }
 
 impl Op for ControlFlowOp {
-    fn name(&self) -> &str {
+    fn name(&self) -> SmolStr {
         match self {
             ControlFlowOp::Conditional { .. } => "ɣ",
             ControlFlowOp::Loop { .. } => "θ",
             ControlFlowOp::BasicBlock { .. } => "β",
             ControlFlowOp::CFG { .. } => "𝛋",
         }
+        .into()
     }
 
     fn signature(&self) -> Signature {
