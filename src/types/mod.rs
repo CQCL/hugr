@@ -1,4 +1,4 @@
-//! Types used in the compiler
+//! General wire types used in the compiler
 
 pub mod custom;
 pub mod simple;

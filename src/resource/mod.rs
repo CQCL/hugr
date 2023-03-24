@@ -98,3 +98,9 @@ impl ResourceSet {
         set
     }
 }
+
+impl FromIterator<ResourceId> for ResourceSet {
+    fn from_iter<I: IntoIterator<Item = ResourceId>>(iter: I) -> Self {
+        Self(HashSet::from_iter(iter))
+    }
+}

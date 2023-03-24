@@ -1,6 +1,7 @@
+//! Opaque types, used to represent a user-defined [`SimpleType`].
 use smol_str::SmolStr;
 
-use super::TypeRow;
+use super::{ClassicType, SimpleType, TypeRow};
 
 /// An opaque type element. Contains an unique identifier and a reference to its definition.
 ///
@@ -11,12 +12,15 @@ use super::TypeRow;
 pub struct CustomType {
     /// Unique identifier of the opaque type.
     id: SmolStr,
-    params: TypeRow,
+    params: Box<TypeRow>,
 }
 
 impl CustomType {
     pub fn new(id: SmolStr, params: TypeRow) -> Self {
-        Self { id, params }
+        Self {
+            id,
+            params: Box::new(params),
+        }
     }
 
     pub fn id(&self) -> &str {
@@ -25,6 +29,10 @@ impl CustomType {
 
     pub fn params(&self) -> &TypeRow {
         &self.params
+    }
+
+    pub const fn simple_type(self) -> SimpleType {
+        SimpleType::Classic(ClassicType::Opaque(self))
     }
 }
 
@@ -35,3 +43,9 @@ impl PartialEq for CustomType {
 }
 
 impl Eq for CustomType {}
+
+impl From<CustomType> for SimpleType {
+    fn from(ty: CustomType) -> Self {
+        ty.simple_type()
+    }
+}

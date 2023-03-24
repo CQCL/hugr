@@ -52,11 +52,11 @@ impl Op for FunctionOp {
 
     fn signature(&self) -> Signature {
         match self {
-            FunctionOp::Input { types } => Signature::new_df(TypeRow::empty(), types.clone()),
-            FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::empty()),
+            FunctionOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
+            FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
             FunctionOp::Call { signature } => {
                 let mut s = signature.clone();
-                s.const_input.types.to_mut().insert(
+                s.const_input.to_mut().insert(
                     0,
                     ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
                 );
@@ -64,7 +64,7 @@ impl Op for FunctionOp {
             }
             FunctionOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
-                s.input.types.to_mut().insert(
+                s.input.to_mut().insert(
                     0,
                     ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
                 );
@@ -72,12 +72,12 @@ impl Op for FunctionOp {
             }
             FunctionOp::LoadConstant { datatype } => Signature::new(
                 vec![datatype.clone()],
-                TypeRow::empty(),
-                TypeRow::empty(),
+                TypeRow::new(),
+                TypeRow::new(),
                 vec![datatype.clone()],
             ),
             FunctionOp::Discard { datatype } => {
-                Signature::new_df(vec![datatype.clone()], TypeRow::empty())
+                Signature::new_df(vec![datatype.clone()], TypeRow::new())
             }
             FunctionOp::Nested { signature } => signature.clone(),
         }

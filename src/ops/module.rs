@@ -94,7 +94,7 @@ impl ConstValue {
         match self {
             Self::Bit(_) => BIT_SIG.into(),
             Self::Int(_) => INT_SIG.into(),
-            Self::Opaque(row, _) => TypeRow::new(vec![row.clone()]),
+            Self::Opaque(row, _) => TypeRow::from(vec![row.clone()]),
         }
     }
 }
