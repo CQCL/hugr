@@ -1,3 +1,5 @@
+//! This is an experiment, it is probably already outdated.
+
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 use cgmath::num_traits::ToPrimitive;

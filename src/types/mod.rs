@@ -22,7 +22,7 @@ pub enum Type {
     /// Data edges of a DDG region
     Value(SimpleType),
     /// A reference to a constant value definition, used in the module region
-    Const(SimpleType),
+    Const(ClassicType),
     /// A strict ordering between nodes
     StateOrder,
     // An edge specifying a resource set
@@ -42,7 +42,7 @@ impl Default for Type {
 /// one for constant definitions. This allows us to reuse the `RowType` type,
 /// but requires that the value ports come all before the constants. We could
 /// change this by redefining
-/// ```ignore
+/// ```text
 /// enum RowTypeVariant {df: DataType, const: DataType}
 /// struct RowType(Vec<RowTypeVariant>);
 /// ```

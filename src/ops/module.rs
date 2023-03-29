@@ -35,6 +35,7 @@ pub enum ModuleOp {
 
 impl Op for ModuleOp {
     fn name(&self) -> SmolStr {
+        // TODO: These should be unique names for each distinct op
         match self {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",

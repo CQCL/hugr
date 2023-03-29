@@ -74,3 +74,27 @@ impl Default for OpType {
         Self::Leaf(Default::default())
     }
 }
+
+impl From<ModuleOp> for OpType {
+    fn from(op: ModuleOp) -> Self {
+        Self::Module(op)
+    }
+}
+
+impl From<ControlFlowOp> for OpType {
+    fn from(op: ControlFlowOp) -> Self {
+        Self::ControlFlow(op)
+    }
+}
+
+impl From<FunctionOp> for OpType {
+    fn from(op: FunctionOp) -> Self {
+        Self::Function(op)
+    }
+}
+
+impl From<LeafOp> for OpType {
+    fn from(op: LeafOp) -> Self {
+        Self::Leaf(op)
+    }
+}
