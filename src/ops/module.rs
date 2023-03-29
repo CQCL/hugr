@@ -3,6 +3,7 @@ use std::any::Any;
 use super::Op;
 use crate::{
     macros::impl_box_clone,
+    type_row,
     types::{ClassicType, Signature, SignatureDescription, SimpleType, TypeRow},
 };
 
@@ -90,11 +91,11 @@ impl Default for ConstValue {
 impl ConstValue {
     /// Returns the datatype of the constant
     pub fn type_row(&self) -> TypeRow {
-        static BIT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Bit)];
-        static INT_SIG: &[SimpleType] = &[SimpleType::Classic(ClassicType::Int)];
+        const BIT: SimpleType = SimpleType::Classic(ClassicType::Bit);
+        const INT: SimpleType = SimpleType::Classic(ClassicType::Int);
         match self {
-            Self::Bit(_) => BIT_SIG.into(),
-            Self::Int(_) => INT_SIG.into(),
+            Self::Bit(_) => type_row![BIT],
+            Self::Int(_) => type_row![INT],
             Self::Opaque(row, _) => TypeRow::from(vec![row.clone()]),
         }
     }

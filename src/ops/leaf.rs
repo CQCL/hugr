@@ -5,7 +5,10 @@
 use smol_str::SmolStr;
 
 use super::{Op, OpaqueOp};
-use crate::types::{ClassicType, QuantumType, Signature, SimpleType};
+use crate::{
+    type_row,
+    types::{ClassicType, QuantumType, Signature, SimpleType},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -72,11 +75,6 @@ impl Op for LeafOp {
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Quantum(QuantumType::Qubit);
         const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
-        static ROW_QUBIT: &[SimpleType] = &[Q];
-        static ROW_2QUBIT: &[SimpleType] = &[Q, Q];
-        static ROW_BIT: &[SimpleType] = &[B];
-        static ROW_2BIT: &[SimpleType] = &[B, B];
-        static ROW_QUBIT_BIT: &[SimpleType] = &[Q, B];
 
         match self {
             LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
@@ -88,14 +86,14 @@ impl Op for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => Signature::new_linear(ROW_QUBIT),
-            LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(ROW_2QUBIT),
-            LeafOp::Measure => Signature::new_linear(ROW_QUBIT_BIT),
+            | LeafOp::Z => Signature::new_linear(type_row![Q]),
+            LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
+            LeafOp::Measure => Signature::new_linear(type_row![Q, B]),
             LeafOp::Copy { n_copies, typ } => {
                 let typ: SimpleType = typ.clone().into();
                 Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
             }
-            LeafOp::Xor => Signature::new_df(ROW_2BIT, ROW_BIT),
+            LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(opaque) => opaque.signature(),
         }
     }

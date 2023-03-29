@@ -117,10 +117,16 @@ impl TypeRow {
     }
 }
 impl TypeRow {
+    /// Create a new empty row.
     pub const fn new() -> Self {
         Self { types: None }
     }
 
+    /// Create a new row from a Cow slice of types.
+    ///
+    /// See [`type_row!`] for a more ergonomic way to create a statically allocated rows.
+    ///
+    /// [`type_row!`]: crate::macros::type_row
     pub fn from(types: impl Into<Cow<'static, [SimpleType]>>) -> Self {
         let types = types.into();
         Self {

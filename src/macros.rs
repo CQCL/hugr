@@ -30,12 +30,18 @@ pub(crate) use impl_box_clone;
 
 /// Creates a [`TypeRow`] backed by statically defined data, avoiding allocations.
 ///
+/// The parameters must be constants of type [`SimpleType`].
+///
+/// For type rows that cannot be statically defined, use a vector or slice instead.
+///
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
 /// const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
-/// let sig: Signature = Signature::new_df(type_row![B, B], type_row![B]);
+/// let static_row: TypeRow = type_row![B, B];
+/// let dynamic_row: TypeRow = vec![B, B, B].into();
+/// let sig: Signature = Signature::new_df(static_row, dynamic_row);
 /// ```
 #[allow(unused_macros)]
 #[macro_export]
