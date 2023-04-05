@@ -61,12 +61,11 @@ impl BaseBuilder {
 
     /// Build the HUGR, returning an error if the graph is not valid.
     pub fn finish(self) -> Result<Hugr, BuildError> {
-        let mut hugr = self.hugr;
+        let hugr = self.hugr;
         let roots = self.roots;
 
         match roots.len() {
-            0 => {}
-            1 => hugr.set_root(roots[0]),
+            0 | 1 => {}
             _ => return Err(BuildError::TooManyRoots { roots }),
         }
 

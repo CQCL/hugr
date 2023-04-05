@@ -6,7 +6,7 @@
 use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
-use crate::ops::{Op, OpType};
+use crate::ops::{ModuleOp, Op, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 
 /// The Hugr data structure.
@@ -22,7 +22,7 @@ pub struct Hugr {
     /// It must correspond to a [`ModuleOp::Root`] node.
     ///
     /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root
-    root: Option<NodeIndex>,
+    root: NodeIndex,
 
     /// Operation types for each node.
     op_types: SecondaryMap<NodeIndex, OpType>,
@@ -37,14 +37,16 @@ impl Default for Hugr {
 impl Hugr {
     /// Create a new Hugr, with a single root node.
     pub(crate) fn new() -> Self {
-        let graph = PortGraph::default();
+        let mut graph = PortGraph::default();
         let hierarchy = Hierarchy::new();
-        let op_types = SecondaryMap::new();
+        let mut op_types = SecondaryMap::new();
+        let root = graph.add_node(0, 0);
+        op_types[root] = OpType::Module(ModuleOp::Root);
 
         Self {
             graph,
             hierarchy,
-            root: None,
+            root,
             op_types,
         }
     }
@@ -75,12 +77,6 @@ impl Hugr {
     pub fn set_parent(&mut self, node: NodeIndex, parent: NodeIndex) -> Result<(), HugrError> {
         self.hierarchy.push_child(node, parent)?;
         Ok(())
-    }
-
-    /// Sets the root node of the HUGR.
-    pub fn set_root(&mut self, root: NodeIndex) {
-        assert!(self.hierarchy.is_root(root));
-        self.root = Some(root);
     }
 
     /// Applies a rewrite to the graph.
