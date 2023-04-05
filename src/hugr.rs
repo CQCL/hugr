@@ -9,8 +9,10 @@ use thiserror::Error;
 use crate::ops::{ModuleOp, Op, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 
+pub mod serialize;
+
 /// The Hugr data structure.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
     pub(crate) graph: PortGraph,
