@@ -16,7 +16,7 @@ use crate::resource::ResourceSet;
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub enum Type {
+pub enum EdgeKind {
     /// Control edges of a CFG region
     ControlFlow,
     /// Data edges of a DDG region
