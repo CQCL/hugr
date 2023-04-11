@@ -29,12 +29,10 @@ pub enum EdgeKind {
     Resource(ResourceSet),
 }
 
-/// Describes all edges to/from a node. This includes the concept of "signature" in the spec,
-/// but also other edges.
+/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
+/// and also the target (value) of a call (constant).
 ///
-/// TODO(1): consider separating input/output value edges from the others.
-///
-/// TODO(2): Consider using Cow here instead of in the TypeRow.
+/// TODO: Consider using Cow here instead of in the TypeRow.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
@@ -42,7 +40,7 @@ pub struct Signature {
     pub input: TypeRow,
     /// Value outputs of the function
     pub output: TypeRow,
-    /// Possible constE input (for call / graph-constant)
+    /// Possible constE input (for call / load-constant)
     pub const_input: Option<ClassicType>,
 }
 
