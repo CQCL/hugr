@@ -117,7 +117,7 @@ impl Op for ConstValue {
     }
 
     fn signature_desc(&self) -> Option<SignatureDescription> {
-        Some(SignatureDescription::new([], [], None))
+        None
     }
 }
 
