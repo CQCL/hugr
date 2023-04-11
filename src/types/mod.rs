@@ -12,38 +12,29 @@ use smol_str::SmolStr;
 
 use crate::resource::ResourceSet;
 
-/// The wire types
+/// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum EdgeKind {
     /// Control edges of a CFG region
     ControlFlow,
-    /// Data edges of a DDG region
+    /// Data edges of a DDG region, also known as "wires"
     Value(SimpleType),
     /// A reference to a constant value definition, used in the module region
     Const(ClassicType),
-    /// A strict ordering between nodes
+    /// Explicitly enforce an ordering between nodes in a DDG
     StateOrder,
     // An edge specifying a resource set
     Resource(ResourceSet),
 }
 
-/// A function signature with dataflow types. This does not specify control flow
-/// ports nor state ordering
+/// Describes all edges to/from a node. This includes the concept of "signature" in the spec,
+/// but also other edges.
 ///
-/// TODO: Here we split the input and output into two parts, one for value wires and
-/// one for constant definitions. This allows us to reuse the `RowType` type,
-/// but requires that the value ports come all before the constants. We could
-/// change this by redefining
-/// ```text
-/// enum RowTypeVariant {df: DataType, const: DataType}
-/// struct RowType(Vec<RowTypeVariant>);
-/// ```
-/// but that seems more annoying to work with.
-/// That would reduce the size of `OpType` by about 50%, so it's worth considering.
+/// TODO(1): consider separating input/output value edges from the others.
 ///
-/// TODO: Option2 is using Cow here instead of in the TypeRow.
+/// TODO(2): Consider using Cow here instead of in the TypeRow.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
