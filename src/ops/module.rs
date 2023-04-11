@@ -3,7 +3,7 @@ use std::any::Any;
 use super::Op;
 use crate::{
     macros::impl_box_clone,
-    types::{ClassicType, Signature, SignatureDescription, SimpleType},
+    types::{ClassicType, Signature, SimpleType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -114,10 +114,6 @@ impl Op for ConstValue {
 
     fn signature(&self) -> Signature {
         Signature::default()
-    }
-
-    fn signature_desc(&self) -> Option<SignatureDescription> {
-        None
     }
 }
 
