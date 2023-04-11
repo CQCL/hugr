@@ -222,13 +222,9 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> Option<(&'a SmolStr, &'a ClassicType)> {
-        match (&self.const_input, &signature.const_input) {
-            (None, None) => None,
-            (Some(n), Some(k)) => Some((&n, &k)),
-            _ => panic!(
-                "Did not match {:?} with {:?}",
-                self.const_input, signature.const_input
-            ),
+        match &signature.const_input {
+            None => None,
+            Some(t) => Some((self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t)),
         }
     }
 }
