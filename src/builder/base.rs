@@ -14,8 +14,6 @@ use crate::{
 pub struct BaseBuilder {
     /// The partial HUGR being built.
     hugr: Hugr,
-    /// Sets of nodes that do not have a parent in the hierarchy.
-    roots: Vec<NodeIndex>,
 }
 
 impl BaseBuilder {
@@ -60,12 +58,6 @@ impl BaseBuilder {
     /// Build the HUGR, returning an error if the graph is not valid.
     pub fn finish(self) -> Result<Hugr, BuildError> {
         let hugr = self.hugr;
-        let roots = self.roots;
-
-        match roots.len() {
-            0 | 1 => {}
-            _ => return Err(BuildError::TooManyRoots { roots }),
-        }
 
         hugr.validate()?;
 
