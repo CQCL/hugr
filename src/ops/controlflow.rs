@@ -1,19 +1,19 @@
 use smol_str::SmolStr;
 
-use crate::types::Signature;
+use crate::types::{EdgeKind, Signature, TypeRow};
 
 use super::Op;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
     /// ɣ (gamma) node: conditional operation
-    Conditional { signature: Signature },
-    /// θ (theta) node: tail-controlled loop
-    Loop { signature: Signature },
-    /// β (beta): a CFG basic block node
-    BasicBlock { signature: Signature },
+    Conditional { inputs: TypeRow, outputs: TypeRow },
+    /// θ (theta) node: tail-controlled loop. Here we assume the same inputs + outputs variant.
+    Loop { vars: TypeRow },
+    /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
+    BasicBlock { inputs: TypeRow, outputs: TypeRow },
     /// 𝛋 (kappa): a dataflow node which is defined by a child CFG
-    CFG { signature: Signature },
+    CFG { inputs: TypeRow, outputs: TypeRow },
 }
 
 impl Op for ControlFlowOp {
@@ -29,10 +29,20 @@ impl Op for ControlFlowOp {
 
     fn signature(&self) -> Signature {
         match self {
-            ControlFlowOp::Conditional { signature } => signature.clone(),
-            ControlFlowOp::Loop { signature } => signature.clone(),
-            ControlFlowOp::BasicBlock { signature } => signature.clone(),
-            ControlFlowOp::CFG { signature } => signature.clone(),
+            ControlFlowOp::Conditional { inputs, outputs } => {
+                Signature::new_df(inputs.clone(), outputs.clone())
+            }
+            ControlFlowOp::Loop { vars } => Signature::new_linear(vars.clone()),
+            ControlFlowOp::BasicBlock { .. } => Signature::new(
+                vec![],
+                vec![],
+                None,
+                Some(EdgeKind::ControlFlow),
+                Some(EdgeKind::ControlFlow),
+            ),
+            ControlFlowOp::CFG { inputs, outputs } => {
+                Signature::new_df(inputs.clone(), outputs.clone())
+            }
         }
     }
 }

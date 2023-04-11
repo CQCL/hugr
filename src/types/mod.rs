@@ -119,11 +119,7 @@ impl Signature {
     /// Create a new signature with the same input and output types
     pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
-        Self {
-            input: linear.clone(),
-            output: linear,
-            ..Default::default()
-        }
+        Signature::new_df(linear.clone(), linear)
     }
 
     /// Create a new signature with only dataflow inputs and outputs
@@ -131,7 +127,9 @@ impl Signature {
         Self {
             input: input.into(),
             output: output.into(),
-            ..Default::default()
+            const_input: None,
+            other_inputs: Some(EdgeKind::StateOrder),
+            other_outputs: Some(EdgeKind::StateOrder),
         }
     }
 
