@@ -173,11 +173,7 @@ impl SignatureDescription {
     /// Create a new signature with only linear dataflow inputs and outputs
     pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
-        Self {
-            input: linear.clone(),
-            output: linear,
-            ..Default::default()
-        }
+        SignatureDescription::new_df(linear.clone(), linear.clone())
     }
 
     /// Create a new signature with only dataflow inputs and outputs
