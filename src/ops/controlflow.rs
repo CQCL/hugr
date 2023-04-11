@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, TypeRow};
+use crate::types::{Signature, TypeRow};
 
 use super::Op;
 
@@ -33,13 +33,7 @@ impl Op for ControlFlowOp {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }
             ControlFlowOp::Loop { vars } => Signature::new_linear(vars.clone()),
-            ControlFlowOp::BasicBlock { .. } => Signature::new(
-                vec![],
-                vec![],
-                None,
-                Some(EdgeKind::ControlFlow),
-                Some(EdgeKind::ControlFlow),
-            ),
+            ControlFlowOp::BasicBlock { .. } => Signature::default(),
             ControlFlowOp::CFG { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }

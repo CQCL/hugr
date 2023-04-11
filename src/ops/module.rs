@@ -54,7 +54,7 @@ impl Op for ModuleOp {
             ModuleOp::Declare { signature } => signature.clone(),
             ModuleOp::Struct { .. } => todo!(),
             ModuleOp::Alias { .. } => todo!(),
-            ModuleOp::Const(v) => Signature::new_const(v.const_type()),
+            ModuleOp::Const(v) => v.signature(),
         }
     }
 }
@@ -113,7 +113,7 @@ impl Op for ConstValue {
     }
 
     fn signature(&self) -> Signature {
-        Signature::new_const(self.const_type())
+        Signature::default()
     }
 
     fn signature_desc(&self) -> Option<SignatureDescription> {

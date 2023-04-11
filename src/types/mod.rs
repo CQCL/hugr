@@ -44,11 +44,6 @@ pub struct Signature {
     pub output: TypeRow,
     /// Possible constE input (for call / graph-constant)
     pub const_input: Option<ClassicType>,
-    /// If None, there will be no other input edges.
-    /// Otherwise, all other input edges will be of that kind.
-    pub other_inputs: Option<EdgeKind>,
-    /// Same for output edges.
-    pub other_outputs: Option<EdgeKind>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -95,15 +90,11 @@ impl Signature {
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
         const_input: impl Into<Option<ClassicType>>,
-        other_inputs: impl Into<Option<EdgeKind>>,
-        other_outputs: impl Into<Option<EdgeKind>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
-            other_inputs: other_inputs.into(),
-            other_outputs: other_outputs.into(),
         }
     }
 
@@ -115,21 +106,7 @@ impl Signature {
 
     /// Create a new signature with only dataflow inputs and outputs
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            const_input: None,
-            other_inputs: Some(EdgeKind::StateOrder),
-            other_outputs: Some(EdgeKind::StateOrder),
-        }
-    }
-
-    /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<ClassicType>) -> Self {
-        Self {
-            other_outputs: Some(EdgeKind::Const(const_output.into())),
-            ..Default::default()
-        }
+        Signature::new(input, output, None)
     }
 }
 

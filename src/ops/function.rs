@@ -55,16 +55,14 @@ impl Op for FunctionOp {
             FunctionOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
             FunctionOp::Call { signature } => Signature {
-                const_input: ClassicType::Graph(Box::new((Default::default(), signature.clone())))
-                    .into(),
+                const_input: ClassicType::graph_from_sig(signature.clone()).into(),
                 ..signature.clone()
             },
             FunctionOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
-                s.input.to_mut().insert(
-                    0,
-                    ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
-                );
+                s.input
+                    .to_mut()
+                    .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
                 s
             }
             FunctionOp::LoadConstant { datatype } => Signature {
