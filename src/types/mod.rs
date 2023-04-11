@@ -29,12 +29,6 @@ pub enum Type {
     Resource(ResourceSet),
 }
 
-impl Default for Type {
-    fn default() -> Self {
-        Self::StateOrder
-    }
-}
-
 /// A function signature with dataflow types. This does not specify control flow
 /// ports nor state ordering
 ///
