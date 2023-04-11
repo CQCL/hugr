@@ -21,6 +21,8 @@ pub struct Hugr {
 
     /// The single root node in the hierarchy.
     /// It must correspond to a [`ModuleOp::Root`] node.
+    ///
+    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root
     root: Option<NodeIndex>,
 
     /// Operation types for each node.

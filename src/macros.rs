@@ -28,11 +28,17 @@ macro_rules! impl_box_clone {
 }
 pub(crate) use impl_box_clone;
 
-/// Creates a [`TypeRow`] backed by statically defined data, avoiding allocations.
+/// Creates a [`TypeRow`] backed by statically defined data, avoiding
+/// allocations.
 ///
 /// The parameters must be constants of type [`SimpleType`].
 ///
-/// For type rows that cannot be statically defined, use a vector or slice instead.
+/// For type rows that cannot be statically defined, use a vector or slice with
+/// [`TypeRow::from`] instead.
+///
+/// [`SimpleType`]: crate::types::SimpleType
+/// [`TypeRow`]: crate::types::TypeRow
+/// [`TypeRow::from`]: crate::types::TypeRow::from
 ///
 /// Example:
 /// ```
