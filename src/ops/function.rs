@@ -1,7 +1,7 @@
 use smol_str::SmolStr;
 
 use super::Op;
-use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
+use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
@@ -26,6 +26,24 @@ pub enum FunctionOp {
     Discard { datatype: SimpleType },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
+}
+
+impl FunctionOp {
+    pub fn other_inputs(&self) -> Option<EdgeKind> {
+        if let FunctionOp::Input { .. } = self {
+            None
+        } else {
+            Some(EdgeKind::StateOrder)
+        }
+    }
+
+    pub fn other_outputs(&self) -> Option<EdgeKind> {
+        if let FunctionOp::Output { .. } = self {
+            None
+        } else {
+            Some(EdgeKind::StateOrder)
+        }
+    }
 }
 
 impl Default for FunctionOp {

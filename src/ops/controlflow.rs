@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use crate::types::{Signature, TypeRow};
+use crate::types::{EdgeKind, Signature, TypeRow};
 
 use super::Op;
 
@@ -14,6 +14,16 @@ pub enum ControlFlowOp {
     BasicBlock { inputs: TypeRow, outputs: TypeRow },
     /// 𝛋 (kappa): a dataflow node which is defined by a child CFG
     CFG { inputs: TypeRow, outputs: TypeRow },
+}
+
+impl ControlFlowOp {
+    pub fn other_edges(&self) -> Option<EdgeKind> {
+        Some(if let ControlFlowOp::BasicBlock { .. } = self {
+            EdgeKind::ControlFlow
+        } else {
+            EdgeKind::StateOrder
+        })
+    }
 }
 
 impl Op for ControlFlowOp {
