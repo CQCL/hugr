@@ -19,7 +19,7 @@ pub enum FunctionOp {
     /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type
     CallIndirect { signature: Signature },
     /// Load a static constant in to the local dataflow graph
-    LoadConstant { datatype: SimpleType },
+    LoadConstant { datatype: ClassicType },
     /// Explicit discard, has a single `datatype` input, and a State output
     /// connecting it to the Output node. All stateful operations with no
     /// dataflow outputs should have such State edges.
@@ -54,14 +54,11 @@ impl Op for FunctionOp {
         match self {
             FunctionOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
-            FunctionOp::Call { signature } => {
-                let mut s = signature.clone();
-                s.const_input.to_mut().insert(
-                    0,
-                    ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
-                );
-                s
-            }
+            FunctionOp::Call { signature } => Signature {
+                const_input: ClassicType::Graph(Box::new((Default::default(), signature.clone())))
+                    .into(),
+                ..signature.clone()
+            },
             FunctionOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
                 s.input.to_mut().insert(
@@ -70,12 +67,10 @@ impl Op for FunctionOp {
                 );
                 s
             }
-            FunctionOp::LoadConstant { datatype } => Signature::new(
-                vec![datatype.clone()],
-                TypeRow::new(),
-                TypeRow::new(),
-                vec![datatype.clone()],
-            ),
+            FunctionOp::LoadConstant { datatype } => Signature {
+                const_input: Some(datatype.clone()),
+                ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
+            },
             FunctionOp::Discard { datatype } => {
                 Signature::new_df(vec![datatype.clone()], TypeRow::new())
             }

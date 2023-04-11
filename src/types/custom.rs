@@ -31,8 +31,8 @@ impl CustomType {
         &self.params
     }
 
-    pub const fn simple_type(self) -> SimpleType {
-        SimpleType::Classic(ClassicType::Opaque(self))
+    pub const fn classic_type(self) -> ClassicType {
+        ClassicType::Opaque(self)
     }
 }
 
@@ -46,6 +46,6 @@ impl Eq for CustomType {}
 
 impl From<CustomType> for SimpleType {
     fn from(ty: CustomType) -> Self {
-        ty.simple_type()
+        SimpleType::Classic(ty.classic_type())
     }
 }

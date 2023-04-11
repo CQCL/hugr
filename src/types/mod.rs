@@ -47,14 +47,17 @@ pub enum EdgeKind {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
-    /// Input of the function
+    /// Value inputs of the function
     pub input: TypeRow,
-    /// Output of the function
+    /// Value outputs of the function
     pub output: TypeRow,
-    /// Constant data references used by the function
-    pub const_input: TypeRow,
-    /// Constant data references defined by the function
-    pub const_output: TypeRow,
+    /// Possible constE input (for call / graph-constant)
+    pub const_input: Option<ClassicType>,
+    /// If None, there will be no other input edges.
+    /// Otherwise, all other input edges will be of that kind.
+    pub other_inputs: Option<EdgeKind>,
+    /// Same for output edges.
+    pub other_outputs: Option<EdgeKind>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -62,10 +65,7 @@ impl Signature {
     /// The number of wires in the signature
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty()
-            && self.const_output.is_empty()
-            && self.input.is_empty()
-            && self.output.is_empty()
+        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear
@@ -103,14 +103,16 @@ impl Signature {
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-        const_input: impl Into<TypeRow>,
-        const_output: impl Into<TypeRow>,
+        const_input: impl Into<Option<ClassicType>>,
+        other_inputs: impl Into<Option<EdgeKind>>,
+        other_outputs: impl Into<Option<EdgeKind>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
-            const_output: const_output.into(),
+            other_inputs: other_inputs.into(),
+            other_outputs: other_outputs.into(),
         }
     }
 
@@ -134,9 +136,9 @@ impl Signature {
     }
 
     /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<TypeRow>) -> Self {
+    pub fn new_const(const_output: impl Into<ClassicType>) -> Self {
         Self {
-            const_output: const_output.into(),
+            other_outputs: Some(EdgeKind::Const(const_output.into())),
             ..Default::default()
         }
     }
@@ -153,9 +155,7 @@ pub struct SignatureDescription {
     /// Output of the function
     pub output: Vec<SmolStr>,
     /// Constant data references used by the function
-    pub const_input: Vec<SmolStr>,
-    /// Constant data references defined by the function
-    pub const_output: Vec<SmolStr>,
+    pub const_input: Option<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -163,10 +163,7 @@ impl SignatureDescription {
     /// The number of wires in the signature
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty()
-            && self.const_output.is_empty()
-            && self.input.is_empty()
-            && self.output.is_empty()
+        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
     }
 }
 
@@ -175,14 +172,12 @@ impl SignatureDescription {
     pub fn new(
         input: impl Into<Vec<SmolStr>>,
         output: impl Into<Vec<SmolStr>>,
-        const_input: impl Into<Vec<SmolStr>>,
-        const_output: impl Into<Vec<SmolStr>>,
+        const_input: impl Into<Option<SmolStr>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
-            const_output: const_output.into(),
         }
     }
 
@@ -201,14 +196,6 @@ impl SignatureDescription {
         Self {
             input: input.into(),
             output: output.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<Vec<SmolStr>>) -> Self {
-        Self {
-            const_output: const_output.into(),
             ..Default::default()
         }
     }
@@ -242,29 +229,18 @@ impl SignatureDescription {
     }
 
     /// Iterate over the constant input wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.const_input
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.const_input.iter())
-    }
-
-    /// Iterate over the constant output wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
-    pub fn const_output_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.const_output
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.const_output.iter())
+    ) -> Option<(&'a SmolStr, &'a ClassicType)> {
+        match (&self.const_input, &signature.const_input) {
+            (None, None) => None,
+            (Some(n), Some(k)) => Some((&n, &k)),
+            _ => panic!(
+                "Did not match {:?} with {:?}",
+                self.const_input, signature.const_input
+            ),
+        }
     }
 }
 
