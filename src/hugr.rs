@@ -110,6 +110,10 @@ impl Hugr {
         // TODO
         Ok(())
     }
+
+    pub fn root(&self) -> NodeIndex {
+        self.root
+    }
 }
 
 /// Errors that can occur while manipulating a Hugr.

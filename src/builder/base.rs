@@ -25,10 +25,8 @@ impl BaseBuilder {
     }
 
     /// Add a node to the graph without a parent in the hierarchy.
-    pub fn add_root_op(&mut self, op: impl Into<OpType>) -> NodeIndex {
-        let node = self.hugr.add_node(op.into());
-        self.roots.push(node);
-        node
+    pub fn root(&self) -> NodeIndex {
+        self.hugr.root()
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -103,7 +101,7 @@ mod test {
         let mut builder = BaseBuilder::new();
 
         // Create the root module definition
-        let module: NodeIndex = builder.add_root_op(ModuleOp::Root);
+        let module: NodeIndex = builder.root();
 
         // Start a main function with two nat inputs.
         //
