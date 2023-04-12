@@ -22,7 +22,7 @@ impl BaseBuilder {
         Default::default()
     }
 
-    /// Add a node to the graph without a parent in the hierarchy.
+    /// Return index of HUGR root node.
     pub fn root(&self) -> NodeIndex {
         self.hugr.root()
     }
