@@ -57,7 +57,7 @@ impl OpType {
             OpType::Module(op) => op.other_inputs(),
             OpType::Function(op) => op.other_inputs(),
             OpType::ControlFlow(op) => op.other_edges(),
-            OpType::Leaf(_) => Some(EdgeKind::StateOrder),
+            OpType::Leaf(op) => op.other_edges(),
         }
     }
 
