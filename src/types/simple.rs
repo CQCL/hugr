@@ -97,37 +97,37 @@ impl From<QuantumType> for SimpleType {
 #[non_exhaustive]
 pub struct TypeRow {
     /// The datatypes in the row.
-    types: Option<Cow<'static, [SimpleType]>>,
+    types: Cow<'static, [SimpleType]>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
 impl TypeRow {
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.types.as_ref().map_or(0, |types| types.len())
+        self.types.len()
     }
 
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.types.is_none()
+        self.types.len() == 0
     }
 
     #[inline(always)]
     pub fn purely_linear(&self) -> bool {
-        let Some(types) = &self.types else {return false};
-        types.iter().all(|typ| typ.is_linear())
+        self.types.iter().all(|typ| typ.is_linear())
     }
 
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
-        let Some(types) = &self.types else {return false};
-        !types.iter().all(SimpleType::is_classical)
+        self.types.iter().all(SimpleType::is_classical)
     }
 }
 impl TypeRow {
     /// Create a new empty row.
     pub const fn new() -> Self {
-        Self { types: None }
+        Self {
+            types: Cow::Owned(Vec::new()),
+        }
     }
 
     /// Create a new row from a Cow slice of types.
@@ -136,26 +136,19 @@ impl TypeRow {
     ///
     /// [`type_row!`]: crate::macros::type_row
     pub fn from(types: impl Into<Cow<'static, [SimpleType]>>) -> Self {
-        let types = types.into();
         Self {
-            types: if types.is_empty() { None } else { Some(types) },
+            types: types.into(),
         }
     }
 
     /// Iterator over the types in the row.
     pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
-        self.types.iter().flat_map(|types| types.iter())
+        self.types.iter()
     }
 
     /// Mutable iterator over the types in the row.
-    ///
-    /// This will allocate if the row is empty.
-    ///
-    /// TODO: If the vector is emptied, it should set `types` to `None`. (Or we should modify all the methods to handle empty vectors.)
     pub fn to_mut(&mut self) -> &mut Vec<SimpleType> {
-        self.types
-            .get_or_insert_with(|| Cow::Owned(Vec::new()))
-            .to_mut()
+        self.types.to_mut()
     }
 }
 
