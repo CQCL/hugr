@@ -4,7 +4,7 @@ pub mod function;
 pub mod leaf;
 pub mod module;
 
-use crate::types::{Signature, SignatureDescription};
+use crate::types::{EdgeKind, Signature, SignatureDescription};
 
 pub use controlflow::ControlFlowOp;
 pub use custom::{CustomOp, OpDef, OpaqueOp};
@@ -47,6 +47,28 @@ pub enum OpType {
     Function(FunctionOp),
     /// A quantum circuit operation
     Leaf(LeafOp),
+}
+
+impl OpType {
+    /// If None, there will be no other input edges.
+    /// Otherwise, all other input edges will be of that kind.
+    pub fn other_inputs(&self) -> Option<EdgeKind> {
+        match self {
+            OpType::Module(op) => op.other_inputs(),
+            OpType::Function(op) => op.other_inputs(),
+            OpType::ControlFlow(op) => op.other_edges(),
+            OpType::Leaf(op) => op.other_edges(),
+        }
+    }
+
+    /// Like "other_inputs" but describes any other output edges
+    pub fn other_outputs(&self) -> Option<EdgeKind> {
+        match self {
+            OpType::Module(op) => op.other_inputs(),
+            OpType::Function(op) => op.other_outputs(),
+            _ => self.other_inputs(), // Outputs same as inputs
+        }
+    }
 }
 
 impl Op for OpType {

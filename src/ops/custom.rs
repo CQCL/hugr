@@ -128,18 +128,21 @@ impl OpDef {
         signature: Signature,
         port_names: SignatureDescription,
     ) -> Self {
-        let inputs = port_names
+        let mut inputs: Vec<_> = port_names
             .input_zip(&signature)
-            .chain(port_names.const_input_zip(&signature))
-            .map(|(n, t)| (Some(n.clone()), t.clone()));
+            .map(|(n, t)| (Some(n.clone()), t.clone()))
+            .collect();
+        if let Some((n, k)) = port_names.const_input_zip(&signature) {
+            inputs.push((Some(n.clone()), SimpleType::Classic(k.clone())))
+        }
+
         let outputs = port_names
             .output_zip(&signature)
-            .chain(port_names.const_output_zip(&signature))
             .map(|(n, t)| (Some(n.clone()), t.clone()));
         Self {
             name,
             description,
-            inputs: inputs.collect(),
+            inputs: inputs,
             outputs: outputs.collect(),
             misc: HashMap::new(),
             def: None,

@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 use super::{Op, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, QuantumType, Signature, SimpleType},
+    types::{ClassicType, EdgeKind, QuantumType, Signature, SimpleType},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -64,6 +64,10 @@ impl LeafOp {
 
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()
+    }
+
+    pub fn other_edges(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
     }
 }
 

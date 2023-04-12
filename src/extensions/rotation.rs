@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use crate::ops::CustomOp;
 use crate::ops::{module::CustomConst, Op};
 use crate::resource::ResourceSet;
-use crate::types::{CustomType, Signature, SimpleType, TypeRow};
+use crate::types::{ClassicType, CustomType, Signature, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -49,8 +49,8 @@ impl Type {
         CustomType::new(self.name(), TypeRow::new())
     }
 
-    pub fn simple_type(self) -> SimpleType {
-        self.custom_type().simple_type()
+    pub fn classic_type(self) -> ClassicType {
+        self.custom_type().classic_type()
     }
 }
 
@@ -77,12 +77,12 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn const_type(&self) -> SimpleType {
+    fn const_type(&self) -> ClassicType {
         match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
         }
-        .simple_type()
+        .classic_type()
     }
 }
 
@@ -96,7 +96,7 @@ impl Op for AngleAdd {
 
     fn signature(&self) -> Signature {
         // TODO: Is there a way to make this static? The Opaque simple type requires initializing a Box...
-        Signature::new_linear(vec![Type::Angle.simple_type()])
+        Signature::new_linear(vec![SimpleType::Classic(Type::Angle.classic_type())])
     }
 
     fn description(&self) -> &str {
