@@ -43,6 +43,14 @@ pub enum ClassicType {
     Opaque(CustomType),
 }
 
+impl ClassicType {
+    /// Create a graph type with the given signature, using default resources.
+    /// TODO in the future we'll probably need versions of this that take resources.
+    pub fn graph_from_sig(signature: Signature) -> Self {
+        ClassicType::Graph(Box::new((Default::default(), signature)))
+    }
+}
+
 /// A type that represents concrete quantum data.
 ///
 /// TODO: Derive pyclass

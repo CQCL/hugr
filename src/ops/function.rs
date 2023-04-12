@@ -1,7 +1,7 @@
 use smol_str::SmolStr;
 
 use super::{LeafOp, Op};
-use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
+use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionOp {
@@ -19,11 +19,29 @@ pub enum FunctionOp {
     /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type
     CallIndirect { signature: Signature },
     /// Load a static constant in to the local dataflow graph
-    LoadConstant { datatype: SimpleType },
+    LoadConstant { datatype: ClassicType },
     /// Simple operation that has only value inputs+outputs and (potentially) StateOrder edges.
     Leaf { op: LeafOp },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
+}
+
+impl FunctionOp {
+    pub fn other_inputs(&self) -> Option<EdgeKind> {
+        if let FunctionOp::Input { .. } = self {
+            None
+        } else {
+            Some(EdgeKind::StateOrder)
+        }
+    }
+
+    pub fn other_outputs(&self) -> Option<EdgeKind> {
+        if let FunctionOp::Output { .. } = self {
+            None
+        } else {
+            Some(EdgeKind::StateOrder)
+        }
+    }
 }
 
 impl Default for FunctionOp {
@@ -52,28 +70,21 @@ impl Op for FunctionOp {
         match self {
             FunctionOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
-            FunctionOp::Call { signature } => {
-                let mut s = signature.clone();
-                s.const_input.to_mut().insert(
-                    0,
-                    ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
-                );
-                s
-            }
+            FunctionOp::Call { signature } => Signature {
+                const_input: ClassicType::graph_from_sig(signature.clone()).into(),
+                ..signature.clone()
+            },
             FunctionOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
-                s.input.to_mut().insert(
-                    0,
-                    ClassicType::Graph(Box::new((Default::default(), signature.clone()))).into(),
-                );
+                s.input
+                    .to_mut()
+                    .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
                 s
             }
-            FunctionOp::LoadConstant { datatype } => Signature::new(
-                vec![datatype.clone()],
-                TypeRow::new(),
-                TypeRow::new(),
-                vec![datatype.clone()],
-            ),
+            FunctionOp::LoadConstant { datatype } => Signature {
+                const_input: Some(datatype.clone()),
+                ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
+            },
             FunctionOp::Leaf { op } => op.signature(),
             FunctionOp::Nested { signature } => signature.clone(),
         }

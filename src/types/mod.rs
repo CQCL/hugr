@@ -12,55 +12,36 @@ use smol_str::SmolStr;
 
 use crate::resource::ResourceSet;
 
-/// The wire types
+/// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub enum Type {
+pub enum EdgeKind {
     /// Control edges of a CFG region
     ControlFlow,
-    /// Data edges of a DDG region
+    /// Data edges of a DDG region, also known as "wires"
     Value(SimpleType),
     /// A reference to a constant value definition, used in the module region
     Const(ClassicType),
-    /// A strict ordering between nodes
+    /// Explicitly enforce an ordering between nodes in a DDG
     StateOrder,
     // An edge specifying a resource set
     Resource(ResourceSet),
 }
 
-impl Default for Type {
-    fn default() -> Self {
-        Self::StateOrder
-    }
-}
-
-/// A function signature with dataflow types. This does not specify control flow
-/// ports nor state ordering
+/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
+/// and also the target (value) of a call (constant).
 ///
-/// TODO: Here we split the input and output into two parts, one for value wires and
-/// one for constant definitions. This allows us to reuse the `RowType` type,
-/// but requires that the value ports come all before the constants. We could
-/// change this by redefining
-/// ```text
-/// enum RowTypeVariant {df: DataType, const: DataType}
-/// struct RowType(Vec<RowTypeVariant>);
-/// ```
-/// but that seems more annoying to work with.
-/// That would reduce the size of `OpType` by about 50%, so it's worth considering.
-///
-/// TODO: Option2 is using Cow here instead of in the TypeRow.
+/// TODO: Consider using Cow here instead of in the TypeRow.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
-    /// Input of the function
+    /// Value inputs of the function
     pub input: TypeRow,
-    /// Output of the function
+    /// Value outputs of the function
     pub output: TypeRow,
-    /// Constant data references used by the function
-    pub const_input: TypeRow,
-    /// Constant data references defined by the function
-    pub const_output: TypeRow,
+    /// Possible constE input (for call / load-constant)
+    pub const_input: Option<ClassicType>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -68,10 +49,7 @@ impl Signature {
     /// The number of wires in the signature
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty()
-            && self.const_output.is_empty()
-            && self.input.is_empty()
-            && self.output.is_empty()
+        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear
@@ -109,42 +87,24 @@ impl Signature {
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-        const_input: impl Into<TypeRow>,
-        const_output: impl Into<TypeRow>,
+        const_input: impl Into<Option<ClassicType>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
-            const_output: const_output.into(),
         }
     }
 
     /// Create a new signature with the same input and output types
     pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
-        Self {
-            input: linear.clone(),
-            output: linear,
-            ..Default::default()
-        }
+        Signature::new_df(linear.clone(), linear)
     }
 
     /// Create a new signature with only dataflow inputs and outputs
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<TypeRow>) -> Self {
-        Self {
-            const_output: const_output.into(),
-            ..Default::default()
-        }
+        Signature::new(input, output, None)
     }
 }
 
@@ -159,9 +119,7 @@ pub struct SignatureDescription {
     /// Output of the function
     pub output: Vec<SmolStr>,
     /// Constant data references used by the function
-    pub const_input: Vec<SmolStr>,
-    /// Constant data references defined by the function
-    pub const_output: Vec<SmolStr>,
+    pub const_input: Option<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -169,10 +127,7 @@ impl SignatureDescription {
     /// The number of wires in the signature
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty()
-            && self.const_output.is_empty()
-            && self.input.is_empty()
-            && self.output.is_empty()
+        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
     }
 }
 
@@ -181,25 +136,19 @@ impl SignatureDescription {
     pub fn new(
         input: impl Into<Vec<SmolStr>>,
         output: impl Into<Vec<SmolStr>>,
-        const_input: impl Into<Vec<SmolStr>>,
-        const_output: impl Into<Vec<SmolStr>>,
+        const_input: impl Into<Option<SmolStr>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
-            const_output: const_output.into(),
         }
     }
 
     /// Create a new signature with only linear dataflow inputs and outputs
     pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
-        Self {
-            input: linear.clone(),
-            output: linear,
-            ..Default::default()
-        }
+        SignatureDescription::new_df(linear.clone(), linear.clone())
     }
 
     /// Create a new signature with only dataflow inputs and outputs
@@ -207,14 +156,6 @@ impl SignatureDescription {
         Self {
             input: input.into(),
             output: output.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Create a new signature with only constant outputs
-    pub fn new_const(const_output: impl Into<Vec<SmolStr>>) -> Self {
-        Self {
-            const_output: const_output.into(),
             ..Default::default()
         }
     }
@@ -248,29 +189,14 @@ impl SignatureDescription {
     }
 
     /// Iterate over the constant input wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.const_input
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.const_input.iter())
-    }
-
-    /// Iterate over the constant output wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
-    pub fn const_output_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.const_output
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.const_output.iter())
+    ) -> Option<(&'a SmolStr, &'a ClassicType)> {
+        match &signature.const_input {
+            None => None,
+            Some(t) => Some((self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t)),
+        }
     }
 }
 

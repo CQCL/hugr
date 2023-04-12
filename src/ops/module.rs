@@ -3,8 +3,7 @@ use std::any::Any;
 use super::Op;
 use crate::{
     macros::impl_box_clone,
-    type_row,
-    types::{ClassicType, Signature, SignatureDescription, SimpleType, TypeRow},
+    types::{ClassicType, EdgeKind, Signature, SimpleType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -34,6 +33,22 @@ pub enum ModuleOp {
     Const(ConstValue),
 }
 
+impl ModuleOp {
+    pub fn other_inputs(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    pub fn other_outputs(&self) -> Option<EdgeKind> {
+        match self {
+            ModuleOp::Root | ModuleOp::Struct { .. } | ModuleOp::Alias { .. } => None,
+            ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
+                ClassicType::graph_from_sig(signature.clone()),
+            )),
+            ModuleOp::Const(v) => Some(EdgeKind::Const(v.const_type())),
+        }
+    }
+}
+
 impl Op for ModuleOp {
     fn name(&self) -> SmolStr {
         // TODO: These should be unique names for each distinct op
@@ -55,7 +70,7 @@ impl Op for ModuleOp {
             ModuleOp::Declare { signature } => signature.clone(),
             ModuleOp::Struct { .. } => todo!(),
             ModuleOp::Alias { .. } => todo!(),
-            ModuleOp::Const(v) => Signature::new_const(v.type_row()),
+            ModuleOp::Const(v) => v.signature(),
         }
     }
 }
@@ -90,13 +105,11 @@ impl Default for ConstValue {
 
 impl ConstValue {
     /// Returns the datatype of the constant
-    pub fn type_row(&self) -> TypeRow {
-        const BIT: SimpleType = SimpleType::Classic(ClassicType::Bit);
-        const INT: SimpleType = SimpleType::Classic(ClassicType::Int);
+    pub fn const_type(&self) -> ClassicType {
         match self {
-            Self::Bit(_) => type_row![BIT],
-            Self::Int(_) => type_row![INT],
-            Self::Opaque(row, _) => TypeRow::from(vec![row.clone()]),
+            Self::Bit(_) => ClassicType::Bit,
+            Self::Int(_) => ClassicType::Int,
+            Self::Opaque(_, b) => (*b).const_type(),
         }
     }
 }
@@ -116,19 +129,13 @@ impl Op for ConstValue {
     }
 
     fn signature(&self) -> Signature {
-        Signature::new_const(self.type_row())
-    }
-
-    fn signature_desc(&self) -> Option<SignatureDescription> {
-        Some(SignatureDescription::new_const([
-            "Constant value output".into()
-        ]))
+        Signature::default()
     }
 }
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque(v.const_type(), Box::new(v))
+        Self::Opaque(SimpleType::Classic(v.const_type()), Box::new(v))
     }
 }
 
@@ -143,7 +150,7 @@ pub trait CustomConst:
     fn name(&self) -> SmolStr;
 
     /// Returns the type of the constant.
-    fn const_type(&self) -> SimpleType;
+    fn const_type(&self) -> ClassicType;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn eq(&self, other: &dyn CustomConst) -> bool {

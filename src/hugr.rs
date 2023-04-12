@@ -3,12 +3,11 @@
 //! TODO: metadata
 #![allow(dead_code)]
 
-use portgraph::{Hierarchy, NodeIndex, PortGraph, PortIndex, SecondaryMap};
+use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
 use crate::ops::{Op, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
-use crate::types::Type;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -27,11 +26,6 @@ pub struct Hugr {
 
     /// Operation types for each node.
     op_types: SecondaryMap<NodeIndex, OpType>,
-
-    /// Port types for each port.
-    ///
-    /// TODO: This is redundant information with the operation signature. Remove it?
-    port_types: SecondaryMap<PortIndex, Type>,
 }
 
 impl Default for Hugr {
@@ -46,14 +40,12 @@ impl Hugr {
         let graph = PortGraph::default();
         let hierarchy = Hierarchy::new();
         let op_types = SecondaryMap::new();
-        let port_types = SecondaryMap::new();
 
         Self {
             graph,
             hierarchy,
             root: None,
             op_types,
-            port_types,
         }
     }
 
@@ -103,15 +95,12 @@ impl Hugr {
             std::mem::swap(&mut self.op_types[new], &mut replacement.op_types[old]);
             // TODO: metadata (Fn parameter ?)
         };
-        let port_inserted = |old, new| {
-            std::mem::swap(&mut self.port_types[new], &mut replacement.port_types[old]);
-        };
         rewrite.apply_with_callbacks(
             &mut self.graph,
             |_| {},
             |_| {},
             node_inserted,
-            port_inserted,
+            |_, _| {},
             |_, _| {},
         )?;
 
