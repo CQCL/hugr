@@ -45,8 +45,6 @@ pub enum OpType {
     ControlFlow(ControlFlowOp),
     /// A function manipulation node
     Function(FunctionOp),
-    /// A quantum circuit operation
-    Leaf(LeafOp),
 }
 
 impl Op for OpType {
@@ -55,7 +53,6 @@ impl Op for OpType {
             OpType::Module(op) => op.name(),
             OpType::ControlFlow(op) => op.name(),
             OpType::Function(op) => op.name(),
-            OpType::Leaf(op) => op.name(),
         }
     }
 
@@ -64,14 +61,13 @@ impl Op for OpType {
             OpType::Module(op) => op.signature(),
             OpType::ControlFlow(op) => op.signature(),
             OpType::Function(op) => op.signature(),
-            OpType::Leaf(op) => op.signature(),
         }
     }
 }
 
 impl Default for OpType {
     fn default() -> Self {
-        Self::Leaf(Default::default())
+        Self::Function(Default::default())
     }
 }
 
@@ -87,14 +83,11 @@ impl From<ControlFlowOp> for OpType {
     }
 }
 
-impl From<FunctionOp> for OpType {
-    fn from(op: FunctionOp) -> Self {
-        Self::Function(op)
-    }
-}
-
-impl From<LeafOp> for OpType {
-    fn from(op: LeafOp) -> Self {
-        Self::Leaf(op)
+impl<T> From<T> for OpType
+where
+    T: Into<FunctionOp>,
+{
+    fn from(op: T) -> Self {
+        Self::Function(op.into())
     }
 }

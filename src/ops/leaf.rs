@@ -30,6 +30,9 @@ pub enum LeafOp {
     Noop(SimpleType),
     Measure,
     Copy {
+        /// Note that a 0-ary copy acts as an explicit discard.
+        /// Like any stateful operation with no dataflow outputs, such
+        /// a copy should have a State output connecting it to the Output node.
         n_copies: u32,
         typ: ClassicType,
     },
