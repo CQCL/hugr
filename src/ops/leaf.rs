@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 use super::{Op, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, EdgeKind, QuantumType, Signature, SimpleType},
+    types::{ClassicType, QuantumType, Signature, SimpleType},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,6 +30,9 @@ pub enum LeafOp {
     Noop(SimpleType),
     Measure,
     Copy {
+        /// Note that a 0-ary copy acts as an explicit discard.
+        /// Like any stateful operation with no dataflow outputs, such
+        /// a copy should have a State output connecting it to the Output node.
         n_copies: u32,
         typ: ClassicType,
     },
@@ -64,10 +67,6 @@ impl LeafOp {
 
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()
-    }
-
-    pub fn other_edges(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
     }
 }
 

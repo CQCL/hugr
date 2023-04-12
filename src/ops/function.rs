@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use super::Op;
+use super::{LeafOp, Op};
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -20,10 +20,8 @@ pub enum FunctionOp {
     CallIndirect { signature: Signature },
     /// Load a static constant in to the local dataflow graph
     LoadConstant { datatype: ClassicType },
-    /// Explicit discard, has a single `datatype` input, and a State output
-    /// connecting it to the Output node. All stateful operations with no
-    /// dataflow outputs should have such State edges.
-    Discard { datatype: SimpleType },
+    /// Simple operation that has only value inputs+outputs and (potentially) StateOrder edges.
+    Leaf { op: LeafOp },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
 }
@@ -48,8 +46,8 @@ impl FunctionOp {
 
 impl Default for FunctionOp {
     fn default() -> Self {
-        FunctionOp::Input {
-            types: Default::default(),
+        Self::Leaf {
+            op: LeafOp::default(),
         }
     }
 }
@@ -62,7 +60,7 @@ impl Op for FunctionOp {
             FunctionOp::Call { .. } => "call",
             FunctionOp::CallIndirect { .. } => "call_indirect",
             FunctionOp::LoadConstant { .. } => "load",
-            FunctionOp::Discard { .. } => "discard",
+            FunctionOp::Leaf { op } => return op.name(),
             FunctionOp::Nested { .. } => "nested",
         }
         .into()
@@ -87,10 +85,14 @@ impl Op for FunctionOp {
                 const_input: Some(datatype.clone()),
                 ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
             },
-            FunctionOp::Discard { datatype } => {
-                Signature::new_df(vec![datatype.clone()], TypeRow::new())
-            }
+            FunctionOp::Leaf { op } => op.signature(),
             FunctionOp::Nested { signature } => signature.clone(),
         }
+    }
+}
+
+impl From<LeafOp> for FunctionOp {
+    fn from(op: LeafOp) -> Self {
+        Self::Leaf { op }
     }
 }
