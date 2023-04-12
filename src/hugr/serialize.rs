@@ -35,6 +35,9 @@ impl From<&Hugr> for SerHugr {
                     n
                 });
                 let opt = &op_types[n];
+                // secondary map holds default values for empty positions
+                // whether or not the default value is present or not - the
+                // serializaion roundtrip will be correct
                 if opt != &OpType::default() {
                     op_types_hsh.insert(n, opt.clone());
                 }
