@@ -104,6 +104,7 @@ pub struct Rewrite {
     replacement: OpenHugr,
     /// A map from nodes in the subgraph to be replaced to nodes in the replacement graph.
     /// For each key-value pair, all children of the key will be transferred to be children of the value.
+    /// Note: any children of nodes in the replaced subgraph not in this map, will be removed.
     child_transfers: ParentsMap,
 }
 
