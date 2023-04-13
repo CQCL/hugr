@@ -9,12 +9,12 @@ use crate::Hugr;
 /// A subset of the nodes in a sibling graph, i.e. all with the same parent,
 /// and the ports that it is connected to.
 #[derive(Debug, Clone, Default)]
-pub struct BoundedSubgraph {
+pub struct SiblingSubgraph {
     /// Nodes in the subgraph.
     pub subgraph: portgraph::substitute::BoundedSubgraph,
 }
 
-impl BoundedSubgraph {
+impl SiblingSubgraph {
     /// Creates a new bounded subgraph.
     ///
     /// TODO: We should be able to automatically detect dangling ports by
@@ -74,7 +74,7 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 #[derive(Debug, Clone)]
 pub struct Rewrite {
     /// The subgraph to be replaced.
-    subgraph: BoundedSubgraph,
+    subgraph: SiblingSubgraph,
     /// The replacement graph. This should be a forest, i.e. the nodes without parents
     /// will be assigned the same parent as the nodes in the subgraph being replaced.
     replacement: OpenHugr,
@@ -86,7 +86,7 @@ pub struct Rewrite {
 impl Rewrite {
     /// Creates a new rewrite operation.
     pub fn new(
-        subgraph: BoundedSubgraph,
+        subgraph: SiblingSubgraph,
         replacement: OpenHugr,
         parents: impl Into<ParentsMap>,
     ) -> Self {
