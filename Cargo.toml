@@ -43,6 +43,10 @@ pyo3 = ["dep:pyo3"]
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["html_reports"] }
 rstest = "0.16.0"
+portgraph = { git = "http://github.com/CQCL/portgraph", features = ["proptest"] }
+proptest = "1.1.0"
+rmp-serde = "1.1.1"
+
 
 [[bench]]
 name = "bench_main"
