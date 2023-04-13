@@ -11,7 +11,7 @@ use crate::Hugr;
 #[derive(Debug, Clone, Default)]
 pub struct SiblingSubgraph {
     /// Nodes in the subgraph.
-    pub subgraph: portgraph::substitute::BoundedSubgraph,
+    subgraph: portgraph::substitute::BoundedSubgraph,
 }
 
 impl SiblingSubgraph {
