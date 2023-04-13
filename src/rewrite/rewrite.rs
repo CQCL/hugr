@@ -104,7 +104,7 @@ pub struct Rewrite {
     replacement: OpenHugr,
     /// A map from nodes in the subgraph to be replaced to nodes in the replacement graph.
     /// For each key-value pair, all children of the key will be transferred to be children of the value.
-    parents: ParentsMap,
+    child_transfers: ParentsMap,
 }
 
 impl Rewrite {
@@ -112,12 +112,12 @@ impl Rewrite {
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: OpenHugr,
-        parents: impl Into<ParentsMap>,
+        child_transfers: impl Into<ParentsMap>,
     ) -> Self {
         Self {
             subgraph,
             replacement,
-            parents: parents.into(),
+            child_transfers: child_transfers.into(),
         }
     }
 
@@ -130,7 +130,7 @@ impl Rewrite {
         (
             portgraph::substitute::Rewrite::new(self.subgraph.subgraph, open_graph),
             replacement,
-            self.parents,
+            self.child_transfers,
         )
     }
 
