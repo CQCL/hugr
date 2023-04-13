@@ -96,6 +96,7 @@ impl TryFrom<&Hugr> for SerHugr {
         })
     }
 }
+
 impl TryFrom<SerHugr> for Hugr {
     type Error = HUGRSerializationError;
     fn try_from(
@@ -163,6 +164,8 @@ pub mod test {
     use proptest::prelude::*;
     proptest! {
         #[test]
+        // miri fails due to proptest filesystem access
+        #[cfg_attr(miri, ignore)]
         fn prop_serialization(mut graph in gen_portgraph(100, 50, 1000)) {
             let root = graph.add_node(0, 0);
             let mut hierarchy = Hierarchy::new();
