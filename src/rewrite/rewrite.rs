@@ -6,7 +6,8 @@ use thiserror::Error;
 
 use crate::Hugr;
 
-/// A subset of the nodes in a graph, and the ports that it is connected to.
+/// A subset of the nodes in a sibling graph, i.e. all with the same parent,
+/// and the ports that it is connected to.
 #[derive(Debug, Clone, Default)]
 pub struct BoundedSubgraph {
     /// Nodes in the subgraph.
@@ -74,9 +75,11 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 pub struct Rewrite {
     /// The subgraph to be replaced.
     subgraph: BoundedSubgraph,
-    /// The replacement graph.
+    /// The replacement graph. This should be a forest, i.e. the nodes without parents
+    /// will be assigned the same parent as the nodes in the subgraph being replaced.
     replacement: OpenHugr,
-    /// A map from the nodes in the replacement graph to the target parents in the original graph.
+    /// A map from nodes in the subgraph to be replaced to nodes in the replacement graph.
+    /// For each key-value pair, all children of the key will be transferred to be children of the value.
     parents: ParentsMap,
 }
 
