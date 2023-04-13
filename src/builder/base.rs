@@ -90,7 +90,7 @@ pub enum BuildError {
 mod test {
     use crate::{
         macros::type_row,
-        ops::{FunctionOp, LeafOp, ModuleOp},
+        ops::{DataflowOp, LeafOp, ModuleOp},
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -122,7 +122,7 @@ mod test {
             let f_in = builder
                 .add_op(
                     f,
-                    FunctionOp::Input {
+                    DataflowOp::Input {
                         types: type_row![NAT],
                     },
                 )
@@ -139,7 +139,7 @@ mod test {
             let f_out = builder
                 .add_op(
                     f,
-                    FunctionOp::Output {
+                    DataflowOp::Output {
                         types: type_row![NAT, NAT],
                     },
                 )
