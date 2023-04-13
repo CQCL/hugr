@@ -81,6 +81,10 @@ impl Hugr {
         Ok(())
     }
 
+    pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
+        self.hierarchy.parent(node)
+    }
+
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.

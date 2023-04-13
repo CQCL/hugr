@@ -20,8 +20,29 @@ impl SiblingSubgraph {
     /// TODO: We should be able to automatically detect dangling ports by
     /// finding inputs and outputs in `hugr` that are connected to things
     /// outside. Can we do that efficiently?
-    pub fn new(_hugr: &Hugr, _nodes: impl IntoIterator<Item = NodeIndex>) -> Self {
+    pub fn new(hugr: &Hugr, nodes: impl IntoIterator<Item = NodeIndex>) -> Result<Self, SiblingError> {
+        let nodes: Vec<NodeIndex> = nodes.into_iter().collect();
+        SiblingSubgraph::validate_siblings(hugr, &nodes)?;
         todo!()
+    }
+
+    fn validate_siblings(hugr: &Hugr, nodes: &Vec<NodeIndex>) -> Result<(), SiblingError> {
+        let parent = hugr.get_parent(*nodes.first().ok_or(SiblingError::Empty)?);
+        match parent {
+            None => {
+                if nodes.len() != 1 || nodes[0] != hugr.root() {
+                    return Err(SiblingError::OnlyRoot)
+                }
+            }
+            Some(_) => {
+                for p_idx in nodes.iter().map(|n| hugr.get_parent(*n)) {
+                    if p_idx != parent {
+                        return Err(SiblingError::MultipleParents(parent, p_idx))
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -155,4 +176,14 @@ impl From<portgraph::substitute::RewriteError> for RewriteError {
             portgraph::substitute::RewriteError::Link(e) => Self::ConnectionError(e),
         }
     }
+}
+
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum SiblingError {
+    #[error("No nodes in subgraph")]
+    Empty,
+    #[error("Only the root node may have no parent")]
+    OnlyRoot,
+    #[error("Nodes in the subgraph were not siblings")]
+    MultipleParents(Option<NodeIndex>, Option<NodeIndex>)
 }
