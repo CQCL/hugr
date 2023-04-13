@@ -6,7 +6,7 @@
 use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
-use crate::ops::{ModuleOp, Op, OpType};
+use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 
 pub mod serialize;
