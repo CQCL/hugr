@@ -1,6 +1,6 @@
 pub mod controlflow;
 pub mod custom;
-pub mod function;
+pub mod dataflow;
 pub mod leaf;
 pub mod module;
 
@@ -8,7 +8,7 @@ use crate::types::{EdgeKind, Signature, SignatureDescription};
 
 pub use controlflow::BasicBlockOp;
 pub use custom::{CustomOp, OpDef, OpaqueOp};
-pub use function::FunctionOp;
+pub use dataflow::DataflowOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
 use smol_str::SmolStr;
@@ -45,7 +45,7 @@ pub enum OpType {
     BasicBlock(BasicBlockOp),
     /// A function manipulation node - parent will be a dataflow-graph container
     /// (delta, gamma, theta, def, beta)
-    Function(FunctionOp),
+    Function(DataflowOp),
 }
 
 impl OpType {
@@ -107,7 +107,7 @@ impl From<BasicBlockOp> for OpType {
 
 impl<T> From<T> for OpType
 where
-    T: Into<FunctionOp>,
+    T: Into<DataflowOp>,
 {
     fn from(op: T) -> Self {
         Self::Function(op.into())

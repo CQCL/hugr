@@ -4,7 +4,7 @@ use super::{controlflow::ControlFlowOp, LeafOp, Op};
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum FunctionOp {
+pub enum DataflowOp {
     /// An input node.
     /// The outputs of this node are the inputs to the function.
     Input { types: TypeRow },
@@ -28,9 +28,9 @@ pub enum FunctionOp {
     ControlFlow { op: ControlFlowOp },
 }
 
-impl FunctionOp {
+impl DataflowOp {
     pub fn other_inputs(&self) -> Option<EdgeKind> {
-        if let FunctionOp::Input { .. } = self {
+        if let DataflowOp::Input { .. } = self {
             None
         } else {
             Some(EdgeKind::StateOrder)
@@ -38,7 +38,7 @@ impl FunctionOp {
     }
 
     pub fn other_outputs(&self) -> Option<EdgeKind> {
-        if let FunctionOp::Output { .. } = self {
+        if let DataflowOp::Output { .. } = self {
             None
         } else {
             Some(EdgeKind::StateOrder)
@@ -46,7 +46,7 @@ impl FunctionOp {
     }
 }
 
-impl Default for FunctionOp {
+impl Default for DataflowOp {
     fn default() -> Self {
         Self::Leaf {
             op: LeafOp::default(),
@@ -54,54 +54,54 @@ impl Default for FunctionOp {
     }
 }
 
-impl Op for FunctionOp {
+impl Op for DataflowOp {
     fn name(&self) -> SmolStr {
         match self {
-            FunctionOp::Input { .. } => "input",
-            FunctionOp::Output { .. } => "output",
-            FunctionOp::Call { .. } => "call",
-            FunctionOp::CallIndirect { .. } => "call_indirect",
-            FunctionOp::LoadConstant { .. } => "load",
-            FunctionOp::Leaf { op } => return op.name(),
-            FunctionOp::Nested { .. } => "nested",
-            FunctionOp::ControlFlow { op } => return op.name(),
+            DataflowOp::Input { .. } => "input",
+            DataflowOp::Output { .. } => "output",
+            DataflowOp::Call { .. } => "call",
+            DataflowOp::CallIndirect { .. } => "call_indirect",
+            DataflowOp::LoadConstant { .. } => "load",
+            DataflowOp::Leaf { op } => return op.name(),
+            DataflowOp::Nested { .. } => "nested",
+            DataflowOp::ControlFlow { op } => return op.name(),
         }
         .into()
     }
 
     fn signature(&self) -> Signature {
         match self {
-            FunctionOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
-            FunctionOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
-            FunctionOp::Call { signature } => Signature {
+            DataflowOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
+            DataflowOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
+            DataflowOp::Call { signature } => Signature {
                 const_input: ClassicType::graph_from_sig(signature.clone()).into(),
                 ..signature.clone()
             },
-            FunctionOp::CallIndirect { signature } => {
+            DataflowOp::CallIndirect { signature } => {
                 let mut s = signature.clone();
                 s.input
                     .to_mut()
                     .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
                 s
             }
-            FunctionOp::LoadConstant { datatype } => Signature {
+            DataflowOp::LoadConstant { datatype } => Signature {
                 const_input: Some(datatype.clone()),
                 ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
             },
-            FunctionOp::Leaf { op } => op.signature(),
-            FunctionOp::Nested { signature } => signature.clone(),
-            FunctionOp::ControlFlow { op } => op.signature(),
+            DataflowOp::Leaf { op } => op.signature(),
+            DataflowOp::Nested { signature } => signature.clone(),
+            DataflowOp::ControlFlow { op } => op.signature(),
         }
     }
 }
 
-impl From<LeafOp> for FunctionOp {
+impl From<LeafOp> for DataflowOp {
     fn from(op: LeafOp) -> Self {
         Self::Leaf { op }
     }
 }
 
-impl From<ControlFlowOp> for FunctionOp {
+impl From<ControlFlowOp> for DataflowOp {
     fn from(op: ControlFlowOp) -> Self {
         Self::ControlFlow { op }
     }
