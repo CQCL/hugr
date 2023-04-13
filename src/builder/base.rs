@@ -14,8 +14,6 @@ use crate::{
 pub struct BaseBuilder {
     /// The partial HUGR being built.
     hugr: Hugr,
-    /// Sets of nodes that do not have a parent in the hierarchy.
-    roots: Vec<NodeIndex>,
 }
 
 impl BaseBuilder {
@@ -24,11 +22,9 @@ impl BaseBuilder {
         Default::default()
     }
 
-    /// Add a node to the graph without a parent in the hierarchy.
-    pub fn add_root_op(&mut self, op: impl Into<OpType>) -> NodeIndex {
-        let node = self.hugr.add_node(op.into());
-        self.roots.push(node);
-        node
+    /// Return index of HUGR root node.
+    pub fn root(&self) -> NodeIndex {
+        self.hugr.root()
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -61,14 +57,7 @@ impl BaseBuilder {
 
     /// Build the HUGR, returning an error if the graph is not valid.
     pub fn finish(self) -> Result<Hugr, BuildError> {
-        let mut hugr = self.hugr;
-        let roots = self.roots;
-
-        match roots.len() {
-            0 => {}
-            1 => hugr.set_root(roots[0]),
-            _ => return Err(BuildError::TooManyRoots { roots }),
-        }
+        let hugr = self.hugr;
 
         hugr.validate()?;
 
@@ -104,7 +93,7 @@ mod test {
         let mut builder = BaseBuilder::new();
 
         // Create the root module definition
-        let module: NodeIndex = builder.add_root_op(ModuleOp::Root);
+        let module: NodeIndex = builder.root();
 
         // Start a main function with two nat inputs.
         //
