@@ -2,9 +2,13 @@
 //! [`Hugr`]: crate::hugr::Hugr
 
 use std::collections::HashMap;
+use thiserror::Error;
 
 use crate::{hugr::Hugr, ops::OpType};
-use portgraph::{Direction, Hierarchy, NodeIndex, PortGraph, PortIndex, SecondaryMap};
+use portgraph::{
+    hierarchy::AttachError, Direction, Hierarchy, LinkError, NodeIndex, PortGraph, PortIndex,
+    SecondaryMap,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -15,21 +19,39 @@ struct SerHugr {
     op_types: HashMap<NodeIndex, OpType>,
 }
 
-impl From<&Hugr> for SerHugr {
-    fn from(
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum HUGRSerializationError {
+    /// Cannot serialize a non-compact graph.
+    #[error("Cannot serialize a non-compact graph (node indices must be contiguous).")]
+    NonCompactGraph,
+    /// Unexpected hierarchy error.
+    #[error("Failed to attach child to parent: {0:?}.")]
+    AttachError(#[from] AttachError),
+    /// Failed to add edge.
+    #[error("Failed to build edge when deserializing: {0:?}.")]
+    LinkError(#[from] LinkError),
+}
+
+impl TryFrom<&Hugr> for SerHugr {
+    type Error = HUGRSerializationError;
+
+    fn try_from(
         Hugr {
             graph,
             hierarchy,
             root,
             op_types,
         }: &Hugr,
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
         let mut op_types_hsh = HashMap::new();
-        let nodes: Vec<_> = graph
+        let nodes: Result<Vec<_>, HUGRSerializationError> = graph
             .nodes_iter()
             .enumerate()
             .map(|(i, n)| {
-                assert_eq!(i, n.index(), "can't serialize a non-compact graph");
+                if i != n.index() {
+                    return Err(HUGRSerializationError::NonCompactGraph);
+                }
+
                 let parent = hierarchy.parent(n).unwrap_or_else(|| {
                     assert_eq!(*root, n);
                     n
@@ -41,9 +63,10 @@ impl From<&Hugr> for SerHugr {
                 if opt != &OpType::default() {
                     op_types_hsh.insert(n, opt.clone());
                 }
-                (parent, graph.num_inputs(n), graph.num_outputs(n))
+                Ok((parent, graph.num_inputs(n), graph.num_outputs(n)))
             })
             .collect();
+        let nodes = nodes?;
 
         let find_offset = |p: PortIndex| {
             (
@@ -65,24 +88,24 @@ impl From<&Hugr> for SerHugr {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             nodes,
             edges,
             root: *root,
             op_types: op_types_hsh,
-        }
+        })
     }
 }
-
-impl From<SerHugr> for Hugr {
-    fn from(
+impl TryFrom<SerHugr> for Hugr {
+    type Error = HUGRSerializationError;
+    fn try_from(
         SerHugr {
             nodes,
             edges,
             root,
             mut op_types,
         }: SerHugr,
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
         let mut hierarchy = Hierarchy::new();
 
         // if there are any unconnected ports the capacity will be an
@@ -92,9 +115,7 @@ impl From<SerHugr> for Hugr {
         for (parent, incoming, outgoing) in nodes {
             let ni = graph.add_node(incoming, outgoing);
             if parent != ni {
-                hierarchy
-                    .push_child(ni, parent)
-                    .expect("Unexpected hierarchy error"); // TODO remove unwrap
+                hierarchy.push_child(ni, parent)?; // TODO remove unwrap
             }
             if let Some(typ) = op_types.remove(&ni) {
                 op_types_sec[ni] = typ;
@@ -102,17 +123,15 @@ impl From<SerHugr> for Hugr {
         }
 
         for [(srcn, from_offset), (tgtn, to_offset)] in edges {
-            graph
-                .link_nodes(srcn, from_offset, tgtn, to_offset)
-                .expect("Unexpected link error");
+            graph.link_nodes(srcn, from_offset, tgtn, to_offset)?;
         }
 
-        Self {
+        Ok(Self {
             graph,
             hierarchy,
             root,
             op_types: op_types_sec,
-        }
+        })
     }
 }
 
@@ -121,7 +140,7 @@ impl Serialize for Hugr {
     where
         S: serde::Serializer,
     {
-        let shg: SerHugr = self.into();
+        let shg: SerHugr = self.try_into().map_err(serde::ser::Error::custom)?;
         shg.serialize(serializer)
     }
 }
@@ -132,7 +151,7 @@ impl<'de> Deserialize<'de> for Hugr {
         D: Deserializer<'de>,
     {
         let shg = SerHugr::deserialize(deserializer)?;
-        Ok(shg.into())
+        shg.try_into().map_err(serde::de::Error::custom)
     }
 }
 
