@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use super::{LeafOp, Op};
+use super::{controlflow::ControlFlowOp, LeafOp, Op};
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -24,6 +24,8 @@ pub enum FunctionOp {
     Leaf { op: LeafOp },
     /// δ (delta): a simply nested dataflow graph
     Nested { signature: Signature },
+    /// Operation related to control flow
+    ControlFlow { op: ControlFlowOp },
 }
 
 impl FunctionOp {
@@ -62,6 +64,7 @@ impl Op for FunctionOp {
             FunctionOp::LoadConstant { .. } => "load",
             FunctionOp::Leaf { op } => return op.name(),
             FunctionOp::Nested { .. } => "nested",
+            FunctionOp::ControlFlow { op } => return op.name(),
         }
         .into()
     }
@@ -87,6 +90,7 @@ impl Op for FunctionOp {
             },
             FunctionOp::Leaf { op } => op.signature(),
             FunctionOp::Nested { signature } => signature.clone(),
+            FunctionOp::ControlFlow { op } => op.signature(),
         }
     }
 }
@@ -94,5 +98,11 @@ impl Op for FunctionOp {
 impl From<LeafOp> for FunctionOp {
     fn from(op: LeafOp) -> Self {
         Self::Leaf { op }
+    }
+}
+
+impl From<ControlFlowOp> for FunctionOp {
+    fn from(op: ControlFlowOp) -> Self {
+        Self::ControlFlow { op }
     }
 }

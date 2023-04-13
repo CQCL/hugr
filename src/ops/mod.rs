@@ -6,7 +6,7 @@ pub mod module;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 
-pub use controlflow::ControlFlowOp;
+pub use controlflow::BasicBlockOp;
 pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use function::FunctionOp;
 pub use leaf::LeafOp;
@@ -39,11 +39,12 @@ pub trait Op {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {
-    /// A module region node.
+    /// A module region node - parent will be the Root (or the node itself is the Root)
     Module(ModuleOp),
-    /// A control flow node
-    ControlFlow(ControlFlowOp),
-    /// A function manipulation node
+    /// A basic block in a control flow graph - parent will be a kappa node
+    BasicBlock(BasicBlockOp),
+    /// A function manipulation node - parent will be a dataflow-graph container
+    /// (delta, gamma, theta, def, beta)
     Function(FunctionOp),
 }
 
@@ -54,7 +55,7 @@ impl OpType {
         match self {
             OpType::Module(op) => op.other_inputs(),
             OpType::Function(op) => op.other_inputs(),
-            OpType::ControlFlow(op) => op.other_edges(),
+            OpType::BasicBlock(op) => op.other_edges(),
         }
     }
 
@@ -63,7 +64,7 @@ impl OpType {
         match self {
             OpType::Module(op) => op.other_inputs(),
             OpType::Function(op) => op.other_outputs(),
-            OpType::ControlFlow(op) => op.other_edges(),
+            OpType::BasicBlock(op) => op.other_edges(),
         }
     }
 }
@@ -72,7 +73,7 @@ impl Op for OpType {
     fn name(&self) -> SmolStr {
         match self {
             OpType::Module(op) => op.name(),
-            OpType::ControlFlow(op) => op.name(),
+            OpType::BasicBlock(op) => op.name(),
             OpType::Function(op) => op.name(),
         }
     }
@@ -80,7 +81,7 @@ impl Op for OpType {
     fn signature(&self) -> Signature {
         match self {
             OpType::Module(op) => op.signature(),
-            OpType::ControlFlow(op) => op.signature(),
+            OpType::BasicBlock(op) => op.signature(),
             OpType::Function(op) => op.signature(),
         }
     }
@@ -98,9 +99,9 @@ impl From<ModuleOp> for OpType {
     }
 }
 
-impl From<ControlFlowOp> for OpType {
-    fn from(op: ControlFlowOp) -> Self {
-        Self::ControlFlow(op)
+impl From<BasicBlockOp> for OpType {
+    fn from(op: BasicBlockOp) -> Self {
+        Self::BasicBlock(op)
     }
 }
 
