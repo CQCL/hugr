@@ -63,15 +63,15 @@ impl DataflowOp {
     /// The description of the operation.
     pub fn description(&self) -> &str {
         match self {
-            DataflowOp::Input { .. } => "An input node",
-            DataflowOp::Output { .. } => "An output node",
+            DataflowOp::Input { .. } => "The input node for this dataflow subgraph",
+            DataflowOp::Output { .. } => "The output node for this dataflow subgraph",
             DataflowOp::Call { .. } => "Call a function directly",
             DataflowOp::CallIndirect { .. } => "Call a function indirectly",
             DataflowOp::LoadConstant { .. } => {
                 "Load a static constant in to the local dataflow graph"
             }
             DataflowOp::Leaf { op } => return op.description(),
-            DataflowOp::Nested { .. } => "δ (delta): a simply nested dataflow graph",
+            DataflowOp::Nested { .. } => "A simply nested dataflow graph",
             DataflowOp::ControlFlow { op } => return op.description(),
         }
     }

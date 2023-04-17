@@ -27,7 +27,7 @@ impl ControlFlowOp {
     /// The description of the operation
     pub fn description(&self) -> &str {
         match self {
-            ControlFlowOp::Conditional { .. } => "A conditional operation",
+            ControlFlowOp::Conditional { .. } => "HUGR conditional operation",
             ControlFlowOp::Loop { .. } => "A tail-controlled loop",
             ControlFlowOp::CFG { .. } => "A dataflow node defined by a child CFG",
         }

@@ -47,13 +47,13 @@ impl Default for LeafOp {
 
 impl LeafOp {
     /// Returns true if the operation has a single quantum input and output
-    /// TODO: Ignore Money
+    /// TODO: Consider non-qubit linear outputs
     pub fn is_one_qb_gate(&self) -> bool {
         self.signature().linear().count() == 1
     }
 
     /// Returns true if the operation has exactly two quantum inputs and outputs
-    /// TODO: Ignore Money
+    /// TODO: Consider non-qubit linear outputs
     pub fn is_two_qb_gate(&self) -> bool {
         self.signature().linear().count() == 1
     }
@@ -110,8 +110,6 @@ impl LeafOp {
 
     /// The signature of the operation.
     pub fn signature(&self) -> Signature {
-        // TODO: Missing [`DataType::Money`] inputs and outputs.
-
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Quantum(QuantumType::Qubit);

@@ -66,7 +66,7 @@ impl Signature {
 }
 impl Signature {
     /// Returns the linear part of the signature
-    /// TODO: This fails when mixing Money and Qubit ports
+    /// TODO: This fails when mixing different linear types
     #[inline(always)]
     pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
         debug_assert_eq!(
