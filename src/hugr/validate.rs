@@ -1,7 +1,7 @@
 use portgraph::{NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
-use crate::ops::{ModuleOp, OpType};
+use crate::ops::{ModuleOp, OpType, OpTypeValidator};
 use crate::types::EdgeKind;
 use crate::Hugr;
 
@@ -35,9 +35,26 @@ impl Hugr {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&self, node: NodeIndex) -> Result<(), ValidationError> {
-        // TODO: Operation-specific checks
         let optype = self.get_optype(node);
         let sig = optype.signature();
+
+        // The parent must be compatible with the node operation.
+        if node != self.root {
+            let Some(parent) = self.get_parent(node) else {
+                return Err(ValidationError::NoParent { node });
+            };
+
+            let parent_optype = self.get_optype(parent);
+            if !optype.is_valid_parent(parent_optype) {
+                return Err(ValidationError::InvalidParent {
+                    node,
+                    optype: optype.clone(),
+                    parent_optype: parent_optype.clone(),
+                });
+            }
+        }
+
+        // TODO: Check the other `OpTypeValidator` constraints.
 
         // Check that we have enough ports.
         // The actual number may be larger than the signature if non-dataflow ports are present.
@@ -140,4 +157,26 @@ pub enum ValidationError {
         port: (NodeIndex, PortOffset, EdgeKind),
         other: (NodeIndex, PortOffset, EdgeKind),
     },
+    /// The non-root node has no parent.
+    #[error("The node {node:?} has no parent.")]
+    NoParent { node: NodeIndex },
+    /// The parent node is not compatible with the child node.
+    #[error("The node {node:?} has an invalid parent. The operation {optype:?} cannot be a child of an operation {parent_optype:?}.")]
+    InvalidParent {
+        node: NodeIndex,
+        optype: OpType,
+        parent_optype: OpType,
+    },
+}
+
+#[cfg(test)]
+mod test {
+    use crate::builder::BaseBuilder;
+
+    #[test]
+    fn test_empty() {
+        let b = BaseBuilder::new();
+        let hugr = b.finish().unwrap();
+        assert_eq!(hugr.validate(), Ok(()));
+    }
 }

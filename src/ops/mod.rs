@@ -124,3 +124,110 @@ where
         Self::Function(op.into())
     }
 }
+
+/// A trait defining validity properties of an operation type.
+pub trait OpTypeValidator {
+    /// Returns whether the given operation is allowed as a parent.
+    fn is_valid_parent(&self, parent: &OpType) -> bool;
+
+    /// Whether the operation can have children
+    fn is_container(&self) -> bool {
+        false
+    }
+
+    /// Whether the operation must have children
+    fn requires_children(&self) -> bool {
+        self.is_container()
+    }
+
+    /// Whether the operation contains dataflow children
+    fn is_df_container(&self) -> bool {
+        false
+    }
+
+    /// A restriction on the operation type of the first child
+    fn first_child_valid(&self, _child: OpType) -> bool {
+        true
+    }
+
+    /// A restriction on the operation type of the last child
+    fn last_child_valid(&self, _child: OpType) -> bool {
+        true
+    }
+
+    /// Whether the children must form a DAG (no cycles)
+    fn require_dag(&self) -> bool {
+        false
+    }
+
+    /// Whether the first/last child must dominate/post-dominate all other children
+    fn require_dominators(&self) -> bool {
+        false
+    }
+}
+
+impl OpTypeValidator for OpType {
+    fn is_valid_parent(&self, parent: &OpType) -> bool {
+        match self {
+            OpType::Module(op) => op.is_valid_parent(parent),
+            OpType::Function(op) => op.is_valid_parent(parent),
+            OpType::BasicBlock(op) => op.is_valid_parent(parent),
+        }
+    }
+
+    fn is_container(&self) -> bool {
+        match self {
+            OpType::Module(op) => op.is_container(),
+            OpType::Function(op) => op.is_container(),
+            OpType::BasicBlock(op) => op.is_container(),
+        }
+    }
+
+    fn requires_children(&self) -> bool {
+        match self {
+            OpType::Module(op) => op.requires_children(),
+            OpType::Function(op) => op.requires_children(),
+            OpType::BasicBlock(op) => op.requires_children(),
+        }
+    }
+
+    fn is_df_container(&self) -> bool {
+        match self {
+            OpType::Module(op) => op.is_df_container(),
+            OpType::Function(op) => op.is_df_container(),
+            OpType::BasicBlock(op) => op.is_df_container(),
+        }
+    }
+
+    fn first_child_valid(&self, child: OpType) -> bool {
+        match self {
+            OpType::Module(op) => op.first_child_valid(child),
+            OpType::Function(op) => op.first_child_valid(child),
+            OpType::BasicBlock(op) => op.first_child_valid(child),
+        }
+    }
+
+    fn last_child_valid(&self, child: OpType) -> bool {
+        match self {
+            OpType::Module(op) => op.last_child_valid(child),
+            OpType::Function(op) => op.last_child_valid(child),
+            OpType::BasicBlock(op) => op.last_child_valid(child),
+        }
+    }
+
+    fn require_dag(&self) -> bool {
+        match self {
+            OpType::Module(op) => op.require_dag(),
+            OpType::Function(op) => op.require_dag(),
+            OpType::BasicBlock(op) => op.require_dag(),
+        }
+    }
+
+    fn require_dominators(&self) -> bool {
+        match self {
+            OpType::Module(op) => op.require_dominators(),
+            OpType::Function(op) => op.require_dominators(),
+            OpType::BasicBlock(op) => op.require_dominators(),
+        }
+    }
+}

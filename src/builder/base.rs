@@ -67,11 +67,8 @@ impl BaseBuilder {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum BuildError {
-    /// The hierarchy has to many root nodes.
-    #[error("The hierarchy has too many roots: {roots:?}.")]
-    TooManyRoots { roots: Vec<NodeIndex> },
     /// The constructed HUGR is invalid.
-    #[error("The constructed HUGR is invalid: {0:?}.")]
+    #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
 }
 
@@ -141,6 +138,9 @@ mod test {
 
         // Finish the construction and create the HUGR
         let hugr: Result<Hugr, BuildError> = builder.finish();
+        if let Err(e) = &hugr {
+            println!("{}", e);
+        }
         assert!(hugr.is_ok());
     }
 }
