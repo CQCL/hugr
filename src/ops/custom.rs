@@ -5,19 +5,29 @@ use once_cell::sync::OnceCell;
 use smol_str::SmolStr;
 use std::any::Any;
 use std::collections::HashMap;
+use std::ops::Deref;
 
-use super::Op;
 use crate::hugr::Hugr;
 use crate::macros::impl_box_clone;
 use crate::resource::ResourceSet;
 use crate::types::SimpleType;
 use crate::types::{Signature, SignatureDescription};
 
-/// A wrapped custom operation with fast equality checks.
+/// A wrapped [`CustomOp`] with fast equality checks.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {
-    pub id: SmolStr,
-    pub custom_op: Box<dyn CustomOp>,
+    /// Operation name, cached for fast equality checks.
+    id: SmolStr,
+
+    /// The custom operation.
+    op: Box<dyn CustomOp>,
+}
+
+impl OpaqueOp {
+    /// The name of the operation, cached for fast equality checks.
+    pub fn name(&self) -> SmolStr {
+        self.id.clone()
+    }
 }
 
 impl PartialEq for OpaqueOp {
@@ -28,21 +38,11 @@ impl PartialEq for OpaqueOp {
 
 impl Eq for OpaqueOp {}
 
-impl Op for OpaqueOp {
-    fn name(&self) -> SmolStr {
-        self.id.clone()
-    }
+impl Deref for OpaqueOp {
+    type Target = dyn CustomOp;
 
-    fn description(&self) -> &str {
-        self.custom_op.description()
-    }
-
-    fn signature(&self) -> Signature {
-        self.custom_op.signature()
-    }
-
-    fn signature_desc(&self) -> Option<SignatureDescription> {
-        self.custom_op.signature_desc()
+    fn deref(&self) -> &Self::Target {
+        self.op.as_ref()
     }
 }
 
@@ -50,7 +50,7 @@ impl<T: CustomOp> From<T> for OpaqueOp {
     fn from(op: T) -> Self {
         Self {
             id: op.name(),
-            custom_op: Box::new(op),
+            op: Box::new(op),
         }
     }
 }
@@ -60,7 +60,7 @@ impl<T: CustomOp> From<T> for OpaqueOp {
 /// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
 #[typetag::serde]
-pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any + Downcast {
+pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Any + Downcast {
     /// Try to convert the custom op to a graph definition.
     ///
     /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
@@ -71,12 +71,30 @@ pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Op + Any 
 
     /// List the resources required to execute this operation.
     fn resources(&self) -> &ResourceSet;
+
+    /// The name of the operation.
+    fn name(&self) -> SmolStr;
+
+    /// Optional description of the operation.
+    fn description(&self) -> &str {
+        ""
+    }
+
+    /// The signature of the operation.
+    fn signature(&self) -> Signature;
+
+    /// Optional descriptions of the ports in the signature.
+    fn signature_desc(&self) -> SignatureDescription {
+        Default::default()
+    }
 }
 
 impl_downcast!(CustomOp);
 impl_box_clone!(CustomOp, CustomOpBoxClone);
 
-/// Dynamically loaded operation definition.
+/// Serializable definition for dynamically loaded operations.
+///
+/// TODO: Define a way to construct new CustomOps from a serialized definition.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
     /// Unique identifier of the operation.
@@ -142,7 +160,7 @@ impl OpDef {
         Self {
             name,
             description,
-            inputs: inputs,
+            inputs,
             outputs: outputs.collect(),
             misc: HashMap::new(),
             def: None,
@@ -151,18 +169,8 @@ impl OpDef {
             port_names: OnceCell::with_value(port_names),
         }
     }
-}
 
-impl Op for OpDef {
-    fn name(&self) -> SmolStr {
-        self.name.clone()
-    }
-
-    fn description(&self) -> &str {
-        &self.description
-    }
-
-    fn signature(&self) -> Signature {
+    pub fn signature(&self) -> Signature {
         self.signature
             .get_or_init(|| {
                 let inputs = self
@@ -180,7 +188,7 @@ impl Op for OpDef {
             .clone()
     }
 
-    fn signature_desc(&self) -> Option<SignatureDescription> {
+    pub fn signature_desc(&self) -> Option<SignatureDescription> {
         Some(
             self.port_names
                 .get_or_init(|| {
@@ -198,16 +206,5 @@ impl Op for OpDef {
                 })
                 .clone(),
         )
-    }
-}
-
-#[typetag::serde]
-impl CustomOp for OpDef {
-    fn try_into_hugr(&self, _resources: &ResourceSet) -> Option<Hugr> {
-        todo!("Parse definition, check the available resources, and create a HUGR.")
-    }
-
-    fn resources(&self) -> &ResourceSet {
-        &self.resource_reqs
     }
 }

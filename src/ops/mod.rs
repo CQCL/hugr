@@ -13,29 +13,7 @@ pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
 use smol_str::SmolStr;
 
-/// A generic node operation
-pub trait Op {
-    /// The name of the operation.
-    fn name(&self) -> SmolStr;
-    /// The description of the operation.
-    fn description(&self) -> &str {
-        ""
-    }
-    /// The signature of the operation.
-    ///
-    /// TODO: Return a reference? It'll need some lazy_statics to make it work.
-    fn signature(&self) -> Signature;
-    /// Optional description of the ports in the signature.
-    ///
-    /// TODO: Implement where possible
-    fn signature_desc(&self) -> Option<SignatureDescription> {
-        None
-    }
-}
-
 /// The concrete operation types for a node in the HUGR.
-///
-/// TODO: Flatten the enum? It improves efficiency, but makes it harder to read.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {
@@ -49,6 +27,44 @@ pub enum OpType {
 }
 
 impl OpType {
+    /// The name of the operation.
+    pub fn name(&self) -> SmolStr {
+        match self {
+            OpType::Module(op) => op.name(),
+            OpType::BasicBlock(op) => op.name(),
+            OpType::Function(op) => op.name(),
+        }
+    }
+
+    /// The description of the operation.
+    pub fn description(&self) -> &str {
+        match self {
+            OpType::Module(op) => op.description(),
+            OpType::BasicBlock(op) => op.description(),
+            OpType::Function(op) => op.description(),
+        }
+    }
+
+    /// The signature of the operation.
+    ///
+    /// Only dataflow operations have a non-empty signature.
+    pub fn signature(&self) -> Signature {
+        match self {
+            OpType::Function(op) => op.signature(),
+            _ => Default::default(),
+        }
+    }
+
+    /// Optional description of the ports in the signature.
+    ///
+    /// Only dataflow operations have a non-empty signature.
+    pub fn signature_desc(&self) -> SignatureDescription {
+        match self {
+            OpType::Function(op) => op.signature_desc(),
+            _ => Default::default(),
+        }
+    }
+
     /// If None, there will be no other input edges.
     /// Otherwise, all other input edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
@@ -62,27 +78,9 @@ impl OpType {
     /// Like "other_inputs" but describes any other output edges
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
-            OpType::Module(op) => op.other_inputs(),
+            OpType::Module(op) => op.other_outputs(),
             OpType::Function(op) => op.other_outputs(),
             OpType::BasicBlock(op) => op.other_edges(),
-        }
-    }
-}
-
-impl Op for OpType {
-    fn name(&self) -> SmolStr {
-        match self {
-            OpType::Module(op) => op.name(),
-            OpType::BasicBlock(op) => op.name(),
-            OpType::Function(op) => op.name(),
-        }
-    }
-
-    fn signature(&self) -> Signature {
-        match self {
-            OpType::Module(op) => op.signature(),
-            OpType::BasicBlock(op) => op.signature(),
-            OpType::Function(op) => op.signature(),
         }
     }
 }

@@ -1,7 +1,7 @@
 use smol_str::SmolStr;
 
-use super::{controlflow::ControlFlowOp, LeafOp, Op};
-use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
+use super::{controlflow::ControlFlowOp, LeafOp};
+use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DataflowOp {
@@ -44,18 +44,9 @@ impl DataflowOp {
             Some(EdgeKind::StateOrder)
         }
     }
-}
 
-impl Default for DataflowOp {
-    fn default() -> Self {
-        Self::Leaf {
-            op: LeafOp::default(),
-        }
-    }
-}
-
-impl Op for DataflowOp {
-    fn name(&self) -> SmolStr {
+    /// The name of the operation.
+    pub fn name(&self) -> SmolStr {
         match self {
             DataflowOp::Input { .. } => "input",
             DataflowOp::Output { .. } => "output",
@@ -69,7 +60,24 @@ impl Op for DataflowOp {
         .into()
     }
 
-    fn signature(&self) -> Signature {
+    /// The description of the operation.
+    pub fn description(&self) -> &str {
+        match self {
+            DataflowOp::Input { .. } => "The input node for this dataflow subgraph",
+            DataflowOp::Output { .. } => "The output node for this dataflow subgraph",
+            DataflowOp::Call { .. } => "Call a function directly",
+            DataflowOp::CallIndirect { .. } => "Call a function indirectly",
+            DataflowOp::LoadConstant { .. } => {
+                "Load a static constant in to the local dataflow graph"
+            }
+            DataflowOp::Leaf { op } => return op.description(),
+            DataflowOp::Nested { .. } => "A simply nested dataflow graph",
+            DataflowOp::ControlFlow { op } => return op.description(),
+        }
+    }
+
+    /// The signature of the operation.
+    pub fn signature(&self) -> Signature {
         match self {
             DataflowOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             DataflowOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
@@ -91,6 +99,24 @@ impl Op for DataflowOp {
             DataflowOp::Leaf { op } => op.signature(),
             DataflowOp::Nested { signature } => signature.clone(),
             DataflowOp::ControlFlow { op } => op.signature(),
+        }
+    }
+
+    /// Optional description of the ports in the signature.
+    pub fn signature_desc(&self) -> SignatureDescription {
+        match self {
+            DataflowOp::Leaf { op } => op.signature_desc(),
+            DataflowOp::ControlFlow { op } => op.signature_desc(),
+            // TODO: add port descriptions for other ops
+            _ => SignatureDescription::default(),
+        }
+    }
+}
+
+impl Default for DataflowOp {
+    fn default() -> Self {
+        Self::Leaf {
+            op: LeafOp::default(),
         }
     }
 }

@@ -9,8 +9,8 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::ops::module::CustomConst;
 use crate::ops::CustomOp;
-use crate::ops::{module::CustomConst, Op};
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, CustomType, Signature, SimpleType, TypeRow};
 use crate::Resource;
@@ -89,7 +89,8 @@ impl CustomConst for Constant {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AngleAdd;
 
-impl Op for AngleAdd {
+#[typetag::serde]
+impl CustomOp for AngleAdd {
     fn name(&self) -> SmolStr {
         "AngleAdd".into()
     }
@@ -99,17 +100,6 @@ impl Op for AngleAdd {
         Signature::new_linear(vec![SimpleType::Classic(Type::Angle.classic_type())])
     }
 
-    fn description(&self) -> &str {
-        ""
-    }
-
-    fn signature_desc(&self) -> Option<crate::types::SignatureDescription> {
-        None
-    }
-}
-
-#[typetag::serde]
-impl CustomOp for AngleAdd {
     fn resources(&self) -> &ResourceSet {
         // TODO: Don't return a reference? We need to initialize the resource set.
         todo!()

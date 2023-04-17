@@ -1,6 +1,5 @@
 use std::any::Any;
 
-use super::Op;
 use crate::{
     macros::impl_box_clone,
     types::{ClassicType, EdgeKind, Signature, SimpleType},
@@ -34,6 +33,29 @@ pub enum ModuleOp {
 }
 
 impl ModuleOp {
+    pub fn name(&self) -> SmolStr {
+        match self {
+            ModuleOp::Root => "module",
+            ModuleOp::Def { .. } => "def",
+            ModuleOp::Declare { .. } => "declare",
+            ModuleOp::Struct { .. } => "struct",
+            ModuleOp::Alias { .. } => "alias",
+            ModuleOp::Const(val) => return val.name(),
+        }
+        .into()
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
+            ModuleOp::Def { .. } => "A function definition",
+            ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
+            ModuleOp::Struct { .. } => "Top level struct type definition",
+            ModuleOp::Alias { .. } => "A type alias",
+            ModuleOp::Const(val) => val.description(),
+        }
+    }
+
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         None
     }
@@ -45,32 +67,6 @@ impl ModuleOp {
                 ClassicType::graph_from_sig(signature.clone()),
             )),
             ModuleOp::Const(v) => Some(EdgeKind::Const(v.const_type())),
-        }
-    }
-}
-
-impl Op for ModuleOp {
-    fn name(&self) -> SmolStr {
-        // TODO: These should be unique names for each distinct op
-        match self {
-            ModuleOp::Root => "module",
-            ModuleOp::Def { .. } => "def",
-            ModuleOp::Declare { .. } => "declare",
-            ModuleOp::Struct { .. } => "struct",
-            ModuleOp::Alias { .. } => "alias",
-            ModuleOp::Const(_) => "const",
-        }
-        .into()
-    }
-
-    fn signature(&self) -> Signature {
-        match self {
-            ModuleOp::Root => Signature::default(),
-            ModuleOp::Def { signature } => signature.clone(),
-            ModuleOp::Declare { signature } => signature.clone(),
-            ModuleOp::Struct { .. } => todo!(),
-            ModuleOp::Alias { .. } => todo!(),
-            ModuleOp::Const(v) => v.signature(),
         }
     }
 }
@@ -112,10 +108,9 @@ impl ConstValue {
             Self::Opaque(_, b) => (*b).const_type(),
         }
     }
-}
 
-impl Op for ConstValue {
-    fn name(&self) -> SmolStr {
+    /// Unique name of the constant
+    pub fn name(&self) -> SmolStr {
         match self {
             Self::Bit(v) => format!("const:bit:{v}"),
             Self::Int(v) => format!("const:int:{v}"),
@@ -124,12 +119,9 @@ impl Op for ConstValue {
         .into()
     }
 
-    fn description(&self) -> &str {
+    /// Description of the constant
+    pub fn description(&self) -> &str {
         "Constant value"
-    }
-
-    fn signature(&self) -> Signature {
-        Signature::default()
     }
 }
 

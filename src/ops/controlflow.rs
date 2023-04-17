@@ -1,8 +1,6 @@
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, TypeRow};
-
-use super::Op;
+use crate::types::{EdgeKind, Signature, SignatureDescription, TypeRow};
 
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -15,8 +13,9 @@ pub enum ControlFlowOp {
     CFG { inputs: TypeRow, outputs: TypeRow },
 }
 
-impl Op for ControlFlowOp {
-    fn name(&self) -> SmolStr {
+impl ControlFlowOp {
+    /// The name of the operation
+    pub fn name(&self) -> SmolStr {
         match self {
             ControlFlowOp::Conditional { .. } => "ɣ",
             ControlFlowOp::Loop { .. } => "θ",
@@ -25,7 +24,17 @@ impl Op for ControlFlowOp {
         .into()
     }
 
-    fn signature(&self) -> Signature {
+    /// The description of the operation
+    pub fn description(&self) -> &str {
+        match self {
+            ControlFlowOp::Conditional { .. } => "HUGR conditional operation",
+            ControlFlowOp::Loop { .. } => "A tail-controlled loop",
+            ControlFlowOp::CFG { .. } => "A dataflow node defined by a child CFG",
+        }
+    }
+
+    /// The signature of the operation
+    pub fn signature(&self) -> Signature {
         match self {
             ControlFlowOp::Conditional { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
@@ -35,6 +44,12 @@ impl Op for ControlFlowOp {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }
         }
+    }
+
+    /// Optional description of the ports in the signature
+    pub fn signature_desc(&self) -> SignatureDescription {
+        // TODO: add descriptions
+        Default::default()
     }
 }
 
@@ -49,15 +64,14 @@ impl BasicBlockOp {
     pub fn other_edges(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
-}
 
-impl Op for BasicBlockOp {
-    fn name(&self) -> SmolStr {
+    /// The name of the operation
+    pub fn name(&self) -> SmolStr {
         "β".into()
     }
 
-    fn signature(&self) -> Signature {
-        // The value edges into/out of the beta-node itself
-        Signature::default()
+    /// The description of the operation
+    pub fn description(&self) -> &str {
+        "A CFG basic block node"
     }
 }
