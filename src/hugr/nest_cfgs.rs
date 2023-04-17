@@ -34,19 +34,25 @@ impl EdgeDest {
             EdgeDest::Backward(i) => *i,
         }
     }
+    pub fn flip(&self, src: NodeIndex) -> (EdgeDest, NodeIndex) {
+        match self {
+            EdgeDest::Forward(tgt) => (EdgeDest::Forward(src), *tgt),
+            EdgeDest::Backward(tgt) => (EdgeDest::Backward(src), *tgt),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum UDEdge {
     CFGEdge(NodeIndex, EdgeDest),
-    CappingBackedge(NodeIndex, u64)
+    CappingBackedge(NodeIndex, usize)
 }
 
-type CycleClass = (UDEdge, u64);
+type CycleClass = (UDEdge, usize);
 
 struct BracketList {
     items: LinkedList<UDEdge>,
-    size: u64 // deleted items already taken off
+    size: usize // deleted items already taken off
 }
 
 impl BracketList {
@@ -93,22 +99,46 @@ impl BracketList {
 
 struct UndirectedDFSTree<'a> {
     h: &'a HugrView,
-    dfs_num: HashMap<NodeIndex, u64>,
+    dfs_num: HashMap<NodeIndex, usize>,
     dfs_parents: HashMap<NodeIndex, EdgeDest>, // value is direction + source of edge along which key was reached
 }
 
 struct TraversalState {
     deleted_backedges: HashSet<UDEdge>,
-    capping_edges: HashMap<u64, Vec<UDEdge>>, // Indexed by DFS num, elems all CappingBackedge's
+    capping_edges: HashMap<usize, Vec<UDEdge>>, // Indexed by DFS num, elems all CappingBackedge's
     edge_classes: HashMap<UDEdge, CycleClass>
 }
 
 impl<'a> UndirectedDFSTree<'a> {
-    pub fn new(h: &HugrView) -> Self {
-        //let mut reachable = BitVec::new();
-        todo!()
+    pub fn new(h: &'a HugrView) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
+        let mut reachable = HashSet::new();
+        {
+            let mut pending = LinkedList::new();
+            pending.push_back(h.exit_node());
+            while let Some(n) = pending.pop_front() {
+                if reachable.insert(n) {
+                    pending.extend(h.predecessors(n));
+                }
+            }
+        }
         //2. Traverse undirected from entry node, building dfs_num and setting dfs_parents
+        let mut t = UndirectedDFSTree {
+            h: h,
+            dfs_num: HashMap::new(),
+            dfs_parents: HashMap::new()
+        };
+        let mut pending = vec![(EdgeDest::Forward(h.exit_node()), h.entry_node())];
+        while let Some((p_edge, n)) = pending.pop() {
+            if !t.dfs_num.contains_key(&n) && reachable.contains(&n) {
+                t.dfs_num.insert(n, t.dfs_num.len());
+                t.dfs_parents.insert(n, p_edge);
+                for e in t.undirected_edges(n) {
+                    pending.push(e.flip(n));
+                }
+            }
+        };
+        t
     }
 
     fn undirected_edges(&self, n: NodeIndex) -> impl Iterator<Item=EdgeDest> {
@@ -120,24 +150,21 @@ impl<'a> UndirectedDFSTree<'a> {
         // If we didn't filter reachable above, we should do so here (not unwrap)
         // Also, exclude the edge from this node's parent!
         self.undirected_edges(n).partition(|e| {
-            let (from, tgt) = match e {
-                EdgeDest::Forward(d) => (EdgeDest::Forward(n), d),
-                EdgeDest::Backward(d) => (EdgeDest::Backward(n), d)
-            };
-            (*self.dfs_parents.get(tgt).unwrap()) == from
+            let (from, tgt) = e.flip(n);
+            (*self.dfs_parents.get(&tgt).unwrap()) == from
         })
     }
 
-    fn traverse(&self, st: &mut TraversalState, n: NodeIndex) -> (u64, BracketList) {
+    fn traverse(&self, st: &mut TraversalState, n: NodeIndex) -> (usize, BracketList) {
         let n_dfs = *self.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
         let (children, non_capping_backedges) = self.children_backedges(n);
         let child_results: Vec<_> = children.iter().map(|c| self.traverse(st, c.node_index())).collect();
-        let mut min_dfs_target: [Option<u64>; 2] = [None, None];
+        let mut min_dfs_target: [Option<usize>; 2] = [None, None];
         let mut bs = BracketList::new();
         for (tgt,brs) in child_results {
-            if tgt < min_dfs_target[0].unwrap_or(u64::MAX) {
+            if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
                 min_dfs_target = [Some(tgt), min_dfs_target[0]]
-            } else if tgt < min_dfs_target[1].unwrap_or(u64::MAX) {
+            } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
                 min_dfs_target[1] = Some(tgt)
             }
             bs.concat(brs);
