@@ -34,26 +34,33 @@ pub trait OpTypeValidator {
         true
     }
 
+    /// Validates the complete set of children
+    fn validate_children<'a>(&self, children: impl DoubleEndedIterator<Item = &'a OpType>) -> bool {
+        // TODO: Use this to validate the children of branches and loops
+        // TODO: Probably merge the first/last child validation into this, defining a custom ChildrenValidationError to throw
+        let _ = children;
+        true
+    }
+
     /// Whether the children must form a DAG (no cycles)
     fn require_dag(&self) -> bool {
         false
     }
-
-    /// Whether the first/last child must dominate/post-dominate all other children
-    fn require_dominators(&self) -> bool {
-        false
-    }
 }
 
-/// Set of operation kinds.
+/// Sets of operation kinds.
 ///
-/// Used to indicate the allowed parent operations.
+/// Used to validate the allowed parent operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OpTypeSet {
+    /// No valid operation types.
     None,
+    /// Only the module root operation.
     ModuleRoot,
+    /// Any dataflow container operation.
     DataflowContainers,
+    /// A control flow container operation.
     CfgNode,
 }
 
@@ -141,14 +148,6 @@ impl OpTypeValidator for OpType {
             OpType::BasicBlock(op) => op.require_dag(),
         }
     }
-
-    fn require_dominators(&self) -> bool {
-        match self {
-            OpType::Module(op) => op.require_dominators(),
-            OpType::Function(op) => op.require_dominators(),
-            OpType::BasicBlock(op) => op.require_dominators(),
-        }
-    }
 }
 
 impl OpTypeValidator for ModuleOp {
@@ -161,6 +160,11 @@ impl OpTypeValidator for ModuleOp {
 
     fn is_container(&self) -> bool {
         matches!(self, ModuleOp::Root | ModuleOp::Def { .. })
+    }
+
+    fn requires_children(&self) -> bool {
+        // Allow empty modules roots for non-runnable hugrs
+        matches!(self, ModuleOp::Def { .. })
     }
 
     fn is_df_container(&self) -> bool {
@@ -183,10 +187,6 @@ impl OpTypeValidator for ModuleOp {
     }
 
     fn require_dag(&self) -> bool {
-        matches!(self, ModuleOp::Def { .. })
-    }
-
-    fn require_dominators(&self) -> bool {
         matches!(self, ModuleOp::Def { .. })
     }
 }
@@ -237,14 +237,6 @@ impl OpTypeValidator for ControlFlowOp {
             ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. }
         )
     }
-
-    fn require_dominators(&self) -> bool {
-        // TODO: Should we require the CFGs entry(exit) to be the single source(sink)?
-        matches!(
-            self,
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. }
-        )
-    }
 }
 
 impl OpTypeValidator for BasicBlockOp {
@@ -261,10 +253,6 @@ impl OpTypeValidator for BasicBlockOp {
     }
 
     fn require_dag(&self) -> bool {
-        true
-    }
-
-    fn require_dominators(&self) -> bool {
         true
     }
 }
@@ -301,10 +289,10 @@ impl OpTypeValidator for DataflowOp {
     }
 
     fn require_dag(&self) -> bool {
-        false
-    }
-
-    fn require_dominators(&self) -> bool {
-        false
+        match self {
+            DataflowOp::ControlFlow { op } => op.require_dag(),
+            DataflowOp::Nested { .. } => true,
+            _ => false,
+        }
     }
 }

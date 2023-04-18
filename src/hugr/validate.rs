@@ -1,4 +1,6 @@
-use portgraph::{NodeIndex, PortIndex, PortOffset};
+use std::collections::HashMap;
+
+use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -112,6 +114,11 @@ impl Hugr {
             });
         };
 
+        // Avoid double checking connected port types.
+        if offset.direction() == Direction::Incoming {
+            return Ok(());
+        }
+
         let other_node = self.graph.port_node(link).unwrap();
         let other_offset = self.graph.port_offset(link).unwrap();
         let other_op = self.get_optype(other_node);
@@ -128,6 +135,9 @@ impl Hugr {
                 other: (other_node, other_offset, other_kind),
             });
         }
+
+        // TODO: Check inter-graph edges
+
         Ok(())
     }
 
@@ -168,13 +178,105 @@ impl Hugr {
                     child_position: "last".into(),
                 });
             }
+
+            if optype.require_dag() {
+                self.validate_children_dag(node, optype)?;
+            }
         } else if optype.requires_children() {
-                return Err(ValidationError::ContainerWithoutChildren {
-                    node,
-                    optype: optype.clone(),
-                });
+            return Err(ValidationError::ContainerWithoutChildren {
+                node,
+                optype: optype.clone(),
+            });
         }
-        // TODO: Dag/dominators
+
+        Ok(())
+    }
+
+    /// Ensure that the children of a node form a direct acyclic graph. That is,
+    /// their edges do not form cycles in the graph.
+    ///
+    /// Inter-graph edges are ignored. Only internal dataflow, constant, or
+    /// state order edges are considered.
+    fn validate_children_dag(
+        &self,
+        parent: NodeIndex,
+        optype: &OpType,
+    ) -> Result<(), ValidationError> {
+        let ignore_port = |child: NodeIndex, child_optype: &OpType, port: PortOffset| {
+            let kind = child_optype.port_kind(port).unwrap();
+            if matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
+                return true;
+            }
+
+            // Ignore ports that are not connected (that property is checked elsewhere)
+            let Some(pred_port) = self.graph.port_index(child, port).and_then(|p| self.graph.port_link(p))  else {
+                return true;
+            };
+            let pred = self.graph.port_node(pred_port).unwrap();
+
+            // Ignore inter-graph edges
+            //
+            // TODO: Can these cause cycles?
+            if Some(parent) != self.hierarchy.parent(pred) {
+                return true;
+            }
+
+            false
+        };
+
+        // Number of nodes visited
+        let mut nodes_visited = 0;
+
+        // Number of input ports to a node that remain unvisited. Once this
+        // reaches zero, the node is added to the candidate list.
+        let mut unvisited_ports: HashMap<NodeIndex, usize> = HashMap::new();
+
+        // Candidates with no unvisited predecessors.
+        // Initially, all children with no incoming internal edges.
+        let mut candidates: Vec<NodeIndex> = {
+            self.hierarchy
+                .children(parent)
+                .filter(|&child| {
+                    let child_optype = self.get_optype(child);
+                    self.graph
+                        .input_offsets(child)
+                        .all(|off| ignore_port(child, child_optype, off))
+                })
+                .collect()
+        };
+
+        while let Some(child) = candidates.pop() {
+            nodes_visited += 1;
+            let child_optype = self.get_optype(child);
+
+            // Add children with no unvisited predecessors to the candidate list.
+            for offset in self.graph.output_offsets(child) {
+                if ignore_port(child, child_optype, offset) {
+                    continue;
+                }
+                let port = self.graph.port_index(child, offset).unwrap();
+                let Some(successor) = self.graph.port_link(port).and_then(|p| self.graph.port_node(p)) else {
+                    continue;
+                };
+                let visit_count = unvisited_ports.entry(successor).or_insert_with(|| {
+                    self.graph
+                        .input_offsets(successor)
+                        .filter(|&p| !ignore_port(successor, child_optype, p))
+                        .count()
+                });
+                *visit_count -= 1;
+                if *visit_count == 0 {
+                    candidates.push(successor);
+                }
+            }
+        }
+
+        if nodes_visited != self.hierarchy.child_count(parent) {
+            return Err(ValidationError::NotADag {
+                node: parent,
+                optype: optype.clone(),
+            });
+        }
 
         Ok(())
     }
@@ -238,6 +340,9 @@ pub enum ValidationError {
     /// The node must have children, but has none.
     #[error("The node {node:?} with optype {optype:?} must have children, but has none.")]
     ContainerWithoutChildren { node: NodeIndex, optype: OpType },
+    /// The children of a node have cycles.
+    #[error("The operation {optype:?} does not allow cycles in its children. In node {node:?}.")]
+    NotADag { node: NodeIndex, optype: OpType },
 }
 
 #[cfg(test)]
@@ -247,7 +352,7 @@ mod test {
     #[test]
     fn test_empty() {
         let b = BaseBuilder::new();
-        let hugr = b.finish().unwrap();
-        assert_eq!(hugr.validate(), Ok(()));
+        let hugr = b.finish();
+        assert_eq!(hugr.err(), None);
     }
 }

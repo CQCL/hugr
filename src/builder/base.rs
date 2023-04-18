@@ -138,9 +138,6 @@ mod test {
 
         // Finish the construction and create the HUGR
         let hugr: Result<Hugr, BuildError> = builder.finish();
-        if let Err(e) = &hugr {
-            println!("{}", e);
-        }
-        assert!(hugr.is_ok());
+        assert_eq!(hugr.err(), None);
     }
 }
