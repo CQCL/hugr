@@ -82,7 +82,7 @@ impl Hugr {
 
         // Ports must always be connected
         let Some(link) = self.graph.port_link(port) else {
-            return Err(ValidationError::UnconnectedDFPort {
+            return Err(ValidationError::UnconnectedPort {
                 node,
                 port: offset,
                 port_kind,
@@ -128,7 +128,7 @@ pub enum ValidationError {
     },
     /// A dataflow port is not connected.
     #[error("The node {node:?} has an unconnected port {port:?} of type {port_kind:?}.")]
-    UnconnectedDFPort {
+    UnconnectedPort {
         node: NodeIndex,
         port: PortOffset,
         port_kind: EdgeKind,
