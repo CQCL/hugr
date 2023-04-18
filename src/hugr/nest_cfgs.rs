@@ -47,7 +47,7 @@ enum UDEdge {
     CappingBackedge(NodeIndex, usize),
 }
 impl UDEdge {
-    fn cfgEdge(p: (NodeIndex, EdgeDest)) -> Self {
+    fn cfg_edge(p: (NodeIndex, EdgeDest)) -> Self {
         let (n, e) = p;
         Self::CFGEdge(n, e)
     }
@@ -71,7 +71,7 @@ impl Hash for UDEdge {
             Self::CappingBackedge(_, _) => (),
             Self::CFGEdge(n, e) => {
                 if *n > e.node_index() {
-                    return Self::cfgEdge(e.flip(*n)).hash(state);
+                    return Self::cfg_edge(e.flip(*n)).hash(state);
                 }
             }
         };
