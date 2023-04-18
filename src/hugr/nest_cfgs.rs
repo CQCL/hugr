@@ -1,6 +1,6 @@
 use portgraph::NodeIndex;
-use std::cmp::min;
 use std::collections::{HashMap, HashSet, LinkedList};
+use std::hash::Hash;
 use std::iter::empty;
 
 struct HugrView {}
@@ -21,7 +21,7 @@ impl HugrView {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum EdgeDest {
     Forward(NodeIndex),
     Backward(NodeIndex),
@@ -33,20 +33,51 @@ impl EdgeDest {
             EdgeDest::Backward(i) => *i,
         }
     }
-    pub fn flip(&self, src: NodeIndex) -> (EdgeDest, NodeIndex) {
+    pub fn flip(&self, src: NodeIndex) -> (NodeIndex, EdgeDest) {
         match self {
-            EdgeDest::Forward(tgt) => (EdgeDest::Forward(src), *tgt),
-            EdgeDest::Backward(tgt) => (EdgeDest::Backward(src), *tgt),
+            EdgeDest::Forward(tgt) => (*tgt, EdgeDest::Backward(src)),
+            EdgeDest::Backward(tgt) => (*tgt, EdgeDest::Forward(src)),
         }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Eq)]
 enum UDEdge {
     CFGEdge(NodeIndex, EdgeDest),
     CappingBackedge(NodeIndex, usize),
 }
-
+impl UDEdge {
+    fn cfgEdge(p: (NodeIndex, EdgeDest)) -> Self {
+        let (n, e) = p;
+        Self::CFGEdge(n, e)
+    }
+}
+impl PartialEq for UDEdge {
+    fn eq(&self, other: &UDEdge) -> bool {
+        match (self, other) {
+            (UDEdge::CappingBackedge(idx1, dfs1), UDEdge::CappingBackedge(idx2, dfs2)) => {
+                idx1 == idx2 && dfs1 == dfs2
+            }
+            (UDEdge::CFGEdge(n1, d1), UDEdge::CFGEdge(n2, d2)) => {
+                (*n1, *d1) == (*n2, *d2) || d1.flip(*n1) == (*n2, *d2)
+            }
+            (_, _) => false,
+        }
+    }
+}
+impl Hash for UDEdge {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::CappingBackedge(_, _) => (),
+            Self::CFGEdge(n, e) => {
+                if *n > e.node_index() {
+                    return Self::cfgEdge(e.flip(*n)).hash(state);
+                }
+            }
+        };
+        core::mem::discriminant(self).hash(state);
+    }
+}
 type CycleClass = (UDEdge, usize);
 
 struct BracketList {
@@ -127,13 +158,16 @@ impl<'a> UndirectedDFSTree<'a> {
             dfs_num: HashMap::new(),
             dfs_parents: HashMap::new(),
         };
-        let mut pending = vec![(EdgeDest::Forward(h.exit_node()), h.entry_node())];
-        while let Some((p_edge, n)) = pending.pop() {
-            if !t.dfs_num.contains_key(&n) && reachable.contains(&n) {
-                t.dfs_num.insert(n, t.dfs_num.len());
-                t.dfs_parents.insert(n, p_edge);
-                for e in t.undirected_edges(n) {
-                    pending.push(e.flip(n));
+        {
+            // Node, and edge along which reached
+            let mut pending = vec![(h.entry_node(), EdgeDest::Forward(h.exit_node()))];
+            while let Some((n, p_edge)) = pending.pop() {
+                if !t.dfs_num.contains_key(&n) && reachable.contains(&n) {
+                    t.dfs_num.insert(n, t.dfs_num.len());
+                    t.dfs_parents.insert(n, p_edge);
+                    for e in t.undirected_edges(n) {
+                        pending.push(e.flip(n));
+                    }
                 }
             }
         }
@@ -152,7 +186,7 @@ impl<'a> UndirectedDFSTree<'a> {
         // If we didn't filter reachable above, we should do so here (not unwrap)
         // Also, exclude the edge from this node's parent!
         self.undirected_edges(n).partition(|e| {
-            let (from, tgt) = e.flip(n);
+            let (tgt, from) = e.flip(n);
             (*self.dfs_parents.get(&tgt).unwrap()) == from
         })
     }
@@ -189,37 +223,45 @@ impl<'a> UndirectedDFSTree<'a> {
             }
         }
 
-        // remove edges to here - these are <backedges> to nodes with greater dfs_num
-        // add backedges from here - i.e. any <backedges> to nodes with lower dfs_num
-        for e in non_capping_backedges.iter() {
-            let target_dfs = *self.dfs_num.get(&e.node_index()).unwrap();
-            let b = UDEdge::CFGEdge(n, e.clone());
-            if target_dfs < n_dfs {
-                // add backedges from here to higher up
-                bs.push(b);
-                min_dfs_target[0] = Some(match min_dfs_target[0] {
-                    None => target_dfs,
-                    Some(d) => min(target_dfs, d),
-                });
-            } else if target_dfs > n_dfs {
-                // Remove backedges to here from lower down, including capping
-                bs.delete(&b, &mut st.deleted_backedges);
-            }
-        }
-        // also remove any capping backedges
-        for e in st
-            .capping_edges
-            .remove(&n_dfs)
+        let num_backedges = non_capping_backedges.len();
+        let parent_edge = self.dfs_parents.get(&n).unwrap().clone();
+        let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
             .into_iter()
-            .flat_map(|v| v.into_iter())
+            .filter(|e| *e != parent_edge)
+            .map(|e| (*self.dfs_num.get(&e.node_index()).unwrap(), e))
+            .partition(|(dfs, _)| *dfs < n_dfs);
+        assert!(be_down.len() + be_up.len() + 1 == num_backedges); // Parent found exactly once
+
+        // Remove edges to here from beneath
+        for e in be_down
+            .into_iter()
+            .map(|(_, e)| UDEdge::CFGEdge(n, e))
+            .chain(
+                // Also capping backedges
+                st.capping_edges
+                    .remove(&n_dfs)
+                    .into_iter()
+                    .flat_map(|v| v.into_iter()),
+            )
         {
             bs.delete(&e, &mut st.deleted_backedges);
         }
-        let parent_edge = self.dfs_parents.get(&n).unwrap();
-        st.edge_classes.insert(
-            UDEdge::CFGEdge(n, parent_edge.clone()),
-            bs.tag(&st.deleted_backedges).unwrap(),
-        );
-        (min_dfs_target[0].unwrap(), bs)
+        // Add backedges from here to ancestors
+        be_up
+            .iter()
+            .for_each(|(_, e)| bs.push(UDEdge::CFGEdge(n, e.clone())));
+
+        // Now calculate edge classes
+        let class = bs.tag(&st.deleted_backedges).unwrap();
+        if let (e, 1) = &class {
+            st.edge_classes.insert(e.clone(), class.clone());
+        }
+        st.edge_classes
+            .insert(UDEdge::CFGEdge(n, parent_edge.clone()), class);
+        let highest_target = be_up
+            .into_iter()
+            .map(|(dfs, _)| dfs)
+            .chain(min_dfs_target[0].into_iter());
+        (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
