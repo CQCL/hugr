@@ -1,6 +1,9 @@
 //! Dataflow types
 
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    ops::{Index, IndexMut},
+};
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
@@ -150,6 +153,18 @@ impl TypeRow {
     pub fn to_mut(&mut self) -> &mut Vec<SimpleType> {
         self.types.to_mut()
     }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get(&self, offset: usize) -> Option<&SimpleType> {
+        self.types.get(offset)
+    }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get_mut(&mut self, offset: usize) -> Option<&mut SimpleType> {
+        self.types.to_mut().get_mut(offset)
+    }
 }
 
 impl Default for TypeRow {
@@ -164,5 +179,19 @@ where
 {
     fn from(types: T) -> Self {
         Self::from(types.into())
+    }
+}
+
+impl Index<usize> for TypeRow {
+    type Output = SimpleType;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index).unwrap()
+    }
+}
+
+impl IndexMut<usize> for TypeRow {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index).unwrap()
     }
 }

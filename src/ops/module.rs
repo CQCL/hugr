@@ -8,7 +8,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ModuleOp {
     #[default]
     /// The root of a module, parent of all other `ModuleOp`s
@@ -92,6 +92,8 @@ impl PartialEq for ConstValue {
         }
     }
 }
+
+impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
