@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use super::{controlflow::ControlFlowOp, LeafOp, OpType, OpTypeValidator};
+use super::{controlflow::ControlFlowOp, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -130,45 +130,5 @@ impl From<LeafOp> for DataflowOp {
 impl From<ControlFlowOp> for DataflowOp {
     fn from(op: ControlFlowOp) -> Self {
         Self::ControlFlow { op }
-    }
-}
-
-impl OpTypeValidator for DataflowOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        parent.is_df_container()
-    }
-
-    fn is_container(&self) -> bool {
-        match self {
-            DataflowOp::ControlFlow { op } => op.is_df_container(),
-            DataflowOp::Nested { .. } => true,
-            _ => false,
-        }
-    }
-
-    fn is_df_container(&self) -> bool {
-        match self {
-            DataflowOp::ControlFlow { op } => op.is_df_container(),
-            DataflowOp::Nested { .. } => true,
-            _ => false,
-        }
-    }
-
-    fn first_child_valid(&self, child: OpType) -> bool {
-        match self {
-            DataflowOp::ControlFlow { op } => op.first_child_valid(child),
-            DataflowOp::Nested { .. } => {
-                matches!(child, OpType::Function(DataflowOp::Input { .. }))
-            }
-            _ => true,
-        }
-    }
-
-    fn require_dag(&self) -> bool {
-        false
-    }
-
-    fn require_dominators(&self) -> bool {
-        false
     }
 }

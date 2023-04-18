@@ -8,8 +8,6 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-use super::{DataflowOp, OpType, OpTypeValidator};
-
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ModuleOp {
     #[default]
@@ -70,46 +68,6 @@ impl ModuleOp {
             )),
             ModuleOp::Const(v) => Some(EdgeKind::Const(v.const_type())),
         }
-    }
-}
-
-impl OpTypeValidator for ModuleOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        match self {
-            ModuleOp::Root => false,
-            _ => matches!(parent, OpType::Module(ModuleOp::Root)),
-        }
-    }
-
-    fn is_container(&self) -> bool {
-        matches!(self, ModuleOp::Root | ModuleOp::Def { .. })
-    }
-
-    fn is_df_container(&self) -> bool {
-        matches!(self, ModuleOp::Def { .. })
-    }
-
-    fn first_child_valid(&self, child: OpType) -> bool {
-        match self {
-            ModuleOp::Root { .. } => matches!(child, OpType::Module(ModuleOp::Def { .. })),
-            ModuleOp::Def { .. } => matches!(child, OpType::Function(DataflowOp::Input { .. })),
-            _ => true,
-        }
-    }
-
-    fn last_child_valid(&self, child: OpType) -> bool {
-        match self {
-            ModuleOp::Def { .. } => matches!(child, OpType::Function(DataflowOp::Output { .. })),
-            _ => true,
-        }
-    }
-
-    fn require_dag(&self) -> bool {
-        matches!(self, ModuleOp::Def { .. })
-    }
-
-    fn require_dominators(&self) -> bool {
-        matches!(self, ModuleOp::Def { .. })
     }
 }
 

@@ -1,7 +1,8 @@
 use portgraph::{NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
-use crate::ops::{ModuleOp, OpType, OpTypeValidator};
+use crate::ops::validate::OpTypeValidator;
+use crate::ops::{ModuleOp, OpType};
 use crate::types::EdgeKind;
 use crate::Hugr;
 

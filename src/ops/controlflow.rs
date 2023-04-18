@@ -1,11 +1,6 @@
 use smol_str::SmolStr;
 
-use crate::{
-    ops::DataflowOp,
-    types::{EdgeKind, Signature, SignatureDescription, TypeRow},
-};
-
-use super::{OpType, OpTypeValidator};
+use crate::types::{EdgeKind, Signature, SignatureDescription, TypeRow};
 
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -58,64 +53,6 @@ impl ControlFlowOp {
     }
 }
 
-impl OpTypeValidator for ControlFlowOp {
-    // TODO: CFG nodes require checking the internal signature of pairs of
-    // BasicBlocks connected by ControlFlow edges. This is not currently
-    // implemented, and should probably go outside of the OpTypeValidator trait.
-
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        // Note: This method is never used. `DataflowOp::is_valid_parent` calls
-        // `is_df_container` directly.
-        parent.is_df_container()
-    }
-
-    fn is_container(&self) -> bool {
-        true
-    }
-
-    fn is_df_container(&self) -> bool {
-        matches!(
-            self,
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. }
-        )
-    }
-
-    fn first_child_valid(&self, child: OpType) -> bool {
-        // TODO: check signatures
-        match self {
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. } => {
-                matches!(child, OpType::Function(DataflowOp::Input { .. }))
-            }
-            ControlFlowOp::CFG { .. } => matches!(child, OpType::BasicBlock(_)),
-        }
-    }
-
-    fn last_child_valid(&self, child: OpType) -> bool {
-        // TODO: check signatures
-        match self {
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. } => {
-                matches!(child, OpType::Function(DataflowOp::Output { .. }))
-            }
-            ControlFlowOp::CFG { .. } => matches!(child, OpType::BasicBlock(_)),
-        }
-    }
-
-    fn require_dag(&self) -> bool {
-        matches!(
-            self,
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. }
-        )
-    }
-
-    fn require_dominators(&self) -> bool {
-        // TODO: Should we require the CFGs entry(exit) to be the single source(sink)?
-        matches!(
-            self,
-            ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. }
-        )
-    }
-}
-
 /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BasicBlockOp {
@@ -136,32 +73,5 @@ impl BasicBlockOp {
     /// The description of the operation
     pub fn description(&self) -> &str {
         "A CFG basic block node"
-    }
-}
-
-impl OpTypeValidator for BasicBlockOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        matches!(
-            parent,
-            OpType::Function(DataflowOp::ControlFlow {
-                op: ControlFlowOp::CFG { .. }
-            })
-        )
-    }
-
-    fn is_container(&self) -> bool {
-        true
-    }
-
-    fn is_df_container(&self) -> bool {
-        true
-    }
-
-    fn require_dag(&self) -> bool {
-        true
-    }
-
-    fn require_dominators(&self) -> bool {
-        true
     }
 }
