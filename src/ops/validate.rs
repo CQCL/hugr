@@ -4,8 +4,8 @@ use super::{BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
 /// A trait defining validity properties of an operation type.
 pub trait OpTypeValidator {
-    /// Returns whether the given operation is allowed as a parent.
-    fn is_valid_parent(&self, parent: &OpType) -> bool;
+    /// Returns the set of valid parent operation types.
+    fn valid_parents(&self) -> OpTypeSet;
 
     /// Whether the operation can have children
     fn is_container(&self) -> bool {
@@ -45,12 +45,52 @@ pub trait OpTypeValidator {
     }
 }
 
-impl OpTypeValidator for OpType {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
+/// Set of operation kinds.
+///
+/// Used to indicate the allowed parent operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OpTypeSet {
+    None,
+    ModuleRoot,
+    DataflowContainers,
+    CfgNode,
+}
+
+impl OpTypeSet {
+    /// Returns true if the set contains the given operation type.
+    pub fn contains(&self, optype: &OpType) -> bool {
         match self {
-            OpType::Module(op) => op.is_valid_parent(parent),
-            OpType::Function(op) => op.is_valid_parent(parent),
-            OpType::BasicBlock(op) => op.is_valid_parent(parent),
+            OpTypeSet::None => false,
+            OpTypeSet::ModuleRoot => matches!(optype, OpType::Module(ModuleOp::Root)),
+            OpTypeSet::DataflowContainers => optype.is_df_container(),
+            OpTypeSet::CfgNode => matches!(
+                optype,
+                OpType::Function(DataflowOp::ControlFlow {
+                    op: ControlFlowOp::CFG { .. }
+                })
+            ),
+        }
+    }
+
+    /// Returns a user-friendly description of the set.
+    pub fn set_description(&self) -> String {
+        match self {
+            OpTypeSet::None => "None",
+            OpTypeSet::ModuleRoot => "ModuleOp::Root",
+            OpTypeSet::DataflowContainers => "Dataflow containers",
+            OpTypeSet::CfgNode => "ControlFlowOp::CFG",
+        }
+        .into()
+    }
+}
+
+impl OpTypeValidator for OpType {
+    fn valid_parents(&self) -> OpTypeSet {
+        match self {
+            OpType::Module(op) => op.valid_parents(),
+            OpType::Function(op) => op.valid_parents(),
+            OpType::BasicBlock(op) => op.valid_parents(),
         }
     }
 
@@ -112,10 +152,10 @@ impl OpTypeValidator for OpType {
 }
 
 impl OpTypeValidator for ModuleOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
+    fn valid_parents(&self) -> OpTypeSet {
         match self {
-            ModuleOp::Root => false,
-            _ => matches!(parent, OpType::Module(ModuleOp::Root)),
+            ModuleOp::Root => OpTypeSet::None,
+            _ => OpTypeSet::ModuleRoot,
         }
     }
 
@@ -156,10 +196,8 @@ impl OpTypeValidator for ControlFlowOp {
     // BasicBlocks connected by ControlFlow edges. This is not currently
     // implemented, and should probably go outside of the OpTypeValidator trait.
 
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        // Note: This method is never used. `DataflowOp::is_valid_parent` calls
-        // `is_df_container` directly.
-        parent.is_df_container()
+    fn valid_parents(&self) -> OpTypeSet {
+        OpTypeSet::DataflowContainers
     }
 
     fn is_container(&self) -> bool {
@@ -210,13 +248,8 @@ impl OpTypeValidator for ControlFlowOp {
 }
 
 impl OpTypeValidator for BasicBlockOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        matches!(
-            parent,
-            OpType::Function(DataflowOp::ControlFlow {
-                op: ControlFlowOp::CFG { .. }
-            })
-        )
+    fn valid_parents(&self) -> OpTypeSet {
+        OpTypeSet::CfgNode
     }
 
     fn is_container(&self) -> bool {
@@ -237,8 +270,8 @@ impl OpTypeValidator for BasicBlockOp {
 }
 
 impl OpTypeValidator for DataflowOp {
-    fn is_valid_parent(&self, parent: &OpType) -> bool {
-        parent.is_df_container()
+    fn valid_parents(&self) -> OpTypeSet {
+        OpTypeSet::DataflowContainers
     }
 
     fn is_container(&self) -> bool {

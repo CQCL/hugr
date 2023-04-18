@@ -2,7 +2,7 @@ use portgraph::{NodeIndex, PortIndex, PortOffset};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::ops::validate::OpTypeValidator;
+use crate::ops::validate::{OpTypeSet, OpTypeValidator};
 use crate::ops::{ModuleOp, OpType};
 use crate::types::EdgeKind;
 use crate::Hugr;
@@ -47,11 +47,14 @@ impl Hugr {
             };
 
             let parent_optype = self.get_optype(parent);
-            if !optype.is_valid_parent(parent_optype) {
+            let valid_parents = optype.valid_parents();
+            if !valid_parents.contains(parent_optype) {
                 return Err(ValidationError::InvalidParent {
-                    node,
-                    optype: optype.clone(),
+                    child: node,
+                    child_optype: optype.clone(),
+                    parent,
                     parent_optype: parent_optype.clone(),
+                    expected_parent: valid_parents,
                 });
             }
         }
@@ -165,13 +168,11 @@ impl Hugr {
                     child_position: "last".into(),
                 });
             }
-        } else {
-            if optype.requires_children() {
+        } else if optype.requires_children() {
                 return Err(ValidationError::ContainerWithoutChildren {
                     node,
                     optype: optype.clone(),
                 });
-            }
         }
         // TODO: Dag/dominators
 
@@ -223,11 +224,13 @@ pub enum ValidationError {
     #[error("The node {node:?} has no parent.")]
     NoParent { node: NodeIndex },
     /// The parent node is not compatible with the child node.
-    #[error("The node {node:?} has an invalid parent. The operation {optype:?} cannot be a child of an operation {parent_optype:?}.")]
+    #[error("The operation {parent_optype:?} is not allowed as a parent of operation {child_optype:?}. Expected: {}. In node {child:?} with parent {parent:?}.", expected_parent.set_description())]
     InvalidParent {
-        node: NodeIndex,
-        optype: OpType,
+        child: NodeIndex,
+        child_optype: OpType,
+        parent: NodeIndex,
         parent_optype: OpType,
+        expected_parent: OpTypeSet,
     },
     /// The node operation is not a container, but has children.
     #[error("The node {node:?} with optype {optype:?} is not a container, but has children.")]
