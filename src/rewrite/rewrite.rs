@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use portgraph::substitute::OpenGraph;
 use portgraph::{NodeIndex, PortIndex};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::Hugr;
@@ -91,7 +90,24 @@ impl OpenHugr {
     }
 }
 
-pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
+/// Describes what to do with the nodes being replaced.
+#[derive(Clone, Debug)]
+pub enum ParentsMap {
+    /// Default: the replaced nodes should just be removed from the graph
+    DiscardAll,
+    /// All the replaced nodes should be made children of the specified node in the replacement.
+    /// TODO: clarify what happens to edges in/out of the replaced subgraph?
+    TransferAll(NodeIndex),
+    /// Each key identifies a (container) node N1 in the replaced subgraph;
+    /// the corresponding value identifies a (container) node N2 in the replacement.
+    /// All children of N1 should be transferred to become children of N2.
+    TransferSelectedChildren(HashMap<NodeIndex, NodeIndex>),
+}
+impl Default for ParentsMap {
+    fn default() -> Self {
+        Self::DiscardAll
+    }
+}
 
 /// A rewrite operation that replaces a subgraph with another graph.
 /// Includes the new weights for the nodes in the replacement graph.
@@ -102,10 +118,8 @@ pub struct Rewrite {
     /// The replacement graph. This should be a forest, i.e. the nodes without parents
     /// will be assigned the same parent as the nodes in the subgraph being replaced.
     replacement: OpenHugr,
-    /// A map from nodes in the subgraph to be replaced to nodes in the replacement graph.
-    /// For each key-value pair, all children of the key will be transferred to be children of the value.
-    /// Note: any children of nodes in the replaced subgraph not in this map, will be removed.
-    child_transfers: ParentsMap,
+    /// Specifies what to do with the replaced nodes.
+    transfers: ParentsMap,
 }
 
 impl Rewrite {
@@ -113,12 +127,12 @@ impl Rewrite {
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: OpenHugr,
-        child_transfers: impl Into<ParentsMap>,
+        transfers: impl Into<ParentsMap>,
     ) -> Self {
         Self {
             subgraph,
             replacement,
-            child_transfers: child_transfers.into(),
+            transfers: transfers.into(),
         }
     }
 
@@ -131,7 +145,7 @@ impl Rewrite {
         (
             portgraph::substitute::Rewrite::new(self.subgraph.subgraph, open_graph),
             replacement,
-            self.child_transfers,
+            self.transfers,
         )
     }
 
