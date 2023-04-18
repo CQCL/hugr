@@ -15,9 +15,9 @@ impl Hugr {
             return Err(ValidationError::RootNotRoot);
         }
         if self.get_optype(self.root) != &OpType::Module(ModuleOp::Root) {
-            return Err(ValidationError::OpTypeNotAllowed {
+            return Err(ValidationError::InvalidRootOpType {
                 node: self.root,
-                op_type: self.get_optype(self.root).clone(),
+                optype: self.get_optype(self.root).clone(),
             });
         }
 
@@ -115,12 +115,9 @@ pub enum ValidationError {
     /// The root node is not a root in the hierarchy.
     #[error("The root node is not a root in the hierarchy.")]
     RootNotRoot,
-    /// Invalid operation type.
-    #[error("The node {node:?} is not allowed to have the operation type {op_type:?}.")]
-    OpTypeNotAllowed {
-        node: NodeIndex,
-        op_type: OpType,
-    },
+    /// Invalid root operation type.
+    #[error("The operation type {optype:?} is not allowed as a root node. Expected Optype::Module(ModuleType::Root). In node {node:?}.")]
+    InvalidRootOpType { node: NodeIndex, optype: OpType },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
