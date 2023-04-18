@@ -3,13 +3,16 @@
 //! TODO: metadata
 #![allow(dead_code)]
 
+pub mod serialize;
+pub mod validate;
+
 use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
 use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 
-pub mod serialize;
+pub use validate::ValidationError;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -76,13 +79,23 @@ impl Hugr {
     /// Sets the parent of a node.
     ///
     /// The node becomes the parent's last child.
-    pub fn set_parent(&mut self, node: NodeIndex, parent: NodeIndex) -> Result<(), HugrError> {
+    pub(crate) fn set_parent(
+        &mut self,
+        node: NodeIndex,
+        parent: NodeIndex,
+    ) -> Result<(), HugrError> {
         self.hierarchy.push_child(node, parent)?;
         Ok(())
     }
 
+    /// Returns the parent of a node.
     pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
         self.hierarchy.parent(node)
+    }
+
+    /// Returns the operation type of a node.
+    pub fn get_optype(&self, node: NodeIndex) -> &OpType {
+        self.op_types.get(node)
     }
 
     /// Applies a rewrite to the graph.
@@ -111,12 +124,6 @@ impl Hugr {
         Ok(())
     }
 
-    /// Check the validity of the HUGR.
-    pub fn validate(&self) -> Result<(), ValidationError> {
-        // TODO
-        Ok(())
-    }
-
     pub fn root(&self) -> NodeIndex {
         self.root
     }
@@ -135,6 +142,3 @@ pub enum HugrError {
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum ValidationError {}

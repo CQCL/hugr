@@ -11,10 +11,11 @@ pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use dataflow::DataflowOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
+use portgraph::{Direction, PortOffset};
 use smol_str::SmolStr;
 
 /// The concrete operation types for a node in the HUGR.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {
     /// A module region node - parent will be the Root (or the node itself is the Root)
@@ -81,6 +82,18 @@ impl OpType {
             OpType::Module(op) => op.other_outputs(),
             OpType::Function(op) => op.other_outputs(),
             OpType::BasicBlock(op) => op.other_edges(),
+        }
+    }
+
+    /// Returns the edge kind for the given port offset
+    pub fn port_kind(&self, offset: PortOffset) -> Option<EdgeKind> {
+        let signature = self.signature();
+        if let Some(port_kind) = signature.get(offset) {
+            Some(port_kind)
+        } else if offset.direction() == Direction::Incoming {
+            self.other_inputs()
+        } else {
+            self.other_outputs()
         }
     }
 }

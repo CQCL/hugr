@@ -45,6 +45,17 @@ jobs:
       - name: Run miri
         run: cargo miri test
 
+  benches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build benchmarks with no features
+        run: cargo bench --verbose --no-run --no-default-features
+      - name: Build benchmarks with all features
+        run: cargo bench --verbose --no-run --all-features
+
   tests:
     runs-on: ubuntu-latest
     strategy:
@@ -57,7 +68,6 @@ jobs:
             cache: true
           - rust: nightly
             cache: true
-            bench: true
 
     steps:
       - uses: actions/checkout@v3
@@ -79,9 +89,3 @@ jobs:
         run: cargo test --verbose --no-default-features
       - name: Tests with all features
         run: cargo test --verbose --all-features
-      - name: Build benchmarks with no features
-        if: ${{ matrix.bench }}
-        run: cargo bench --verbose --no-run --no-default-features
-      - name: Build benchmarks with all features
-        if: ${{ matrix.bench }}
-        run: cargo bench --verbose --no-run --all-features

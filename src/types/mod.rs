@@ -3,11 +3,17 @@
 pub mod custom;
 pub mod simple;
 
+use std::ops::Index;
+
+use portgraph::Direction;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
 pub use simple::{ClassicType, QuantumType, SimpleType, TypeRow};
+
+pub use portgraph::PortOffset;
+
 use smol_str::SmolStr;
 
 use crate::resource::ResourceSet;
@@ -80,6 +86,31 @@ impl Signature {
                 .collect::<Vec<_>>()
         );
         self.input.iter().filter(|t| t.is_linear())
+    }
+
+    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    pub fn get(&self, offset: PortOffset) -> Option<EdgeKind> {
+        if offset.direction() == Direction::Incoming && offset.index() == self.input.len() {
+            self.const_input.clone().map(EdgeKind::Const)
+        } else {
+            self.get_df(offset).cloned().map(EdgeKind::Value)
+        }
+    }
+
+    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    pub fn get_df(&self, offset: PortOffset) -> Option<&SimpleType> {
+        match offset.direction() {
+            Direction::Incoming => self.input.get(offset.index()),
+            Direction::Outgoing => self.output.get(offset.index()),
+        }
+    }
+
+    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    pub fn get_df_mut(&mut self, offset: PortOffset) -> Option<&mut SimpleType> {
+        match offset.direction() {
+            Direction::Incoming => self.input.get_mut(offset.index()),
+            Direction::Outgoing => self.output.get_mut(offset.index()),
+        }
     }
 }
 
@@ -198,6 +229,17 @@ impl SignatureDescription {
             .const_input
             .as_ref()
             .map(|t| (self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t))
+    }
+}
+
+impl Index<PortOffset> for SignatureDescription {
+    type Output = SmolStr;
+
+    fn index(&self, index: PortOffset) -> &Self::Output {
+        match index.direction() {
+            Direction::Incoming => self.input.get(index.index()).unwrap_or(EMPTY_STRING_REF),
+            Direction::Outgoing => self.output.get(index.index()).unwrap_or(EMPTY_STRING_REF),
+        }
     }
 }
 

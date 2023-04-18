@@ -3,7 +3,7 @@ use smol_str::SmolStr;
 use super::{controlflow::ControlFlowOp, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DataflowOp {
     /// An input node.
     /// The outputs of this node are the inputs to the function.
