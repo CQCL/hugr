@@ -23,12 +23,14 @@ pub trait OpTypeValidator {
     }
 
     /// A restriction on the operation type of the first child
-    fn first_child_valid(&self, _child: OpType) -> bool {
+    fn validate_first_child(&self, child: &OpType) -> bool {
+        let _ = child;
         true
     }
 
     /// A restriction on the operation type of the last child
-    fn last_child_valid(&self, _child: OpType) -> bool {
+    fn validate_last_child(&self, child: &OpType) -> bool {
+        let _ = child;
         true
     }
 
@@ -76,19 +78,19 @@ impl OpTypeValidator for OpType {
         }
     }
 
-    fn first_child_valid(&self, child: OpType) -> bool {
+    fn validate_first_child(&self, child: &OpType) -> bool {
         match self {
-            OpType::Module(op) => op.first_child_valid(child),
-            OpType::Function(op) => op.first_child_valid(child),
-            OpType::BasicBlock(op) => op.first_child_valid(child),
+            OpType::Module(op) => op.validate_first_child(child),
+            OpType::Function(op) => op.validate_first_child(child),
+            OpType::BasicBlock(op) => op.validate_first_child(child),
         }
     }
 
-    fn last_child_valid(&self, child: OpType) -> bool {
+    fn validate_last_child(&self, child: &OpType) -> bool {
         match self {
-            OpType::Module(op) => op.last_child_valid(child),
-            OpType::Function(op) => op.last_child_valid(child),
-            OpType::BasicBlock(op) => op.last_child_valid(child),
+            OpType::Module(op) => op.validate_last_child(child),
+            OpType::Function(op) => op.validate_last_child(child),
+            OpType::BasicBlock(op) => op.validate_last_child(child),
         }
     }
 
@@ -125,7 +127,7 @@ impl OpTypeValidator for ModuleOp {
         matches!(self, ModuleOp::Def { .. })
     }
 
-    fn first_child_valid(&self, child: OpType) -> bool {
+    fn validate_first_child(&self, child: &OpType) -> bool {
         match self {
             ModuleOp::Root { .. } => matches!(child, OpType::Module(ModuleOp::Def { .. })),
             ModuleOp::Def { .. } => matches!(child, OpType::Function(DataflowOp::Input { .. })),
@@ -133,7 +135,7 @@ impl OpTypeValidator for ModuleOp {
         }
     }
 
-    fn last_child_valid(&self, child: OpType) -> bool {
+    fn validate_last_child(&self, child: &OpType) -> bool {
         match self {
             ModuleOp::Def { .. } => matches!(child, OpType::Function(DataflowOp::Output { .. })),
             _ => true,
@@ -171,7 +173,7 @@ impl OpTypeValidator for ControlFlowOp {
         )
     }
 
-    fn first_child_valid(&self, child: OpType) -> bool {
+    fn validate_first_child(&self, child: &OpType) -> bool {
         // TODO: check signatures
         match self {
             ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. } => {
@@ -181,7 +183,7 @@ impl OpTypeValidator for ControlFlowOp {
         }
     }
 
-    fn last_child_valid(&self, child: OpType) -> bool {
+    fn validate_last_child(&self, child: &OpType) -> bool {
         // TODO: check signatures
         match self {
             ControlFlowOp::Conditional { .. } | ControlFlowOp::Loop { .. } => {
@@ -255,9 +257,9 @@ impl OpTypeValidator for DataflowOp {
         }
     }
 
-    fn first_child_valid(&self, child: OpType) -> bool {
+    fn validate_first_child(&self, child: &OpType) -> bool {
         match self {
-            DataflowOp::ControlFlow { op } => op.first_child_valid(child),
+            DataflowOp::ControlFlow { op } => op.validate_first_child(child),
             DataflowOp::Nested { .. } => {
                 matches!(child, OpType::Function(DataflowOp::Input { .. }))
             }

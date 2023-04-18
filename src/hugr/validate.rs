@@ -1,4 +1,5 @@
 use portgraph::{NodeIndex, PortIndex, PortOffset};
+use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::ops::validate::OpTypeValidator;
@@ -55,8 +56,6 @@ impl Hugr {
             }
         }
 
-        // TODO: Check the other `OpTypeValidator` constraints.
-
         // Check that we have enough ports.
         // The actual number may be larger than the signature if non-dataflow ports are present.
         let mut df_inputs = sig.input.len();
@@ -82,6 +81,9 @@ impl Hugr {
             let offset = PortOffset::new_outgoing(i);
             self.validate_port(node, port, offset, optype)?;
         }
+
+        // Check operation-specific constraints
+        self.validate_operation(node, optype)?;
 
         Ok(())
     }
@@ -125,6 +127,56 @@ impl Hugr {
         }
         Ok(())
     }
+
+    /// Check operation-specific constraints.
+    ///
+    /// These are flags defined for each operation type by the [`OpTypeValidator`] trait.
+    fn validate_operation(&self, node: NodeIndex, optype: &OpType) -> Result<(), ValidationError> {
+        // Container related properties
+        // Note: The `is_df_container` check is run by the children in `is_valid_parent`
+        if self.hierarchy.child_count(node) > 0 {
+            if !optype.is_container() {
+                return Err(ValidationError::NonContainerWithChildren {
+                    node,
+                    optype: optype.clone(),
+                });
+            }
+
+            let first_child = self.hierarchy.first(node).unwrap();
+            let last_child = self.hierarchy.last(node).unwrap();
+            let first_child_optype = self.get_optype(first_child);
+            let last_child_optype = self.get_optype(last_child);
+
+            if !optype.validate_first_child(first_child_optype) {
+                return Err(ValidationError::InvalidChildOpType {
+                    parent: node,
+                    child: first_child,
+                    parent_optype: optype.clone(),
+                    child_optype: first_child_optype.clone(),
+                    child_position: "first".into(),
+                });
+            }
+            if !optype.validate_last_child(self.get_optype(last_child)) {
+                return Err(ValidationError::InvalidChildOpType {
+                    parent: node,
+                    child: last_child,
+                    parent_optype: optype.clone(),
+                    child_optype: last_child_optype.clone(),
+                    child_position: "last".into(),
+                });
+            }
+        } else {
+            if optype.requires_children() {
+                return Err(ValidationError::ContainerWithoutChildren {
+                    node,
+                    optype: optype.clone(),
+                });
+            }
+        }
+        // TODO: Dag/dominators
+
+        Ok(())
+    }
 }
 
 /// Errors that can occur while validating a Hugr.
@@ -136,6 +188,15 @@ pub enum ValidationError {
     /// Invalid root operation type.
     #[error("The operation type {optype:?} is not allowed as a root node. Expected Optype::Module(ModuleType::Root). In node {node:?}.")]
     InvalidRootOpType { node: NodeIndex, optype: OpType },
+    /// Invalid first/last child.
+    #[error("The operation {child_optype:?} is not allowed as a {child_position} child of operation {parent_optype:?}. In child {child:?} of node {parent:?}.")]
+    InvalidChildOpType {
+        parent: NodeIndex,
+        child: NodeIndex,
+        parent_optype: OpType,
+        child_optype: OpType,
+        child_position: SmolStr,
+    },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
@@ -168,6 +229,12 @@ pub enum ValidationError {
         optype: OpType,
         parent_optype: OpType,
     },
+    /// The node operation is not a container, but has children.
+    #[error("The node {node:?} with optype {optype:?} is not a container, but has children.")]
+    NonContainerWithChildren { node: NodeIndex, optype: OpType },
+    /// The node must have children, but has none.
+    #[error("The node {node:?} with optype {optype:?} must have children, but has none.")]
+    ContainerWithoutChildren { node: NodeIndex, optype: OpType },
 }
 
 #[cfg(test)]
