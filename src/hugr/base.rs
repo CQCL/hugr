@@ -24,24 +24,16 @@ impl BaseBuilder {
 
     /// Return index of HUGR root node.
     pub fn root(&self) -> NodeIndex {
-        self.hugr.root()
+        self.hugr.root
     }
 
-    /// Add a node to the graph with a parent in the hierarchy.
-    pub fn add_op(
-        &mut self,
-        parent: NodeIndex,
-        op: impl Into<OpType>,
-    ) -> Result<NodeIndex, HugrError> {
-        let node = self.hugr.add_node(op.into());
-        self.hugr.set_parent(node, parent)?;
-        Ok(node)
-    }
-
-    /// Set the parent of a node.
-    pub fn set_parent(&mut self, node: NodeIndex, parent: NodeIndex) -> Result<(), HugrError> {
-        self.hugr.set_parent(node, parent)?;
-        Ok(())
+    /// Add a node to the graph.
+    pub fn add_op(&mut self, op: impl Into<OpType>) -> NodeIndex {
+        let op: OpType = op.into();
+        let sig = op.signature();
+        let node = self.hugr.graph.add_node(sig.input.len(), sig.output.len());
+        self.hugr.op_types[node] = op;
+        node
     }
 
     /// Connect two nodes at the given ports.
@@ -52,7 +44,38 @@ impl BaseBuilder {
         dst: NodeIndex,
         dst_port: usize,
     ) -> Result<(), HugrError> {
-        self.hugr.connect(src, src_port, dst, dst_port)
+        self.hugr.graph.link_nodes(src, src_port, dst, dst_port)?;
+        Ok(())
+    }
+
+    /// Sets the parent of a node.
+    ///
+    /// The node becomes the parent's last child.
+    pub fn set_parent(&mut self, node: NodeIndex, parent: NodeIndex) -> Result<(), HugrError> {
+        self.hugr.hierarchy.push_child(node, parent)?;
+        Ok(())
+    }
+
+    /// Add a node to the graph with a parent in the hierarchy.
+    pub fn add_op_with_parent(
+        &mut self,
+        parent: NodeIndex,
+        op: impl Into<OpType>,
+    ) -> Result<NodeIndex, HugrError> {
+        let node = self.add_op(op.into());
+        self.set_parent(node, parent)?;
+        Ok(node)
+    }
+
+    /// Add a node to the graph with a parent in the hierarchy.
+    pub fn add_op_before(
+        &mut self,
+        sibling: NodeIndex,
+        op: impl Into<OpType>,
+    ) -> Result<NodeIndex, HugrError> {
+        let node = self.add_op(op.into());
+        self.hugr.hierarchy.insert_before(node, sibling)?;
+        Ok(node)
     }
 
     /// Build the HUGR, returning an error if the graph is not valid.
@@ -96,7 +119,7 @@ mod test {
         //
         // `add_op` is equivalent to `add_root_op` followed by `set_parent`
         let f: NodeIndex = builder
-            .add_op(
+            .add_op_with_parent(
                 module,
                 ModuleOp::Def {
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
@@ -106,7 +129,7 @@ mod test {
 
         {
             let f_in = builder
-                .add_op(
+                .add_op_with_parent(
                     f,
                     DataflowOp::Input {
                         types: type_row![NAT],
@@ -114,7 +137,7 @@ mod test {
                 )
                 .unwrap();
             let copy = builder
-                .add_op(
+                .add_op_with_parent(
                     f,
                     LeafOp::Copy {
                         n_copies: 2,
@@ -123,7 +146,7 @@ mod test {
                 )
                 .unwrap();
             let f_out = builder
-                .add_op(
+                .add_op_with_parent(
                     f,
                     DataflowOp::Output {
                         types: type_row![NAT, NAT],

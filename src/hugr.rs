@@ -3,7 +3,6 @@
 //! TODO: metadata
 #![allow(dead_code)]
 
-pub mod serialize;
 pub mod validate;
 
 use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
@@ -13,6 +12,9 @@ use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 
 pub use validate::ValidationError;
+mod base;
+pub mod serialize;
+pub use base::BaseBuilder;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -56,38 +58,6 @@ impl Hugr {
         }
     }
 
-    /// Add a node to the graph.
-    pub fn add_node(&mut self, op: OpType) -> NodeIndex {
-        let sig = op.signature();
-        let node = self.graph.add_node(sig.input.len(), sig.output.len());
-        self.op_types[node] = op;
-        node
-    }
-
-    /// Connect two nodes at the given ports.
-    pub fn connect(
-        &mut self,
-        src: NodeIndex,
-        src_port: usize,
-        dst: NodeIndex,
-        dst_port: usize,
-    ) -> Result<(), HugrError> {
-        self.graph.link_nodes(src, src_port, dst, dst_port)?;
-        Ok(())
-    }
-
-    /// Sets the parent of a node.
-    ///
-    /// The node becomes the parent's last child.
-    pub(crate) fn set_parent(
-        &mut self,
-        node: NodeIndex,
-        parent: NodeIndex,
-    ) -> Result<(), HugrError> {
-        self.hierarchy.push_child(node, parent)?;
-        Ok(())
-    }
-
     /// Returns the parent of a node.
     pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
         self.hierarchy.parent(node)
@@ -97,7 +67,6 @@ impl Hugr {
     pub fn get_optype(&self, node: NodeIndex) -> &OpType {
         self.op_types.get(node)
     }
-
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
@@ -122,10 +91,6 @@ impl Hugr {
         // TODO: Check types
 
         Ok(())
-    }
-
-    pub fn root(&self) -> NodeIndex {
-        self.root
     }
 }
 
