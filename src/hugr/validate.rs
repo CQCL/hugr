@@ -1,10 +1,8 @@
-use std::cmp::Ordering;
-
-use portgraph::{NodeIndex, PortOffset};
+use portgraph::{NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
 use crate::ops::{ModuleOp, OpType};
-use crate::types::{EdgeKind, Signature, SimpleType};
+use crate::types::EdgeKind;
 use crate::Hugr;
 
 /// HUGR invariant checks.
@@ -16,10 +14,11 @@ impl Hugr {
         if !self.hierarchy.is_root(self.root) {
             return Err(ValidationError::RootNotRoot);
         }
-        if self.get_optype(self.root) != &ModuleOp::Root.into() {
+        if self.get_optype(self.root) != &OpType::Module(ModuleOp::Root) {
             return Err(ValidationError::OpTypeNotAllowed {
                 node: self.root,
                 op_type: self.get_optype(self.root).clone(),
+                expected: vec![OpType::Module(ModuleOp::Root)],
             });
         }
 
@@ -37,28 +36,18 @@ impl Hugr {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&self, node: NodeIndex) -> Result<(), ValidationError> {
-        // TODO: Signature correctness, allowed children, children-specific
-        // constraints (e.g. first/last types), children DAG, type of parent
+        // TODO: Operation-specific checks
         let optype = self.get_optype(node);
         let sig = optype.signature();
 
-        // Check the number of ports.
+        // Check that we have enough ports.
+        // The actual number may be larger than the signature if non-dataflow ports are present.
         let mut df_inputs = sig.input.len();
         let df_outputs = sig.output.len();
         if sig.const_input.is_some() {
             df_inputs += 1
         };
-        let valid_inputs = match self.graph.num_inputs(node).cmp(&df_inputs) {
-            Ordering::Less => false,
-            Ordering::Equal => true,
-            Ordering::Greater => optype.other_inputs().is_some(),
-        };
-        let valid_outputs = match self.graph.num_outputs(node).cmp(&df_outputs) {
-            Ordering::Less => false,
-            Ordering::Equal => true,
-            Ordering::Greater => optype.other_outputs().is_some(),
-        };
-        if !valid_inputs || !valid_outputs {
+        if self.graph.num_inputs(node) < df_inputs || self.graph.num_outputs(node) < df_outputs {
             return Err(ValidationError::WrongNumberOfPorts {
                 node,
                 optype: optype.clone(),
@@ -68,53 +57,44 @@ impl Hugr {
         }
 
         // Check port connections
-        for input in 0..sig.input.len() {
-            let offset = PortOffset::new_incoming(input);
-            self.validate_df_port(node, &sig, offset)?;
+        for (i, port) in self.graph.inputs(node).enumerate() {
+            let offset = PortOffset::new_incoming(i);
+            self.validate_port(node, port, offset, optype)?;
         }
-        for output in 0..sig.output.len() {
-            let offset = PortOffset::new_outgoing(output);
-            self.validate_df_port(node, &sig, offset)?;
-        }
-        if sig.const_input.is_some() {
-            let offset = PortOffset::new_incoming(sig.input.len());
-            self.validate_df_port(node, &sig, offset)?;
+        for (i, port) in self.graph.outputs(node).enumerate() {
+            let offset = PortOffset::new_outgoing(i);
+            self.validate_port(node, port, offset, optype)?;
         }
 
         Ok(())
     }
 
-    /// Check that a port is valid.
-    /// - Dataflow kinds must be connected
-    /// - The connected port must have a compatible type
-    fn validate_df_port(
+    /// Check whether a port is valid.
+    /// - It must be connected
+    /// - The linked port must have a compatible type
+    fn validate_port(
         &self,
         node: NodeIndex,
-        sig: &Signature,
+        port: PortIndex,
         offset: PortOffset,
+        optype: &OpType,
     ) -> Result<(), ValidationError> {
-        let port = self.graph.port_index(node, offset).unwrap();
-        let port_kind = sig.get(offset).unwrap();
+        let port_kind = optype.port_kind(offset).unwrap();
 
+        // Ports must always be connected
         let Some(link) = self.graph.port_link(port) else {
-            // Dataflow ports must always be connected
-            if let EdgeKind::Value(typ) = port_kind {
-                return Err(ValidationError::UnconnectedDFPort {
-                    node,
-                    port: offset,
-                    wire_type: typ,
-                });
-            } else {
-                return Ok(());
-            }
+            return Err(ValidationError::UnconnectedDFPort {
+                node,
+                port: offset,
+                port_kind,
+            });
         };
 
         let other_node = self.graph.port_node(link).unwrap();
         let other_offset = self.graph.port_offset(link).unwrap();
         let other_op = self.get_optype(other_node);
-        let other_sig = other_op.signature();
 
-        let Some(other_kind) = other_sig.get(other_offset) else {
+        let Some(other_kind) = other_op.port_kind(other_offset) else {
             // The number of ports in `other_node` does not match the operation definition.
             // This should be caught by `validate_node`.
             return Err(self.validate_node(other_node).unwrap_err());
@@ -137,8 +117,12 @@ pub enum ValidationError {
     #[error("The root node is not a root in the hierarchy.")]
     RootNotRoot,
     /// Invalid operation type.
-    #[error("The node {node:?} is not allowed to have the operation type {op_type:?}.")]
-    OpTypeNotAllowed { node: NodeIndex, op_type: OpType },
+    #[error("The node {node:?} is not allowed to have the operation type {op_type:?}. Expected one of {expected:?}")]
+    OpTypeNotAllowed {
+        node: NodeIndex,
+        op_type: OpType,
+        expected: Vec<OpType>,
+    },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
@@ -148,11 +132,11 @@ pub enum ValidationError {
         actual_outputs: usize,
     },
     /// A dataflow port is not connected.
-    #[error("The node {node:?} has an unconnected port {port:?} of type {wire_type:?}.")]
+    #[error("The node {node:?} has an unconnected port {port:?} of type {port_kind:?}.")]
     UnconnectedDFPort {
         node: NodeIndex,
         port: PortOffset,
-        wire_type: SimpleType,
+        port_kind: EdgeKind,
     },
     /// Connected ports have different types, or non-unifiable types.
     #[error("Connected ports {:?} in node {:?} and {:?} in node {:?} have incompatible kinds. Cannot connect {:?} to {:?}.",
