@@ -1,23 +1,51 @@
-use portgraph::NodeIndex;
+use portgraph::{NodeIndex, PortIndex};
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
-use std::iter::empty;
 
-struct HugrView {}
-impl HugrView {
+use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
+use crate::Hugr;
+
+struct CfgView<'a> {
+    h: &'a Hugr,
+    parent: NodeIndex,
+}
+
+impl<'a> CfgView<'a> {
+    pub fn new(h: &'a Hugr, parent: NodeIndex) -> Result<Self, String> {
+        if let OpType::Function(DataflowOp::ControlFlow {
+            op: ControlFlowOp::CFG { .. },
+        }) = h.get_optype(parent)
+        {
+            Ok(Self {
+                h: h,
+                parent: parent,
+            })
+        } else {
+            Err("Not a kappa-node".to_string())
+        }
+    }
     pub fn entry_node(&self) -> NodeIndex {
-        todo!()
+        self.h.hierarchy.first(self.parent).unwrap()
     }
     pub fn exit_node(&self) -> NodeIndex {
-        todo!()
+        self.h.hierarchy.last(self.parent).unwrap()
     }
-    pub fn successors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> {
-        todo!();
-        empty()
+    pub fn successors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
+        self.h
+            .graph
+            .output_links(n)
+            .into_iter()
+            .map(|p| self.port_owner(p))
     }
-    pub fn predecessors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> {
-        todo!();
-        empty()
+    pub fn predecessors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
+        self.h
+            .graph
+            .input_links(n)
+            .into_iter()
+            .map(|p| self.port_owner(p))
+    }
+    fn port_owner(&self, p: Option<PortIndex>) -> NodeIndex {
+        self.h.graph.port_node(p.unwrap()).unwrap()
     }
 }
 
@@ -128,7 +156,7 @@ impl BracketList {
 }
 
 struct UndirectedDFSTree<'a> {
-    h: &'a HugrView,
+    h: &'a CfgView<'a>,
     dfs_num: HashMap<NodeIndex, usize>,
     dfs_parents: HashMap<NodeIndex, EdgeDest>, // value is direction + source of edge along which key was reached
 }
@@ -140,7 +168,7 @@ struct TraversalState {
 }
 
 impl<'a> UndirectedDFSTree<'a> {
-    pub fn new(h: &'a HugrView) -> Self {
+    pub fn new(h: &'a CfgView) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
