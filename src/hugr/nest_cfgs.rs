@@ -224,7 +224,7 @@ impl<'a> UndirectedDFSTree<'a> {
         }
 
         let num_backedges = non_capping_backedges.len();
-        let parent_edge = self.dfs_parents.get(&n).unwrap().clone();
+        let parent_edge = *self.dfs_parents.get(&n).unwrap();
         let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
             .into_iter()
             .filter(|e| *e != parent_edge)
@@ -249,7 +249,7 @@ impl<'a> UndirectedDFSTree<'a> {
         // Add backedges from here to ancestors
         be_up
             .iter()
-            .for_each(|(_, e)| bs.push(UDEdge::CFGEdge(n, e.clone())));
+            .for_each(|(_, e)| bs.push(UDEdge::CFGEdge(n, *e)));
 
         // Now calculate edge classes
         let class = bs.tag(&st.deleted_backedges).unwrap();
@@ -257,7 +257,7 @@ impl<'a> UndirectedDFSTree<'a> {
             st.edge_classes.insert(e.clone(), class.clone());
         }
         st.edge_classes
-            .insert(UDEdge::CFGEdge(n, parent_edge.clone()), class);
+            .insert(UDEdge::CFGEdge(n, parent_edge), class);
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
