@@ -18,7 +18,6 @@ impl Hugr {
             return Err(ValidationError::OpTypeNotAllowed {
                 node: self.root,
                 op_type: self.get_optype(self.root).clone(),
-                expected: vec![OpType::Module(ModuleOp::Root)],
             });
         }
 
@@ -117,11 +116,10 @@ pub enum ValidationError {
     #[error("The root node is not a root in the hierarchy.")]
     RootNotRoot,
     /// Invalid operation type.
-    #[error("The node {node:?} is not allowed to have the operation type {op_type:?}. Expected one of {expected:?}")]
+    #[error("The node {node:?} is not allowed to have the operation type {op_type:?}.")]
     OpTypeNotAllowed {
         node: NodeIndex,
         op_type: OpType,
-        expected: Vec<OpType>,
     },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
