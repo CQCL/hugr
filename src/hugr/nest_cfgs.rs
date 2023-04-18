@@ -174,17 +174,15 @@ impl<'a> UndirectedDFSTree<'a> {
         t
     }
 
-    fn undirected_edges(&self, n: NodeIndex) -> impl Iterator<Item = EdgeDest> {
-        // Filter reachable? Or no?
+    fn undirected_edges(&self, n: NodeIndex) -> impl Iterator<Item = EdgeDest> + '_ {
         self.h
             .successors(n)
             .map(EdgeDest::Forward)
             .chain(self.h.predecessors(n).map(EdgeDest::Backward))
+            .filter(|e| self.dfs_parents.contains_key(&e.node_index()))
     }
 
     pub fn children_backedges(&self, n: NodeIndex) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
-        // If we didn't filter reachable above, we should do so here (not unwrap)
-        // Also, exclude the edge from this node's parent!
         self.undirected_edges(n).partition(|e| {
             let (tgt, from) = e.flip(n);
             (*self.dfs_parents.get(&tgt).unwrap()) == from
