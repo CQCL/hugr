@@ -66,6 +66,7 @@ impl Signature {
 }
 impl Signature {
     /// Returns the linear part of the signature
+    /// TODO: This fails when mixing different linear types
     #[inline(always)]
     pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
         debug_assert_eq!(
@@ -148,7 +149,7 @@ impl SignatureDescription {
     /// Create a new signature with only linear dataflow inputs and outputs
     pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
-        SignatureDescription::new_df(linear.clone(), linear.clone())
+        SignatureDescription::new_df(linear.clone(), linear)
     }
 
     /// Create a new signature with only dataflow inputs and outputs
@@ -193,10 +194,10 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> Option<(&'a SmolStr, &'a ClassicType)> {
-        match &signature.const_input {
-            None => None,
-            Some(t) => Some((self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t)),
-        }
+        signature
+            .const_input
+            .as_ref()
+            .map(|t| (self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t))
     }
 }
 

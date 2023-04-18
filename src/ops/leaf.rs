@@ -4,10 +4,10 @@
 
 use smol_str::SmolStr;
 
-use super::{Op, OpaqueOp};
+use super::OpaqueOp;
 use crate::{
     type_row,
-    types::{ClassicType, QuantumType, Signature, SimpleType},
+    types::{ClassicType, QuantumType, Signature, SignatureDescription, SimpleType},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -45,35 +45,71 @@ impl Default for LeafOp {
     }
 }
 
-pub fn approx_eq(x: f64, y: f64, modulo: u32, tol: f64) -> bool {
-    let modulo = f64::from(modulo);
-    let x = (x - y) / modulo;
-
-    let x = x - x.floor();
-
-    let r = modulo * x;
-
-    r < tol || r > modulo - tol
-}
-
 impl LeafOp {
+    /// Returns true if the operation has a single quantum input and output
+    /// TODO: Consider non-qubit linear outputs
     pub fn is_one_qb_gate(&self) -> bool {
         self.signature().linear().count() == 1
     }
 
+    /// Returns true if the operation has exactly two quantum inputs and outputs
+    /// TODO: Consider non-qubit linear outputs
     pub fn is_two_qb_gate(&self) -> bool {
         self.signature().linear().count() == 1
     }
 
+    /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()
     }
-}
 
-impl Op for LeafOp {
-    fn signature(&self) -> Signature {
-        // TODO: Missing [`DataType::Money`] inputs and outputs.
+    /// The name of the operation.
+    pub fn name(&self) -> SmolStr {
+        match self {
+            LeafOp::CustomOp(opaque) => return opaque.name(),
+            LeafOp::H => "H",
+            LeafOp::T => "T",
+            LeafOp::S => "S",
+            LeafOp::X => "X",
+            LeafOp::Y => "Y",
+            LeafOp::Z => "Z",
+            LeafOp::Tadj => "Tadj",
+            LeafOp::Sadj => "Sadj",
+            LeafOp::CX => "CX",
+            LeafOp::ZZMax => "ZZMax",
+            LeafOp::Reset => "Reset",
+            LeafOp::Noop(_) => "Noop",
+            LeafOp::Measure => "Measure",
+            LeafOp::Copy { .. } => "Copy",
+            LeafOp::Xor => "Xor",
+        }
+        .into()
+    }
 
+    /// The description of the operation.
+    pub fn description(&self) -> &str {
+        match self {
+            LeafOp::CustomOp(opaque) => opaque.description(),
+            LeafOp::H => "Hadamard gate",
+            LeafOp::T => "T gate",
+            LeafOp::S => "S gate",
+            LeafOp::X => "X gate",
+            LeafOp::Y => "Y gate",
+            LeafOp::Z => "Z gate",
+            LeafOp::Tadj => "Adjoint T gate",
+            LeafOp::Sadj => "Adjoint S gate",
+            LeafOp::CX => "Controlled X gate",
+            LeafOp::ZZMax => "ZZMax gate",
+            LeafOp::Reset => "Reset gate",
+            LeafOp::Noop(_) => "Noop gate",
+            LeafOp::Measure => "Measure gate",
+            LeafOp::Copy { .. } => "Copy gate",
+            LeafOp::Xor => "Xor gate",
+        }
+    }
+
+    /// The signature of the operation.
+    pub fn signature(&self) -> Signature {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Quantum(QuantumType::Qubit);
@@ -101,25 +137,11 @@ impl Op for LeafOp {
         }
     }
 
-    fn name(&self) -> SmolStr {
+    pub fn signature_desc(&self) -> SignatureDescription {
         match self {
-            LeafOp::CustomOp(opaque) => opaque.id.as_str(),
-            LeafOp::H => "H",
-            LeafOp::T => "T",
-            LeafOp::S => "S",
-            LeafOp::X => "X",
-            LeafOp::Y => "Y",
-            LeafOp::Z => "Z",
-            LeafOp::Tadj => "Tadj",
-            LeafOp::Sadj => "Sadj",
-            LeafOp::CX => "CX",
-            LeafOp::ZZMax => "ZZMax",
-            LeafOp::Reset => "Reset",
-            LeafOp::Noop(_) => "Noop",
-            LeafOp::Measure => "Measure",
-            LeafOp::Copy { .. } => "Copy",
-            LeafOp::Xor => "Xor",
+            LeafOp::CustomOp(opaque) => opaque.signature_desc(),
+            // TODO: More port descriptions
+            _ => Default::default(),
         }
-        .into()
     }
 }
