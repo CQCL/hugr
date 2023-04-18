@@ -3,6 +3,7 @@
 //! TODO: metadata
 #![allow(dead_code)]
 
+pub mod nest_cfgs;
 pub mod serialize;
 pub mod validate;
 
