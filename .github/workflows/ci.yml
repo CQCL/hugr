@@ -51,6 +51,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: v0
       - name: Build benchmarks with no features
         run: cargo bench --verbose --no-run --no-default-features
       - name: Build benchmarks with all features
