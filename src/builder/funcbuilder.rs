@@ -1,7 +1,10 @@
+use std::marker::PhantomData;
+
 use portgraph::NodeIndex;
 
 use crate::hugr::{BuildError, HugrMut};
-use crate::ops::{DataflowOp, ModuleOp};
+use crate::ops::controlflow::ControlFlowOp;
+use crate::ops::{BasicBlockOp, DataflowOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
@@ -13,7 +16,26 @@ pub struct DeltaID {
     out_wires: Vec<Wire>,
 }
 
+pub struct KappaID {
+    node: NodeIndex,
+    out_wires: Vec<Wire>,
+}
+
 pub struct FuncID(NodeIndex);
+
+impl From<DeltaID> for FuncID {
+    fn from(value: DeltaID) -> Self {
+        Self(value.node)
+    }
+}
+
+pub struct BetaID(NodeIndex);
+
+impl From<DeltaID> for BetaID {
+    fn from(value: DeltaID) -> Self {
+        Self(value.node)
+    }
+}
 
 #[derive(Default)]
 pub struct ModuleBuilder(HugrMut);
@@ -82,6 +104,7 @@ pub trait Dataflow: Container {
             .try_into()
             .expect(&format!("Incorrect number of wires: {}", N)[..])
     }
+
     fn delta_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
@@ -97,6 +120,53 @@ pub trait Dataflow: Container {
         )?;
 
         DeltaBuilder::create_with_io(self.base(), deltn, input_types.into(), outputs)
+    }
+
+    fn kappa_builder<'a: 'b, 'b>(
+        &'a mut self,
+        entry_inputs: Vec<(SimpleType, Wire)>,
+        entry_outputs: TypeRow,
+        exit_inputs: TypeRow,
+        exit_outputs: TypeRow,
+    ) -> Result<KappaBuilder<'b>, HugrError> {
+        let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) =
+            entry_inputs.into_iter().unzip();
+
+        let inputs: TypeRow = input_types.into();
+
+        let (kapn, wirs) = add_op_with_wires(
+            self,
+            OpType::Function(DataflowOp::ControlFlow {
+                op: ControlFlowOp::CFG {
+                    inputs: inputs.clone(),
+                    outputs: exit_outputs.clone(),
+                },
+            }),
+            input_wires,
+        )?;
+        let entryop = OpType::BasicBlock(BasicBlockOp {
+            inputs: inputs.clone(),
+            outputs: entry_outputs.clone(),
+        });
+        let exitop = OpType::BasicBlock(BasicBlockOp {
+            inputs: exit_inputs.clone(),
+            outputs: exit_outputs.clone(),
+        });
+
+        let entry_n = self.base().add_op_with_parent(kapn, entryop)?;
+        let exit_n = self.base().add_op_with_parent(kapn, exitop)?;
+
+        let kb = KappaBuilder {
+            base: self.base(),
+            kapp_node: kapn,
+            external_out_wires: wirs,
+            entry_exit: [
+                (entry_n, inputs, entry_outputs),
+                (exit_n, exit_inputs, exit_outputs),
+            ],
+        };
+
+        Ok(kb)
     }
 }
 
@@ -119,7 +189,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 }
 
 impl<'f> DeltaBuilder<'f> {
-    pub fn create_with_io(
+    fn create_with_io(
         base: &'f mut HugrMut,
         parent: NodeIndex,
         inputs: TypeRow,
@@ -191,10 +261,22 @@ impl Container for ModuleBuilder {
     }
 }
 
-pub struct FunctionBuilder<'b>(DeltaBuilder<'b>);
+pub struct DeltaWrapper<'b, T>(DeltaBuilder<'b>, PhantomData<T>);
 
-impl<'b> Container for FunctionBuilder<'b> {
-    type ContainerHandle = FuncID;
+pub type FunctionBuilder<'b> = DeltaWrapper<'b, FuncID>;
+pub type BetaBuilder<'b> = DeltaWrapper<'b, BetaID>;
+
+impl<'b, T> DeltaWrapper<'b, T> {
+    fn new(db: DeltaBuilder<'b>) -> Self {
+        Self(db, PhantomData)
+    }
+}
+
+impl<'b, T> Container for DeltaWrapper<'b, T>
+where
+    T: From<DeltaID>,
+{
+    type ContainerHandle = T;
 
     fn container_node(&self) -> NodeIndex {
         self.0.container_node()
@@ -205,12 +287,14 @@ impl<'b> Container for FunctionBuilder<'b> {
     }
 
     fn finish(self) -> Self::ContainerHandle {
-        let n = self.0.finish();
-        FuncID(n.node)
+        self.0.finish().into()
     }
 }
 
-impl<'b> Dataflow for FunctionBuilder<'b> {
+impl<'b, T> Dataflow for DeltaWrapper<'b, T>
+where
+    T: From<DeltaID>,
+{
     fn io(&self) -> [NodeIndex; 2] {
         self.0.io
     }
@@ -232,7 +316,77 @@ impl ModuleBuilder {
         }))?;
 
         let db = DeltaBuilder::create_with_io(self.base(), defn, inputs, outputs)?;
-        Ok(FunctionBuilder(db))
+        Ok(FunctionBuilder::new(db))
+    }
+}
+
+pub struct KappaBuilder<'f> {
+    base: &'f mut HugrMut,
+    kapp_node: NodeIndex,
+    external_out_wires: Vec<Wire>,
+    entry_exit: [(NodeIndex, TypeRow, TypeRow); 2],
+}
+
+impl<'f> Container for KappaBuilder<'f> {
+    type ContainerHandle = KappaID;
+
+    fn container_node(&self) -> NodeIndex {
+        self.kapp_node
+    }
+
+    fn base(&mut self) -> &mut HugrMut {
+        self.base
+    }
+
+    fn finish(self) -> Self::ContainerHandle {
+        KappaID {
+            node: self.kapp_node,
+            out_wires: self.external_out_wires,
+        }
+    }
+}
+
+impl<'f> KappaBuilder<'f> {
+    pub fn beta_builder<'a: 'b, 'b>(
+        &'a mut self,
+        inputs: TypeRow,
+        outputs: TypeRow,
+    ) -> Result<BetaBuilder<'b>, HugrError> {
+        let op = OpType::BasicBlock(BasicBlockOp {
+            inputs: inputs.clone(),
+            outputs: outputs.clone(),
+        });
+        let [_, (exit, ..)] = self.entry_exit;
+        let base = self.base();
+        let opn = base.add_op_before(exit, op)?;
+
+        let db = DeltaBuilder::create_with_io(self.base(), opn, inputs, outputs)?;
+        Ok(BetaBuilder::new(db))
+    }
+
+    fn entry_exit_builder<'a: 'b, 'b, const N: usize>(
+        &'a mut self,
+    ) -> Result<BetaBuilder<'b>, HugrError> {
+        let (betn, inputs, outputs) = self.entry_exit[N].clone();
+        DeltaBuilder::create_with_io(self.base(), betn, inputs, outputs).map(BetaBuilder::new)
+    }
+    pub fn entry_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
+        self.entry_exit_builder::<'a, 'b, 0>()
+    }
+
+    pub fn exit_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
+        self.entry_exit_builder::<'a, 'b, 1>()
+    }
+
+    pub fn branch(&mut self, from: &BetaID, to: &BetaID) -> Result<(), HugrError> {
+        let fin = self.base.node_inputs(from.0).count();
+        let fout = self.base.node_outputs(from.0).count();
+        let tin = self.base.node_inputs(to.0).count();
+        let tout = self.base.node_outputs(to.0).count();
+
+        self.base().set_num_ports(from.0, fin, fout + 1);
+        self.base().set_num_ports(to.0, tin + 1, tout);
+        self.base().connect(from.0, fout, to.0, tin)
     }
 }
 
@@ -266,13 +420,62 @@ mod test {
                     vec![qb],
                 )?;
 
-                let indelt: DeltaID = {
-                    let inbuilder = fbuild.delta_builder(vec![(NAT, int)], type_row![NAT])?;
-                    let [iw] = inbuilder.input_wires_arr();
-                    inbuilder.finish_with_outputs([iw])?
-                };
+                let inbuilder = fbuild.delta_builder(vec![(NAT, int)], type_row![NAT])?;
+                let indelt = nat_identity(inbuilder)?;
 
                 fbuild.finish_with_outputs([indelt.out_wires, qout].concat())?
+            };
+            modbuilder.finish()
+        };
+
+        println!("{}", buildres.clone().unwrap().dot_string());
+        assert!(buildres.is_ok());
+
+        Ok(())
+    }
+
+    fn nat_identity<T: Dataflow>(inbuilder: T) -> Result<T::ContainerHandle, HugrError> {
+        let [iw] = inbuilder.input_wires_arr();
+        inbuilder.finish_with_outputs([iw])
+    }
+
+    #[test]
+    fn basic_cfg() -> Result<(), HugrError> {
+        let buildres = {
+            let mut modbuilder = ModuleBuilder::new();
+
+            let _fdef = {
+                let mut fbuild =
+                    modbuilder.function_builder("main", type_row![NAT], type_row![NAT])?;
+
+                let [int] = fbuild.input_wires_arr();
+
+                let inkapp: KappaID = {
+                    let mut cfgbuilder = fbuild.kappa_builder(
+                        vec![(NAT, int)],
+                        type_row![NAT],
+                        type_row![NAT],
+                        type_row![NAT],
+                    )?;
+                    let entrybuild = cfgbuilder.entry_builder()?;
+
+                    let entry = nat_identity(entrybuild)?;
+
+                    let middlebuild = cfgbuilder.beta_builder(type_row![NAT], type_row![NAT])?;
+
+                    let middle = nat_identity(middlebuild)?;
+
+                    let exitbuild = cfgbuilder.exit_builder()?;
+
+                    let exit = nat_identity(exitbuild)?;
+
+                    cfgbuilder.branch(&entry, &middle)?;
+                    cfgbuilder.branch(&middle, &exit)?;
+
+                    cfgbuilder.finish()
+                };
+
+                fbuild.finish_with_outputs(inkapp.out_wires)?
             };
             modbuilder.finish()
         };
