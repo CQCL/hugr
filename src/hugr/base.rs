@@ -11,12 +11,12 @@ use crate::{
 
 /// A low-level builder for a HUGR.
 #[derive(Clone, Debug, Default)]
-pub struct BaseBuilder {
+pub struct HugrMut {
     /// The partial HUGR being built.
     hugr: Hugr,
 }
 
-impl BaseBuilder {
+impl HugrMut {
     /// Initialize a new builder.
     pub fn new() -> Self {
         Default::default()
@@ -110,7 +110,7 @@ mod test {
     #[test]
     fn simple_function() {
         // Starts an empty builder
-        let mut builder = BaseBuilder::new();
+        let mut builder = HugrMut::new();
 
         // Create the root module definition
         let module: NodeIndex = builder.root();

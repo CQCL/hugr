@@ -14,7 +14,7 @@ use crate::rewrite::{Rewrite, RewriteError};
 pub use validate::ValidationError;
 mod base;
 pub mod serialize;
-pub use base::BaseBuilder;
+pub use base::{HugrMut, BuildError};
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
