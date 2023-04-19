@@ -41,8 +41,11 @@ impl<'a> CfgView<'a> {
     pub fn exit_node(&self) -> HalfNode {
         self.resolve_out(self.h.hierarchy.last(self.parent).unwrap())
     }
+    fn is_multi_node(&self, n: NodeIndex) -> bool {
+        self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
+    }
     fn resolve_out(&self, n: NodeIndex) -> HalfNode {
-        if self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4 {
+        if self.is_multi_node(n) {
             HalfNode::X(n)
         } else {
             HalfNode::N(n)
@@ -53,14 +56,11 @@ impl<'a> CfgView<'a> {
         'outer: {
             let ni = match h {
                 HalfNode::N(ni) => {
-                    let r = self.resolve_out(ni);
-                    match r {
-                        HalfNode::X(_) => {
-                            ss.push(r);
-                            break 'outer;
-                        }
-                        HalfNode::N(_) => ni,
+                    if self.is_multi_node(ni) {
+                        ss.push(HalfNode::X(ni));
+                        break 'outer;
                     }
+                    ni
                 }
                 HalfNode::X(ni) => ni,
             };
