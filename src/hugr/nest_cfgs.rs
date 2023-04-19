@@ -87,7 +87,7 @@ impl<'a> CfgView<'a> {
             .map(EdgeDest::Forward)
             .chain(self.predecessors(n).map(EdgeDest::Backward))
     }
-    pub fn get_edge_classes(&self) -> HashMap<CFEdge, CycleClass> {
+    pub fn get_edge_classes(&self) -> HashMap<CFEdge, Option<CycleClass>> {
         let tree = UndirectedDFSTree::new(self);
         let mut st = TraversalState {
             deleted_backedges: HashSet::new(),
@@ -215,7 +215,7 @@ struct UndirectedDFSTree<'a> {
 struct TraversalState {
     deleted_backedges: HashSet<UDEdge>,
     capping_edges: HashMap<usize, Vec<CappingEdge>>, // Indexed by DFS num, elems all CappingBackedge's
-    edge_classes: HashMap<CFEdge, CycleClass>,
+    edge_classes: HashMap<CFEdge, Option<CycleClass>>,
 }
 
 impl<'a> UndirectedDFSTree<'a> {
@@ -242,7 +242,7 @@ impl<'a> UndirectedDFSTree<'a> {
                     dfs_num.insert(n, dfs_num.len());
                     dfs_parents.insert(n, p_edge);
                     for e in h.undirected_edges(n) {
-                        pending.push(CFEdge(n, e));
+                        pending.push(CFEdge(n, e).flip());
                     }
                 }
             }
@@ -298,41 +298,36 @@ impl<'a> UndirectedDFSTree<'a> {
             }
         }
 
-        let num_backedges = non_capping_backedges.len();
         let parent_edge = *self.dfs_parents.get(&n).unwrap();
         let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
             .into_iter()
-            .filter(|e| *e != parent_edge)
             .map(|e| (*self.dfs_num.get(&e.target()).unwrap(), e))
             .partition(|(dfs, _)| *dfs < n_dfs);
-        assert!(be_down.len() + be_up.len() + 1 == num_backedges); // Parent found exactly once
 
         // Remove edges to here from beneath
-        for e in be_down
-            .into_iter()
-            .map(|(_, e)| UDEdge::RealEdge(CFEdge(n, e)))
-            .chain(
-                // Also capping backedges
-                st.capping_edges
-                    .remove(&n_dfs)
-                    .into_iter()
-                    .flat_map(|v| v.into_iter())
-                    .map(UDEdge::FakeEdge),
-            )
-        {
+        for (_,e) in be_down {
+            let e = UDEdge::RealEdge(CFEdge(n, e));
             bs.delete(&e, &mut st.deleted_backedges);
         }
-        // Add backedges from here to ancestors
+        // And capping backedges
+        for e in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+            bs.delete(&UDEdge::FakeEdge(e), &mut st.deleted_backedges)
+        }
+        
+        // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
         be_up
             .iter()
+            .filter(|(_,e)| *e != parent_edge)
             .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge(n, *e))));
 
         // Now calculate edge classes
-        let class = bs.tag(&st.deleted_backedges).unwrap();
-        if let (UDEdge::RealEdge(e), 1) = &class {
+        let class = bs.tag(&st.deleted_backedges);
+        if let Some((UDEdge::RealEdge(e), 1)) = &class {
             st.edge_classes.insert(e.clone(), class.clone());
         }
-        st.edge_classes.insert(CFEdge(n, parent_edge), class);
+        if let Some(parent_edge) = self.dfs_parents.get(&n) {
+            st.edge_classes.insert(CFEdge(n, *parent_edge), class);
+        }
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
