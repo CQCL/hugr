@@ -335,3 +335,69 @@ impl<'a> UndirectedDFSTree<'a> {
         (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, OpType};
+    use crate::type_row;
+    use crate::types::{ClassicType, SimpleType};
+    use crate::{hugr::HugrError, Hugr};
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::Nat);
+
+    fn kappa() -> OpType {
+        OpType::Function(DataflowOp::ControlFlow {
+            op: ControlFlowOp::CFG {
+                inputs: type_row![NAT],
+                outputs: type_row![NAT],
+            },
+        })
+    }
+
+    fn add_block(
+        h: &mut Hugr,
+        parent: NodeIndex,
+        num_inputs: usize,
+        num_outputs: usize,
+    ) -> Result<NodeIndex, HugrError> {
+        let idx = h.add_node(OpType::BasicBlock(BasicBlockOp {
+            inputs: type_row![NAT],
+            outputs: type_row![NAT],
+        }));
+        h.set_parent(idx, parent)?;
+        h.graph
+            .set_num_ports(idx, num_inputs, num_outputs, |_, _| {});
+        Ok(idx)
+    }
+
+    #[test]
+    fn test_branch_then_loop() -> Result<(), HugrError> {
+        let mut h = Hugr::new();
+        let k = h.add_node(kappa());
+        let entry = add_block(&mut h, k, 0, 1)?;
+        let split = add_block(&mut h, k, 1, 2)?;
+        h.connect(entry, 0, split, 0)?;
+
+        let left = add_block(&mut h, k, 1, 1)?;
+        h.connect(split, 0, left, 0)?;
+        let right = add_block(&mut h, k, 1, 1)?;
+        h.connect(split, 1, right, 0)?;
+        let merge = add_block(&mut h, k, 3, 1)?;
+        h.connect(left, 0, merge, 0)?;
+        h.connect(right, 0, merge, 1)?;
+        let loop_ = add_block(&mut h, k, 1, 2)?;
+        h.connect(merge, 0, loop_, 0)?;
+        h.connect(loop_, 0, merge, 2)?;
+        let exit = add_block(&mut h, k, 1, 0)?;
+        h.connect(loop_, 1, exit, 0)?;
+        let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
+        let mut groups = HashMap::new();
+        for (e, c) in classes {
+            groups.entry(c).or_insert(Vec::new()).push(e);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_branch_in_loop() -> () {}
+}

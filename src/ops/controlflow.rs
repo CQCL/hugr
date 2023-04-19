@@ -56,8 +56,8 @@ impl ControlFlowOp {
 /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BasicBlockOp {
-    inputs: TypeRow,
-    outputs: TypeRow,
+    pub inputs: TypeRow,
+    pub outputs: TypeRow,
 }
 
 impl BasicBlockOp {
