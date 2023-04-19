@@ -57,6 +57,9 @@ impl<'a> CfgView<'a> {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
             HalfNode::X(ni) => ps.push(HalfNode::N(ni)),
         };
+        if h == self.entry_node() {
+            ps.push(self.exit_node());
+        }
         ps.into_iter()
     }
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
@@ -82,6 +85,9 @@ impl<'a> CfgView<'a> {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),
             HalfNode::N(ni) | HalfNode::X(ni) => succs.extend(self.bb_succs(ni).map(HalfNode::N)),
         };
+        if n == self.exit_node() {
+            succs.push(self.entry_node());
+        }
         succs
             .into_iter()
             .map(EdgeDest::Forward)
@@ -96,6 +102,7 @@ impl<'a> CfgView<'a> {
         };
         tree.traverse(&mut st, self.entry_node());
         assert!(st.capping_edges.is_empty());
+        st.edge_classes.remove(&CFEdge(self.exit_node(), EdgeDest::Forward(self.entry_node())));
         st.edge_classes
     }
 }
@@ -246,6 +253,7 @@ impl<'a> UndirectedDFSTree<'a> {
                     }
                 }
             }
+            dfs_parents.remove(&h.entry_node()).unwrap();
         }
         UndirectedDFSTree {
             h,
@@ -257,11 +265,11 @@ impl<'a> UndirectedDFSTree<'a> {
     pub fn children_backedges(&self, n: HalfNode) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
         self.h
             .undirected_edges(n)
-            .filter(|e| self.dfs_parents.contains_key(&e.target()))
+            .filter(|e| self.dfs_num.contains_key(&e.target()))
             .partition(|e| {
                 // The tree edges are those whose *targets* list the edge as parent-edge
                 let CFEdge(tgt, from) = CFEdge(n, *e).flip();
-                (*self.dfs_parents.get(&tgt).unwrap()) == from
+                self.dfs_parents.get(&tgt) == Some(&from)
             })
     }
 
@@ -298,7 +306,7 @@ impl<'a> UndirectedDFSTree<'a> {
             }
         }
 
-        let parent_edge = *self.dfs_parents.get(&n).unwrap();
+        let parent_edge = self.dfs_parents.get(&n);
         let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
             .into_iter()
             .map(|e| (*self.dfs_num.get(&e.target()).unwrap(), e))
@@ -317,7 +325,7 @@ impl<'a> UndirectedDFSTree<'a> {
         // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
         be_up
             .iter()
-            .filter(|(_,e)| *e != parent_edge)
+            .filter(|(_,e)| Some(e) != parent_edge)
             .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge(n, *e))));
 
         // Now calculate edge classes
