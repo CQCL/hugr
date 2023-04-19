@@ -5,6 +5,17 @@ use std::hash::Hash;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 use crate::Hugr;
 
+/// We provide a view of a cfg where every node has at most one of
+/// (multiple predecessors, multiple successors).
+// So, for BBs with multiple preds + succs, we generate TWO HalfNode's.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum HalfNode {
+    /// All predecessors of original BB; successors if this does not break rule, else the X
+    N(NodeIndex),
+    // Exists only for BBs with multiple preds _and_ succs; has a single pred (the N), plus original succs
+    X(NodeIndex),
+}
+
 struct CfgView<'a> {
     h: &'a Hugr,
     parent: NodeIndex,
@@ -24,20 +35,55 @@ impl<'a> CfgView<'a> {
             Err("Not a kappa-node".to_string())
         }
     }
-    pub fn entry_node(&self) -> NodeIndex {
-        self.h.hierarchy.first(self.parent).unwrap()
+    pub fn entry_node(&self) -> HalfNode {
+        HalfNode::N(self.h.hierarchy.first(self.parent).unwrap())
     }
-    pub fn exit_node(&self) -> NodeIndex {
-        self.h.hierarchy.last(self.parent).unwrap()
+    pub fn exit_node(&self) -> HalfNode {
+        self.resolve_out(self.h.hierarchy.last(self.parent).unwrap())
     }
-    pub fn successors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
+    fn resolve_out(&self, n: NodeIndex) -> HalfNode {
+        if self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4 {
+            HalfNode::X(n)
+        } else {
+            HalfNode::N(n)
+        }
+    }
+    pub fn successors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
+        let mut ss = Vec::new();
+        'outer: {
+            let ni = match h {
+                HalfNode::N(ni) => {
+                    let r = self.resolve_out(ni);
+                    match r {
+                        HalfNode::X(_) => {
+                            ss.push(r);
+                            break 'outer;
+                        }
+                        HalfNode::N(_) => ni,
+                    }
+                }
+                HalfNode::X(ni) => ni,
+            };
+            ss.extend(self.bb_succs(ni).map(HalfNode::N));
+        }
+        ss.into_iter()
+    }
+    pub fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
+        let mut ps = Vec::new();
+        match h {
+            HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
+            HalfNode::X(ni) => ps.push(HalfNode::N(ni)),
+        };
+        ps.into_iter()
+    }
+    fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
         self.h
             .graph
             .output_links(n)
             .into_iter()
             .map(|p| self.port_owner(p))
     }
-    pub fn predecessors(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
+    fn bb_preds(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
         self.h
             .graph
             .input_links(n)
@@ -51,11 +97,11 @@ impl<'a> CfgView<'a> {
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum EdgeDest {
-    Forward(NodeIndex),
-    Backward(NodeIndex),
+    Forward(HalfNode),
+    Backward(HalfNode),
 }
 impl EdgeDest {
-    pub fn node_index(&self) -> NodeIndex {
+    pub fn target(&self) -> HalfNode {
         match self {
             EdgeDest::Forward(i) => *i,
             EdgeDest::Backward(i) => *i,
@@ -64,7 +110,7 @@ impl EdgeDest {
 }
 
 #[derive(Copy, Clone, Eq)]
-struct CFGEdge(NodeIndex, EdgeDest);
+struct CFGEdge(HalfNode, EdgeDest);
 impl CFGEdge {
     pub fn flip(&self) -> Self {
         match self.1 {
@@ -96,7 +142,7 @@ impl Hash for CFGEdge {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct CappingEdge {
-    common_parent: NodeIndex,
+    common_parent: HalfNode,
     dfs_target: usize,
 }
 
@@ -157,8 +203,8 @@ impl BracketList {
 
 struct UndirectedDFSTree<'a> {
     h: &'a CfgView<'a>,
-    dfs_num: HashMap<NodeIndex, usize>,
-    dfs_parents: HashMap<NodeIndex, EdgeDest>, // value is direction + source of edge along which key was reached
+    dfs_num: HashMap<HalfNode, usize>,
+    dfs_parents: HashMap<HalfNode, EdgeDest>, // value is direction + source of edge along which key was reached
 }
 
 struct TraversalState {
@@ -202,15 +248,15 @@ impl<'a> UndirectedDFSTree<'a> {
         t
     }
 
-    fn undirected_edges(&self, n: NodeIndex) -> impl Iterator<Item = EdgeDest> + '_ {
+    fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
         self.h
             .successors(n)
             .map(EdgeDest::Forward)
             .chain(self.h.predecessors(n).map(EdgeDest::Backward))
-            .filter(|e| self.dfs_parents.contains_key(&e.node_index()))
+            .filter(|e| self.dfs_parents.contains_key(&e.target()))
     }
 
-    pub fn children_backedges(&self, n: NodeIndex) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
+    pub fn children_backedges(&self, n: HalfNode) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
         self.undirected_edges(n).partition(|e| {
             // The tree edges are those whose *targets* list the edge as parent-edge
             let CFGEdge(tgt, from) = CFGEdge(n, *e).flip();
@@ -218,12 +264,12 @@ impl<'a> UndirectedDFSTree<'a> {
         })
     }
 
-    fn traverse(&self, st: &mut TraversalState, n: NodeIndex) -> (usize, BracketList) {
+    fn traverse(&self, st: &mut TraversalState, n: HalfNode) -> (usize, BracketList) {
         let n_dfs = *self.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
         let (children, non_capping_backedges) = self.children_backedges(n);
         let child_results: Vec<_> = children
             .iter()
-            .map(|c| self.traverse(st, c.node_index()))
+            .map(|c| self.traverse(st, c.target()))
             .collect();
         let mut min_dfs_target: [Option<usize>; 2] = [None, None];
         let mut bs = BracketList::new();
@@ -258,7 +304,7 @@ impl<'a> UndirectedDFSTree<'a> {
         let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
             .into_iter()
             .filter(|e| *e != parent_edge)
-            .map(|e| (*self.dfs_num.get(&e.node_index()).unwrap(), e))
+            .map(|e| (*self.dfs_num.get(&e.target()).unwrap(), e))
             .partition(|(dfs, _)| *dfs < n_dfs);
         assert!(be_down.len() + be_up.len() + 1 == num_backedges); // Parent found exactly once
 
