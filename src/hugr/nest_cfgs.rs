@@ -51,23 +51,6 @@ impl<'a> CfgView<'a> {
             HalfNode::N(n)
         }
     }
-    fn successors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
-        let mut ss = Vec::new();
-        'outer: {
-            let ni = match h {
-                HalfNode::N(ni) => {
-                    if self.is_multi_node(ni) {
-                        ss.push(HalfNode::X(ni));
-                        break 'outer;
-                    }
-                    ni
-                }
-                HalfNode::X(ni) => ni,
-            };
-            ss.extend(self.bb_succs(ni).map(HalfNode::N));
-        }
-        ss.into_iter()
-    }
     fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
         let mut ps = Vec::new();
         match h {
@@ -94,7 +77,22 @@ impl<'a> CfgView<'a> {
         self.h.graph.port_node(p.unwrap()).unwrap()
     }
     pub fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
-        self.successors(n)
+        let mut succs = Vec::new();
+        'outer: {
+            let ni = match n {
+                HalfNode::N(ni) => {
+                    if self.is_multi_node(ni) {
+                        succs.push(HalfNode::X(ni));
+                        break 'outer;
+                    }
+                    ni
+                }
+                HalfNode::X(ni) => ni,
+            };
+            succs.extend(self.bb_succs(ni).map(HalfNode::N));
+        }
+        succs
+            .into_iter()
             .map(EdgeDest::Forward)
             .chain(self.predecessors(n).map(EdgeDest::Backward))
     }
