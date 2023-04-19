@@ -291,12 +291,10 @@ impl<'a> UndirectedDFSTree<'a> {
                 };
                 bs.push(UDEdge::FakeEdge(capping_edge.clone()));
                 // mark capping edge to be removed when we return out to the other end
-                match st.capping_edges.get_mut(&min1dfs) {
-                    Some(v) => v.push(capping_edge),
-                    None => {
-                        st.capping_edges.insert(min1dfs, vec![capping_edge]);
-                    }
-                };
+                st.capping_edges
+                    .entry(min1dfs)
+                    .or_insert(Vec::new())
+                    .push(capping_edge);
             }
         }
 
