@@ -78,19 +78,10 @@ impl<'a> CfgView<'a> {
     }
     pub fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
         let mut succs = Vec::new();
-        'outer: {
-            let ni = match n {
-                HalfNode::N(ni) => {
-                    if self.is_multi_node(ni) {
-                        succs.push(HalfNode::X(ni));
-                        break 'outer;
-                    }
-                    ni
-                }
-                HalfNode::X(ni) => ni,
-            };
-            succs.extend(self.bb_succs(ni).map(HalfNode::N));
-        }
+        match n {
+            HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),
+            HalfNode::N(ni) | HalfNode::X(ni) => succs.extend(self.bb_succs(ni).map(HalfNode::N)),
+        };
         succs
             .into_iter()
             .map(EdgeDest::Forward)
