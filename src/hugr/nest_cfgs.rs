@@ -87,6 +87,17 @@ impl<'a> CfgView<'a> {
             .map(EdgeDest::Forward)
             .chain(self.predecessors(n).map(EdgeDest::Backward))
     }
+    pub fn get_edge_classes(&self) -> HashMap<CFGEdge, CycleClass> {
+        let tree = UndirectedDFSTree::new(self);
+        let mut st = TraversalState {
+            deleted_backedges: HashSet::new(),
+            capping_edges: HashMap::new(),
+            edge_classes: HashMap::new(),
+        };
+        tree.traverse(&mut st, self.entry_node());
+        assert!(st.capping_edges.is_empty());
+        st.edge_classes
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
