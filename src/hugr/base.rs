@@ -1,6 +1,6 @@
 //! Base HUGR builder providing low-level building blocks.
 
-use portgraph::NodeIndex;
+use portgraph::{portgraph::NodePorts, NodeIndex};
 use thiserror::Error;
 
 use crate::{
@@ -48,6 +48,12 @@ impl HugrMut {
         Ok(())
     }
 
+    pub fn set_num_ports(&mut self, n: NodeIndex, incoming: usize, outgoing: usize) {
+        self.hugr
+            .graph
+            .set_num_ports(n, incoming, outgoing, |_, _| {})
+    }
+
     /// Sets the parent of a node.
     ///
     /// The node becomes the parent's last child.
@@ -85,6 +91,14 @@ impl HugrMut {
         hugr.validate()?;
 
         Ok(hugr)
+    }
+
+    pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
+        self.hugr.node_inputs(node)
+    }
+
+    pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
+        self.hugr.node_outputs(node)
     }
 }
 
