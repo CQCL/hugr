@@ -48,7 +48,7 @@ impl<'a> CfgView<'a> {
             HalfNode::N(n)
         }
     }
-    pub fn successors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
+    fn successors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
         let mut ss = Vec::new();
         'outer: {
             let ni = match h {
@@ -68,7 +68,7 @@ impl<'a> CfgView<'a> {
         }
         ss.into_iter()
     }
-    pub fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
+    fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
         let mut ps = Vec::new();
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
@@ -92,6 +92,11 @@ impl<'a> CfgView<'a> {
     }
     fn port_owner(&self, p: Option<PortIndex>) -> NodeIndex {
         self.h.graph.port_node(p.unwrap()).unwrap()
+    }
+    pub fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
+        self.successors(n)
+            .map(EdgeDest::Forward)
+            .chain(self.predecessors(n).map(EdgeDest::Backward))
     }
 }
 
@@ -227,41 +232,37 @@ impl<'a> UndirectedDFSTree<'a> {
             }
         }
         //2. Traverse undirected from entry node, building dfs_num and setting dfs_parents
-        let mut t = UndirectedDFSTree {
-            h: h,
-            dfs_num: HashMap::new(),
-            dfs_parents: HashMap::new(),
-        };
+        let mut dfs_num = HashMap::new();
+        let mut dfs_parents = HashMap::new();
         {
             // Node, and edge along which reached
             let mut pending = vec![CFGEdge(h.entry_node(), EdgeDest::Backward(h.exit_node()))];
             while let Some(CFGEdge(n, p_edge)) = pending.pop() {
-                if !t.dfs_num.contains_key(&n) && reachable.contains(&n) {
-                    t.dfs_num.insert(n, t.dfs_num.len());
-                    t.dfs_parents.insert(n, p_edge);
-                    for e in t.undirected_edges(n) {
+                if !dfs_num.contains_key(&n) && reachable.contains(&n) {
+                    dfs_num.insert(n, dfs_num.len());
+                    dfs_parents.insert(n, p_edge);
+                    for e in h.undirected_edges(n) {
                         pending.push(CFGEdge(n, e));
                     }
                 }
             }
         }
-        t
-    }
-
-    fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
-        self.h
-            .successors(n)
-            .map(EdgeDest::Forward)
-            .chain(self.h.predecessors(n).map(EdgeDest::Backward))
-            .filter(|e| self.dfs_parents.contains_key(&e.target()))
+        UndirectedDFSTree {
+            h,
+            dfs_num,
+            dfs_parents,
+        }
     }
 
     pub fn children_backedges(&self, n: HalfNode) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
-        self.undirected_edges(n).partition(|e| {
-            // The tree edges are those whose *targets* list the edge as parent-edge
-            let CFGEdge(tgt, from) = CFGEdge(n, *e).flip();
-            (*self.dfs_parents.get(&tgt).unwrap()) == from
-        })
+        self.h
+            .undirected_edges(n)
+            .filter(|e| self.dfs_parents.contains_key(&e.target()))
+            .partition(|e| {
+                // The tree edges are those whose *targets* list the edge as parent-edge
+                let CFGEdge(tgt, from) = CFGEdge(n, *e).flip();
+                (*self.dfs_parents.get(&tgt).unwrap()) == from
+            })
     }
 
     fn traverse(&self, st: &mut TraversalState, n: HalfNode) -> (usize, BracketList) {
