@@ -4,7 +4,7 @@ use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::ops::validate::{OpTypeSet, OpTypeValidator};
+use crate::ops::validate::ValidParentSet;
 use crate::ops::{ModuleOp, OpType};
 use crate::types::EdgeKind;
 use crate::Hugr;
@@ -49,14 +49,14 @@ impl Hugr {
             };
 
             let parent_optype = self.get_optype(parent);
-            let valid_parents = optype.valid_parents();
-            if !valid_parents.contains(parent_optype) {
+            let allowed_parents = optype.validity_flags().allowed_parents;
+            if !allowed_parents.contains(parent_optype) {
                 return Err(ValidationError::InvalidParent {
                     child: node,
                     child_optype: optype.clone(),
                     parent,
                     parent_optype: parent_optype.clone(),
-                    expected_parent: valid_parents,
+                    expected_parent: allowed_parents,
                 });
             }
         }
@@ -147,14 +147,16 @@ impl Hugr {
     fn validate_operation(&self, node: NodeIndex, optype: &OpType) -> Result<(), ValidationError> {
         // Container related properties
         // Note: The `is_df_container` check is run by the children in `is_valid_parent`
+        let flags = optype.validity_flags();
         if self.hierarchy.child_count(node) > 0 {
-            if !optype.is_container() {
+            if !flags.is_container {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
                     optype: optype.clone(),
                 });
             }
 
+            /*
             let first_child = self.hierarchy.first(node).unwrap();
             let last_child = self.hierarchy.last(node).unwrap();
             let first_child_optype = self.get_optype(first_child);
@@ -178,11 +180,12 @@ impl Hugr {
                     child_position: "last".into(),
                 });
             }
+            */
 
-            if optype.require_dag() {
+            if flags.require_dag {
                 self.validate_children_dag(node, optype)?;
             }
-        } else if optype.requires_children() {
+        } else if flags.requires_children {
             return Err(ValidationError::ContainerWithoutChildren {
                 node,
                 optype: optype.clone(),
@@ -332,7 +335,7 @@ pub enum ValidationError {
         child_optype: OpType,
         parent: NodeIndex,
         parent_optype: OpType,
-        expected_parent: OpTypeSet,
+        expected_parent: ValidParentSet,
     },
     /// The node operation is not a container, but has children.
     #[error("The node {node:?} with optype {optype:?} is not a container, but has children.")]
