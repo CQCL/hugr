@@ -1,6 +1,6 @@
 //! Base HUGR builder providing low-level building blocks.
 
-use portgraph::{portgraph::NodePorts, NodeIndex};
+use portgraph::NodeIndex;
 use thiserror::Error;
 
 use crate::{
@@ -93,12 +93,9 @@ impl HugrMut {
         Ok(hugr)
     }
 
-    pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
-        self.hugr.node_inputs(node)
-    }
-
-    pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
-        self.hugr.node_outputs(node)
+    // Immutable reference to HUGR being built
+    pub fn hugr(&self) -> &Hugr {
+        &self.hugr
     }
 }
 

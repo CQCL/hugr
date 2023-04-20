@@ -5,6 +5,8 @@
 
 pub mod validate;
 
+use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
+use portgraph::portgraph::NodePorts;
 use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
@@ -14,7 +16,7 @@ use crate::rewrite::{Rewrite, RewriteError};
 pub use validate::ValidationError;
 mod base;
 pub mod serialize;
-pub use base::{HugrMut, BuildError};
+pub use base::{BuildError, HugrMut};
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -91,6 +93,42 @@ impl Hugr {
         // TODO: Check types
 
         Ok(())
+    }
+
+    /// Iterator over outputs of node
+    pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
+        self.graph.outputs(node)
+    }
+
+    /// Iterator over inputs of node
+    pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
+        self.graph.inputs(node)
+    }
+
+    /// Return dot string showing underlying graph and hierarchy side by side
+    pub fn dot_string(&self) -> String {
+        hier_graph_dot_string_with(
+            &self.graph,
+            &self.hierarchy,
+            |n| {
+                format!(
+                    "({ni}) {name}",
+                    name = self.op_types[n].name(),
+                    ni = n.index()
+                )
+            },
+            |_| ("".into(), DotEdgeStyle::None),
+        )
+    }
+
+    /// Number of inputs to node
+    pub fn num_inputs(&self, node: NodeIndex) -> usize {
+        self.graph.num_inputs(node)
+    }
+
+    /// Number of outputs to node
+    pub fn num_outputs(&self, node: NodeIndex) -> usize {
+        self.graph.num_outputs(node)
     }
 }
 
