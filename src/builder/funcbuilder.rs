@@ -371,22 +371,24 @@ impl<'f> KappaBuilder<'f> {
         DeltaBuilder::create_with_io(self.base(), betn, inputs, outputs).map(BetaBuilder::new)
     }
     pub fn entry_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
-        self.entry_exit_builder::<'a, 'b, 0>()
+        self.entry_exit_builder::<0>()
     }
 
     pub fn exit_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
-        self.entry_exit_builder::<'a, 'b, 1>()
+        self.entry_exit_builder::<1>()
     }
 
     pub fn branch(&mut self, from: &BetaID, to: &BetaID) -> Result<(), HugrError> {
-        let fin = self.base.node_inputs(from.0).count();
-        let fout = self.base.node_outputs(from.0).count();
-        let tin = self.base.node_inputs(to.0).count();
-        let tout = self.base.node_outputs(to.0).count();
+        let base = &mut self.base;
+        let hugr = base.hugr();
+        let fin = hugr.num_inputs(from.0);
+        let fout = hugr.num_outputs(from.0);
+        let tin = hugr.num_inputs(to.0);
+        let tout = hugr.num_outputs(to.0);
 
-        self.base().set_num_ports(from.0, fin, fout + 1);
-        self.base().set_num_ports(to.0, tin + 1, tout);
-        self.base().connect(from.0, fout, to.0, tin)
+        base.set_num_ports(from.0, fin, fout + 1);
+        base.set_num_ports(to.0, tin + 1, tout);
+        base.connect(from.0, fout, to.0, tin)
     }
 }
 

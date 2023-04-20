@@ -1,6 +1,6 @@
 //! Base HUGR builder providing low-level building blocks.
 
-use portgraph::{portgraph::NodePorts, NodeIndex};
+use portgraph::NodeIndex;
 use thiserror::Error;
 
 use crate::{
