@@ -244,12 +244,9 @@ impl BasicBlockOp {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.inputs,
-            Some(&self.outputs),
-            "basic block graph",
-            children,
-        )
+        // TODO: The output signature of a basic block should be a sum of the different possible outputs.
+        // This is not yet implemented in the type system.
+        validate_io_nodes(&self.inputs, None, "basic block graph", children)
     }
 }
 
