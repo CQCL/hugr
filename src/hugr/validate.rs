@@ -156,7 +156,7 @@ impl Hugr {
 
             let first_child = self.get_optype(self.hierarchy.first(node).unwrap());
             if !flags.allowed_first_child.contains(first_child) {
-                return Err(ValidationError::InvalidEdgeChildren {
+                return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
                     parent_optype: optype.clone(),
                     optype: first_child.clone(),
@@ -167,7 +167,7 @@ impl Hugr {
 
             let last_child = self.get_optype(self.hierarchy.last(node).unwrap());
             if !flags.allowed_last_child.contains(last_child) {
-                return Err(ValidationError::InvalidEdgeChildren {
+                return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
                     parent_optype: optype.clone(),
                     optype: last_child.clone(),
@@ -335,7 +335,7 @@ pub enum ValidationError {
     },
     /// Invalid first/last child.
     #[error("A {optype:?} operation cannot be the {position} child of a {parent_optype:?}. Expected {expected}. In parent node {parent:?}")]
-    InvalidEdgeChildren {
+    InvalidBoundaryChild {
         parent: NodeIndex,
         parent_optype: OpType,
         optype: OpType,
