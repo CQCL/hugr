@@ -23,6 +23,7 @@ impl HugrMut {
     }
 
     /// Return index of HUGR root node.
+    #[inline]
     pub fn root(&self) -> NodeIndex {
         self.hugr.root
     }
@@ -94,6 +95,7 @@ impl HugrMut {
     }
 
     // Immutable reference to HUGR being built
+    #[inline]
     pub fn hugr(&self) -> &Hugr {
         &self.hugr
     }

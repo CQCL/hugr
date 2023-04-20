@@ -61,11 +61,13 @@ impl Hugr {
     }
 
     /// Returns the parent of a node.
+    #[inline]
     pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
         self.hierarchy.parent(node)
     }
 
     /// Returns the operation type of a node.
+    #[inline]
     pub fn get_optype(&self, node: NodeIndex) -> &OpType {
         self.op_types.get(node)
     }
@@ -96,11 +98,13 @@ impl Hugr {
     }
 
     /// Iterator over outputs of node
+    #[inline]
     pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.outputs(node)
     }
 
     /// Iterator over inputs of node
+    #[inline]
     pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.inputs(node)
     }
@@ -122,11 +126,13 @@ impl Hugr {
     }
 
     /// Number of inputs to node
+    #[inline]
     pub fn num_inputs(&self, node: NodeIndex) -> usize {
         self.graph.num_inputs(node)
     }
 
     /// Number of outputs to node
+    #[inline]
     pub fn num_outputs(&self, node: NodeIndex) -> usize {
         self.graph.num_outputs(node)
     }
