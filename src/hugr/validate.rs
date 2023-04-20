@@ -177,7 +177,10 @@ impl Hugr {
             }
 
             // Additional validations running over the full list of children optypes
-            let children_optypes = self.hierarchy.children(node).map(|c| self.get_optype(c));
+            let children_optypes = self
+                .hierarchy
+                .children(node)
+                .map(|c| (c, self.get_optype(c)));
             if let Err(source) = optype.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -341,7 +344,8 @@ pub enum ValidationError {
     },
     /// The children list has invalid elements.
     #[error(
-        "An operation {parent_optype:?} contains invalid children. In parent {parent:?}: {source}"
+        "An operation {parent_optype:?} contains invalid children: {source}. In parent {parent:?}, child {child:?}",
+        child=source.child(),
     )]
     InvalidChildren {
         parent: NodeIndex,
