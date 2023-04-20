@@ -311,6 +311,7 @@ impl ModuleBuilder {
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<FunctionBuilder<'b>, HugrError> {
+        // TODO add name and param names to metadata
         let defn = self.add_child_op(OpType::Module(ModuleOp::Def {
             signature: Signature::new(inputs.clone(), outputs.clone(), None),
         }))?;
