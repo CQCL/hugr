@@ -8,34 +8,13 @@ use crate::ops::{BasicBlockOp, DataflowOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
+use nodehandle::{BetaID, DeltaID, FuncID, KappaID};
 
+use self::nodehandle::BuildHandle;
+
+pub mod nodehandle;
 #[derive(Clone, Copy)]
 pub struct Wire(NodeIndex, usize);
-pub struct DeltaID {
-    node: NodeIndex,
-    out_wires: Vec<Wire>,
-}
-
-pub struct KappaID {
-    node: NodeIndex,
-    out_wires: Vec<Wire>,
-}
-
-pub struct FuncID(NodeIndex);
-
-impl From<DeltaID> for FuncID {
-    fn from(value: DeltaID) -> Self {
-        Self(value.node)
-    }
-}
-
-pub struct BetaID(NodeIndex);
-
-impl From<DeltaID> for BetaID {
-    fn from(value: DeltaID) -> Self {
-        Self(value.node)
-    }
-}
 
 #[derive(Default)]
 pub struct ModuleBuilder(HugrMut);
@@ -220,26 +199,28 @@ impl<'f> DeltaBuilder<'f> {
 
 impl<'f> Container for DeltaBuilder<'f> {
     type ContainerHandle = DeltaID;
+    #[inline]
     fn container_node(&self) -> NodeIndex {
         self.delt_node
     }
 
+    #[inline]
     fn base(&mut self) -> &mut HugrMut {
         self.base
     }
+    #[inline]
     fn finish(self) -> DeltaID {
-        DeltaID {
-            node: self.delt_node,
-            out_wires: self.external_out_wires,
-        }
+        (self.delt_node, self.external_out_wires).into()
     }
 }
 
 impl<'f> Dataflow for DeltaBuilder<'f> {
+    #[inline]
     fn io(&self) -> [NodeIndex; 2] {
         self.io
     }
 
+    #[inline]
     fn input_wires(&self) -> &[Wire] {
         &self.internal_in_wires[..]
     }
@@ -248,14 +229,17 @@ impl<'f> Dataflow for DeltaBuilder<'f> {
 impl Container for ModuleBuilder {
     type ContainerHandle = Result<Hugr, BuildError>;
 
+    #[inline]
     fn container_node(&self) -> NodeIndex {
         self.0.root()
     }
 
+    #[inline]
     fn base(&mut self) -> &mut HugrMut {
         &mut self.0
     }
 
+    #[inline]
     fn finish(self) -> Self::ContainerHandle {
         self.0.finish()
     }
@@ -272,33 +256,32 @@ impl<'b, T> DeltaWrapper<'b, T> {
     }
 }
 
-impl<'b, T> Container for DeltaWrapper<'b, T>
-where
-    T: From<DeltaID>,
-{
+impl<'b, T: From<DeltaID>> Container for DeltaWrapper<'b, T> {
     type ContainerHandle = T;
 
+    #[inline]
     fn container_node(&self) -> NodeIndex {
         self.0.container_node()
     }
 
+    #[inline]
     fn base(&mut self) -> &mut HugrMut {
         self.0.base()
     }
 
+    #[inline]
     fn finish(self) -> Self::ContainerHandle {
         self.0.finish().into()
     }
 }
 
-impl<'b, T> Dataflow for DeltaWrapper<'b, T>
-where
-    T: From<DeltaID>,
-{
+impl<'b, T: From<DeltaID>> Dataflow for DeltaWrapper<'b, T> {
+    #[inline]
     fn io(&self) -> [NodeIndex; 2] {
         self.0.io
     }
 
+    #[inline]
     fn input_wires(&self) -> &[Wire] {
         self.0.input_wires()
     }
@@ -331,19 +314,19 @@ pub struct KappaBuilder<'f> {
 impl<'f> Container for KappaBuilder<'f> {
     type ContainerHandle = KappaID;
 
+    #[inline]
     fn container_node(&self) -> NodeIndex {
         self.kapp_node
     }
 
+    #[inline]
     fn base(&mut self) -> &mut HugrMut {
         self.base
     }
 
+    #[inline]
     fn finish(self) -> Self::ContainerHandle {
-        KappaID {
-            node: self.kapp_node,
-            out_wires: self.external_out_wires,
-        }
+        (self.kapp_node, self.external_out_wires).into()
     }
 }
 
@@ -371,25 +354,29 @@ impl<'f> KappaBuilder<'f> {
         let (betn, inputs, outputs) = self.entry_exit[N].clone();
         DeltaBuilder::create_with_io(self.base(), betn, inputs, outputs).map(BetaBuilder::new)
     }
+    #[inline]
     pub fn entry_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
         self.entry_exit_builder::<0>()
     }
 
+    #[inline]
     pub fn exit_builder<'a: 'b, 'b>(&'a mut self) -> Result<BetaBuilder<'b>, HugrError> {
         self.entry_exit_builder::<1>()
     }
 
     pub fn branch(&mut self, from: &BetaID, to: &BetaID) -> Result<(), HugrError> {
+        let from = from.node();
+        let to = to.node();
         let base = &mut self.base;
         let hugr = base.hugr();
-        let fin = hugr.num_inputs(from.0);
-        let fout = hugr.num_outputs(from.0);
-        let tin = hugr.num_inputs(to.0);
-        let tout = hugr.num_outputs(to.0);
+        let fin = hugr.num_inputs(from);
+        let fout = hugr.num_outputs(from);
+        let tin = hugr.num_inputs(to);
+        let tout = hugr.num_outputs(to);
 
-        base.set_num_ports(from.0, fin, fout + 1);
-        base.set_num_ports(to.0, tin + 1, tout);
-        base.connect(from.0, fout, to.0, tin)
+        base.set_num_ports(from, fin, fout + 1);
+        base.set_num_ports(to, tin + 1, tout);
+        base.connect(from, fout, to, tin)
     }
 }
 
@@ -426,7 +413,7 @@ mod test {
                 let inbuilder = fbuild.delta_builder(vec![(NAT, int)], type_row![NAT])?;
                 let indelt = nat_identity(inbuilder)?;
 
-                fbuild.finish_with_outputs([indelt.out_wires, qout].concat())?
+                fbuild.finish_with_outputs([indelt.sig_out_wires(), &qout].concat())?
             };
             modbuilder.finish()
         };
@@ -478,12 +465,12 @@ mod test {
                     cfgbuilder.finish()
                 };
 
-                fbuild.finish_with_outputs(inkapp.out_wires)?
+                fbuild.finish_with_outputs(Vec::from(inkapp.sig_out_wires()))?
             };
             modbuilder.finish()
         };
 
-        crate::utils::test::viz_dotstr(&buildres.clone().unwrap().dot_string());
+        // crate::utils::test::viz_dotstr(&buildres.clone().unwrap().dot_string());
         assert!(buildres.is_ok());
 
         Ok(())
