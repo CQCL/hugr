@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
-use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::ops::validate::ValidParentSet;
+use crate::ops::validate::{ChildrenValidationError, ValidOpSet};
 use crate::ops::{ModuleOp, OpType};
 use crate::types::EdgeKind;
 use crate::Hugr;
@@ -143,11 +142,10 @@ impl Hugr {
 
     /// Check operation-specific constraints.
     ///
-    /// These are flags defined for each operation type by the [`OpTypeValidator`] trait.
+    /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
     fn validate_operation(&self, node: NodeIndex, optype: &OpType) -> Result<(), ValidationError> {
-        // Container related properties
-        // Note: The `is_df_container` check is run by the children in `is_valid_parent`
         let flags = optype.validity_flags();
+
         if self.hierarchy.child_count(node) > 0 {
             if !flags.is_container {
                 return Err(ValidationError::NonContainerWithChildren {
@@ -156,33 +154,39 @@ impl Hugr {
                 });
             }
 
-            /*
-            let first_child = self.hierarchy.first(node).unwrap();
-            let last_child = self.hierarchy.last(node).unwrap();
-            let first_child_optype = self.get_optype(first_child);
-            let last_child_optype = self.get_optype(last_child);
-
-            if !optype.validate_first_child(first_child_optype) {
-                return Err(ValidationError::InvalidChildOpType {
+            let first_child = self.get_optype(self.hierarchy.first(node).unwrap());
+            if !flags.allowed_first_child.contains(first_child) {
+                return Err(ValidationError::InvalidEdgeChildren {
                     parent: node,
-                    child: first_child,
                     parent_optype: optype.clone(),
-                    child_optype: first_child_optype.clone(),
-                    child_position: "first".into(),
+                    optype: first_child.clone(),
+                    expected: flags.allowed_first_child,
+                    position: "first",
                 });
             }
-            if !optype.validate_last_child(self.get_optype(last_child)) {
-                return Err(ValidationError::InvalidChildOpType {
+
+            let last_child = self.get_optype(self.hierarchy.last(node).unwrap());
+            if !flags.allowed_last_child.contains(last_child) {
+                return Err(ValidationError::InvalidEdgeChildren {
                     parent: node,
-                    child: last_child,
                     parent_optype: optype.clone(),
-                    child_optype: last_child_optype.clone(),
-                    child_position: "last".into(),
+                    optype: last_child.clone(),
+                    expected: flags.allowed_last_child,
+                    position: "last",
                 });
             }
-            */
 
-            if flags.require_dag {
+            // Additional validations running over the full list of children optypes
+            let children_optypes = self.hierarchy.children(node).map(|c| self.get_optype(c));
+            if let Err(source) = optype.validate_children(children_optypes) {
+                return Err(ValidationError::InvalidChildren {
+                    parent: node,
+                    parent_optype: optype.clone(),
+                    source,
+                });
+            }
+
+            if flags.requires_dag {
                 self.validate_children_dag(node, optype)?;
             }
         } else if flags.requires_children {
@@ -227,7 +231,6 @@ impl Hugr {
             false
         };
 
-        // Number of nodes visited
         let mut nodes_visited = 0;
 
         // Number of input ports to a node that remain unvisited. Once this
@@ -236,17 +239,21 @@ impl Hugr {
 
         // Candidates with no unvisited predecessors.
         // Initially, all children with no incoming internal edges.
-        let mut candidates: Vec<NodeIndex> = {
-            self.hierarchy
-                .children(parent)
-                .filter(|&child| {
-                    let child_optype = self.get_optype(child);
-                    self.graph
-                        .input_offsets(child)
-                        .all(|off| ignore_port(child, child_optype, off))
-                })
-                .collect()
-        };
+        let mut candidates: Vec<NodeIndex> = Vec::new();
+
+        for child in self.hierarchy.children(parent) {
+            let child_optype = self.get_optype(child);
+            let input_count = self
+                .graph
+                .input_offsets(child)
+                .filter(|&off| !ignore_port(child, child_optype, off))
+                .count();
+            if input_count > 0 {
+                unvisited_ports.insert(child, input_count);
+            } else {
+                candidates.push(child);
+            }
+        }
 
         while let Some(child) = candidates.pop() {
             nodes_visited += 1;
@@ -261,12 +268,7 @@ impl Hugr {
                 let Some(successor) = self.graph.port_link(port).and_then(|p| self.graph.port_node(p)) else {
                     continue;
                 };
-                let visit_count = unvisited_ports.entry(successor).or_insert_with(|| {
-                    self.graph
-                        .input_offsets(successor)
-                        .filter(|&p| !ignore_port(successor, child_optype, p))
-                        .count()
-                });
+                let visit_count = unvisited_ports.get_mut(&successor).unwrap();
                 *visit_count -= 1;
                 if *visit_count == 0 {
                     candidates.push(successor);
@@ -294,15 +296,6 @@ pub enum ValidationError {
     /// Invalid root operation type.
     #[error("The operation type {optype:?} is not allowed as a root node. Expected Optype::Module(ModuleType::Root). In node {node:?}.")]
     InvalidRootOpType { node: NodeIndex, optype: OpType },
-    /// Invalid first/last child.
-    #[error("The operation {child_optype:?} is not allowed as a {child_position} child of operation {parent_optype:?}. In child {child:?} of node {parent:?}.")]
-    InvalidChildOpType {
-        parent: NodeIndex,
-        child: NodeIndex,
-        parent_optype: OpType,
-        child_optype: OpType,
-        child_position: SmolStr,
-    },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
@@ -335,7 +328,25 @@ pub enum ValidationError {
         child_optype: OpType,
         parent: NodeIndex,
         parent_optype: OpType,
-        expected_parent: ValidParentSet,
+        expected_parent: ValidOpSet,
+    },
+    /// Invalid first/last child.
+    #[error("A {optype:?} operation cannot be the {position} child of a {parent_optype:?}. Expected {expected}. In parent node {parent:?}")]
+    InvalidEdgeChildren {
+        parent: NodeIndex,
+        parent_optype: OpType,
+        optype: OpType,
+        expected: ValidOpSet,
+        position: &'static str,
+    },
+    /// The children list has invalid elements.
+    #[error(
+        "An operation {parent_optype:?} contains invalid children. In parent {parent:?}: {source}"
+    )]
+    InvalidChildren {
+        parent: NodeIndex,
+        parent_optype: OpType,
+        source: ChildrenValidationError,
     },
     /// The node operation is not a container, but has children.
     #[error("The node {node:?} with optype {optype:?} is not a container, but has children.")]
