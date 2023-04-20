@@ -18,6 +18,7 @@ pub mod ops;
 pub mod resource;
 pub mod rewrite;
 pub mod types;
+mod utils;
 
 pub use crate::hugr::Hugr;
 pub use portgraph::{NodeIndex, PortIndex};
