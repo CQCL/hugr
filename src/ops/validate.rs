@@ -144,7 +144,14 @@ impl OpType {
 
 /// Errors that can occur while checking the children of a node.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum ChildrenValidationError {}
+pub enum ChildrenValidationError {
+    /// An operation only allowed as the first/last child was found as an intermediate child.
+    #[error("A {optype:?} operation is only allowed as a {expected_position} child")]
+    NonEdgeChildren {
+        optype: OpType,
+        expected_position: &'static str,
+    },
+}
 
 impl ModuleOp {
     /// Returns the set of allowed parent operation types.
@@ -210,7 +217,7 @@ impl ControlFlowOp {
         let _ = children;
         Ok(())
 
-        // TODO: For Conditional and loop, all blocks must be `DataFlowOp::Nested`, with matching signatures.
+        // TODO: For Conditional and loop, every children must have an specific signature.
 
         // TODO: CFG nodes require checking the internal signature of pairs of
         // BasicBlocks connected by ControlFlow edges. This should probably go
@@ -258,12 +265,31 @@ impl DataflowOp {
     /// Validate the ordered list of children
     fn validate_children<'a>(
         &self,
-        children: impl DoubleEndedIterator<Item = &'a OpType>,
+        mut children: impl DoubleEndedIterator<Item = &'a OpType>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
             DataflowOp::ControlFlow { op } => op.validate_children(children),
             DataflowOp::Nested { .. } => {
-                // TODO: Don't allow non-edge Input or Output nodes
+                // Don't allow non-edge Input or Output nodes
+                children.next();
+                children.next_back();
+                for child in children {
+                    match child {
+                        OpType::Function(DataflowOp::Input { .. }) => {
+                            return Err(ChildrenValidationError::NonEdgeChildren {
+                                optype: child.clone(),
+                                expected_position: "first",
+                            })
+                        }
+                        OpType::Function(DataflowOp::Output { .. }) => {
+                            return Err(ChildrenValidationError::NonEdgeChildren {
+                                optype: child.clone(),
+                                expected_position: "last",
+                            })
+                        }
+                        _ => {}
+                    }
+                }
                 Ok(())
             }
             _ => Ok(()),
