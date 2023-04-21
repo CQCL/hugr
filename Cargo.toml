@@ -46,6 +46,7 @@ rstest = "0.16.0"
 portgraph = { git = "http://github.com/CQCL/portgraph", features = ["proptest"] }
 proptest = "1.1.0"
 rmp-serde = "1.1.1"
+test-case = "3.1.0"
 
 
 [[bench]]

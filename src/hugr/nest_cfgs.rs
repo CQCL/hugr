@@ -351,6 +351,7 @@ mod test {
     use crate::type_row;
     use crate::types::{ClassicType, SimpleType};
     use crate::{hugr::HugrError, Hugr};
+    use test_case::test_case;
     const NAT: SimpleType = SimpleType::Classic(ClassicType::Nat);
 
     fn kappa() -> OpType {
@@ -378,8 +379,9 @@ mod test {
         Ok(idx)
     }
 
-    #[test]
-    fn test_branch_then_loop() -> Result<(), HugrError> {
+    #[test_case(true; "separate merge + loop-header")]
+    #[test_case(false; "combined merge + loop-header")]
+    fn test_branch_then_loop(separate_header: bool) -> Result<(), HugrError> {
         let mut h = Hugr::new();
         let k = h.add_node(kappa());
         let entry = add_block(&mut h, k, 0, 1)?;
@@ -390,12 +392,24 @@ mod test {
         h.connect(split, 0, left, 0)?;
         let right = add_block(&mut h, k, 1, 1)?;
         h.connect(split, 1, right, 0)?;
-        let merge = add_block(&mut h, k, 3, 1)?;
+        let merge = add_block(&mut h, k, if separate_header { 2 } else { 3 }, 1)?;
         h.connect(left, 0, merge, 0)?;
         h.connect(right, 0, merge, 1)?;
+        let loop_header = if separate_header {
+            let hdr = add_block(&mut h, k, 2, 1)?;
+            h.connect(merge, 0, hdr, 0)?;
+            hdr
+        } else {
+            merge
+        };
         let loop_tail = add_block(&mut h, k, 1, 2)?;
-        h.connect(merge, 0, loop_tail, 0)?;
-        h.connect(loop_tail, 0, merge, 2)?;
+        h.connect(loop_header, 0, loop_tail, 0)?;
+        h.connect(
+            loop_tail,
+            0,
+            loop_header,
+            if separate_header { 1 } else { 2 },
+        )?;
         let exit = add_block(&mut h, k, 1, 0)?;
         h.connect(loop_tail, 1, exit, 0)?;
         let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
@@ -405,10 +419,22 @@ mod test {
         }
         let g: Vec<_> = groups.into_values().filter(|s| s.len() > 1).collect();
         assert_eq!(g.len(), 3);
-        assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::N(entry), EdgeDest::Forward(HalfNode::N(split))),
-            CFEdge(HalfNode::N(loop_tail), EdgeDest::Forward(HalfNode::N(exit)))
-        ])));
+        let outer_class = if separate_header {
+            HashSet::from([
+                CFEdge(HalfNode::N(entry), EdgeDest::Forward(HalfNode::N(split))),
+                CFEdge(
+                    HalfNode::N(merge),
+                    EdgeDest::Forward(HalfNode::N(loop_header)),
+                ),
+                CFEdge(HalfNode::N(loop_tail), EdgeDest::Forward(HalfNode::N(exit))),
+            ])
+        } else {
+            HashSet::from([
+                CFEdge(HalfNode::N(entry), EdgeDest::Forward(HalfNode::N(split))),
+                CFEdge(HalfNode::N(loop_tail), EdgeDest::Forward(HalfNode::N(exit))),
+            ])
+        };
+        assert!(g.contains(&outer_class));
         assert!(g.contains(&HashSet::from([
             CFEdge(HalfNode::N(split), EdgeDest::Forward(HalfNode::N(left))),
             CFEdge(HalfNode::N(left), EdgeDest::Forward(HalfNode::N(merge)))
