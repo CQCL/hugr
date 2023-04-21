@@ -102,7 +102,10 @@ impl<'a> CfgView<'a> {
         };
         tree.traverse(&mut st, self.entry_node());
         assert!(st.capping_edges.is_empty());
-        st.edge_classes.remove(&CFEdge(self.exit_node(), EdgeDest::Forward(self.entry_node())));
+        st.edge_classes.remove(&CFEdge(
+            self.exit_node(),
+            EdgeDest::Forward(self.entry_node()),
+        ));
         st.edge_classes
     }
 }
@@ -320,7 +323,7 @@ impl<'a> UndirectedDFSTree<'a> {
         for e in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
             bs.delete(&UDEdge::FakeEdge(e), &mut st.deleted_backedges)
         }
-        
+
         // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
         be_up
             .iter()
