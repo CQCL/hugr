@@ -5,9 +5,41 @@ use std::hash::Hash;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 use crate::Hugr;
 
+/// Identify Single-Entry-Single-Exit regions in the CFG.
+/// These are pairs of edges (a,b) where
+/// a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
+/// (the third condition is necessary because loop backedges do not affect (post)dominance).
+/// Algorithm here: https://dl.acm.org/doi/10.1145/773473.178258, approximately:
+/// (1) those three conditions are equivalent to:
+/// >>>a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry<<<
+/// where cycle-equivalent means every cycle has either both a and b, or neither
+/// (2) cycle equivalence is unaffected if all edges are considered *un*directed
+///     (not obvious, see paper for proof)
+/// (3) take undirected CFG, perform depth-first traversal
+///     => all edges are *tree edges* or *backedges* where one endpoint is an ancestor of the other
+/// (4) identify the "bracketlist" of each tree edge - the set of backedges going from a descendant to an ancestor
+///     -- post-order traversal, merging bracketlists of children,
+///            then delete backedges from below to here, add backedges from here to above
+///     => tree edges with the same bracketlist are cycle-equivalent;
+///        + a tree edge with a single-element bracketlist is cycle-equivalent with that single element
+/// (5) this would be expensive (comparing large sets of backedges) - so to optimize,
+///     - the backedge most recently added (at the top) of the bracketlist, plus the size of the bracketlist,
+///       is sufficient to identify the set *when the UDFS tree is linear*;
+///     - when UDFS is treelike, any ancestor with backedges from >1 subtree cannot be cycle-equivalent with any descendant,
+///       so add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
+///       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
+
+/// TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
+/// (in a BB with one predecessor and one successor, which may then be merged
+///     and contents parallelized with predecessor or successor).
+
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
-// So, for BBs with multiple preds + succs, we generate TWO HalfNode's.
+/// So, for BBs with multiple preds + succs, we generate TWO HalfNode's.
+/// TODO: this unfortunately doesn't capture all cases: when a node has multiple preds and succs,
+/// we could "merge" *any subset* of the in-edges into a single in-edge via an extra empty BB;
+/// the in-edge from that extra/empty BB, might be the endpoint of a useful SESE region,
+/// but we don't have a way to identify *which subset* to select. (Here we say *all preds* if >1 succ)
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum HalfNode {
     /// All predecessors of original BB; successors if this does not break rule, else the X
@@ -63,6 +95,8 @@ impl<'a> CfgView<'a> {
         ps.into_iter()
     }
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
+        // TODO filter out duplicate successors (and duplicate predecessors)
+        // - but not duplicate (successor + predecessors) i.e. where edge directions are reversed
         self.h
             .graph
             .output_links(n)
@@ -93,6 +127,8 @@ impl<'a> CfgView<'a> {
             .map(EdgeDest::Forward)
             .chain(self.predecessors(n).map(EdgeDest::Backward))
     }
+    /// Computes equivalence class of each edge, i.e. two edges with the same value
+    /// are cycle-equivalent.
     pub fn get_edge_classes(&self) -> HashMap<CFEdge, Option<CycleClass>> {
         let tree = UndirectedDFSTree::new(self);
         let mut st = TraversalState {
@@ -189,7 +225,7 @@ impl BracketList {
 
     pub fn delete(&mut self, b: &UDEdge, deleted: &mut HashSet<UDEdge>) {
         // Ideally, here we would also assert that no *other* BracketList contains b.
-        debug_assert!(self.items.contains(b));
+        debug_assert!(self.items.contains(b)); // Makes operation O(n), otherwise O(1)
         assert!(!deleted.contains(b));
         deleted.insert(b.clone());
         self.size -= 1;
@@ -208,9 +244,9 @@ struct UndirectedDFSTree<'a> {
 }
 
 struct TraversalState {
-    deleted_backedges: HashSet<UDEdge>,
-    capping_edges: HashMap<usize, Vec<CappingEdge>>, // Indexed by DFS num, elems all CappingBackedge's
-    edge_classes: HashMap<CFEdge, Option<CycleClass>>,
+    deleted_backedges: HashSet<UDEdge>, // Allows constant-time deletion
+    capping_edges: HashMap<usize, Vec<CappingEdge>>, // Indexed by DFS num
+    edge_classes: HashMap<CFEdge, Option<CycleClass>>, // Accumulates result (never overwritten)
 }
 
 impl<'a> UndirectedDFSTree<'a> {
@@ -268,7 +304,7 @@ impl<'a> UndirectedDFSTree<'a> {
             .iter()
             .map(|c| self.traverse(st, c.target()))
             .collect();
-        let mut min_dfs_target: [Option<usize>; 2] = [None, None];
+        let mut min_dfs_target: [Option<usize>; 2] = [None, None]; // We want highest-but-one
         let mut bs = BracketList::new();
         for (tgt, brs) in child_results {
             if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
