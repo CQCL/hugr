@@ -447,5 +447,72 @@ mod test {
     }
 
     #[test]
-    fn test_branch_in_loop() -> () {}
+    fn test_branch_in_loop() -> Result<(), HugrError> {
+        let mut h = Hugr::new();
+        let k = h.add_node(kappa());
+        let entry = add_block(&mut h, k, 0, 1)?;
+        // (Cases like) this test are about the only ones where "HalfNode" splits nodes in the
+        // right place (all in-edges THEN all out-edges)
+        let split_header = add_block(&mut h, k, 2, 2)?;
+        h.connect(entry, 0, split_header, 0)?;
+        let left = add_block(&mut h, k, 1, 1)?;
+        h.connect(split_header, 0, left, 0)?;
+        let right = add_block(&mut h, k, 1, 1)?;
+        h.connect(split_header, 1, right, 0)?;
+        // And symmetrically here, the merge/loop is split correctly by the HalfNode
+        let merge_tail = add_block(&mut h, k, 2, 2)?;
+        h.connect(left, 0, merge_tail, 0)?;
+        h.connect(right, 0, merge_tail, 1)?;
+        h.connect(merge_tail, 0, split_header, 1)?;
+        let exit = add_block(&mut h, k, 1, 0)?;
+        h.connect(merge_tail, 1, exit, 0)?;
+        let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
+        let mut groups = HashMap::new();
+        for (e, c) in classes {
+            groups.entry(c).or_insert(HashSet::new()).insert(e);
+        }
+        let g: Vec<_> = groups.into_values().filter(|s| s.len() > 1).collect();
+        assert_eq!(g.len(), 4);
+        assert!(g.contains(&HashSet::from([
+            CFEdge(
+                HalfNode::N(entry),
+                EdgeDest::Forward(HalfNode::N(split_header))
+            ),
+            CFEdge(
+                HalfNode::X(merge_tail),
+                EdgeDest::Forward(HalfNode::N(exit))
+            )
+        ])));
+        assert!(g.contains(&HashSet::from([
+            CFEdge(
+                HalfNode::N(split_header),
+                EdgeDest::Forward(HalfNode::X(split_header))
+            ),
+            CFEdge(
+                HalfNode::N(merge_tail),
+                EdgeDest::Forward(HalfNode::X(merge_tail))
+            )
+        ])));
+        assert!(g.contains(&HashSet::from([
+            CFEdge(
+                HalfNode::X(split_header),
+                EdgeDest::Forward(HalfNode::N(left))
+            ),
+            CFEdge(
+                HalfNode::N(left),
+                EdgeDest::Forward(HalfNode::N(merge_tail))
+            )
+        ])));
+        assert!(g.contains(&HashSet::from([
+            CFEdge(
+                HalfNode::X(split_header),
+                EdgeDest::Forward(HalfNode::N(right))
+            ),
+            CFEdge(
+                HalfNode::N(right),
+                EdgeDest::Forward(HalfNode::N(merge_tail))
+            )
+        ])));
+        Ok(())
+    }
 }
