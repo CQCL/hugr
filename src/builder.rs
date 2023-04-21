@@ -126,10 +126,11 @@ pub trait Dataflow: Container {
             outputs: outputs.clone(),
         });
         let exit_node = self.base().add_op_with_parent(kapn, exitbeta)?;
+        let n_out_wires = outputs.len();
         let kb = KappaBuilder {
             base: self.base(),
             kapp_node: kapn,
-            exit_types: outputs,
+            n_out_wires,
             exit_node,
         };
 
@@ -296,7 +297,7 @@ pub struct KappaBuilder<'f> {
     base: &'f mut HugrMut,
     kapp_node: NodeIndex,
     exit_node: NodeIndex,
-    exit_types: TypeRow,
+    n_out_wires: usize,
 }
 
 impl<'f> Container for KappaBuilder<'f> {
@@ -314,7 +315,7 @@ impl<'f> Container for KappaBuilder<'f> {
 
     #[inline]
     fn finish(self) -> Self::ContainerHandle {
-        let wirs = (0..self.exit_types.len())
+        let wirs = (0..self.n_out_wires)
             .map(|i| Wire(self.kapp_node, i))
             .collect();
         (self.kapp_node, wirs).into()
