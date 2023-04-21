@@ -230,8 +230,8 @@ impl BasicBlockOp {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_parents: ValidOpSet::CfgNode,
-            allowed_first_child: ValidOpSet::Any,
-            allowed_last_child: ValidOpSet::Any,
+            allowed_first_child: ValidOpSet::Input,
+            allowed_last_child: ValidOpSet::Output,
             is_container: true,
             is_df_container: true,
             requires_children: true,
@@ -333,7 +333,7 @@ impl ControlFlowOp {
                 // TODO: "The first input to the ɣ-node is a predicate of Sum type, whose arity matches the number of children of the ɣ-node."
                 let _ = predicate;
 
-                // Every children must have the specified signature.
+                // Each child must have the specified signature.
                 for (child, optype) in children {
                     let sig = optype.signature();
                     if sig.input != *inputs || sig.output != *outputs {

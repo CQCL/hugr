@@ -214,7 +214,7 @@ impl Hugr {
     ) -> Result<(), ValidationError> {
         let ignore_port = |child: NodeIndex, child_optype: &OpType, port: PortOffset| {
             let kind = child_optype.port_kind(port).unwrap();
-            if matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
+            if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
                 return true;
             }
 
