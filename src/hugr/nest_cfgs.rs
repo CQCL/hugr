@@ -313,7 +313,7 @@ impl<'a> UndirectedDFSTree<'a> {
             .partition(|(dfs, _)| *dfs < n_dfs);
 
         // Remove edges to here from beneath
-        for (_,e) in be_down {
+        for (_, e) in be_down {
             let e = UDEdge::RealEdge(CFEdge(n, e));
             bs.delete(&e, &mut st.deleted_backedges);
         }
@@ -325,7 +325,7 @@ impl<'a> UndirectedDFSTree<'a> {
         // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
         be_up
             .iter()
-            .filter(|(_,e)| Some(e) != parent_edge)
+            .filter(|(_, e)| Some(e) != parent_edge)
             .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge(n, *e))));
 
         // Now calculate edge classes
@@ -393,16 +393,30 @@ mod test {
         let merge = add_block(&mut h, k, 3, 1)?;
         h.connect(left, 0, merge, 0)?;
         h.connect(right, 0, merge, 1)?;
-        let loop_ = add_block(&mut h, k, 1, 2)?;
-        h.connect(merge, 0, loop_, 0)?;
-        h.connect(loop_, 0, merge, 2)?;
+        let loop_tail = add_block(&mut h, k, 1, 2)?;
+        h.connect(merge, 0, loop_tail, 0)?;
+        h.connect(loop_tail, 0, merge, 2)?;
         let exit = add_block(&mut h, k, 1, 0)?;
-        h.connect(loop_, 1, exit, 0)?;
+        h.connect(loop_tail, 1, exit, 0)?;
         let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
         let mut groups = HashMap::new();
         for (e, c) in classes {
-            groups.entry(c).or_insert(Vec::new()).push(e);
+            groups.entry(c).or_insert(HashSet::new()).insert(e);
         }
+        let g: Vec<_> = groups.into_values().filter(|s| s.len() > 1).collect();
+        assert_eq!(g.len(), 3);
+        assert!(g.contains(&HashSet::from([
+            CFEdge(HalfNode::N(entry), EdgeDest::Forward(HalfNode::N(split))),
+            CFEdge(HalfNode::N(loop_tail), EdgeDest::Forward(HalfNode::N(exit)))
+        ])));
+        assert!(g.contains(&HashSet::from([
+            CFEdge(HalfNode::N(split), EdgeDest::Forward(HalfNode::N(left))),
+            CFEdge(HalfNode::N(left), EdgeDest::Forward(HalfNode::N(merge)))
+        ])));
+        assert!(g.contains(&HashSet::from([
+            CFEdge(HalfNode::N(split), EdgeDest::Forward(HalfNode::N(right))),
+            CFEdge(HalfNode::N(right), EdgeDest::Forward(HalfNode::N(merge)))
+        ])));
         Ok(())
     }
 
