@@ -40,6 +40,7 @@ pub struct OpValidityFlags {
 
 impl Default for OpValidityFlags {
     fn default() -> Self {
+        // Defaults to flags valid for non-container operations
         Self {
             allowed_parents: ValidOpSet::Any,
             allowed_first_child: ValidOpSet::Any,
@@ -155,7 +156,7 @@ pub enum ChildrenValidationError {
         optype: OpType,
         expected_position: &'static str,
     },
-    /// The signature of the tail-controlled loop graph does not match the one of the container.
+    /// The signature of the contained dataflow graph does not match the one of the container.
     #[error("The {node_desc} node of a {container_desc} has a signature of {actual:?}, which differs from the expected type row {expected:?}")]
     IOSignatureMismatch {
         child: NodeIndex,
@@ -204,6 +205,7 @@ impl ModuleOp {
                 requires_dag: true,
                 ..flags
             },
+            // Default flags are valid for non-container operations
             _ => flags,
         }
     }

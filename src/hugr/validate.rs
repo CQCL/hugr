@@ -271,7 +271,9 @@ impl Hugr {
                 let Some(successor) = self.graph.port_link(port).and_then(|p| self.graph.port_node(p)) else {
                     continue;
                 };
-                let visit_count = unvisited_ports.get_mut(&successor).unwrap();
+                let visit_count = unvisited_ports
+                    .get_mut(&successor)
+                    .expect("Non-sibling encountered as successor, should have been ignored");
                 *visit_count -= 1;
                 if *visit_count == 0 {
                     candidates.push(successor);
