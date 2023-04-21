@@ -1,12 +1,16 @@
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SignatureDescription, TypeRow};
+use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
     /// ɣ (gamma) node: conditional operation
-    Conditional { inputs: TypeRow, outputs: TypeRow },
+    Conditional {
+        predicate: ClassicType,
+        inputs: TypeRow,
+        outputs: TypeRow,
+    },
     /// θ (theta) node: tail-controlled loop. Here we assume the same inputs + outputs variant.
     Loop { vars: TypeRow },
     /// 𝛋 (kappa): a dataflow node which is defined by a child CFG
@@ -36,8 +40,14 @@ impl ControlFlowOp {
     /// The signature of the operation
     pub fn signature(&self) -> Signature {
         match self {
-            ControlFlowOp::Conditional { inputs, outputs } => {
-                Signature::new_df(inputs.clone(), outputs.clone())
+            ControlFlowOp::Conditional {
+                predicate,
+                inputs,
+                outputs,
+            } => {
+                let mut sig_in = vec![SimpleType::Classic(predicate.clone())];
+                sig_in.extend_from_slice(inputs);
+                Signature::new_df(sig_in, outputs.clone())
             }
             ControlFlowOp::Loop { vars } => Signature::new_linear(vars.clone()),
             ControlFlowOp::CFG { inputs, outputs } => {
@@ -56,8 +66,8 @@ impl ControlFlowOp {
 /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BasicBlockOp {
-    inputs: TypeRow,
-    outputs: TypeRow,
+    pub inputs: TypeRow,
+    pub outputs: TypeRow,
 }
 
 impl BasicBlockOp {

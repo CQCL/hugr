@@ -2,7 +2,7 @@
 
 use std::{
     borrow::Cow,
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut},
 };
 
 #[cfg(feature = "pyo3")]
@@ -182,16 +182,16 @@ where
     }
 }
 
-impl Index<usize> for TypeRow {
-    type Output = SimpleType;
+impl Deref for TypeRow {
+    type Target = [SimpleType];
 
-    fn index(&self, index: usize) -> &Self::Output {
-        self.get(index).unwrap()
+    fn deref(&self) -> &Self::Target {
+        &self.types
     }
 }
 
-impl IndexMut<usize> for TypeRow {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.get_mut(index).unwrap()
+impl DerefMut for TypeRow {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.types.to_mut()
     }
 }

@@ -3,10 +3,11 @@ pub mod custom;
 pub mod dataflow;
 pub mod leaf;
 pub mod module;
+pub mod validate;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 
-pub use controlflow::BasicBlockOp;
+pub use controlflow::{BasicBlockOp, ControlFlowOp};
 pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use dataflow::DataflowOp;
 pub use leaf::LeafOp;
