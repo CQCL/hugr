@@ -121,23 +121,22 @@ impl EdgeDest {
     }
 }
 
-#[derive(Copy, Clone, Eq)]
-struct CFEdge(HalfNode, EdgeDest);
-impl CFEdge {
-    pub fn flip(&self) -> Self {
-        match self.1 {
-            EdgeDest::Forward(tgt) => Self(tgt, EdgeDest::Backward(self.0)),
-            EdgeDest::Backward(tgt) => Self(tgt, EdgeDest::Forward(self.0)),
-        }
+fn flip(src: HalfNode, d: EdgeDest) -> (HalfNode, EdgeDest) {
+    match d {
+        EdgeDest::Forward(tgt) => (tgt, EdgeDest::Backward(src)),
+        EdgeDest::Backward(tgt) => (tgt, EdgeDest::Forward(src)),
     }
 }
+
+#[derive(Copy, Clone, Eq)]
+struct CFEdge(HalfNode, EdgeDest);
 
 impl PartialEq for CFEdge {
     fn eq(&self, other: &CFEdge) -> bool {
         let &CFEdge(n1, d1) = self;
         let &CFEdge(n2, d2) = other;
         (n1, d1) == (n2, d2) || {
-            let CFEdge(n1, d1) = self.flip();
+            let (n1, d1) = flip(self.0, self.1);
             (n1, d1) == (n2, d2)
         }
     }
@@ -147,7 +146,7 @@ impl Hash for CFEdge {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self.1 {
             EdgeDest::Forward(d) => (self.0, d).hash(state),
-            EdgeDest::Backward(_) => self.flip().hash(state),
+            EdgeDest::Backward(d) => (d, self.0).hash(state),
         };
     }
 }
@@ -243,13 +242,13 @@ impl<'a> UndirectedDFSTree<'a> {
         let mut dfs_parents = HashMap::new();
         {
             // Node, and edge along which reached
-            let mut pending = vec![CFEdge(h.entry_node(), EdgeDest::Backward(h.exit_node()))];
-            while let Some(CFEdge(n, p_edge)) = pending.pop() {
+            let mut pending = vec![(h.entry_node(), EdgeDest::Backward(h.exit_node()))];
+            while let Some((n, p_edge)) = pending.pop() {
                 if !dfs_num.contains_key(&n) && reachable.contains(&n) {
                     dfs_num.insert(n, dfs_num.len());
                     dfs_parents.insert(n, p_edge);
                     for e in h.undirected_edges(n) {
-                        pending.push(CFEdge(n, e).flip());
+                        pending.push(flip(n, e));
                     }
                 }
             }
@@ -268,7 +267,7 @@ impl<'a> UndirectedDFSTree<'a> {
             .filter(|e| self.dfs_num.contains_key(&e.target()))
             .partition(|e| {
                 // The tree edges are those whose *targets* list the edge as parent-edge
-                let CFEdge(tgt, from) = CFEdge(n, *e).flip();
+                let (tgt, from) = flip(n, *e);
                 self.dfs_parents.get(&tgt) == Some(&from)
             })
     }
