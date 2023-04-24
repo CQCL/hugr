@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 // Test only utils
 #[cfg(test)]
 pub(crate) mod test {
