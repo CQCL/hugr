@@ -106,7 +106,7 @@ impl ConstValue {
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Bit(_) => ClassicType::Bit,
-            Self::Int(_) => ClassicType::Int,
+            Self::Int(_) => ClassicType::I64,
             Self::Opaque(_, b) => (*b).const_type(),
         }
     }

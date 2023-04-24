@@ -118,7 +118,7 @@ mod test {
 
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::Nat);
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::U64);
 
     #[test]
     fn simple_function() {
@@ -154,7 +154,7 @@ mod test {
                     f,
                     LeafOp::Copy {
                         n_copies: 2,
-                        typ: ClassicType::Nat,
+                        typ: ClassicType::U64,
                     },
                 )
                 .unwrap();

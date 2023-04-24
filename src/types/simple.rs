@@ -33,8 +33,8 @@ pub enum SimpleType {
 #[non_exhaustive]
 pub enum ClassicType {
     Variable(SmolStr),
-    Nat,
-    Int,
+    U64,
+    I64,
     #[default]
     Bit,
     Graph(Box<(ResourceSet, Signature)>),
