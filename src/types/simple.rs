@@ -81,6 +81,8 @@ impl Default for ClassicType {
 pub enum LinearType {
     #[default]
     Qubit,
+    /// A linear opaque operation that can be downcasted by the extensions that define it.
+    Qpaque(CustomType),
     Array(Box<LinearType>, usize),
 }
 
