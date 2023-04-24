@@ -364,15 +364,16 @@ impl<'f> KappaBuilder<'f> {
 mod test {
 
     use crate::{
+        hugr::ValidationError,
         ops::LeafOp,
         type_row,
-        types::{ClassicType, QuantumType},
+        types::{ClassicType, LinearType},
     };
 
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::Nat);
-    const QB: SimpleType = SimpleType::Quantum(QuantumType::Qubit);
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
     #[test]
     fn nested_identity() -> Result<(), HugrError> {
@@ -445,7 +446,12 @@ mod test {
         };
 
         // crate::utils::test::viz_dotstr(&buildres.clone().unwrap().dot_string());
-        assert_eq!(buildres.err(), None);
+        assert!(matches!(
+            buildres,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::ContainerWithoutChildren { .. }
+            ))
+        ));
 
         Ok(())
     }
