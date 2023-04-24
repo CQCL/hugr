@@ -111,7 +111,7 @@ impl LeafOp {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
-        const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
+        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
 
         match self {
             LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),

@@ -29,14 +29,11 @@ pub enum SimpleType {
 /// Uses `Box`es on most variants to reduce the memory footprint.
 ///
 /// TODO: Derive pyclass
-#[derive(Clone, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ClassicType {
     Variable(SmolStr),
-    U64,
-    I64,
-    #[default]
-    Bit,
+    Int(usize),
     Graph(Box<(ResourceSet, Signature)>),
     Pair(Box<(ClassicType, ClassicType)>),
     List(Box<ClassicType>),
@@ -51,6 +48,27 @@ impl ClassicType {
     /// TODO in the future we'll probably need versions of this that take resources.
     pub fn graph_from_sig(signature: Signature) -> Self {
         ClassicType::Graph(Box::new((Default::default(), signature)))
+    }
+
+    #[inline]
+    pub const fn int<const N: usize>() -> Self {
+        Self::Int(N)
+    }
+
+    #[inline]
+    pub const fn i64() -> Self {
+        Self::int::<64>()
+    }
+
+    #[inline]
+    pub const fn bit() -> Self {
+        Self::int::<1>()
+    }
+}
+
+impl Default for ClassicType {
+    fn default() -> Self {
+        Self::int::<1>()
     }
 }
 
