@@ -62,7 +62,6 @@ impl ClassicType {
 pub enum LinearType {
     #[default]
     Qubit,
-    Money,
     Array(Box<LinearType>, usize),
 }
 
