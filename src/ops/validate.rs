@@ -154,7 +154,7 @@ impl OpType {
 pub enum ChildrenValidationError {
     /// An operation only allowed as the first/last child was found as an intermediate child.
     #[error("A {optype:?} operation is only allowed as a {expected_position} child")]
-    NonEdgeChildren {
+    InternalIOChildren {
         child: NodeIndex,
         optype: OpType,
         expected_position: &'static str,
@@ -177,7 +177,7 @@ impl ChildrenValidationError {
     /// Returns the node index of the child that caused the error.
     pub fn child(&self) -> NodeIndex {
         match self {
-            ChildrenValidationError::NonEdgeChildren { child, .. } => *child,
+            ChildrenValidationError::InternalIOChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalBranchSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
         }
@@ -401,14 +401,14 @@ fn validate_io_nodes<'a>(
     for (child, optype) in children {
         match optype {
             OpType::Function(DataflowOp::Input { .. }) => {
-                return Err(ChildrenValidationError::NonEdgeChildren {
+                return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "first",
                 })
             }
             OpType::Function(DataflowOp::Output { .. }) => {
-                return Err(ChildrenValidationError::NonEdgeChildren {
+                return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "last",
@@ -418,4 +418,77 @@ fn validate_io_nodes<'a>(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use cool_asserts::assert_matches;
+
+    use crate::{
+        ops::LeafOp,
+        type_row,
+        types::{ClassicType, SimpleType},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_validate_io_nodes() {
+        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+
+        let in_types = type_row![B];
+        let out_types = type_row![B, B];
+
+        let input_node = OpType::Function(DataflowOp::Input {
+            types: in_types.clone(),
+        });
+        let output_node = OpType::Function(DataflowOp::Output {
+            types: out_types.clone(),
+        });
+        let leaf_node = OpType::Function(DataflowOp::Leaf {
+            op: LeafOp::Copy {
+                n_copies: 2,
+                typ: ClassicType::bit(),
+            },
+        });
+
+        // Well-formed dataflow sibling nodes. Check the input and output node signatures.
+        let children = vec![
+            (0, &input_node),
+            (1, &leaf_node),
+            (2, &leaf_node),
+            (3, &output_node),
+        ];
+        assert_eq!(
+            validate_io_nodes(&in_types, Some(&out_types), "test", make_iter(&children)),
+            Ok(())
+        );
+        assert_matches!(
+            validate_io_nodes(&out_types, Some(&out_types), "test", make_iter(&children)),
+            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 0
+        );
+        assert_matches!(
+            validate_io_nodes(&in_types, Some(&in_types), "test", make_iter(&children)),
+            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 3
+        );
+
+        // Internal I/O nodes
+        let children = vec![
+            (0, &input_node),
+            (1, &leaf_node),
+            (42, &output_node),
+            (2, &leaf_node),
+            (3, &output_node),
+        ];
+        assert_matches!(
+            validate_io_nodes(&in_types, Some(&out_types), "test", make_iter(&children)),
+            Err(ChildrenValidationError::InternalIOChildren { child, .. }) if child.index() == 42
+        );
+    }
+
+    fn make_iter<'a>(
+        children: &'a [(usize, &OpType)],
+    ) -> impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)> {
+        children.iter().map(|(n, op)| (NodeIndex::new(*n), *op))
+    }
 }
