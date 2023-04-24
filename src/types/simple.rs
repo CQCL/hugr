@@ -37,10 +37,9 @@ pub enum ClassicType {
     F64,
     String,
     Graph(Box<(ResourceSet, Signature)>),
-    Pair(Box<(ClassicType, ClassicType)>),
     List(Box<ClassicType>),
     Map(Box<(ClassicType, ClassicType)>),
-    Struct(Box<TypeRow>),
+    Tuple(Box<TypeRow>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
 }
