@@ -18,8 +18,8 @@ use super::{BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 /// A set of property flags required for an operation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpValidityFlags {
-    /// The set of valid parent operation types
-    pub allowed_parents: ValidOpSet,
+    /// The set of valid children operation types
+    pub allowed_children: ValidOpSet,
     /// Additional restrictions on the first child operation.
     ///
     /// This is checked in addition to the child allowing the parent optype.
@@ -28,10 +28,6 @@ pub struct OpValidityFlags {
     ///
     /// This is checked in addition to the child allowing the parent optype.
     pub allowed_last_child: ValidOpSet,
-    /// Whether the operation can have children
-    pub is_container: bool,
-    /// Whether the operation contains dataflow children
-    pub is_df_container: bool,
     /// Whether the operation must have children
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles)
@@ -42,11 +38,9 @@ impl Default for OpValidityFlags {
     fn default() -> Self {
         // Defaults to flags valid for non-container operations
         Self {
-            allowed_parents: ValidOpSet::Any,
+            allowed_children: ValidOpSet::None,
             allowed_first_child: ValidOpSet::Any,
             allowed_last_child: ValidOpSet::Any,
-            is_container: false,
-            is_df_container: false,
             requires_children: false,
             requires_dag: false,
         }
@@ -64,12 +58,10 @@ pub enum ValidOpSet {
     Any,
     /// No valid operation types.
     None,
-    /// Only the module root operation.
-    ModuleRoot,
-    /// Any dataflow container operation.
-    DataflowContainers,
-    /// A control flow container operation.
-    CfgNode,
+    /// Non-root module operations
+    ModuleOps,
+    /// Any dataflow operation.
+    DataflowOps,
     /// A dataflow input
     Input,
     /// A dataflow output
@@ -78,6 +70,8 @@ pub enum ValidOpSet {
     Def,
     /// A control flow basic block
     BasicBlock,
+    /// A control flow exit node
+    BasicBlockExit,
 }
 
 impl ValidOpSet {
@@ -86,18 +80,21 @@ impl ValidOpSet {
         match self {
             ValidOpSet::Any => true,
             ValidOpSet::None => false,
-            ValidOpSet::ModuleRoot => matches!(optype, OpType::Module(ModuleOp::Root)),
-            ValidOpSet::DataflowContainers => optype.validity_flags().is_df_container,
-            ValidOpSet::CfgNode => matches!(
-                optype,
-                OpType::Function(DataflowOp::ControlFlow {
-                    op: ControlFlowOp::CFG { .. }
-                })
-            ),
+            ValidOpSet::ModuleOps => {
+                if let OpType::Module(op) = optype {
+                    op != &ModuleOp::Root
+                } else {
+                    false
+                }
+            }
+            ValidOpSet::DataflowOps => matches!(optype, OpType::Function(_)),
             ValidOpSet::Input => matches!(optype, OpType::Function(DataflowOp::Input { .. })),
             ValidOpSet::Output => matches!(optype, OpType::Function(DataflowOp::Output { .. })),
             ValidOpSet::Def => matches!(optype, OpType::Module(ModuleOp::Def { .. })),
             ValidOpSet::BasicBlock => matches!(optype, OpType::BasicBlock(_)),
+            ValidOpSet::BasicBlockExit => {
+                matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. }))
+            }
         }
     }
 
@@ -106,14 +103,20 @@ impl ValidOpSet {
         match self {
             ValidOpSet::Any => "Any",
             ValidOpSet::None => "None",
-            ValidOpSet::ModuleRoot => "Module roots",
-            ValidOpSet::DataflowContainers => "Dataflow containers",
-            ValidOpSet::CfgNode => "CFG containers",
+            ValidOpSet::ModuleOps => "Module operations",
+            ValidOpSet::DataflowOps => "Dataflow operations",
             ValidOpSet::Input => "Input node",
             ValidOpSet::Output => "Output node",
             ValidOpSet::Def => "Function definition",
             ValidOpSet::BasicBlock => "Basic block",
+            ValidOpSet::BasicBlockExit => "Exit basic block node",
         }
+    }
+
+    /// Returns whether the set is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        matches!(self, ValidOpSet::None)
     }
 }
 
@@ -184,29 +187,22 @@ impl ChildrenValidationError {
 impl ModuleOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
-        let flags = OpValidityFlags {
-            allowed_parents: ValidOpSet::ModuleRoot,
-            ..Default::default()
-        };
         match self {
             ModuleOp::Root { .. } => OpValidityFlags {
-                allowed_parents: ValidOpSet::None,
+                allowed_children: ValidOpSet::ModuleOps,
                 allowed_first_child: ValidOpSet::Def,
-                is_container: true,
                 requires_children: false,
-                ..flags
+                ..Default::default()
             },
             ModuleOp::Def { .. } => OpValidityFlags {
+                allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
-                is_container: true,
-                is_df_container: true,
                 requires_children: true,
                 requires_dag: true,
-                ..flags
             },
             // Default flags are valid for non-container operations
-            _ => flags,
+            _ => Default::default(),
         }
     }
 
@@ -232,20 +228,14 @@ impl BasicBlockOp {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             BasicBlockOp::Beta { .. } => OpValidityFlags {
-                allowed_parents: ValidOpSet::CfgNode,
+                allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
-                is_container: true,
-                is_df_container: true,
                 requires_children: true,
                 requires_dag: true,
             },
-            BasicBlockOp::Exit { .. } => OpValidityFlags {
-                allowed_parents: ValidOpSet::CfgNode,
-                allowed_first_child: ValidOpSet::None,
-                allowed_last_child: ValidOpSet::None,
-                ..Default::default()
-            },
+            // Default flags are valid for non-container operations
+            BasicBlockOp::Exit { .. } => Default::default(),
         }
     }
 
@@ -271,18 +261,14 @@ impl DataflowOp {
         match self {
             DataflowOp::ControlFlow { op } => op.validity_flags(),
             DataflowOp::Nested { .. } => OpValidityFlags {
-                allowed_parents: ValidOpSet::DataflowContainers,
+                allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
-                is_container: true,
-                is_df_container: true,
                 requires_children: true,
                 requires_dag: true,
             },
-            _ => OpValidityFlags {
-                allowed_parents: ValidOpSet::DataflowContainers,
-                ..Default::default()
-            },
+            // Default flags are valid for non-container operations
+            _ => Default::default(),
         }
     }
 
@@ -307,29 +293,26 @@ impl DataflowOp {
 impl ControlFlowOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
-        let flags = OpValidityFlags {
-            allowed_parents: ValidOpSet::DataflowContainers,
-            is_container: true,
-            requires_children: true,
-            ..Default::default()
-        };
         match self {
             ControlFlowOp::Conditional { .. } => OpValidityFlags {
-                is_df_container: true,
+                allowed_children: ValidOpSet::DataflowOps,
+                requires_children: true,
                 requires_dag: false,
-                ..flags
+                ..Default::default()
             },
             ControlFlowOp::Loop { .. } => OpValidityFlags {
+                allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
-                is_df_container: true,
+                requires_children: true,
                 requires_dag: true,
-                ..flags
             },
             ControlFlowOp::CFG { .. } => OpValidityFlags {
-                is_df_container: false,
+                allowed_children: ValidOpSet::BasicBlock,
+                allowed_last_child: ValidOpSet::BasicBlockExit,
+                requires_children: true,
                 requires_dag: false,
-                ..flags
+                ..Default::default()
             },
         }
     }
@@ -372,6 +355,8 @@ impl ControlFlowOp {
                 // BasicBlocks connected by ControlFlow edges. This should probably go
                 // outside of the OpTypeValidator trait, as we don't have access to the
                 // graph edges from here.
+
+                // TODO: No internal exit nodes.
             }
         }
         Ok(())
