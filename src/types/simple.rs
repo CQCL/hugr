@@ -34,6 +34,8 @@ pub enum SimpleType {
 pub enum ClassicType {
     Variable(SmolStr),
     Int(usize),
+    F64,
+    String,
     Graph(Box<(ResourceSet, Signature)>),
     Pair(Box<(ClassicType, ClassicType)>),
     List(Box<ClassicType>),
