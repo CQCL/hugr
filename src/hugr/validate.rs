@@ -367,11 +367,11 @@ pub enum ValidationError {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::BaseBuilder;
+    use crate::hugr::HugrMut;
 
     #[test]
     fn test_empty() {
-        let b = BaseBuilder::new();
+        let b = HugrMut::new();
         let hugr = b.finish();
         assert_eq!(hugr.err(), None);
     }
