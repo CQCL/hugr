@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use portgraph::algorithms::toposort_filtered;
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
@@ -212,15 +211,18 @@ impl Hugr {
         parent: NodeIndex,
         optype: &OpType,
     ) -> Result<(), ValidationError> {
-        let ignore_port = |child: NodeIndex, child_optype: &OpType, port: PortOffset| {
-            let kind = child_optype.port_kind(port).unwrap();
+        let port_filter = |child, port: PortIndex| {
+            let offset = self.graph.port_offset(port).unwrap();
+            let child_optype = self.get_optype(child);
+
+            let kind = child_optype.port_kind(offset).unwrap();
             if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
-                return true;
+                return false;
             }
 
             // Ignore ports that are not connected (that property is checked elsewhere)
-            let Some(pred_port) = self.graph.port_index(child, port).and_then(|p| self.graph.port_link(p))  else {
-                return true;
+            let Some(pred_port) = self.graph.port_index(child, offset).and_then(|p| self.graph.port_link(p))  else {
+                return false;
             };
             let pred = self.graph.port_node(pred_port).unwrap();
 
@@ -228,60 +230,31 @@ impl Hugr {
             //
             // TODO: Can these cause cycles?
             if Some(parent) != self.hierarchy.parent(pred) {
-                return true;
+                return false;
             }
 
-            false
+            true
         };
 
-        let mut nodes_visited = 0;
+        let Some(first_child) = self.hierarchy.first(parent) else {
+            // No children, nothing to do
+            return Ok(());
+        };
 
-        // Number of input ports to a node that remain unvisited. Once this
-        // reaches zero, the node is added to the candidate list.
-        let mut unvisited_ports: HashMap<NodeIndex, usize> = HashMap::new();
+        let topo = toposort_filtered(
+            &self.graph,
+            [first_child],
+            Direction::Outgoing,
+            |_| true,
+            port_filter,
+        );
 
-        // Candidates with no unvisited predecessors.
-        // Initially, all children with no incoming internal edges.
-        let mut candidates: Vec<NodeIndex> = Vec::new();
+        // Compute the number of nodes visited and keep the last one.
+        let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| (n + 1, Some(node)));
 
-        for child in self.hierarchy.children(parent) {
-            let child_optype = self.get_optype(child);
-            let input_count = self
-                .graph
-                .input_offsets(child)
-                .filter(|&off| !ignore_port(child, child_optype, off))
-                .count();
-            if input_count > 0 {
-                unvisited_ports.insert(child, input_count);
-            } else {
-                candidates.push(child);
-            }
-        }
-
-        while let Some(child) = candidates.pop() {
-            nodes_visited += 1;
-            let child_optype = self.get_optype(child);
-
-            // Add children with no unvisited predecessors to the candidate list.
-            for offset in self.graph.output_offsets(child) {
-                if ignore_port(child, child_optype, offset) {
-                    continue;
-                }
-                let port = self.graph.port_index(child, offset).unwrap();
-                let Some(successor) = self.graph.port_link(port).and_then(|p| self.graph.port_node(p)) else {
-                    continue;
-                };
-                let visit_count = unvisited_ports
-                    .get_mut(&successor)
-                    .expect("Non-sibling encountered as successor, should have been ignored");
-                *visit_count -= 1;
-                if *visit_count == 0 {
-                    candidates.push(successor);
-                }
-            }
-        }
-
-        if nodes_visited != self.hierarchy.child_count(parent) {
+        if nodes_visited != self.hierarchy.child_count(parent)
+            || last_node != self.hierarchy.last(parent)
+        {
             return Err(ValidationError::NotADag {
                 node: parent,
                 optype: optype.clone(),
