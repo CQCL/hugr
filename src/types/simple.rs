@@ -21,7 +21,32 @@ use crate::resource::ResourceSet;
 #[non_exhaustive]
 pub enum SimpleType {
     Classic(ClassicType),
-    Quantum(QuantumType),
+    Linear(LinearType),
+}
+
+/// Trait of primitive types (ClassicType or LinearType)
+pub trait PrimType {
+    // may be updated with functions in future for necessary shared functionality
+    // across ClassicType and LinearType
+    // currently used to constrain Container<T>
+}
+
+// For algebraic types Sum, Struct if one element of type row is linear, the
+// overall type is too
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Container<T: PrimType> {
+    /// Variable sized list of T
+    List(Box<T>),
+    /// Hash map from hashable key type to value T
+    Map(Box<(ClassicType, T)>),
+    /// Product type, known-size tuple over elements of type row
+    Tuple(Box<TypeRow>),
+    /// Product type, variants are tagged by their position in the type row
+    Sum(Box<TypeRow>),
+    /// Known size array of T
+    Array(Box<T>, usize),
+    /// Named type defined by, but distinct from, T
+    NewType(SmolStr, Box<T>),
 }
 
 /// A type that represents concrete classical data.
@@ -29,19 +54,15 @@ pub enum SimpleType {
 /// Uses `Box`es on most variants to reduce the memory footprint.
 ///
 /// TODO: Derive pyclass
-#[derive(Clone, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ClassicType {
     Variable(SmolStr),
-    Nat,
-    Int,
-    #[default]
-    Bit,
+    Int(usize),
+    F64,
+    String,
     Graph(Box<(ResourceSet, Signature)>),
-    Pair(Box<(ClassicType, ClassicType)>),
-    List(Box<ClassicType>),
-    Map(Box<(ClassicType, ClassicType)>),
-    Struct(Box<TypeRow>),
+    Container(Container<ClassicType>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
 }
@@ -52,23 +73,49 @@ impl ClassicType {
     pub fn graph_from_sig(signature: Signature) -> Self {
         ClassicType::Graph(Box::new((Default::default(), signature)))
     }
+
+    #[inline]
+    pub const fn int<const N: usize>() -> Self {
+        Self::Int(N)
+    }
+
+    #[inline]
+    pub const fn i64() -> Self {
+        Self::int::<64>()
+    }
+
+    #[inline]
+    pub const fn bit() -> Self {
+        Self::int::<1>()
+    }
 }
 
-/// A type that represents concrete quantum data.
+impl Default for ClassicType {
+    fn default() -> Self {
+        Self::int::<1>()
+    }
+}
+
+impl PrimType for ClassicType {}
+
+/// A type that represents concrete linear data.
 ///
 /// TODO: Derive pyclass
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub enum QuantumType {
+pub enum LinearType {
     #[default]
     Qubit,
-    Money,
-    Array(Box<QuantumType>, usize),
+    /// A linear opaque operation that can be downcasted by the extensions that define it.
+    Qpaque(CustomType),
+    Container(Container<LinearType>),
 }
+
+impl PrimType for LinearType {}
 
 impl SimpleType {
     pub fn is_linear(&self) -> bool {
-        matches!(self, Self::Quantum(_))
+        matches!(self, Self::Linear(_))
     }
 
     pub fn is_classical(&self) -> bool {
@@ -78,7 +125,7 @@ impl SimpleType {
 
 impl Default for SimpleType {
     fn default() -> Self {
-        Self::Quantum(Default::default())
+        Self::Linear(Default::default())
     }
 }
 
@@ -88,9 +135,9 @@ impl From<ClassicType> for SimpleType {
     }
 }
 
-impl From<QuantumType> for SimpleType {
-    fn from(typ: QuantumType) -> Self {
-        Self::Quantum(typ)
+impl From<LinearType> for SimpleType {
+    fn from(typ: LinearType) -> Self {
+        Self::Linear(typ)
     }
 }
 

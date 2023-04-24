@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 use super::OpaqueOp;
 use crate::{
     type_row,
-    types::{ClassicType, QuantumType, Signature, SignatureDescription, SimpleType},
+    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -46,15 +46,13 @@ impl Default for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns true if the operation has a single quantum input and output
-    /// TODO: Consider non-qubit linear outputs
-    pub fn is_one_qb_gate(&self) -> bool {
+    /// Returns true if the operation has a single linear input and output
+    pub fn is_one_linear_op(&self) -> bool {
         self.signature().linear().count() == 1
     }
 
-    /// Returns true if the operation has exactly two quantum inputs and outputs
-    /// TODO: Consider non-qubit linear outputs
-    pub fn is_two_qb_gate(&self) -> bool {
+    /// Returns true if the operation has exactly two linear inputs and outputs
+    pub fn is_two_linear_op(&self) -> bool {
         self.signature().linear().count() == 1
     }
 
@@ -112,8 +110,8 @@ impl LeafOp {
     pub fn signature(&self) -> Signature {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
-        const Q: SimpleType = SimpleType::Quantum(QuantumType::Qubit);
-        const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
+        const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
+        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
 
         match self {
             LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),

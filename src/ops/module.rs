@@ -74,10 +74,10 @@ impl ModuleOp {
 /// Value constants
 ///
 /// TODO: Add more constants
+/// TODO: bigger/smaller integers
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ConstValue {
-    Bit(bool),
     Int(i64),
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
@@ -85,7 +85,6 @@ pub enum ConstValue {
 impl PartialEq for ConstValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::Int(l0), Self::Int(r0)) => l0 == r0,
             (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
             _ => false,
@@ -97,7 +96,7 @@ impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
-        Self::Bit(false)
+        Self::Int(0)
     }
 }
 
@@ -105,8 +104,7 @@ impl ConstValue {
     /// Returns the datatype of the constant
     pub fn const_type(&self) -> ClassicType {
         match self {
-            Self::Bit(_) => ClassicType::Bit,
-            Self::Int(_) => ClassicType::Int,
+            Self::Int(_) => ClassicType::i64(),
             Self::Opaque(_, b) => (*b).const_type(),
         }
     }
@@ -114,7 +112,6 @@ impl ConstValue {
     /// Unique name of the constant
     pub fn name(&self) -> SmolStr {
         match self {
-            Self::Bit(v) => format!("const:bit:{v}"),
             Self::Int(v) => format!("const:int:{v}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
         }
