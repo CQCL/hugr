@@ -24,6 +24,31 @@ pub enum SimpleType {
     Linear(LinearType),
 }
 
+/// Trait of primitive types (ClassicType or LinearType)
+pub trait PrimType {
+    // may be updated with functions in future for necessary shared functionality
+    // across ClassicType and LinearType
+    // currently used to constrain Container<T>
+}
+
+// For algebraic types Sum, Struct if one element of type row is linear, the
+// overall type is too
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Container<T: PrimType> {
+    /// Variable sized list of T
+    List(Box<T>),
+    /// Hash map from hashable key type to value T
+    Map(Box<(ClassicType, T)>),
+    /// Product type, known-size tuple over elements of type row
+    Tuple(Box<TypeRow>),
+    /// Product type, variants are tagged by their position in the type row
+    Sum(Box<TypeRow>),
+    /// Known size array of T
+    Array(Box<T>, usize),
+    /// Named type defined by, but distinct from, T
+    NewType(SmolStr, Box<T>),
+}
+
 /// A type that represents concrete classical data.
 ///
 /// Uses `Box`es on most variants to reduce the memory footprint.
@@ -37,9 +62,7 @@ pub enum ClassicType {
     F64,
     String,
     Graph(Box<(ResourceSet, Signature)>),
-    List(Box<ClassicType>),
-    Map(Box<(ClassicType, ClassicType)>),
-    Tuple(Box<TypeRow>),
+    Container(Container<ClassicType>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
 }
@@ -73,6 +96,8 @@ impl Default for ClassicType {
     }
 }
 
+impl PrimType for ClassicType {}
+
 /// A type that represents concrete linear data.
 ///
 /// TODO: Derive pyclass
@@ -83,8 +108,10 @@ pub enum LinearType {
     Qubit,
     /// A linear opaque operation that can be downcasted by the extensions that define it.
     Qpaque(CustomType),
-    Array(Box<LinearType>, usize),
+    Container(Container<LinearType>),
 }
+
+impl PrimType for LinearType {}
 
 impl SimpleType {
     pub fn is_linear(&self) -> bool {
