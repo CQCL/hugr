@@ -21,7 +21,7 @@ use crate::resource::ResourceSet;
 #[non_exhaustive]
 pub enum SimpleType {
     Classic(ClassicType),
-    Quantum(QuantumType),
+    Linear(LinearType),
 }
 
 /// A type that represents concrete classical data.
@@ -54,21 +54,21 @@ impl ClassicType {
     }
 }
 
-/// A type that represents concrete quantum data.
+/// A type that represents concrete linear data.
 ///
 /// TODO: Derive pyclass
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-pub enum QuantumType {
+pub enum LinearType {
     #[default]
     Qubit,
     Money,
-    Array(Box<QuantumType>, usize),
+    Array(Box<LinearType>, usize),
 }
 
 impl SimpleType {
     pub fn is_linear(&self) -> bool {
-        matches!(self, Self::Quantum(_))
+        matches!(self, Self::Linear(_))
     }
 
     pub fn is_classical(&self) -> bool {
@@ -78,7 +78,7 @@ impl SimpleType {
 
 impl Default for SimpleType {
     fn default() -> Self {
-        Self::Quantum(Default::default())
+        Self::Linear(Default::default())
     }
 }
 
@@ -88,9 +88,9 @@ impl From<ClassicType> for SimpleType {
     }
 }
 
-impl From<QuantumType> for SimpleType {
-    fn from(typ: QuantumType) -> Self {
-        Self::Quantum(typ)
+impl From<LinearType> for SimpleType {
+    fn from(typ: LinearType) -> Self {
+        Self::Linear(typ)
     }
 }
 
