@@ -296,19 +296,52 @@ impl<'b, T: From<DeltaID>> Dataflow for DeltaWrapper<'b, T> {
 }
 
 impl ModuleBuilder {
-    pub fn function_builder<'a: 'b, 'b>(
+    pub fn define_function<'a: 'b, 'b>(
+        &'a mut self,
+        fid: &FuncID,
+    ) -> Result<FunctionBuilder<'b>, HugrError> {
+        let fnode = fid.node();
+        let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
+            self.base().hugr().get_optype(fnode)
+        {
+            (signature.input.clone(), signature.output.clone())
+        } else {
+            // TODO return error
+            panic!("FuncID does not refer to a declaration. May have already been defined.")
+        };
+        self.base().replace_op(
+            fnode,
+            OpType::Module(ModuleOp::Def {
+                signature: Signature::new(inputs.clone(), outputs.clone(), None),
+            }),
+        );
+
+        let db = DeltaBuilder::create_with_io(self.base(), fnode, inputs, outputs)?;
+        Ok(FunctionBuilder::new(db))
+    }
+
+    pub fn declare_and_def<'a: 'b, 'b>(
         &'a mut self,
         _name: impl Into<String>,
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<FunctionBuilder<'b>, HugrError> {
-        // TODO add name and param names to metadata
-        let defn = self.add_child_op(OpType::Module(ModuleOp::Def {
-            signature: Signature::new(inputs.clone(), outputs.clone(), None),
-        }))?;
+        let fid = self.declare(_name, inputs, outputs)?;
+        self.define_function(&fid)
+    }
 
-        let db = DeltaBuilder::create_with_io(self.base(), defn, inputs, outputs)?;
-        Ok(FunctionBuilder::new(db))
+    pub fn declare(
+        &mut self,
+        _name: impl Into<String>,
+        inputs: TypeRow,
+        outputs: TypeRow,
+    ) -> Result<FuncID, HugrError> {
+        // TODO add name and param names to metadata
+        let decln = self.add_child_op(ModuleOp::Declare {
+            signature: Signature::new(inputs.clone(), outputs.clone(), None),
+        })?;
+
+        Ok(decln.into())
     }
 
     pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, HugrError> {
@@ -418,7 +451,7 @@ mod test {
 
             let _fdef = {
                 let mut fbuild =
-                    modbuilder.function_builder("main", type_row![NAT, QB], type_row![NAT, QB])?;
+                    modbuilder.declare_and_def("main", type_row![NAT, QB], type_row![NAT, QB])?;
 
                 let [int, qb] = fbuild.input_wires_arr();
 
@@ -451,15 +484,12 @@ mod test {
 
         let buildres = {
             let mut modbuilder = ModuleBuilder::new();
+            let main =
+                modbuilder.declare("main", vec![sum2_type.clone(), NAT].into(), type_row![NAT])?;
             let s1 = modbuilder.constant(ConstValue::predicate(0, 1))?;
             let _fdef = {
-                let mut fbuild = modbuilder.function_builder(
-                    "main",
-                    vec![sum2_type.clone(), NAT].into(),
-                    type_row![NAT],
-                )?;
-
-                let [int, flag] = fbuild.input_wires_arr();
+                let mut fbuild = modbuilder.define_function(&main)?;
+                let [flag, int] = fbuild.input_wires_arr();
 
                 let inkapp: KappaID = {
                     let mut cfgbuilder = fbuild
