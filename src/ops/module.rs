@@ -2,7 +2,7 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
-    types::{ClassicType, EdgeKind, Signature, SimpleType},
+    types::{ClassicType, Container, EdgeKind, Signature, SimpleType, TypeRow},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -79,6 +79,11 @@ impl ModuleOp {
 #[non_exhaustive]
 pub enum ConstValue {
     Int(i64),
+    Sum {
+        tag: usize,
+        variants: TypeRow,
+        val: Box<ConstValue>,
+    },
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
 
@@ -87,6 +92,14 @@ impl PartialEq for ConstValue {
         match (self, other) {
             (Self::Int(l0), Self::Int(r0)) => l0 == r0,
             (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
+            (
+                Self::Sum { tag, variants, val },
+                Self::Sum {
+                    tag: t1,
+                    variants: type1,
+                    val: v1,
+                },
+            ) => tag == t1 && variants == type1 && val == v1,
             _ => false,
         }
     }
@@ -106,6 +119,9 @@ impl ConstValue {
         match self {
             Self::Int(_) => ClassicType::i64(),
             Self::Opaque(_, b) => (*b).const_type(),
+            Self::Sum { variants, val, .. } => {
+                ClassicType::Container(Container::Sum(Box::new(variants.clone())))
+            }
         }
     }
 
@@ -114,6 +130,9 @@ impl ConstValue {
         match self {
             Self::Int(v) => format!("const:int:{v}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
+            Self::Sum { tag, variants, val } => {
+                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            }
         }
         .into()
     }
