@@ -65,9 +65,9 @@ impl ControlFlowOp {
 
 /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct BasicBlockOp {
-    pub inputs: TypeRow,
-    pub outputs: TypeRow,
+pub enum BasicBlockOp {
+    Beta { inputs: TypeRow, outputs: TypeRow },
+    Exit { outputs: TypeRow },
 }
 
 impl BasicBlockOp {
@@ -77,11 +77,17 @@ impl BasicBlockOp {
 
     /// The name of the operation
     pub fn name(&self) -> SmolStr {
-        "β".into()
+        match self {
+            BasicBlockOp::Beta { .. } => "β".into(),
+            BasicBlockOp::Exit { .. } => "β_e".into(),
+        }
     }
 
     /// The description of the operation
     pub fn description(&self) -> &str {
-        "A CFG basic block node"
+        match self {
+            BasicBlockOp::Beta { .. } => "A CFG basic block node",
+            BasicBlockOp::Exit { .. } => "A CFG exit block node",
+        }
     }
 }

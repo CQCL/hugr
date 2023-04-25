@@ -230,14 +230,22 @@ impl ModuleOp {
 impl BasicBlockOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
-        OpValidityFlags {
-            allowed_parents: ValidOpSet::CfgNode,
-            allowed_first_child: ValidOpSet::Input,
-            allowed_last_child: ValidOpSet::Output,
-            is_container: true,
-            is_df_container: true,
-            requires_children: true,
-            requires_dag: true,
+        match self {
+            BasicBlockOp::Beta { .. } => OpValidityFlags {
+                allowed_parents: ValidOpSet::CfgNode,
+                allowed_first_child: ValidOpSet::Input,
+                allowed_last_child: ValidOpSet::Output,
+                is_container: true,
+                is_df_container: true,
+                requires_children: true,
+                requires_dag: true,
+            },
+            BasicBlockOp::Exit { .. } => OpValidityFlags {
+                allowed_parents: ValidOpSet::CfgNode,
+                allowed_first_child: ValidOpSet::None,
+                allowed_last_child: ValidOpSet::None,
+                ..Default::default()
+            },
         }
     }
 
@@ -248,7 +256,12 @@ impl BasicBlockOp {
     ) -> Result<(), ChildrenValidationError> {
         // TODO: The output signature of a basic block should be a sum of the different possible outputs.
         // This is not yet implemented in the type system.
-        validate_io_nodes(&self.inputs, None, "basic block graph", children)
+        match self {
+            BasicBlockOp::Beta { inputs, .. } => {
+                validate_io_nodes(inputs, None, "basic block graph", children)
+            }
+            BasicBlockOp::Exit { .. } => Ok(()),
+        }
     }
 }
 
