@@ -15,7 +15,7 @@ use self::nodehandle::{BuildHandle, ConstID};
 
 pub mod nodehandle;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Wire(NodeIndex, usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -26,6 +26,12 @@ pub enum BuildError {
     /// HUGR construction error.
     #[error("Error when mutating HUGR: {0}.")]
     ConstructError(#[from] HugrError),
+    /// CFG can only have one entry.
+    #[error("CFG entry node already built for CFG node: {0:?}.")]
+    EntryBuiltError(NodeIndex),
+    /// FuncID does not refer to declare.
+    #[error("FuncID containing node {0:?} does not refer to a Declare as expected")]
+    NotDeclareError(NodeIndex),
 }
 
 #[derive(Default)]
@@ -53,7 +59,6 @@ pub trait Container {
         let parent = self.container_node();
         Ok(self.base().add_op_with_parent(parent, op)?)
     }
-
     fn finish(self) -> Self::ContainerHandle;
 }
 
@@ -319,7 +324,7 @@ impl ModuleBuilder {
             (signature.input.clone(), signature.output.clone())
         } else {
             // TODO return error
-            panic!("FuncID does not refer to a declaration. May have already been defined.")
+            return Err(BuildError::NotDeclareError(fid.node()));
         };
         self.base().replace_op(
             fnode,
@@ -421,7 +426,10 @@ impl<'f> KappaBuilder<'f> {
         outputs: TypeRow,
         n_branches: usize,
     ) -> Result<BetaBuilder<'b>, BuildError> {
-        let inputs = self.inputs.take().expect("Entry has already been built.");
+        let inputs = self
+            .inputs
+            .take()
+            .ok_or(BuildError::EntryBuiltError(self.kapp_node))?;
         self.beta_builder(inputs, outputs, n_branches)
     }
 

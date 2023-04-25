@@ -13,16 +13,16 @@ pub trait BuildHandle {
     }
 }
 
-#[derive(DerFrom)]
+#[derive(DerFrom, Debug)]
 pub struct DeltaID(NodeIndex, Vec<Wire>);
 
-#[derive(DerFrom)]
+#[derive(DerFrom, Debug)]
 pub struct KappaID(NodeIndex, Vec<Wire>);
 
-#[derive(DerFrom)]
+#[derive(DerFrom, Debug, Clone)]
 pub struct FuncID(NodeIndex);
 
-#[derive(DerFrom)]
+#[derive(DerFrom, Debug)]
 pub struct ConstID(NodeIndex, ClassicType);
 
 impl ConstID {
@@ -31,7 +31,7 @@ impl ConstID {
     }
 }
 
-#[derive(DerFrom)]
+#[derive(DerFrom, Debug)]
 pub struct BetaID(NodeIndex);
 
 impl From<DeltaID> for FuncID {

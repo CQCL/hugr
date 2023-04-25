@@ -112,7 +112,6 @@ impl HugrMut {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::{
