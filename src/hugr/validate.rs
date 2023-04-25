@@ -1,10 +1,13 @@
+use std::iter;
+
+use itertools::Itertools;
 use portgraph::algorithms::toposort_filtered;
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
 use crate::ops::validate::{ChildrenValidationError, ValidOpSet};
-use crate::ops::{ModuleOp, OpType};
-use crate::types::EdgeKind;
+use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::types::{EdgeKind, SimpleType};
 use crate::Hugr;
 
 /// HUGR invariant checks.
@@ -14,7 +17,7 @@ impl Hugr {
     pub fn validate(&self) -> Result<(), ValidationError> {
         // Root node must be a root in the hierarchy, and a module root operation.
         if !self.hierarchy.is_root(self.root) {
-            return Err(ValidationError::RootNotRoot);
+            return Err(ValidationError::RootNotRoot { node: self.root });
         }
         if self.get_optype(self.root) != &OpType::Module(ModuleOp::Root) {
             return Err(ValidationError::InvalidRootOpType {
@@ -134,7 +137,7 @@ impl Hugr {
             });
         }
 
-        // TODO: Check inter-graph edges
+        self.validate_intergraph_edge(node, offset, optype, other_node, other_offset)?;
 
         Ok(())
     }
@@ -239,6 +242,121 @@ impl Hugr {
         Ok(())
     }
 
+    /// Check inter-graph edges. These are classical value edges between a copy
+    /// node and another non-sibling node.
+    ///
+    /// They come in two flavors depending on the type of the parent node of the
+    /// source:
+    /// - External edges, from a copy node to a sibling's descendant. There must
+    ///   also be an order edge between the copy and the sibling.
+    /// - Dominator edges, from a copy node in a beta node to a descendant of a
+    ///   post-dominated sibling of the beta.
+    fn validate_intergraph_edge(
+        &self,
+        from: NodeIndex,
+        from_offset: PortOffset,
+        from_optype: &OpType,
+        to: NodeIndex,
+        to_offset: PortOffset,
+    ) -> Result<(), ValidationError> {
+        let from_parent = self.get_parent(from).expect("Root nodes cannot have ports");
+        let to_parent = self.get_parent(to);
+        if Some(from_parent) == to_parent {
+            // Regular edge
+            return Ok(());
+        }
+
+        if !matches!(
+            from_optype,
+            OpType::Function(DataflowOp::Leaf {
+                op: LeafOp::Copy { .. }
+            })
+        ) {
+            return Err(InterGraphEdgeError::NonCopySource {
+                from,
+                from_offset,
+                from_optype: from_optype.clone(),
+                to,
+                to_offset,
+            }
+            .into());
+        }
+
+        match from_optype.port_kind(from_offset).unwrap() {
+            EdgeKind::Value(SimpleType::Classic(_)) => {}
+            ty => {
+                return Err(InterGraphEdgeError::NonClassicalData {
+                    from,
+                    from_offset,
+                    to,
+                    to_offset,
+                    ty,
+                }
+                .into())
+            }
+        }
+
+        // To detect either external or dominator edges, we traverse the ancestors
+        // of the target until we find either `from_parent` (in the external
+        // case), or the parent of `from_parent` (in the dominator case).
+        //
+        // This search could be sped-up with a pre-computed LCA structure, but
+        // for valid Hugrs this search should be very short.
+        let from_parent_parent = self
+            .get_parent(from_parent)
+            .expect("Copy nodes cannot have a root parent.");
+        for (ancestor, ancestor_parent) in
+            iter::successors(to_parent, |&p| self.get_parent(p)).tuple_windows()
+        {
+            if ancestor_parent == from_parent {
+                // External edge. Must have an order edge.
+                self.graph
+                    .get_connections(from, ancestor)
+                    .find(|&(p, _)| {
+                        let offset = self.graph.port_offset(p).unwrap();
+                        from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
+                    })
+                    .ok_or(InterGraphEdgeError::MissingOrderEdge {
+                        from,
+                        from_offset,
+                        to,
+                        to_offset,
+                        to_ancestor: ancestor,
+                    })?;
+                return Ok(());
+            } else if ancestor_parent == from_parent_parent {
+                // Dominator edge
+                let ancestor_parent_op = self.get_optype(ancestor_parent);
+                if !matches!(
+                    ancestor_parent_op,
+                    OpType::Function(DataflowOp::ControlFlow {
+                        op: ControlFlowOp::CFG { .. }
+                    })
+                ) {
+                    return Err(InterGraphEdgeError::NonCFGAncestor {
+                        from,
+                        from_offset,
+                        to,
+                        to_offset,
+                        ancestor_parent_op: ancestor_parent_op.clone(),
+                    }
+                    .into());
+                }
+
+                // TODO: check domination
+                return Ok(());
+            }
+        }
+
+        Err(InterGraphEdgeError::NoRelation {
+            from,
+            from_offset,
+            to,
+            to_offset,
+        }
+        .into())
+    }
+
     /// A filter function for internal dataflow edges.
     ///
     /// Returns `true` for ports that connect to a sibling node with a value or
@@ -270,9 +388,9 @@ impl Hugr {
 /// Errors that can occur while validating a Hugr.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
-    /// The root node is not a root in the hierarchy.
-    #[error("The root node is not a root in the hierarchy.")]
-    RootNotRoot,
+    /// The root node of the Hugr is not a root in the hierarchy.
+    #[error("The root node of the Hugr {node:?} is not a root in the hierarchy.")]
+    RootNotRoot { node: NodeIndex },
     /// Invalid root operation type.
     #[error("The operation type {optype:?} is not allowed as a root node. Expected Optype::Module(ModuleType::Root). In node {node:?}.")]
     InvalidRootOpType { node: NodeIndex, optype: OpType },
@@ -338,6 +456,58 @@ pub enum ValidationError {
     /// The children of a node have cycles.
     #[error("The operation {optype:?} does not allow cycles in its children. In node {node:?}.")]
     NotADag { node: NodeIndex, optype: OpType },
+    /// There are invalid inter-graph edges.
+    #[error(transparent)]
+    InterGraphEdgeError(#[from] InterGraphEdgeError),
+}
+
+/// Errors that can occur while validating a Hugr.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum InterGraphEdgeError {
+    /// Inter-Graph edges can only carry classical data
+    #[error("Inter-graph edges can only carry classical data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
+    NonClassicalData {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        to: NodeIndex,
+        to_offset: PortOffset,
+        ty: EdgeKind,
+    },
+    /// Inter-Graph edges must start from a copy node
+    #[error("Inter-graph edges must start from a copy node. Found operation {from_optype:?}. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
+    NonCopySource {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        from_optype: OpType,
+        to: NodeIndex,
+        to_offset: PortOffset,
+    },
+    /// The grandparent of a dominator inter-graph edge must be a CFG container.
+    #[error("The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op:?}. In a dominator inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
+    NonCFGAncestor {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        to: NodeIndex,
+        to_offset: PortOffset,
+        ancestor_parent_op: OpType,
+    },
+    /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
+    #[error("Missing state order between the external inter-graph source {from:?} and the ancestor of the target {to_ancestor:?}. In an external inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
+    MissingOrderEdge {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        to: NodeIndex,
+        to_offset: PortOffset,
+        to_ancestor: NodeIndex,
+    },
+    /// N
+    #[error("The ancestors of an inter-graph edge are not related. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
+    NoRelation {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        to: NodeIndex,
+        to_offset: PortOffset,
+    },
 }
 
 #[cfg(test)]
