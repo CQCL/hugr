@@ -156,6 +156,30 @@ impl ConstValue {
     pub fn description(&self) -> &str {
         "Constant value"
     }
+
+    /// Constant unit type (empty Tuple)
+    pub const fn unit() -> ConstValue {
+        ConstValue::Tuple(vec![])
+    }
+
+    pub fn trueval() -> Self {
+        Self::pred(1, 2)
+    }
+
+    pub fn falseval() -> Self {
+        Self::pred(0, 2)
+    }
+
+    /// Constant Sum over units, used as predicates
+    pub fn pred(tag: usize, size: usize) -> Self {
+        let unit: SimpleType = SimpleType::unit();
+        let vars = vec![unit; size];
+        ConstValue::Sum {
+            tag,
+            variants: vars.into(),
+            val: Box::new(Self::unit()),
+        }
+    }
 }
 
 impl<T: CustomConst> From<T> for ConstValue {

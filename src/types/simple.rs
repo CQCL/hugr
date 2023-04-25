@@ -149,6 +149,19 @@ impl SimpleType {
             Container::<LinearType>::Tuple(Box::new(row)).into()
         }
     }
+
+    pub fn unit() -> Self {
+        Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
+            TypeRow::new(),
+        ))))
+    }
+
+    pub fn pred(size: usize) -> Self {
+        let rowvec = vec![Self::unit(); size];
+        Self::Classic(ClassicType::Container(Container::Sum(Box::new(
+            rowvec.into(),
+        ))))
+    }
 }
 
 impl Default for SimpleType {
