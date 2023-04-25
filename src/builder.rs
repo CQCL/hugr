@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
 
 use portgraph::NodeIndex;
+use thiserror::Error;
 
-use crate::hugr::{BuildError, HugrMut};
+use crate::hugr::{HugrMut, ValidationError};
 use crate::ops::controlflow::ControlFlowOp;
 use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
@@ -13,8 +14,19 @@ use nodehandle::{BetaID, DeltaID, FuncID, KappaID};
 use self::nodehandle::{BuildHandle, ConstID};
 
 pub mod nodehandle;
+
 #[derive(Clone, Copy)]
 pub struct Wire(NodeIndex, usize);
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum BuildError {
+    /// The constructed HUGR is invalid.
+    #[error("The constructed HUGR is invalid: {0}.")]
+    InvalidHUGR(#[from] ValidationError),
+    /// HUGR construction error.
+    #[error("Error when mutating HUGR: {0}.")]
+    ConstructError(#[from] HugrError),
+}
 
 #[derive(Default)]
 pub struct ModuleBuilder(HugrMut);
@@ -37,9 +49,9 @@ pub trait Container {
     type ContainerHandle;
     fn container_node(&self) -> NodeIndex;
     fn base(&mut self) -> &mut HugrMut;
-    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<NodeIndex, HugrError> {
+    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<NodeIndex, BuildError> {
         let parent = self.container_node();
-        self.base().add_op_with_parent(parent, op)
+        Ok(self.base().add_op_with_parent(parent, op)?)
     }
 
     fn finish(self) -> Self::ContainerHandle;
@@ -51,12 +63,12 @@ pub trait Dataflow: Container {
         &mut self,
         op: impl Into<OpType>,
         inputs: Vec<Wire>,
-    ) -> Result<Vec<Wire>, HugrError> {
+    ) -> Result<Vec<Wire>, BuildError> {
         let (_, wires) = add_op_with_wires(self, op, inputs)?;
         Ok(wires)
     }
 
-    fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Wire>) -> Result<(), HugrError> {
+    fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Wire>) -> Result<(), BuildError> {
         let [_, out] = self.io();
         let base = self.base();
         for (dst_port, Wire(src, src_port)) in outputs.into_iter().enumerate() {
@@ -68,7 +80,7 @@ pub trait Dataflow: Container {
     fn finish_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Self::ContainerHandle, HugrError>
+    ) -> Result<Self::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
@@ -88,7 +100,7 @@ pub trait Dataflow: Container {
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<DeltaBuilder<'b>, HugrError> {
+    ) -> Result<DeltaBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (deltn, _) = add_op_with_wires(
             self,
@@ -105,7 +117,7 @@ pub trait Dataflow: Container {
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<KappaBuilder<'b>, HugrError> {
+    ) -> Result<KappaBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -137,7 +149,7 @@ pub trait Dataflow: Container {
         Ok(kb)
     }
 
-    fn load_const(&mut self, cid: &ConstID) -> Result<Wire, HugrError> {
+    fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let cn = cid.node();
         let cout = self.base().hugr().num_outputs(cn);
 
@@ -161,7 +173,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     dbuild: &mut T,
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
-) -> Result<(NodeIndex, Vec<Wire>), HugrError> {
+) -> Result<(NodeIndex, Vec<Wire>), BuildError> {
     let [_, out] = dbuild.io();
     let base = dbuild.base();
     let op: OpType = op.into();
@@ -181,7 +193,7 @@ impl<'f> DeltaBuilder<'f> {
         parent: NodeIndex,
         inputs: TypeRow,
         outputs: TypeRow,
-    ) -> Result<Self, HugrError> {
+    ) -> Result<Self, BuildError> {
         let ilen = inputs.len();
         let olen = outputs.len();
         let i = base.add_op_with_parent(
@@ -249,7 +261,7 @@ impl Container for ModuleBuilder {
 
     #[inline]
     fn finish(self) -> Self::ContainerHandle {
-        self.0.finish()
+        Ok(self.0.finish()?)
     }
 }
 
@@ -299,7 +311,7 @@ impl ModuleBuilder {
     pub fn define_function<'a: 'b, 'b>(
         &'a mut self,
         fid: &FuncID,
-    ) -> Result<FunctionBuilder<'b>, HugrError> {
+    ) -> Result<FunctionBuilder<'b>, BuildError> {
         let fnode = fid.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.base().hugr().get_optype(fnode)
@@ -325,7 +337,7 @@ impl ModuleBuilder {
         _name: impl Into<String>,
         inputs: TypeRow,
         outputs: TypeRow,
-    ) -> Result<FunctionBuilder<'b>, HugrError> {
+    ) -> Result<FunctionBuilder<'b>, BuildError> {
         let fid = self.declare(_name, inputs, outputs)?;
         self.define_function(&fid)
     }
@@ -335,7 +347,7 @@ impl ModuleBuilder {
         _name: impl Into<String>,
         inputs: TypeRow,
         outputs: TypeRow,
-    ) -> Result<FuncID, HugrError> {
+    ) -> Result<FuncID, BuildError> {
         // TODO add name and param names to metadata
         let decln = self.add_child_op(ModuleOp::Declare {
             signature: Signature::new(inputs.clone(), outputs.clone(), None),
@@ -344,7 +356,7 @@ impl ModuleBuilder {
         Ok(decln.into())
     }
 
-    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, HugrError> {
+    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
         let cn = self.add_child_op(ModuleOp::Const(val))?;
 
@@ -388,7 +400,7 @@ impl<'f> KappaBuilder<'f> {
         inputs: TypeRow,
         outputs: TypeRow,
         n_branches: usize,
-    ) -> Result<BetaBuilder<'b>, HugrError> {
+    ) -> Result<BetaBuilder<'b>, BuildError> {
         let predtype = SimpleType::new_predicate(n_branches);
         let outputs: TypeRow = [&[predtype], outputs.as_ref()].concat().into();
         let op = OpType::BasicBlock(BasicBlockOp::Beta {
@@ -408,7 +420,7 @@ impl<'f> KappaBuilder<'f> {
         &'a mut self,
         outputs: TypeRow,
         n_branches: usize,
-    ) -> Result<BetaBuilder<'b>, HugrError> {
+    ) -> Result<BetaBuilder<'b>, BuildError> {
         let inputs = self.inputs.take().expect("Entry has already been built.");
         self.beta_builder(inputs, outputs, n_branches)
     }
@@ -417,7 +429,12 @@ impl<'f> KappaBuilder<'f> {
         self.exit_node.into()
     }
 
-    pub fn branch(&mut self, pred: &BetaID, branch: usize, succ: &BetaID) -> Result<(), HugrError> {
+    pub fn branch(
+        &mut self,
+        pred: &BetaID,
+        branch: usize,
+        succ: &BetaID,
+    ) -> Result<(), BuildError> {
         let from = pred.node();
         let to = succ.node();
         let base = &mut self.base;
@@ -426,7 +443,7 @@ impl<'f> KappaBuilder<'f> {
         let tout = hugr.num_outputs(to);
 
         base.set_num_ports(to, tin + 1, tout);
-        base.connect(from, branch, to, tin)
+        Ok(base.connect(from, branch, to, tin)?)
     }
 }
 
@@ -445,7 +462,7 @@ mod test {
     const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
     #[test]
-    fn nested_identity() -> Result<(), HugrError> {
+    fn nested_identity() -> Result<(), BuildError> {
         let buildres = {
             let mut modbuilder = ModuleBuilder::new();
 
@@ -473,13 +490,13 @@ mod test {
         Ok(())
     }
 
-    fn n_identity<T: Dataflow>(inbuilder: T) -> Result<T::ContainerHandle, HugrError> {
+    fn n_identity<T: Dataflow>(inbuilder: T) -> Result<T::ContainerHandle, BuildError> {
         let w = Vec::from(inbuilder.input_wires());
         inbuilder.finish_with_outputs(w)
     }
 
     #[test]
-    fn basic_cfg() -> Result<(), HugrError> {
+    fn basic_cfg() -> Result<(), BuildError> {
         let sum2_type = SimpleType::new_predicate(2);
 
         let buildres = {

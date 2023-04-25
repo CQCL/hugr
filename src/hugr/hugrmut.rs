@@ -89,7 +89,7 @@ impl HugrMut {
     }
 
     /// Build the HUGR, returning an error if the graph is not valid.
-    pub fn finish(self) -> Result<Hugr, BuildError> {
+    pub fn finish(self) -> Result<Hugr, ValidationError> {
         let hugr = self.hugr;
 
         hugr.validate()?;
@@ -112,12 +112,6 @@ impl HugrMut {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum BuildError {
-    /// The constructed HUGR is invalid.
-    #[error("The constructed HUGR is invalid: {0}.")]
-    InvalidHUGR(#[from] ValidationError),
-}
 
 #[cfg(test)]
 mod test {
@@ -184,7 +178,7 @@ mod test {
         }
 
         // Finish the construction and create the HUGR
-        let hugr: Result<Hugr, BuildError> = builder.finish();
+        let hugr: Result<Hugr, ValidationError> = builder.finish();
         assert_eq!(hugr.err(), None);
     }
 }
