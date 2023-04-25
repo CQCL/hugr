@@ -32,7 +32,10 @@ impl HugrMut {
     pub fn add_op(&mut self, op: impl Into<OpType>) -> NodeIndex {
         let op: OpType = op.into();
         let sig = op.signature();
-        let node = self.hugr.graph.add_node(sig.input.len(), sig.output.len());
+        let node = self.hugr.graph.add_node(
+            sig.input.len() + sig.const_input.iter().count(),
+            sig.output.len(),
+        );
         self.hugr.op_types[node] = op;
         node
     }
