@@ -106,10 +106,7 @@ impl HugrMut {
     /// Replace the OpType at node and return the old OpType
     pub fn replace_op(&mut self, node: NodeIndex, op: impl Into<OpType>) -> OpType {
         let cur = self.hugr.op_types.get_mut(node);
-        let mut op = op.into();
-        std::mem::swap(cur, &mut op);
-
-        op
+        std::mem::replace(cur, op.into())
     }
 }
 
