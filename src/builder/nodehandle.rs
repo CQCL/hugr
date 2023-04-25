@@ -1,3 +1,5 @@
+use crate::types::ClassicType;
+
 use super::Wire;
 use derive_more::From as DerFrom;
 use portgraph::NodeIndex;
@@ -19,6 +21,15 @@ pub struct KappaID(NodeIndex, Vec<Wire>);
 
 #[derive(DerFrom)]
 pub struct FuncID(NodeIndex);
+
+#[derive(DerFrom)]
+pub struct ConstID(NodeIndex, ClassicType);
+
+impl ConstID {
+    pub fn const_type(&self) -> ClassicType {
+        self.1.clone()
+    }
+}
 
 #[derive(DerFrom)]
 pub struct BetaID(NodeIndex);
@@ -62,6 +73,18 @@ impl BuildHandle for KappaID {
 }
 
 impl BuildHandle for FuncID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn sig_out_wires(&self) -> &[Wire] {
+        &[]
+    }
+}
+
+impl BuildHandle for ConstID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0

@@ -4,13 +4,13 @@ use portgraph::NodeIndex;
 
 use crate::hugr::{BuildError, HugrMut};
 use crate::ops::controlflow::ControlFlowOp;
-use crate::ops::{BasicBlockOp, DataflowOp, ModuleOp};
+use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID};
 
-use self::nodehandle::BuildHandle;
+use self::nodehandle::{BuildHandle, ConstID};
 
 pub mod nodehandle;
 #[derive(Clone, Copy)]
@@ -114,7 +114,7 @@ pub trait Dataflow: Container {
             self,
             OpType::Function(DataflowOp::ControlFlow {
                 op: ControlFlowOp::CFG {
-                    inputs,
+                    inputs: inputs.clone(),
                     outputs: outputs.clone(),
                 },
             }),
@@ -131,9 +131,29 @@ pub trait Dataflow: Container {
             kapp_node: kapn,
             n_out_wires,
             exit_node,
+            inputs: Some(inputs),
         };
 
         Ok(kb)
+    }
+
+    fn load_const(&mut self, cid: &ConstID) -> Result<Wire, HugrError> {
+        let cn = cid.node();
+        let cout = self.base().hugr().num_outputs(cn);
+
+        self.base().set_num_ports(cn, 0, cout + 1);
+        // let ctyp = self.base().hugr().get_optype(node)
+        let loadop = DataflowOp::LoadConstant {
+            datatype: cid.const_type(),
+        };
+        let mut loadn = self.add_dataflow_op(
+            DataflowOp::LoadConstant {
+                datatype: cid.const_type(),
+            },
+            vec![Wire(cn, cout)],
+        )?;
+
+        Ok(loadn.remove(0))
     }
 }
 
@@ -290,11 +310,19 @@ impl ModuleBuilder {
         let db = DeltaBuilder::create_with_io(self.base(), defn, inputs, outputs)?;
         Ok(FunctionBuilder::new(db))
     }
+
+    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, HugrError> {
+        let typ = val.const_type();
+        let cn = self.add_child_op(ModuleOp::Const(val))?;
+
+        Ok((cn, typ).into())
+    }
 }
 
 pub struct KappaBuilder<'f> {
     base: &'f mut HugrMut,
     kapp_node: NodeIndex,
+    inputs: Option<TypeRow>,
     exit_node: NodeIndex,
     n_out_wires: usize,
 }
@@ -325,21 +353,31 @@ impl<'f> KappaBuilder<'f> {
     pub fn beta_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
-        sum_outputs: TypeRow,
+        outputs: TypeRow,
+        n_branches: usize,
     ) -> Result<BetaBuilder<'b>, HugrError> {
+        let predtype = SimpleType::new_predicate(n_branches);
+        let outputs: TypeRow = [&[predtype], outputs.as_ref()].concat().into();
         let op = OpType::BasicBlock(BasicBlockOp::Beta {
             inputs: inputs.clone(),
-            outputs: sum_outputs.clone(),
+            outputs: outputs.clone(),
         });
         let exit = self.exit_node;
         let beta_n = self.base().add_op_before(exit, op)?;
 
-        self.base().set_num_ports(beta_n, 0, sum_outputs.len());
+        self.base().set_num_ports(beta_n, 0, n_branches);
 
-        // TODO the output should be the SUM over the elements of sum_outputs
-        let s1 = sum_outputs[0].clone();
-        let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, vec![s1].into())?;
+        let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, outputs)?;
         Ok(BetaBuilder::new(db))
+    }
+
+    pub fn entry_builder<'a: 'b, 'b>(
+        &'a mut self,
+        outputs: TypeRow,
+        n_branches: usize,
+    ) -> Result<BetaBuilder<'b>, HugrError> {
+        let inputs = self.inputs.take().expect("Entry has already been built.");
+        self.beta_builder(inputs, outputs, n_branches)
     }
 
     pub fn exit_block(&self) -> BetaID {
@@ -409,25 +447,35 @@ mod test {
 
     #[test]
     fn basic_cfg() -> Result<(), HugrError> {
+        let sum2_type = SimpleType::new_predicate(2);
+
         let buildres = {
             let mut modbuilder = ModuleBuilder::new();
-
+            let s1 = modbuilder.constant(ConstValue::predicate(0, 1))?;
             let _fdef = {
-                let mut fbuild =
-                    modbuilder.function_builder("main", type_row![NAT], type_row![NAT])?;
+                let mut fbuild = modbuilder.function_builder(
+                    "main",
+                    vec![sum2_type.clone(), NAT].into(),
+                    type_row![NAT],
+                )?;
 
-                let [int] = fbuild.input_wires_arr();
+                let [int, flag] = fbuild.input_wires_arr();
 
                 let inkapp: KappaID = {
-                    let mut cfgbuilder = fbuild.kappa_builder(vec![(NAT, int)], type_row![NAT])?;
-                    let entrybuild =
-                        cfgbuilder.beta_builder(type_row![NAT], type_row![NAT, NAT])?;
+                    let mut cfgbuilder = fbuild
+                        .kappa_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
+                    let entrybuild = cfgbuilder.entry_builder(type_row![NAT], 2)?;
 
                     let entry = n_identity(entrybuild)?;
 
-                    let middlebuild = cfgbuilder.beta_builder(type_row![NAT], type_row![NAT])?;
+                    let mut middlebuild =
+                        cfgbuilder.beta_builder(type_row![NAT], type_row![NAT], 1)?;
 
-                    let middle = n_identity(middlebuild)?;
+                    let middle = {
+                        let c = middlebuild.load_const(&s1)?;
+                        let [inw] = middlebuild.input_wires_arr();
+                        middlebuild.finish_with_outputs([c, inw])?
+                    };
 
                     let exit = cfgbuilder.exit_block();
 
@@ -440,6 +488,7 @@ mod test {
 
                 fbuild.finish_with_outputs(Vec::from(inkapp.sig_out_wires()))?
             };
+
             modbuilder.finish()
         };
 
