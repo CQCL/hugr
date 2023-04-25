@@ -84,6 +84,7 @@ pub enum ConstValue {
         variants: TypeRow,
         val: Box<ConstValue>,
     },
+    Tuple(Vec<ConstValue>),
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
 
@@ -100,6 +101,8 @@ impl PartialEq for ConstValue {
                     val: v1,
                 },
             ) => tag == t1 && variants == type1 && val == v1,
+
+            (Self::Tuple(v1), Self::Tuple(v2)) => v1.eq(v2),
             _ => false,
         }
     }
@@ -119,8 +122,15 @@ impl ConstValue {
         match self {
             Self::Int(_) => ClassicType::i64(),
             Self::Opaque(_, b) => (*b).const_type(),
-            Self::Sum { variants, val, .. } => {
+            Self::Sum { variants, .. } => {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
+            }
+            Self::Tuple(vals) => {
+                let row: Vec<_> = vals
+                    .iter()
+                    .map(|val| SimpleType::Classic(val.const_type()))
+                    .collect();
+                ClassicType::Container(Container::Tuple(Box::new(row.into())))
             }
         }
     }
@@ -130,8 +140,13 @@ impl ConstValue {
         match self {
             Self::Int(v) => format!("const:int:{v}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
-            Self::Sum { tag, variants, val } => {
+            Self::Sum { tag, val, .. } => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            }
+            Self::Tuple(vals) => {
+                let valstr: Vec<_> = vals.iter().map(|v| v.name()).collect();
+                let valstr = valstr.join(", ");
+                format!("const:tuple:{{{valstr}}}")
             }
         }
         .into()

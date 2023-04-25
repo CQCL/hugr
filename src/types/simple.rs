@@ -135,20 +135,18 @@ impl SimpleType {
     }
 
     pub fn new_sum(row: TypeRow) -> Self {
-        let rowbox = Box::new(row);
         if row.purely_classical() {
-            Container::<ClassicType>::Sum(rowbox).into()
+            Container::<ClassicType>::Sum(Box::new(row)).into()
         } else {
-            Container::<LinearType>::Sum(rowbox).into()
+            Container::<LinearType>::Sum(Box::new(row)).into()
         }
     }
 
     pub fn new_tuple(row: TypeRow) -> Self {
-        let rowbox = Box::new(row);
         if row.purely_classical() {
-            Container::<ClassicType>::Tuple(rowbox).into()
+            Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
-            Container::<LinearType>::Tuple(rowbox).into()
+            Container::<LinearType>::Tuple(Box::new(row)).into()
         }
     }
 }
