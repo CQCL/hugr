@@ -121,9 +121,8 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        let exitbeta = OpType::BasicBlock(BasicBlockOp {
-            inputs: outputs.clone(),
-            outputs: outputs.clone(),
+        let exitbeta = OpType::BasicBlock(BasicBlockOp::Exit {
+            cfg_outputs: outputs.clone(),
         });
         let exit_node = self.base().add_op_with_parent(kapn, exitbeta)?;
         let n_out_wires = outputs.len();
@@ -328,7 +327,7 @@ impl<'f> KappaBuilder<'f> {
         inputs: TypeRow,
         sum_outputs: TypeRow,
     ) -> Result<BetaBuilder<'b>, HugrError> {
-        let op = OpType::BasicBlock(BasicBlockOp {
+        let op = OpType::BasicBlock(BasicBlockOp::Beta {
             inputs: inputs.clone(),
             outputs: sum_outputs.clone(),
         });
@@ -364,7 +363,6 @@ impl<'f> KappaBuilder<'f> {
 mod test {
 
     use crate::{
-        hugr::ValidationError,
         ops::LeafOp,
         type_row,
         types::{ClassicType, LinearType},
@@ -446,12 +444,7 @@ mod test {
         };
 
         // crate::utils::test::viz_dotstr(&buildres.clone().unwrap().dot_string());
-        assert!(matches!(
-            buildres,
-            Err(BuildError::InvalidHUGR(
-                ValidationError::ContainerWithoutChildren { .. }
-            ))
-        ));
+        assert_eq!(buildres.err(), None);
 
         Ok(())
     }
