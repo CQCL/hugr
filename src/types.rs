@@ -10,7 +10,7 @@ use portgraph::Direction;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicType, LinearType, SimpleType, TypeRow, Container};
+pub use simple::{ClassicType, Container, LinearType, SimpleType, TypeRow};
 
 pub use portgraph::PortOffset;
 
