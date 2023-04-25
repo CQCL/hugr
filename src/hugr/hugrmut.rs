@@ -103,7 +103,9 @@ impl HugrMut {
         &self.hugr
     }
 
-    /// Replace the OpType at node and return the old OpType
+    /// Replace the OpType at node and return the old OpType.
+    /// In general this invalidates the ports, which may need to be resized to
+    /// match the OpType signature
     pub fn replace_op(&mut self, node: NodeIndex, op: impl Into<OpType>) -> OpType {
         let cur = self.hugr.op_types.get_mut(node);
         std::mem::replace(cur, op.into())
