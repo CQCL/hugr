@@ -134,6 +134,7 @@ impl SimpleType {
         matches!(self, Self::Classic(_))
     }
 
+    /// New Sum type, variants defined by TypeRow
     pub fn new_sum(row: TypeRow) -> Self {
         if row.purely_classical() {
             Container::<ClassicType>::Sum(Box::new(row)).into()
@@ -142,6 +143,7 @@ impl SimpleType {
         }
     }
 
+    /// New Tuple type, elements defined by TypeRow
     pub fn new_tuple(row: TypeRow) -> Self {
         if row.purely_classical() {
             Container::<ClassicType>::Tuple(Box::new(row)).into()
@@ -150,14 +152,16 @@ impl SimpleType {
         }
     }
 
-    pub fn unit() -> Self {
+    /// New unit type, defined as an empty Tuple
+    pub fn new_unit() -> Self {
         Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
             TypeRow::new(),
         ))))
     }
 
-    pub fn pred(size: usize) -> Self {
-        let rowvec = vec![Self::unit(); size];
+    /// New Sum of Unit types, used as predicates in branching
+    pub fn new_predicate(size: usize) -> Self {
+        let rowvec = vec![Self::new_unit(); size];
         Self::Classic(ClassicType::Container(Container::Sum(Box::new(
             rowvec.into(),
         ))))

@@ -162,17 +162,19 @@ impl ConstValue {
         ConstValue::Tuple(vec![])
     }
 
+    /// Constant "true" value, i.e. the second variant of Sum((), ())
     pub fn trueval() -> Self {
-        Self::pred(1, 2)
+        Self::predicate(1, 2)
     }
 
+    /// Constant "true" value, i.e. the first variant of Sum((), ())
     pub fn falseval() -> Self {
-        Self::pred(0, 2)
+        Self::predicate(0, 2)
     }
 
     /// Constant Sum over units, used as predicates
-    pub fn pred(tag: usize, size: usize) -> Self {
-        let unit: SimpleType = SimpleType::unit();
+    pub fn predicate(tag: usize, size: usize) -> Self {
+        let unit: SimpleType = SimpleType::new_unit();
         let vars = vec![unit; size];
         ConstValue::Sum {
             tag,
