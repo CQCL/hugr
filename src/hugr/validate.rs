@@ -97,7 +97,7 @@ impl<'a> ValidationContext<'a> {
             let parent_optype = self.hugr.get_optype(parent);
             let allowed_children = parent_optype.validity_flags().allowed_children;
             if !allowed_children.contains(optype) {
-                return Err(ValidationError::InvalidParent {
+                return Err(ValidationError::InvalidParentOp {
                     child: node,
                     child_optype: optype.clone(),
                     parent,
@@ -179,8 +179,12 @@ impl<'a> ValidationContext<'a> {
         // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
         if other_kind != port_kind {
             return Err(ValidationError::IncompatiblePorts {
-                port: (node, offset, port_kind),
-                other: (other_node, other_offset, other_kind),
+                from: node,
+                from_port: offset,
+                from_kind: port_kind,
+                to: other_node,
+                to_port: other_offset,
+                to_kind: other_kind,
             });
         }
 
@@ -484,18 +488,21 @@ pub enum ValidationError {
         port_kind: EdgeKind,
     },
     /// Connected ports have different types, or non-unifiable types.
-    #[error("Connected ports {:?} in node {:?} and {:?} in node {:?} have incompatible kinds. Cannot connect {:?} to {:?}.",
-        port.1, port.0, other.1, other.0, port.2, other.2)]
+    #[error("Connected ports {from_port:?} in node {from:?} and {to_port:?} in node {to:?} have incompatible kinds. Cannot connect {from_kind:?} to {to_kind:?}.")]
     IncompatiblePorts {
-        port: (NodeIndex, PortOffset, EdgeKind),
-        other: (NodeIndex, PortOffset, EdgeKind),
+        from: NodeIndex,
+        from_port: PortOffset,
+        from_kind: EdgeKind,
+        to: NodeIndex,
+        to_port: PortOffset,
+        to_kind: EdgeKind,
     },
     /// The non-root node has no parent.
     #[error("The node {node:?} has no parent.")]
     NoParent { node: NodeIndex },
     /// The parent node is not compatible with the child node.
     #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a child. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.set_description())]
-    InvalidParent {
+    InvalidParentOp {
         child: NodeIndex,
         child_optype: OpType,
         parent: NodeIndex,
@@ -596,12 +603,167 @@ pub enum InterGraphEdgeError {
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
+    use super::*;
     use crate::hugr::HugrMut;
+    use crate::ops::{ModuleOp, OpType};
+    use crate::type_row;
+    use crate::types::{ClassicType, Signature};
 
     #[test]
-    fn test_empty() {
-        let b = HugrMut::new();
-        let hugr = b.finish();
-        assert_eq!(hugr.err(), None);
+    fn invalid_root() {
+        let declare_op: OpType = ModuleOp::Declare {
+            signature: Default::default(),
+        }
+        .into();
+
+        let mut b = HugrMut::new();
+        let root = b.root();
+        assert_eq!(b.hugr().validate(), Ok(()));
+
+        // Add another hierarchy root
+        let other = b.add_op(ModuleOp::Root);
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::NoParent { node }) if node == other
+        );
+        b.set_parent(other, root).unwrap();
+        b.replace_op(other, declare_op.clone());
+        assert_eq!(b.hugr().validate(), Ok(()));
+
+        // Change the root type
+        b.replace_op(root, declare_op);
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidRootOpType { node, .. }) if node == root
+        );
+
+        // Make the hugr root not a hierarchy root
+        {
+            let mut hugr = b.hugr().clone();
+            hugr.root = other;
+            assert_matches!(
+                hugr.validate(),
+                Err(ValidationError::RootNotRoot { node }) if node == other
+            );
+        }
+    }
+
+    /// Creates a hugr with a single function definition that copies a bit.
+    fn make_simple_hugr() -> HugrMut {
+        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+
+        let def_op: OpType = ModuleOp::Def {
+            signature: Signature::new_df(type_row![B], type_row![B, B]),
+        }
+        .into();
+
+        let mut b = HugrMut::new();
+        let root = b.root();
+
+        // Add a node with the wrong number of ports
+        let def = b.add_op_with_parent(root, def_op).unwrap();
+        let input = b
+            .add_op_with_parent(
+                def,
+                DataflowOp::Input {
+                    types: type_row![B],
+                },
+            )
+            .unwrap();
+        let copy = b
+            .add_op_with_parent(
+                def,
+                LeafOp::Copy {
+                    n_copies: 2,
+                    typ: ClassicType::bit(),
+                },
+            )
+            .unwrap();
+        let output = b
+            .add_op_with_parent(
+                def,
+                DataflowOp::Output {
+                    types: type_row![B, B],
+                },
+            )
+            .unwrap();
+
+        b.connect(input, 0, copy, 0).unwrap();
+        b.connect(copy, 0, output, 0).unwrap();
+        b.connect(copy, 1, output, 1).unwrap();
+
+        b
+    }
+
+    #[test]
+    fn simple_hugr() {
+        let b = make_simple_hugr();
+        assert_eq!(b.hugr().validate(), Ok(()));
+    }
+
+    #[test]
+    fn invalid_ports() {
+        let mut b = make_simple_hugr();
+        let root = b.root();
+        let def = b.hugr().hierarchy.first(root).unwrap();
+        let (_input, copy, output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
+
+        // Missing an output port
+        b.replace_op(
+            copy,
+            LeafOp::Copy {
+                n_copies: 3,
+                typ: ClassicType::bit(),
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::WrongNumberOfPorts { node, .. }) if node == copy
+        );
+
+        // Allocate that port, it remains unconnected
+        b.set_num_ports(copy, 1, 3);
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::UnconnectedPort { node, .. }) if node == copy
+        );
+
+        // Make the 2nd copy output become an order edge, mismatching the output port
+        b.set_num_ports(copy, 1, 2);
+        b.replace_op(
+            copy,
+            LeafOp::Copy {
+                n_copies: 1,
+                typ: ClassicType::bit(),
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::IncompatiblePorts { from, to, .. }) if from == copy && to == output
+        );
+    }
+
+    #[test]
+    fn children_restrictions() {
+        // TODO
+        // InvalidParent
+        // InvalidBoundaryChild
+        // InvalidChildren (all of the variants)
+        // NonContainerWithChildren
+        // ContainerWithoutChildren
+    }
+
+    #[test]
+    fn dags() {
+        // TODO
+        // NotADag
+    }
+
+    #[test]
+    fn intergraph_edges() {
+        // TODO
+        // InterGraphEdge (all of the variants)
     }
 }

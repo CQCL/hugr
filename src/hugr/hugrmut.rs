@@ -100,6 +100,8 @@ impl HugrMut {
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
+    ///
+    /// The node becomes the parent's last child.
     pub fn add_op_with_parent(
         &mut self,
         parent: NodeIndex,
