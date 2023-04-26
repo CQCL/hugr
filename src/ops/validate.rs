@@ -359,13 +359,13 @@ impl ControlFlowOp {
                     }
                 }
             }
-            ControlFlowOp::Loop { vars } => {
+            ControlFlowOp::Loop { inputs, .. } => {
                 // TODO: Check the output node signature. "the DDG within the
                 // θ-node computes a value of 2-ary Sum type; the first variant
                 // means to repeat the loop with those values “fed” in at at the
                 // top; the second variant means to exit the loop with those
                 // values."
-                validate_io_nodes(vars, None, "tail-controlled loop graph", children)?;
+                validate_io_nodes(inputs, None, "tail-controlled loop graph", children)?;
             }
             ControlFlowOp::CFG { .. } => {
                 // TODO: CFG nodes require checking the internal signature of pairs of

@@ -11,8 +11,8 @@ pub enum ControlFlowOp {
         inputs: TypeRow,
         outputs: TypeRow,
     },
-    /// θ (theta) node: tail-controlled loop. Here we assume the same inputs + outputs variant.
-    Loop { vars: TypeRow },
+    /// θ (theta) node: tail-controlled loop.
+    Loop { inputs: TypeRow, outputs: TypeRow },
     /// 𝛋 (kappa): a dataflow node which is defined by a child CFG
     CFG { inputs: TypeRow, outputs: TypeRow },
 }
@@ -49,7 +49,9 @@ impl ControlFlowOp {
                 sig_in.extend_from_slice(inputs);
                 Signature::new_df(sig_in, outputs.clone())
             }
-            ControlFlowOp::Loop { vars } => Signature::new_linear(vars.clone()),
+            ControlFlowOp::Loop { inputs, outputs } => {
+                Signature::new_df(inputs.clone(), outputs.clone())
+            }
             ControlFlowOp::CFG { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }
