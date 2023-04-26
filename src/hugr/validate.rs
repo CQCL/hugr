@@ -1,7 +1,10 @@
+//! HUGR invariant checks.
+
+use std::collections::HashMap;
 use std::iter;
 
 use itertools::Itertools;
-use portgraph::algorithms::toposort_filtered;
+use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
@@ -10,28 +13,70 @@ use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
 use crate::types::{EdgeKind, SimpleType};
 use crate::Hugr;
 
-/// HUGR invariant checks.
+/// Structure keeping track of pre-computed information used in the validation
+/// process.
+///
+/// TODO: Consider implementing updatable dominator trees and storing it in the
+/// Hugr to avoid recomputing it every time.
+struct ValidationContext<'a> {
+    hugr: &'a Hugr,
+    /// Dominator tree for each CFG region, using the container node as index.
+    dominators: HashMap<NodeIndex, DominatorTree>,
+}
 
 impl Hugr {
     /// Check the validity of the HUGR.
     pub fn validate(&self) -> Result<(), ValidationError> {
-        // Root node must be a root in the hierarchy, and a module root operation.
-        if !self.hierarchy.is_root(self.root) {
-            return Err(ValidationError::RootNotRoot { node: self.root });
+        let mut validator = ValidationContext::new(self);
+        validator.validate()
+    }
+}
+
+impl<'a> ValidationContext<'a> {
+    /// Create a new validation context.
+    pub fn new(hugr: &'a Hugr) -> Self {
+        Self {
+            hugr,
+            dominators: HashMap::new(),
         }
-        if self.get_optype(self.root) != &OpType::Module(ModuleOp::Root) {
+    }
+
+    /// Check the validity of the HUGR.
+    pub fn validate(&mut self) -> Result<(), ValidationError> {
+        // Root node must be a root in the hierarchy, and a module root operation.
+        if !self.hugr.hierarchy.is_root(self.hugr.root) {
+            return Err(ValidationError::RootNotRoot {
+                node: self.hugr.root,
+            });
+        }
+        if self.hugr.get_optype(self.hugr.root) != &OpType::Module(ModuleOp::Root) {
             return Err(ValidationError::InvalidRootOpType {
-                node: self.root,
-                optype: self.get_optype(self.root).clone(),
+                node: self.hugr.root,
+                optype: self.hugr.get_optype(self.hugr.root).clone(),
             });
         }
 
         // Node-specific checks
-        for node in self.graph.nodes_iter() {
+        for node in self.hugr.graph.nodes_iter() {
             self.validate_node(node)?;
         }
 
         Ok(())
+    }
+
+    /// Returns the dominator tree for a CFG region, identified by its container node.
+    /// May compute the dominator tree if it has not been computed yet.
+    fn dominator_tree(&mut self, node: NodeIndex) -> &DominatorTree {
+        self.dominators.entry(node).or_insert_with(|| {
+            let entry = self.hugr.hierarchy.first(node).unwrap();
+            dominators_filtered(
+                &self.hugr.graph,
+                entry,
+                Direction::Outgoing,
+                |n| matches!(self.hugr.get_optype(n), OpType::BasicBlock(_)),
+                |_, _| true,
+            )
+        })
     }
 
     /// Check the constraints on a single node.
@@ -39,17 +84,17 @@ impl Hugr {
     /// This includes:
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
-    fn validate_node(&self, node: NodeIndex) -> Result<(), ValidationError> {
-        let optype = self.get_optype(node);
+    fn validate_node(&mut self, node: NodeIndex) -> Result<(), ValidationError> {
+        let optype = self.hugr.get_optype(node);
         let sig = optype.signature();
 
         // The Hugr can have only one root node.
-        if node != self.root {
-            let Some(parent) = self.get_parent(node) else {
+        if node != self.hugr.root {
+            let Some(parent) = self.hugr.get_parent(node) else {
                 return Err(ValidationError::NoParent { node });
             };
 
-            let parent_optype = self.get_optype(parent);
+            let parent_optype = self.hugr.get_optype(parent);
             let allowed_children = parent_optype.validity_flags().allowed_children;
             if !allowed_children.contains(optype) {
                 return Err(ValidationError::InvalidParent {
@@ -69,7 +114,9 @@ impl Hugr {
         if sig.const_input.is_some() {
             df_inputs += 1
         };
-        if self.graph.num_inputs(node) < df_inputs || self.graph.num_outputs(node) < df_outputs {
+        if self.hugr.graph.num_inputs(node) < df_inputs
+            || self.hugr.graph.num_outputs(node) < df_outputs
+        {
             return Err(ValidationError::WrongNumberOfPorts {
                 node,
                 optype: optype.clone(),
@@ -79,11 +126,11 @@ impl Hugr {
         }
 
         // Check port connections
-        for (i, port) in self.graph.inputs(node).enumerate() {
+        for (i, port) in self.hugr.graph.inputs(node).enumerate() {
             let offset = PortOffset::new_incoming(i);
             self.validate_port(node, port, offset, optype)?;
         }
-        for (i, port) in self.graph.outputs(node).enumerate() {
+        for (i, port) in self.hugr.graph.outputs(node).enumerate() {
             let offset = PortOffset::new_outgoing(i);
             self.validate_port(node, port, offset, optype)?;
         }
@@ -98,7 +145,7 @@ impl Hugr {
     /// - It must be connected
     /// - The linked port must have a compatible type
     fn validate_port(
-        &self,
+        &mut self,
         node: NodeIndex,
         port: PortIndex,
         offset: PortOffset,
@@ -107,7 +154,7 @@ impl Hugr {
         let port_kind = optype.port_kind(offset).unwrap();
 
         // Ports must always be connected
-        let Some(link) = self.graph.port_link(port) else {
+        let Some(link) = self.hugr.graph.port_link(port) else {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port: offset,
@@ -120,9 +167,9 @@ impl Hugr {
             return Ok(());
         }
 
-        let other_node = self.graph.port_node(link).unwrap();
-        let other_offset = self.graph.port_offset(link).unwrap();
-        let other_op = self.get_optype(other_node);
+        let other_node = self.hugr.graph.port_node(link).unwrap();
+        let other_offset = self.hugr.graph.port_offset(link).unwrap();
+        let other_op = self.hugr.get_optype(other_node);
 
         let Some(other_kind) = other_op.port_kind(other_offset) else {
             // The number of ports in `other_node` does not match the operation definition.
@@ -148,7 +195,7 @@ impl Hugr {
     fn validate_operation(&self, node: NodeIndex, optype: &OpType) -> Result<(), ValidationError> {
         let flags = optype.validity_flags();
 
-        if self.hierarchy.child_count(node) > 0 {
+        if self.hugr.hierarchy.child_count(node) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -156,7 +203,9 @@ impl Hugr {
                 });
             }
 
-            let first_child = self.get_optype(self.hierarchy.first(node).unwrap());
+            let first_child = self
+                .hugr
+                .get_optype(self.hugr.hierarchy.first(node).unwrap());
             if !flags.allowed_first_child.contains(first_child) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
@@ -167,7 +216,9 @@ impl Hugr {
                 });
             }
 
-            let last_child = self.get_optype(self.hierarchy.last(node).unwrap());
+            let last_child = self
+                .hugr
+                .get_optype(self.hugr.hierarchy.last(node).unwrap());
             if !flags.allowed_last_child.contains(last_child) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
@@ -180,9 +231,10 @@ impl Hugr {
 
             // Additional validations running over the full list of children optypes
             let children_optypes = self
+                .hugr
                 .hierarchy
                 .children(node)
-                .map(|c| (c, self.get_optype(c)));
+                .map(|c| (c, self.hugr.get_optype(c)));
             if let Err(source) = optype.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -214,13 +266,13 @@ impl Hugr {
         parent: NodeIndex,
         optype: &OpType,
     ) -> Result<(), ValidationError> {
-        let Some(first_child) = self.hierarchy.first(parent) else {
+        let Some(first_child) = self.hugr.hierarchy.first(parent) else {
             // No children, nothing to do
             return Ok(());
         };
 
         let topo = toposort_filtered(
-            &self.graph,
+            &self.hugr.graph,
             [first_child],
             Direction::Outgoing,
             |_| true,
@@ -230,8 +282,8 @@ impl Hugr {
         // Compute the number of nodes visited and keep the last one.
         let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| (n + 1, Some(node)));
 
-        if nodes_visited != self.hierarchy.child_count(parent)
-            || last_node != self.hierarchy.last(parent)
+        if nodes_visited != self.hugr.hierarchy.child_count(parent)
+            || last_node != self.hugr.hierarchy.last(parent)
         {
             return Err(ValidationError::NotADag {
                 node: parent,
@@ -252,15 +304,18 @@ impl Hugr {
     /// - Dominator edges, from a copy node in a beta node to a descendant of a
     ///   post-dominated sibling of the beta.
     fn validate_intergraph_edge(
-        &self,
+        &mut self,
         from: NodeIndex,
         from_offset: PortOffset,
         from_optype: &OpType,
         to: NodeIndex,
         to_offset: PortOffset,
     ) -> Result<(), ValidationError> {
-        let from_parent = self.get_parent(from).expect("Root nodes cannot have ports");
-        let to_parent = self.get_parent(to);
+        let from_parent = self
+            .hugr
+            .get_parent(from)
+            .expect("Root nodes cannot have ports");
+        let to_parent = self.hugr.get_parent(to);
         if Some(from_parent) == to_parent {
             // Regular edge
             return Ok(());
@@ -303,17 +358,19 @@ impl Hugr {
         // This search could be sped-up with a pre-computed LCA structure, but
         // for valid Hugrs this search should be very short.
         let from_parent_parent = self
+            .hugr
             .get_parent(from_parent)
             .expect("Copy nodes cannot have a root parent.");
         for (ancestor, ancestor_parent) in
-            iter::successors(to_parent, |&p| self.get_parent(p)).tuple_windows()
+            iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
             if ancestor_parent == from_parent {
                 // External edge. Must have an order edge.
-                self.graph
+                self.hugr
+                    .graph
                     .get_connections(from, ancestor)
                     .find(|&(p, _)| {
-                        let offset = self.graph.port_offset(p).unwrap();
+                        let offset = self.hugr.graph.port_offset(p).unwrap();
                         from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
                     })
                     .ok_or(InterGraphEdgeError::MissingOrderEdge {
@@ -326,7 +383,7 @@ impl Hugr {
                 return Ok(());
             } else if ancestor_parent == from_parent_parent {
                 // Dominator edge
-                let ancestor_parent_op = self.get_optype(ancestor_parent);
+                let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
                 if !matches!(
                     ancestor_parent_op,
                     OpType::Function(DataflowOp::ControlFlow {
@@ -343,7 +400,24 @@ impl Hugr {
                     .into());
                 }
 
-                // TODO: check domination
+                // Check domination
+                //
+                // TODO: Add a more efficient lookup for dominator trees.
+                let dominator_tree = self.dominator_tree(ancestor_parent);
+                let mut dominators =
+                    iter::successors(Some(ancestor), |&n| dominator_tree.immediate_dominator(n));
+                if !dominators.any(|n| n == from_parent) {
+                    return Err(InterGraphEdgeError::NonDominatedAncestor {
+                        from,
+                        from_offset,
+                        to,
+                        to_offset,
+                        from_parent,
+                        ancestor,
+                    }
+                    .into());
+                }
+
                 return Ok(());
             }
         }
@@ -362,8 +436,8 @@ impl Hugr {
     /// Returns `true` for ports that connect to a sibling node with a value or
     /// state order edge.
     fn df_port_filter(&self, node: NodeIndex, port: PortIndex) -> bool {
-        let offset = self.graph.port_offset(port).unwrap();
-        let node_optype = self.get_optype(node);
+        let offset = self.hugr.graph.port_offset(port).unwrap();
+        let node_optype = self.hugr.get_optype(node);
 
         let kind = node_optype.port_kind(offset).unwrap();
         if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
@@ -371,13 +445,13 @@ impl Hugr {
         }
 
         // Ignore ports that are not connected (that property is checked elsewhere)
-        let Some(other_port) = self.graph.port_index(node, offset).and_then(|p| self.graph.port_link(p))  else {
+        let Some(other_port) = self.hugr.graph.port_index(node, offset).and_then(|p| self.hugr.graph.port_link(p))  else {
                 return false;
             };
-        let other = self.graph.port_node(other_port).unwrap();
+        let other = self.hugr.graph.port_node(other_port).unwrap();
 
         // Ignore inter-graph edges
-        if self.hierarchy.parent(node) != self.hierarchy.parent(other) {
+        if self.hugr.hierarchy.parent(node) != self.hugr.hierarchy.parent(other) {
             return false;
         }
 
@@ -500,13 +574,23 @@ pub enum InterGraphEdgeError {
         to_offset: PortOffset,
         to_ancestor: NodeIndex,
     },
-    /// N
+    /// The ancestors of an inter-graph edge are not related.
     #[error("The ancestors of an inter-graph edge are not related. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
     NoRelation {
         from: NodeIndex,
         from_offset: PortOffset,
         to: NodeIndex,
         to_offset: PortOffset,
+    },
+    /// The basic block containing the source node does not dominate the basic block containing the target node.
+    #[error(" The basic block containing the source node does not dominate the basic block containing the target node in the CFG. Expected node {from_parent:?} to dominate {ancestor:?}. In a dominator inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
+    NonDominatedAncestor {
+        from: NodeIndex,
+        from_offset: PortOffset,
+        to: NodeIndex,
+        to_offset: PortOffset,
+        from_parent: NodeIndex,
+        ancestor: NodeIndex,
     },
 }
 
