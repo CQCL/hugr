@@ -31,7 +31,7 @@ pub trait PrimType {
     // currently used to constrain Container<T>
 }
 
-// For algebraic types Sum, Struct if one element of type row is linear, the
+// For algebraic types Sum, Tuple if one element of type row is linear, the
 // overall type is too
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Container<T: PrimType> {
@@ -47,6 +47,18 @@ pub enum Container<T: PrimType> {
     Array(Box<T>, usize),
     /// Named type defined by, but distinct from, T
     NewType(SmolStr, Box<T>),
+}
+
+impl From<Container<ClassicType>> for SimpleType {
+    fn from(value: Container<ClassicType>) -> Self {
+        Self::Classic(ClassicType::Container(value))
+    }
+}
+
+impl From<Container<LinearType>> for SimpleType {
+    fn from(value: Container<LinearType>) -> Self {
+        Self::Linear(LinearType::Container(value))
+    }
 }
 
 /// A type that represents concrete classical data.
@@ -120,6 +132,39 @@ impl SimpleType {
 
     pub fn is_classical(&self) -> bool {
         matches!(self, Self::Classic(_))
+    }
+
+    /// New Sum type, variants defined by TypeRow
+    pub fn new_sum(row: TypeRow) -> Self {
+        if row.purely_classical() {
+            Container::<ClassicType>::Sum(Box::new(row)).into()
+        } else {
+            Container::<LinearType>::Sum(Box::new(row)).into()
+        }
+    }
+
+    /// New Tuple type, elements defined by TypeRow
+    pub fn new_tuple(row: TypeRow) -> Self {
+        if row.purely_classical() {
+            Container::<ClassicType>::Tuple(Box::new(row)).into()
+        } else {
+            Container::<LinearType>::Tuple(Box::new(row)).into()
+        }
+    }
+
+    /// New unit type, defined as an empty Tuple
+    pub fn new_unit() -> Self {
+        Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
+            TypeRow::new(),
+        ))))
+    }
+
+    /// New Sum of Unit types, used as predicates in branching
+    pub fn new_predicate(size: usize) -> Self {
+        let rowvec = vec![Self::new_unit(); size];
+        Self::Classic(ClassicType::Container(Container::Sum(Box::new(
+            rowvec.into(),
+        ))))
     }
 }
 
