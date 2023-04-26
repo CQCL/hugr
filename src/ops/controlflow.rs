@@ -63,11 +63,14 @@ impl ControlFlowOp {
     }
 }
 
-/// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Basic block ops - nodes valid in control flow graphs
 pub enum BasicBlockOp {
+    /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
     Beta { inputs: TypeRow, outputs: TypeRow },
-    Exit { outputs: TypeRow },
+    /// β_e (beta exit): the single exit node of the CFG,
+    /// stores the types of the CFG node output
+    Exit { cfg_outputs: TypeRow },
 }
 
 impl BasicBlockOp {
