@@ -16,6 +16,8 @@ use self::nodehandle::{BuildHandle, ConstID};
 pub mod nodehandle;
 
 #[derive(Clone, Copy, Debug)]
+/// A DataFlow wire, defined by a Value-kind output port of a node
+// Stores node and offset to output port
 pub struct Wire(NodeIndex, usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
