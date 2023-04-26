@@ -39,6 +39,10 @@ pub enum LeafOp {
     Xor,
     MakeTuple(TypeRow),
     UnpackTuple(TypeRow),
+    Tag {
+        tag: usize,
+        variants: TypeRow,
+    },
 }
 
 impl Default for LeafOp {
@@ -84,6 +88,7 @@ impl LeafOp {
             LeafOp::Xor => "Xor",
             LeafOp::MakeTuple(_) => "MakeTuple",
             LeafOp::UnpackTuple(_) => "UnpackTuple",
+            LeafOp::Tag { .. } => "Tag",
         }
         .into()
     }
@@ -109,6 +114,7 @@ impl LeafOp {
             LeafOp::Xor => "Xor gate",
             LeafOp::MakeTuple(_) => "MakeTuple operation",
             LeafOp::UnpackTuple(_) => "UnpackTuple operation",
+            LeafOp::Tag { .. } => "Tag Sum operation",
         }
     }
 
@@ -144,6 +150,10 @@ impl LeafOp {
             LeafOp::UnpackTuple(types) => {
                 Signature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
             }
+            LeafOp::Tag { tag, variants } => Signature::new_df(
+                vec![variants.get(*tag).expect("Not a valid tag").clone()],
+                vec![SimpleType::new_sum(variants.clone())],
+            ),
         }
     }
 
