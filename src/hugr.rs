@@ -16,7 +16,7 @@ use crate::rewrite::{Rewrite, RewriteError};
 pub use validate::ValidationError;
 mod hugrmut;
 pub mod serialize;
-pub use hugrmut::{BuildError, HugrMut};
+pub use hugrmut::HugrMut;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -121,7 +121,21 @@ impl Hugr {
                     ni = n.index()
                 )
             },
-            |_| ("".into(), DotEdgeStyle::None),
+            |p| {
+                ("".into(), {
+                    let src = self.graph.port_node(p).unwrap();
+                    let tgt = self
+                        .graph
+                        .port_node(self.graph.port_link(p).unwrap())
+                        .unwrap();
+
+                    if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
+                        DotEdgeStyle::Some("dashed".into())
+                    } else {
+                        DotEdgeStyle::None
+                    }
+                })
+            },
         )
     }
 
