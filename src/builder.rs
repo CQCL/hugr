@@ -5,13 +5,13 @@ use thiserror::Error;
 
 use crate::hugr::{HugrMut, ValidationError};
 use crate::ops::controlflow::ControlFlowOp;
-use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, ModuleOp};
+use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID};
 
-use self::nodehandle::{BuildHandle, ConstID};
+use self::nodehandle::{BuildHandle, ConstID, ThetaID};
 
 pub mod nodehandle;
 
@@ -189,6 +189,36 @@ pub trait Dataflow: Container {
         self.add_other_wire(input, load_n[0].0)?;
 
         Ok(load_n[0])
+    }
+
+    fn theta_builder<'a: 'b, 'b>(
+        &'a mut self,
+        inputs: Vec<(SimpleType, Wire)>,
+        outputs: TypeRow,
+    ) -> Result<ThetaBuilder<'b>, BuildError> {
+        let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
+        let (deltn, _) = add_op_with_wires(
+            self,
+            OpType::Function(
+                ControlFlowOp::Loop {
+                    inputs: input_types.clone().into(),
+                    outputs: outputs.clone(),
+                }
+                .into(),
+            ),
+            input_wires,
+        )?;
+
+        let input: TypeRow = input_types.into();
+
+        let delta_build = DeltaBuilder::create_with_io(
+            self.base(),
+            deltn,
+            input.clone(),
+            vec![SimpleType::new_sum(theta_sum_variants(input, outputs))].into(),
+        )?;
+
+        Ok(ThetaBuilder::new(delta_build))
     }
 }
 
@@ -508,7 +538,7 @@ impl<'b> BetaBuilder<'b> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<<DeltaWrapper<'b, BetaID> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<BetaBuilder<'b> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
@@ -517,8 +547,78 @@ impl<'b> BetaBuilder<'b> {
     }
 }
 
+pub type ThetaBuilder<'b> = DeltaWrapper<'b, ThetaID>;
+
+impl<'b> ThetaBuilder<'b> {
+    pub fn set_outputs(&mut self, out_variant: Wire) -> Result<(), BuildError> {
+        Dataflow::set_outputs(self, [out_variant])
+    }
+
+    pub fn finish_with_outputs(
+        mut self,
+        out_variant: Wire,
+    ) -> Result<<ThetaBuilder<'b> as Container>::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(out_variant)?;
+        Ok(self.finish())
+    }
+
+    fn theta_signature(&self) -> Result<Signature, BuildError> {
+        let hugr = self.hugr();
+
+        if let OpType::Function(DataflowOp::ControlFlow {
+            op: ControlFlowOp::Loop { inputs, outputs },
+        }) = hugr.get_optype(self.container_node())
+        {
+            Ok(Signature::new_df(inputs.clone(), outputs.clone()))
+        } else {
+            Err(BuildError::UnexpectedType {
+                node: self.container_node(),
+                op_desc: "ControlFlowOp::Loop",
+            })
+        }
+    }
+
+    fn make_out_variant<const N: usize>(
+        &mut self,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        let Signature { input, output, .. } = self.theta_signature()?;
+        let sig = (if N == 1 { &output } else { &input }).clone();
+        let outs = self.add_dataflow_op(LeafOp::MakeTuple(sig), values.into_iter().collect())?;
+        let tuple = outs[0];
+        let variants = theta_sum_variants(input, output);
+
+        let sum = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?[0];
+
+        Ok(sum)
+    }
+
+    pub fn make_continue(
+        &mut self,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        self.make_out_variant::<0>(values)
+    }
+
+    pub fn make_break(
+        &mut self,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        self.make_out_variant::<1>(values)
+    }
+}
+
+fn theta_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
+    vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
+}
+
 #[cfg(test)]
 mod test {
+
+    use cool_asserts::assert_matches;
 
     use crate::{
         ops::LeafOp,
@@ -615,6 +715,36 @@ mod test {
         };
 
         assert_eq!(build_result.err(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_theta() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+            let main = module_builder.declare("main", type_row![], type_row![NAT])?;
+            let s1 = module_builder.constant(ConstValue::Int(1))?;
+            let _fdef = {
+                let mut fbuild = module_builder.define_function(&main)?;
+
+                let theta: ThetaID = {
+                    let mut theta_b = fbuild.theta_builder(vec![], type_row![NAT])?;
+
+                    let const_wire = theta_b.load_const(&s1)?;
+
+                    let break_wire = theta_b.make_break([const_wire])?;
+
+                    theta_b.finish_with_outputs(break_wire)?
+                };
+
+                fbuild.finish_with_outputs(theta.sig_out_wires().iter().cloned())?
+            };
+            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
+            module_builder.finish()
+        };
+
+        assert_matches!(build_result, Ok(_));
 
         Ok(())
     }

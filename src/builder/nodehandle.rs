@@ -34,6 +34,9 @@ impl ConstID {
 #[derive(DerFrom, Debug)]
 pub struct BetaID(NodeIndex);
 
+#[derive(DerFrom, Debug)]
+pub struct ThetaID(NodeIndex, Vec<Wire>);
+
 impl From<DeltaID> for FuncID {
     #[inline]
     fn from(value: DeltaID) -> Self {
@@ -48,7 +51,26 @@ impl From<DeltaID> for BetaID {
     }
 }
 
+impl From<DeltaID> for ThetaID {
+    #[inline]
+    fn from(value: DeltaID) -> Self {
+        Self(value.0, value.1)
+    }
+}
+
 impl BuildHandle for DeltaID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn sig_out_wires(&self) -> &[Wire] {
+        &self.1
+    }
+}
+
+impl BuildHandle for ThetaID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
