@@ -31,9 +31,12 @@ pub enum BuildError {
     /// CFG can only have one entry.
     #[error("CFG entry node already built for CFG node: {0:?}.")]
     EntryBuiltError(NodeIndex),
-    /// FuncID does not refer to declare.
-    #[error("FuncID containing node {0:?} does not refer to a Declare as expected")]
-    NotDeclareError(NodeIndex),
+    /// Node was expected to have a certain type but was found to not.
+    #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
+    UnexpectedType {
+        node: NodeIndex,
+        op_desc: &'static str,
+    },
 }
 
 #[derive(Default)]
@@ -57,6 +60,7 @@ pub trait Container {
     type ContainerHandle;
     fn container_node(&self) -> NodeIndex;
     fn base(&mut self) -> &mut HugrMut;
+    fn hugr(&self) -> &Hugr;
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<NodeIndex, BuildError> {
         let parent = self.container_node();
         Ok(self.base().add_op_with_parent(parent, op)?)
@@ -168,7 +172,7 @@ pub trait Dataflow: Container {
 
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let cn = cid.node();
-        let c_out = self.base().hugr().num_outputs(cn);
+        let c_out = self.hugr().num_outputs(cn);
 
         self.base().add_ports(cn, Direction::Outgoing, 1);
 
@@ -251,6 +255,11 @@ impl<'f> Container for DeltaBuilder<'f> {
     fn finish(self) -> DeltaID {
         (self.delta_node, self.external_out_wires).into()
     }
+
+    #[inline]
+    fn hugr(&self) -> &Hugr {
+        self.base.hugr()
+    }
 }
 
 impl<'f> Dataflow for DeltaBuilder<'f> {
@@ -282,6 +291,10 @@ impl Container for ModuleBuilder {
     fn finish(self) -> Self::ContainerHandle {
         Ok(self.0.finish()?)
     }
+
+    fn hugr(&self) -> &Hugr {
+        self.0.hugr()
+    }
 }
 
 pub struct DeltaWrapper<'b, T>(DeltaBuilder<'b>, PhantomData<T>);
@@ -308,6 +321,10 @@ impl<'b, T: From<DeltaID>> Container for DeltaWrapper<'b, T> {
     }
 
     #[inline]
+    fn hugr(&self) -> &Hugr {
+        self.0.hugr()
+    }
+    #[inline]
     fn finish(self) -> Self::ContainerHandle {
         self.0.finish().into()
     }
@@ -332,11 +349,14 @@ impl ModuleBuilder {
     ) -> Result<FunctionBuilder<'b>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
-            self.base().hugr().get_optype(f_node)
+            self.hugr().get_optype(f_node)
         {
             (signature.input.clone(), signature.output.clone())
         } else {
-            return Err(BuildError::NotDeclareError(f_id.node()));
+            return Err(BuildError::UnexpectedType {
+                node: f_node,
+                op_desc: "ModuleOp::Declare",
+            });
         };
         self.base().replace_op(
             f_node,
@@ -400,6 +420,11 @@ impl<'f> Container for KappaBuilder<'f> {
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
         self.base
+    }
+
+    #[inline]
+    fn hugr(&self) -> &Hugr {
+        self.base.hugr()
     }
 
     #[inline]
