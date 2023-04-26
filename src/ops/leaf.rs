@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 use super::OpaqueOp;
 use crate::{
     type_row,
-    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType},
+    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -37,6 +37,8 @@ pub enum LeafOp {
         typ: ClassicType,
     },
     Xor,
+    MakeTuple(TypeRow),
+    UnpackTuple(TypeRow),
 }
 
 impl Default for LeafOp {
@@ -80,6 +82,8 @@ impl LeafOp {
             LeafOp::Measure => "Measure",
             LeafOp::Copy { .. } => "Copy",
             LeafOp::Xor => "Xor",
+            LeafOp::MakeTuple(_) => "MakeTuple",
+            LeafOp::UnpackTuple(_) => "UnpackTuple",
         }
         .into()
     }
@@ -103,6 +107,8 @@ impl LeafOp {
             LeafOp::Measure => "Measure gate",
             LeafOp::Copy { .. } => "Copy gate",
             LeafOp::Xor => "Xor gate",
+            LeafOp::MakeTuple(_) => "MakeTuple operation",
+            LeafOp::UnpackTuple(_) => "UnpackTuple operation",
         }
     }
 
@@ -132,6 +138,12 @@ impl LeafOp {
             }
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(opaque) => opaque.signature(),
+            LeafOp::MakeTuple(types) => {
+                Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
+            }
+            LeafOp::UnpackTuple(types) => {
+                Signature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
+            }
         }
     }
 
