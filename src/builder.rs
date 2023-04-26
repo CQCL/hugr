@@ -270,7 +270,6 @@ impl Container for ModuleBuilder {
 pub struct DeltaWrapper<'b, T>(DeltaBuilder<'b>, PhantomData<T>);
 
 pub type FunctionBuilder<'b> = DeltaWrapper<'b, FuncID>;
-pub type BetaBuilder<'b> = DeltaWrapper<'b, BetaID>;
 
 impl<'b, T> DeltaWrapper<'b, T> {
     fn new(db: DeltaBuilder<'b>) -> Self {
@@ -451,6 +450,29 @@ impl<'f> KappaBuilder<'f> {
     }
 }
 
+pub type BetaBuilder<'b> = DeltaWrapper<'b, BetaID>;
+
+impl<'b> BetaBuilder<'b> {
+    pub fn set_outputs(
+        &mut self,
+        branch_wire: Wire,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<(), BuildError> {
+        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
+    }
+    pub fn finish_with_outputs(
+        mut self,
+        branch_wire: Wire,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<<DeltaWrapper<'b, BetaID> as Container>::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(branch_wire, outputs)?;
+        Ok(self.finish())
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -525,7 +547,7 @@ mod test {
                     let middle = {
                         let c = middlebuild.load_const(&s1)?;
                         let [inw] = middlebuild.input_wires_arr();
-                        middlebuild.finish_with_outputs([c, inw])?
+                        middlebuild.finish_with_outputs(c, [inw])?
                     };
 
                     let exit = cfgbuilder.exit_block();
