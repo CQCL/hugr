@@ -1,7 +1,6 @@
 //! Base HUGR builder providing low-level building blocks.
 
 use portgraph::NodeIndex;
-use thiserror::Error;
 
 use crate::{
     hugr::{HugrError, ValidationError},

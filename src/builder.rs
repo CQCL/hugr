@@ -159,10 +159,7 @@ pub trait Dataflow: Container {
         let cout = self.base().hugr().num_outputs(cn);
 
         self.base().set_num_ports(cn, 0, cout + 1);
-        // let ctyp = self.base().hugr().get_optype(node)
-        let loadop = DataflowOp::LoadConstant {
-            datatype: cid.const_type(),
-        };
+
         let mut loadn = self.add_dataflow_op(
             DataflowOp::LoadConstant {
                 datatype: cid.const_type(),
@@ -323,7 +320,6 @@ impl ModuleBuilder {
         {
             (signature.input.clone(), signature.output.clone())
         } else {
-            // TODO return error
             return Err(BuildError::NotDeclareError(fid.node()));
         };
         self.base().replace_op(
@@ -355,7 +351,7 @@ impl ModuleBuilder {
     ) -> Result<FuncID, BuildError> {
         // TODO add name and param names to metadata
         let decln = self.add_child_op(ModuleOp::Declare {
-            signature: Signature::new(inputs.clone(), outputs.clone(), None),
+            signature: Signature::new(inputs, outputs, None),
         })?;
 
         Ok(decln.into())
@@ -543,11 +539,9 @@ mod test {
 
                 fbuild.finish_with_outputs(Vec::from(inkapp.sig_out_wires()))?
             };
-
             modbuilder.finish()
         };
 
-        // crate::utils::test::viz_dotstr(&buildres.clone().unwrap().dot_string());
         assert_eq!(buildres.err(), None);
 
         Ok(())
