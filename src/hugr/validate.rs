@@ -325,20 +325,24 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         }
 
-        if !matches!(
-            from_optype,
-            OpType::Function(DataflowOp::Leaf {
-                op: LeafOp::Copy { .. }
-            })
-        ) {
-            return Err(InterGraphEdgeError::NonCopySource {
-                from,
-                from_offset,
-                from_optype: from_optype.clone(),
-                to,
-                to_offset,
+        match from_optype {
+            OpType::Module(ModuleOp::Const(_)) => {
+                // Inter-graph constant wires do not have restrictions
+                return Ok(());
             }
-            .into());
+            OpType::Function(DataflowOp::Leaf {
+                op: LeafOp::Copy { .. },
+            }) => {}
+            _ => {
+                return Err(InterGraphEdgeError::NonCopySource {
+                    from,
+                    from_offset,
+                    from_optype: from_optype.clone(),
+                    to,
+                    to_offset,
+                }
+                .into())
+            }
         }
 
         match from_optype.port_kind(from_offset).unwrap() {
