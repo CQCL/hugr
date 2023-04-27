@@ -8,7 +8,9 @@ use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTre
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
-use crate::ops::validate::{ChildrenValidationError, ValidOpSet};
+use crate::ops::validate::{
+    ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, ValidOpSet,
+};
 use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
 use crate::types::{EdgeKind, SimpleType};
 use crate::Hugr;
@@ -256,6 +258,38 @@ impl<'a> ValidationContext<'a> {
                     parent_optype: optype.clone(),
                     source,
                 });
+            }
+
+            // Additional validations running over the edges of the contained graph
+            if let Some(edge_check) = flags.edge_check {
+                for source in self.hugr.hierarchy.children(node) {
+                    for target in self.hugr.graph.output_neighbours(source) {
+                        if self.hugr.hierarchy.parent(target) != Some(node) {
+                            continue;
+                        }
+                        let source_op = self.hugr.get_optype(source);
+                        let target_op = self.hugr.get_optype(target);
+                        for (source_port, target_port) in
+                            self.hugr.graph.get_connections(source, target)
+                        {
+                            let edge_data = ChildrenEdgeData {
+                                source,
+                                target,
+                                source_port: self.hugr.graph.port_offset(source_port).unwrap(),
+                                target_port: self.hugr.graph.port_offset(target_port).unwrap(),
+                                source_op: source_op.clone(),
+                                target_op: target_op.clone(),
+                            };
+                            if let Err(source) = edge_check(edge_data) {
+                                return Err(ValidationError::InvalidEdges {
+                                    parent: node,
+                                    parent_optype: optype.clone(),
+                                    source,
+                                });
+                            }
+                        }
+                    }
+                }
             }
 
             if flags.requires_dag {
@@ -542,6 +576,19 @@ pub enum ValidationError {
         parent: NodeIndex,
         parent_optype: OpType,
         source: ChildrenValidationError,
+    },
+    /// The children graph has invalid edges.
+    #[error(
+        "An operation {parent_optype:?} contains invalid edges between its children: {source}. In parent {parent:?}, edge from {from:?} port {from_port:?} to {to:?} port {to_port:?}",
+        from=source.edge().source,
+        from_port=source.edge().source_port,
+        to=source.edge().target,
+        to_port=source.edge().target_port,
+    )]
+    InvalidEdges {
+        parent: NodeIndex,
+        parent_optype: OpType,
+        source: EdgeValidationError,
     },
     /// The node operation is not a container, but has children.
     #[error("The node {node:?} with optype {optype:?} is not a container, but has children.")]
