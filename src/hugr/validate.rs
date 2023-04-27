@@ -211,31 +211,6 @@ impl Hugr {
         parent: NodeIndex,
         optype: &OpType,
     ) -> Result<(), ValidationError> {
-        let port_filter = |child, port: PortIndex| {
-            let offset = self.graph.port_offset(port).unwrap();
-            let child_optype = self.get_optype(child);
-
-            let kind = child_optype.port_kind(offset).unwrap();
-            if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
-                return false;
-            }
-
-            // Ignore ports that are not connected (that property is checked elsewhere)
-            let Some(pred_port) = self.graph.port_index(child, offset).and_then(|p| self.graph.port_link(p))  else {
-                return false;
-            };
-            let pred = self.graph.port_node(pred_port).unwrap();
-
-            // Ignore inter-graph edges
-            //
-            // TODO: Can these cause cycles?
-            if Some(parent) != self.hierarchy.parent(pred) {
-                return false;
-            }
-
-            true
-        };
-
         let Some(first_child) = self.hierarchy.first(parent) else {
             // No children, nothing to do
             return Ok(());
@@ -246,7 +221,7 @@ impl Hugr {
             [first_child],
             Direction::Outgoing,
             |_| true,
-            port_filter,
+            |n, p| self.df_port_filter(n, p),
         );
 
         // Compute the number of nodes visited and keep the last one.
@@ -262,6 +237,33 @@ impl Hugr {
         }
 
         Ok(())
+    }
+
+    /// A filter function por internal dataflow edges.
+    ///
+    /// Returns `true` for ports that connect to a sibling node with a value or
+    /// state order edge.
+    fn df_port_filter(&self, node: NodeIndex, port: PortIndex) -> bool {
+        let offset = self.graph.port_offset(port).unwrap();
+        let node_optype = self.get_optype(node);
+
+        let kind = node_optype.port_kind(offset).unwrap();
+        if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
+            return false;
+        }
+
+        // Ignore ports that are not connected (that property is checked elsewhere)
+        let Some(other_port) = self.graph.port_index(node, offset).and_then(|p| self.graph.port_link(p))  else {
+                return false;
+            };
+        let other = self.graph.port_node(other_port).unwrap();
+
+        // Ignore inter-graph edges
+        if self.hierarchy.parent(node) != self.hierarchy.parent(other) {
+            return false;
+        }
+
+        true
     }
 }
 
