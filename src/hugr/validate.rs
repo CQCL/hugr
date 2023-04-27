@@ -327,7 +327,7 @@ pub enum ValidationError {
     #[error("The node {node:?} has no parent.")]
     NoParent { node: NodeIndex },
     /// The parent node is not compatible with the child node.
-    #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a children. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.set_description())]
+    #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a child. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.set_description())]
     InvalidParent {
         child: NodeIndex,
         child_optype: OpType,
