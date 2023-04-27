@@ -50,7 +50,7 @@ proptest = "1.1.0"
 rmp-serde = "1.1.1"
 open = "4.0.2"
 url-escape = "0.1.1"
-
+cool_asserts = "2.0.3"
 
 [[bench]]
 name = "bench_main"

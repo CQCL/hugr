@@ -41,21 +41,21 @@ impl Hugr {
         let optype = self.get_optype(node);
         let sig = optype.signature();
 
-        // The parent must be compatible with the node operation.
+        // The Hugr can have only one root node.
         if node != self.root {
             let Some(parent) = self.get_parent(node) else {
                 return Err(ValidationError::NoParent { node });
             };
 
             let parent_optype = self.get_optype(parent);
-            let allowed_parents = optype.validity_flags().allowed_parents;
-            if !allowed_parents.contains(parent_optype) {
+            let allowed_children = parent_optype.validity_flags().allowed_children;
+            if !allowed_children.contains(optype) {
                 return Err(ValidationError::InvalidParent {
                     child: node,
                     child_optype: optype.clone(),
                     parent,
                     parent_optype: parent_optype.clone(),
-                    expected_parent: allowed_parents,
+                    allowed_children,
                 });
             }
         }
@@ -147,7 +147,7 @@ impl Hugr {
         let flags = optype.validity_flags();
 
         if self.hierarchy.child_count(node) > 0 {
-            if !flags.is_container {
+            if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
                     optype: optype.clone(),
@@ -327,13 +327,13 @@ pub enum ValidationError {
     #[error("The node {node:?} has no parent.")]
     NoParent { node: NodeIndex },
     /// The parent node is not compatible with the child node.
-    #[error("The operation {parent_optype:?} is not allowed as a parent of operation {child_optype:?}. Expected: {}. In node {child:?} with parent {parent:?}.", expected_parent.set_description())]
+    #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a child. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.set_description())]
     InvalidParent {
         child: NodeIndex,
         child_optype: OpType,
         parent: NodeIndex,
         parent_optype: OpType,
-        expected_parent: ValidOpSet,
+        allowed_children: ValidOpSet,
     },
     /// Invalid first/last child.
     #[error("A {optype:?} operation cannot be the {position} child of a {parent_optype:?}. Expected {expected}. In parent node {parent:?}")]
