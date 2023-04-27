@@ -1,6 +1,8 @@
 //! Base HUGR builder providing low-level building blocks.
 
-use portgraph::NodeIndex;
+use std::ops::Range;
+
+use portgraph::{Direction, NodeIndex};
 
 use crate::{
     hugr::{HugrError, ValidationError},
@@ -51,10 +53,42 @@ impl HugrMut {
         Ok(())
     }
 
-    pub fn set_num_ports(&mut self, n: NodeIndex, incoming: usize, outgoing: usize) {
+    /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
+    #[inline]
+    pub fn set_num_ports(&mut self, node: NodeIndex, incoming: usize, outgoing: usize) {
         self.hugr
             .graph
-            .set_num_ports(n, incoming, outgoing, |_, _| {})
+            .set_num_ports(node, incoming, outgoing, |_, _| {})
+    }
+
+    /// Alter the number of ports on a node and returns a range with the new
+    /// port offsets, if any. This may invalidate the node's `PortIndex`.
+    ///
+    /// The `direction` parameter specifies whether to add ports to the incoming
+    /// or outgoing. The
+    #[inline]
+    pub fn add_ports(
+        &mut self,
+        node: NodeIndex,
+        direction: Direction,
+        amount: isize,
+    ) -> Range<usize> {
+        let mut incoming = self.hugr.graph.num_inputs(node);
+        let mut outgoing = self.hugr.graph.num_outputs(node);
+        let increment = |num: &mut usize| {
+            let new = num.saturating_add_signed(amount);
+            let range = *num..new;
+            *num = new;
+            range
+        };
+        let range = match direction {
+            Direction::Incoming => increment(&mut incoming),
+            Direction::Outgoing => increment(&mut outgoing),
+        };
+        self.hugr
+            .graph
+            .set_num_ports(node, incoming, outgoing, |_, _| {});
+        range
     }
 
     /// Sets the parent of a node.
