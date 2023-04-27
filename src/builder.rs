@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
-use portgraph::NodeIndex;
+use itertools::Itertools;
+use portgraph::{Direction, NodeIndex};
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, ValidationError};
@@ -61,6 +62,24 @@ pub trait Container {
         let parent = self.container_node();
         Ok(self.base().add_op_with_parent(parent, op)?)
     }
+
+    /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`OpType::other_inputs`] or  [`OpType::other_outputs`]
+    ///
+    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
+    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
+    fn add_other_wire(&mut self, src: NodeIndex, dst: NodeIndex) -> Result<Wire, BuildError> {
+        let src_port: usize = self
+            .base()
+            .add_ports(src, Direction::Outgoing, 1)
+            .collect_vec()[0];
+        let dst_port: usize = self
+            .base()
+            .add_ports(dst, Direction::Incoming, 1)
+            .collect_vec()[0];
+        self.base().connect(src, src_port, dst, dst_port)?;
+        Ok(Wire(src, src_port))
+    }
+
     fn finish(self) -> Self::ContainerHandle;
 }
 
@@ -160,16 +179,21 @@ pub trait Dataflow: Container {
         let cn = cid.node();
         let c_out = self.base().hugr().num_outputs(cn);
 
-        self.base().set_num_ports(cn, 0, c_out + 1);
+        self.base().add_ports(cn, Direction::Outgoing, 1);
 
-        let mut load_n = self.add_dataflow_op(
+        let load_n = self.add_dataflow_op(
             DataflowOp::LoadConstant {
                 datatype: cid.const_type(),
             },
+            // Constant wire from the constant value node
             vec![Wire(cn, c_out)],
         )?;
 
-        Ok(load_n.remove(0))
+        // Add the required incoming order wire
+        let input = self.io()[0];
+        self.add_other_wire(input, load_n[0].0)?;
+
+        Ok(load_n[0])
     }
 }
 
