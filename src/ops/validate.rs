@@ -8,10 +8,11 @@
 
 use std::fmt::Display;
 
+use itertools::Itertools;
 use portgraph::NodeIndex;
 use thiserror::Error;
 
-use crate::types::TypeRow;
+use crate::types::{SimpleType, TypeRow};
 
 use super::{BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
@@ -171,6 +172,14 @@ pub enum ChildrenValidationError {
     /// The signature of a children branch in a conditional operation does not match the container's signature.
     #[error("A conditional branch has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalBranchSignature { child: NodeIndex, optype: OpType },
+    /// The conditional container's branch predicate does not match the number of children
+    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate type: {actual_predicate:?} ")]
+    InvalidConditionalPredicate {
+        child: NodeIndex,
+        expected_count: usize,
+        actual_count: usize,
+        actual_predicate: TypeRow,
+    },
 }
 
 impl ChildrenValidationError {
@@ -180,6 +189,7 @@ impl ChildrenValidationError {
             ChildrenValidationError::InternalIOChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalBranchSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
+            ChildrenValidationError::InvalidConditionalPredicate { child, .. } => *child,
         }
     }
 }
@@ -213,7 +223,7 @@ impl ModuleOp {
         match self {
             ModuleOp::Def { signature } => validate_io_nodes(
                 &signature.input,
-                Some(&signature.output),
+                &signature.output,
                 "function definition",
                 children,
             ),
@@ -243,12 +253,11 @@ impl BasicBlockOp {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        // TODO: The output signature of a basic block should be a sum of the different possible outputs.
-        // This is not yet implemented in the type system.
         match self {
-            BasicBlockOp::Beta { inputs, .. } => {
-                validate_io_nodes(inputs, None, "basic block graph", children)
+            BasicBlockOp::Beta { inputs, outputs } => {
+                validate_io_nodes(inputs, outputs, "basic block graph", children)
             }
+            // Exit nodes do not have children
             BasicBlockOp::Exit { .. } => Ok(()),
         }
     }
@@ -280,7 +289,7 @@ impl DataflowOp {
             DataflowOp::ControlFlow { op } => op.validate_children(children),
             DataflowOp::Nested { signature } => validate_io_nodes(
                 &signature.input,
-                Some(&signature.output),
+                &signature.output,
                 "nested graph",
                 children,
             ),
@@ -323,17 +332,31 @@ impl ControlFlowOp {
     ) -> Result<(), ChildrenValidationError> {
         match self {
             ControlFlowOp::Conditional {
-                predicate,
+                predicate_inputs,
                 inputs,
                 outputs,
             } => {
-                // TODO: "The first input to the ɣ-node is a predicate of Sum type, whose arity matches the number of children of the ɣ-node."
-                let _ = predicate;
+                let children = children.collect_vec();
+                // The first input to the ɣ-node is a predicate of Sum type,
+                // whose arity matches the number of children of the ɣ-node.
+                if predicate_inputs.len() != children.len() {
+                    return Err(ChildrenValidationError::InvalidConditionalPredicate {
+                        child: children[0].0, // Pass an arbitrary child
+                        expected_count: children.len(),
+                        actual_count: predicate_inputs.len(),
+                        actual_predicate: predicate_inputs.clone(),
+                    });
+                }
 
-                // Each child must have the specified signature.
+                // Each child must have it's predicate variant and the rest of `inputs` as input,
+                // and matching output
                 for (child, optype) in children {
                     let sig = optype.signature();
-                    if sig.input != *inputs || sig.output != *outputs {
+                    let pred = &predicate_inputs[child.index()];
+                    if sig.input[0] != *pred
+                        || sig.input[1..] != inputs[..]
+                        || sig.output != *outputs
+                    {
                         return Err(ChildrenValidationError::ConditionalBranchSignature {
                             child,
                             optype: optype.clone(),
@@ -341,13 +364,18 @@ impl ControlFlowOp {
                     }
                 }
             }
-            ControlFlowOp::Loop { inputs, .. } => {
-                // TODO: Check the output node signature. "the DDG within the
-                // θ-node computes a value of 2-ary Sum type; the first variant
-                // means to repeat the loop with those values “fed” in at at the
-                // top; the second variant means to exit the loop with those
-                // values."
-                validate_io_nodes(inputs, None, "tail-controlled loop graph", children)?;
+            ControlFlowOp::Loop { inputs, outputs } => {
+                let expected_output = SimpleType::new_sum(vec![
+                    SimpleType::new_tuple(inputs.clone()),
+                    SimpleType::new_tuple(outputs.clone()),
+                ]);
+                let expected_output: TypeRow = vec![expected_output].into();
+                validate_io_nodes(
+                    inputs,
+                    &expected_output,
+                    "tail-controlled loop graph",
+                    children,
+                )?;
             }
             ControlFlowOp::CFG { .. } => {
                 // TODO: CFG nodes require checking the internal signature of pairs of
@@ -367,7 +395,7 @@ impl ControlFlowOp {
 /// have the correct signature.
 fn validate_io_nodes<'a>(
     expected_input: &TypeRow,
-    expected_output: Option<&TypeRow>, // TODO: This should be non-optional, but we allow it for not-yet-implemented checks.
+    expected_output: &TypeRow,
     container_desc: &'static str,
     mut children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
 ) -> Result<(), ChildrenValidationError> {
@@ -384,16 +412,14 @@ fn validate_io_nodes<'a>(
             container_desc,
         });
     }
-    if let Some(expected_output) = expected_output {
-        if &last_optype.signature().input != expected_output {
-            return Err(ChildrenValidationError::IOSignatureMismatch {
-                child: last,
-                actual: last_optype.signature().input,
-                expected: expected_output.clone(),
-                node_desc: "Output",
-                container_desc,
-            });
-        }
+    if &last_optype.signature().input != expected_output {
+        return Err(ChildrenValidationError::IOSignatureMismatch {
+            child: last,
+            actual: last_optype.signature().input,
+            expected: expected_output.clone(),
+            node_desc: "Output",
+            container_desc,
+        });
     }
 
     // The first and last children have already been popped from the iterator.
@@ -459,15 +485,15 @@ mod test {
             (3, &output_node),
         ];
         assert_eq!(
-            validate_io_nodes(&in_types, Some(&out_types), "test", make_iter(&children)),
+            validate_io_nodes(&in_types, &out_types, "test", make_iter(&children)),
             Ok(())
         );
         assert_matches!(
-            validate_io_nodes(&out_types, Some(&out_types), "test", make_iter(&children)),
+            validate_io_nodes(&out_types, &out_types, "test", make_iter(&children)),
             Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 0
         );
         assert_matches!(
-            validate_io_nodes(&in_types, Some(&in_types), "test", make_iter(&children)),
+            validate_io_nodes(&in_types, &in_types, "test", make_iter(&children)),
             Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 3
         );
 
@@ -480,7 +506,7 @@ mod test {
             (3, &output_node),
         ];
         assert_matches!(
-            validate_io_nodes(&in_types, Some(&out_types), "test", make_iter(&children)),
+            validate_io_nodes(&in_types, &out_types, "test", make_iter(&children)),
             Err(ChildrenValidationError::InternalIOChildren { child, .. }) if child.index() == 42
         );
     }
