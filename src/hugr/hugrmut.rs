@@ -65,7 +65,7 @@ impl HugrMut {
     /// port offsets, if any. This may invalidate the node's `PortIndex`.
     ///
     /// The `direction` parameter specifies whether to add ports to the incoming
-    /// or outgoing. The
+    /// or outgoing list.
     #[inline]
     pub fn add_ports(
         &mut self,
