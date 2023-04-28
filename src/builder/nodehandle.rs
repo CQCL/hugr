@@ -48,6 +48,9 @@ pub struct BetaID(NodeIndex);
 #[derive(DerFrom, Debug)]
 pub struct ThetaID(NodeIndex, usize);
 
+#[derive(DerFrom, Debug)]
+pub struct GammaID(NodeIndex, usize);
+
 impl From<DeltaID> for FuncID {
     #[inline]
     fn from(value: DeltaID) -> Self {
@@ -70,6 +73,18 @@ impl From<DeltaID> for ThetaID {
 }
 
 impl BuildHandle for OpID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn num_value_outputs(&self) -> usize {
+        self.1
+    }
+}
+
+impl BuildHandle for GammaID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0

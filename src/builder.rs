@@ -1,17 +1,19 @@
+use std::collections::HashSet;
 use std::marker::PhantomData;
 
+use itertools::Itertools;
 use portgraph::{Direction, NodeIndex};
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, ValidationError};
 use crate::ops::controlflow::ControlFlowOp;
-use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
+use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, LeafOp, ModuleOp, BranchOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
 
-use self::nodehandle::{BuildHandle, ConstID, ThetaID};
+use self::nodehandle::{BuildHandle, ConstID, GammaID, ThetaID};
 
 pub mod nodehandle;
 
@@ -37,6 +39,9 @@ pub enum BuildError {
         node: NodeIndex,
         op_desc: &'static str,
     },
+    /// Error building gamma node
+    #[error("Error building gamma node: {0}.")]
+    GammaError(#[from] GammaBuildError),
 }
 
 #[derive(Default)]
@@ -92,9 +97,9 @@ pub trait Dataflow: Container {
     fn add_dataflow_op(
         &mut self,
         op: impl Into<OpType>,
-        inputs: impl IntoIterator<Item = Wire>,
+        input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<OpID, BuildError> {
-        let outs = add_op_with_wires(self, op, inputs.into_iter().collect())?;
+        let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
     }
@@ -226,6 +231,37 @@ pub trait Dataflow: Container {
         )?;
 
         Ok(ThetaBuilder::new(delta_build))
+    }
+
+    fn gamma_builder<'a: 'b, 'b>(
+        &'a mut self,
+        (predicate_inputs, predicate_wire): (TypeRow, Wire),
+        other_inputs: Vec<(SimpleType, Wire)>,
+        outputs: TypeRow,
+    ) -> Result<GammaBuilder<'b>, BuildError> {
+        let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
+            other_inputs.into_iter().unzip();
+
+        input_wires.insert(0, predicate_wire);
+
+        let inputs: TypeRow = input_types.into();
+        let n_branches = predicate_inputs.len();
+        let n_out_wires = outputs.len();
+
+        let gamma_node = self.add_dataflow_op(
+            ControlFlowOp::Conditional {
+                predicate_inputs,
+                inputs,
+                outputs,
+            },
+            input_wires,
+        )?;
+        Ok(GammaBuilder {
+            base: self.base(),
+            gamma_node: gamma_node.node(),
+            n_out_wires,
+            remaining_branches: (0..n_branches).collect(),
+        })
     }
 
     /// Add an order edge from `before` to `after`. Assumes any additional edges
@@ -635,6 +671,87 @@ fn theta_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
     vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum GammaBuildError {
+    /// Branch already built.
+    #[error("Branch {branch} of gamma node {gamma:?} has already been built.")]
+    BranchBuiltError { gamma: NodeIndex, branch: usize },
+    /// Branch already built.
+    #[error("Gamma node {gamma:?} has no branch with index {branch}.")]
+    NotBranchError { gamma: NodeIndex, branch: usize },
+    /// Not all branches of gamma built.
+    #[error("Branches {branches:?} of gamma node {gamma:?} have not been built.")]
+    NotAllBranchesBuiltError {
+        gamma: NodeIndex,
+        branches: HashSet<usize>,
+    },
+}
+pub struct GammaBuilder<'f> {
+    base: &'f mut HugrMut,
+    gamma_node: NodeIndex,
+    n_out_wires: usize,
+    remaining_branches: HashSet<usize>,
+}
+
+impl<'f> Container for GammaBuilder<'f> {
+    type ContainerHandle = GammaID;
+
+    #[inline]
+    fn container_node(&self) -> NodeIndex {
+        self.gamma_node
+    }
+
+    #[inline]
+    fn base(&mut self) -> &mut HugrMut {
+        self.base
+    }
+
+    #[inline]
+    fn hugr(&self) -> &Hugr {
+        self.base.hugr()
+    }
+
+    fn finish(self) -> Self::ContainerHandle {
+        // TODO check all branches built
+        (self.gamma_node, self.n_out_wires).into()
+    }
+}
+
+impl<'f> GammaBuilder<'f> {
+    pub fn branch_builder<'a: 'b, 'b>(
+        &'a mut self,
+        branch: usize,
+    ) -> Result<DeltaBuilder<'b>, BuildError> {
+        let gamma = self.gamma_node;
+        let control_op: Result<ControlFlowOp, ()> =
+            self.hugr().get_optype(self.gamma_node).clone().try_into();
+
+        let Ok(ControlFlowOp::Conditional { 
+            predicate_inputs,
+            inputs,
+            outputs,
+        }) = control_op else {panic!("Gamma node does not have gamma optype.")};
+        let sum_input = predicate_inputs
+            .get(branch)
+            .ok_or(GammaBuildError::NotBranchError { gamma, branch })?
+            .clone();
+
+        if !self.remaining_branches.remove(&branch) {
+            return Err(GammaBuildError::BranchBuiltError { gamma, branch }.into());
+        }
+
+        let inputs: TypeRow = [vec![sum_input], inputs.iter().cloned().collect_vec()]
+            .concat()
+            .into();
+
+        let branch_node = self.add_child_op(OpType::Branch(BranchOp {
+            signature: Signature::new_df(inputs.clone(), outputs.clone()),
+        }))?;
+
+        DeltaBuilder::create_with_io(self.base(), branch_node, inputs, outputs)
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -761,6 +878,40 @@ mod test {
                 fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
             };
             // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
+            module_builder.finish()
+        };
+
+        assert_matches!(build_result, Ok(_));
+
+        Ok(())
+    }
+
+    
+    #[test]
+    fn basic_gamma() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+            let main = module_builder.declare("main", type_row![NAT], type_row![NAT])?;
+            let tru_const = module_builder.constant(ConstValue::predicate(1, 2))?;
+            let _fdef = {
+                let mut fbuild = module_builder.define_function(&main)?;
+
+                let const_wire = fbuild.load_const(&tru_const)?;
+                let [int] = fbuild.input_wires_arr();
+                let gamma: GammaID = {
+                    let mut gamma_b = fbuild.gamma_builder((vec![SimpleType::new_unit(); 2].into(), const_wire), vec![(NAT, int)], type_row![NAT])?;
+
+
+                    // let branch_0 = gamma_b.branch_builder(0)?;
+                    n_identity(gamma_b.branch_builder(0)?)?;
+                    n_identity(gamma_b.branch_builder(1)?)?;
+                    
+                    gamma_b.finish()
+                };
+                
+                crate::utils::test::viz_dotstr(&fbuild.hugr().dot_string());
+                fbuild.finish_with_outputs(gamma.outputs().iter().cloned())?
+            };
             module_builder.finish()
         };
 
