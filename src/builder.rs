@@ -9,7 +9,7 @@ use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
 use crate::types::{Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
-use nodehandle::{BetaID, DeltaID, FuncID, KappaID};
+use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
 
 use self::nodehandle::{BuildHandle, ConstID, ThetaID};
 
@@ -83,15 +83,11 @@ pub trait Dataflow: Container {
     fn add_dataflow_op(
         &mut self,
         op: impl Into<OpType>,
-        inputs: Vec<Wire>,
-    ) -> Result<Vec<Wire>, BuildError> {
-        let no_inputs = inputs.is_empty();
-        let (node, wires) = add_op_with_wires(self, op, inputs)?;
-        if no_inputs {
-            self.add_other_wire(self.io()[0], node)?;
-        }
+        inputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<OpID, BuildError> {
+        let outs = add_op_with_wires(self, op, inputs.into_iter().collect())?;
 
-        Ok(wires)
+        Ok(outs.into())
     }
 
     fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Wire>) -> Result<(), BuildError> {
@@ -191,9 +187,9 @@ pub trait Dataflow: Container {
 
         // Add the required incoming order wire
         let input = self.io()[0];
-        self.add_other_wire(input, load_n[0].0)?;
+        self.add_other_wire(input, load_n.node())?;
 
-        Ok(load_n[0])
+        Ok(load_n.out_wire(0))
     }
 
     fn theta_builder<'a: 'b, 'b>(
@@ -231,7 +227,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
-) -> Result<(NodeIndex, Vec<Wire>), BuildError> {
+) -> Result<(NodeIndex, usize), BuildError> {
     let [inp, out] = data_builder.io();
 
     let base = data_builder.base();
@@ -253,9 +249,8 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
         base.connect(src, src_port, opn, dst_port)?;
     }
-    let wires = (0..sig.output.len()).map(|i| Wire(opn, i)).collect();
 
-    Ok((opn, wires))
+    Ok((opn, sig.output.len()))
 }
 
 impl<'f> DeltaBuilder<'f> {
@@ -602,13 +597,13 @@ impl<'b> ThetaBuilder<'b> {
     ) -> Result<Wire, BuildError> {
         let Signature { input, output, .. } = self.theta_signature()?;
         let sig = (if N == 1 { &output } else { &input }).clone();
-        let outs = self.add_dataflow_op(LeafOp::MakeTuple(sig), values.into_iter().collect())?;
-        let tuple = outs[0];
+        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(sig), values)?;
+        let tuple = make_op.out_wire(0);
         let variants = theta_sum_variants(input, output);
 
-        let sum = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?[0];
+        let tag_op = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?;
 
-        Ok(sum)
+        Ok(tag_op.out_wire(0))
     }
 
     pub fn make_continue(
@@ -668,7 +663,7 @@ mod test {
                 let inner_builder = func_builder.delta_builder(vec![(NAT, int)], type_row![NAT])?;
                 let inner_id = n_identity(inner_builder)?;
 
-                func_builder.finish_with_outputs([inner_id.sig_out_wires(), q_out].concat())?
+                func_builder.finish_with_outputs([inner_id.outputs(), q_out.outputs()].concat())?
             };
             module_builder.finish()
         };
@@ -679,7 +674,7 @@ mod test {
     }
 
     fn n_identity<T: Dataflow>(dataflow_builder: T) -> Result<T::ContainerHandle, BuildError> {
-        let w = Vec::from(dataflow_builder.input_wires());
+        let w = dataflow_builder.input_wires();
         dataflow_builder.finish_with_outputs(w)
     }
 
@@ -724,7 +719,7 @@ mod test {
                     cfg_builder.finish()
                 };
 
-                func_builder.finish_with_outputs(Vec::from(kappa_id.sig_out_wires()))?
+                func_builder.finish_with_outputs(kappa_id.outputs())?
             };
             module_builder.finish()
         };
@@ -753,7 +748,7 @@ mod test {
                     theta_b.finish_with_outputs(break_wire)?
                 };
 
-                fbuild.finish_with_outputs(theta.sig_out_wires().iter().cloned())?
+                fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
             };
             // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
             module_builder.finish()

@@ -6,11 +6,11 @@ use portgraph::NodeIndex;
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
-    fn num_sig_outputs(&self) -> usize {
+    fn num_value_outputs(&self) -> usize {
         0
     }
-    fn sig_out_wires(&self) -> Vec<Wire> {
-        (0..self.num_sig_outputs())
+    fn outputs(&self) -> Vec<Wire> {
+        (0..self.num_value_outputs())
             .map(|offset| self.out_wire(offset))
             .collect()
     }
@@ -20,6 +20,9 @@ pub trait BuildHandle {
         Wire(self.node(), offset)
     }
 }
+
+#[derive(DerFrom, Debug)]
+pub struct OpID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
 pub struct DeltaID(NodeIndex, usize);
@@ -66,6 +69,18 @@ impl From<DeltaID> for ThetaID {
     }
 }
 
+impl BuildHandle for OpID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn num_value_outputs(&self) -> usize {
+        self.1
+    }
+}
+
 impl BuildHandle for DeltaID {
     #[inline]
     fn node(&self) -> NodeIndex {
@@ -73,7 +88,7 @@ impl BuildHandle for DeltaID {
     }
 
     #[inline]
-    fn num_sig_outputs(&self) -> usize {
+    fn num_value_outputs(&self) -> usize {
         self.1
     }
 }
@@ -85,7 +100,7 @@ impl BuildHandle for ThetaID {
     }
 
     #[inline]
-    fn num_sig_outputs(&self) -> usize {
+    fn num_value_outputs(&self) -> usize {
         self.1
     }
 }
@@ -97,7 +112,7 @@ impl BuildHandle for KappaID {
     }
 
     #[inline]
-    fn num_sig_outputs(&self) -> usize {
+    fn num_value_outputs(&self) -> usize {
         self.1
     }
 }
