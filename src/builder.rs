@@ -51,8 +51,8 @@ impl ModuleBuilder {
 pub struct DeltaBuilder<'f> {
     base: &'f mut HugrMut,
     delta_node: NodeIndex,
-    internal_in_wires: Vec<Wire>,
-    external_out_wires: Vec<Wire>,
+    num_in_wires: usize,
+    num_out_wires: usize,
     io: [NodeIndex; 2],
 }
 
@@ -114,7 +114,7 @@ pub trait Dataflow: Container {
         Ok(self.finish())
     }
 
-    fn input_wires(&self) -> &[Wire];
+    fn input_wires(&self) -> Vec<Wire>;
 
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         self.input_wires()
@@ -265,8 +265,8 @@ impl<'f> DeltaBuilder<'f> {
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<Self, BuildError> {
-        let in_len = inputs.len();
-        let out_len = outputs.len();
+        let num_in_wires = inputs.len();
+        let num_out_wires = outputs.len();
         let i = base.add_op_with_parent(
             parent,
             OpType::Function(DataflowOp::Input { types: inputs }),
@@ -276,14 +276,12 @@ impl<'f> DeltaBuilder<'f> {
             OpType::Function(DataflowOp::Output { types: outputs }),
         )?;
 
-        let internal_in_wires = (0..in_len).map(|port| Wire(i, port)).collect();
-        let external_out_wires = (0..out_len).map(|port| Wire(parent, port)).collect();
         Ok(Self {
             base,
             delta_node: parent,
             io: [i, o],
-            internal_in_wires,
-            external_out_wires,
+            num_in_wires,
+            num_out_wires,
         })
     }
 }
@@ -301,7 +299,7 @@ impl<'f> Container for DeltaBuilder<'f> {
     }
     #[inline]
     fn finish(self) -> DeltaID {
-        (self.delta_node, self.external_out_wires).into()
+        (self.delta_node, self.num_out_wires).into()
     }
 
     #[inline]
@@ -317,8 +315,10 @@ impl<'f> Dataflow for DeltaBuilder<'f> {
     }
 
     #[inline]
-    fn input_wires(&self) -> &[Wire] {
-        &self.internal_in_wires[..]
+    fn input_wires(&self) -> Vec<Wire> {
+        (0..self.num_in_wires)
+            .map(|offset| Wire(self.io[0], offset))
+            .collect_vec()
     }
 }
 
@@ -385,7 +385,7 @@ impl<'b, T: From<DeltaID>> Dataflow for DeltaWrapper<'b, T> {
     }
 
     #[inline]
-    fn input_wires(&self) -> &[Wire] {
+    fn input_wires(&self) -> Vec<Wire> {
         self.0.input_wires()
     }
 }
@@ -477,10 +477,7 @@ impl<'f> Container for KappaBuilder<'f> {
 
     #[inline]
     fn finish(self) -> Self::ContainerHandle {
-        let wires = (0..self.n_out_wires)
-            .map(|i| Wire(self.kappa_node, i))
-            .collect();
-        (self.kappa_node, wires).into()
+        (self.kappa_node, self.n_out_wires).into()
     }
 }
 
@@ -671,7 +668,7 @@ mod test {
                 let inner_builder = func_builder.delta_builder(vec![(NAT, int)], type_row![NAT])?;
                 let inner_id = n_identity(inner_builder)?;
 
-                func_builder.finish_with_outputs([inner_id.sig_out_wires(), &q_out].concat())?
+                func_builder.finish_with_outputs([inner_id.sig_out_wires(), q_out].concat())?
             };
             module_builder.finish()
         };

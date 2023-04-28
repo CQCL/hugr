@@ -6,7 +6,15 @@ use portgraph::NodeIndex;
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
-    fn sig_out_wires(&self) -> &[Wire];
+    fn num_sig_outputs(&self) -> usize {
+        0
+    }
+    fn sig_out_wires(&self) -> Vec<Wire> {
+        (0..self.num_sig_outputs())
+            .map(|offset| self.out_wire(offset))
+            .collect()
+    }
+
     #[inline]
     fn out_wire(&self, offset: usize) -> Wire {
         Wire(self.node(), offset)
@@ -14,10 +22,10 @@ pub trait BuildHandle {
 }
 
 #[derive(DerFrom, Debug)]
-pub struct DeltaID(NodeIndex, Vec<Wire>);
+pub struct DeltaID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-pub struct KappaID(NodeIndex, Vec<Wire>);
+pub struct KappaID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
 pub struct FuncID(NodeIndex);
@@ -35,7 +43,7 @@ impl ConstID {
 pub struct BetaID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-pub struct ThetaID(NodeIndex, Vec<Wire>);
+pub struct ThetaID(NodeIndex, usize);
 
 impl From<DeltaID> for FuncID {
     #[inline]
@@ -65,8 +73,8 @@ impl BuildHandle for DeltaID {
     }
 
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &self.1
+    fn num_sig_outputs(&self) -> usize {
+        self.1
     }
 }
 
@@ -77,8 +85,8 @@ impl BuildHandle for ThetaID {
     }
 
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &self.1
+    fn num_sig_outputs(&self) -> usize {
+        self.1
     }
 }
 
@@ -89,8 +97,8 @@ impl BuildHandle for KappaID {
     }
 
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &self.1
+    fn num_sig_outputs(&self) -> usize {
+        self.1
     }
 }
 
@@ -99,11 +107,6 @@ impl BuildHandle for FuncID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
-    }
 }
 
 impl BuildHandle for ConstID {
@@ -111,21 +114,11 @@ impl BuildHandle for ConstID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
-    }
 }
 
 impl BuildHandle for BetaID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
-    }
-
-    #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
     }
 }
