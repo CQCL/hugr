@@ -190,7 +190,6 @@ impl ModuleOp {
         match self {
             ModuleOp::Root { .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::ModuleOps,
-                allowed_first_child: ValidOpSet::Def,
                 requires_children: false,
                 ..Default::default()
             },
