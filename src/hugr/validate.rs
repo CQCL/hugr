@@ -239,7 +239,7 @@ impl Hugr {
         Ok(())
     }
 
-    /// A filter function por internal dataflow edges.
+    /// A filter function for internal dataflow edges.
     ///
     /// Returns `true` for ports that connect to a sibling node with a value or
     /// state order edge.
