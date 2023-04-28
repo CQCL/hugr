@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use portgraph::algorithms::toposort_filtered;
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
@@ -212,76 +211,25 @@ impl Hugr {
         parent: NodeIndex,
         optype: &OpType,
     ) -> Result<(), ValidationError> {
-        let ignore_port = |child: NodeIndex, child_optype: &OpType, port: PortOffset| {
-            let kind = child_optype.port_kind(port).unwrap();
-            if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
-                return true;
-            }
-
-            // Ignore ports that are not connected (that property is checked elsewhere)
-            let Some(pred_port) = self.graph.port_index(child, port).and_then(|p| self.graph.port_link(p))  else {
-                return true;
-            };
-            let pred = self.graph.port_node(pred_port).unwrap();
-
-            // Ignore inter-graph edges
-            //
-            // TODO: Can these cause cycles?
-            if Some(parent) != self.hierarchy.parent(pred) {
-                return true;
-            }
-
-            false
+        let Some(first_child) = self.hierarchy.first(parent) else {
+            // No children, nothing to do
+            return Ok(());
         };
 
-        let mut nodes_visited = 0;
+        let topo = toposort_filtered(
+            &self.graph,
+            [first_child],
+            Direction::Outgoing,
+            |_| true,
+            |n, p| self.df_port_filter(n, p),
+        );
 
-        // Number of input ports to a node that remain unvisited. Once this
-        // reaches zero, the node is added to the candidate list.
-        let mut unvisited_ports: HashMap<NodeIndex, usize> = HashMap::new();
+        // Compute the number of nodes visited and keep the last one.
+        let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| (n + 1, Some(node)));
 
-        // Candidates with no unvisited predecessors.
-        // Initially, all children with no incoming internal edges.
-        let mut candidates: Vec<NodeIndex> = Vec::new();
-
-        for child in self.hierarchy.children(parent) {
-            let child_optype = self.get_optype(child);
-            let input_count = self
-                .graph
-                .input_offsets(child)
-                .filter(|&off| !ignore_port(child, child_optype, off))
-                .count();
-            if input_count > 0 {
-                unvisited_ports.insert(child, input_count);
-            } else {
-                candidates.push(child);
-            }
-        }
-
-        while let Some(child) = candidates.pop() {
-            nodes_visited += 1;
-            let child_optype = self.get_optype(child);
-
-            // Add children with no unvisited predecessors to the candidate list.
-            for offset in self.graph.output_offsets(child) {
-                if ignore_port(child, child_optype, offset) {
-                    continue;
-                }
-                let port = self.graph.port_index(child, offset).unwrap();
-                let Some(successor) = self.graph.port_link(port).and_then(|p| self.graph.port_node(p)) else {
-                    continue;
-                };
-                let visit_count = unvisited_ports
-                    .get_mut(&successor)
-                    .expect("Non-sibling encountered as successor, should have been ignored");
-                *visit_count -= 1;
-                if *visit_count == 0 {
-                    candidates.push(successor);
-                }
-            }
-        }
-
-        if nodes_visited != self.hierarchy.child_count(parent) {
+        if nodes_visited != self.hierarchy.child_count(parent)
+            || last_node != self.hierarchy.last(parent)
+        {
             return Err(ValidationError::NotADag {
                 node: parent,
                 optype: optype.clone(),
@@ -289,6 +237,33 @@ impl Hugr {
         }
 
         Ok(())
+    }
+
+    /// A filter function for internal dataflow edges.
+    ///
+    /// Returns `true` for ports that connect to a sibling node with a value or
+    /// state order edge.
+    fn df_port_filter(&self, node: NodeIndex, port: PortIndex) -> bool {
+        let offset = self.graph.port_offset(port).unwrap();
+        let node_optype = self.get_optype(node);
+
+        let kind = node_optype.port_kind(offset).unwrap();
+        if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
+            return false;
+        }
+
+        // Ignore ports that are not connected (that property is checked elsewhere)
+        let Some(other_port) = self.graph.port_index(node, offset).and_then(|p| self.graph.port_link(p))  else {
+                return false;
+            };
+        let other = self.graph.port_node(other_port).unwrap();
+
+        // Ignore inter-graph edges
+        if self.hierarchy.parent(node) != self.hierarchy.parent(other) {
+            return false;
+        }
+
+        true
     }
 }
 
