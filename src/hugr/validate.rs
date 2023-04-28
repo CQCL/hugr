@@ -546,7 +546,7 @@ pub enum ValidationError {
     InterGraphEdgeError(#[from] InterGraphEdgeError),
 }
 
-/// Errors that can occur while validating a Hugr.
+/// Errors related to the inter-graph edge validations
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum InterGraphEdgeError {
     /// Inter-Graph edges can only carry classical data
@@ -630,7 +630,7 @@ mod test {
         let other = b.add_op(ModuleOp::Root);
         assert_matches!(
             b.hugr().validate(),
-            Err(ValidationError::NoParent { node }) if node == other
+            Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, declare_op.clone());
@@ -640,7 +640,7 @@ mod test {
         b.replace_op(root, declare_op);
         assert_matches!(
             b.hugr().validate(),
-            Err(ValidationError::InvalidRootOpType { node, .. }) if node == root
+            Err(ValidationError::InvalidRootOpType { node, .. }) => assert_eq!(node, root)
         );
 
         // Make the hugr root not a hierarchy root
@@ -649,7 +649,7 @@ mod test {
             hugr.root = other;
             assert_matches!(
                 hugr.validate(),
-                Err(ValidationError::RootNotRoot { node }) if node == other
+                Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
             );
         }
     }
@@ -666,7 +666,6 @@ mod test {
         let mut b = HugrMut::new();
         let root = b.root();
 
-        // Add a node with the wrong number of ports
         let def = b.add_op_with_parent(root, def_op).unwrap();
         let input = b
             .add_op_with_parent(
@@ -724,14 +723,14 @@ mod test {
         );
         assert_matches!(
             b.hugr().validate(),
-            Err(ValidationError::WrongNumberOfPorts { node, .. }) if node == copy
+            Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, copy)
         );
 
         // Allocate that port, it remains unconnected
         b.set_num_ports(copy, 1, 3);
         assert_matches!(
             b.hugr().validate(),
-            Err(ValidationError::UnconnectedPort { node, .. }) if node == copy
+            Err(ValidationError::UnconnectedPort { node, .. }) => assert_eq!(node, copy)
         );
 
         // Make the 2nd copy output become an order edge, mismatching the output port
@@ -745,7 +744,7 @@ mod test {
         );
         assert_matches!(
             b.hugr().validate(),
-            Err(ValidationError::IncompatiblePorts { from, to, .. }) if from == copy && to == output
+            Err(ValidationError::IncompatiblePorts { from, to, .. }) => {assert_eq!(from, copy); assert_eq!(to, output)}
         );
     }
 
