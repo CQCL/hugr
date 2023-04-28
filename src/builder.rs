@@ -85,7 +85,12 @@ pub trait Dataflow: Container {
         op: impl Into<OpType>,
         inputs: Vec<Wire>,
     ) -> Result<Vec<Wire>, BuildError> {
-        let (_, wires) = add_op_with_wires(self, op, inputs)?;
+        let no_inputs = inputs.is_empty();
+        let (node, wires) = add_op_with_wires(self, op, inputs)?;
+        if no_inputs {
+            self.add_other_wire(self.io()[0], node)?;
+        }
+
         Ok(wires)
     }
 
@@ -197,7 +202,7 @@ pub trait Dataflow: Container {
         outputs: TypeRow,
     ) -> Result<ThetaBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
-        let (deltn, _) = add_op_with_wires(
+        let (theta_node, _) = add_op_with_wires(
             self,
             OpType::Function(
                 ControlFlowOp::Loop {
@@ -213,7 +218,7 @@ pub trait Dataflow: Container {
 
         let delta_build = DeltaBuilder::create_with_io(
             self.base(),
-            deltn,
+            theta_node,
             input.clone(),
             vec![SimpleType::new_sum(theta_sum_variants(input, outputs))].into(),
         )?;
@@ -227,11 +232,24 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(NodeIndex, Vec<Wire>), BuildError> {
-    let [_, out] = data_builder.io();
+    let [inp, out] = data_builder.io();
+
     let base = data_builder.base();
     let op: OpType = op.into();
     let sig = op.signature();
     let opn = base.add_op_before(out, op)?;
+    if inputs.is_empty() {
+        // TODO use general ordering code
+        let mut new_input = base.add_ports(inp, Direction::Outgoing, 1);
+        let mut order_port = base.add_ports(opn, Direction::Incoming, 1);
+
+        base.connect(
+            inp,
+            new_input.next().unwrap(),
+            opn,
+            order_port.next().unwrap(),
+        )?;
+    }
     for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
         base.connect(src, src_port, opn, dst_port)?;
     }
