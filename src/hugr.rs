@@ -12,6 +12,7 @@ use thiserror::Error;
 
 use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
+use crate::types::EdgeKind;
 
 pub use validate::ValidationError;
 mod hugrmut;
@@ -131,6 +132,12 @@ impl Hugr {
 
                     if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
                         DotEdgeStyle::Some("dashed".into())
+                    } else if self
+                        .get_optype(src)
+                        .port_kind(self.graph.port_offset(p).unwrap())
+                        == Some(EdgeKind::StateOrder)
+                    {
+                        DotEdgeStyle::Some("dotted".into())
                     } else {
                         DotEdgeStyle::None
                     }
