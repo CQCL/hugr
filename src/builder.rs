@@ -80,6 +80,15 @@ pub trait Container {
 
 pub trait Dataflow: Container {
     fn io(&self) -> [NodeIndex; 2];
+    fn num_inputs(&self) -> usize;
+
+    fn input(&self) -> OpID {
+        (self.io()[0], self.num_inputs()).into()
+    }
+
+    fn input_wires(&self) -> Vec<Wire> {
+        self.input().outputs()
+    }
     fn add_dataflow_op(
         &mut self,
         op: impl Into<OpType>,
@@ -109,8 +118,6 @@ pub trait Dataflow: Container {
         self.set_outputs(outputs)?;
         Ok(self.finish())
     }
-
-    fn input_wires(&self) -> Vec<Wire>;
 
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         self.input_wires()
@@ -186,8 +193,7 @@ pub trait Dataflow: Container {
         )?;
 
         // Add the required incoming order wire
-        let input = self.io()[0];
-        self.add_other_wire(input, load_n.node())?;
+        self.set_order(&self.input(), &load_n)?;
 
         Ok(load_n.out_wire(0))
     }
@@ -221,6 +227,18 @@ pub trait Dataflow: Container {
 
         Ok(ThetaBuilder::new(delta_build))
     }
+
+    /// Add an order edge from `before` to `after`. Assumes any additional edges
+    /// to both nodes will be Order kind.
+    fn set_order(
+        &mut self,
+        before: &impl BuildHandle,
+        after: &impl BuildHandle,
+    ) -> Result<(), BuildError> {
+        self.add_other_wire(before.node(), after.node())?;
+
+        Ok(())
+    }
 }
 
 fn add_op_with_wires<T: Dataflow + ?Sized>(
@@ -234,20 +252,14 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     let op: OpType = op.into();
     let sig = op.signature();
     let opn = base.add_op_before(out, op)?;
-    if inputs.is_empty() {
-        // TODO use general ordering code
-        let mut new_input = base.add_ports(inp, Direction::Outgoing, 1);
-        let mut order_port = base.add_ports(opn, Direction::Incoming, 1);
+    let no_inputs = inputs.is_empty();
 
-        base.connect(
-            inp,
-            new_input.next().unwrap(),
-            opn,
-            order_port.next().unwrap(),
-        )?;
-    }
     for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
         base.connect(src, src_port, opn, dst_port)?;
+    }
+
+    if no_inputs {
+        data_builder.add_other_wire(inp, opn)?;
     }
 
     Ok((opn, sig.output.len()))
@@ -310,10 +322,8 @@ impl<'f> Dataflow for DeltaBuilder<'f> {
     }
 
     #[inline]
-    fn input_wires(&self) -> Vec<Wire> {
-        (0..self.num_in_wires)
-            .map(|offset| Wire(self.io[0], offset))
-            .collect_vec()
+    fn num_inputs(&self) -> usize {
+        self.num_in_wires
     }
 }
 
@@ -380,8 +390,8 @@ impl<'b, T: From<DeltaID>> Dataflow for DeltaWrapper<'b, T> {
     }
 
     #[inline]
-    fn input_wires(&self) -> Vec<Wire> {
-        self.0.input_wires()
+    fn num_inputs(&self) -> usize {
+        self.0.num_inputs()
     }
 }
 
