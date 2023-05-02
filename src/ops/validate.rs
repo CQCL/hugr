@@ -350,10 +350,10 @@ impl ControlFlowOp {
 
                 // Each child must have it's predicate variant and the rest of `inputs` as input,
                 // and matching output
-                for (child, optype) in children {
+                for (i, (child, optype)) in children.into_iter().enumerate() {
                     let sig = optype.signature();
-                    let pred = &predicate_inputs[child.index()];
-                    if sig.input[0] != *pred
+                    let predicate_value = &predicate_inputs[i];
+                    if sig.input[0] != *predicate_value
                         || sig.input[1..] != inputs[..]
                         || sig.output != *outputs
                     {
