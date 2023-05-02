@@ -84,6 +84,7 @@ pub enum BasicBlockOp {
 }
 
 impl BasicBlockOp {
+    /// Non dataflow edge types allowed for this node
     pub fn other_edges(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
@@ -101,6 +102,22 @@ impl BasicBlockOp {
         match self {
             BasicBlockOp::Beta { .. } => "A CFG basic block node",
             BasicBlockOp::Exit { .. } => "A CFG exit block node",
+        }
+    }
+
+    /// The input signature of the contained dataflow graph
+    pub fn dataflow_input(&self) -> &TypeRow {
+        match self {
+            BasicBlockOp::Beta { inputs, .. } => inputs,
+            BasicBlockOp::Exit { cfg_outputs } => cfg_outputs,
+        }
+    }
+
+    /// The output signature of the contained dataflow graph
+    pub fn dataflow_output(&self) -> &TypeRow {
+        match self {
+            BasicBlockOp::Beta { outputs, .. } => outputs,
+            BasicBlockOp::Exit { cfg_outputs } => cfg_outputs,
         }
     }
 }

@@ -125,3 +125,39 @@ where
         Self::Function(op.into())
     }
 }
+
+/// Implementations of TryFrom for OpType and &'a OpType for each variant.
+macro_rules! impl_try_from_optype {
+    ($target:ident, $matcher:pat, $unpack:expr) => {
+        impl TryFrom<OpType> for $target {
+            type Error = ();
+
+            fn try_from(op: OpType) -> Result<Self, Self::Error> {
+                match op {
+                    $matcher => Ok($unpack),
+                    _ => Err(()),
+                }
+            }
+        }
+
+        impl<'a> TryFrom<&'a OpType> for &'a $target {
+            type Error = ();
+
+            fn try_from(op: &'a OpType) -> Result<Self, Self::Error> {
+                match op {
+                    $matcher => Ok($unpack),
+                    _ => Err(()),
+                }
+            }
+        }
+    };
+}
+impl_try_from_optype!(ModuleOp, OpType::Module(op), op);
+impl_try_from_optype!(BasicBlockOp, OpType::BasicBlock(op), op);
+impl_try_from_optype!(DataflowOp, OpType::Function(op), op);
+impl_try_from_optype!(
+    ControlFlowOp,
+    OpType::Function(DataflowOp::ControlFlow { op }),
+    op
+);
+impl_try_from_optype!(LeafOp, OpType::Function(DataflowOp::Leaf { op }), op);
