@@ -1,14 +1,17 @@
 use smol_str::SmolStr;
 
-use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
+use crate::types::{EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
     /// ɣ (gamma) node: conditional operation
     Conditional {
-        predicate: ClassicType,
+        /// The branch predicate. It's len is equal to the number of branches.
+        predicate_inputs: TypeRow,
+        /// Other inputs passed to all branches.
         inputs: TypeRow,
+        /// Common output of all branches.
         outputs: TypeRow,
     },
     /// θ (theta) node: tail-controlled loop.
@@ -41,11 +44,12 @@ impl ControlFlowOp {
     pub fn signature(&self) -> Signature {
         match self {
             ControlFlowOp::Conditional {
-                predicate,
+                predicate_inputs,
                 inputs,
                 outputs,
             } => {
-                let mut sig_in = vec![SimpleType::Classic(predicate.clone())];
+                let predicate = SimpleType::new_sum(predicate_inputs.clone());
+                let mut sig_in = vec![predicate];
                 sig_in.extend_from_slice(inputs);
                 Signature::new_df(sig_in, outputs.clone())
             }

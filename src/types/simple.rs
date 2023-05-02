@@ -135,7 +135,8 @@ impl SimpleType {
     }
 
     /// New Sum type, variants defined by TypeRow
-    pub fn new_sum(row: TypeRow) -> Self {
+    pub fn new_sum(row: impl Into<TypeRow>) -> Self {
+        let row = row.into();
         if row.purely_classical() {
             Container::<ClassicType>::Sum(Box::new(row)).into()
         } else {
@@ -144,7 +145,8 @@ impl SimpleType {
     }
 
     /// New Tuple type, elements defined by TypeRow
-    pub fn new_tuple(row: TypeRow) -> Self {
+    pub fn new_tuple(row: impl Into<TypeRow>) -> Self {
+        let row = row.into();
         if row.purely_classical() {
             Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
