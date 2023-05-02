@@ -220,7 +220,7 @@ pub enum EdgeValidationError {
 }
 
 impl EdgeValidationError {
-    /// Returns the node index of the child that caused the error.
+    /// Returns information on the edge that caused the error.
     pub fn edge(&self) -> &ChildrenEdgeData {
         match self {
             EdgeValidationError::CFGEdgeSignatureMismatch { edge } => edge,
@@ -510,12 +510,10 @@ fn validate_io_nodes<'a>(
 
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
-    let source: &BasicBlockOp = (&edge.source_op)
-        .try_into()
-        .expect("CFG sibling graphs can only contain basic block operations.");
-    let target: &BasicBlockOp = (&edge.target_op)
-        .try_into()
-        .expect("CFG sibling graphs can only contain basic block operations.");
+    let [source, target]: [&BasicBlockOp; 2] = [&edge.source_op, &edge.target_op].map(|op| {
+        op.try_into()
+            .expect("CFG sibling graphs can only contain basic block operations.")
+    });
 
     if source.dataflow_output() != target.dataflow_input() {
         return Err(EdgeValidationError::CFGEdgeSignatureMismatch { edge });
