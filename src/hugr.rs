@@ -123,25 +123,24 @@ impl Hugr {
                 )
             },
             |p| {
-                ("".into(), {
-                    let src = self.graph.port_node(p).unwrap();
-                    let tgt = self
-                        .graph
-                        .port_node(self.graph.port_link(p).unwrap())
-                        .unwrap();
+                let src = self.graph.port_node(p).unwrap();
+                let Some(tgt_port) = self.graph.port_link(p) else {
+                        return ("".into(), DotEdgeStyle::None);
+                    };
+                let tgt = self.graph.port_node(tgt_port).unwrap();
+                let style = if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
+                    DotEdgeStyle::Some("dashed".into())
+                } else if self
+                    .get_optype(src)
+                    .port_kind(self.graph.port_offset(p).unwrap())
+                    == Some(EdgeKind::StateOrder)
+                {
+                    DotEdgeStyle::Some("dotted".into())
+                } else {
+                    DotEdgeStyle::None
+                };
 
-                    if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
-                        DotEdgeStyle::Some("dashed".into())
-                    } else if self
-                        .get_optype(src)
-                        .port_kind(self.graph.port_offset(p).unwrap())
-                        == Some(EdgeKind::StateOrder)
-                    {
-                        DotEdgeStyle::Some("dotted".into())
-                    } else {
-                        DotEdgeStyle::None
-                    }
-                })
+                ("".into(), style)
             },
         )
     }
