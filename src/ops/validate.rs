@@ -228,7 +228,7 @@ impl EdgeValidationError {
     }
 }
 
-/// Auxiliary structure passed as data in the [`validate_children_edges`] method.
+/// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChildrenEdgeData {
     /// Source child
