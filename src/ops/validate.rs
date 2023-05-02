@@ -36,6 +36,8 @@ pub struct OpValidityFlags {
     /// A strict requirement on the number of non-dataflow input and output wires
     pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
+    ///
+    // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
 }
 
@@ -439,11 +441,6 @@ impl ControlFlowOp {
                 )?;
             }
             ControlFlowOp::CFG { .. } => {
-                // TODO: CFG nodes require checking the internal signature of pairs of
-                // BasicBlocks connected by ControlFlow edges. This should probably go
-                // outside of the OpTypeValidator trait, as we don't have access to the
-                // graph edges from here.
-
                 // Only the last child can be an exit node
                 for (child, optype) in children.dropping_back(1) {
                     if matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. })) {
@@ -511,12 +508,18 @@ fn validate_io_nodes<'a>(
     Ok(())
 }
 
-/// Validate the ordered list of children
-fn validate_cfg_edge(_edges: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
-    // Basic blocks connected by control flow wires must have matching
-    // input/output types.
+/// Validate an edge between two basic blocks in a CFG sibling graph.
+fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
+    let source: &BasicBlockOp = (&edge.source_op)
+        .try_into()
+        .expect("CFG sibling graphs can only contain basic block operations.");
+    let target: &BasicBlockOp = (&edge.target_op)
+        .try_into()
+        .expect("CFG sibling graphs can only contain basic block operations.");
 
-    // TODO: Matching number of connections
+    if source.dataflow_output() != target.dataflow_input() {
+        return Err(EdgeValidationError::CFGEdgeSignatureMismatch { edge });
+    }
 
     Ok(())
 }
