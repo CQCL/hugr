@@ -73,7 +73,11 @@ impl ControlFlowOp {
 /// Basic block ops - nodes valid in control flow graphs
 pub enum BasicBlockOp {
     /// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
-    Beta { inputs: TypeRow, outputs: TypeRow },
+    Beta {
+        inputs: TypeRow,
+        outputs: TypeRow,
+        n_branches: usize,
+    },
     /// β_e (beta exit): the single exit node of the CFG,
     /// stores the types of the CFG node output
     Exit { cfg_outputs: TypeRow },

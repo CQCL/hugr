@@ -427,18 +427,20 @@ impl<'f> KappaBuilder<'f> {
         outputs: TypeRow,
         n_branches: usize,
     ) -> Result<BetaBuilder<'b>, BuildError> {
-        let predicate_type = SimpleType::new_predicate(n_branches);
-        let outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
         let op = OpType::BasicBlock(BasicBlockOp::Beta {
             inputs: inputs.clone(),
             outputs: outputs.clone(),
+            n_branches,
         });
         let exit = self.exit_node;
         let beta_n = self.base().add_op_before(exit, op)?;
 
         self.base().set_num_ports(beta_n, 0, n_branches);
 
-        let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, outputs)?;
+        // The node outputs a predicate before the data outputs of the beta node
+        let predicate_type = SimpleType::new_predicate(n_branches);
+        let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
+        let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, node_outputs)?;
         Ok(BetaBuilder::new(db))
     }
 

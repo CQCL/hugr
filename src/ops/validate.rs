@@ -18,6 +18,7 @@ use super::{BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
 /// A set of property flags required for an operation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OpValidityFlags {
     /// The set of valid children operation types
     pub allowed_children: ValidOpSet,
@@ -33,6 +34,8 @@ pub struct OpValidityFlags {
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles)
     pub requires_dag: bool,
+    /// A strict requirement on the number of non-dataflow input and output wires
+    pub non_df_ports: (Option<usize>, Option<usize>),
 }
 
 impl Default for OpValidityFlags {
@@ -44,6 +47,7 @@ impl Default for OpValidityFlags {
             allowed_last_child: ValidOpSet::Any,
             requires_children: false,
             requires_dag: false,
+            non_df_ports: (None, None),
         }
     }
 }
@@ -153,6 +157,9 @@ impl OpType {
 /// Errors that can occur while checking the children of a node.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ChildrenValidationError {
+    /// An CFG graph has an exit operation as a non-last child.
+    #[error("Exit basic blocks are only allowed as the last child in a CFG graph")]
+    InternalExitChildren { child: NodeIndex },
     /// An operation only allowed as the first/last child was found as an intermediate child.
     #[error("A {optype:?} operation is only allowed as a {expected_position} child")]
     InternalIOChildren {
@@ -187,6 +194,7 @@ impl ChildrenValidationError {
     pub fn child(&self) -> NodeIndex {
         match self {
             ChildrenValidationError::InternalIOChildren { child, .. } => *child,
+            ChildrenValidationError::InternalExitChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalBranchSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
             ChildrenValidationError::InvalidConditionalPredicate { child, .. } => *child,
@@ -209,6 +217,7 @@ impl ModuleOp {
                 allowed_last_child: ValidOpSet::Output,
                 requires_children: true,
                 requires_dag: true,
+                ..Default::default()
             },
             // Default flags are valid for non-container operations
             _ => Default::default(),
@@ -236,12 +245,14 @@ impl BasicBlockOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlockOp::Beta { .. } => OpValidityFlags {
+            BasicBlockOp::Beta { n_branches, .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
                 requires_children: true,
                 requires_dag: true,
+                non_df_ports: (None, Some(*n_branches)),
+                ..Default::default()
             },
             // Default flags are valid for non-container operations
             BasicBlockOp::Exit { .. } => Default::default(),
@@ -254,8 +265,14 @@ impl BasicBlockOp {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            BasicBlockOp::Beta { inputs, outputs } => {
-                validate_io_nodes(inputs, outputs, "basic block graph", children)
+            BasicBlockOp::Beta {
+                inputs,
+                outputs,
+                n_branches,
+            } => {
+                let predicate_type = SimpleType::new_predicate(*n_branches);
+                let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
+                validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children
             BasicBlockOp::Exit { .. } => Ok(()),
@@ -274,6 +291,7 @@ impl DataflowOp {
                 allowed_last_child: ValidOpSet::Output,
                 requires_children: true,
                 requires_dag: true,
+                ..Default::default()
             },
             // Default flags are valid for non-container operations
             _ => Default::default(),
@@ -314,6 +332,7 @@ impl ControlFlowOp {
                 allowed_last_child: ValidOpSet::Output,
                 requires_children: true,
                 requires_dag: true,
+                ..Default::default()
             },
             ControlFlowOp::CFG { .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::BasicBlock,
@@ -383,7 +402,12 @@ impl ControlFlowOp {
                 // outside of the OpTypeValidator trait, as we don't have access to the
                 // graph edges from here.
 
-                // TODO: No internal exit nodes.
+                // Only the last child can be an exit node
+                for (child, optype) in children.dropping_back(1) {
+                    if matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. })) {
+                        return Err(ChildrenValidationError::InternalExitChildren { child });
+                    }
+                }
             }
         }
         Ok(())

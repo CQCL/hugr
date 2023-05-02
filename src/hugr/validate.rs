@@ -87,6 +87,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_node(&mut self, node: NodeIndex) -> Result<(), ValidationError> {
         let optype = self.hugr.get_optype(node);
         let sig = optype.signature();
+        let flags = optype.validity_flags();
 
         // The Hugr can have only one root node.
         if node != self.hugr.root {
@@ -107,16 +108,26 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        // Check that we have enough ports.
-        // The actual number may be larger than the signature if non-dataflow ports are present.
-        let mut df_inputs = sig.input.len();
-        let df_outputs = sig.output.len();
-        if sig.const_input.is_some() {
-            df_inputs += 1
+        // Check that we have enough ports. If the `non_df_ports` flag is set
+        // for the direction, we require exactly that number of ports after the
+        // dataflow ports. Otherwise, we allow any number of extra ports.
+        let check_extra_ports = |df_ports: usize, non_df_ports, actual| {
+            if let Some(non_df) = non_df_ports {
+                df_ports + non_df == actual
+            } else {
+                df_ports <= actual
+            }
         };
-        if self.hugr.graph.num_inputs(node) < df_inputs
-            || self.hugr.graph.num_outputs(node) < df_outputs
-        {
+        let df_const_input = sig.const_input.is_some() as usize;
+        if !check_extra_ports(
+            sig.input.len() + df_const_input,
+            flags.non_df_ports.0,
+            self.hugr.graph.num_inputs(node),
+        ) || !check_extra_ports(
+            sig.output.len(),
+            flags.non_df_ports.1,
+            self.hugr.graph.num_outputs(node),
+        ) {
             return Err(ValidationError::WrongNumberOfPorts {
                 node,
                 optype: optype.clone(),
