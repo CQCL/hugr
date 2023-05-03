@@ -15,6 +15,12 @@ pub trait BuildHandle {
             .collect()
     }
 
+    fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
+        self.outputs()
+            .try_into()
+            .expect(&format!("Incorrect number of wires: {}", N)[..])
+    }
+
     #[inline]
     fn out_wire(&self, offset: usize) -> Wire {
         Wire(self.node(), offset)

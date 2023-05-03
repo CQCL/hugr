@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use itertools::Itertools;
-use portgraph::{Direction, NodeIndex};
+use portgraph::{Direction, NodeIndex, PortOffset};
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, ValidationError};
 use crate::ops::controlflow::ControlFlowOp;
-use crate::ops::{BasicBlockOp, ConstValue, DataflowOp, LeafOp, ModuleOp, BranchOp};
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::ops::{BasicBlockOp, BranchOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
+use crate::types::{ClassicType, EdgeKind, LinearType, Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
@@ -17,7 +17,7 @@ use self::nodehandle::{BuildHandle, ConstID, GammaID, ThetaID};
 
 pub mod nodehandle;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
 pub struct Wire(NodeIndex, usize);
@@ -42,6 +42,14 @@ pub enum BuildError {
     /// Error building gamma node
     #[error("Error building gamma node: {0}.")]
     GammaError(#[from] GammaBuildError),
+
+    /// Wire not found in Hugr
+    #[error("Wire not found in Hugr: {0:?}.")]
+    WireNotFound(Wire),
+
+    /// Can't copy a linear type
+    #[error("Can't copy linear type: {0:?}.")]
+    NoCopyLinear(LinearType),
 }
 
 #[derive(Default)]
@@ -274,6 +282,34 @@ pub trait Dataflow: Container {
         self.add_other_wire(before.node(), after.node())?;
 
         Ok(())
+    }
+
+    fn get_wire_type(&self, wire: Wire) -> Option<SimpleType> {
+        let kind = self
+            .hugr()
+            .get_optype(wire.0)
+            .port_kind(PortOffset::new_outgoing(wire.1))?;
+
+        if let EdgeKind::Value(typ) = kind {
+            Some(typ)
+        } else {
+            None
+        }
+    }
+
+    fn discard_type(&mut self, wire: Wire, typ: ClassicType) -> Result<OpID, BuildError> {
+        self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
+    }
+
+    fn discard(&mut self, wire: Wire) -> Result<OpID, BuildError> {
+        let typ = self
+            .get_wire_type(wire)
+            .ok_or(BuildError::WireNotFound(wire))?;
+        let typ = match typ {
+            SimpleType::Classic(typ) => typ,
+            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
+        };
+        self.discard_type(wire, typ)
     }
 }
 
@@ -726,7 +762,7 @@ impl<'f> GammaBuilder<'f> {
         let control_op: Result<ControlFlowOp, ()> =
             self.hugr().get_optype(self.gamma_node).clone().try_into();
 
-        let Ok(ControlFlowOp::Conditional { 
+        let Ok(ControlFlowOp::Conditional {
             predicate_inputs,
             inputs,
             outputs,
@@ -886,7 +922,6 @@ mod test {
         Ok(())
     }
 
-    
     #[test]
     fn basic_gamma() -> Result<(), BuildError> {
         let build_result = {
@@ -899,19 +934,57 @@ mod test {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
                 let gamma: GammaID = {
-                    let mut gamma_b = fbuild.gamma_builder((vec![SimpleType::new_unit(); 2].into(), const_wire), vec![(NAT, int)], type_row![NAT])?;
-
+                    let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
+                    let other_inputs = vec![(NAT, int)];
+                    let outputs = vec![SimpleType::new_unit(), NAT].into();
+                    let mut gamma_b = fbuild.gamma_builder(
+                        (predicate_inputs, const_wire),
+                        other_inputs,
+                        outputs,
+                    )?;
 
                     // let branch_0 = gamma_b.branch_builder(0)?;
                     n_identity(gamma_b.branch_builder(0)?)?;
                     n_identity(gamma_b.branch_builder(1)?)?;
-                    
+
                     gamma_b.finish()
                 };
-                
-                crate::utils::test::viz_dotstr(&fbuild.hugr().dot_string());
-                fbuild.finish_with_outputs(gamma.outputs().iter().cloned())?
+                let [unit, int] = gamma.outputs_arr();
+                fbuild.discard(unit)?;
+                fbuild.finish_with_outputs([int])?
             };
+            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
+            module_builder.finish()
+        };
+
+        assert_matches!(build_result, Ok(_));
+
+        Ok(())
+    }
+
+    #[test]
+    fn theta_with_gamma() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+            let main = module_builder.declare("main", type_row![], type_row![NAT])?;
+            let s1 = module_builder.constant(ConstValue::Int(1))?;
+            let s2 = module_builder.constant(ConstValue::Int(2))?;
+            let _fdef = {
+                let mut fbuild = module_builder.define_function(&main)?;
+
+                let theta: ThetaID = {
+                    let mut theta_b = fbuild.theta_builder(vec![], type_row![NAT])?;
+
+                    let const_wire = theta_b.load_const(&s1)?;
+
+                    let break_wire = theta_b.make_break([const_wire])?;
+
+                    theta_b.finish_with_outputs(break_wire)?
+                };
+
+                fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
+            };
+            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
             module_builder.finish()
         };
 
