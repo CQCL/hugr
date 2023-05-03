@@ -885,6 +885,7 @@ mod test {
         let root = b.root();
         let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
 
+        // Add a definition without children
         let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
         let new_def = b
             .add_op_with_parent(root, ModuleOp::Def { signature: def_sig })
@@ -894,6 +895,7 @@ mod test {
             Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
         );
 
+        // Add children to the definition, but move it to be a child of the copy
         add_df_children(&mut b, new_def, 2);
         b.set_parent(new_def, copy).unwrap();
         assert_matches!(
@@ -902,6 +904,8 @@ mod test {
         );
         b.set_parent(new_def, root).unwrap();
 
+        // After moving the previous definition to a valid place,
+        // add an input node to the module subgraph
         let new_input = b
             .add_op_with_parent(root, DataflowOp::Input { types: type_row![] })
             .unwrap();
@@ -909,7 +913,6 @@ mod test {
             b.hugr().validate(),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
-        b.remove_op(new_input).unwrap();
     }
 
     #[test]
@@ -918,6 +921,7 @@ mod test {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
 
+        // Replace the output operation of the df subgraph with a copy
         b.replace_op(
             output,
             LeafOp::Copy {
@@ -930,6 +934,7 @@ mod test {
             Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
         );
 
+        // Revert it back to an output, but with the wrong number of ports
         b.replace_op(
             output,
             DataflowOp::Output {
@@ -948,6 +953,7 @@ mod test {
             },
         );
 
+        // After fixing the output back, replace the copy with an output op
         b.replace_op(
             copy,
             DataflowOp::Output {
@@ -966,6 +972,9 @@ mod test {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
 
+        // Add a dangling discard operation without outgoing order edges. Note
+        // that the dag check only allows for one source and sink (the input and
+        // output resp.).
         b.replace_op(
             copy,
             LeafOp::Copy {
@@ -1009,6 +1018,7 @@ mod test {
         );
         let cfg = copy;
 
+        // Construct a valid CFG, with one beta node and one exit node
         let beta = b
             .add_op_with_parent(
                 cfg,
@@ -1031,12 +1041,52 @@ mod test {
         b.add_other_wire(beta, exit).unwrap();
         assert_eq!(b.hugr().validate(), Ok(()));
 
-        // TODO: Test malformed errors
-    }
+        // Test malformed errors
 
-    #[test]
-    fn intergraph_edges() {
-        // TODO
-        // InterGraphEdge (all of the variants)
+        // Add an internal exit node
+        let exit2 = b
+            .add_op_before(
+                exit,
+                BasicBlockOp::Exit {
+                    cfg_outputs: type_row![B],
+                },
+            )
+            .unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
+                => {assert_eq!(parent, cfg); assert_eq!(child, exit2)}
+        );
+        b.remove_op(exit2).unwrap();
+
+        // Change the types in the beta node to work on qubits instead of bits
+        b.replace_op(
+            beta,
+            BasicBlockOp::Beta {
+                inputs: type_row![Q],
+                outputs: type_row![Q],
+                n_branches: 1,
+            },
+        );
+        let mut beta_children = b.hugr().hierarchy.children(beta);
+        let beta_input = beta_children.next().unwrap();
+        let beta_output = beta_children.next_back().unwrap();
+        b.replace_op(
+            beta_input,
+            DataflowOp::Input {
+                types: type_row![Q],
+            },
+        );
+        b.replace_op(
+            beta_output,
+            DataflowOp::Output {
+                types: vec![SimpleType::new_predicate(1), Q].into(),
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
+                => assert_eq!(parent, cfg)
+        );
     }
 }
