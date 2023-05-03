@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
 
-use super::{BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
+use super::{controlflow::BranchOp, BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
 /// A set of property flags required for an operation
 #[non_exhaustive]
@@ -79,6 +79,8 @@ pub enum ValidOpSet {
     Def,
     /// A control flow basic block
     BasicBlock,
+    /// A branch op inside a conditional,
+    Branch,
     /// A control flow exit node
     BasicBlockExit,
 }
@@ -104,6 +106,7 @@ impl ValidOpSet {
             ValidOpSet::BasicBlockExit => {
                 matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. }))
             }
+            ValidOpSet::Branch => matches!(optype, OpType::Branch(_)),
         }
     }
 
@@ -119,6 +122,7 @@ impl ValidOpSet {
             ValidOpSet::Def => "Function definition",
             ValidOpSet::BasicBlock => "Basic block",
             ValidOpSet::BasicBlockExit => "Exit basic block node",
+            ValidOpSet::Branch => "Branch",
         }
     }
 
@@ -143,6 +147,7 @@ impl OpType {
             OpType::Module(op) => op.validity_flags(),
             OpType::Function(op) => op.validity_flags(),
             OpType::BasicBlock(op) => op.validity_flags(),
+            OpType::Branch(op) => op.validity_flags(),
         }
     }
 
@@ -156,6 +161,7 @@ impl OpType {
             OpType::Module(op) => op.validate_children(children),
             OpType::Function(op) => op.validate_children(children),
             OpType::BasicBlock(op) => op.validate_children(children),
+            OpType::Branch(op) => op.validate_children(children),
         }
     }
 }
@@ -323,6 +329,34 @@ impl BasicBlockOp {
     }
 }
 
+impl BranchOp {
+    /// Returns the set of allowed parent operation types.
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: ValidOpSet::DataflowOps,
+            allowed_first_child: ValidOpSet::Input,
+            allowed_last_child: ValidOpSet::Output,
+            requires_children: true,
+            requires_dag: true,
+            non_df_ports: (Some(0), Some(0)),
+            ..Default::default()
+        }
+    }
+
+    /// Validate the ordered list of children
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        validate_io_nodes(
+            &self.signature.input,
+            &self.signature.output,
+            "Conditional (gamma)",
+            children,
+        )
+    }
+}
+
 impl DataflowOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
@@ -364,7 +398,7 @@ impl ControlFlowOp {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             ControlFlowOp::Conditional { .. } => OpValidityFlags {
-                allowed_children: ValidOpSet::DataflowOps,
+                allowed_children: ValidOpSet::Branch,
                 requires_children: true,
                 requires_dag: false,
                 ..Default::default()
@@ -414,7 +448,10 @@ impl ControlFlowOp {
                 // Each child must have it's predicate variant and the rest of `inputs` as input,
                 // and matching output
                 for (i, (child, optype)) in children.into_iter().enumerate() {
-                    let sig = optype.signature();
+                    let branch_op: &BranchOp = optype
+                        .try_into()
+                        .expect("Child check should have already checked valid ops.");
+                    let sig = &branch_op.signature;
                     let predicate_value = &predicate_inputs[i];
                     if sig.input[0] != *predicate_value
                         || sig.input[1..] != inputs[..]
