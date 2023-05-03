@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use itertools::Itertools;
 use portgraph::{Direction, NodeIndex};
 use thiserror::Error;
 
@@ -68,15 +67,7 @@ pub trait Container {
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
     fn add_other_wire(&mut self, src: NodeIndex, dst: NodeIndex) -> Result<Wire, BuildError> {
-        let src_port: usize = self
-            .base()
-            .add_ports(src, Direction::Outgoing, 1)
-            .collect_vec()[0];
-        let dst_port: usize = self
-            .base()
-            .add_ports(dst, Direction::Incoming, 1)
-            .collect_vec()[0];
-        self.base().connect(src, src_port, dst, dst_port)?;
+        let (src_port, _) = self.base().add_other_wire(src, dst)?;
         Ok(Wire(src, src_port))
     }
 

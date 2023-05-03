@@ -176,17 +176,45 @@ impl Default for SimpleType {
     }
 }
 
-impl From<ClassicType> for SimpleType {
-    fn from(typ: ClassicType) -> Self {
-        Self::Classic(typ)
-    }
-}
+/// Implementations of Into and TryFrom for SimpleType and &'a SimpleType.
+macro_rules! impl_from_into_simple_type {
+    ($target:ident, $matcher:pat, $unpack:expr, $new:expr) => {
+        impl From<$target> for SimpleType {
+            fn from(typ: $target) -> Self {
+                $new(typ)
+            }
+        }
 
-impl From<LinearType> for SimpleType {
-    fn from(typ: LinearType) -> Self {
-        Self::Linear(typ)
-    }
+        impl TryFrom<SimpleType> for $target {
+            type Error = ();
+
+            fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
+                match op {
+                    $matcher => Ok($unpack),
+                    _ => Err(()),
+                }
+            }
+        }
+
+        impl<'a> TryFrom<&'a SimpleType> for &'a $target {
+            type Error = ();
+
+            fn try_from(op: &'a SimpleType) -> Result<Self, Self::Error> {
+                match op {
+                    $matcher => Ok($unpack),
+                    _ => Err(()),
+                }
+            }
+        }
+    };
 }
+impl_from_into_simple_type!(
+    ClassicType,
+    SimpleType::Classic(typ),
+    typ,
+    SimpleType::Classic
+);
+impl_from_into_simple_type!(LinearType, SimpleType::Linear(typ), typ, SimpleType::Linear);
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

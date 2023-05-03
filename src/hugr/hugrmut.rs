@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use itertools::Itertools;
 use portgraph::{Direction, NodeIndex};
 
 use crate::{
@@ -41,6 +42,21 @@ impl HugrMut {
         node
     }
 
+    /// Remove a node from the graph.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is the root node.
+    pub fn remove_op(&mut self, node: NodeIndex) -> Result<(), HugrError> {
+        if node == self.hugr.root {
+            // TODO: Add a HugrMutError ?
+            panic!("cannot remove root node");
+        }
+        self.hugr.hierarchy.detach(node);
+        self.hugr.graph.remove_node(node);
+        Ok(())
+    }
+
     /// Connect two nodes at the given ports.
     pub fn connect(
         &mut self,
@@ -51,6 +67,26 @@ impl HugrMut {
     ) -> Result<(), HugrError> {
         self.hugr.graph.link_nodes(src, src_port, dst, dst_port)?;
         Ok(())
+    }
+
+    /// Adds a non-dataflow edge between two nodes, allocating new ports for the
+    /// connection. The kind is given by the operation's
+    /// [`OpType::other_inputs`] or [`OpType::other_outputs`].
+    ///
+    /// Returns the offsets of the new input and output ports, or an error if
+    /// the connection failed.
+    ///
+    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
+    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
+    pub fn add_other_wire(
+        &mut self,
+        src: NodeIndex,
+        dst: NodeIndex,
+    ) -> Result<(usize, usize), HugrError> {
+        let src_port: usize = self.add_ports(src, Direction::Outgoing, 1).collect_vec()[0];
+        let dst_port: usize = self.add_ports(dst, Direction::Incoming, 1).collect_vec()[0];
+        self.connect(src, src_port, dst, dst_port)?;
+        Ok((src_port, dst_port))
     }
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
@@ -95,7 +131,39 @@ impl HugrMut {
     ///
     /// The node becomes the parent's last child.
     pub fn set_parent(&mut self, node: NodeIndex, parent: NodeIndex) -> Result<(), HugrError> {
+        self.hugr.hierarchy.detach(node);
         self.hugr.hierarchy.push_child(node, parent)?;
+        Ok(())
+    }
+
+    /// Move a node in the hierarchy to be the subsequent sibling of another
+    /// node.
+    ///
+    /// The sibling node's parent becomes the new node's parent.
+    ///
+    /// The node becomes the parent's last child.
+    pub fn move_after_sibling(
+        &mut self,
+        node: NodeIndex,
+        after: NodeIndex,
+    ) -> Result<(), HugrError> {
+        self.hugr.hierarchy.detach(node);
+        self.hugr.hierarchy.insert_after(node, after)?;
+        Ok(())
+    }
+
+    /// Move a node in the hierarchy to be the prior sibling of another node.
+    ///
+    /// The sibling node's parent becomes the new node's parent.
+    ///
+    /// The node becomes the parent's last child.
+    pub fn move_before_sibling(
+        &mut self,
+        node: NodeIndex,
+        before: NodeIndex,
+    ) -> Result<(), HugrError> {
+        self.hugr.hierarchy.detach(node);
+        self.hugr.hierarchy.insert_before(node, before)?;
         Ok(())
     }
 
@@ -108,11 +176,18 @@ impl HugrMut {
         op: impl Into<OpType>,
     ) -> Result<NodeIndex, HugrError> {
         let node = self.add_op(op.into());
-        self.set_parent(node, parent)?;
+        self.hugr.hierarchy.push_child(node, parent)?;
         Ok(node)
     }
 
-    /// Add a node to the graph with a parent in the hierarchy.
+    /// Add a node to the graph as the previous sibling of another node.
+    ///
+    /// The sibling node's parent becomes the new node's parent.
+    ///
+    /// # Errors
+    ///
+    ///  - If the sibling node does not have a parent.
+    ///  - If the attachment would introduce a cycle.
     pub fn add_op_before(
         &mut self,
         sibling: NodeIndex,
@@ -120,6 +195,24 @@ impl HugrMut {
     ) -> Result<NodeIndex, HugrError> {
         let node = self.add_op(op.into());
         self.hugr.hierarchy.insert_before(node, sibling)?;
+        Ok(node)
+    }
+
+    /// Add a node to the graph as the next sibling of another node.
+    ///
+    /// The sibling node's parent becomes the new node's parent.
+    ///
+    /// # Errors
+    ///
+    ///  - If the sibling node does not have a parent.
+    ///  - If the attachment would introduce a cycle.
+    pub fn add_op_after(
+        &mut self,
+        sibling: NodeIndex,
+        op: impl Into<OpType>,
+    ) -> Result<NodeIndex, HugrError> {
+        let node = self.add_op(op.into());
+        self.hugr.hierarchy.insert_after(node, sibling)?;
         Ok(node)
     }
 
