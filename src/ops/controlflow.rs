@@ -121,3 +121,36 @@ impl BasicBlockOp {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Branch ops - nodes valid inside gamma (conditional) nodes
+pub struct BranchOp {
+    pub signature: Signature,
+}
+
+impl BranchOp {
+    /// Non dataflow edge types allowed for this node
+    pub fn other_edges(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    /// The name of the operation
+    pub fn name(&self) -> SmolStr {
+        "λ".into()
+    }
+
+    /// The description of the operation
+    pub fn description(&self) -> &str {
+        "A branch node inside a conditional"
+    }
+
+    /// The input signature of the contained dataflow graph
+    pub fn dataflow_input(&self) -> &TypeRow {
+        &self.signature.input
+    }
+
+    /// The output signature of the contained dataflow graph
+    pub fn dataflow_output(&self) -> &TypeRow {
+        &self.signature.output
+    }
+}
