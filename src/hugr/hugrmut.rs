@@ -136,7 +136,8 @@ impl HugrMut {
         Ok(())
     }
 
-    /// Add a node to the graph as the previous sibling of another node.
+    /// Move a node in the hierarchy to be the subsequent sibling of another
+    /// node.
     ///
     /// The sibling node's parent becomes the new node's parent.
     ///
@@ -151,7 +152,7 @@ impl HugrMut {
         Ok(())
     }
 
-    /// Add a node to the graph as the previous sibling of another node.
+    /// Move a node in the hierarchy to be the prior sibling of another node.
     ///
     /// The sibling node's parent becomes the new node's parent.
     ///
