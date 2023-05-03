@@ -13,7 +13,7 @@ use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
 
-use self::nodehandle::{BuildHandle, ConstID, GammaID, ThetaID};
+use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, ThetaID};
 
 pub mod nodehandle;
 
@@ -228,17 +228,8 @@ pub trait Dataflow: Container {
             ),
             input_wires,
         )?;
-
         let input: TypeRow = input_types.into();
-
-        let delta_build = DeltaBuilder::create_with_io(
-            self.base(),
-            theta_node,
-            input.clone(),
-            vec![SimpleType::new_sum(theta_sum_variants(input, outputs))].into(),
-        )?;
-
-        Ok(ThetaBuilder::new(delta_build))
+        ThetaBuilder::create_with_io(self.base(), theta_node, input, outputs)
     }
 
     fn gamma_builder<'a: 'b, 'b>(
@@ -310,6 +301,38 @@ pub trait Dataflow: Container {
             SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
         };
         self.discard_type(wire, typ)
+    }
+
+    fn make_out_variant<const N: usize>(
+        &mut self,
+        signature: Signature,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        let Signature { input, output, .. } = signature;
+        let sig = (if N == 1 { &output } else { &input }).clone();
+        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(sig), values)?;
+        let tuple = make_op.out_wire(0);
+        let variants = theta_sum_variants(input, output);
+
+        let tag_op = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?;
+
+        Ok(tag_op.out_wire(0))
+    }
+
+    fn make_continue(
+        &mut self,
+        signature: Signature,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        self.make_out_variant::<0>(signature, values)
+    }
+
+    fn make_break(
+        &mut self,
+        signature: Signature,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        self.make_out_variant::<1>(signature, values)
     }
 }
 
@@ -642,6 +665,21 @@ impl<'b> BetaBuilder<'b> {
 pub type ThetaBuilder<'b> = DeltaWrapper<'b, ThetaID>;
 
 impl<'b> ThetaBuilder<'b> {
+    fn create_with_io(
+        base: &'b mut HugrMut,
+        theta_node: NodeIndex,
+        inputs: TypeRow,
+        outputs: TypeRow,
+    ) -> Result<Self, BuildError> {
+        let delta_build = DeltaBuilder::create_with_io(
+            base,
+            theta_node,
+            inputs.clone(),
+            theta_output_row(inputs, outputs),
+        )?;
+
+        Ok(ThetaBuilder::new(delta_build))
+    }
     pub fn set_outputs(&mut self, out_variant: Wire) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [out_variant])
     }
@@ -657,7 +695,7 @@ impl<'b> ThetaBuilder<'b> {
         Ok(self.finish())
     }
 
-    fn theta_signature(&self) -> Result<Signature, BuildError> {
+    pub fn theta_signature(&self) -> Result<Signature, BuildError> {
         let hugr = self.hugr();
 
         if let OpType::Function(DataflowOp::ControlFlow {
@@ -673,39 +711,22 @@ impl<'b> ThetaBuilder<'b> {
         }
     }
 
-    fn make_out_variant<const N: usize>(
-        &mut self,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
+    pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         let Signature { input, output, .. } = self.theta_signature()?;
-        let sig = (if N == 1 { &output } else { &input }).clone();
-        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(sig), values)?;
-        let tuple = make_op.out_wire(0);
-        let variants = theta_sum_variants(input, output);
 
-        let tag_op = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?;
-
-        Ok(tag_op.out_wire(0))
+        Ok(theta_output_row(input, output))
     }
+}
 
-    pub fn make_continue(
-        &mut self,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
-        self.make_out_variant::<0>(values)
-    }
-
-    pub fn make_break(
-        &mut self,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
-        self.make_out_variant::<1>(values)
-    }
+fn theta_output_row(input: TypeRow, output: TypeRow) -> TypeRow {
+    vec![SimpleType::new_sum(theta_sum_variants(input, output))].into()
 }
 
 fn theta_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
     vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
 }
+
+pub type LambdaBuilder<'b> = DeltaWrapper<'b, LambdaID>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum GammaBuildError {
@@ -757,7 +778,7 @@ impl<'f> GammaBuilder<'f> {
     pub fn branch_builder<'a: 'b, 'b>(
         &'a mut self,
         branch: usize,
-    ) -> Result<DeltaBuilder<'b>, BuildError> {
+    ) -> Result<LambdaBuilder<'b>, BuildError> {
         let gamma = self.gamma_node;
         let control_op: Result<ControlFlowOp, ()> =
             self.hugr().get_optype(self.gamma_node).clone().try_into();
@@ -784,7 +805,10 @@ impl<'f> GammaBuilder<'f> {
             signature: Signature::new_df(inputs.clone(), outputs.clone()),
         }))?;
 
-        DeltaBuilder::create_with_io(self.base(), branch_node, inputs, outputs)
+        let delta_builder =
+            DeltaBuilder::create_with_io(self.base(), branch_node, inputs, outputs)?;
+
+        Ok(LambdaBuilder::new(delta_builder))
     }
 }
 
@@ -802,6 +826,7 @@ mod test {
     use super::*;
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
     const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
     #[test]
@@ -906,14 +931,14 @@ mod test {
 
                     let const_wire = theta_b.load_const(&s1)?;
 
-                    let break_wire = theta_b.make_break([const_wire])?;
+                    let break_wire =
+                        theta_b.make_break(theta_b.theta_signature()?, [const_wire])?;
 
                     theta_b.finish_with_outputs(break_wire)?
                 };
 
                 fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
             };
-            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
             module_builder.finish()
         };
 
@@ -953,7 +978,6 @@ mod test {
                 fbuild.discard(unit)?;
                 fbuild.finish_with_outputs([int])?
             };
-            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
             module_builder.finish()
         };
 
@@ -966,25 +990,53 @@ mod test {
     fn theta_with_gamma() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare("main", type_row![], type_row![NAT])?;
-            let s1 = module_builder.constant(ConstValue::Int(1))?;
+            let main = module_builder.declare("main", type_row![BIT], type_row![NAT])?;
+
             let s2 = module_builder.constant(ConstValue::Int(2))?;
+            let tru_const = module_builder.constant(ConstValue::predicate(1, 2))?;
+
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
-
+                let [b1] = fbuild.input_wires_arr();
                 let theta: ThetaID = {
-                    let mut theta_b = fbuild.theta_builder(vec![], type_row![NAT])?;
+                    let mut theta_b = fbuild.theta_builder(vec![(BIT, b1)], type_row![NAT])?;
+                    let signature = theta_b.theta_signature()?;
+                    let const_wire = theta_b.load_const(&tru_const)?;
+                    let [b1] = theta_b.input_wires_arr();
+                    let gamma: GammaID = {
+                        let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
+                        let output_row = theta_b.internal_output_row()?;
+                        let mut gamma_b = theta_b.gamma_builder(
+                            (predicate_inputs, const_wire),
+                            vec![(BIT, b1)],
+                            output_row,
+                        )?;
 
-                    let const_wire = theta_b.load_const(&s1)?;
+                        let mut branch_0 = gamma_b.branch_builder(0)?;
+                        let [pred, b1] = branch_0.input_wires_arr();
+                        branch_0.discard(pred)?;
 
-                    let break_wire = theta_b.make_break([const_wire])?;
+                        let continue_wire = branch_0.make_continue(signature.clone(), [b1])?;
+                        branch_0.finish_with_outputs([continue_wire])?;
 
-                    theta_b.finish_with_outputs(break_wire)?
+                        let mut branch_1 = gamma_b.branch_builder(1)?;
+                        let [pred, b1] = branch_1.input_wires_arr();
+
+                        branch_1.discard(pred)?;
+                        branch_1.discard(b1)?;
+
+                        let wire = branch_1.load_const(&s2)?;
+                        let break_wire = branch_1.make_break(signature, [wire])?;
+                        branch_1.finish_with_outputs([break_wire])?;
+
+                        gamma_b.finish()
+                    };
+
+                    theta_b.finish_with_outputs(gamma.out_wire(0))?
                 };
 
                 fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
             };
-            // crate::utils::test::viz_dotstr(&module_builder.hugr().dot_string());
             module_builder.finish()
         };
 

@@ -52,6 +52,9 @@ impl ConstID {
 pub struct BetaID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
+pub struct LambdaID(NodeIndex);
+
+#[derive(DerFrom, Debug)]
 pub struct ThetaID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
@@ -65,6 +68,13 @@ impl From<DeltaID> for FuncID {
 }
 
 impl From<DeltaID> for BetaID {
+    #[inline]
+    fn from(value: DeltaID) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<DeltaID> for LambdaID {
     #[inline]
     fn from(value: DeltaID) -> Self {
         Self(value.0)
