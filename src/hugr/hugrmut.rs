@@ -60,6 +60,9 @@ impl HugrMut {
     /// Connect two nodes at the given ports.
     ///
     /// The port must have already been created. See [`add_ports`] and [`set_num_ports`].
+    ///
+    /// [`add_ports`]: #method.add_ports
+    /// [`set_num_ports`]: #method.set_num_ports
     pub fn connect(
         &mut self,
         src: NodeIndex,
