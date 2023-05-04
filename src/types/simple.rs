@@ -168,6 +168,19 @@ impl SimpleType {
             rowvec.into(),
         ))))
     }
+
+    /// Convert to a named NewType
+    pub fn into_new_type(self, name: impl Into<SmolStr>) -> SimpleType {
+        match self {
+            // annoying that the arms have the same code
+            SimpleType::Classic(typ) => {
+                Container::<ClassicType>::NewType(name.into(), Box::new(typ)).into()
+            }
+            SimpleType::Linear(typ) => {
+                Container::<LinearType>::NewType(name.into(), Box::new(typ)).into()
+            }
+        }
+    }
 }
 
 impl Default for SimpleType {

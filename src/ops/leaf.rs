@@ -39,6 +39,10 @@ pub enum LeafOp {
     Xor,
     MakeTuple(TypeRow),
     UnpackTuple(TypeRow),
+    MakeNewType {
+        name: SmolStr,
+        typ: SimpleType,
+    },
     Tag {
         tag: usize,
         variants: TypeRow,
@@ -83,6 +87,7 @@ impl LeafOp {
             LeafOp::Xor => "Xor",
             LeafOp::MakeTuple(_) => "MakeTuple",
             LeafOp::UnpackTuple(_) => "UnpackTuple",
+            LeafOp::MakeNewType { .. } => "MakeNewType",
             LeafOp::Tag { .. } => "Tag",
         }
         .into()
@@ -110,6 +115,9 @@ impl LeafOp {
             LeafOp::MakeTuple(_) => "MakeTuple operation",
             LeafOp::UnpackTuple(_) => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
+            LeafOp::MakeNewType { .. } => {
+                "Make a new type value from a value of the defining type."
+            }
         }
     }
 
@@ -148,6 +156,10 @@ impl LeafOp {
             LeafOp::Tag { tag, variants } => Signature::new_df(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![SimpleType::new_sum(variants.clone())],
+            ),
+            LeafOp::MakeNewType { typ, name } => Signature::new_df(
+                vec![typ.clone()],
+                vec![typ.clone().into_new_type(name.clone())],
             ),
         }
     }

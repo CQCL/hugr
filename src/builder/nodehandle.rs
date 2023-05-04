@@ -1,8 +1,9 @@
-use crate::types::ClassicType;
+use crate::types::{ClassicType, SimpleType};
 
 use super::Wire;
 use derive_more::From as DerFrom;
 use portgraph::NodeIndex;
+use smol_str::SmolStr;
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
@@ -38,6 +39,30 @@ pub struct KappaID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
 pub struct FuncID(NodeIndex);
+
+#[derive(DerFrom, Debug, Clone)]
+pub struct NewTypeID {
+    node: NodeIndex,
+    name: SmolStr,
+    core_type: SimpleType,
+}
+
+impl NewTypeID {
+    // Retrieve the NewType
+    pub fn get_new_type(&self) -> SimpleType {
+        self.core_type.clone().into_new_type(self.name.clone())
+    }
+
+    // Retrieve the underlying core type
+    pub fn get_core_type(&self) -> &SimpleType {
+        &self.core_type
+    }
+
+    // Retrieve the underlying core type
+    pub fn get_name(&self) -> &SmolStr {
+        &self.name
+    }
+}
 
 #[derive(DerFrom, Debug)]
 pub struct ConstID(NodeIndex, ClassicType);
@@ -152,6 +177,13 @@ impl BuildHandle for FuncID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
+    }
+}
+
+impl BuildHandle for NewTypeID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.node
     }
 }
 

@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 
 use itertools::Itertools;
 use portgraph::{Direction, NodeIndex, PortOffset};
+use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, ValidationError};
@@ -13,7 +14,7 @@ use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
 
-use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, ThetaID};
+use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, NewTypeID, ThetaID};
 
 pub mod nodehandle;
 
@@ -303,6 +304,27 @@ pub trait Dataflow: Container {
         self.discard_type(wire, typ)
     }
 
+    fn make_tuple(
+        &mut self,
+        types: TypeRow,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        let make_op: OpID = self.add_dataflow_op(LeafOp::MakeTuple(types), values)?;
+        Ok(make_op.out_wire(0))
+    }
+
+    fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
+        let make_op: OpID = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
+        Ok(make_op.out_wire(0))
+    }
+
+    fn make_new_type(&mut self, new_type: &NewTypeID, value: Wire) -> Result<Wire, BuildError> {
+        let name = new_type.get_name().clone();
+        let typ = new_type.get_core_type().clone();
+        let make_op: OpID = self.add_dataflow_op(LeafOp::MakeNewType { name, typ }, [value])?;
+        Ok(make_op.out_wire(0))
+    }
+
     fn make_out_variant<const N: usize>(
         &mut self,
         signature: Signature,
@@ -310,13 +332,10 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let Signature { input, output, .. } = signature;
         let sig = (if N == 1 { &output } else { &input }).clone();
-        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(sig), values)?;
-        let tuple = make_op.out_wire(0);
+        let tuple = self.make_tuple(sig, values)?;
         let variants = theta_sum_variants(input, output);
 
-        let tag_op = self.add_dataflow_op(LeafOp::Tag { tag: N, variants }, vec![tuple])?;
-
-        Ok(tag_op.out_wire(0))
+        self.make_tag(N, variants, tuple)
     }
 
     fn make_continue(
@@ -573,6 +592,22 @@ impl ModuleBuilder {
         let const_n = self.add_child_op(ModuleOp::Const(val))?;
 
         Ok((const_n, typ).into())
+    }
+
+    /// Add a NewType node and return a handle to the NewType
+    pub fn add_new_type(
+        &mut self,
+        name: impl Into<SmolStr>,
+        typ: SimpleType,
+    ) -> Result<NewTypeID, BuildError> {
+        let name: SmolStr = name.into();
+
+        let node = self.add_child_op(ModuleOp::NewType {
+            name: name.clone(),
+            definition: typ.clone(),
+        })?;
+
+        Ok((node, name, typ).into())
     }
 }
 
@@ -1088,6 +1123,32 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
+            module_builder.finish()
+        };
+        assert_matches!(build_result, Ok(_));
+        Ok(())
+    }
+
+    #[test]
+    fn simple_newtype() -> Result<(), BuildError> {
+        let inputs = type_row![QB, BIT];
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+
+            let qubit_state_type = module_builder
+                .add_new_type("qubit_state", SimpleType::new_tuple(inputs.clone()))?;
+
+            let mut f_build = module_builder.declare_and_def(
+                "main",
+                inputs.clone(),
+                vec![qubit_state_type.get_new_type()].into(),
+            )?;
+            {
+                let tuple = f_build.make_tuple(inputs, f_build.input_wires())?;
+                let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
+                f_build.finish_with_outputs([q_s_val])?;
+            }
+
             module_builder.finish()
         };
         assert_matches!(build_result, Ok(_));
