@@ -83,14 +83,12 @@ impl HugrMut {
         port: usize,
         direction: Direction,
     ) -> Result<(), HugrError> {
+        let offset = PortOffset::new(direction, port);
         let port = self
             .hugr
             .graph
-            .port_index(node, PortOffset::new(direction, port))
-            .ok_or(portgraph::LinkError::UnknownOffset {
-                node,
-                offset: PortOffset::new_outgoing(port),
-            })?;
+            .port_index(node, offset)
+            .ok_or(portgraph::LinkError::UnknownOffset { node, offset })?;
         self.hugr.graph.unlink_port(port);
         Ok(())
     }

@@ -671,7 +671,7 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::{BasicBlockOp, ConstValue, ModuleOp, OpType};
     use crate::type_row;
-    use crate::types::{ClassicType, LinearType, Signature, TypeRow};
+    use crate::types::{ClassicType, LinearType, Signature};
 
     const B: SimpleType = SimpleType::Classic(ClassicType::bit());
     const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
@@ -746,7 +746,7 @@ mod test {
         parent: NodeIndex,
         predicate_size: usize,
     ) -> (NodeIndex, NodeIndex, NodeIndex, NodeIndex) {
-        let tag_variants: TypeRow = vec![SimpleType::new_unit(); predicate_size].into();
+        let const_op = ModuleOp::Const(ConstValue::predicate(0, predicate_size));
         let tag_type = SimpleType::new_predicate(predicate_size);
 
         let input = b
@@ -757,16 +757,7 @@ mod test {
                 },
             )
             .unwrap();
-        let tag_def = b
-            .add_op_with_parent(
-                b.root(),
-                ModuleOp::Const(crate::ops::ConstValue::Sum {
-                    tag: 0,
-                    variants: tag_variants,
-                    val: Box::new(ConstValue::Tuple(vec![])),
-                }),
-            )
-            .unwrap();
+        let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
             .add_op_with_parent(
                 parent,
