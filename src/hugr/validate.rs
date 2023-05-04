@@ -370,11 +370,15 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         }
 
+        if matches!(
+            from_optype.port_kind(from_offset).unwrap(),
+            EdgeKind::Const(_)
+        ) {
+            // Inter-graph constant wires do not have restrictions
+            return Ok(());
+        }
+
         match from_optype {
-            x if matches!(x.port_kind(from_offset).unwrap(), EdgeKind::Const(_)) => {
-                // Inter-graph constant wires do not have restrictions
-                return Ok(());
-            }
             OpType::Function(DataflowOp::Leaf {
                 op: LeafOp::Copy { .. },
             }) => {}
