@@ -777,7 +777,7 @@ mod test {
 
         b.add_ports(tag_def, Direction::Outgoing, 1);
         b.connect(tag_def, 0, tag, 0).unwrap();
-        b.add_other_wire(input, tag).unwrap();
+        b.add_other_edge(input, tag).unwrap();
         b.connect(tag, 0, output, 0).unwrap();
         b.connect(input, 0, output, 1).unwrap();
 
@@ -1029,7 +1029,7 @@ mod test {
                 },
             )
             .unwrap();
-        b.add_other_wire(beta, exit).unwrap();
+        b.add_other_edge(beta, exit).unwrap();
         assert_eq!(b.hugr().validate(), Ok(()));
 
         // Test malformed errors

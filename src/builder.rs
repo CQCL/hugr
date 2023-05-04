@@ -67,7 +67,7 @@ pub trait Container {
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
     fn add_other_wire(&mut self, src: NodeIndex, dst: NodeIndex) -> Result<Wire, BuildError> {
-        let (src_port, _) = self.base().add_other_wire(src, dst)?;
+        let (src_port, _) = self.base().add_other_edge(src, dst)?;
         Ok(Wire(src, src_port))
     }
 
