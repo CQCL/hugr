@@ -778,7 +778,7 @@ pub struct GammaBuilder<'f> {
 }
 
 impl<'f> Container for GammaBuilder<'f> {
-    type ContainerHandle = GammaID;
+    type ContainerHandle = Result<GammaID, GammaBuildError>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
@@ -796,8 +796,13 @@ impl<'f> Container for GammaBuilder<'f> {
     }
 
     fn finish(self) -> Self::ContainerHandle {
-        // TODO check all branches built
-        (self.gamma_node, self.n_out_wires).into()
+        if !self.remaining_branches.is_empty() {
+            return Err(GammaBuildError::NotAllBranchesBuiltError {
+                gamma: self.gamma_node,
+                branches: self.remaining_branches,
+            });
+        }
+        Ok((self.gamma_node, self.n_out_wires).into())
     }
 }
 
@@ -999,7 +1004,7 @@ mod test {
                     n_identity(gamma_b.branch_builder(0)?)?;
                     n_identity(gamma_b.branch_builder(1)?)?;
 
-                    gamma_b.finish()
+                    gamma_b.finish()?
                 };
                 let [unit, int] = gamma.outputs_arr();
                 fbuild.discard(unit)?;
@@ -1056,7 +1061,7 @@ mod test {
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 
-                        gamma_b.finish()
+                        gamma_b.finish()?
                     };
 
                     theta_b.finish_with_outputs(gamma.out_wire(0))?
