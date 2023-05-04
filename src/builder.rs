@@ -334,6 +334,33 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         self.make_out_variant::<1>(signature, values)
     }
+
+    fn call(
+        &mut self,
+        function: &FuncID,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<OpID, BuildError> {
+        let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();
+        let signature = match def_op {
+            Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),
+            _ => {
+                return Err(BuildError::UnexpectedType {
+                    node: function.node(),
+                    op_desc: "Declare/Def",
+                })
+            }
+        };
+        let const_in_port = signature.output.len();
+        let op_id = self.add_dataflow_op(DataflowOp::Call { signature }, input_wires)?;
+        let src_port: usize = self
+            .base()
+            .add_ports(function.node(), Direction::Outgoing, 1)
+            .collect_vec()[0];
+
+        self.base()
+            .connect(function.node(), src_port, op_id.node(), const_in_port)?;
+        Ok(op_id)
+    }
 }
 
 fn add_op_with_wires<T: Dataflow + ?Sized>(
@@ -1042,6 +1069,23 @@ mod test {
 
         assert_matches!(build_result, Ok(_));
 
+        Ok(())
+    }
+
+    #[test]
+    fn basic_recurse() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+
+            let f_id = module_builder.declare("main", type_row![NAT], type_row![NAT])?;
+
+            let mut f_build = module_builder.define_function(&f_id)?;
+            let call = f_build.call(&f_id, f_build.input_wires())?;
+
+            f_build.finish_with_outputs(call.outputs())?;
+            module_builder.finish()
+        };
+        assert_matches!(build_result, Ok(_));
         Ok(())
     }
 }
