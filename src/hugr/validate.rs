@@ -371,7 +371,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         match from_optype {
-            OpType::Module(ModuleOp::Const(_)) => {
+            x if matches!(x.port_kind(from_offset).unwrap(), EdgeKind::Const(_)) => {
                 // Inter-graph constant wires do not have restrictions
                 return Ok(());
             }
