@@ -52,14 +52,9 @@ impl Default for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns true if the operation has a single linear input and output
-    pub fn is_one_linear_op(&self) -> bool {
-        self.signature().linear().count() == 1
-    }
-
-    /// Returns true if the operation has exactly two linear inputs and outputs
-    pub fn is_two_linear_op(&self) -> bool {
-        self.signature().linear().count() == 2
+    /// Returns the number of linear inputs (also outputs) of the operation
+    pub fn linear_count(&self) -> usize {
+        self.signature().linear().count()
     }
 
     /// Returns true if the operation has only classical inputs and outputs.
