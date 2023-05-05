@@ -370,27 +370,9 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         }
 
-        match from_optype {
-            OpType::Module(ModuleOp::Const(_)) => {
-                // Inter-graph constant wires do not have restrictions
-                return Ok(());
-            }
-            OpType::Function(DataflowOp::Leaf {
-                op: LeafOp::Copy { .. },
-            }) => {}
-            _ => {
-                return Err(InterGraphEdgeError::NonCopySource {
-                    from,
-                    from_offset,
-                    from_optype: from_optype.clone(),
-                    to,
-                    to_offset,
-                }
-                .into())
-            }
-        }
-
         match from_optype.port_kind(from_offset).unwrap() {
+            // Inter-graph constant wires do not have restrictions
+            EdgeKind::Const(_) => return Ok(()),
             EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
                 return Err(InterGraphEdgeError::NonClassicalData {
@@ -402,6 +384,22 @@ impl<'a> ValidationContext<'a> {
                 }
                 .into())
             }
+        }
+
+        if !matches!(
+            from_optype,
+            OpType::Function(DataflowOp::Leaf {
+                op: LeafOp::Copy { .. },
+            })
+        ) {
+            return Err(InterGraphEdgeError::NonCopySource {
+                from,
+                from_offset,
+                from_optype: from_optype.clone(),
+                to,
+                to_offset,
+            }
+            .into());
         }
 
         // To detect either external or dominator edges, we traverse the ancestors
