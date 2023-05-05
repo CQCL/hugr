@@ -102,7 +102,7 @@ impl HugrMut {
     ///
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
-    pub fn add_other_wire(
+    pub fn add_other_edge(
         &mut self,
         src: NodeIndex,
         dst: NodeIndex,
