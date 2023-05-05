@@ -59,7 +59,7 @@ impl LeafOp {
 
     /// Returns true if the operation has exactly two linear inputs and outputs
     pub fn is_two_linear_op(&self) -> bool {
-        self.signature().linear().count() == 1
+        self.signature().linear().count() == 2
     }
 
     /// Returns true if the operation has only classical inputs and outputs.
