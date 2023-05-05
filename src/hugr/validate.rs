@@ -667,9 +667,120 @@ mod test {
 
     use super::*;
     use crate::hugr::HugrMut;
-    use crate::ops::{ModuleOp, OpType};
+    use crate::ops::{BasicBlockOp, ConstValue, ModuleOp, OpType};
     use crate::type_row;
-    use crate::types::{ClassicType, Signature};
+    use crate::types::{ClassicType, LinearType, Signature};
+
+    const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+    const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
+
+    /// Creates a hugr with a single function definition that copies a bit `copies` times.
+    ///
+    /// Returns the hugr and the node index of the definition.
+    fn make_simple_hugr(copies: usize) -> (HugrMut, NodeIndex) {
+        let def_op: OpType = ModuleOp::Def {
+            signature: Signature::new_df(type_row![B], vec![B; copies]),
+        }
+        .into();
+
+        let mut b = HugrMut::new();
+        let root = b.root();
+
+        let def = b.add_op_with_parent(root, def_op).unwrap();
+        let _ = add_df_children(&mut b, def, copies);
+
+        (b, def)
+    }
+
+    /// Adds an input{B}, copy{B -> B^copies}, and output{B^copies} operation to a dataflow container.
+    ///
+    /// Returns the node indices of each of the operations.
+    fn add_df_children(
+        b: &mut HugrMut,
+        parent: NodeIndex,
+        copies: usize,
+    ) -> (NodeIndex, NodeIndex, NodeIndex) {
+        let input = b
+            .add_op_with_parent(
+                parent,
+                DataflowOp::Input {
+                    types: type_row![B],
+                },
+            )
+            .unwrap();
+        let copy = b
+            .add_op_with_parent(
+                parent,
+                LeafOp::Copy {
+                    n_copies: copies as u32,
+                    typ: ClassicType::bit(),
+                },
+            )
+            .unwrap();
+        let output = b
+            .add_op_with_parent(
+                parent,
+                DataflowOp::Output {
+                    types: vec![B; copies].into(),
+                },
+            )
+            .unwrap();
+
+        b.connect(input, 0, copy, 0).unwrap();
+        for i in 0..copies {
+            b.connect(copy, i, output, i).unwrap();
+        }
+
+        (input, copy, output)
+    }
+
+    /// Adds an input{B}, tag_constant(0, B^pred_size), tag(B^pred_size), and
+    /// output{Sum{unit^pred_size}, B} operation to a dataflow container.
+    /// Intended to be used to populate a beta node in a CFG.
+    ///
+    /// Returns the node indices of each of the operations.
+    fn add_beta_children(
+        b: &mut HugrMut,
+        parent: NodeIndex,
+        predicate_size: usize,
+    ) -> (NodeIndex, NodeIndex, NodeIndex, NodeIndex) {
+        let const_op = ModuleOp::Const(ConstValue::predicate(0, predicate_size));
+        let tag_type = SimpleType::new_predicate(predicate_size);
+
+        let input = b
+            .add_op_with_parent(
+                parent,
+                DataflowOp::Input {
+                    types: type_row![B],
+                },
+            )
+            .unwrap();
+        let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
+        let tag = b
+            .add_op_with_parent(
+                parent,
+                DataflowOp::LoadConstant {
+                    datatype: tag_type.clone().try_into().unwrap(),
+                },
+            )
+            .unwrap();
+        let output = b
+            .add_op_with_parent(
+                parent,
+                DataflowOp::Output {
+                    types: vec![tag_type, B].into(),
+                },
+            )
+            .unwrap();
+
+        b.add_ports(tag_def, Direction::Outgoing, 1);
+        b.connect(tag_def, 0, tag, 0).unwrap();
+        b.add_other_wire(input, tag).unwrap();
+        b.connect(tag, 0, output, 0).unwrap();
+        b.connect(input, 0, output, 1).unwrap();
+
+        (input, tag_def, tag, output)
+    }
 
     #[test]
     fn invalid_root() {
@@ -710,63 +821,15 @@ mod test {
         }
     }
 
-    /// Creates a hugr with a single function definition that copies a bit.
-    fn make_simple_hugr() -> HugrMut {
-        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-
-        let def_op: OpType = ModuleOp::Def {
-            signature: Signature::new_df(type_row![B], type_row![B, B]),
-        }
-        .into();
-
-        let mut b = HugrMut::new();
-        let root = b.root();
-
-        let def = b.add_op_with_parent(root, def_op).unwrap();
-        let input = b
-            .add_op_with_parent(
-                def,
-                DataflowOp::Input {
-                    types: type_row![B],
-                },
-            )
-            .unwrap();
-        let copy = b
-            .add_op_with_parent(
-                def,
-                LeafOp::Copy {
-                    n_copies: 2,
-                    typ: ClassicType::bit(),
-                },
-            )
-            .unwrap();
-        let output = b
-            .add_op_with_parent(
-                def,
-                DataflowOp::Output {
-                    types: type_row![B, B],
-                },
-            )
-            .unwrap();
-
-        b.connect(input, 0, copy, 0).unwrap();
-        b.connect(copy, 0, output, 0).unwrap();
-        b.connect(copy, 1, output, 1).unwrap();
-
-        b
-    }
-
     #[test]
     fn simple_hugr() {
-        let b = make_simple_hugr();
+        let b = make_simple_hugr(2).0;
         assert_eq!(b.hugr().validate(), Ok(()));
     }
 
     #[test]
     fn invalid_ports() {
-        let mut b = make_simple_hugr();
-        let root = b.root();
-        let def = b.hugr().hierarchy.first(root).unwrap();
+        let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
 
         // Missing an output port
@@ -805,24 +868,214 @@ mod test {
     }
 
     #[test]
+    /// General children restrictions
     fn children_restrictions() {
-        // TODO
-        // InvalidParent
-        // InvalidBoundaryChild
-        // InvalidChildren (all of the variants)
-        // NonContainerWithChildren
-        // ContainerWithoutChildren
+        let (mut b, def) = make_simple_hugr(2);
+        let root = b.root();
+        let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
+
+        // Add a definition without children
+        let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
+        let new_def = b
+            .add_op_with_parent(root, ModuleOp::Def { signature: def_sig })
+            .unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
+        );
+
+        // Add children to the definition, but move it to be a child of the copy
+        add_df_children(&mut b, new_def, 2);
+        b.set_parent(new_def, copy).unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
+        );
+        b.set_parent(new_def, root).unwrap();
+
+        // After moving the previous definition to a valid place,
+        // add an input node to the module subgraph
+        let new_input = b
+            .add_op_with_parent(root, DataflowOp::Input { types: type_row![] })
+            .unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
+        );
+    }
+
+    #[test]
+    /// Validation errors in a dataflow subgraph
+    fn df_children_restrictions() {
+        let (mut b, def) = make_simple_hugr(2);
+        let (_input, copy, output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
+
+        // Replace the output operation of the df subgraph with a copy
+        b.replace_op(
+            output,
+            LeafOp::Copy {
+                n_copies: 0,
+                typ: ClassicType::bit(),
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
+        );
+
+        // Revert it back to an output, but with the wrong number of ports
+        b.replace_op(
+            output,
+            DataflowOp::Output {
+                types: type_row![B],
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
+                => {assert_eq!(parent, def); assert_eq!(child, output)}
+        );
+        b.replace_op(
+            output,
+            DataflowOp::Output {
+                types: type_row![B, B],
+            },
+        );
+
+        // After fixing the output back, replace the copy with an output op
+        b.replace_op(
+            copy,
+            DataflowOp::Output {
+                types: type_row![B, B],
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
+                => {assert_eq!(parent, def); assert_eq!(child, copy)}
+        );
     }
 
     #[test]
     fn dags() {
-        // TODO
-        // NotADag
+        let (mut b, def) = make_simple_hugr(2);
+        let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
+
+        // Add a dangling discard operation without outgoing order edges. Note
+        // that the dag check only allows for one source and sink (the input and
+        // output resp.).
+        b.replace_op(
+            copy,
+            LeafOp::Copy {
+                n_copies: 3,
+                typ: ClassicType::bit(),
+            },
+        );
+        let new_copy = b
+            .add_op_after(
+                copy,
+                LeafOp::Copy {
+                    n_copies: 0,
+                    typ: ClassicType::bit(),
+                },
+            )
+            .unwrap();
+        b.add_ports(copy, Direction::Outgoing, 1);
+        b.connect(copy, 2, new_copy, 0).unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::NotADag { node, .. }) => assert_eq!(node, def)
+        );
     }
 
     #[test]
-    fn intergraph_edges() {
-        // TODO
-        // InterGraphEdge (all of the variants)
+    /// Validation errors in a dataflow subgraph
+    fn cfg_children_restrictions() {
+        let (mut b, def) = make_simple_hugr(1);
+        let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
+
+        b.replace_op(
+            copy,
+            ControlFlowOp::CFG {
+                inputs: type_row![B],
+                outputs: type_row![B],
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::ContainerWithoutChildren { .. })
+        );
+        let cfg = copy;
+
+        // Construct a valid CFG, with one beta node and one exit node
+        let beta = b
+            .add_op_with_parent(
+                cfg,
+                BasicBlockOp::Beta {
+                    inputs: type_row![B],
+                    outputs: type_row![B],
+                    n_branches: 1,
+                },
+            )
+            .unwrap();
+        add_beta_children(&mut b, beta, 1);
+        let exit = b
+            .add_op_with_parent(
+                cfg,
+                BasicBlockOp::Exit {
+                    cfg_outputs: type_row![B],
+                },
+            )
+            .unwrap();
+        b.add_other_wire(beta, exit).unwrap();
+        assert_eq!(b.hugr().validate(), Ok(()));
+
+        // Test malformed errors
+
+        // Add an internal exit node
+        let exit2 = b
+            .add_op_before(
+                exit,
+                BasicBlockOp::Exit {
+                    cfg_outputs: type_row![B],
+                },
+            )
+            .unwrap();
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
+                => {assert_eq!(parent, cfg); assert_eq!(child, exit2)}
+        );
+        b.remove_op(exit2).unwrap();
+
+        // Change the types in the beta node to work on qubits instead of bits
+        b.replace_op(
+            beta,
+            BasicBlockOp::Beta {
+                inputs: type_row![Q],
+                outputs: type_row![Q],
+                n_branches: 1,
+            },
+        );
+        let mut beta_children = b.hugr().hierarchy.children(beta);
+        let beta_input = beta_children.next().unwrap();
+        let beta_output = beta_children.next_back().unwrap();
+        b.replace_op(
+            beta_input,
+            DataflowOp::Input {
+                types: type_row![Q],
+            },
+        );
+        b.replace_op(
+            beta_output,
+            DataflowOp::Output {
+                types: vec![SimpleType::new_predicate(1), Q].into(),
+            },
+        );
+        assert_matches!(
+            b.hugr().validate(),
+            Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
+                => assert_eq!(parent, cfg)
+        );
     }
 }

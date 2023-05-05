@@ -3,7 +3,7 @@
 use std::ops::Range;
 
 use itertools::Itertools;
-use portgraph::{Direction, NodeIndex};
+use portgraph::{Direction, NodeIndex, PortOffset};
 
 use crate::{
     hugr::{HugrError, ValidationError},
@@ -58,6 +58,11 @@ impl HugrMut {
     }
 
     /// Connect two nodes at the given ports.
+    ///
+    /// The port must have already been created. See [`add_ports`] and [`set_num_ports`].
+    ///
+    /// [`add_ports`]: #method.add_ports
+    /// [`set_num_ports`]: #method.set_num_ports
     pub fn connect(
         &mut self,
         src: NodeIndex,
@@ -66,6 +71,25 @@ impl HugrMut {
         dst_port: usize,
     ) -> Result<(), HugrError> {
         self.hugr.graph.link_nodes(src, src_port, dst, dst_port)?;
+        Ok(())
+    }
+
+    /// Disconnects the given ports.
+    ///
+    /// The port is left in place.
+    pub fn disconnect(
+        &mut self,
+        node: NodeIndex,
+        port: usize,
+        direction: Direction,
+    ) -> Result<(), HugrError> {
+        let offset = PortOffset::new(direction, port);
+        let port = self
+            .hugr
+            .graph
+            .port_index(node, offset)
+            .ok_or(portgraph::LinkError::UnknownOffset { node, offset })?;
+        self.hugr.graph.unlink_port(port);
         Ok(())
     }
 
