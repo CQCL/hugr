@@ -7,7 +7,7 @@ pub mod validate;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::portgraph::NodePorts;
-use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
+use portgraph::{Hierarchy, NodeIndex, PortGraph, PortOffset, SecondaryMap};
 use thiserror::Error;
 
 use crate::ops::{ModuleOp, OpType};
@@ -108,6 +108,18 @@ impl Hugr {
     #[inline]
     pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.inputs(node)
+    }
+
+    /// Return node and port connected to provided port, if not connected return None
+    #[inline]
+    pub fn linked_port(
+        &self,
+        node: NodeIndex,
+        offset: PortOffset,
+    ) -> Option<(NodeIndex, PortOffset)> {
+        let port = self.graph.port_index(node, offset)?;
+        let link = self.graph.port_link(port)?;
+        Some((self.graph.port_node(link)?, self.graph.port_offset(port)?))
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side

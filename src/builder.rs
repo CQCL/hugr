@@ -114,12 +114,8 @@ pub trait Dataflow: Container {
     }
 
     fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Wire>) -> Result<(), BuildError> {
-        let [_, out] = self.io();
-        let base = self.base();
-        for (dst_port, Wire(src, src_port)) in outputs.into_iter().enumerate() {
-            base.connect(src, src_port, out, dst_port)?;
-        }
-        Ok(())
+        let [inp, out] = self.io();
+        wire_up_inputs(outputs.into_iter().collect_vec(), out, self, inp)
     }
 
     fn finish_with_outputs(
@@ -389,21 +385,87 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 ) -> Result<(NodeIndex, usize), BuildError> {
     let [inp, out] = data_builder.io();
 
-    let base = data_builder.base();
     let op: OpType = op.into();
     let sig = op.signature();
-    let opn = base.add_op_before(out, op)?;
-    let no_inputs = inputs.is_empty();
+    let op_node = data_builder.base().add_op_before(out, op)?;
 
+    wire_up_inputs(inputs, op_node, data_builder, inp)?;
+
+    Ok((op_node, sig.output.len()))
+}
+
+fn wire_up_inputs<T: Dataflow + ?Sized>(
+    inputs: Vec<Wire>,
+    op_node: NodeIndex,
+    data_builder: &mut T,
+    inp: NodeIndex,
+) -> Result<(), BuildError> {
+    let no_inputs = inputs.is_empty();
     for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
-        base.connect(src, src_port, opn, dst_port)?;
+        wire_up(data_builder, src_port, src, op_node, dst_port)?;
     }
 
     if no_inputs {
-        data_builder.add_other_wire(inp, opn)?;
-    }
+        // If op has no inputs add a StateOrder edge from input to place in
+        // causal cone of Input node
+        data_builder.add_other_wire(inp, op_node)?;
+    };
+    Ok(())
+}
 
-    Ok((opn, sig.output.len()))
+fn wire_up<T: Dataflow + ?Sized>(
+    data_builder: &mut T,
+    mut src_port: usize,
+    mut src: NodeIndex,
+    op_node: NodeIndex,
+    dst_port: usize,
+) -> Result<(), BuildError> {
+    let base = data_builder.base();
+    let src_offset = PortOffset::new_outgoing(src_port);
+
+    if let Some((connected, connected_offset)) = base.hugr().linked_port(src, src_offset) {
+        let connected_op: Result<&LeafOp, ()> = base.hugr().get_optype(connected).try_into();
+        if let Ok(LeafOp::Copy { n_copies, typ }) = connected_op {
+            let copy_node = connected;
+            // If already connected to a copy node, add wire to the copy
+            let n_copies = *n_copies;
+            base.replace_op(
+                copy_node,
+                LeafOp::Copy {
+                    n_copies: n_copies + 1,
+                    typ: typ.clone(),
+                },
+            );
+            src_port = base
+                .add_ports(copy_node, Direction::Outgoing, 1)
+                .next()
+                .unwrap();
+            src = copy_node;
+        } else {
+            // Need to insert a copy - first check can be copied
+            let wire_kind = base.hugr().get_optype(src).port_kind(src_offset);
+            let  Some(EdgeKind::Value(simple_type)) = wire_kind  else {panic!("Wires can only be Value kind")};
+
+            let typ = match simple_type {
+                SimpleType::Classic(typ) => typ,
+                SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
+            };
+            // TODO API consistency in using PortOffset vs. usize
+            base.disconnect(src, src_port, Direction::Outgoing)?;
+
+            let copy = data_builder
+                .add_dataflow_op(LeafOp::Copy { n_copies: 2, typ }, [Wire(src, src_port)])?;
+
+            let base = data_builder.base();
+            base.connect(copy.node(), 0, connected, connected_offset.index())?;
+            src = copy.node();
+            src_port = 1;
+        }
+    }
+    data_builder
+        .base()
+        .connect(src, src_port, op_node, dst_port)?;
+    Ok(())
 }
 
 impl<'f> DeltaBuilder<'f> {
@@ -1153,5 +1215,73 @@ mod test {
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
+    }
+
+    // Scaffolding for copy insertion tests
+    fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
+    where
+        F: FnOnce(FunctionBuilder) -> Result<FuncID, BuildError>,
+    {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+
+            let f_build =
+                module_builder.declare_and_def("main", type_row![BIT], type_row![BIT, BIT])?;
+
+            f(f_build)?;
+
+            module_builder.finish()
+        };
+        assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
+
+        Ok(())
+    }
+    #[test]
+    fn copy_insertion() -> Result<(), BuildError> {
+        copy_scaffold(
+            |f_build| {
+                let [b1] = f_build.input_wires_arr();
+                f_build.finish_with_outputs([b1, b1])
+            },
+            "Copy input and output",
+        )?;
+
+        copy_scaffold(
+            |mut f_build| {
+                let [b1] = f_build.input_wires_arr();
+                let xor = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
+                f_build.finish_with_outputs([xor.out_wire(0), b1])
+            },
+            "Copy input and use with binary function",
+        )?;
+
+        copy_scaffold(
+            |mut f_build| {
+                let [b1] = f_build.input_wires_arr();
+                let xor1 = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
+                let xor2 = f_build.add_dataflow_op(LeafOp::Xor, [b1, xor1.out_wire(0)])?;
+                f_build.finish_with_outputs([xor2.out_wire(0), b1])
+            },
+            "Copy multiple times",
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn copy_insertion_qubit() {
+        let builder = || {
+            let mut module_builder = ModuleBuilder::new();
+
+            let f_build =
+                module_builder.declare_and_def("main", type_row![QB], type_row![QB, QB])?;
+
+            let [q1] = f_build.input_wires_arr();
+            f_build.finish_with_outputs([q1, q1])?;
+
+            module_builder.finish()
+        };
+
+        assert_eq!(builder(), Err(BuildError::NoCopyLinear(LinearType::Qubit)));
     }
 }
