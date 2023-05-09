@@ -250,7 +250,7 @@ pub trait Dataflow: Container {
         let inputs: TypeRow = input_types.into();
         let n_branches = predicate_inputs.len();
         let n_out_wires = outputs.len();
-
+        // TODO make child order match predicate order
         let gamma_node = self.add_dataflow_op(
             ControlFlowOp::Conditional {
                 predicate_inputs,
@@ -263,7 +263,7 @@ pub trait Dataflow: Container {
             base: self.base(),
             gamma_node: gamma_node.node(),
             n_out_wires,
-            remaining_branches: (0..n_branches).collect(),
+            branch_nodes: vec![None; n_branches],
         })
     }
 
@@ -940,7 +940,7 @@ pub struct GammaBuilder<'f> {
     base: &'f mut HugrMut,
     gamma_node: NodeIndex,
     n_out_wires: usize,
-    remaining_branches: HashSet<usize>,
+    branch_nodes: Vec<Option<NodeIndex>>,
 }
 
 impl<'f> Container for GammaBuilder<'f> {
@@ -962,10 +962,16 @@ impl<'f> Container for GammaBuilder<'f> {
     }
 
     fn finish(self) -> Self::ContainerHandle {
-        if !self.remaining_branches.is_empty() {
+        let branches: HashSet<usize> = self
+            .branch_nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, node)| if node.is_none() { Some(i) } else { None })
+            .collect();
+        if !branches.is_empty() {
             return Err(GammaBuildError::NotAllBranchesBuiltError {
                 gamma: self.gamma_node,
-                branches: self.remaining_branches,
+                branches,
             });
         }
         Ok((self.gamma_node, self.n_out_wires).into())
@@ -991,7 +997,7 @@ impl<'f> GammaBuilder<'f> {
             .ok_or(GammaBuildError::NotBranchError { gamma, branch })?
             .clone();
 
-        if !self.remaining_branches.remove(&branch) {
+        if self.branch_nodes.get(branch).unwrap().is_some() {
             return Err(GammaBuildError::BranchBuiltError { gamma, branch }.into());
         }
 
@@ -999,9 +1005,18 @@ impl<'f> GammaBuilder<'f> {
             .concat()
             .into();
 
-        let branch_node = self.add_child_op(OpType::Branch(BranchOp {
+        let bb_op = OpType::Branch(BranchOp {
             signature: Signature::new_df(inputs.clone(), outputs.clone()),
-        }))?;
+        });
+        let branch_node =
+            // add branch before any existing subsequent branches
+            if let Some(&sibling_node) = self.branch_nodes[branch + 1..].iter().flatten().next() {
+                self.base().add_op_before(sibling_node, bb_op)?
+            } else {
+                self.add_child_op(bb_op)?
+            };
+
+        self.branch_nodes[branch] = Some(branch_node);
 
         let delta_builder =
             DeltaBuilder::create_with_io(self.base(), branch_node, inputs, outputs)?;
