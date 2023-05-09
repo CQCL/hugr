@@ -1,12 +1,78 @@
-use crate::types::ClassicType;
+use crate::types::{ClassicType, SimpleType};
 
 use super::Wire;
+use core::iter::FusedIterator;
 use derive_more::From as DerFrom;
+use itertools::Itertools;
 use portgraph::NodeIndex;
+use smol_str::SmolStr;
+
+#[derive(Debug, Clone)]
+pub struct Outputs {
+    node: NodeIndex,
+    range: std::ops::Range<usize>,
+}
+
+impl Iterator for Outputs {
+    type Item = Wire;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.range.next().map(|offset| Wire(self.node, offset))
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.range.nth(n).map(|offset| Wire(self.node, offset))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.range.count()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.range.size_hint()
+    }
+}
+
+impl ExactSizeIterator for Outputs {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
+}
+
+impl DoubleEndedIterator for Outputs {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.range.next_back().map(|offset| Wire(self.node, offset))
+    }
+}
+
+impl FusedIterator for Outputs {}
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
-    fn sig_out_wires(&self) -> &[Wire];
+    fn num_value_outputs(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn outputs(&self) -> Outputs {
+        Outputs {
+            node: self.node(),
+            range: (0..self.num_value_outputs()),
+        }
+    }
+
+    fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
+        self.outputs()
+            .collect_vec()
+            .try_into()
+            .expect(&format!("Incorrect number of wires: {}", N)[..])
+    }
+
     #[inline]
     fn out_wire(&self, offset: usize) -> Wire {
         Wire(self.node(), offset)
@@ -14,13 +80,40 @@ pub trait BuildHandle {
 }
 
 #[derive(DerFrom, Debug)]
-pub struct DeltaID(NodeIndex, Vec<Wire>);
+pub struct OpID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-pub struct KappaID(NodeIndex, Vec<Wire>);
+pub struct DeltaID(NodeIndex, usize);
+
+#[derive(DerFrom, Debug)]
+pub struct KappaID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
 pub struct FuncID(NodeIndex);
+
+#[derive(DerFrom, Debug, Clone)]
+pub struct NewTypeID {
+    node: NodeIndex,
+    name: SmolStr,
+    core_type: SimpleType,
+}
+
+impl NewTypeID {
+    /// Retrieve the NewType
+    pub fn get_new_type(&self) -> SimpleType {
+        self.core_type.clone().into_new_type(self.name.clone())
+    }
+
+    /// Retrieve the underlying core type
+    pub fn get_core_type(&self) -> &SimpleType {
+        &self.core_type
+    }
+
+    /// Retrieve the underlying core type
+    pub fn get_name(&self) -> &SmolStr {
+        &self.name
+    }
+}
 
 #[derive(DerFrom, Debug)]
 pub struct ConstID(NodeIndex, ClassicType);
@@ -33,6 +126,15 @@ impl ConstID {
 
 #[derive(DerFrom, Debug)]
 pub struct BetaID(NodeIndex);
+
+#[derive(DerFrom, Debug)]
+pub struct LambdaID(NodeIndex);
+
+#[derive(DerFrom, Debug)]
+pub struct ThetaID(NodeIndex, usize);
+
+#[derive(DerFrom, Debug)]
+pub struct GammaID(NodeIndex, usize);
 
 impl From<DeltaID> for FuncID {
     #[inline]
@@ -48,6 +150,44 @@ impl From<DeltaID> for BetaID {
     }
 }
 
+impl From<DeltaID> for LambdaID {
+    #[inline]
+    fn from(value: DeltaID) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<DeltaID> for ThetaID {
+    #[inline]
+    fn from(value: DeltaID) -> Self {
+        Self(value.0, value.1)
+    }
+}
+
+impl BuildHandle for OpID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn num_value_outputs(&self) -> usize {
+        self.1
+    }
+}
+
+impl BuildHandle for GammaID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn num_value_outputs(&self) -> usize {
+        self.1
+    }
+}
+
 impl BuildHandle for DeltaID {
     #[inline]
     fn node(&self) -> NodeIndex {
@@ -55,8 +195,20 @@ impl BuildHandle for DeltaID {
     }
 
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &self.1
+    fn num_value_outputs(&self) -> usize {
+        self.1
+    }
+}
+
+impl BuildHandle for ThetaID {
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+
+    #[inline]
+    fn num_value_outputs(&self) -> usize {
+        self.1
     }
 }
 
@@ -67,8 +219,8 @@ impl BuildHandle for KappaID {
     }
 
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &self.1
+    fn num_value_outputs(&self) -> usize {
+        self.1
     }
 }
 
@@ -77,10 +229,12 @@ impl BuildHandle for FuncID {
     fn node(&self) -> NodeIndex {
         self.0
     }
+}
 
+impl BuildHandle for NewTypeID {
     #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
+    fn node(&self) -> NodeIndex {
+        self.node
     }
 }
 
@@ -89,21 +243,11 @@ impl BuildHandle for ConstID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
-    }
 }
 
 impl BuildHandle for BetaID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
-    }
-
-    #[inline]
-    fn sig_out_wires(&self) -> &[Wire] {
-        &[]
     }
 }

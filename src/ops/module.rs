@@ -23,8 +23,10 @@ pub enum ModuleOp {
         signature: Signature,
     },
     /// Top level struct type definition
-    #[non_exhaustive] // TODO
-    Struct {},
+    NewType {
+        name: SmolStr,
+        definition: SimpleType,
+    },
     /// A type alias
     #[non_exhaustive] // TODO
     Alias {},
@@ -38,7 +40,7 @@ impl ModuleOp {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",
             ModuleOp::Declare { .. } => "declare",
-            ModuleOp::Struct { .. } => "struct",
+            ModuleOp::NewType { .. } => "newtype",
             ModuleOp::Alias { .. } => "alias",
             ModuleOp::Const(val) => return val.name(),
         }
@@ -50,7 +52,7 @@ impl ModuleOp {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
             ModuleOp::Def { .. } => "A function definition",
             ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
-            ModuleOp::Struct { .. } => "Top level struct type definition",
+            ModuleOp::NewType { .. } => "Top level new type definition",
             ModuleOp::Alias { .. } => "A type alias",
             ModuleOp::Const(val) => val.description(),
         }
@@ -62,7 +64,7 @@ impl ModuleOp {
 
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
-            ModuleOp::Root | ModuleOp::Struct { .. } | ModuleOp::Alias { .. } => None,
+            ModuleOp::Root | ModuleOp::NewType { .. } | ModuleOp::Alias { .. } => None,
             ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
                 ClassicType::graph_from_sig(signature.clone()),
             )),
