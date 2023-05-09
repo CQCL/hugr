@@ -250,7 +250,6 @@ pub trait Dataflow: Container {
         let inputs: TypeRow = input_types.into();
         let n_branches = predicate_inputs.len();
         let n_out_wires = outputs.len();
-        // TODO make child order match predicate order
         let gamma_node = self.add_dataflow_op(
             ControlFlowOp::Conditional {
                 predicate_inputs,
