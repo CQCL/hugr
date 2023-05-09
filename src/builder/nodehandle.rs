@@ -1,6 +1,7 @@
 use crate::types::{ClassicType, SimpleType};
 
 use super::Wire;
+use core::iter::FusedIterator;
 use derive_more::From as DerFrom;
 use itertools::Itertools;
 use portgraph::NodeIndex;
