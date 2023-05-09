@@ -408,7 +408,7 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 ) -> Result<(), BuildError> {
     let mut any_local_inputs = false;
     for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
-        any_local_inputs = wire_up(data_builder, src, src_port, op_node, dst_port)?;
+        any_local_inputs |= wire_up(data_builder, src, src_port, op_node, dst_port)?;
     }
 
     if !any_local_inputs {

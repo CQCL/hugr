@@ -10,6 +10,7 @@ pub trait BuildHandle {
     fn num_value_outputs(&self) -> usize {
         0
     }
+    #[inline]
     fn outputs(&self) -> Vec<Wire> {
         (0..self.num_value_outputs())
             .map(|offset| self.out_wire(offset))
@@ -48,17 +49,17 @@ pub struct NewTypeID {
 }
 
 impl NewTypeID {
-    // Retrieve the NewType
+    /// Retrieve the NewType
     pub fn get_new_type(&self) -> SimpleType {
         self.core_type.clone().into_new_type(self.name.clone())
     }
 
-    // Retrieve the underlying core type
+    /// Retrieve the underlying core type
     pub fn get_core_type(&self) -> &SimpleType {
         &self.core_type
     }
 
-    // Retrieve the underlying core type
+    /// Retrieve the underlying core type
     pub fn get_name(&self) -> &SmolStr {
         &self.name
     }
