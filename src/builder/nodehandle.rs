@@ -6,6 +6,7 @@ use itertools::Itertools;
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
+#[derive(Debug, Clone)]
 pub struct Outputs {
     node: NodeIndex,
     range: std::ops::Range<usize>,
@@ -17,7 +18,38 @@ impl Iterator for Outputs {
     fn next(&mut self) -> Option<Self::Item> {
         self.range.next().map(|offset| Wire(self.node, offset))
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.range.nth(n).map(|offset| Wire(self.node, offset))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.range.count()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.range.size_hint()
+    }
 }
+
+impl ExactSizeIterator for Outputs {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
+}
+
+impl DoubleEndedIterator for Outputs {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.range.next_back().map(|offset| Wire(self.node, offset))
+    }
+}
+
+impl FusedIterator for Outputs {}
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
