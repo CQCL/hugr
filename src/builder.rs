@@ -16,7 +16,7 @@ use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
 use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
 
-use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, NewTypeID, ThetaID};
+use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, NewTypeID, Outputs, ThetaID};
 
 pub mod nodehandle;
 
@@ -106,7 +106,7 @@ pub trait Dataflow: Container {
         (self.io()[1], 0).into()
     }
 
-    fn input_wires(&self) -> Vec<Wire> {
+    fn input_wires(&self) -> Outputs {
         self.input().outputs()
     }
     fn add_dataflow_op(
@@ -137,6 +137,7 @@ pub trait Dataflow: Container {
 
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         self.input_wires()
+            .collect_vec()
             .try_into()
             .expect(&format!("Incorrect number of wires: {}", N)[..])
     }
@@ -1048,7 +1049,7 @@ mod test {
                 let inner_builder = func_builder.delta_builder(vec![(NAT, int)], type_row![NAT])?;
                 let inner_id = n_identity(inner_builder)?;
 
-                func_builder.finish_with_outputs([inner_id.outputs(), q_out.outputs()].concat())?
+                func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
             module_builder.finish()
         };
@@ -1135,7 +1136,7 @@ mod test {
                     theta_b.finish_with_outputs(break_wire)?
                 };
 
-                fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
+                fbuild.finish_with_outputs(theta.outputs())?
             };
             module_builder.finish()
         };
@@ -1233,7 +1234,7 @@ mod test {
                     theta_b.finish_with_outputs(gamma.out_wire(0))?
                 };
 
-                fbuild.finish_with_outputs(theta.outputs().iter().cloned())?
+                fbuild.finish_with_outputs(theta.outputs())?
             };
             module_builder.finish()
         };

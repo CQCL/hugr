@@ -2,23 +2,40 @@ use crate::types::{ClassicType, SimpleType};
 
 use super::Wire;
 use derive_more::From as DerFrom;
+use itertools::Itertools;
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
+
+pub struct Outputs {
+    node: NodeIndex,
+    range: std::ops::Range<usize>,
+}
+
+impl Iterator for Outputs {
+    type Item = Wire;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.range.next().map(|offset| Wire(self.node, offset))
+    }
+}
 
 pub trait BuildHandle {
     fn node(&self) -> NodeIndex;
     fn num_value_outputs(&self) -> usize {
         0
     }
+
     #[inline]
-    fn outputs(&self) -> Vec<Wire> {
-        (0..self.num_value_outputs())
-            .map(|offset| self.out_wire(offset))
-            .collect()
+    fn outputs(&self) -> Outputs {
+        Outputs {
+            node: self.node(),
+            range: (0..self.num_value_outputs()),
+        }
     }
 
     fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
         self.outputs()
+            .collect_vec()
             .try_into()
             .expect(&format!("Incorrect number of wires: {}", N)[..])
     }
