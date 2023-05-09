@@ -6,6 +6,7 @@
 pub mod validate;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
+use portgraph::hierarchy::Children;
 use portgraph::portgraph::NodePorts;
 use portgraph::{Hierarchy, NodeIndex, PortGraph, PortOffset, SecondaryMap};
 use thiserror::Error;
@@ -167,6 +168,11 @@ impl Hugr {
     #[inline]
     pub fn num_outputs(&self, node: NodeIndex) -> usize {
         self.graph.num_outputs(node)
+    }
+
+    /// Return iterator over children of node
+    pub fn children(&self, node: NodeIndex) -> Children<'_> {
+        self.hierarchy.children(node)
     }
 }
 
