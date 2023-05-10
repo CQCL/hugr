@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
 
-use super::{controlflow::BranchOp, BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
+use super::{controlflow::CaseOp, BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
 /// A set of property flags required for an operation
 #[non_exhaustive]
@@ -79,8 +79,8 @@ pub enum ValidOpSet {
     Def,
     /// A control flow basic block
     BasicBlock,
-    /// A branch op inside a conditional,
-    Branch,
+    /// A case op inside a conditional,
+    Case,
     /// A control flow exit node
     BasicBlockExit,
 }
@@ -106,7 +106,7 @@ impl ValidOpSet {
             ValidOpSet::BasicBlockExit => {
                 matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. }))
             }
-            ValidOpSet::Branch => matches!(optype, OpType::Branch(_)),
+            ValidOpSet::Case => matches!(optype, OpType::Case(_)),
         }
     }
 
@@ -122,7 +122,7 @@ impl ValidOpSet {
             ValidOpSet::Def => "Function definition",
             ValidOpSet::BasicBlock => "Basic block",
             ValidOpSet::BasicBlockExit => "Exit basic block node",
-            ValidOpSet::Branch => "Branch",
+            ValidOpSet::Case => "Case",
         }
     }
 
@@ -147,7 +147,7 @@ impl OpType {
             OpType::Module(op) => op.validity_flags(),
             OpType::Function(op) => op.validity_flags(),
             OpType::BasicBlock(op) => op.validity_flags(),
-            OpType::Branch(op) => op.validity_flags(),
+            OpType::Case(op) => op.validity_flags(),
         }
     }
 
@@ -161,7 +161,7 @@ impl OpType {
             OpType::Module(op) => op.validate_children(children),
             OpType::Function(op) => op.validate_children(children),
             OpType::BasicBlock(op) => op.validate_children(children),
-            OpType::Branch(op) => op.validate_children(children),
+            OpType::Case(op) => op.validate_children(children),
         }
     }
 }
@@ -188,9 +188,9 @@ pub enum ChildrenValidationError {
         node_desc: &'static str,
         container_desc: &'static str,
     },
-    /// The signature of a children branch in a conditional operation does not match the container's signature.
-    #[error("A conditional branch has optype {optype:?}, which differs from the signature of Conditional container")]
-    ConditionalBranchSignature { child: NodeIndex, optype: OpType },
+    /// The signature of a child case in a conditional operation does not match the container's signature.
+    #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
+    ConditionalCaseSignature { child: NodeIndex, optype: OpType },
     /// The conditional container's branch predicate does not match the number of children
     #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate type: {actual_predicate:?} ")]
     InvalidConditionalPredicate {
@@ -207,7 +207,7 @@ impl ChildrenValidationError {
         match self {
             ChildrenValidationError::InternalIOChildren { child, .. } => *child,
             ChildrenValidationError::InternalExitChildren { child, .. } => *child,
-            ChildrenValidationError::ConditionalBranchSignature { child, .. } => *child,
+            ChildrenValidationError::ConditionalCaseSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
             ChildrenValidationError::InvalidConditionalPredicate { child, .. } => *child,
         }
@@ -294,13 +294,13 @@ impl BasicBlockOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlockOp::Beta { n_branches, .. } => OpValidityFlags {
+            BasicBlockOp::Block { n_cases, .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(*n_branches)),
+                non_df_ports: (None, Some(*n_cases)),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -314,12 +314,12 @@ impl BasicBlockOp {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            BasicBlockOp::Beta {
+            BasicBlockOp::Block {
                 inputs,
                 outputs,
-                n_branches,
+                n_cases,
             } => {
-                let predicate_type = SimpleType::new_predicate(*n_branches);
+                let predicate_type = SimpleType::new_predicate(*n_cases);
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
@@ -329,7 +329,7 @@ impl BasicBlockOp {
     }
 }
 
-impl BranchOp {
+impl CaseOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
@@ -351,7 +351,7 @@ impl BranchOp {
         validate_io_nodes(
             &self.signature.input,
             &self.signature.output,
-            "Conditional (gamma)",
+            "Conditional",
             children,
         )
     }
@@ -362,7 +362,7 @@ impl DataflowOp {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             DataflowOp::ControlFlow { op } => op.validity_flags(),
-            DataflowOp::Nested { .. } => OpValidityFlags {
+            DataflowOp::DFG { .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
@@ -382,7 +382,7 @@ impl DataflowOp {
     ) -> Result<(), ChildrenValidationError> {
         match self {
             DataflowOp::ControlFlow { op } => op.validate_children(children),
-            DataflowOp::Nested { signature } => validate_io_nodes(
+            DataflowOp::DFG { signature } => validate_io_nodes(
                 &signature.input,
                 &signature.output,
                 "nested graph",
@@ -398,12 +398,12 @@ impl ControlFlowOp {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             ControlFlowOp::Conditional { .. } => OpValidityFlags {
-                allowed_children: ValidOpSet::Branch,
+                allowed_children: ValidOpSet::Case,
                 requires_children: true,
                 requires_dag: false,
                 ..Default::default()
             },
-            ControlFlowOp::Loop { .. } => OpValidityFlags {
+            ControlFlowOp::TailLoop { .. } => OpValidityFlags {
                 allowed_children: ValidOpSet::DataflowOps,
                 allowed_first_child: ValidOpSet::Input,
                 allowed_last_child: ValidOpSet::Output,
@@ -448,23 +448,23 @@ impl ControlFlowOp {
                 // Each child must have it's predicate variant and the rest of `inputs` as input,
                 // and matching output
                 for (i, (child, optype)) in children.into_iter().enumerate() {
-                    let branch_op: &BranchOp = optype
+                    let case_op: &CaseOp = optype
                         .try_into()
                         .expect("Child check should have already checked valid ops.");
-                    let sig = &branch_op.signature;
+                    let sig = &case_op.signature;
                     let predicate_value = &predicate_inputs[i];
                     if sig.input[0] != *predicate_value
                         || sig.input[1..] != inputs[..]
                         || sig.output != *outputs
                     {
-                        return Err(ChildrenValidationError::ConditionalBranchSignature {
+                        return Err(ChildrenValidationError::ConditionalCaseSignature {
                             child,
                             optype: optype.clone(),
                         });
                     }
                 }
             }
-            ControlFlowOp::Loop { inputs, outputs } => {
+            ControlFlowOp::TailLoop { inputs, outputs } => {
                 let expected_output = SimpleType::new_sum(vec![
                     SimpleType::new_tuple(inputs.clone()),
                     SimpleType::new_tuple(outputs.clone()),

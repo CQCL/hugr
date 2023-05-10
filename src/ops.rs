@@ -7,7 +7,7 @@ pub mod validate;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 
-pub use controlflow::{BasicBlockOp, BranchOp, ControlFlowOp};
+pub use controlflow::{BasicBlockOp, CaseOp, ControlFlowOp};
 pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use dataflow::DataflowOp;
 pub use leaf::LeafOp;
@@ -21,12 +21,12 @@ use smol_str::SmolStr;
 pub enum OpType {
     /// A module region node - parent will be the Root (or the node itself is the Root)
     Module(ModuleOp),
-    /// A basic block in a control flow graph - parent will be a kappa node
+    /// A basic block in a control flow graph - parent will be a CFG node
     BasicBlock(BasicBlockOp),
-    /// A branch in a dataflow graph - parent will be a gamma node
-    Branch(BranchOp),
+    /// A branch in a dataflow graph - parent will be a Conditional node
+    Case(CaseOp),
     /// A function manipulation node - parent will be a dataflow-graph container
-    /// (delta, gamma, theta, def, beta)
+    /// (DFG, Conditional, TailLoop, def, BasicBlock)
     Function(DataflowOp),
 }
 
@@ -36,7 +36,7 @@ impl OpType {
         match self {
             OpType::Module(op) => op.name(),
             OpType::BasicBlock(op) => op.name(),
-            OpType::Branch(op) => op.name(),
+            OpType::Case(op) => op.name(),
             OpType::Function(op) => op.name(),
         }
     }
@@ -46,7 +46,7 @@ impl OpType {
         match self {
             OpType::Module(op) => op.description(),
             OpType::BasicBlock(op) => op.description(),
-            OpType::Branch(op) => op.description(),
+            OpType::Case(op) => op.description(),
             OpType::Function(op) => op.description(),
         }
     }
@@ -78,7 +78,7 @@ impl OpType {
             OpType::Module(op) => op.other_inputs(),
             OpType::Function(op) => op.other_inputs(),
             OpType::BasicBlock(op) => op.other_edges(),
-            OpType::Branch(op) => op.other_edges(),
+            OpType::Case(op) => op.other_edges(),
         }
     }
 
@@ -88,7 +88,7 @@ impl OpType {
             OpType::Module(op) => op.other_outputs(),
             OpType::Function(op) => op.other_outputs(),
             OpType::BasicBlock(op) => op.other_edges(),
-            OpType::Branch(op) => op.other_edges(),
+            OpType::Case(op) => op.other_edges(),
         }
     }
 
@@ -132,9 +132,9 @@ where
     }
 }
 
-impl From<BranchOp> for OpType {
-    fn from(op: BranchOp) -> Self {
-        OpType::Branch(op)
+impl From<CaseOp> for OpType {
+    fn from(op: CaseOp) -> Self {
+        OpType::Case(op)
     }
 }
 
@@ -166,7 +166,7 @@ macro_rules! impl_try_from_optype {
 }
 impl_try_from_optype!(ModuleOp, OpType::Module(op), op);
 impl_try_from_optype!(BasicBlockOp, OpType::BasicBlock(op), op);
-impl_try_from_optype!(BranchOp, OpType::Branch(op), op);
+impl_try_from_optype!(CaseOp, OpType::Case(op), op);
 impl_try_from_optype!(DataflowOp, OpType::Function(op), op);
 impl_try_from_optype!(
     ControlFlowOp,

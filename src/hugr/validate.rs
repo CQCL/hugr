@@ -350,8 +350,8 @@ impl<'a> ValidationContext<'a> {
     /// source:
     /// - External edges, from a copy node to a sibling's descendant. There must
     ///   also be an order edge between the copy and the sibling.
-    /// - Dominator edges, from a copy node in a beta node to a descendant of a
-    ///   post-dominated sibling of the beta.
+    /// - Dominator edges, from a copy node in a BasicBlock node to a descendant of a
+    ///   post-dominated sibling of the BasicBlock.
     fn validate_intergraph_edge(
         &mut self,
         from: NodeIndex,
@@ -736,10 +736,10 @@ mod test {
 
     /// Adds an input{B}, tag_constant(0, B^pred_size), tag(B^pred_size), and
     /// output{Sum{unit^pred_size}, B} operation to a dataflow container.
-    /// Intended to be used to populate a beta node in a CFG.
+    /// Intended to be used to populate a BasicBlock node in a CFG.
     ///
     /// Returns the node indices of each of the operations.
-    fn add_beta_children(
+    fn add_block_children(
         b: &mut HugrMut,
         parent: NodeIndex,
         predicate_size: usize,
@@ -1007,18 +1007,18 @@ mod test {
         );
         let cfg = copy;
 
-        // Construct a valid CFG, with one beta node and one exit node
-        let beta = b
+        // Construct a valid CFG, with one BasicBlock node and one exit node
+        let block = b
             .add_op_with_parent(
                 cfg,
-                BasicBlockOp::Beta {
+                BasicBlockOp::Block {
                     inputs: type_row![B],
                     outputs: type_row![B],
-                    n_branches: 1,
+                    n_cases: 1,
                 },
             )
             .unwrap();
-        add_beta_children(&mut b, beta, 1);
+        add_block_children(&mut b, block, 1);
         let exit = b
             .add_op_with_parent(
                 cfg,
@@ -1027,7 +1027,7 @@ mod test {
                 },
             )
             .unwrap();
-        b.add_other_edge(beta, exit).unwrap();
+        b.add_other_edge(block, exit).unwrap();
         assert_eq!(b.hugr().validate(), Ok(()));
 
         // Test malformed errors
@@ -1048,26 +1048,26 @@ mod test {
         );
         b.remove_op(exit2).unwrap();
 
-        // Change the types in the beta node to work on qubits instead of bits
+        // Change the types in the BasicBlock node to work on qubits instead of bits
         b.replace_op(
-            beta,
-            BasicBlockOp::Beta {
+            block,
+            BasicBlockOp::Block {
                 inputs: type_row![Q],
                 outputs: type_row![Q],
-                n_branches: 1,
+                n_cases: 1,
             },
         );
-        let mut beta_children = b.hugr().hierarchy.children(beta);
-        let beta_input = beta_children.next().unwrap();
-        let beta_output = beta_children.next_back().unwrap();
+        let mut block_children = b.hugr().hierarchy.children(block);
+        let block_input = block_children.next().unwrap();
+        let block_output = block_children.next_back().unwrap();
         b.replace_op(
-            beta_input,
+            block_input,
             DataflowOp::Input {
                 types: type_row![Q],
             },
         );
         b.replace_op(
-            beta_output,
+            block_output,
             DataflowOp::Output {
                 types: vec![SimpleType::new_predicate(1), Q].into(),
             },
