@@ -388,7 +388,7 @@ impl<'a> ValidationContext<'a> {
 
         if !matches!(
             from_optype,
-            OpType::Function(DataflowOp::Leaf {
+            OpType::Dataflow(DataflowOp::Leaf {
                 op: LeafOp::Copy { .. },
             })
         ) {
@@ -437,7 +437,7 @@ impl<'a> ValidationContext<'a> {
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
                 if !matches!(
                     ancestor_parent_op,
-                    OpType::Function(DataflowOp::ControlFlow {
+                    OpType::Dataflow(DataflowOp::ControlFlow {
                         op: ControlFlowOp::CFG { .. }
                     })
                 ) {

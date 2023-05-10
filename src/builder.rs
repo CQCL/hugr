@@ -152,7 +152,7 @@ pub trait Dataflow: Container {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
-            OpType::Function(DataflowOp::DFG {
+            OpType::Dataflow(DataflowOp::DFG {
                 signature: Signature::new(input_types.clone(), outputs.clone(), None),
             }),
             input_wires,
@@ -172,7 +172,7 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_op_with_wires(
             self,
-            OpType::Function(DataflowOp::ControlFlow {
+            OpType::Dataflow(DataflowOp::ControlFlow {
                 op: ControlFlowOp::CFG {
                     inputs: inputs.clone(),
                     outputs: outputs.clone(),
@@ -225,7 +225,7 @@ pub trait Dataflow: Container {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (loop_node, _) = add_op_with_wires(
             self,
-            OpType::Function(
+            OpType::Dataflow(
                 ControlFlowOp::TailLoop {
                     inputs: input_types.clone().into(),
                     outputs: outputs.clone(),
@@ -559,11 +559,11 @@ impl<'f> DFGBuilder<'f> {
         let num_out_wires = outputs.len();
         let i = base.add_op_with_parent(
             parent,
-            OpType::Function(DataflowOp::Input { types: inputs }),
+            OpType::Dataflow(DataflowOp::Input { types: inputs }),
         )?;
         let o = base.add_op_with_parent(
             parent,
-            OpType::Function(DataflowOp::Output { types: outputs }),
+            OpType::Dataflow(DataflowOp::Output { types: outputs }),
         )?;
 
         Ok(Self {
@@ -922,7 +922,7 @@ impl<'b> TailLoopBuilder<'b> {
     pub fn loop_signature(&self) -> Result<Signature, BuildError> {
         let hugr = self.hugr();
 
-        if let OpType::Function(DataflowOp::ControlFlow {
+        if let OpType::Dataflow(DataflowOp::ControlFlow {
             op: ControlFlowOp::TailLoop { inputs, outputs },
         }) = hugr.get_optype(self.container_node())
         {
@@ -1090,7 +1090,7 @@ mod test {
                 let [int, qb] = func_builder.input_wires_arr();
 
                 let q_out = func_builder.add_dataflow_op(
-                    OpType::Function(DataflowOp::Leaf { op: LeafOp::H }),
+                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
                     vec![qb],
                 )?;
 

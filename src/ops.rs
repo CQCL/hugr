@@ -25,9 +25,9 @@ pub enum OpType {
     BasicBlock(BasicBlockOp),
     /// A branch in a dataflow graph - parent will be a Conditional node
     Case(CaseOp),
-    /// A function manipulation node - parent will be a dataflow-graph container
+    /// Nodes used inside dataflow containers
     /// (DFG, Conditional, TailLoop, def, BasicBlock)
-    Function(DataflowOp),
+    Dataflow(DataflowOp),
 }
 
 impl OpType {
@@ -37,7 +37,7 @@ impl OpType {
             OpType::Module(op) => op.name(),
             OpType::BasicBlock(op) => op.name(),
             OpType::Case(op) => op.name(),
-            OpType::Function(op) => op.name(),
+            OpType::Dataflow(op) => op.name(),
         }
     }
 
@@ -47,7 +47,7 @@ impl OpType {
             OpType::Module(op) => op.description(),
             OpType::BasicBlock(op) => op.description(),
             OpType::Case(op) => op.description(),
-            OpType::Function(op) => op.description(),
+            OpType::Dataflow(op) => op.description(),
         }
     }
 
@@ -56,7 +56,7 @@ impl OpType {
     /// Only dataflow operations have a non-empty signature.
     pub fn signature(&self) -> Signature {
         match self {
-            OpType::Function(op) => op.signature(),
+            OpType::Dataflow(op) => op.signature(),
             _ => Default::default(),
         }
     }
@@ -66,7 +66,7 @@ impl OpType {
     /// Only dataflow operations have a non-empty signature.
     pub fn signature_desc(&self) -> SignatureDescription {
         match self {
-            OpType::Function(op) => op.signature_desc(),
+            OpType::Dataflow(op) => op.signature_desc(),
             _ => Default::default(),
         }
     }
@@ -76,7 +76,7 @@ impl OpType {
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         match self {
             OpType::Module(op) => op.other_inputs(),
-            OpType::Function(op) => op.other_inputs(),
+            OpType::Dataflow(op) => op.other_inputs(),
             OpType::BasicBlock(op) => op.other_edges(),
             OpType::Case(op) => op.other_edges(),
         }
@@ -86,7 +86,7 @@ impl OpType {
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
             OpType::Module(op) => op.other_outputs(),
-            OpType::Function(op) => op.other_outputs(),
+            OpType::Dataflow(op) => op.other_outputs(),
             OpType::BasicBlock(op) => op.other_edges(),
             OpType::Case(op) => op.other_edges(),
         }
@@ -107,7 +107,7 @@ impl OpType {
 
 impl Default for OpType {
     fn default() -> Self {
-        Self::Function(Default::default())
+        Self::Dataflow(Default::default())
     }
 }
 
@@ -128,7 +128,7 @@ where
     T: Into<DataflowOp>,
 {
     fn from(op: T) -> Self {
-        Self::Function(op.into())
+        Self::Dataflow(op.into())
     }
 }
 
@@ -167,10 +167,10 @@ macro_rules! impl_try_from_optype {
 impl_try_from_optype!(ModuleOp, OpType::Module(op), op);
 impl_try_from_optype!(BasicBlockOp, OpType::BasicBlock(op), op);
 impl_try_from_optype!(CaseOp, OpType::Case(op), op);
-impl_try_from_optype!(DataflowOp, OpType::Function(op), op);
+impl_try_from_optype!(DataflowOp, OpType::Dataflow(op), op);
 impl_try_from_optype!(
     ControlFlowOp,
-    OpType::Function(DataflowOp::ControlFlow { op }),
+    OpType::Dataflow(DataflowOp::ControlFlow { op }),
     op
 );
-impl_try_from_optype!(LeafOp, OpType::Function(DataflowOp::Leaf { op }), op);
+impl_try_from_optype!(LeafOp, OpType::Dataflow(DataflowOp::Leaf { op }), op);
