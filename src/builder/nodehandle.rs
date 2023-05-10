@@ -83,10 +83,10 @@ pub trait BuildHandle {
 pub struct OpID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-pub struct DeltaID(NodeIndex, usize);
+pub struct DfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-pub struct KappaID(NodeIndex, usize);
+pub struct CfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
 pub struct FuncID(NodeIndex);
@@ -125,41 +125,41 @@ impl ConstID {
 }
 
 #[derive(DerFrom, Debug)]
-pub struct BetaID(NodeIndex);
+pub struct BasicBlockID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-pub struct LambdaID(NodeIndex);
+pub struct CaseID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-pub struct ThetaID(NodeIndex, usize);
+pub struct TailLoopID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-pub struct GammaID(NodeIndex, usize);
+pub struct ConditionalID(NodeIndex, usize);
 
-impl From<DeltaID> for FuncID {
+impl From<DfgID> for FuncID {
     #[inline]
-    fn from(value: DeltaID) -> Self {
+    fn from(value: DfgID) -> Self {
         Self(value.0)
     }
 }
 
-impl From<DeltaID> for BetaID {
+impl From<DfgID> for BasicBlockID {
     #[inline]
-    fn from(value: DeltaID) -> Self {
+    fn from(value: DfgID) -> Self {
         Self(value.0)
     }
 }
 
-impl From<DeltaID> for LambdaID {
+impl From<DfgID> for CaseID {
     #[inline]
-    fn from(value: DeltaID) -> Self {
+    fn from(value: DfgID) -> Self {
         Self(value.0)
     }
 }
 
-impl From<DeltaID> for ThetaID {
+impl From<DfgID> for TailLoopID {
     #[inline]
-    fn from(value: DeltaID) -> Self {
+    fn from(value: DfgID) -> Self {
         Self(value.0, value.1)
     }
 }
@@ -176,7 +176,7 @@ impl BuildHandle for OpID {
     }
 }
 
-impl BuildHandle for GammaID {
+impl BuildHandle for ConditionalID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
@@ -188,7 +188,7 @@ impl BuildHandle for GammaID {
     }
 }
 
-impl BuildHandle for DeltaID {
+impl BuildHandle for DfgID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
@@ -200,7 +200,7 @@ impl BuildHandle for DeltaID {
     }
 }
 
-impl BuildHandle for ThetaID {
+impl BuildHandle for TailLoopID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
@@ -212,7 +212,7 @@ impl BuildHandle for ThetaID {
     }
 }
 
-impl BuildHandle for KappaID {
+impl BuildHandle for CfgID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
@@ -245,7 +245,7 @@ impl BuildHandle for ConstID {
     }
 }
 
-impl BuildHandle for BetaID {
+impl BuildHandle for BasicBlockID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0

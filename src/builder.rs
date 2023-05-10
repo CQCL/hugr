@@ -10,13 +10,15 @@ use thiserror::Error;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::{HugrMut, ValidationError};
 use crate::ops::controlflow::ControlFlowOp;
-use crate::ops::{BasicBlockOp, BranchOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
+use crate::ops::{BasicBlockOp, CaseOp, ConstValue, DataflowOp, LeafOp, ModuleOp};
 use crate::types::{ClassicType, EdgeKind, LinearType, Signature, SimpleType, TypeRow};
 use crate::Hugr;
 use crate::{hugr::HugrError, ops::OpType};
-use nodehandle::{BetaID, DeltaID, FuncID, KappaID, OpID};
+use nodehandle::{BasicBlockID, CfgID, DfgID, FuncID, OpID};
 
-use self::nodehandle::{BuildHandle, ConstID, GammaID, LambdaID, NewTypeID, Outputs, ThetaID};
+use self::nodehandle::{
+    BuildHandle, CaseID, ConditionalID, ConstID, NewTypeID, Outputs, TailLoopID,
+};
 
 pub mod nodehandle;
 
@@ -42,9 +44,9 @@ pub enum BuildError {
         node: NodeIndex,
         op_desc: &'static str,
     },
-    /// Error building gamma node
-    #[error("Error building gamma node: {0}.")]
-    GammaError(#[from] GammaBuildError),
+    /// Error building Conditional node
+    #[error("Error building Conditional node: {0}.")]
+    ConditionalError(#[from] ConditionalBuildError),
 
     /// Wire not found in Hugr
     #[error("Wire not found in Hugr: {0:?}.")]
@@ -64,9 +66,9 @@ impl ModuleBuilder {
     }
 }
 
-pub struct DeltaBuilder<'f> {
+pub struct DFGBuilder<'f> {
     base: &'f mut HugrMut,
-    delta_node: NodeIndex,
+    dfg_node: NodeIndex,
     num_in_wires: usize,
     num_out_wires: usize,
     io: [NodeIndex; 2],
@@ -142,33 +144,33 @@ pub trait Dataflow: Container {
             .expect(&format!("Incorrect number of wires: {}", N)[..])
     }
 
-    fn delta_builder<'a: 'b, 'b>(
+    fn dfg_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<DeltaBuilder<'b>, BuildError> {
+    ) -> Result<DFGBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
-        let (delta_n, _) = add_op_with_wires(
+        let (dfg_n, _) = add_op_with_wires(
             self,
-            OpType::Function(DataflowOp::Nested {
+            OpType::Function(DataflowOp::DFG {
                 signature: Signature::new(input_types.clone(), outputs.clone(), None),
             }),
             input_wires,
         )?;
 
-        DeltaBuilder::create_with_io(self.base(), delta_n, input_types.into(), outputs)
+        DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), outputs)
     }
 
-    fn kappa_builder<'a: 'b, 'b>(
+    fn cfg_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<KappaBuilder<'b>, BuildError> {
+    ) -> Result<CFGBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
 
-        let (kappa_node, _) = add_op_with_wires(
+        let (cfg_node, _) = add_op_with_wires(
             self,
             OpType::Function(DataflowOp::ControlFlow {
                 op: ControlFlowOp::CFG {
@@ -179,20 +181,20 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        let exit_beta = OpType::BasicBlock(BasicBlockOp::Exit {
+        let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
             cfg_outputs: outputs.clone(),
         });
-        let exit_node = self.base().add_op_with_parent(kappa_node, exit_beta)?;
+        let exit_node = self.base().add_op_with_parent(cfg_node, exit_block_type)?;
         let n_out_wires = outputs.len();
-        let kb = KappaBuilder {
+        let cfg_builder = CFGBuilder {
             base: self.base(),
-            kappa_node,
+            cfg_node,
             n_out_wires,
             exit_node,
             inputs: Some(inputs),
         };
 
-        Ok(kb)
+        Ok(cfg_builder)
     }
 
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
@@ -215,16 +217,16 @@ pub trait Dataflow: Container {
         Ok(load_n.out_wire(0))
     }
 
-    fn theta_builder<'a: 'b, 'b>(
+    fn tail_loop_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<ThetaBuilder<'b>, BuildError> {
+    ) -> Result<TailLoopBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
-        let (theta_node, _) = add_op_with_wires(
+        let (loop_node, _) = add_op_with_wires(
             self,
             OpType::Function(
-                ControlFlowOp::Loop {
+                ControlFlowOp::TailLoop {
                     inputs: input_types.clone().into(),
                     outputs: outputs.clone(),
                 }
@@ -233,24 +235,24 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
         let input: TypeRow = input_types.into();
-        ThetaBuilder::create_with_io(self.base(), theta_node, input, outputs)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, input, outputs)
     }
 
-    fn gamma_builder<'a: 'b, 'b>(
+    fn conditional_builder<'a: 'b, 'b>(
         &'a mut self,
         (predicate_inputs, predicate_wire): (TypeRow, Wire),
         other_inputs: Vec<(SimpleType, Wire)>,
         outputs: TypeRow,
-    ) -> Result<GammaBuilder<'b>, BuildError> {
+    ) -> Result<ConditionalBuilder<'b>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
         input_wires.insert(0, predicate_wire);
 
         let inputs: TypeRow = input_types.into();
-        let n_branches = predicate_inputs.len();
+        let n_cases = predicate_inputs.len();
         let n_out_wires = outputs.len();
-        let gamma_node = self.add_dataflow_op(
+        let conditional_id = self.add_dataflow_op(
             ControlFlowOp::Conditional {
                 predicate_inputs,
                 inputs,
@@ -258,11 +260,11 @@ pub trait Dataflow: Container {
             },
             input_wires,
         )?;
-        Ok(GammaBuilder {
+        Ok(ConditionalBuilder {
             base: self.base(),
-            gamma_node: gamma_node.node(),
+            conditional_node: conditional_id.node(),
             n_out_wires,
-            branch_nodes: vec![None; n_branches],
+            case_nodes: vec![None; n_cases],
         })
     }
 
@@ -346,7 +348,7 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let Signature { input, output, .. } = signature;
         let sig = (if N == 1 { &output } else { &input }).clone();
-        let variants = theta_sum_variants(input, output);
+        let variants = loop_sum_variants(input, output);
         self.make_tuple_variant(sig, values, N, variants)
     }
 
@@ -546,7 +548,7 @@ fn if_copy_add_port(base: &mut HugrMut, src: NodeIndex) -> Option<usize> {
     }
 }
 
-impl<'f> DeltaBuilder<'f> {
+impl<'f> DFGBuilder<'f> {
     fn create_with_io(
         base: &'f mut HugrMut,
         parent: NodeIndex,
@@ -566,7 +568,7 @@ impl<'f> DeltaBuilder<'f> {
 
         Ok(Self {
             base,
-            delta_node: parent,
+            dfg_node: parent,
             io: [i, o],
             num_in_wires,
             num_out_wires,
@@ -574,11 +576,11 @@ impl<'f> DeltaBuilder<'f> {
     }
 }
 
-impl<'f> Container for DeltaBuilder<'f> {
-    type ContainerHandle = DeltaID;
+impl<'f> Container for DFGBuilder<'f> {
+    type ContainerHandle = DfgID;
     #[inline]
     fn container_node(&self) -> NodeIndex {
-        self.delta_node
+        self.dfg_node
     }
 
     #[inline]
@@ -586,8 +588,8 @@ impl<'f> Container for DeltaBuilder<'f> {
         self.base
     }
     #[inline]
-    fn finish(self) -> DeltaID {
-        (self.delta_node, self.num_out_wires).into()
+    fn finish(self) -> DfgID {
+        (self.dfg_node, self.num_out_wires).into()
     }
 
     #[inline]
@@ -596,7 +598,7 @@ impl<'f> Container for DeltaBuilder<'f> {
     }
 }
 
-impl<'f> Dataflow for DeltaBuilder<'f> {
+impl<'f> Dataflow for DFGBuilder<'f> {
     #[inline]
     fn io(&self) -> [NodeIndex; 2] {
         self.io
@@ -631,17 +633,17 @@ impl Container for ModuleBuilder {
     }
 }
 
-pub struct DeltaWrapper<'b, T>(DeltaBuilder<'b>, PhantomData<T>);
+pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
 
-pub type FunctionBuilder<'b> = DeltaWrapper<'b, FuncID>;
+pub type FunctionBuilder<'b> = DFGWrapper<'b, FuncID>;
 
-impl<'b, T> DeltaWrapper<'b, T> {
-    fn new(db: DeltaBuilder<'b>) -> Self {
+impl<'b, T> DFGWrapper<'b, T> {
+    fn new(db: DFGBuilder<'b>) -> Self {
         Self(db, PhantomData)
     }
 }
 
-impl<'b, T: From<DeltaID>> Container for DeltaWrapper<'b, T> {
+impl<'b, T: From<DfgID>> Container for DFGWrapper<'b, T> {
     type ContainerHandle = T;
 
     #[inline]
@@ -664,7 +666,7 @@ impl<'b, T: From<DeltaID>> Container for DeltaWrapper<'b, T> {
     }
 }
 
-impl<'b, T: From<DeltaID>> Dataflow for DeltaWrapper<'b, T> {
+impl<'b, T: From<DfgID>> Dataflow for DFGWrapper<'b, T> {
     #[inline]
     fn io(&self) -> [NodeIndex; 2] {
         self.0.io
@@ -699,7 +701,7 @@ impl ModuleBuilder {
             }),
         );
 
-        let db = DeltaBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
         Ok(FunctionBuilder::new(db))
     }
 
@@ -751,20 +753,20 @@ impl ModuleBuilder {
     }
 }
 
-pub struct KappaBuilder<'f> {
+pub struct CFGBuilder<'f> {
     base: &'f mut HugrMut,
-    kappa_node: NodeIndex,
+    cfg_node: NodeIndex,
     inputs: Option<TypeRow>,
     exit_node: NodeIndex,
     n_out_wires: usize,
 }
 
-impl<'f> Container for KappaBuilder<'f> {
-    type ContainerHandle = KappaID;
+impl<'f> Container for CFGBuilder<'f> {
+    type ContainerHandle = CfgID;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
-        self.kappa_node
+        self.cfg_node
     }
 
     #[inline]
@@ -779,75 +781,75 @@ impl<'f> Container for KappaBuilder<'f> {
 
     #[inline]
     fn finish(self) -> Self::ContainerHandle {
-        (self.kappa_node, self.n_out_wires).into()
+        (self.cfg_node, self.n_out_wires).into()
     }
 }
 
-impl<'f> KappaBuilder<'f> {
-    pub fn beta_builder<'a: 'b, 'b>(
+impl<'f> CFGBuilder<'f> {
+    pub fn block_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
         outputs: TypeRow,
         predicate_variants: TypeRow,
-    ) -> Result<BetaBuilder<'b>, BuildError> {
-        let n_branches = predicate_variants.len();
-        let op = OpType::BasicBlock(BasicBlockOp::Beta {
+    ) -> Result<BlockBuilder<'b>, BuildError> {
+        let n_cases = predicate_variants.len();
+        let op = OpType::BasicBlock(BasicBlockOp::Block {
             inputs: inputs.clone(),
             outputs: outputs.clone(),
-            n_branches,
+            n_cases,
         });
         let exit = self.exit_node;
-        let beta_n = self.base().add_op_before(exit, op)?;
+        let block_n = self.base().add_op_before(exit, op)?;
 
-        self.base().set_num_ports(beta_n, 0, n_branches);
+        self.base().set_num_ports(block_n, 0, n_cases);
 
-        // The node outputs a predicate before the data outputs of the beta node
+        // The node outputs a predicate before the data outputs of the block node
         let predicate_type = SimpleType::new_sum(predicate_variants);
         let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
-        let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, node_outputs)?;
-        Ok(BetaBuilder::new(db))
+        let db = DFGBuilder::create_with_io(self.base(), block_n, inputs, node_outputs)?;
+        Ok(BlockBuilder::new(db))
     }
-    pub fn simple_beta_builder<'a: 'b, 'b>(
+    pub fn simple_block_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
         outputs: TypeRow,
-        n_branches: usize,
-    ) -> Result<BetaBuilder<'b>, BuildError> {
-        let predicate_variants = vec![SimpleType::new_unit(); n_branches].into();
+        n_cases: usize,
+    ) -> Result<BlockBuilder<'b>, BuildError> {
+        let predicate_variants = vec![SimpleType::new_unit(); n_cases].into();
 
-        self.beta_builder(inputs, outputs, predicate_variants)
+        self.block_builder(inputs, outputs, predicate_variants)
     }
 
     pub fn entry_builder<'a: 'b, 'b>(
         &'a mut self,
         outputs: TypeRow,
         predicate_variants: TypeRow,
-    ) -> Result<BetaBuilder<'b>, BuildError> {
+    ) -> Result<BlockBuilder<'b>, BuildError> {
         let inputs = self
             .inputs
             .take()
-            .ok_or(BuildError::EntryBuiltError(self.kappa_node))?;
-        self.beta_builder(inputs, outputs, predicate_variants)
+            .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
+        self.block_builder(inputs, outputs, predicate_variants)
     }
     pub fn simple_entry_builder<'a: 'b, 'b>(
         &'a mut self,
         outputs: TypeRow,
-        n_branches: usize,
-    ) -> Result<BetaBuilder<'b>, BuildError> {
-        let predicate_variants = vec![SimpleType::new_unit(); n_branches].into();
+        n_cases: usize,
+    ) -> Result<BlockBuilder<'b>, BuildError> {
+        let predicate_variants = vec![SimpleType::new_unit(); n_cases].into();
 
         self.entry_builder(outputs, predicate_variants)
     }
 
-    pub fn exit_block(&self) -> BetaID {
+    pub fn exit_block(&self) -> BasicBlockID {
         self.exit_node.into()
     }
 
     pub fn branch(
         &mut self,
-        predicate: &BetaID,
+        predicate: &BasicBlockID,
         branch: usize,
-        successor: &BetaID,
+        successor: &BasicBlockID,
     ) -> Result<(), BuildError> {
         let from = predicate.node();
         let to = successor.node();
@@ -861,9 +863,9 @@ impl<'f> KappaBuilder<'f> {
     }
 }
 
-pub type BetaBuilder<'b> = DeltaWrapper<'b, BetaID>;
+pub type BlockBuilder<'b> = DFGWrapper<'b, BasicBlockID>;
 
-impl<'b> BetaBuilder<'b> {
+impl<'b> BlockBuilder<'b> {
     pub fn set_outputs(
         &mut self,
         branch_wire: Wire,
@@ -875,7 +877,7 @@ impl<'b> BetaBuilder<'b> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<<BetaBuilder<'b> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<BlockBuilder<'b> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
@@ -884,23 +886,23 @@ impl<'b> BetaBuilder<'b> {
     }
 }
 
-pub type ThetaBuilder<'b> = DeltaWrapper<'b, ThetaID>;
+pub type TailLoopBuilder<'b> = DFGWrapper<'b, TailLoopID>;
 
-impl<'b> ThetaBuilder<'b> {
+impl<'b> TailLoopBuilder<'b> {
     fn create_with_io(
         base: &'b mut HugrMut,
-        theta_node: NodeIndex,
+        loop_node: NodeIndex,
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<Self, BuildError> {
-        let delta_build = DeltaBuilder::create_with_io(
+        let dfg_build = DFGBuilder::create_with_io(
             base,
-            theta_node,
+            loop_node,
             inputs.clone(),
-            theta_output_row(inputs, outputs),
+            loop_output_row(inputs, outputs),
         )?;
 
-        Ok(ThetaBuilder::new(delta_build))
+        Ok(TailLoopBuilder::new(dfg_build))
     }
     pub fn set_outputs(&mut self, out_variant: Wire) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [out_variant])
@@ -909,7 +911,7 @@ impl<'b> ThetaBuilder<'b> {
     pub fn finish_with_outputs(
         mut self,
         out_variant: Wire,
-    ) -> Result<<ThetaBuilder<'b> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<TailLoopBuilder<'b> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
@@ -917,67 +919,67 @@ impl<'b> ThetaBuilder<'b> {
         Ok(self.finish())
     }
 
-    pub fn theta_signature(&self) -> Result<Signature, BuildError> {
+    pub fn loop_signature(&self) -> Result<Signature, BuildError> {
         let hugr = self.hugr();
 
         if let OpType::Function(DataflowOp::ControlFlow {
-            op: ControlFlowOp::Loop { inputs, outputs },
+            op: ControlFlowOp::TailLoop { inputs, outputs },
         }) = hugr.get_optype(self.container_node())
         {
             Ok(Signature::new_df(inputs.clone(), outputs.clone()))
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
-                op_desc: "ControlFlowOp::Loop",
+                op_desc: "ControlFlowOp::TailLoop",
             })
         }
     }
 
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
-        let Signature { input, output, .. } = self.theta_signature()?;
+        let Signature { input, output, .. } = self.loop_signature()?;
 
-        Ok(theta_output_row(input, output))
+        Ok(loop_output_row(input, output))
     }
 }
 
-fn theta_output_row(input: TypeRow, output: TypeRow) -> TypeRow {
-    vec![SimpleType::new_sum(theta_sum_variants(input, output))].into()
+fn loop_output_row(input: TypeRow, output: TypeRow) -> TypeRow {
+    vec![SimpleType::new_sum(loop_sum_variants(input, output))].into()
 }
 
-fn theta_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
+fn loop_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
     vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
 }
 
-pub type LambdaBuilder<'b> = DeltaWrapper<'b, LambdaID>;
+pub type CaseBuilder<'b> = DFGWrapper<'b, CaseID>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum GammaBuildError {
-    /// Branch already built.
-    #[error("Branch {branch} of gamma node {gamma:?} has already been built.")]
-    BranchBuiltError { gamma: NodeIndex, branch: usize },
-    /// Branch already built.
-    #[error("Gamma node {gamma:?} has no branch with index {branch}.")]
-    NotBranchError { gamma: NodeIndex, branch: usize },
-    /// Not all branches of gamma built.
-    #[error("Branches {branches:?} of gamma node {gamma:?} have not been built.")]
-    NotAllBranchesBuiltError {
-        gamma: NodeIndex,
-        branches: HashSet<usize>,
+pub enum ConditionalBuildError {
+    /// Case already built.
+    #[error("Case {case} of Conditional node {conditional:?} has already been built.")]
+    CaseBuiltError { conditional: NodeIndex, case: usize },
+    /// Case already built.
+    #[error("Conditional node {conditional:?} has no case with index {case}.")]
+    NotCaseError { conditional: NodeIndex, case: usize },
+    /// Not all cases of Conditional built.
+    #[error("Cases {cases:?} of Conditional node {conditional:?} have not been built.")]
+    NotAllCasesBuiltError {
+        conditional: NodeIndex,
+        cases: HashSet<usize>,
     },
 }
-pub struct GammaBuilder<'f> {
+pub struct ConditionalBuilder<'f> {
     base: &'f mut HugrMut,
-    gamma_node: NodeIndex,
+    conditional_node: NodeIndex,
     n_out_wires: usize,
-    branch_nodes: Vec<Option<NodeIndex>>,
+    case_nodes: Vec<Option<NodeIndex>>,
 }
 
-impl<'f> Container for GammaBuilder<'f> {
-    type ContainerHandle = Result<GammaID, GammaBuildError>;
+impl<'f> Container for ConditionalBuilder<'f> {
+    type ContainerHandle = Result<ConditionalID, ConditionalBuildError>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
-        self.gamma_node
+        self.conditional_node
     }
 
     #[inline]
@@ -991,66 +993,68 @@ impl<'f> Container for GammaBuilder<'f> {
     }
 
     fn finish(self) -> Self::ContainerHandle {
-        let branches: HashSet<usize> = self
-            .branch_nodes
+        let cases: HashSet<usize> = self
+            .case_nodes
             .iter()
             .enumerate()
             .filter_map(|(i, node)| if node.is_none() { Some(i) } else { None })
             .collect();
-        if !branches.is_empty() {
-            return Err(GammaBuildError::NotAllBranchesBuiltError {
-                gamma: self.gamma_node,
-                branches,
+        if !cases.is_empty() {
+            return Err(ConditionalBuildError::NotAllCasesBuiltError {
+                conditional: self.conditional_node,
+                cases,
             });
         }
-        Ok((self.gamma_node, self.n_out_wires).into())
+        Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
 
-impl<'f> GammaBuilder<'f> {
-    pub fn branch_builder<'a: 'b, 'b>(
+impl<'f> ConditionalBuilder<'f> {
+    pub fn case_builder<'a: 'b, 'b>(
         &'a mut self,
-        branch: usize,
-    ) -> Result<LambdaBuilder<'b>, BuildError> {
-        let gamma = self.gamma_node;
-        let control_op: Result<ControlFlowOp, ()> =
-            self.hugr().get_optype(self.gamma_node).clone().try_into();
+        case: usize,
+    ) -> Result<CaseBuilder<'b>, BuildError> {
+        let conditional = self.conditional_node;
+        let control_op: Result<ControlFlowOp, ()> = self
+            .hugr()
+            .get_optype(self.conditional_node)
+            .clone()
+            .try_into();
 
         let Ok(ControlFlowOp::Conditional {
             predicate_inputs,
             inputs,
             outputs,
-        }) = control_op else {panic!("Gamma node does not have gamma optype.")};
+        }) = control_op else {panic!("Parent node does not have Conditional optype.")};
         let sum_input = predicate_inputs
-            .get(branch)
-            .ok_or(GammaBuildError::NotBranchError { gamma, branch })?
+            .get(case)
+            .ok_or(ConditionalBuildError::NotCaseError { conditional, case })?
             .clone();
 
-        if self.branch_nodes.get(branch).unwrap().is_some() {
-            return Err(GammaBuildError::BranchBuiltError { gamma, branch }.into());
+        if self.case_nodes.get(case).unwrap().is_some() {
+            return Err(ConditionalBuildError::CaseBuiltError { conditional, case }.into());
         }
 
         let inputs: TypeRow = [vec![sum_input], inputs.iter().cloned().collect_vec()]
             .concat()
             .into();
 
-        let bb_op = OpType::Branch(BranchOp {
+        let bb_op = OpType::Case(CaseOp {
             signature: Signature::new_df(inputs.clone(), outputs.clone()),
         });
-        let branch_node =
-            // add branch before any existing subsequent branches
-            if let Some(&sibling_node) = self.branch_nodes[branch + 1..].iter().flatten().next() {
+        let case_node =
+            // add case before any existing subsequent cases
+            if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
                 self.base().add_op_before(sibling_node, bb_op)?
             } else {
                 self.add_child_op(bb_op)?
             };
 
-        self.branch_nodes[branch] = Some(branch_node);
+        self.case_nodes[case] = Some(case_node);
 
-        let delta_builder =
-            DeltaBuilder::create_with_io(self.base(), branch_node, inputs, outputs)?;
+        let dfg_builder = DFGBuilder::create_with_io(self.base(), case_node, inputs, outputs)?;
 
-        Ok(LambdaBuilder::new(delta_builder))
+        Ok(CaseBuilder::new(dfg_builder))
     }
 }
 
@@ -1090,7 +1094,7 @@ mod test {
                     vec![qb],
                 )?;
 
-                let inner_builder = func_builder.delta_builder(vec![(NAT, int)], type_row![NAT])?;
+                let inner_builder = func_builder.dfg_builder(vec![(NAT, int)], type_row![NAT])?;
                 let inner_id = n_identity(inner_builder)?;
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
@@ -1124,15 +1128,15 @@ mod test {
                 let mut func_builder = module_builder.define_function(&main)?;
                 let [flag, int] = func_builder.input_wires_arr();
 
-                let kappa_id: KappaID = {
+                let cfg_id: CfgID = {
                     let mut cfg_builder = func_builder
-                        .kappa_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
+                        .cfg_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
                     let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
 
                     let entry = n_identity(entry_b)?;
 
                     let mut middle_b =
-                        cfg_builder.simple_beta_builder(type_row![NAT], type_row![NAT], 1)?;
+                        cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
 
                     let middle = {
                         let c = middle_b.load_const(&s1)?;
@@ -1149,7 +1153,7 @@ mod test {
                     cfg_builder.finish()
                 };
 
-                func_builder.finish_with_outputs(kappa_id.outputs())?
+                func_builder.finish_with_outputs(cfg_id.outputs())?
             };
 
             module_builder.finish()
@@ -1161,7 +1165,7 @@ mod test {
     }
 
     #[test]
-    fn basic_theta() -> Result<(), BuildError> {
+    fn basic_loop() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder.declare("main", type_row![], type_row![NAT])?;
@@ -1169,18 +1173,17 @@ mod test {
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
 
-                let theta: ThetaID = {
-                    let mut theta_b = fbuild.theta_builder(vec![], type_row![NAT])?;
+                let loop_id: TailLoopID = {
+                    let mut loop_b = fbuild.tail_loop_builder(vec![], type_row![NAT])?;
 
-                    let const_wire = theta_b.load_const(&s1)?;
+                    let const_wire = loop_b.load_const(&s1)?;
 
-                    let break_wire =
-                        theta_b.make_break(theta_b.theta_signature()?, [const_wire])?;
+                    let break_wire = loop_b.make_break(loop_b.loop_signature()?, [const_wire])?;
 
-                    theta_b.finish_with_outputs(break_wire)?
+                    loop_b.finish_with_outputs(break_wire)?
                 };
 
-                fbuild.finish_with_outputs(theta.outputs())?
+                fbuild.finish_with_outputs(loop_id.outputs())?
             };
             module_builder.finish()
         };
@@ -1191,7 +1194,7 @@ mod test {
     }
 
     #[test]
-    fn basic_gamma() -> Result<(), BuildError> {
+    fn basic_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder.declare("main", type_row![NAT], type_row![NAT])?;
@@ -1201,23 +1204,22 @@ mod test {
 
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
-                let gamma: GammaID = {
+                let conditional_id: ConditionalID = {
                     let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
                     let other_inputs = vec![(NAT, int)];
                     let outputs = vec![SimpleType::new_unit(), NAT].into();
-                    let mut gamma_b = fbuild.gamma_builder(
+                    let mut conditional_b = fbuild.conditional_builder(
                         (predicate_inputs, const_wire),
                         other_inputs,
                         outputs,
                     )?;
 
-                    // let branch_0 = gamma_b.branch_builder(0)?;
-                    n_identity(gamma_b.branch_builder(0)?)?;
-                    n_identity(gamma_b.branch_builder(1)?)?;
+                    n_identity(conditional_b.case_builder(0)?)?;
+                    n_identity(conditional_b.case_builder(1)?)?;
 
-                    gamma_b.finish()?
+                    conditional_b.finish()?
                 };
-                let [unit, int] = gamma.outputs_arr();
+                let [unit, int] = conditional_id.outputs_arr();
                 fbuild.discard(unit)?;
                 fbuild.finish_with_outputs([int])?
             };
@@ -1230,7 +1232,7 @@ mod test {
     }
 
     #[test]
-    fn theta_with_gamma() -> Result<(), BuildError> {
+    fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder.declare("main", type_row![BIT], type_row![NAT])?;
@@ -1241,28 +1243,28 @@ mod test {
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
                 let [b1] = fbuild.input_wires_arr();
-                let theta: ThetaID = {
-                    let mut theta_b = fbuild.theta_builder(vec![(BIT, b1)], type_row![NAT])?;
-                    let signature = theta_b.theta_signature()?;
-                    let const_wire = theta_b.load_const(&tru_const)?;
-                    let [b1] = theta_b.input_wires_arr();
-                    let gamma: GammaID = {
+                let loop_id: TailLoopID = {
+                    let mut loop_b = fbuild.tail_loop_builder(vec![(BIT, b1)], type_row![NAT])?;
+                    let signature = loop_b.loop_signature()?;
+                    let const_wire = loop_b.load_const(&tru_const)?;
+                    let [b1] = loop_b.input_wires_arr();
+                    let conditional_id: ConditionalID = {
                         let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
-                        let output_row = theta_b.internal_output_row()?;
-                        let mut gamma_b = theta_b.gamma_builder(
+                        let output_row = loop_b.internal_output_row()?;
+                        let mut conditional_b = loop_b.conditional_builder(
                             (predicate_inputs, const_wire),
                             vec![(BIT, b1)],
                             output_row,
                         )?;
 
-                        let mut branch_0 = gamma_b.branch_builder(0)?;
+                        let mut branch_0 = conditional_b.case_builder(0)?;
                         let [pred, b1] = branch_0.input_wires_arr();
                         branch_0.discard(pred)?;
 
                         let continue_wire = branch_0.make_continue(signature.clone(), [b1])?;
                         branch_0.finish_with_outputs([continue_wire])?;
 
-                        let mut branch_1 = gamma_b.branch_builder(1)?;
+                        let mut branch_1 = conditional_b.case_builder(1)?;
                         let [pred, b1] = branch_1.input_wires_arr();
 
                         branch_1.discard(pred)?;
@@ -1272,13 +1274,13 @@ mod test {
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 
-                        gamma_b.finish()?
+                        conditional_b.finish()?
                     };
 
-                    theta_b.finish_with_outputs(gamma.out_wire(0))?
+                    loop_b.finish_with_outputs(conditional_id.out_wire(0))?
                 };
 
-                fbuild.finish_with_outputs(theta.outputs())?
+                fbuild.finish_with_outputs(loop_id.outputs())?
             };
             module_builder.finish()
         };
@@ -1411,7 +1413,7 @@ mod test {
             let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested = f_build.delta_builder(vec![], type_row![BIT])?;
+            let mut nested = f_build.dfg_builder(vec![], type_row![BIT])?;
 
             let id = nested.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
 
