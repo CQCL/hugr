@@ -98,9 +98,9 @@ impl ValidOpSet {
                     false
                 }
             }
-            ValidOpSet::DataflowOps => matches!(optype, OpType::Function(_)),
-            ValidOpSet::Input => matches!(optype, OpType::Function(DataflowOp::Input { .. })),
-            ValidOpSet::Output => matches!(optype, OpType::Function(DataflowOp::Output { .. })),
+            ValidOpSet::DataflowOps => matches!(optype, OpType::Dataflow(_)),
+            ValidOpSet::Input => matches!(optype, OpType::Dataflow(DataflowOp::Input { .. })),
+            ValidOpSet::Output => matches!(optype, OpType::Dataflow(DataflowOp::Output { .. })),
             ValidOpSet::Def => matches!(optype, OpType::Module(ModuleOp::Def { .. })),
             ValidOpSet::BasicBlock => matches!(optype, OpType::BasicBlock(_)),
             ValidOpSet::BasicBlockExit => {
@@ -145,7 +145,7 @@ impl OpType {
     pub fn validity_flags(&self) -> OpValidityFlags {
         match self {
             OpType::Module(op) => op.validity_flags(),
-            OpType::Function(op) => op.validity_flags(),
+            OpType::Dataflow(op) => op.validity_flags(),
             OpType::BasicBlock(op) => op.validity_flags(),
             OpType::Case(op) => op.validity_flags(),
         }
@@ -159,7 +159,7 @@ impl OpType {
     ) -> Result<(), ChildrenValidationError> {
         match self {
             OpType::Module(op) => op.validate_children(children),
-            OpType::Function(op) => op.validate_children(children),
+            OpType::Dataflow(op) => op.validate_children(children),
             OpType::BasicBlock(op) => op.validate_children(children),
             OpType::Case(op) => op.validate_children(children),
         }
@@ -525,14 +525,14 @@ fn validate_io_nodes<'a>(
     // The first and last children have already been popped from the iterator.
     for (child, optype) in children {
         match optype {
-            OpType::Function(DataflowOp::Input { .. }) => {
+            OpType::Dataflow(DataflowOp::Input { .. }) => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "first",
                 })
             }
-            OpType::Function(DataflowOp::Output { .. }) => {
+            OpType::Dataflow(DataflowOp::Output { .. }) => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
@@ -578,13 +578,13 @@ mod test {
         let in_types = type_row![B];
         let out_types = type_row![B, B];
 
-        let input_node = OpType::Function(DataflowOp::Input {
+        let input_node = OpType::Dataflow(DataflowOp::Input {
             types: in_types.clone(),
         });
-        let output_node = OpType::Function(DataflowOp::Output {
+        let output_node = OpType::Dataflow(DataflowOp::Output {
             types: out_types.clone(),
         });
-        let leaf_node = OpType::Function(DataflowOp::Leaf {
+        let leaf_node = OpType::Dataflow(DataflowOp::Leaf {
             op: LeafOp::Copy {
                 n_copies: 2,
                 typ: ClassicType::bit(),
