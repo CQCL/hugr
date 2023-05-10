@@ -167,7 +167,7 @@ mod test {
                 vec![qubit_state_type.get_new_type()].into(),
             )?;
             {
-                let tuple = f_build.make_tuple(inputs, f_build.input_wires())?;
+                let tuple = f_build.make_tuple(f_build.input_wires())?;
                 let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
                 f_build.finish_with_outputs([q_s_val])?;
             }

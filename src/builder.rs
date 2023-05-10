@@ -1,3 +1,6 @@
+#![warn(missing_docs)]
+//! Tools for building valid HUGRs.
+//!
 use portgraph::NodeIndex;
 use thiserror::Error;
 
@@ -31,6 +34,7 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 pub struct Wire(NodeIndex, usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+/// Error during building of HUGR
 pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
@@ -44,7 +48,9 @@ pub enum BuildError {
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
     UnexpectedType {
+        /// Index of node where error occurred
         node: NodeIndex,
+        /// Description of expected node
         op_desc: &'static str,
     },
     /// Error building Conditional node
@@ -71,6 +77,7 @@ mod test {
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
     pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
+    /// Wire up inputs of a Dataflow container to the outputs
     pub(super) fn n_identity<T: Dataflow>(
         dataflow_builder: T,
     ) -> Result<T::ContainerHandle, BuildError> {
