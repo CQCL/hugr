@@ -327,6 +327,18 @@ pub trait Dataflow: Container {
         Ok(make_op.out_wire(0))
     }
 
+    fn make_tuple_variant(
+        &mut self,
+        tuple_elements: TypeRow,
+        values: impl IntoIterator<Item = Wire>,
+        tag: usize,
+        variants: TypeRow,
+    ) -> Result<Wire, BuildError> {
+        let tuple = self.make_tuple(tuple_elements, values)?;
+
+        self.make_tag(tag, variants, tuple)
+    }
+
     fn make_out_variant<const N: usize>(
         &mut self,
         signature: Signature,
@@ -334,10 +346,8 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let Signature { input, output, .. } = signature;
         let sig = (if N == 1 { &output } else { &input }).clone();
-        let tuple = self.make_tuple(sig, values)?;
         let variants = theta_sum_variants(input, output);
-
-        self.make_tag(N, variants, tuple)
+        self.make_tuple_variant(sig, values, N, variants)
     }
 
     fn make_continue(
@@ -778,8 +788,9 @@ impl<'f> KappaBuilder<'f> {
         &'a mut self,
         inputs: TypeRow,
         outputs: TypeRow,
-        n_branches: usize,
+        predicate_variants: TypeRow,
     ) -> Result<BetaBuilder<'b>, BuildError> {
+        let n_branches = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlockOp::Beta {
             inputs: inputs.clone(),
             outputs: outputs.clone(),
@@ -791,22 +802,41 @@ impl<'f> KappaBuilder<'f> {
         self.base().set_num_ports(beta_n, 0, n_branches);
 
         // The node outputs a predicate before the data outputs of the beta node
-        let predicate_type = SimpleType::new_predicate(n_branches);
+        let predicate_type = SimpleType::new_sum(predicate_variants);
         let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
         let db = DeltaBuilder::create_with_io(self.base(), beta_n, inputs, node_outputs)?;
         Ok(BetaBuilder::new(db))
+    }
+    pub fn simple_beta_builder<'a: 'b, 'b>(
+        &'a mut self,
+        inputs: TypeRow,
+        outputs: TypeRow,
+        n_branches: usize,
+    ) -> Result<BetaBuilder<'b>, BuildError> {
+        let predicate_variants = vec![SimpleType::new_unit(); n_branches].into();
+
+        self.beta_builder(inputs, outputs, predicate_variants)
     }
 
     pub fn entry_builder<'a: 'b, 'b>(
         &'a mut self,
         outputs: TypeRow,
-        n_branches: usize,
+        predicate_variants: TypeRow,
     ) -> Result<BetaBuilder<'b>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.kappa_node))?;
-        self.beta_builder(inputs, outputs, n_branches)
+        self.beta_builder(inputs, outputs, predicate_variants)
+    }
+    pub fn simple_entry_builder<'a: 'b, 'b>(
+        &'a mut self,
+        outputs: TypeRow,
+        n_branches: usize,
+    ) -> Result<BetaBuilder<'b>, BuildError> {
+        let predicate_variants = vec![SimpleType::new_unit(); n_branches].into();
+
+        self.entry_builder(outputs, predicate_variants)
     }
 
     pub fn exit_block(&self) -> BetaID {
@@ -1097,12 +1127,12 @@ mod test {
                 let kappa_id: KappaID = {
                     let mut cfg_builder = func_builder
                         .kappa_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
-                    let entry_b = cfg_builder.entry_builder(type_row![NAT], 2)?;
+                    let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
 
                     let entry = n_identity(entry_b)?;
 
                     let mut middle_b =
-                        cfg_builder.beta_builder(type_row![NAT], type_row![NAT], 1)?;
+                        cfg_builder.simple_beta_builder(type_row![NAT], type_row![NAT], 1)?;
 
                     let middle = {
                         let c = middle_b.load_const(&s1)?;
