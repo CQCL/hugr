@@ -23,13 +23,13 @@ pub type CaseBuilder<'b> = DFGWrapper<'b, CaseID>;
 pub enum ConditionalBuildError {
     /// Case already built.
     #[error("Case {case} of Conditional node {conditional:?} has already been built.")]
-    CaseBuiltError { conditional: NodeIndex, case: usize },
+    CaseBuilt { conditional: NodeIndex, case: usize },
     /// Case already built.
     #[error("Conditional node {conditional:?} has no case with index {case}.")]
-    NotCaseError { conditional: NodeIndex, case: usize },
+    NotCase { conditional: NodeIndex, case: usize },
     /// Not all cases of Conditional built.
     #[error("Cases {cases:?} of Conditional node {conditional:?} have not been built.")]
-    NotAllCasesBuiltError {
+    NotAllCasesBuilt {
         conditional: NodeIndex,
         cases: HashSet<usize>,
     },
@@ -68,7 +68,7 @@ impl<'f> Container for ConditionalBuilder<'f> {
             .filter_map(|(i, node)| if node.is_none() { Some(i) } else { None })
             .collect();
         if !cases.is_empty() {
-            return Err(ConditionalBuildError::NotAllCasesBuiltError {
+            return Err(ConditionalBuildError::NotAllCasesBuilt {
                 conditional: self.conditional_node,
                 cases,
             });
@@ -96,11 +96,11 @@ impl<'f> ConditionalBuilder<'f> {
         }) = control_op else {panic!("Parent node does not have Conditional optype.")};
         let sum_input = predicate_inputs
             .get(case)
-            .ok_or(ConditionalBuildError::NotCaseError { conditional, case })?
+            .ok_or(ConditionalBuildError::NotCase { conditional, case })?
             .clone();
 
         if self.case_nodes.get(case).unwrap().is_some() {
-            return Err(ConditionalBuildError::CaseBuiltError { conditional, case }.into());
+            return Err(ConditionalBuildError::CaseBuilt { conditional, case }.into());
         }
 
         let inputs: TypeRow = [vec![sum_input], inputs.iter().cloned().collect_vec()]
