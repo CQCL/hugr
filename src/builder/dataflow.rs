@@ -10,6 +10,7 @@ use portgraph::NodeIndex;
 
 use crate::{hugr::HugrMut, Hugr};
 
+/// Builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node.
 pub struct DFGBuilder<'f> {
     pub(crate) base: &'f mut HugrMut,
     pub(crate) dfg_node: NodeIndex,
@@ -19,7 +20,7 @@ pub struct DFGBuilder<'f> {
 }
 
 impl<'f> DFGBuilder<'f> {
-    pub(crate) fn create_with_io(
+    pub(super) fn create_with_io(
         base: &'f mut HugrMut,
         parent: NodeIndex,
         inputs: TypeRow,
@@ -82,10 +83,11 @@ impl<'f> Dataflow for DFGBuilder<'f> {
 
 pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
 
+/// Builder for a [`crate::ops::module::ModuleOp::Def`] node
 pub type FunctionBuilder<'b> = DFGWrapper<'b, FuncID>;
 
 impl<'b, T> DFGWrapper<'b, T> {
-    pub(crate) fn new(db: DFGBuilder<'b>) -> Self {
+    pub(super) fn new(db: DFGBuilder<'b>) -> Self {
         Self(db, PhantomData)
     }
 }
@@ -137,7 +139,7 @@ mod test {
         },
         ops::LeafOp,
         type_row,
-        types::LinearType,
+        types::{LinearType, Signature},
     };
 
     use super::*;
@@ -149,8 +151,7 @@ mod test {
             let _f_id = {
                 let mut func_builder = module_builder.declare_and_def(
                     "main",
-                    type_row![NAT, QB],
-                    type_row![NAT, QB],
+                    Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
@@ -181,8 +182,10 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build =
-                module_builder.declare_and_def("main", type_row![BIT], type_row![BIT, BIT])?;
+            let f_build = module_builder.declare_and_def(
+                "main",
+                Signature::new_df(type_row![BIT], type_row![BIT, BIT]),
+            )?;
 
             f(f_build)?;
 
@@ -229,8 +232,8 @@ mod test {
         let builder = || {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build =
-                module_builder.declare_and_def("main", type_row![QB], type_row![QB, QB])?;
+            let f_build = module_builder
+                .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
@@ -246,8 +249,8 @@ mod test {
         let builder = || {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build =
-                module_builder.declare_and_def("main", type_row![BIT], type_row![BIT])?;
+            let mut f_build = module_builder
+                .declare_and_def("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;

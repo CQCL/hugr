@@ -8,7 +8,7 @@ use crate::types::SimpleType;
 
 use crate::ops::{ConstValue, ModuleOp, OpType};
 
-use crate::types::{Signature, TypeRow};
+use crate::types::Signature;
 
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
@@ -16,9 +16,13 @@ use smol_str::SmolStr;
 use crate::{hugr::HugrMut, Hugr};
 
 #[derive(Default)]
+/// Builder for a HUGR module.
+/// Top level builder which can generate sub-builders.
+/// Validates and returns the HUGR on `finish`.
 pub struct ModuleBuilder(HugrMut);
 
 impl ModuleBuilder {
+    /// New builder for a new HUGR.
     pub fn new() -> Self {
         Self(HugrMut::new())
     }
@@ -48,6 +52,14 @@ impl Container for ModuleBuilder {
 }
 
 impl ModuleBuilder {
+    /// Generate a builder for defining a function body graph.
+    ///
+    /// Replaces a [`ModuleOp::Declare`] node as specified by `f_id`
+    /// with a [`ModuleOp::Def`] node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the node.
     pub fn define_function<'a: 'b, 'b>(
         &'a mut self,
         f_id: &FuncID,
@@ -74,30 +86,45 @@ impl ModuleBuilder {
         Ok(FunctionBuilder::new(db))
     }
 
+    /// Add a [`ModuleOp::Def`] node and returns a builder to define the function
+    /// body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Def`] node.
     pub fn declare_and_def<'a: 'b, 'b>(
         &'a mut self,
         _name: impl Into<String>,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        signature: Signature,
     ) -> Result<FunctionBuilder<'b>, BuildError> {
-        let fid = self.declare(_name, inputs, outputs)?;
+        let fid = self.declare(_name, signature)?;
         self.define_function(&fid)
     }
 
+    /// Declare a function with `signature` and return a handle to the declaration.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Declare`] node.
     pub fn declare(
         &mut self,
         _name: impl Into<String>,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        signature: Signature,
     ) -> Result<FuncID, BuildError> {
         // TODO add name and param names to metadata
-        let declare_n = self.add_child_op(ModuleOp::Declare {
-            signature: Signature::new(inputs, outputs, None),
-        })?;
+        let declare_n = self.add_child_op(ModuleOp::Declare { signature })?;
 
         Ok(declare_n.into())
     }
 
+    /// Add a constant value to the module and return a handle to it.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Const`] node.
     pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
         let const_n = self.add_child_op(ModuleOp::Const(val))?;
@@ -105,7 +132,7 @@ impl ModuleBuilder {
         Ok((const_n, typ).into())
     }
 
-    /// Add a NewType node and return a handle to the NewType
+    /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType.
     pub fn add_new_type(
         &mut self,
         name: impl Into<SmolStr>,
@@ -140,7 +167,8 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_id = module_builder.declare("main", type_row![NAT], type_row![NAT])?;
+            let f_id = module_builder
+                .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
 
             let mut f_build = module_builder.define_function(&f_id)?;
             let call = f_build.call(&f_id, f_build.input_wires())?;
@@ -163,11 +191,10 @@ mod test {
 
             let mut f_build = module_builder.declare_and_def(
                 "main",
-                inputs.clone(),
-                vec![qubit_state_type.get_new_type()].into(),
+                Signature::new_df(inputs, vec![qubit_state_type.get_new_type()]),
             )?;
             {
-                let tuple = f_build.make_tuple(inputs, f_build.input_wires())?;
+                let tuple = f_build.make_tuple(f_build.input_wires())?;
                 let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
                 f_build.finish_with_outputs([q_s_val])?;
             }

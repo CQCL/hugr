@@ -26,11 +26,21 @@ use crate::Hugr;
 
 use crate::hugr::HugrMut;
 
+/// Trait for HUGR container builders.
+/// Containers are nodes that are parents of sibling graphs.
+/// Implementations of this trait allow the child sibling graph to be added to
+/// the HUGR.
 pub trait Container {
+    /// A handle to the finished container node, typically returned when the
+    /// child graph has been finished.
     type ContainerHandle;
+    /// The container node.
     fn container_node(&self) -> NodeIndex;
+    /// The underlying [`HugrMut`] being used to build the HUGR.
     fn base(&mut self) -> &mut HugrMut;
+    /// Immutable reference to HUGR being built.
     fn hugr(&self) -> &Hugr;
+    /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<NodeIndex, BuildError> {
         let parent = self.container_node();
         Ok(self.base().add_op_with_parent(parent, op)?)
@@ -45,24 +55,35 @@ pub trait Container {
         Ok(Wire(src, src_port))
     }
 
+    /// Consume the container builder and return the handle, may perform some
+    /// checks before finishing.
     fn finish(self) -> Self::ContainerHandle;
 }
 
+/// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
+    /// Return indices of input and output nodes.
     fn io(&self) -> [NodeIndex; 2];
+    /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
-
+    /// Handle to input node.
     fn input(&self) -> OpID {
         (self.io()[0], self.num_inputs()).into()
     }
-
+    /// Handle to output node.
     fn output(&self) -> OpID {
         (self.io()[1], 0).into()
     }
-
+    /// Return iterator over all input Value wires.
     fn input_wires(&self) -> Outputs {
         self.input().outputs()
     }
+    /// Add a dataflow op to the sibling graph, wiring up the input_wires to the
+    /// incoming ports of the resulting node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the node.
     fn add_dataflow_op(
         &mut self,
         op: impl Into<OpType>,
@@ -73,11 +94,25 @@ pub trait Dataflow: Container {
         Ok(outs.into())
     }
 
-    fn set_outputs(&mut self, outputs: impl IntoIterator<Item = Wire>) -> Result<(), BuildError> {
+    /// Wire up the output_wires to the input ports of the Output node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when wiring up.
+    fn set_outputs(
+        &mut self,
+        output_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<(), BuildError> {
         let [inp, out] = self.io();
-        wire_up_inputs(outputs.into_iter().collect_vec(), out, self, inp)
+        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self, inp)
     }
 
+    /// Set the outputs of the graph and consume the builder, while returning a
+    /// handle to the parent.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when setting outputs.
     fn finish_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
@@ -89,6 +124,11 @@ pub trait Dataflow: Container {
         Ok(self.finish())
     }
 
+    /// Return an array of the input wires.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of input Wires does not match the size of the array.
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
         self.input_wires()
             .collect_vec()
@@ -96,27 +136,46 @@ pub trait Dataflow: Container {
             .expect(&format!("Incorrect number of wires: {}", N)[..])
     }
 
+    /// Return a builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node, i.e. a nested dataflow subgraph.
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `output_types` are the types of the outputs.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the DFG node.
     fn dfg_builder<'a: 'b, 'b>(
         &'a mut self,
-        inputs: Vec<(SimpleType, Wire)>,
-        outputs: TypeRow,
+        inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        output_types: TypeRow,
     ) -> Result<DFGBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
             OpType::Dataflow(DataflowOp::DFG {
-                signature: Signature::new(input_types.clone(), outputs.clone(), None),
+                signature: Signature::new(input_types.clone(), output_types.clone(), None),
             }),
             input_wires,
         )?;
 
-        DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), outputs)
+        DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), output_types)
     }
 
+    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] node,
+    /// i.e. a nested controlflow subgraph.
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `output_types` are the types of the outputs.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the CFG node.
     fn cfg_builder<'a: 'b, 'b>(
         &'a mut self,
-        inputs: Vec<(SimpleType, Wire)>,
-        outputs: TypeRow,
+        inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        output_types: TypeRow,
     ) -> Result<CFGBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
@@ -127,17 +186,17 @@ pub trait Dataflow: Container {
             OpType::Dataflow(DataflowOp::ControlFlow {
                 op: ControlFlowOp::CFG {
                     inputs: inputs.clone(),
-                    outputs: outputs.clone(),
+                    outputs: output_types.clone(),
                 },
             }),
             input_wires,
         )?;
 
         let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
-            cfg_outputs: outputs.clone(),
+            cfg_outputs: output_types.clone(),
         });
         let exit_node = self.base().add_op_with_parent(cfg_node, exit_block_type)?;
-        let n_out_wires = outputs.len();
+        let n_out_wires = output_types.len();
         let cfg_builder = CFGBuilder {
             base: self.base(),
             cfg_node,
@@ -149,6 +208,11 @@ pub trait Dataflow: Container {
         Ok(cfg_builder)
     }
 
+    /// Load a static constant and return the local dataflow wire for that constant.
+    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let cn = cid.node();
         let c_out = self.hugr().num_outputs(cn);
@@ -169,10 +233,19 @@ pub trait Dataflow: Container {
         Ok(load_n.out_wire(0))
     }
 
+    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `output_types` are the types of the outputs.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the TailLoop node.
     fn tail_loop_builder<'a: 'b, 'b>(
         &'a mut self,
-        inputs: Vec<(SimpleType, Wire)>,
-        outputs: TypeRow,
+        inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        output_types: TypeRow,
     ) -> Result<TailLoopBuilder<'b>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (loop_node, _) = add_op_with_wires(
@@ -180,21 +253,33 @@ pub trait Dataflow: Container {
             OpType::Dataflow(
                 ControlFlowOp::TailLoop {
                     inputs: input_types.clone().into(),
-                    outputs: outputs.clone(),
+                    outputs: output_types.clone(),
                 }
                 .into(),
             ),
             input_wires,
         )?;
         let input: TypeRow = input_types.into();
-        TailLoopBuilder::create_with_io(self.base(), loop_node, input, outputs)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, input, output_types)
     }
 
+    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
+    /// `predicate_inputs` and `predicate_wire` define the type of the predicate
+    /// variants and the wire carrying the predicate respectively.
+    ///
+    /// The `other_inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `outputs` are the types of the outputs.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the Conditional node.
     fn conditional_builder<'a: 'b, 'b>(
         &'a mut self,
         (predicate_inputs, predicate_wire): (TypeRow, Wire),
-        other_inputs: Vec<(SimpleType, Wire)>,
-        outputs: TypeRow,
+        other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        output_types: TypeRow,
     ) -> Result<ConditionalBuilder<'b>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -203,12 +288,12 @@ pub trait Dataflow: Container {
 
         let inputs: TypeRow = input_types.into();
         let n_cases = predicate_inputs.len();
-        let n_out_wires = outputs.len();
+        let n_out_wires = output_types.len();
         let conditional_id = self.add_dataflow_op(
             ControlFlowOp::Conditional {
                 predicate_inputs,
                 inputs,
-                outputs,
+                outputs: output_types,
             },
             input_wires,
         )?;
@@ -232,27 +317,39 @@ pub trait Dataflow: Container {
         Ok(())
     }
 
-    fn get_wire_type(&self, wire: Wire) -> Option<SimpleType> {
+    /// Get the type of a Value [`Wire`]. If not valid port or of Value kind, returns None.
+    fn get_wire_type(&self, wire: Wire) -> Result<SimpleType, BuildError> {
         let kind = self
             .hugr()
             .get_optype(wire.0)
-            .port_kind(PortOffset::new_outgoing(wire.1))?;
+            .port_kind(PortOffset::new_outgoing(wire.1));
 
-        if let EdgeKind::Value(typ) = kind {
-            Some(typ)
+        if let Some(EdgeKind::Value(typ)) = kind {
+            Ok(typ)
         } else {
-            None
+            Err(BuildError::WireNotFound(wire))
         }
     }
 
+    /// Add a discard (0-arity copy) for a `wire` with a known type `typ`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// copy node.
     fn discard_type(&mut self, wire: Wire, typ: ClassicType) -> Result<OpID, BuildError> {
         self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
     }
 
+    /// Discard a value on a `wire` using [`Dataflow::discard_type`], retrieving
+    /// the type of the Wire from it's source.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if ther is an error when adding the
+    /// copy node.
     fn discard(&mut self, wire: Wire) -> Result<OpID, BuildError> {
-        let typ = self
-            .get_wire_type(wire)
-            .ok_or(BuildError::WireNotFound(wire))?;
+        let typ = self.get_wire_type(wire)?;
         let typ = match typ {
             SimpleType::Classic(typ) => typ,
             SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
@@ -260,20 +357,45 @@ pub trait Dataflow: Container {
         self.discard_type(wire, typ)
     }
 
-    fn make_tuple(
-        &mut self,
-        types: TypeRow,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
+    /// Add a [`LeafOp::MakeTuple`] node and wire in the `values` Wires,
+    /// returning the Wire corresponding to the tuple.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the
+    /// MakeTuple node.
+    fn make_tuple(&mut self, values: impl IntoIterator<Item = Wire>) -> Result<Wire, BuildError> {
+        let values = values.into_iter().collect_vec();
+        let types: Result<Vec<SimpleType>, _> = values
+            .iter()
+            .map(|&wire| self.get_wire_type(wire))
+            .collect();
+        let types = types?.into();
         let make_op: OpID = self.add_dataflow_op(LeafOp::MakeTuple(types), values)?;
         Ok(make_op.out_wire(0))
     }
 
+    /// Add a [`LeafOp::Tag`] node and wire in the `value` Wire,
+    /// to make a value with Sum type, with `tag` and possible types described
+    /// by `variants`.
+    /// Returns the Wire corresponding to the Sum value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the
+    /// Tag node.
     fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
         let make_op: OpID = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
         Ok(make_op.out_wire(0))
     }
 
+    /// Cast an incoming `value` to `new_type` by adding a
+    /// [`LeafOp::MakeNewType`] node and return the resulting wire.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the
+    /// MakeNewType node.
     fn make_new_type(&mut self, new_type: &NewTypeID, value: Wire) -> Result<Wire, BuildError> {
         let name = new_type.get_name().clone();
         let typ = new_type.get_core_type().clone();
@@ -281,45 +403,48 @@ pub trait Dataflow: Container {
         Ok(make_op.out_wire(0))
     }
 
-    fn make_tuple_variant(
-        &mut self,
-        tuple_elements: TypeRow,
-        values: impl IntoIterator<Item = Wire>,
-        tag: usize,
-        variants: TypeRow,
-    ) -> Result<Wire, BuildError> {
-        let tuple = self.make_tuple(tuple_elements, values)?;
-
-        self.make_tag(tag, variants, tuple)
-    }
-
-    fn make_out_variant<const N: usize>(
-        &mut self,
-        signature: Signature,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
-        let Signature { input, output, .. } = signature;
-        let sig = (if N == 1 { &output } else { &input }).clone();
-        let variants = loop_sum_variants(input, output);
-        self.make_tuple_variant(sig, values, N, variants)
-    }
-
+    /// Use the wires in `values` to return a wire corresponding to the
+    /// "Continue" variant of a TailLoop with `loop_signature`.
+    ///
+    /// Packs the values in to a tuple and tags appropriately to generate a
+    /// value of Sum type.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the nodes.
     fn make_continue(
         &mut self,
-        signature: Signature,
+        loop_signature: Signature,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_out_variant::<0>(signature, values)
+        make_out_variant::<0, Self>(self, loop_signature, values)
     }
 
+    /// Use the wires in `values` to return a wire corresponding to the
+    /// "Break" variant of a TailLoop with `loop_signature`.
+    ///
+    /// Packs the values in to a tuple and tags appropriately to generate a
+    /// value of Sum type.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the nodes.
     fn make_break(
         &mut self,
-        signature: Signature,
+        loop_signature: Signature,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_out_variant::<1>(signature, values)
+        make_out_variant::<1, Self>(self, loop_signature, values)
     }
 
+    /// Add a [`DataflowOp::Call`] node, calling `function`, with inputs
+    /// specified by `input_wires`. Returns a handle to the corresponding Call node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the Call
+    /// node, or if `function` does not refer to a [`ModuleOp::Declare`] or
+    /// [`ModuleOp::Def`] node.
     fn call(
         &mut self,
         function: &FuncID,
@@ -348,6 +473,20 @@ pub trait Dataflow: Container {
     }
 }
 
+#[inline]
+fn make_out_variant<const N: usize, T: Dataflow + ?Sized>(
+    container: &mut T,
+    signature: Signature,
+    values: impl IntoIterator<Item = Wire>,
+) -> Result<Wire, BuildError> {
+    let Signature { input, output, .. } = signature;
+    let variants = loop_sum_variants(input, output);
+    {
+        let tuple = container.make_tuple(values)?;
+
+        container.make_tag(N, variants, tuple)
+    }
+}
 pub(crate) fn add_op_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     op: impl Into<OpType>,
