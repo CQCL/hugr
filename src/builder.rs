@@ -66,6 +66,9 @@ pub enum BuildError {
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
     NoCopyLinear(LinearType),
+    /// Wire not linear
+    #[error("Wire {0:?} was not linear type as expected.")]
+    WireNotLinear(Wire),
 }
 
 #[cfg(test)]
