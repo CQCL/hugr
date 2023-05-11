@@ -89,7 +89,8 @@ pub enum BasicBlockOp {
 }
 
 impl BasicBlockOp {
-    /// Non dataflow edge types allowed for this node.
+    /// The edge kind for the inputs and outputs of the operation not described
+    /// by the signature.
     pub fn other_edges(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
@@ -135,7 +136,8 @@ pub struct CaseOp {
 }
 
 impl CaseOp {
-    /// Non dataflow edge types allowed for this node.
+    /// The edge kind for the inputs and outputs of the operation not described
+    /// by the signature.
     pub fn other_edges(&self) -> Option<EdgeKind> {
         None
     }

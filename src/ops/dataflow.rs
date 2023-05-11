@@ -33,8 +33,8 @@ pub enum DataflowOp {
 }
 
 impl DataflowOp {
-    /// The non-dataflow edge kind for the inputs of the operation not described
-    /// by the signature.
+    /// The edge kind for the inputs of the operation not described by the
+    /// signature.
     ///
     /// If None, there will be no other input edges. Otherwise, all other input
     /// edges will be of that kind.
@@ -46,11 +46,11 @@ impl DataflowOp {
         }
     }
 
-    /// The non-dataflow edge kind for the outputs of the operation not described
-    /// by the signature.
+    /// The edge kind for the outputs of the operation not described by the
+    /// signature.
     ///
-    /// If None, there will be no other output edges. Otherwise, all other output
-    /// edges will be of that kind.
+    /// If None, there will be no other output edges. Otherwise, all other
+    /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         if let DataflowOp::Output { .. } = self {
             None
