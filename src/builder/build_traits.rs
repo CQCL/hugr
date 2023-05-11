@@ -5,6 +5,7 @@ use std::iter;
 use super::{
     nodehandle::{ConstID, FuncID, NewTypeID, OpID, Outputs},
     tail_loop::loop_sum_variants,
+    LinearBuilder,
 };
 
 use crate::{
@@ -470,6 +471,12 @@ pub trait Dataflow: Container {
         self.base()
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;
         Ok(op_id)
+    }
+
+    /// For the array of `wires`, produce a `LinearBuilder` where ops can be
+    /// added using indices in to the array.
+    fn as_linear<const N: usize>(&mut self, wires: [Wire; N]) -> LinearBuilder<Self, N> {
+        LinearBuilder::new(wires, self)
     }
 }
 

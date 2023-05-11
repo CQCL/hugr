@@ -41,6 +41,8 @@ pub enum LeafOp {
     Noop(SimpleType),
     /// A qubit measurement operation.
     Measure,
+    /// A rotation of a qubit about the Pauli Z axis by an input float angle.
+    RzF64,
     /// A copy operation for classical data.
     Copy {
         /// The number of copies to make.
@@ -114,6 +116,7 @@ impl LeafOp {
             LeafOp::UnpackTuple(_) => "UnpackTuple",
             LeafOp::MakeNewType { .. } => "MakeNewType",
             LeafOp::Tag { .. } => "Tag",
+            LeafOp::RzF64 => "RzF64",
         }
         .into()
     }
@@ -143,6 +146,7 @@ impl LeafOp {
             LeafOp::MakeNewType { .. } => {
                 "Make a new type value from a value of the defining type."
             }
+            LeafOp::RzF64 => "Rz rotation.",
         }
     }
 
@@ -152,6 +156,7 @@ impl LeafOp {
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+        const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
         match self {
             LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
@@ -165,7 +170,7 @@ impl LeafOp {
             | LeafOp::Y
             | LeafOp::Z => Signature::new_linear(type_row![Q]),
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
-            LeafOp::Measure => Signature::new_linear(type_row![Q, B]),
+            LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Copy { n_copies, typ } => {
                 let typ: SimpleType = typ.clone().into();
                 Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
@@ -186,6 +191,7 @@ impl LeafOp {
                 vec![typ.clone()],
                 vec![typ.clone().into_new_type(name.clone())],
             ),
+            LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
         }
     }
 
