@@ -10,7 +10,7 @@ use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
 #[derive(Debug, Clone)]
-/// Iterator over output wires of a [`BuildHandle`]
+/// Iterator over output wires of a [`BuildHandle`].
 pub struct Outputs {
     node: NodeIndex,
     range: std::ops::Range<usize>,
@@ -55,12 +55,12 @@ impl DoubleEndedIterator for Outputs {
 
 impl FusedIterator for Outputs {}
 
-/// Common trait for handles to a node
-/// Typically wrappers around [`NodeIndex`]
+/// Common trait for handles to a node.
+/// Typically wrappers around [`NodeIndex`].
 pub trait BuildHandle {
-    /// Index of underlying node
+    /// Index of underlying node.
     fn node(&self) -> NodeIndex;
-    /// Number of Value kind outputs from this node
+    /// Number of Value kind outputs from this node.
     fn num_value_outputs(&self) -> usize {
         0
     }
@@ -74,7 +74,7 @@ pub trait BuildHandle {
         }
     }
 
-    /// Attempt to cast outputs in to array of Wires
+    /// Attempt to cast outputs in to array of Wires.
     fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
         self.outputs()
             .collect_vec()
@@ -83,8 +83,8 @@ pub trait BuildHandle {
     }
 
     #[inline]
-    /// Retrieve a [`Wire`] corresponding to the given offset
-    /// Does not check whether such a wire is valid for this node
+    /// Retrieve a [`Wire`] corresponding to the given offset.
+    /// Does not check whether such a wire is valid for this node.
     fn out_wire(&self, offset: usize) -> Wire {
         Wire(self.node(), offset)
     }
@@ -92,24 +92,24 @@ pub trait BuildHandle {
 
 #[derive(DerFrom, Debug)]
 
-/// Handle to a [LeafOp](crate::ops::leaf::LeafOp)
+/// Handle to a [LeafOp](crate::ops::leaf::LeafOp).
 pub struct OpID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node
+/// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node.
 pub struct DfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node
+/// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node.
 pub struct CfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
 /// Handle to a [def](crate::ops::module::ModuleOp::Def)
-/// or [declare](crate::ops::module::ModuleOp::Declare) node
+/// or [declare](crate::ops::module::ModuleOp::Declare) node.
 pub struct FuncID(NodeIndex);
 
 #[derive(DerFrom, Debug, Clone)]
-/// Handle to a [NewType](crate::ops::module::ModuleOp::NewType) node
+/// Handle to a [NewType](crate::ops::module::ModuleOp::NewType) node.
 pub struct NewTypeID {
     node: NodeIndex,
     name: SmolStr,
@@ -134,7 +134,7 @@ impl NewTypeID {
 }
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Const](crate::ops::module::ModuleOp::Const) node
+/// Handle to a [Const](crate::ops::module::ModuleOp::Const) node.
 pub struct ConstID(NodeIndex, ClassicType);
 
 impl ConstID {
@@ -145,19 +145,19 @@ impl ConstID {
 }
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node
+/// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node.
 pub struct BasicBlockID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Case](crate::ops::controlflow::CaseOp) node
+/// Handle to a [Case](crate::ops::controlflow::CaseOp) node.
 pub struct CaseID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node
+/// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node.
 pub struct TailLoopID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node
+/// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node.
 pub struct ConditionalID(NodeIndex, usize);
 
 impl From<DfgID> for FuncID {

@@ -132,7 +132,7 @@ impl ModuleBuilder {
         Ok((const_n, typ).into())
     }
 
-    /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType
+    /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType.
     pub fn add_new_type(
         &mut self,
         name: impl Into<SmolStr>,

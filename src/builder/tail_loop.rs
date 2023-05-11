@@ -11,7 +11,7 @@ use portgraph::NodeIndex;
 
 use crate::hugr::HugrMut;
 
-/// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node
+/// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
 pub type TailLoopBuilder<'b> = DFGWrapper<'b, TailLoopID>;
 
 impl<'b> TailLoopBuilder<'b> {
