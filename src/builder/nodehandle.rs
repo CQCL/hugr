@@ -92,29 +92,24 @@ pub trait BuildHandle {
 
 #[derive(DerFrom, Debug)]
 
-/// Handle to a [LeafOp]
-/// [LeafOp]: [`crate::ops::leaf::LeafOp`]
+/// Handle to a [LeafOp](crate::ops::leaf::LeafOp)
 pub struct OpID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [DFG] node
-/// [DFG]: [`crate::ops::dataflow::DataflowOp::DFG`]
+/// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node
 pub struct DfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [CFG] node
-/// [CFG]: [`crate::ops::controlflow::ControlFlowOp::CFG`]
+/// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node
 pub struct CfgID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug, Clone)]
-/// Handle to a [def] or [declare] node
-/// [def]: [`crate::ops::module::ModuleOp::Def`]
-/// [declare]: [`crate::ops::module::ModuleOp::Declare`]
+/// Handle to a [def](crate::ops::module::ModuleOp::Def)
+/// or [declare](crate::ops::module::ModuleOp::Declare) node
 pub struct FuncID(NodeIndex);
 
 #[derive(DerFrom, Debug, Clone)]
-/// Handle to a [NewType] node
-/// [NewType]: [`crate::ops::module::ModuleOp::NewType`]
+/// Handle to a [NewType](crate::ops::module::ModuleOp::NewType) node
 pub struct NewTypeID {
     node: NodeIndex,
     name: SmolStr,
@@ -139,8 +134,7 @@ impl NewTypeID {
 }
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Const] node
-/// [Const]: [`crate::ops::module::ModuleOp::Const`]
+/// Handle to a [Const](crate::ops::module::ModuleOp::Const) node
 pub struct ConstID(NodeIndex, ClassicType);
 
 impl ConstID {
@@ -151,23 +145,19 @@ impl ConstID {
 }
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [BasicBlock] node
-/// [BasicBlock]: [`crate::ops::controlflow::BasicBlockOp`]
+/// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node
 pub struct BasicBlockID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Case] node
-/// [Case]: [`crate::ops::controlflow::CaseOp`]
+/// Handle to a [Case](crate::ops::controlflow::CaseOp) node
 pub struct CaseID(NodeIndex);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [TailLoop] node
-/// [TailLoop]: [`crate::ops::controlflow::ControlFlowOp::TailLoop`]
+/// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node
 pub struct TailLoopID(NodeIndex, usize);
 
 #[derive(DerFrom, Debug)]
-/// Handle to a [Conditional] node
-/// [Conditional]: [`crate::ops::controlflow::ControlFlowOp::Conditional`]
+/// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node
 pub struct ConditionalID(NodeIndex, usize);
 
 impl From<DfgID> for FuncID {
