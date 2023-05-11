@@ -156,7 +156,7 @@ impl<'a> ValidationContext<'a> {
 
     /// Check whether a port is valid.
     /// - It must be connected
-    /// - The linked port must have a compatible type
+    /// - The linked port must have a compatible type.
     fn validate_port(
         &mut self,
         node: NodeIndex,
@@ -603,11 +603,11 @@ pub enum ValidationError {
     InterGraphEdgeError(#[from] InterGraphEdgeError),
 }
 
-/// Errors related to the inter-graph edge validations
+/// Errors related to the inter-graph edge validations.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum InterGraphEdgeError {
-    /// Inter-Graph edges can only carry classical data
+    /// Inter-Graph edges can only carry classical data.
     #[error("Inter-graph edges can only carry classical data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
     NonClassicalData {
         from: NodeIndex,
@@ -616,7 +616,7 @@ pub enum InterGraphEdgeError {
         to_offset: PortOffset,
         ty: EdgeKind,
     },
-    /// Inter-Graph edges must start from a copy node
+    /// Inter-Graph edges must start from a copy node.
     #[error("Inter-graph edges must start from a copy node. Found operation {from_optype:?}. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
     NonCopySource {
         from: NodeIndex,
@@ -870,7 +870,7 @@ mod test {
     }
 
     #[test]
-    /// General children restrictions
+    /// General children restrictions.
     fn children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
         let root = b.root();
@@ -907,7 +907,7 @@ mod test {
     }
 
     #[test]
-    /// Validation errors in a dataflow subgraph
+    /// Validation errors in a dataflow subgraph.
     fn df_children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();
@@ -991,7 +991,7 @@ mod test {
     }
 
     #[test]
-    /// Validation errors in a dataflow subgraph
+    /// Validation errors in a dataflow subgraph.
     fn cfg_children_restrictions() {
         let (mut b, def) = make_simple_hugr(1);
         let (_input, copy, _output) = b.hugr().hierarchy.children(def).collect_tuple().unwrap();

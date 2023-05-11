@@ -74,7 +74,7 @@ impl ControlFlowOp {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// Basic block ops - nodes valid in control flow graphs
+/// Basic block ops - nodes valid in control flow graphs.
 #[allow(missing_docs)]
 pub enum BasicBlockOp {
     /// A CFG basic block node. The signature is that of the internal Dataflow graph.

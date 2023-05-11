@@ -16,10 +16,10 @@ use crate::types::{SimpleType, TypeRow};
 
 use super::{controlflow::CaseOp, BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType};
 
-/// A set of property flags required for an operation
+/// A set of property flags required for an operation.
 #[non_exhaustive]
 pub struct OpValidityFlags {
-    /// The set of valid children operation types
+    /// The set of valid children operation types.
     pub allowed_children: ValidOpSet,
     /// Additional restrictions on the first child operation.
     ///
@@ -29,11 +29,11 @@ pub struct OpValidityFlags {
     ///
     /// This is checked in addition to the child allowing the parent optype.
     pub allowed_last_child: ValidOpSet,
-    /// Whether the operation must have children
+    /// Whether the operation must have children.
     pub requires_children: bool,
-    /// Whether the children must form a DAG (no cycles)
+    /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of non-dataflow input and output wires
+    /// A strict requirement on the number of non-dataflow input and output wires.
     pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
@@ -62,26 +62,26 @@ impl Default for OpValidityFlags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum ValidOpSet {
-    /// All operations allowed
+    /// All operations allowed.
     #[default]
     Any,
     /// No valid operation types.
     None,
-    /// Non-root module operations
+    /// Non-root module operations.
     ModuleOps,
     /// Any dataflow operation.
     DataflowOps,
-    /// A dataflow input
+    /// A dataflow input.
     Input,
-    /// A dataflow output
+    /// A dataflow output.
     Output,
-    /// A function definition
+    /// A function definition.
     Def,
-    /// A control flow basic block
+    /// A control flow basic block.
     BasicBlock,
-    /// A case op inside a conditional,
+    /// A case op inside a conditional,.
     Case,
-    /// A control flow exit node
+    /// A control flow exit node.
     BasicBlockExit,
 }
 
@@ -151,7 +151,7 @@ impl OpType {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     #[inline]
     pub fn validate_children<'a>(
         &self,
@@ -192,7 +192,7 @@ pub enum ChildrenValidationError {
     /// The signature of a child case in a conditional operation does not match the container's signature.
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
-    /// The conditional container's branch predicate does not match the number of children
+    /// The conditional container's branch predicate does not match the number of children.
     #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate type: {actual_predicate:?} ")]
     InvalidConditionalPredicate {
         child: NodeIndex,
@@ -239,17 +239,17 @@ impl EdgeValidationError {
 /// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChildrenEdgeData {
-    /// Source child
+    /// Source child.
     pub source: NodeIndex,
-    /// Target child
+    /// Target child.
     pub target: NodeIndex,
-    /// Operation type of the source child
+    /// Operation type of the source child.
     pub source_op: OpType,
-    /// Operation type of the target child
+    /// Operation type of the target child.
     pub target_op: OpType,
-    /// Source port
+    /// Source port.
     pub source_port: PortOffset,
-    /// Target port
+    /// Target port.
     pub target_port: PortOffset,
 }
 
@@ -275,7 +275,7 @@ impl ModuleOp {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     fn validate_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
@@ -310,7 +310,7 @@ impl BasicBlockOp {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     fn validate_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
@@ -345,7 +345,7 @@ impl CaseOp {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     fn validate_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
@@ -377,7 +377,7 @@ impl DataflowOp {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     fn validate_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
@@ -424,7 +424,7 @@ impl ControlFlowOp {
         }
     }
 
-    /// Validate the ordered list of children
+    /// Validate the ordered list of children.
     fn validate_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,

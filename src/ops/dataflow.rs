@@ -20,15 +20,15 @@ pub enum DataflowOp {
     /// called directly, with a `ConstE<Graph>` edge. The signature of the
     /// remaining ports matches the function being called.
     Call { signature: Signature },
-    /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type
+    /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
     CallIndirect { signature: Signature },
-    /// Load a static constant in to the local dataflow graph
+    /// Load a static constant in to the local dataflow graph.
     LoadConstant { datatype: ClassicType },
     /// Simple operation that has only value inputs+outputs and (potentially) StateOrder edges.
     Leaf { op: LeafOp },
-    /// A simply nested dataflow graph
+    /// A simply nested dataflow graph.
     DFG { signature: Signature },
-    /// Operation related to control flow
+    /// Operation related to control flow.
     ControlFlow { op: ControlFlowOp },
 }
 

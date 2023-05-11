@@ -21,7 +21,7 @@ impl BoundedSubgraph {
     ///
     /// TODO: We should be able to automatically detect dangling ports by
     /// finding inputs and outputs in `hugr` that are connected to things
-    /// outside. Can we do that efficiently?
+    /// outside. Can we do that efficiently?.
     pub fn new(_hugr: &Hugr, _nodes: impl IntoIterator<Item = NodeIndex>) -> Self {
         todo!()
     }
@@ -43,7 +43,7 @@ impl OpenHugr {
     ///
     /// TODO: We should be able to automatically detect dangling ports by
     /// finding inputs and outputs in `hugr` that are connected to things
-    /// outside. Can we do that efficiently?
+    /// outside. Can we do that efficiently?.
     pub fn new(_hugr: Hugr) -> Self {
         todo!()
     }
@@ -143,7 +143,7 @@ pub enum RewriteError {
     ConnectionError(#[source] portgraph::LinkError),
     /// The rewrite target is not convex
     ///
-    /// TODO: include context
+    /// TODO: include context.
     #[error("The rewrite target is not convex")]
     NotConvex(),
 }

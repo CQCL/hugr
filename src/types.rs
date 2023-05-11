@@ -23,15 +23,15 @@ use crate::resource::ResourceSet;
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum EdgeKind {
-    /// Control edges of a CFG region
+    /// Control edges of a CFG region.
     ControlFlow,
-    /// Data edges of a DDG region, also known as "wires"
+    /// Data edges of a DDG region, also known as "wires".
     Value(SimpleType),
-    /// A reference to a constant value definition, used in the module region
+    /// A reference to a constant value definition, used in the module region.
     Const(ClassicType),
-    /// Explicitly enforce an ordering between nodes in a DDG
+    /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
-    /// An edge specifying a resource set
+    /// An edge specifying a resource set.
     Resource(ResourceSet),
 }
 
@@ -42,29 +42,29 @@ pub enum EdgeKind {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
-    /// Value inputs of the function
+    /// Value inputs of the function.
     pub input: TypeRow,
-    /// Value outputs of the function
+    /// Value outputs of the function.
     pub output: TypeRow,
-    /// Possible constE input (for call / load-constant)
+    /// Possible constE input (for call / load-constant).
     pub const_input: Option<ClassicType>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
 impl Signature {
-    /// The number of wires in the signature
+    /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
     }
 
-    /// Returns whether the data wires in the signature are purely linear
+    /// Returns whether the data wires in the signature are purely linear.
     #[inline(always)]
     pub fn purely_linear(&self) -> bool {
         self.input.purely_linear() && self.output.purely_linear()
     }
 
-    /// Returns whether the data wires in the signature are purely classical
+    /// Returns whether the data wires in the signature are purely classical.
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
         self.input.purely_classical() && self.output.purely_classical()
@@ -72,7 +72,7 @@ impl Signature {
 }
 impl Signature {
     /// Returns the linear part of the signature
-    /// TODO: This fails when mixing different linear types
+    /// TODO: This fails when mixing different linear types.
     #[inline(always)]
     pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
         debug_assert_eq!(
@@ -115,7 +115,7 @@ impl Signature {
 }
 
 impl Signature {
-    /// Create a new signature
+    /// Create a new signature.
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
@@ -128,13 +128,13 @@ impl Signature {
         }
     }
 
-    /// Create a new signature with the same input and output types
+    /// Create a new signature with the same input and output types.
     pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Signature::new_df(linear.clone(), linear)
     }
 
-    /// Create a new signature with only dataflow inputs and outputs
+    /// Create a new signature with only dataflow inputs and outputs.
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Signature::new(input, output, None)
     }
@@ -146,17 +146,17 @@ impl Signature {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SignatureDescription {
-    /// Input of the function
+    /// Input of the function.
     pub input: Vec<SmolStr>,
-    /// Output of the function
+    /// Output of the function.
     pub output: Vec<SmolStr>,
-    /// Constant data references used by the function
+    /// Constant data references used by the function.
     pub const_input: Option<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
 impl SignatureDescription {
-    /// The number of wires in the signature
+    /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
@@ -164,7 +164,7 @@ impl SignatureDescription {
 }
 
 impl SignatureDescription {
-    /// Create a new signature
+    /// Create a new signature.
     pub fn new(
         input: impl Into<Vec<SmolStr>>,
         output: impl Into<Vec<SmolStr>>,
@@ -177,13 +177,13 @@ impl SignatureDescription {
         }
     }
 
-    /// Create a new signature with only linear dataflow inputs and outputs
+    /// Create a new signature with only linear dataflow inputs and outputs.
     pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
         SignatureDescription::new_df(linear.clone(), linear)
     }
 
-    /// Create a new signature with only dataflow inputs and outputs
+    /// Create a new signature with only dataflow inputs and outputs.
     pub fn new_df(input: impl Into<Vec<SmolStr>>, output: impl Into<Vec<SmolStr>>) -> Self {
         Self {
             input: input.into(),
@@ -196,7 +196,7 @@ impl SignatureDescription {
     ///
     /// Unnamed wires are given an empty string name.
     ///
-    /// TODO: Return Option<&String> instead of &String for the description
+    /// TODO: Return Option<&String> instead of &String for the description.
     pub fn input_zip<'a>(
         &'a self,
         signature: &'a Signature,

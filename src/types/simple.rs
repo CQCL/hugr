@@ -26,7 +26,7 @@ pub enum SimpleType {
     Linear(LinearType),
 }
 
-/// Trait of primitive types (ClassicType or LinearType)
+/// Trait of primitive types (ClassicType or LinearType).
 pub trait PrimType {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType and LinearType
@@ -36,20 +36,20 @@ pub trait PrimType {
 /// A type that represents a container of other types.
 ///
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
-/// overall type is too
+/// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Container<T: PrimType> {
-    /// Variable sized list of T
+    /// Variable sized list of T.
     List(Box<T>),
-    /// Hash map from hashable key type to value T
+    /// Hash map from hashable key type to value T.
     Map(Box<(ClassicType, T)>),
-    /// Product type, known-size tuple over elements of type row
+    /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow>),
-    /// Product type, variants are tagged by their position in the type row
+    /// Product type, variants are tagged by their position in the type row.
     Sum(Box<TypeRow>),
-    /// Known size array of T
+    /// Known size array of T.
     Array(Box<T>, usize),
-    /// Named type defined by, but distinct from, T
+    /// Named type defined by, but distinct from, T.
     NewType(SmolStr, Box<T>),
 }
 
@@ -71,7 +71,7 @@ impl From<Container<LinearType>> for SimpleType {
 ///
 /// Uses `Box`es on most variants to reduce the memory footprint.
 ///
-/// TODO: Derive pyclass
+/// TODO: Derive pyclass.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ClassicType {
@@ -128,7 +128,7 @@ impl PrimType for ClassicType {}
 
 /// A type that represents concrete linear data.
 ///
-/// TODO: Derive pyclass
+/// TODO: Derive pyclass.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LinearType {
@@ -154,7 +154,7 @@ impl SimpleType {
         matches!(self, Self::Classic(_))
     }
 
-    /// New Sum type, variants defined by TypeRow
+    /// New Sum type, variants defined by TypeRow.
     pub fn new_sum(row: impl Into<TypeRow>) -> Self {
         let row = row.into();
         if row.purely_classical() {
@@ -164,7 +164,7 @@ impl SimpleType {
         }
     }
 
-    /// New Tuple type, elements defined by TypeRow
+    /// New Tuple type, elements defined by TypeRow.
     pub fn new_tuple(row: impl Into<TypeRow>) -> Self {
         let row = row.into();
         if row.purely_classical() {
@@ -174,14 +174,14 @@ impl SimpleType {
         }
     }
 
-    /// New unit type, defined as an empty Tuple
+    /// New unit type, defined as an empty Tuple.
     pub fn new_unit() -> Self {
         Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
             TypeRow::new(),
         ))))
     }
 
-    /// New Sum of Unit types, used as predicates in branching
+    /// New Sum of Unit types, used as predicates in branching.
     pub fn new_predicate(size: usize) -> Self {
         let rowvec = vec![Self::new_unit(); size];
         Self::Classic(ClassicType::Container(Container::Sum(Box::new(
@@ -189,7 +189,7 @@ impl SimpleType {
         ))))
     }
 
-    /// Convert to a named NewType
+    /// Convert to a named NewType.
     pub fn into_new_type(self, name: impl Into<SmolStr>) -> SimpleType {
         match self {
             // annoying that the arms have the same code
@@ -296,7 +296,7 @@ impl TypeRow {
     ///
     /// See [`type_row!`] for a more ergonomic way to create a statically allocated rows.
     ///
-    /// [`type_row!`]: crate::macros::type_row
+    /// [`type_row!`]: crate::macros::type_row.
     pub fn from(types: impl Into<Cow<'static, [SimpleType]>>) -> Self {
         Self {
             types: types.into(),

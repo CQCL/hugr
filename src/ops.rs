@@ -21,14 +21,14 @@ use smol_str::SmolStr;
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {
-    /// A module region node - parent will be the Root (or the node itself is the Root)
+    /// A module region node - parent will be the Root (or the node itself is the Root).
     Module(ModuleOp),
-    /// A basic block in a control flow graph - parent will be a CFG node
+    /// A basic block in a control flow graph - parent will be a CFG node.
     BasicBlock(BasicBlockOp),
-    /// A branch in a dataflow graph - parent will be a Conditional node
+    /// A branch in a dataflow graph - parent will be a Conditional node.
     Case(CaseOp),
     /// Nodes used inside dataflow containers
-    /// (DFG, Conditional, TailLoop, def, BasicBlock)
+    /// (DFG, Conditional, TailLoop, def, BasicBlock).
     Dataflow(DataflowOp),
 }
 

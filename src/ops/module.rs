@@ -9,7 +9,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-/// Module-level operations
+/// Module-level operations.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
 pub enum ModuleOp {
@@ -92,7 +92,7 @@ impl ModuleOp {
 /// Value constants
 ///
 /// TODO: Add more constants
-/// TODO: bigger/smaller integers
+/// TODO: bigger/smaller integers.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[allow(missing_docs)]
@@ -140,7 +140,7 @@ impl Default for ConstValue {
 }
 
 impl ConstValue {
-    /// Returns the datatype of the constant
+    /// Returns the datatype of the constant.
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int(_) => ClassicType::i64(),
@@ -158,7 +158,7 @@ impl ConstValue {
         }
     }
 
-    /// Unique name of the constant
+    /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
             Self::Int(v) => format!("const:int:{v}"),
@@ -175,27 +175,27 @@ impl ConstValue {
         .into()
     }
 
-    /// Description of the constant
+    /// Description of the constant.
     pub fn description(&self) -> &str {
         "Constant value"
     }
 
-    /// Constant unit type (empty Tuple)
+    /// Constant unit type (empty Tuple).
     pub const fn unit() -> ConstValue {
         ConstValue::Tuple(vec![])
     }
 
-    /// Constant "true" value, i.e. the second variant of Sum((), ())
+    /// Constant "true" value, i.e. the second variant of Sum((), ()).
     pub fn trueval() -> Self {
         Self::predicate(1, 2)
     }
 
-    /// Constant "true" value, i.e. the first variant of Sum((), ())
+    /// Constant "true" value, i.e. the first variant of Sum((), ()).
     pub fn falseval() -> Self {
         Self::predicate(0, 2)
     }
 
-    /// Constant Sum over units, used as predicates
+    /// Constant Sum over units, used as predicates.
     pub fn predicate(tag: usize, size: usize) -> Self {
         let unit: SimpleType = SimpleType::new_unit();
         let vars = vec![unit; size];
