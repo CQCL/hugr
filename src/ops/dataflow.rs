@@ -1,9 +1,13 @@
+//! Dataflow operations.
+
 use smol_str::SmolStr;
 
 use super::{controlflow::ControlFlowOp, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
+/// A dataflow operation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub enum DataflowOp {
     /// An input node.
     /// The outputs of this node are the inputs to the function.
@@ -29,6 +33,11 @@ pub enum DataflowOp {
 }
 
 impl DataflowOp {
+    /// The non-dataflow edge kind for the inputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         if let DataflowOp::Input { .. } = self {
             None
@@ -37,6 +46,11 @@ impl DataflowOp {
         }
     }
 
+    /// The non-dataflow edge kind for the outputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other output
+    /// edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         if let DataflowOp::Output { .. } = self {
             None
@@ -60,7 +74,7 @@ impl DataflowOp {
         .into()
     }
 
-    /// The description of the operation.
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             DataflowOp::Input { .. } => "The input node for this dataflow subgraph",

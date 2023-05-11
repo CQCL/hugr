@@ -1,3 +1,6 @@
+#![allow(missing_docs)]
+//! Rewrite operations on Hugr graphs.
+
 use std::collections::HashMap;
 
 use portgraph::substitute::OpenGraph;

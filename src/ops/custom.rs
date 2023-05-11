@@ -170,6 +170,7 @@ impl OpDef {
         }
     }
 
+    /// The signature of the operation.
     pub fn signature(&self) -> Signature {
         self.signature
             .get_or_init(|| {
@@ -188,6 +189,7 @@ impl OpDef {
             .clone()
     }
 
+    /// Optional description of the ports in the signature.
     pub fn signature_desc(&self) -> Option<SignatureDescription> {
         Some(
             self.port_names

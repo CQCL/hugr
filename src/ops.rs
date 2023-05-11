@@ -1,3 +1,5 @@
+//! The operation types for the HUGR.
+
 pub mod controlflow;
 pub mod custom;
 pub mod dataflow;
@@ -41,7 +43,7 @@ impl OpType {
         }
     }
 
-    /// The description of the operation.
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             OpType::Module(op) => op.description(),
@@ -71,8 +73,11 @@ impl OpType {
         }
     }
 
-    /// If None, there will be no other input edges.
-    /// Otherwise, all other input edges will be of that kind.
+    /// The non-dataflow edge kind for the inputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         match self {
             OpType::Module(op) => op.other_inputs(),
@@ -82,7 +87,11 @@ impl OpType {
         }
     }
 
-    /// Like "other_inputs" but describes any other output edges
+    /// The non-dataflow edge kind for the outputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other output
+    /// edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
             OpType::Module(op) => op.other_outputs(),
@@ -92,7 +101,7 @@ impl OpType {
         }
     }
 
-    /// Returns the edge kind for the given port offset
+    /// Returns the edge kind for the given port offset.
     pub fn port_kind(&self, offset: PortOffset) -> Option<EdgeKind> {
         let signature = self.signature();
         if let Some(port_kind) = signature.get(offset) {

@@ -19,18 +19,21 @@ pub type ResourceId = SmolStr;
 
 /// A resource is a set of capabilities required to execute a graph.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-#[allow(dead_code)]
 pub struct Resource {
+    /// Unique identifier for the resource.
     pub name: ResourceId,
+    /// Set of resource dependencies required by this resource.
     pub resource_reqs: ResourceSet,
+    /// Types defined by this resource.
     pub types: Vec<CustomType>,
-    /// Operations with serializable definitions.
+    /// Operation declarations with serializable definitions.
     pub operations: Vec<OpDef>,
-    /// Opaque operations that do not expose their definitions.
+    /// Opaque operations declarations that do not expose their definitions.
     pub opaque_operations: Vec<OpaqueOp>,
 }
 
 impl Resource {
+    /// Creates a new resource with the given name.
     pub fn new(name: ResourceId) -> Self {
         Self {
             name,
@@ -38,18 +41,22 @@ impl Resource {
         }
     }
 
+    /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Add an exported type to the resource.
     pub fn add_type(&mut self, ty: CustomType) {
         self.types.push(ty);
     }
 
+    /// Add an operation definition to the resource.
     pub fn add_op(&mut self, op: OpDef) {
         self.operations.push(op);
     }
 
+    /// Add an opaque operation declaration to the resource.
     pub fn add_opaque_op(&mut self, op: OpaqueOp) {
         self.opaque_operations.push(op);
     }
@@ -61,41 +68,47 @@ impl PartialEq for Resource {
     }
 }
 
-/// A set of resources.
+/// A set of resources identified by their unique [`ResourceId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ResourceSet(HashSet<ResourceId>);
 
 impl ResourceSet {
+    /// Creates a new empty resource set.
     pub fn new() -> Self {
         Self(HashSet::new())
     }
 
+    /// Adds a resource to the set.
     pub fn insert(&mut self, resource: &Resource) {
         self.0.insert(resource.name.clone());
     }
 
+    /// Returns `true` if the set contains the given resource.
     pub fn contains(&self, resource: &Resource) -> bool {
         self.0.contains(&resource.name)
     }
 
+    /// Returns `true` if the set is a subset of `other`.
     pub fn is_subset(&self, other: &Self) -> bool {
         self.0.is_subset(&other.0)
     }
 
+    /// Returns `true` if the set is a superset of `other`.
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(&other.0)
     }
 
+    /// Create a resource set with a single element.
     pub fn singleton(resource: &Resource) -> Self {
         let mut set = Self::new();
         set.insert(resource);
         set
     }
 
-    pub fn union(&self, other: &Self) -> Self {
-        let mut set = self.clone();
-        set.0.extend(other.0.iter().cloned());
-        set
+    /// Returns the union of two resource sets.
+    pub fn union(mut self, other: &Self) -> Self {
+        self.0.extend(other.0.iter().cloned());
+        self
     }
 }
 

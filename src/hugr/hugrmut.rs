@@ -249,7 +249,7 @@ impl HugrMut {
         Ok(hugr)
     }
 
-    // Immutable reference to HUGR being built
+    /// Immutable reference to HUGR being built
     #[inline]
     pub fn hugr(&self) -> &Hugr {
         &self.hugr

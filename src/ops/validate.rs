@@ -168,6 +168,7 @@ impl OpType {
 
 /// Errors that can occur while checking the children of a node.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[allow(missing_docs)]
 pub enum ChildrenValidationError {
     /// An CFG graph has an exit operation as a non-last child.
     #[error("Exit basic blocks are only allowed as the last child in a CFG graph")]
@@ -216,6 +217,7 @@ impl ChildrenValidationError {
 
 /// Errors that can occur while checking the edges between children of a node.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[allow(missing_docs)]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
     #[error("The dataflow signature of two connected basic blocks does not match. Output signature: {source_op:?}, input signature: {target_op:?}",

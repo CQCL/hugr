@@ -31,7 +31,7 @@ pub enum EdgeKind {
     Const(ClassicType),
     /// Explicitly enforce an ordering between nodes in a DDG
     StateOrder,
-    // An edge specifying a resource set
+    /// An edge specifying a resource set
     Resource(ResourceSet),
 }
 

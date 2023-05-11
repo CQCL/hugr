@@ -1,3 +1,4 @@
+//! Module-level operations
 use std::any::Any;
 
 use crate::{
@@ -8,33 +9,37 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+/// Module-level operations
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub enum ModuleOp {
     #[default]
-    /// The root of a module, parent of all other `ModuleOp`s
+    /// The root of a module, parent of all other `ModuleOp`s.
     Root,
     /// A function definition.
-    /// Children nodes are the body of the definition
+    ///
+    /// Children nodes are the body of the definition.
     Def {
         signature: Signature,
     },
-    /// External function declaration, linked at runtime
+    /// External function declaration, linked at runtime.
     Declare {
         signature: Signature,
     },
-    /// Top level struct type definition
+    /// Top level struct type definition.
     NewType {
         name: SmolStr,
         definition: SimpleType,
     },
-    /// A type alias
+    /// A type alias.
     #[non_exhaustive] // TODO
     Alias {},
-    // A constant value definition
+    // A constant value definition.
     Const(ConstValue),
 }
 
 impl ModuleOp {
+    /// The name of the operation.
     pub fn name(&self) -> SmolStr {
         match self {
             ModuleOp::Root => "module",
@@ -47,6 +52,7 @@ impl ModuleOp {
         .into()
     }
 
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
@@ -58,10 +64,20 @@ impl ModuleOp {
         }
     }
 
+    /// The non-dataflow edge kind for the inputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         None
     }
 
+    /// The non-dataflow edge kind for the outputs of the operation not described
+    /// by the signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other output
+    /// edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
             ModuleOp::Root | ModuleOp::NewType { .. } | ModuleOp::Alias { .. } => None,
@@ -79,14 +95,19 @@ impl ModuleOp {
 /// TODO: bigger/smaller integers
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum ConstValue {
+    /// An arbitrary length integer constant.
     Int(i64),
+    /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
         variants: TypeRow,
         val: Box<ConstValue>,
     },
+    /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
+    /// An opaque constant value.
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
 
@@ -194,12 +215,13 @@ impl<T: CustomConst> From<T> for ConstValue {
 
 /// Constant value for opaque [`SimpleType`]s.
 ///
-// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
 #[typetag::serde]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
 {
+    /// An identifier for the constant.
     fn name(&self) -> SmolStr;
 
     /// Returns the type of the constant.

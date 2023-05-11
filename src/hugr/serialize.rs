@@ -19,6 +19,7 @@ struct SerHugr {
     op_types: HashMap<NodeIndex, OpType>,
 }
 
+/// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum HUGRSerializationError {
     /// Cannot serialize a non-compact graph.
