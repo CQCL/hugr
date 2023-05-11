@@ -17,6 +17,7 @@ use itertools::Itertools;
 use portgraph::NodeIndex;
 use thiserror::Error;
 
+/// Builder for a [`CaseOp`] child graph.
 pub type CaseBuilder<'b> = DFGWrapper<'b, CaseID>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -35,11 +36,12 @@ pub enum ConditionalBuildError {
     },
 }
 
+/// Builder for a [`ControlFlowOp::Conditional`] node's children.
 pub struct ConditionalBuilder<'f> {
-    pub(crate) base: &'f mut HugrMut,
-    pub(crate) conditional_node: NodeIndex,
-    pub(crate) n_out_wires: usize,
-    pub(crate) case_nodes: Vec<Option<NodeIndex>>,
+    pub(super) base: &'f mut HugrMut,
+    pub(super) conditional_node: NodeIndex,
+    pub(super) n_out_wires: usize,
+    pub(super) case_nodes: Vec<Option<NodeIndex>>,
 }
 
 impl<'f> Container for ConditionalBuilder<'f> {
@@ -78,6 +80,16 @@ impl<'f> Container for ConditionalBuilder<'f> {
 }
 
 impl<'f> ConditionalBuilder<'f> {
+    /// Return a builder the Case node with index `case`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parent node is not of type [`ControlFlowOp::Conditional`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the case has already been built,
+    /// `case` is not a valid index or if there is an error adding nodes.
     pub fn case_builder<'a: 'b, 'b>(
         &'a mut self,
         case: usize,

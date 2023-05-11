@@ -11,12 +11,14 @@ use portgraph::NodeIndex;
 
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 
+/// Builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] child control
+/// flow graph
 pub struct CFGBuilder<'f> {
-    pub(crate) base: &'f mut HugrMut,
-    pub(crate) cfg_node: NodeIndex,
-    pub(crate) inputs: Option<TypeRow>,
-    pub(crate) exit_node: NodeIndex,
-    pub(crate) n_out_wires: usize,
+    pub(super) base: &'f mut HugrMut,
+    pub(super) cfg_node: NodeIndex,
+    pub(super) inputs: Option<TypeRow>,
+    pub(super) exit_node: NodeIndex,
+    pub(super) n_out_wires: usize,
 }
 
 impl<'f> Container for CFGBuilder<'f> {
@@ -44,6 +46,13 @@ impl<'f> Container for CFGBuilder<'f> {
 }
 
 impl<'f> CFGBuilder<'f> {
+    /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// and `outputs` and the variants of the branching predicate Sum value
+    /// specified by `predicate_variants`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the node.
     pub fn block_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
@@ -67,6 +76,13 @@ impl<'f> CFGBuilder<'f> {
         let db = DFGBuilder::create_with_io(self.base(), block_n, inputs, node_outputs)?;
         Ok(BlockBuilder::new(db))
     }
+
+    /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
@@ -78,6 +94,13 @@ impl<'f> CFGBuilder<'f> {
         self.block_builder(inputs, outputs, predicate_variants)
     }
 
+    /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// and `outputs` and the variants of the branching predicate Sum value
+    /// specified by `predicate_variants`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if an entry block has already been built.
     pub fn entry_builder<'a: 'b, 'b>(
         &'a mut self,
         outputs: TypeRow,
@@ -89,6 +112,13 @@ impl<'f> CFGBuilder<'f> {
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
         self.block_builder(inputs, outputs, predicate_variants)
     }
+
+    /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the node.
     pub fn simple_entry_builder<'a: 'b, 'b>(
         &'a mut self,
         outputs: TypeRow,
@@ -99,17 +129,23 @@ impl<'f> CFGBuilder<'f> {
         self.entry_builder(outputs, predicate_variants)
     }
 
+    /// Returns the exit block of this [`CFGBuilder`].
     pub fn exit_block(&self) -> BasicBlockID {
         self.exit_node.into()
     }
 
+    /// Set the `branch` index `successor` block of `predecessor`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error connecting the blocks.
     pub fn branch(
         &mut self,
-        predicate: &BasicBlockID,
+        predecessor: &BasicBlockID,
         branch: usize,
         successor: &BasicBlockID,
     ) -> Result<(), BuildError> {
-        let from = predicate.node();
+        let from = predecessor.node();
         let to = successor.node();
         let base = &mut self.base;
         let hugr = base.hugr();
@@ -121,6 +157,7 @@ impl<'f> CFGBuilder<'f> {
     }
 }
 
+/// Builder for a [`BasicBlockOp::Block`] child graph.
 pub type BlockBuilder<'b> = DFGWrapper<'b, BasicBlockID>;
 
 impl<'b> BlockBuilder<'b> {
