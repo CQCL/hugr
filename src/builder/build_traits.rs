@@ -473,6 +473,7 @@ pub trait Dataflow: Container {
     }
 }
 
+#[inline]
 fn make_out_variant<const N: usize, T: Dataflow + ?Sized>(
     container: &mut T,
     signature: Signature,
