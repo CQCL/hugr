@@ -128,7 +128,7 @@ impl PrimType for ClassicType {}
 
 /// A type that represents concrete linear data.
 ///
-/// TODO: Derive pyclass.
+// TODO: Derive pyclass.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LinearType {

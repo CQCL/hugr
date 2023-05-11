@@ -28,7 +28,7 @@ pub struct Resource {
     pub types: Vec<CustomType>,
     /// Operation declarations with serializable definitions.
     pub operations: Vec<OpDef>,
-    /// Opaque operations declarations that do not expose their definitions.
+    /// Opaque operation declarations that do not expose their definitions.
     pub opaque_operations: Vec<OpaqueOp>,
 }
 

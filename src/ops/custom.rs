@@ -63,7 +63,7 @@ impl<T: CustomOp> From<T> for OpaqueOp {
 pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Any + Downcast {
     /// Try to convert the custom op to a graph definition.
     ///
-    /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?.
+    /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
     fn try_into_hugr(&self, resources: &ResourceSet) -> Option<Hugr> {
         let _ = resources;
         None
