@@ -1,3 +1,6 @@
+#![allow(missing_docs)]
+//! Rewrite operations on Hugr graphs.
+
 use std::collections::HashMap;
 
 use portgraph::substitute::OpenGraph;
@@ -140,7 +143,7 @@ pub enum RewriteError {
     ConnectionError(#[source] portgraph::LinkError),
     /// The rewrite target is not convex
     ///
-    /// TODO: include context
+    /// TODO: include context.
     #[error("The rewrite target is not convex")]
     NotConvex(),
 }

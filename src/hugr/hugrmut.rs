@@ -62,7 +62,7 @@ impl HugrMut {
     /// The port must have already been created. See [`add_ports`] and [`set_num_ports`].
     ///
     /// [`add_ports`]: #method.add_ports
-    /// [`set_num_ports`]: #method.set_num_ports
+    /// [`set_num_ports`]: #method.set_num_ports.
     pub fn connect(
         &mut self,
         src: NodeIndex,
@@ -101,7 +101,7 @@ impl HugrMut {
     /// the connection failed.
     ///
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
-    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
+    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs.
     pub fn add_other_edge(
         &mut self,
         src: NodeIndex,
@@ -249,7 +249,7 @@ impl HugrMut {
         Ok(hugr)
     }
 
-    // Immutable reference to HUGR being built
+    /// Immutable reference to HUGR being built.
     #[inline]
     pub fn hugr(&self) -> &Hugr {
         &self.hugr
@@ -257,7 +257,7 @@ impl HugrMut {
 
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
-    /// match the OpType signature
+    /// match the OpType signature.
     pub fn replace_op(&mut self, node: NodeIndex, op: impl Into<OpType>) -> OpType {
         let cur = self.hugr.op_types.get_mut(node);
         std::mem::replace(cur, op.into())

@@ -1,3 +1,4 @@
+//! Module-level operations
 use std::any::Any;
 
 use crate::{
@@ -8,33 +9,37 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+/// Module-level operations.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub enum ModuleOp {
     #[default]
-    /// The root of a module, parent of all other `ModuleOp`s
+    /// The root of a module, parent of all other `ModuleOp`s.
     Root,
     /// A function definition.
-    /// Children nodes are the body of the definition
+    ///
+    /// Children nodes are the body of the definition.
     Def {
         signature: Signature,
     },
-    /// External function declaration, linked at runtime
+    /// External function declaration, linked at runtime.
     Declare {
         signature: Signature,
     },
-    /// Top level struct type definition
+    /// Top level struct type definition.
     NewType {
         name: SmolStr,
         definition: SimpleType,
     },
-    /// A type alias
+    /// A type alias.
     #[non_exhaustive] // TODO
     Alias {},
-    // A constant value definition
+    // A constant value definition.
     Const(ConstValue),
 }
 
 impl ModuleOp {
+    /// The name of the operation.
     pub fn name(&self) -> SmolStr {
         match self {
             ModuleOp::Root => "module",
@@ -47,6 +52,7 @@ impl ModuleOp {
         .into()
     }
 
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
@@ -58,10 +64,20 @@ impl ModuleOp {
         }
     }
 
+    /// The edge kind for the inputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         None
     }
 
+    /// The edge kind for the outputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other
+    /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
             ModuleOp::Root | ModuleOp::NewType { .. } | ModuleOp::Alias { .. } => None,
@@ -76,17 +92,22 @@ impl ModuleOp {
 /// Value constants
 ///
 /// TODO: Add more constants
-/// TODO: bigger/smaller integers
+/// TODO: bigger/smaller integers.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum ConstValue {
+    /// An arbitrary length integer constant.
     Int(i64),
+    /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
         variants: TypeRow,
         val: Box<ConstValue>,
     },
+    /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
+    /// An opaque constant value.
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
 
@@ -119,7 +140,7 @@ impl Default for ConstValue {
 }
 
 impl ConstValue {
-    /// Returns the datatype of the constant
+    /// Returns the datatype of the constant.
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int(_) => ClassicType::i64(),
@@ -137,7 +158,7 @@ impl ConstValue {
         }
     }
 
-    /// Unique name of the constant
+    /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
             Self::Int(v) => format!("const:int:{v}"),
@@ -154,27 +175,27 @@ impl ConstValue {
         .into()
     }
 
-    /// Description of the constant
+    /// Description of the constant.
     pub fn description(&self) -> &str {
         "Constant value"
     }
 
-    /// Constant unit type (empty Tuple)
+    /// Constant unit type (empty Tuple).
     pub const fn unit() -> ConstValue {
         ConstValue::Tuple(vec![])
     }
 
-    /// Constant "true" value, i.e. the second variant of Sum((), ())
+    /// Constant "true" value, i.e. the second variant of Sum((), ()).
     pub fn trueval() -> Self {
         Self::predicate(1, 2)
     }
 
-    /// Constant "true" value, i.e. the first variant of Sum((), ())
+    /// Constant "true" value, i.e. the first variant of Sum((), ()).
     pub fn falseval() -> Self {
         Self::predicate(0, 2)
     }
 
-    /// Constant Sum over units, used as predicates
+    /// Constant Sum over units, used as predicates.
     pub fn predicate(tag: usize, size: usize) -> Self {
         let unit: SimpleType = SimpleType::new_unit();
         let vars = vec![unit; size];
@@ -194,12 +215,13 @@ impl<T: CustomConst> From<T> for ConstValue {
 
 /// Constant value for opaque [`SimpleType`]s.
 ///
-// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
 #[typetag::serde]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
 {
+    /// An identifier for the constant.
     fn name(&self) -> SmolStr;
 
     /// Returns the type of the constant.

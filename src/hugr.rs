@@ -32,7 +32,7 @@ pub struct Hugr {
     /// The single root node in the hierarchy.
     /// It must correspond to a [`ModuleOp::Root`] node.
     ///
-    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root
+    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
     root: NodeIndex,
 
     /// Operation types for each node.
@@ -99,19 +99,19 @@ impl Hugr {
         Ok(())
     }
 
-    /// Iterator over outputs of node
+    /// Iterator over outputs of node.
     #[inline]
     pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.outputs(node)
     }
 
-    /// Iterator over inputs of node
+    /// Iterator over inputs of node.
     #[inline]
     pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.inputs(node)
     }
 
-    /// Return node and port connected to provided port, if not connected return None
+    /// Return node and port connected to provided port, if not connected return None.
     #[inline]
     pub fn linked_port(
         &self,
@@ -123,7 +123,7 @@ impl Hugr {
         Some((self.graph.port_node(link)?, self.graph.port_offset(port)?))
     }
 
-    /// Return dot string showing underlying graph and hierarchy side by side
+    /// Return dot string showing underlying graph and hierarchy side by side.
     pub fn dot_string(&self) -> String {
         hier_graph_dot_string_with(
             &self.graph,
@@ -158,19 +158,19 @@ impl Hugr {
         )
     }
 
-    /// Number of inputs to node
+    /// Number of inputs to node.
     #[inline]
     pub fn num_inputs(&self, node: NodeIndex) -> usize {
         self.graph.num_inputs(node)
     }
 
-    /// Number of outputs to node
+    /// Number of outputs to node.
     #[inline]
     pub fn num_outputs(&self, node: NodeIndex) -> usize {
         self.graph.num_outputs(node)
     }
 
-    /// Return iterator over children of node
+    /// Return iterator over children of node.
     pub fn children(&self, node: NodeIndex) -> Children<'_> {
         self.hierarchy.children(node)
     }
