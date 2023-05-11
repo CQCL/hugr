@@ -1,30 +1,28 @@
 //! The Hugr data structure.
-//!
-//! TODO: metadata
-#![allow(dead_code)]
 
+mod hugrmut;
+pub(crate) mod internal;
+
+pub mod serialize;
 pub mod validate;
 
+pub use hugrmut::HugrMut;
+pub use validate::ValidationError;
+
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::hierarchy::Children;
-use portgraph::portgraph::NodePorts;
-use portgraph::{Hierarchy, NodeIndex, PortGraph, PortOffset, SecondaryMap};
+use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
 use thiserror::Error;
 
+use self::internal::HugrView;
 use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
-
-pub use validate::ValidationError;
-mod hugrmut;
-pub mod serialize;
-pub use hugrmut::HugrMut;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
-    pub(crate) graph: PortGraph,
+    graph: PortGraph,
 
     /// The node hierarchy.
     hierarchy: Hierarchy,
@@ -41,38 +39,17 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new()
+        Self::new(ModuleOp::Root)
     }
 }
 
+/// Public API for HUGRs.
 impl Hugr {
-    /// Create a new Hugr, with a single root node.
-    pub(crate) fn new() -> Self {
-        let mut graph = PortGraph::default();
-        let hierarchy = Hierarchy::new();
-        let mut op_types = SecondaryMap::new();
-        let root = graph.add_node(0, 0);
-        op_types[root] = OpType::Module(ModuleOp::Root);
-
-        Self {
-            graph,
-            hierarchy,
-            root,
-            op_types,
-        }
+    /// Returns an immutable view over the graph.
+    pub fn view(&self) {
+        unimplemented!()
     }
 
-    /// Returns the parent of a node.
-    #[inline]
-    pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
-        self.hierarchy.parent(node)
-    }
-
-    /// Returns the operation type of a node.
-    #[inline]
-    pub fn get_optype(&self, node: NodeIndex) -> &OpType {
-        self.op_types.get(node)
-    }
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
@@ -97,30 +74,6 @@ impl Hugr {
         // TODO: Check types
 
         Ok(())
-    }
-
-    /// Iterator over outputs of node.
-    #[inline]
-    pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
-        self.graph.outputs(node)
-    }
-
-    /// Iterator over inputs of node.
-    #[inline]
-    pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
-        self.graph.inputs(node)
-    }
-
-    /// Return node and port connected to provided port, if not connected return None.
-    #[inline]
-    pub fn linked_port(
-        &self,
-        node: NodeIndex,
-        offset: PortOffset,
-    ) -> Option<(NodeIndex, PortOffset)> {
-        let port = self.graph.port_index(node, offset)?;
-        let link = self.graph.port_link(port)?;
-        Some((self.graph.port_node(link)?, self.graph.port_offset(port)?))
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side.
@@ -157,22 +110,24 @@ impl Hugr {
             },
         )
     }
+}
 
-    /// Number of inputs to node.
-    #[inline]
-    pub fn num_inputs(&self, node: NodeIndex) -> usize {
-        self.graph.num_inputs(node)
-    }
+/// Internal API for HUGRs, not intended for use by users.
+impl Hugr {
+    /// Create a new Hugr, with a single root node.
+    pub(crate) fn new(root_op: impl Into<OpType>) -> Self {
+        let mut graph = PortGraph::default();
+        let hierarchy = Hierarchy::new();
+        let mut op_types = SecondaryMap::new();
+        let root = graph.add_node(0, 0);
+        op_types[root] = root_op.into();
 
-    /// Number of outputs to node.
-    #[inline]
-    pub fn num_outputs(&self, node: NodeIndex) -> usize {
-        self.graph.num_outputs(node)
-    }
-
-    /// Return iterator over children of node.
-    pub fn children(&self, node: NodeIndex) -> Children<'_> {
-        self.hierarchy.children(node)
+        Self {
+            graph,
+            hierarchy,
+            root,
+            op_types,
+        }
     }
 }
 

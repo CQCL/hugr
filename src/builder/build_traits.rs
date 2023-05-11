@@ -1,5 +1,5 @@
 use crate::{
-    hugr::{validate::InterGraphEdgeError, ValidationError},
+    hugr::{internal::HugrView, validate::InterGraphEdgeError, ValidationError},
     ops::controlflow::{ConditionalSignature, TailLoopSignature},
 };
 
@@ -470,7 +470,8 @@ pub trait Dataflow: Container {
         function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();
+        let hugr = self.hugr();
+        let def_op: Result<&ModuleOp, ()> = hugr.get_optype(function.node()).try_into();
         let signature = match def_op {
             Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),
             _ => {
