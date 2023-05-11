@@ -11,10 +11,11 @@ use portgraph::NodeIndex;
 
 use crate::hugr::HugrMut;
 
+/// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node
 pub type TailLoopBuilder<'b> = DFGWrapper<'b, TailLoopID>;
 
 impl<'b> TailLoopBuilder<'b> {
-    pub(crate) fn create_with_io(
+    pub(super) fn create_with_io(
         base: &'b mut HugrMut,
         loop_node: NodeIndex,
         inputs: TypeRow,
@@ -67,10 +68,12 @@ impl<'b> TailLoopBuilder<'b> {
     }
 }
 
+/// Build the output TypeRow of the child graph of a TailLoop node.
 pub(super) fn loop_output_row(input: TypeRow, output: TypeRow) -> TypeRow {
     vec![SimpleType::new_sum(loop_sum_variants(input, output))].into()
 }
 
+/// Build the row of variants for the single Sum output of a TailLoop child graph.
 pub(super) fn loop_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
     vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
 }
@@ -94,7 +97,8 @@ mod test {
     fn basic_loop() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare("main", type_row![], type_row![NAT])?;
+            let main =
+                module_builder.declare("main", Signature::new_df(type_row![], type_row![NAT]))?;
             let s1 = module_builder.constant(ConstValue::Int(1))?;
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
@@ -123,7 +127,8 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare("main", type_row![BIT], type_row![NAT])?;
+            let main = module_builder
+                .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 
             let s2 = module_builder.constant(ConstValue::Int(2))?;
             let tru_const = module_builder.constant(ConstValue::predicate(1, 2))?;

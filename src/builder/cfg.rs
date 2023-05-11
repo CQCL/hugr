@@ -153,6 +153,7 @@ mod test {
         },
         ops::ConstValue,
         type_row,
+        types::Signature,
     };
 
     use super::*;
@@ -164,8 +165,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder.declare(
                 "main",
-                vec![sum2_type.clone(), NAT].into(),
-                type_row![NAT],
+                Signature::new_df(vec![sum2_type.clone(), NAT], type_row![NAT]),
             )?;
             let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
             let _f_id = {
