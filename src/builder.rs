@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! Tools for building valid HUGRs.
 //!
 use portgraph::NodeIndex;
