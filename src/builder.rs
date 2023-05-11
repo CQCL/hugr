@@ -27,6 +27,9 @@ pub use tail_loop::TailLoopBuilder;
 mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
+mod linear;
+pub use linear::LinearBuilder;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
@@ -68,9 +71,13 @@ pub enum BuildError {
 #[cfg(test)]
 mod test {
 
-    use crate::types::{ClassicType, LinearType, SimpleType};
+    use crate::{
+        builder::ModuleBuilder,
+        types::{ClassicType, LinearType, Signature, SimpleType},
+        Hugr,
+    };
 
-    use super::{BuildError, Dataflow};
+    use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
@@ -82,5 +89,17 @@ mod test {
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
         dataflow_builder.finish_with_outputs(w)
+    }
+
+    pub(super) fn build_main(
+        signature: Signature,
+        f: impl FnOnce(FunctionBuilder) -> Result<FuncID, BuildError>,
+    ) -> Result<Hugr, BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+        let f_builder = module_builder.declare_and_def("main", signature)?;
+
+        f(f_builder)?;
+
+        module_builder.finish()
     }
 }
