@@ -1,4 +1,4 @@
-use crate::{ops::OpType, types::SimpleType};
+use crate::ops::OpType;
 
 use super::{nodehandle::Outputs, BuildError, BuildHandle, Dataflow, Wire};
 
@@ -11,13 +11,9 @@ pub struct LinearBuilder<'a, T: ?Sized, const N: usize> {
 
 impl<'a, T: Dataflow + ?Sized, const N: usize> LinearBuilder<'a, T, N> {
     /// Construct a new LinearBuilder from an array of incoming wires and the
-    /// builder for the graph.
-    /// Returns an error if the wires are not linear types.
-    pub(super) fn new(wires: [Wire; N], builder: &'a mut T) -> Result<Self, BuildError> {
-        for wire in &wires {
-            check_wire_linear(builder, wire)?;
-        }
-        Ok(Self { wires, builder })
+    /// builder for the graph
+    pub fn new(wires: [Wire; N], builder: &'a mut T) -> Self {
+        Self { wires, builder }
     }
 
     #[inline]
@@ -68,7 +64,6 @@ impl<'a, T: Dataflow + ?Sized, const N: usize> LinearBuilder<'a, T, N> {
         // zip will leave all the non-linear output_wires
         // assumes first len(linear_indices) wires are linear
         for (ind, wire) in linear_indices.into_iter().zip(&mut output_wires) {
-            check_wire_linear(self.builder, &wire)?;
             self.wires[ind] = wire;
         }
 
@@ -81,18 +76,6 @@ impl<'a, T: Dataflow + ?Sized, const N: usize> LinearBuilder<'a, T, N> {
     pub fn finish(self) -> [Wire; N] {
         self.wires
     }
-}
-
-pub(super) fn check_wire_linear<T: Dataflow + ?Sized>(
-    builder: &mut T,
-    wire: &Wire,
-) -> Result<(), BuildError> {
-    match builder.get_wire_type(*wire)? {
-        SimpleType::Classic(_) => return Err(BuildError::WireNotLinear(*wire)),
-        SimpleType::Linear(_) => {}
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -143,7 +126,7 @@ mod test {
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
-                let mut linear = f_build.as_linear([q0, q1])?;
+                let mut linear = f_build.as_linear([q0, q1]);
 
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
