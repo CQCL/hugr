@@ -28,7 +28,7 @@ mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
 mod linear;
-pub use linear::LinearBuilder;
+pub use linear::{AppendWire, LinearBuilder};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
@@ -66,6 +66,10 @@ pub enum BuildError {
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
     NoCopyLinear(LinearType),
+
+    /// Error in LinearBuilder
+    #[error("Error in LinearBuilder: {0}.")]
+    LinearError(#[from] linear::LinearBuildError),
 }
 
 #[cfg(test)]
