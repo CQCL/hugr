@@ -1,3 +1,4 @@
+use super::nodehandle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
 use std::marker::PhantomData;
@@ -48,7 +49,7 @@ impl<'f> DFGBuilder<'f> {
 }
 
 impl<'f> Container for DFGBuilder<'f> {
-    type ContainerHandle = DfgID;
+    type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn container_node(&self) -> NodeIndex {
         self.dfg_node
@@ -59,7 +60,7 @@ impl<'f> Container for DFGBuilder<'f> {
         self.base
     }
     #[inline]
-    fn finish(self) -> DfgID {
+    fn finish(self) -> BuildHandle<DfgID> {
         (self.dfg_node, self.num_out_wires).into()
     }
 
@@ -84,7 +85,7 @@ impl<'f> Dataflow for DFGBuilder<'f> {
 pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
-pub type FunctionBuilder<'b> = DFGWrapper<'b, FuncID>;
+pub type FunctionBuilder<'b> = DFGWrapper<'b, BuildHandle<FuncID>>;
 
 impl<'b, T> DFGWrapper<'b, T> {
     pub(super) fn new(db: DFGBuilder<'b>) -> Self {
@@ -92,7 +93,7 @@ impl<'b, T> DFGWrapper<'b, T> {
     }
 }
 
-impl<'b, T: From<DfgID>> Container for DFGWrapper<'b, T> {
+impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
     type ContainerHandle = T;
 
     #[inline]
@@ -115,7 +116,7 @@ impl<'b, T: From<DfgID>> Container for DFGWrapper<'b, T> {
     }
 }
 
-impl<'b, T: From<DfgID>> Dataflow for DFGWrapper<'b, T> {
+impl<'b, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<'b, T> {
     #[inline]
     fn io(&self) -> [NodeIndex; 2] {
         self.0.io
@@ -135,7 +136,7 @@ mod test {
         builder::{
             module_builder::ModuleBuilder,
             test::{n_identity, BIT, NAT, QB},
-            BuildError, BuildHandle,
+            BuildError,
         },
         ops::LeafOp,
         type_row,
@@ -177,7 +178,7 @@ mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(FunctionBuilder) -> Result<FuncID, BuildError>,
+        F: FnOnce(FunctionBuilder) -> Result<BuildHandle<FuncID>, BuildError>,
     {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();

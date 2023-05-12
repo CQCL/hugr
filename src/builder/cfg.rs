@@ -1,6 +1,7 @@
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
-    BasicBlockID, BuildError, BuildHandle, CfgID, Container, Dataflow, Wire,
+    nodehandle::BuildHandle,
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, NodeHandle, Wire,
 };
 
 use crate::types::SimpleType;
@@ -22,7 +23,7 @@ pub struct CFGBuilder<'f> {
 }
 
 impl<'f> Container for CFGBuilder<'f> {
-    type ContainerHandle = CfgID;
+    type ContainerHandle = BuildHandle<CfgID>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
@@ -139,12 +140,13 @@ impl<'f> CFGBuilder<'f> {
     /// # Errors
     ///
     /// This function will return an error if there is an error connecting the blocks.
-    pub fn branch(
+    pub fn branch<'a>(
         &mut self,
-        predecessor: &BasicBlockID,
+        predecessor: impl Into<&'a BasicBlockID>,
         branch: usize,
         successor: &BasicBlockID,
     ) -> Result<(), BuildError> {
+        let predecessor: &BasicBlockID = predecessor.into();
         let from = predecessor.node();
         let to = successor.node();
         let base = &mut self.base;
@@ -209,7 +211,7 @@ mod test {
                 let mut func_builder = module_builder.define_function(&main)?;
                 let [flag, int] = func_builder.input_wires_arr();
 
-                let cfg_id: CfgID = {
+                let cfg_id = {
                     let mut cfg_builder = func_builder
                         .cfg_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
                     let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
