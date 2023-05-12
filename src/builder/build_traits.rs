@@ -5,7 +5,7 @@ use std::iter;
 use super::{
     nodehandle::{ConstID, FuncID, NewTypeID, OpID, Outputs},
     tail_loop::loop_sum_variants,
-    LinearBuilder,
+    CircuitBuilder,
 };
 
 use crate::{
@@ -473,10 +473,10 @@ pub trait Dataflow: Container {
         Ok(op_id)
     }
 
-    /// For the array of `wires`, produce a `LinearBuilder` where ops can be
-    /// added using indices in to the array.
-    fn as_linear(&mut self, wires: Vec<Wire>) -> LinearBuilder<Self> {
-        LinearBuilder::new(wires, self)
+    /// For the vector of `wires`, produce a `CircuitBuilder` where ops can be
+    /// added using indices in to the vector.
+    fn as_circuit(&mut self, wires: Vec<Wire>) -> CircuitBuilder<Self> {
+        CircuitBuilder::new(wires, self)
     }
 }
 

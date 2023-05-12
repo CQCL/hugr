@@ -27,8 +27,8 @@ pub use tail_loop::TailLoopBuilder;
 mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
-mod linear;
-pub use linear::{AppendWire, LinearBuilder};
+mod circuit_builder;
+pub use circuit_builder::{AppendWire, CircuitBuilder};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
@@ -67,9 +67,9 @@ pub enum BuildError {
     #[error("Can't copy linear type: {0:?}.")]
     NoCopyLinear(LinearType),
 
-    /// Error in LinearBuilder
-    #[error("Error in LinearBuilder: {0}.")]
-    LinearError(#[from] linear::LinearBuildError),
+    /// Error in CircuitBuilder
+    #[error("Error in CircuitBuilder: {0}.")]
+    CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
 
 #[cfg(test)]

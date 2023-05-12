@@ -6,19 +6,20 @@ use crate::ops::OpType;
 
 use super::{BuildError, BuildHandle, Dataflow, Wire};
 
-/// Builder to build linear regions of dataflow graphs
-/// Appends operations to an array of incoming wires
-pub struct LinearBuilder<'a, T: ?Sized> {
+/// Builder to build regions of dataflow graphs that look like Circuits,
+/// where some inputs of operations directly correspond to some outputs.
+/// Allows appending operations by indexing a vector of input wires.
+pub struct CircuitBuilder<'a, T: ?Sized> {
     wires: Vec<Wire>,
     builder: &'a mut T,
 }
 
-/// Enum for specifying a [`LinearBuilder`] input wire using either an index to
+/// Enum for specifying a [`CircuitBuilder`] input wire using either an index to
 /// the builder vector of wires, or an arbitrary other wire.
 pub enum AppendWire {
     /// Arbitrary input wire.
     W(Wire),
-    /// Index to LinearBuilder vector of wires.
+    /// Index to CircuitBuilder vector of wires.
     I(usize),
 }
 
@@ -35,15 +36,15 @@ impl From<Wire> for AppendWire {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-/// Error in LinearBuilder
-pub enum LinearBuildError {
-    /// Invalid index for linear wires.
+/// Error in CircuitBuilder
+pub enum CircuitBuildError {
+    /// Invalid index for stored wires.
     #[error("Invalid wire index.")]
     InvalidWireIndex,
 }
 
-impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
-    /// Construct a new LinearBuilder from a vector of incoming wires and the
+impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
+    /// Construct a new CircuitBuilder from a vector of incoming wires and the
     /// builder for the graph
     pub fn new(wires: Vec<Wire>, builder: &'a mut T) -> Self {
         Self { wires, builder }
@@ -55,7 +56,7 @@ impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
     }
 
     #[inline]
-    /// Append a linear op to the wires in the inner vector with given `indices`.
+    /// Append an op to the wires in the inner vector with given `indices`.
     /// The outputs of the operation become the new wires at those indices.
     /// Only valid for operations that have the same input type row as output
     /// type row.
@@ -69,7 +70,7 @@ impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
     }
 
     #[inline]
-    /// The same as [`LinearBuilder::append_with_outputs`] except it assumes no outputs and
+    /// The same as [`CircuitBuilder::append_with_outputs`] except it assumes no outputs and
     /// instead returns a reference to self to allow chaining.
     pub fn append_and_consume<A: Into<AppendWire>>(
         &mut self,
@@ -111,7 +112,7 @@ impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
             })
             .collect();
 
-        let input_wires = input_wires.ok_or(LinearBuildError::InvalidWireIndex)?;
+        let input_wires = input_wires.ok_or(CircuitBuildError::InvalidWireIndex)?;
 
         let output_wires = self.builder.add_dataflow_op(op, input_wires)?.outputs();
         let nonlinear_outputs: Vec<Wire> = output_wires
@@ -131,8 +132,8 @@ impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
     }
 
     #[inline]
-    /// Finish building the linear region and return the dangling wires
-    /// corresponding to the initially provided wires.
+    /// Finish building the circuit region and return the dangling wires
+    /// that correspond to the initially provided wires.
     pub fn finish(self) -> Vec<Wire> {
         self.wires
     }
@@ -160,7 +161,7 @@ mod test {
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
-                let mut linear = LinearBuilder {
+                let mut linear = CircuitBuilder {
                     wires,
                     builder: &mut f_build,
                 };
@@ -188,7 +189,7 @@ mod test {
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
-                let mut linear = f_build.as_linear(vec![q0, q1]);
+                let mut linear = f_build.as_circuit(vec![q0, q1]);
 
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
