@@ -3,7 +3,7 @@ use crate::hugr::{validate::InterGraphEdgeError, ValidationError};
 use std::iter;
 
 use super::{
-    nodehandle::{ConstID, FuncID, NewTypeID, OpID, Outputs},
+    nodehandle::{ConstID, FuncID, NewTypeID, OpID, OutID, Outputs},
     tail_loop::loop_sum_variants,
     CircuitBuilder,
 };
@@ -68,12 +68,12 @@ pub trait Dataflow: Container {
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
     /// Handle to input node.
-    fn input(&self) -> OpID {
+    fn input(&self) -> OutID<OpID> {
         (self.io()[0], self.num_inputs()).into()
     }
     /// Handle to output node.
     fn output(&self) -> OpID {
-        (self.io()[1], 0).into()
+        self.io()[1].into()
     }
     /// Return iterator over all input Value wires.
     fn input_wires(&self) -> Outputs {
@@ -89,7 +89,7 @@ pub trait Dataflow: Container {
         &mut self,
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<OpID, BuildError> {
+    ) -> Result<OutID<OpID>, BuildError> {
         let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
@@ -338,7 +338,7 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when adding the
     /// copy node.
-    fn discard_type(&mut self, wire: Wire, typ: ClassicType) -> Result<OpID, BuildError> {
+    fn discard_type(&mut self, wire: Wire, typ: ClassicType) -> Result<OutID<OpID>, BuildError> {
         self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
     }
 
@@ -349,7 +349,7 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if ther is an error when adding the
     /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<OpID, BuildError> {
+    fn discard(&mut self, wire: Wire) -> Result<OutID<OpID>, BuildError> {
         let typ = self.get_wire_type(wire)?;
         let typ = match typ {
             SimpleType::Classic(typ) => typ,
@@ -372,7 +372,7 @@ pub trait Dataflow: Container {
             .map(|&wire| self.get_wire_type(wire))
             .collect();
         let types = types?.into();
-        let make_op: OpID = self.add_dataflow_op(LeafOp::MakeTuple(types), values)?;
+        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(types), values)?;
         Ok(make_op.out_wire(0))
     }
 
@@ -386,7 +386,7 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error adding the
     /// Tag node.
     fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
-        let make_op: OpID = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
+        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
         Ok(make_op.out_wire(0))
     }
 
@@ -400,7 +400,7 @@ pub trait Dataflow: Container {
     fn make_new_type(&mut self, new_type: &NewTypeID, value: Wire) -> Result<Wire, BuildError> {
         let name = new_type.get_name().clone();
         let typ = new_type.get_core_type().clone();
-        let make_op: OpID = self.add_dataflow_op(LeafOp::MakeNewType { name, typ }, [value])?;
+        let make_op = self.add_dataflow_op(LeafOp::MakeNewType { name, typ }, [value])?;
         Ok(make_op.out_wire(0))
     }
 
@@ -450,7 +450,7 @@ pub trait Dataflow: Container {
         &mut self,
         function: &FuncID,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<OpID, BuildError> {
+    ) -> Result<OutID<OpID>, BuildError> {
         let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();
         let signature = match def_op {
             Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),

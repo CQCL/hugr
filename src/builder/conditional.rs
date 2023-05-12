@@ -2,6 +2,7 @@ use crate::types::{Signature, TypeRow};
 
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
+use super::nodehandle::OutID;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -18,7 +19,7 @@ use portgraph::NodeIndex;
 use thiserror::Error;
 
 /// Builder for a [`CaseOp`] child graph.
-pub type CaseBuilder<'b> = DFGWrapper<'b, CaseID>;
+pub type CaseBuilder<'b> = DFGWrapper<'b, OutID<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ConditionalBuildError {
@@ -45,7 +46,7 @@ pub struct ConditionalBuilder<'f> {
 }
 
 impl<'f> Container for ConditionalBuilder<'f> {
-    type ContainerHandle = Result<ConditionalID, ConditionalBuildError>;
+    type ContainerHandle = Result<OutID<ConditionalID>, ConditionalBuildError>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
@@ -146,7 +147,7 @@ mod test {
         builder::{
             module_builder::ModuleBuilder,
             test::{n_identity, NAT},
-            BuildHandle, Dataflow,
+            Dataflow,
         },
         ops::ConstValue,
         type_row,
@@ -167,7 +168,7 @@ mod test {
 
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
-                let conditional_id: ConditionalID = {
+                let conditional_id = {
                     let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
                     let other_inputs = vec![(NAT, int)];
                     let outputs = vec![SimpleType::new_unit(), NAT].into();

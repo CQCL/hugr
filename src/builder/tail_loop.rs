@@ -2,6 +2,7 @@ use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::types::{Signature, SimpleType, TypeRow};
 
+use super::nodehandle::OutID;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
@@ -12,7 +13,7 @@ use portgraph::NodeIndex;
 use crate::hugr::HugrMut;
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
-pub type TailLoopBuilder<'b> = DFGWrapper<'b, TailLoopID>;
+pub type TailLoopBuilder<'b> = DFGWrapper<'b, OutID<TailLoopID>>;
 
 impl<'b> TailLoopBuilder<'b> {
     pub(super) fn create_with_io(
@@ -86,7 +87,6 @@ mod test {
         builder::{
             module_builder::ModuleBuilder,
             test::{BIT, NAT},
-            BuildHandle, ConditionalID,
         },
         ops::ConstValue,
         type_row,
@@ -103,7 +103,7 @@ mod test {
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
 
-                let loop_id: TailLoopID = {
+                let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(vec![], type_row![NAT])?;
 
                     let const_wire = loop_b.load_const(&s1)?;
@@ -136,12 +136,12 @@ mod test {
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
                 let [b1] = fbuild.input_wires_arr();
-                let loop_id: TailLoopID = {
+                let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(vec![(BIT, b1)], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?;
                     let const_wire = loop_b.load_const(&tru_const)?;
                     let [b1] = loop_b.input_wires_arr();
-                    let conditional_id: ConditionalID = {
+                    let conditional_id = {
                         let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
                         let output_row = loop_b.internal_output_row()?;
                         let mut conditional_b = loop_b.conditional_builder(

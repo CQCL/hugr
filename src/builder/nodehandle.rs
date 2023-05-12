@@ -60,14 +60,40 @@ impl FusedIterator for Outputs {}
 pub trait BuildHandle {
     /// Index of underlying node.
     fn node(&self) -> NodeIndex;
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Handle to a dataflow node which has a known number of value outputs
+pub struct OutID<T> {
+    node_handle: T,
+    num_value_outputs: usize,
+}
+
+impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for OutID<T> {
+    fn from((node, num_value_outputs): (NodeIndex, usize)) -> Self {
+        Self {
+            node_handle: node.into(),
+            num_value_outputs,
+        }
+    }
+}
+
+impl<T: BuildHandle> BuildHandle for OutID<T> {
+    fn node(&self) -> NodeIndex {
+        self.node_handle.node()
+    }
+}
+
+impl<T: BuildHandle> OutID<T> {
+    #[inline]
     /// Number of Value kind outputs from this node.
     fn num_value_outputs(&self) -> usize {
-        0
+        self.num_value_outputs
     }
 
     #[inline]
     /// Return iterator over Value outputs.
-    fn outputs(&self) -> Outputs {
+    pub fn outputs(&self) -> Outputs {
         Outputs {
             node: self.node(),
             range: (0..self.num_value_outputs()),
@@ -75,7 +101,7 @@ pub trait BuildHandle {
     }
 
     /// Attempt to cast outputs in to array of Wires.
-    fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
+    pub fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
         self.outputs()
             .collect_vec()
             .try_into()
@@ -85,25 +111,30 @@ pub trait BuildHandle {
     #[inline]
     /// Retrieve a [`Wire`] corresponding to the given offset.
     /// Does not check whether such a wire is valid for this node.
-    fn out_wire(&self, offset: usize) -> Wire {
+    pub fn out_wire(&self, offset: usize) -> Wire {
         Wire(self.node(), offset)
+    }
+
+    #[inline]
+    /// Underlying node handle
+    pub fn handle(&self) -> &T {
+        &self.node_handle
     }
 }
 
-#[derive(DerFrom, Debug)]
-
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [LeafOp](crate::ops::leaf::LeafOp).
-pub struct OpID(NodeIndex, usize);
+pub struct OpID(NodeIndex);
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node.
-pub struct DfgID(NodeIndex, usize);
+pub struct DfgID(NodeIndex);
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node.
-pub struct CfgID(NodeIndex, usize);
+pub struct CfgID(NodeIndex);
 
-#[derive(DerFrom, Debug, Clone)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [def](crate::ops::module::ModuleOp::Def)
 /// or [declare](crate::ops::module::ModuleOp::Declare) node.
 pub struct FuncID(NodeIndex);
@@ -144,47 +175,56 @@ impl ConstID {
     }
 }
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node.
 pub struct BasicBlockID(NodeIndex);
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [Case](crate::ops::controlflow::CaseOp) node.
 pub struct CaseID(NodeIndex);
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node.
-pub struct TailLoopID(NodeIndex, usize);
+pub struct TailLoopID(NodeIndex);
 
-#[derive(DerFrom, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node.
-pub struct ConditionalID(NodeIndex, usize);
+pub struct ConditionalID(NodeIndex);
 
-impl From<DfgID> for FuncID {
+impl From<OutID<DfgID>> for OutID<FuncID> {
     #[inline]
-    fn from(value: DfgID) -> Self {
-        Self(value.0)
+    fn from(value: OutID<DfgID>) -> Self {
+        Self {
+            node_handle: FuncID(value.node()),
+            num_value_outputs: value.num_value_outputs,
+        }
     }
 }
 
-impl From<DfgID> for BasicBlockID {
+impl From<OutID<DfgID>> for BasicBlockID {
     #[inline]
-    fn from(value: DfgID) -> Self {
-        Self(value.0)
+    fn from(value: OutID<DfgID>) -> Self {
+        Self(value.node())
     }
 }
 
-impl From<DfgID> for CaseID {
+impl From<OutID<DfgID>> for OutID<CaseID> {
     #[inline]
-    fn from(value: DfgID) -> Self {
-        Self(value.0)
+    fn from(value: OutID<DfgID>) -> Self {
+        Self {
+            node_handle: CaseID(value.node()),
+            num_value_outputs: value.num_value_outputs,
+        }
     }
 }
 
-impl From<DfgID> for TailLoopID {
+impl From<OutID<DfgID>> for OutID<TailLoopID> {
     #[inline]
-    fn from(value: DfgID) -> Self {
-        Self(value.0, value.1)
+    fn from(value: OutID<DfgID>) -> Self {
+        Self {
+            node_handle: TailLoopID(value.node()),
+            num_value_outputs: value.num_value_outputs,
+        }
     }
 }
 
@@ -193,22 +233,12 @@ impl BuildHandle for OpID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn num_value_outputs(&self) -> usize {
-        self.1
-    }
 }
 
 impl BuildHandle for ConditionalID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
-    }
-
-    #[inline]
-    fn num_value_outputs(&self) -> usize {
-        self.1
     }
 }
 
@@ -217,11 +247,6 @@ impl BuildHandle for DfgID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn num_value_outputs(&self) -> usize {
-        self.1
-    }
 }
 
 impl BuildHandle for TailLoopID {
@@ -229,22 +254,12 @@ impl BuildHandle for TailLoopID {
     fn node(&self) -> NodeIndex {
         self.0
     }
-
-    #[inline]
-    fn num_value_outputs(&self) -> usize {
-        self.1
-    }
 }
 
 impl BuildHandle for CfgID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
-    }
-
-    #[inline]
-    fn num_value_outputs(&self) -> usize {
-        self.1
     }
 }
 
