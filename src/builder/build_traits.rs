@@ -5,6 +5,7 @@ use std::iter;
 use super::{
     nodehandle::{ConstID, FuncID, NewTypeID, OpID, Outputs},
     tail_loop::loop_sum_variants,
+    CircuitBuilder,
 };
 
 use crate::{
@@ -471,6 +472,12 @@ pub trait Dataflow: Container {
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;
         Ok(op_id)
     }
+
+    /// For the vector of `wires`, produce a `CircuitBuilder` where ops can be
+    /// added using indices in to the vector.
+    fn as_circuit(&mut self, wires: Vec<Wire>) -> CircuitBuilder<Self> {
+        CircuitBuilder::new(wires, self)
+    }
 }
 
 #[inline]
@@ -487,7 +494,8 @@ fn make_out_variant<const N: usize, T: Dataflow + ?Sized>(
         container.make_tag(N, variants, tuple)
     }
 }
-pub(crate) fn add_op_with_wires<T: Dataflow + ?Sized>(
+
+fn add_op_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
@@ -503,7 +511,7 @@ pub(crate) fn add_op_with_wires<T: Dataflow + ?Sized>(
     Ok((op_node, sig.output.len()))
 }
 
-pub(crate) fn wire_up_inputs<T: Dataflow + ?Sized>(
+fn wire_up_inputs<T: Dataflow + ?Sized>(
     inputs: Vec<Wire>,
     op_node: NodeIndex,
     data_builder: &mut T,
@@ -523,7 +531,7 @@ pub(crate) fn wire_up_inputs<T: Dataflow + ?Sized>(
 }
 
 /// Add edge from src to dst and report back if they do share a parent
-pub(crate) fn wire_up<T: Dataflow + ?Sized>(
+fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     mut src: NodeIndex,
     mut src_port: usize,
@@ -599,7 +607,7 @@ pub(crate) fn wire_up<T: Dataflow + ?Sized>(
 /// Check the kind of a port is a classical Value and return it
 /// Return None if Const kind
 /// Panics if port not valid for Op or port is not Const/Value
-pub(crate) fn check_classical_value(
+fn check_classical_value(
     base: &HugrMut,
     src: NodeIndex,
     src_offset: PortOffset,
@@ -620,7 +628,7 @@ pub(crate) fn check_classical_value(
 }
 
 // Return newly added port to copy node if src node is a copy
-pub(crate) fn if_copy_add_port(base: &mut HugrMut, src: NodeIndex) -> Option<usize> {
+fn if_copy_add_port(base: &mut HugrMut, src: NodeIndex) -> Option<usize> {
     let src_op: Result<&LeafOp, ()> = base.hugr().get_optype(src).try_into();
     if let Ok(LeafOp::Copy { n_copies, typ }) = src_op {
         let copy_node = src;
