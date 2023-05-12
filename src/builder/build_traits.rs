@@ -475,7 +475,7 @@ pub trait Dataflow: Container {
 
     /// For the array of `wires`, produce a `LinearBuilder` where ops can be
     /// added using indices in to the array.
-    fn as_linear<const N: usize>(&mut self, wires: [Wire; N]) -> LinearBuilder<Self, N> {
+    fn as_linear(&mut self, wires: Vec<Wire>) -> LinearBuilder<Self> {
         LinearBuilder::new(wires, self)
     }
 }

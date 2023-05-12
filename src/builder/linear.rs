@@ -4,15 +4,15 @@ use super::{nodehandle::Outputs, BuildError, BuildHandle, Dataflow, Wire};
 
 /// Builder to build linear regions of dataflow graphs
 /// Appends operations to an array of incoming wires
-pub struct LinearBuilder<'a, T: ?Sized, const N: usize> {
-    wires: [Wire; N],
+pub struct LinearBuilder<'a, T: ?Sized> {
+    wires: Vec<Wire>,
     builder: &'a mut T,
 }
 
-impl<'a, T: Dataflow + ?Sized, const N: usize> LinearBuilder<'a, T, N> {
+impl<'a, T: Dataflow + ?Sized> LinearBuilder<'a, T> {
     /// Construct a new LinearBuilder from an array of incoming wires and the
     /// builder for the graph
-    pub fn new(wires: [Wire; N], builder: &'a mut T) -> Self {
+    pub fn new(wires: Vec<Wire>, builder: &'a mut T) -> Self {
         Self { wires, builder }
     }
 
@@ -73,7 +73,7 @@ impl<'a, T: Dataflow + ?Sized, const N: usize> LinearBuilder<'a, T, N> {
     #[inline]
     /// Finish building the linear region and return the dangling wires
     /// corresponding to the initially provided wires.
-    pub fn finish(self) -> [Wire; N] {
+    pub fn finish(self) -> Vec<Wire> {
         self.wires
     }
 }
@@ -86,7 +86,7 @@ mod test {
     use crate::{
         builder::{
             test::{build_main, BIT, F64, QB},
-            BuildError, Dataflow, Wire,
+            Dataflow, Wire,
         },
         ops::LeafOp,
         type_row,
@@ -94,11 +94,11 @@ mod test {
     };
 
     #[test]
-    fn simple_linear() -> Result<(), BuildError> {
+    fn simple_linear() {
         let build_res = build_main(
             Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
             |mut f_build| {
-                let wires: [Wire; 2] = f_build.input_wires_arr();
+                let wires = f_build.input_wires().collect();
 
                 let mut linear = LinearBuilder {
                     wires,
@@ -115,18 +115,16 @@ mod test {
         );
 
         assert_matches!(build_res, Ok(_));
-
-        Ok(())
     }
 
     #[test]
-    fn with_nonlinear_and_outputs() -> Result<(), BuildError> {
+    fn with_nonlinear_and_outputs() {
         let build_res = build_main(
             Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
-                let mut linear = f_build.as_linear([q0, q1]);
+                let mut linear = f_build.as_linear(vec![q0, q1]);
 
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
@@ -139,7 +137,5 @@ mod test {
         );
 
         assert_matches!(build_res, Ok(_));
-
-        Ok(())
     }
 }
