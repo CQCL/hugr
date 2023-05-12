@@ -1,6 +1,6 @@
 use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
-    nodehandle::{BuildHandle, ConstID, FuncID, NewTypeID},
+    nodehandle::{ConstID, FuncID, NewTypeID, NodeHandle},
     BuildError, Container,
 };
 

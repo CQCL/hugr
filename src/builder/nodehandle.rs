@@ -57,19 +57,19 @@ impl FusedIterator for Outputs {}
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`NodeIndex`].
-pub trait BuildHandle {
+pub trait NodeHandle {
     /// Index of underlying node.
     fn node(&self) -> NodeIndex;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Handle to a dataflow node which has a known number of value outputs
-pub struct OutID<T> {
+pub struct BuildHandle<T> {
     node_handle: T,
     num_value_outputs: usize,
 }
 
-impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for OutID<T> {
+impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
     fn from((node, num_value_outputs): (NodeIndex, usize)) -> Self {
         Self {
             node_handle: node.into(),
@@ -78,13 +78,13 @@ impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for OutID<T> {
     }
 }
 
-impl<T: BuildHandle> BuildHandle for OutID<T> {
+impl<T: NodeHandle> NodeHandle for BuildHandle<T> {
     fn node(&self) -> NodeIndex {
         self.node_handle.node()
     }
 }
 
-impl<T: BuildHandle> OutID<T> {
+impl<T: NodeHandle> BuildHandle<T> {
     #[inline]
     /// Number of Value kind outputs from this node.
     fn num_value_outputs(&self) -> usize {
@@ -191,9 +191,9 @@ pub struct TailLoopID(NodeIndex);
 /// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node.
 pub struct ConditionalID(NodeIndex);
 
-impl From<OutID<DfgID>> for OutID<FuncID> {
+impl From<BuildHandle<DfgID>> for BuildHandle<FuncID> {
     #[inline]
-    fn from(value: OutID<DfgID>) -> Self {
+    fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
             node_handle: FuncID(value.node()),
             num_value_outputs: value.num_value_outputs,
@@ -201,16 +201,16 @@ impl From<OutID<DfgID>> for OutID<FuncID> {
     }
 }
 
-impl From<OutID<DfgID>> for BasicBlockID {
+impl From<BuildHandle<DfgID>> for BasicBlockID {
     #[inline]
-    fn from(value: OutID<DfgID>) -> Self {
+    fn from(value: BuildHandle<DfgID>) -> Self {
         Self(value.node())
     }
 }
 
-impl From<OutID<DfgID>> for OutID<CaseID> {
+impl From<BuildHandle<DfgID>> for BuildHandle<CaseID> {
     #[inline]
-    fn from(value: OutID<DfgID>) -> Self {
+    fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
             node_handle: CaseID(value.node()),
             num_value_outputs: value.num_value_outputs,
@@ -218,9 +218,9 @@ impl From<OutID<DfgID>> for OutID<CaseID> {
     }
 }
 
-impl From<OutID<DfgID>> for OutID<TailLoopID> {
+impl From<BuildHandle<DfgID>> for BuildHandle<TailLoopID> {
     #[inline]
-    fn from(value: OutID<DfgID>) -> Self {
+    fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
             node_handle: TailLoopID(value.node()),
             num_value_outputs: value.num_value_outputs,
@@ -228,63 +228,63 @@ impl From<OutID<DfgID>> for OutID<TailLoopID> {
     }
 }
 
-impl BuildHandle for OpID {
+impl NodeHandle for OpID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for ConditionalID {
+impl NodeHandle for ConditionalID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for DfgID {
+impl NodeHandle for DfgID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for TailLoopID {
+impl NodeHandle for TailLoopID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for CfgID {
+impl NodeHandle for CfgID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for FuncID {
+impl NodeHandle for FuncID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for NewTypeID {
+impl NodeHandle for NewTypeID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.node
     }
 }
 
-impl BuildHandle for ConstID {
+impl NodeHandle for ConstID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0
     }
 }
 
-impl BuildHandle for BasicBlockID {
+impl NodeHandle for BasicBlockID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.0

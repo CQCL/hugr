@@ -3,7 +3,7 @@ use crate::hugr::{validate::InterGraphEdgeError, ValidationError};
 use std::iter;
 
 use super::{
-    nodehandle::{ConstID, FuncID, NewTypeID, OpID, OutID, Outputs},
+    nodehandle::{BuildHandle, ConstID, FuncID, NewTypeID, OpID, Outputs},
     tail_loop::loop_sum_variants,
     CircuitBuilder,
 };
@@ -19,8 +19,8 @@ use itertools::Itertools;
 use portgraph::{Direction, NodeIndex, PortOffset};
 
 use super::{
-    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
-    nodehandle::BuildHandle, tail_loop::TailLoopBuilder, BuildError, Wire,
+    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder, nodehandle::NodeHandle,
+    tail_loop::TailLoopBuilder, BuildError, Wire,
 };
 
 use crate::Hugr;
@@ -68,7 +68,7 @@ pub trait Dataflow: Container {
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
     /// Handle to input node.
-    fn input(&self) -> OutID<OpID> {
+    fn input(&self) -> BuildHandle<OpID> {
         (self.io()[0], self.num_inputs()).into()
     }
     /// Handle to output node.
@@ -89,7 +89,7 @@ pub trait Dataflow: Container {
         &mut self,
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<OutID<OpID>, BuildError> {
+    ) -> Result<BuildHandle<OpID>, BuildError> {
         let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
@@ -310,8 +310,8 @@ pub trait Dataflow: Container {
     /// to both nodes will be Order kind.
     fn set_order(
         &mut self,
-        before: &impl BuildHandle,
-        after: &impl BuildHandle,
+        before: &impl NodeHandle,
+        after: &impl NodeHandle,
     ) -> Result<(), BuildError> {
         self.add_other_wire(before.node(), after.node())?;
 
@@ -338,7 +338,11 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when adding the
     /// copy node.
-    fn discard_type(&mut self, wire: Wire, typ: ClassicType) -> Result<OutID<OpID>, BuildError> {
+    fn discard_type(
+        &mut self,
+        wire: Wire,
+        typ: ClassicType,
+    ) -> Result<BuildHandle<OpID>, BuildError> {
         self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
     }
 
@@ -349,7 +353,7 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if ther is an error when adding the
     /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<OutID<OpID>, BuildError> {
+    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<OpID>, BuildError> {
         let typ = self.get_wire_type(wire)?;
         let typ = match typ {
             SimpleType::Classic(typ) => typ,
@@ -450,7 +454,7 @@ pub trait Dataflow: Container {
         &mut self,
         function: &FuncID,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<OutID<OpID>, BuildError> {
+    ) -> Result<BuildHandle<OpID>, BuildError> {
         let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();
         let signature = match def_op {
             Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),

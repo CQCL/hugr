@@ -2,7 +2,7 @@ use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::types::{Signature, SimpleType, TypeRow};
 
-use super::nodehandle::OutID;
+use super::nodehandle::BuildHandle;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
@@ -13,7 +13,7 @@ use portgraph::NodeIndex;
 use crate::hugr::HugrMut;
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
-pub type TailLoopBuilder<'b> = DFGWrapper<'b, OutID<TailLoopID>>;
+pub type TailLoopBuilder<'b> = DFGWrapper<'b, BuildHandle<TailLoopID>>;
 
 impl<'b> TailLoopBuilder<'b> {
     pub(super) fn create_with_io(

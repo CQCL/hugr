@@ -2,7 +2,7 @@ use crate::types::{Signature, TypeRow};
 
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
-use super::nodehandle::OutID;
+use super::nodehandle::BuildHandle;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -19,7 +19,7 @@ use portgraph::NodeIndex;
 use thiserror::Error;
 
 /// Builder for a [`CaseOp`] child graph.
-pub type CaseBuilder<'b> = DFGWrapper<'b, OutID<CaseID>>;
+pub type CaseBuilder<'b> = DFGWrapper<'b, BuildHandle<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ConditionalBuildError {
@@ -46,7 +46,7 @@ pub struct ConditionalBuilder<'f> {
 }
 
 impl<'f> Container for ConditionalBuilder<'f> {
-    type ContainerHandle = Result<OutID<ConditionalID>, ConditionalBuildError>;
+    type ContainerHandle = Result<BuildHandle<ConditionalID>, ConditionalBuildError>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {

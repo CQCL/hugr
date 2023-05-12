@@ -1,7 +1,7 @@
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
-    nodehandle::OutID,
-    BasicBlockID, BuildError, BuildHandle, CfgID, Container, Dataflow, Wire,
+    nodehandle::BuildHandle,
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, NodeHandle, Wire,
 };
 
 use crate::types::SimpleType;
@@ -23,7 +23,7 @@ pub struct CFGBuilder<'f> {
 }
 
 impl<'f> Container for CFGBuilder<'f> {
-    type ContainerHandle = OutID<CfgID>;
+    type ContainerHandle = BuildHandle<CfgID>;
 
     #[inline]
     fn container_node(&self) -> NodeIndex {
