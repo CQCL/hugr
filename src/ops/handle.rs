@@ -176,4 +176,4 @@ impl_nodehandle!(FuncID, OpTag::Function);
 impl_nodehandle!(ConstID, OpTag::Const);
 
 impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
-impl_nodehandle!(NewTypeID, OpTag::NewType, node);
+// impl_nodehandle!(NewTypeID, OpTag::NewType, node);
