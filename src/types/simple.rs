@@ -49,8 +49,8 @@ pub enum Container<T: PrimType> {
     Sum(Box<TypeRow>),
     /// Known size array of T.
     Array(Box<T>, usize),
-    /// Named type defined by, but distinct from, T.
-    NewType(SmolStr, Box<T>),
+    /// Alias defined in AliasDef or AliasDeclare nodes.
+    Alias(SmolStr),
 }
 
 impl From<Container<ClassicType>> for SimpleType {
@@ -187,19 +187,6 @@ impl SimpleType {
         Self::Classic(ClassicType::Container(Container::Sum(Box::new(
             rowvec.into(),
         ))))
-    }
-
-    /// Convert to a named NewType.
-    pub fn into_new_type(self, name: impl Into<SmolStr>) -> SimpleType {
-        match self {
-            // annoying that the arms have the same code
-            SimpleType::Classic(typ) => {
-                Container::<ClassicType>::NewType(name.into(), Box::new(typ)).into()
-            }
-            SimpleType::Linear(typ) => {
-                Container::<LinearType>::NewType(name.into(), Box::new(typ)).into()
-            }
-        }
     }
 }
 

@@ -28,9 +28,16 @@ pub enum ModuleOp {
     Declare {
         signature: Signature,
     },
-    /// A type alias.
-    #[non_exhaustive] // TODO
-    Alias {},
+    /// A type alias declaration. Resolved at link time.
+    AliasDeclare {
+        name: SmolStr,
+        linear: bool,
+    },
+    /// A type alias definition, used only for debug/metadata.
+    AliasDef {
+        name: SmolStr,
+        definition: SimpleType,
+    },
     // A constant value definition.
     Const(ConstValue),
 }
@@ -42,7 +49,8 @@ impl ModuleOp {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",
             ModuleOp::Declare { .. } => "declare",
-            ModuleOp::Alias { .. } => "alias",
+            ModuleOp::AliasDeclare { .. } => "alias_declare",
+            ModuleOp::AliasDef { .. } => "alias_def",
             ModuleOp::Const(val) => return val.name(),
         }
         .into()
@@ -54,7 +62,8 @@ impl ModuleOp {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
             ModuleOp::Def { .. } => "A function definition",
             ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
-            ModuleOp::Alias { .. } => "A type alias",
+            ModuleOp::AliasDeclare { .. } => "A type alias declaration",
+            ModuleOp::AliasDef { .. } => "A type alias definition",
             ModuleOp::Const(val) => val.description(),
         }
     }
@@ -65,7 +74,8 @@ impl ModuleOp {
             ModuleOp::Root => OpTag::ModuleRoot,
             ModuleOp::Def { .. } => OpTag::Def,
             ModuleOp::Declare { .. } => OpTag::Function,
-            ModuleOp::Alias { .. } => OpTag::Alias,
+            ModuleOp::AliasDeclare { .. } => OpTag::Alias,
+            ModuleOp::AliasDef { .. } => OpTag::Alias,
             ModuleOp::Const { .. } => OpTag::Const,
         }
     }
@@ -86,7 +96,7 @@ impl ModuleOp {
     /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
-            ModuleOp::Root | ModuleOp::Alias { .. } => None,
+            ModuleOp::Root | ModuleOp::AliasDeclare { .. } | ModuleOp::AliasDef { .. } => None,
             ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
                 ClassicType::graph_from_sig(signature.clone()),
             )),
