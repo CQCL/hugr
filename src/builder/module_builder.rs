@@ -132,21 +132,21 @@ impl ModuleBuilder {
         Ok((const_n, typ).into())
     }
 
-    /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType.
-    pub fn add_new_type(
-        &mut self,
-        name: impl Into<SmolStr>,
-        typ: SimpleType,
-    ) -> Result<NewTypeID, BuildError> {
-        let name: SmolStr = name.into();
+    // /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType.
+    // pub fn add_new_type(
+    //     &mut self,
+    //     name: impl Into<SmolStr>,
+    //     typ: SimpleType,
+    // ) -> Result<NewTypeID, BuildError> {
+    //     let name: SmolStr = name.into();
 
-        let node = self.add_child_op(ModuleOp::NewType {
-            name: name.clone(),
-            definition: typ.clone(),
-        })?;
+    //     let node = self.add_child_op(ModuleOp::NewType {
+    //         name: name.clone(),
+    //         definition: typ.clone(),
+    //     })?;
 
-        Ok((node, name, typ).into())
-    }
+    //     Ok((node, name, typ).into())
+    // }
 }
 
 #[cfg(test)]
@@ -180,28 +180,28 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn simple_newtype() -> Result<(), BuildError> {
-        let inputs = type_row![QB, BIT];
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+    // #[test]
+    // fn simple_newtype() -> Result<(), BuildError> {
+    //     let inputs = type_row![QB, BIT];
+    //     let build_result = {
+    //         let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type = module_builder
-                .add_new_type("qubit_state", SimpleType::new_tuple(inputs.clone()))?;
+    //         let qubit_state_type = module_builder
+    //             .add_new_type("qubit_state", SimpleType::new_tuple(inputs.clone()))?;
 
-            let mut f_build = module_builder.declare_and_def(
-                "main",
-                Signature::new_df(inputs, vec![qubit_state_type.get_new_type()]),
-            )?;
-            {
-                let tuple = f_build.make_tuple(f_build.input_wires())?;
-                let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
-                f_build.finish_with_outputs([q_s_val])?;
-            }
+    //         let mut f_build = module_builder.declare_and_def(
+    //             "main",
+    //             Signature::new_df(inputs, vec![qubit_state_type.get_new_type()]),
+    //         )?;
+    //         {
+    //             let tuple = f_build.make_tuple(f_build.input_wires())?;
+    //             let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
+    //             f_build.finish_with_outputs([q_s_val])?;
+    //         }
 
-            module_builder.finish()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
+    //         module_builder.finish()
+    //     };
+    //     assert_matches!(build_result, Ok(_));
+    //     Ok(())
+    // }
 }

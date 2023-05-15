@@ -9,7 +9,7 @@ use super::{
 };
 
 use crate::{
-    ops::handle::{ConstID, DataflowOpID, FuncID, NewTypeID, NodeHandle},
+    ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
     ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, LeafOp, ModuleOp, OpType},
     types::{ClassicType, EdgeKind},
 };
@@ -392,20 +392,6 @@ pub trait Dataflow: Container {
     /// Tag node.
     fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
-        Ok(make_op.out_wire(0))
-    }
-
-    /// Cast an incoming `value` to `new_type` by adding a
-    /// [`LeafOp::MakeNewType`] node and return the resulting wire.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the
-    /// MakeNewType node.
-    fn make_new_type(&mut self, new_type: &NewTypeID, value: Wire) -> Result<Wire, BuildError> {
-        let name = new_type.get_name().clone();
-        let typ = new_type.get_core_type().clone();
-        let make_op = self.add_dataflow_op(LeafOp::MakeNewType { name, typ }, [value])?;
         Ok(make_op.out_wire(0))
     }
 

@@ -45,8 +45,6 @@ pub enum OpTag {
     FnCall,
     /// A constant load operation.
     LoadConst,
-    /// A newtype definition.
-    NewType,
     /// A tail-recursive loop.
     TailLoop,
     /// A conditional operation.
@@ -90,7 +88,6 @@ impl OpTag {
             OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowOp],
             OpTag::Dfg => &[OpTag::DataflowOp],
             OpTag::Cfg => &[OpTag::DataflowOp],
-            OpTag::NewType => &[OpTag::ModuleOp],
             OpTag::TailLoop => &[OpTag::DataflowOp],
             OpTag::Conditional => &[OpTag::DataflowOp],
             OpTag::FnCall => &[OpTag::DataflowOp],
@@ -118,7 +115,6 @@ impl OpTag {
             OpTag::Const => "Constant declaration",
             OpTag::Dfg => "Nested data-flow operation",
             OpTag::Cfg => "Nested control-flow operation",
-            OpTag::NewType => "Newtype definition",
             OpTag::TailLoop => "Tail-recursive loop",
             OpTag::Conditional => "Conditional operation",
             OpTag::FnCall => "Function call",
