@@ -1,6 +1,6 @@
 //! Handles to nodes in HUGR.
 //!
-use crate::types::{ClassicType, SimpleType};
+use crate::types::{ClassicType, Container, LinearType, SimpleType};
 
 use derive_more::From as DerFrom;
 use portgraph::NodeIndex;
@@ -80,34 +80,29 @@ pub struct ModuleID(NodeIndex);
 /// or [declare](crate::ops::module::ModuleOp::Declare) node.
 pub struct FuncID(NodeIndex);
 
-#[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
-/// Handle to a [NewType](crate::ops::module::ModuleOp::NewType) node.
-pub struct NewTypeID {
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Handle to a [AliasDef](crate::ops::module::ModuleOp::AliasDef)
+/// or [AliasDeclare](crate::ops::module::ModuleOp::AliasDeclare) node.
+pub struct AliasID {
     node: NodeIndex,
     name: SmolStr,
-    core_type: SimpleType,
+    linear: bool,
 }
 
-impl NewTypeID {
-    /// Create a new NewTypeID
-    pub fn new(node: NodeIndex, name: SmolStr, core_type: SimpleType) -> Self {
-        Self {
-            node,
-            name,
-            core_type,
+impl AliasID {
+    /// Construct new AliasID
+    pub fn new(node: NodeIndex, name: SmolStr, linear: bool) -> Self {
+        Self { node, name, linear }
+    }
+
+    /// Construct new AliasID
+    pub fn get_alias_type(&self) -> SimpleType {
+        if self.linear {
+            Container::<LinearType>::Alias(self.name.clone()).into()
+        } else {
+            Container::<ClassicType>::Alias(self.name.clone()).into()
         }
     }
-
-    /// Retrieve the NewType
-    pub fn get_new_type(&self) -> SimpleType {
-        self.core_type.clone().into_new_type(self.name.clone())
-    }
-
-    /// Retrieve the underlying core type
-    pub fn get_core_type(&self) -> &SimpleType {
-        &self.core_type
-    }
-
     /// Retrieve the underlying core type
     pub fn get_name(&self) -> &SmolStr {
         &self.name
@@ -176,4 +171,4 @@ impl_nodehandle!(FuncID, OpTag::Function);
 impl_nodehandle!(ConstID, OpTag::Const);
 
 impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
-// impl_nodehandle!(NewTypeID, OpTag::NewType, node);
+impl_nodehandle!(AliasID, OpTag::Alias, node);
