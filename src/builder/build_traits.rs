@@ -3,12 +3,13 @@ use crate::hugr::{validate::InterGraphEdgeError, ValidationError};
 use std::iter;
 
 use super::{
-    nodehandle::{BuildHandle, ConstID, FuncID, NewTypeID, OpID, Outputs},
+    handle::{BuildHandle, Outputs},
     tail_loop::loop_sum_variants,
     CircuitBuilder,
 };
 
 use crate::{
+    ops::handle::{ConstID, FuncID, NewTypeID, NodeHandle, OpID},
     ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, LeafOp, ModuleOp, OpType},
     types::{ClassicType, EdgeKind},
 };
@@ -19,7 +20,7 @@ use itertools::Itertools;
 use portgraph::{Direction, NodeIndex, PortOffset};
 
 use super::{
-    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder, nodehandle::NodeHandle,
+    cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
     tail_loop::TailLoopBuilder, BuildError, Wire,
 };
 
@@ -53,7 +54,7 @@ pub trait Container {
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
     fn add_other_wire(&mut self, src: NodeIndex, dst: NodeIndex) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
-        Ok(Wire(src, src_port))
+        Ok(Wire::new(src, src_port))
     }
 
     /// Consume the container builder and return the handle, may perform some
@@ -225,7 +226,7 @@ pub trait Dataflow: Container {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
-            vec![Wire(cn, c_out)],
+            vec![Wire::new(cn, c_out)],
         )?;
 
         // Add the required incoming order wire
@@ -322,8 +323,8 @@ pub trait Dataflow: Container {
     fn get_wire_type(&self, wire: Wire) -> Result<SimpleType, BuildError> {
         let kind = self
             .hugr()
-            .get_optype(wire.0)
-            .port_kind(PortOffset::new_outgoing(wire.1));
+            .get_optype(wire.node())
+            .port_kind(PortOffset::new_outgoing(wire.offset()));
 
         if let Some(EdgeKind::Value(typ)) = kind {
             Ok(typ)
@@ -522,8 +523,8 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     inp: NodeIndex,
 ) -> Result<(), BuildError> {
     let mut any_local_inputs = false;
-    for (dst_port, Wire(src, src_port)) in inputs.into_iter().enumerate() {
-        any_local_inputs |= wire_up(data_builder, src, src_port, op_node, dst_port)?;
+    for (dst_port, wire) in inputs.into_iter().enumerate() {
+        any_local_inputs |= wire_up(data_builder, wire.node(), wire.offset(), op_node, dst_port)?;
     }
 
     if !any_local_inputs {
@@ -595,8 +596,10 @@ fn wire_up<T: Dataflow + ?Sized>(
             // TODO API consistency in using PortOffset vs. usize
             base.disconnect(src, src_port, Direction::Outgoing)?;
 
-            let copy = data_builder
-                .add_dataflow_op(LeafOp::Copy { n_copies: 2, typ }, [Wire(src, src_port)])?;
+            let copy = data_builder.add_dataflow_op(
+                LeafOp::Copy { n_copies: 2, typ },
+                [Wire::new(src, src_port)],
+            )?;
 
             let base = data_builder.base();
             base.connect(copy.node(), 0, connected, connected_offset.index())?;
