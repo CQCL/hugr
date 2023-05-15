@@ -177,6 +177,13 @@ fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, 
     }
 }
 
+fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> (T, T) {
+    match d {
+        EdgeDest::Forward(t) => (s, t),
+        EdgeDest::Backward(t) => (t, s),
+    }
+}
+
 struct UndirectedDFSTree<T: Copy + Clone + PartialEq + Eq + Hash> {
     dfs_num: HashMap<T, usize>,
     dfs_parents: HashMap<T, EdgeDest<T>>, // value is direction + source of edge along which key was reached
@@ -222,14 +229,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
 struct TraversalState<T> {
     deleted_backedges: HashSet<UDEdge<T>>, // Allows constant-time deletion
     capping_edges: HashMap<usize, Vec<CappingEdge<T>>>, // Indexed by DFS num
-    edge_classes: HashMap<CFEdge<T>, Option<(UDEdge<T>, usize)>>, // Accumulates result (never overwritten)
+    edge_classes: HashMap<(T, T), Option<(UDEdge<T>, usize)>>, // Accumulates result (never overwritten)
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
 /// are cycle-equivalent.
 pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     cfg: &dyn CfgView<T>,
-) -> HashMap<CFEdge<T>, usize> {
+) -> HashMap<(T, T), usize> {
     let tree = UndirectedDFSTree::new(cfg);
     let mut st = TraversalState {
         deleted_backedges: HashSet::new(),
@@ -238,8 +245,7 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     };
     traverse(cfg, &tree, &mut st, cfg.entry_node());
     assert!(st.capping_edges.is_empty());
-    st.edge_classes
-        .remove(&CFEdge(cfg.exit_node(), cfg.entry_node()));
+    st.edge_classes.remove(&(cfg.exit_node(), cfg.entry_node()));
     let mut cycle_class_idxs = HashMap::new();
     st.edge_classes
         .into_iter()
@@ -250,17 +256,6 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
         .collect()
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct CFEdge<T>(T, T); // TODO use tuple?
-impl<T: Copy + Clone + PartialEq + Eq + Hash> CFEdge<T> {
-    fn from(s: T, t: EdgeDest<T>) -> Self {
-        match t {
-            EdgeDest::Forward(t) => Self(s, t),
-            EdgeDest::Backward(t) => Self(t, s),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct CappingEdge<T> {
     common_parent: T,
@@ -269,7 +264,7 @@ struct CappingEdge<T> {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum UDEdge<T> {
-    RealEdge(CFEdge<T>),
+    RealEdge((T, T)),
     FakeEdge(CappingEdge<T>),
 }
 
@@ -372,7 +367,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 
     // Remove edges to here from beneath
     for (_, e) in be_down {
-        let e = UDEdge::RealEdge(CFEdge::from(n, e));
+        let e = UDEdge::RealEdge(cfg_edge(n, e));
         bs.delete(&e, &mut st.deleted_backedges);
     }
     // And capping backedges
@@ -384,7 +379,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     be_up
         .iter()
         .filter(|(_, e)| Some(e) != parent_edge)
-        .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge::from(n, *e))));
+        .for_each(|(_, e)| bs.push(UDEdge::RealEdge(cfg_edge(n, *e))));
 
     // Now calculate edge classes
     let class = bs.tag(&st.deleted_backedges);
@@ -392,7 +387,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
         st.edge_classes.insert(e.clone(), class.clone());
     }
     if let Some(parent_edge) = tree.dfs_parents.get(&n) {
-        st.edge_classes.insert(CFEdge::from(n, *parent_edge), class);
+        st.edge_classes.insert(cfg_edge(n, *parent_edge), class);
     }
     let highest_target = be_up
         .into_iter()
@@ -478,24 +473,24 @@ mod test {
         assert_eq!(g.len(), 3);
         let outer_class = if separate_header {
             HashSet::from([
-                CFEdge(HalfNode::N(entry), HalfNode::N(split)),
-                CFEdge(HalfNode::N(merge), HalfNode::N(loop_header)),
-                CFEdge(HalfNode::N(loop_tail), HalfNode::N(exit)),
+                (HalfNode::N(entry), HalfNode::N(split)),
+                (HalfNode::N(merge), HalfNode::N(loop_header)),
+                (HalfNode::N(loop_tail), HalfNode::N(exit)),
             ])
         } else {
             HashSet::from([
-                CFEdge(HalfNode::N(entry), HalfNode::N(split)),
-                CFEdge(HalfNode::N(loop_tail), HalfNode::N(exit)),
+                (HalfNode::N(entry), HalfNode::N(split)),
+                (HalfNode::N(loop_tail), HalfNode::N(exit)),
             ])
         };
         assert!(g.contains(&outer_class));
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::N(split), HalfNode::N(left)),
-            CFEdge(HalfNode::N(left), HalfNode::N(merge))
+            (HalfNode::N(split), HalfNode::N(left)),
+            (HalfNode::N(left), HalfNode::N(merge))
         ])));
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::N(split), HalfNode::N(right)),
-            CFEdge(HalfNode::N(right), HalfNode::N(merge))
+            (HalfNode::N(split), HalfNode::N(right)),
+            (HalfNode::N(right), HalfNode::N(merge))
         ])));
         Ok(())
     }
@@ -528,20 +523,20 @@ mod test {
         let g: Vec<_> = groups.into_values().filter(|s| s.len() > 1).collect();
         assert_eq!(g.len(), 4);
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::N(entry), HalfNode::N(split_header)),
-            CFEdge(HalfNode::X(merge_tail), HalfNode::N(exit))
+            (HalfNode::N(entry), HalfNode::N(split_header)),
+            (HalfNode::X(merge_tail), HalfNode::N(exit))
         ])));
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::N(split_header), HalfNode::X(split_header)),
-            CFEdge(HalfNode::N(merge_tail), HalfNode::X(merge_tail))
+            (HalfNode::N(split_header), HalfNode::X(split_header)),
+            (HalfNode::N(merge_tail), HalfNode::X(merge_tail))
         ])));
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::X(split_header), HalfNode::N(left)),
-            CFEdge(HalfNode::N(left), HalfNode::N(merge_tail))
+            (HalfNode::X(split_header), HalfNode::N(left)),
+            (HalfNode::N(left), HalfNode::N(merge_tail))
         ])));
         assert!(g.contains(&HashSet::from([
-            CFEdge(HalfNode::X(split_header), HalfNode::N(right)),
-            CFEdge(HalfNode::N(right), HalfNode::N(merge_tail))
+            (HalfNode::X(split_header), HalfNode::N(right)),
+            (HalfNode::N(right), HalfNode::N(merge_tail))
         ])));
         Ok(())
     }
