@@ -40,8 +40,11 @@ use crate::Hugr;
 pub trait CfgView<T> {
     fn entry_node(&self) -> T;
     fn exit_node(&self) -> T;
-    fn successors(&self, item: T) -> Box<dyn Iterator<Item = T>>;
-    fn predecessors(&self, item: T) -> Box<dyn Iterator<Item = T>>;
+    type Iterator<'c>: Iterator<Item = T>
+    where
+        Self: 'c;
+    fn successors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
+    fn predecessors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
 }
 
 /// We provide a view of a cfg where every node has at most one of
@@ -112,13 +115,14 @@ impl<'a> HalfNodeView<'a> {
 }
 
 impl CfgView<HalfNode> for HalfNodeView<'_> {
+    type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.h.hierarchy.first(self.parent).unwrap())
     }
     fn exit_node(&self) -> HalfNode {
         self.resolve_out(self.h.hierarchy.last(self.parent).unwrap())
     }
-    fn predecessors(&self, h: HalfNode) -> Box<dyn Iterator<Item = HalfNode>> {
+    fn predecessors<'a>(&'a self, h: HalfNode) -> Self::Iterator<'a> {
         let mut ps = Vec::new();
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
@@ -127,15 +131,15 @@ impl CfgView<HalfNode> for HalfNodeView<'_> {
         if h == self.entry_node() {
             ps.push(self.exit_node());
         }
-        Box::new(ps.into_iter())
+        ps.into_iter()
     }
-    fn successors(&self, n: HalfNode) -> Box<dyn Iterator<Item = HalfNode>> {
+    fn successors<'a>(&'a self, n: HalfNode) -> Self::Iterator<'a> {
         let mut succs = Vec::new();
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),
             HalfNode::N(ni) | HalfNode::X(ni) => succs.extend(self.bb_succs(ni).map(HalfNode::N)),
         };
-        Box::new(succs.into_iter())
+        succs.into_iter()
     }
 }
 
@@ -156,8 +160,8 @@ where
     }
 }
 
-fn undirected_edges<T: Copy + Clone + PartialEq + Eq + Hash>(
-    cfg: &dyn CfgView<T>,
+fn undirected_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
+    cfg: &'a impl CfgView<T>,
     n: T,
 ) -> impl Iterator<Item = EdgeDest<T>> + '_ {
     let mut succs: Vec<_> = cfg.successors(n).collect();
@@ -190,7 +194,7 @@ struct UndirectedDFSTree<T: Copy + Clone + PartialEq + Eq + Hash> {
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
-    pub fn new(cfg: &dyn CfgView<T>) -> Self {
+    pub fn new(cfg: &impl CfgView<T>) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
@@ -235,7 +239,7 @@ struct TraversalState<T> {
 /// Computes equivalence class of each edge, i.e. two edges with the same value
 /// are cycle-equivalent.
 pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
-    cfg: &dyn CfgView<T>,
+    cfg: &impl CfgView<T>,
 ) -> HashMap<(T, T), usize> {
     let tree = UndirectedDFSTree::new(cfg);
     let mut st = TraversalState {
@@ -316,7 +320,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
 }
 
 fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
-    cfg: &dyn CfgView<T>,
+    cfg: &impl CfgView<T>,
     tree: &UndirectedDFSTree<T>,
     st: &mut TraversalState<T>,
     n: T,
