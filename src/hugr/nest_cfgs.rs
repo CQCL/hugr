@@ -222,14 +222,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
 struct TraversalState<T> {
     deleted_backedges: HashSet<UDEdge<T>>, // Allows constant-time deletion
     capping_edges: HashMap<usize, Vec<CappingEdge<T>>>, // Indexed by DFS num
-    edge_classes: HashMap<CFEdge<T>, Option<CycleClass<T>>>, // Accumulates result (never overwritten)
+    edge_classes: HashMap<CFEdge<T>, Option<(UDEdge<T>, usize)>>, // Accumulates result (never overwritten)
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
 /// are cycle-equivalent.
 pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     cfg: &dyn CfgView<T>,
-) -> HashMap<CFEdge<T>, Option<CycleClass<T>>> {
+) -> HashMap<CFEdge<T>, usize> {
     let tree = UndirectedDFSTree::new(cfg);
     let mut st = TraversalState {
         deleted_backedges: HashSet::new(),
@@ -240,7 +240,14 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     assert!(st.capping_edges.is_empty());
     st.edge_classes
         .remove(&CFEdge(cfg.exit_node(), cfg.entry_node()));
+    let mut cycle_class_idxs = HashMap::new();
     st.edge_classes
+        .into_iter()
+        .map(|(k, v)| {
+            let l = cycle_class_idxs.len();
+            (k, *cycle_class_idxs.entry(v).or_insert(l))
+        })
+        .collect()
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -255,20 +262,16 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> CFEdge<T> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct CappingEdge<T> {
-    // TODO hide
+struct CappingEdge<T> {
     common_parent: T,
     dfs_target: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum UDEdge<T> {
-    // TODO hide
+enum UDEdge<T> {
     RealEdge(CFEdge<T>),
     FakeEdge(CappingEdge<T>),
 }
-
-pub type CycleClass<T> = (UDEdge<T>, usize); // TODO hide (replace in output)
 
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
     items: LinkedList<UDEdge<T>>,
@@ -283,7 +286,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
         }
     }
 
-    pub fn tag(&mut self, deleted: &HashSet<UDEdge<T>>) -> Option<CycleClass<T>> {
+    pub fn tag(&mut self, deleted: &HashSet<UDEdge<T>>) -> Option<(UDEdge<T>, usize)> {
         while let Some(e) = self.items.front() {
             // Pop deleted elements to save time (and memory)
             if deleted.contains(e) {
