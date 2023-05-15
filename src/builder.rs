@@ -4,10 +4,11 @@ use portgraph::NodeIndex;
 use thiserror::Error;
 
 use crate::hugr::{HugrError, ValidationError};
+use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID, Wire};
 use crate::types::LinearType;
 
-pub mod nodehandle;
-pub use nodehandle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, NodeHandle, TailLoopID};
+pub mod handle;
+pub use handle::BuildHandle;
 
 mod build_traits;
 pub use build_traits::{Container, Dataflow};
@@ -29,11 +30,6 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 
 mod circuit_builder;
 pub use circuit_builder::{AppendWire, CircuitBuilder};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-/// A DataFlow wire, defined by a Value-kind output port of a node
-// Stores node and offset to output port
-pub struct Wire(NodeIndex, usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 /// Error while building the HUGR.
@@ -75,15 +71,11 @@ pub enum BuildError {
 #[cfg(test)]
 mod test {
 
-    use crate::{
-        builder::ModuleBuilder,
-        types::{ClassicType, LinearType, Signature, SimpleType},
-        Hugr,
-    };
+    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
+    use crate::{builder::ModuleBuilder, Hugr};
 
-    use super::{
-        nodehandle::BuildHandle, BuildError, Container, Dataflow, FuncID, FunctionBuilder,
-    };
+    use super::handle::BuildHandle;
+    use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);

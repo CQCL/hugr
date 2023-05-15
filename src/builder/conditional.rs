@@ -1,12 +1,12 @@
 use crate::types::{Signature, TypeRow};
 
+use crate::ops::handle::CaseID;
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
-use super::nodehandle::BuildHandle;
+use super::handle::BuildHandle;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
-    nodehandle::CaseID,
     BuildError, ConditionalID,
 };
 

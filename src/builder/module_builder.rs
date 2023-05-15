@@ -1,11 +1,11 @@
 use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
-    nodehandle::{ConstID, FuncID, NewTypeID, NodeHandle},
     BuildError, Container,
 };
 
 use crate::types::SimpleType;
 
+use crate::ops::handle::{ConstID, FuncID, NewTypeID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
 
 use crate::types::Signature;

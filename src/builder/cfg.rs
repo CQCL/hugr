@@ -1,11 +1,12 @@
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
-    nodehandle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, NodeHandle, Wire,
+    handle::BuildHandle,
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, Wire,
 };
 
 use crate::types::SimpleType;
 
+use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};
 
 use portgraph::NodeIndex;

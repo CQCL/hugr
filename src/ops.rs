@@ -3,6 +3,7 @@
 pub mod controlflow;
 pub mod custom;
 pub mod dataflow;
+pub mod handle;
 pub mod leaf;
 pub mod module;
 pub mod validate;

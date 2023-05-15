@@ -2,7 +2,7 @@ use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::types::{Signature, SimpleType, TypeRow};
 
-use super::nodehandle::BuildHandle;
+use super::handle::BuildHandle;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,

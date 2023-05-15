@@ -1,4 +1,4 @@
-use super::nodehandle::BuildHandle;
+use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
 use std::marker::PhantomData;
