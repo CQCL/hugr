@@ -33,6 +33,17 @@ use crate::Hugr;
 /// (in a BB with one predecessor and one successor, which may then be merged
 ///     and contents parallelized with predecessor or successor).
 
+// A view of a CFG. Although we can think of each T being a BasicBlock i.e. a NodeIndex in the HUGR,
+// this extra level of indirection allows "splitting" of one HUGR basic block into many (or vice versa).
+// Since regions are identified by edges between pairs of such T, such splitting may allow to identify
+// more regions than existed in the underlying CFG (without mutating the underlying CFG perhaps in vain).
+pub trait CfgView<T> {
+    fn entry_node(&self) -> T;
+    fn exit_node(&self) -> T;
+    fn successors(&self, item: T) -> Box<dyn Iterator<Item = T>>;
+    fn predecessors(&self, item: T) -> Box<dyn Iterator<Item = T>>;
+}
+
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
 /// So, for BBs with multiple preds + succs, we generate TWO HalfNode's.
@@ -48,12 +59,12 @@ enum HalfNode {
     X(NodeIndex),
 }
 
-struct CfgView<'a> {
+struct HalfNodeView<'a> {
     h: &'a Hugr,
     parent: NodeIndex,
 }
 
-impl<'a> CfgView<'a> {
+impl<'a> HalfNodeView<'a> {
     pub fn new(h: &'a Hugr, parent: NodeIndex) -> Result<Self, String> {
         if let OpType::Function(DataflowOp::ControlFlow {
             op: ControlFlowOp::CFG { .. },
@@ -67,12 +78,7 @@ impl<'a> CfgView<'a> {
             Err("Not a kappa-node".to_string())
         }
     }
-    pub fn entry_node(&self) -> HalfNode {
-        HalfNode::N(self.h.hierarchy.first(self.parent).unwrap())
-    }
-    pub fn exit_node(&self) -> HalfNode {
-        self.resolve_out(self.h.hierarchy.last(self.parent).unwrap())
-    }
+
     fn is_multi_node(&self, n: NodeIndex) -> bool {
         self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
     }
@@ -83,17 +89,7 @@ impl<'a> CfgView<'a> {
             HalfNode::N(n)
         }
     }
-    fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> + '_ {
-        let mut ps = Vec::new();
-        match h {
-            HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
-            HalfNode::X(ni) => ps.push(HalfNode::N(ni)),
-        };
-        if h == self.entry_node() {
-            ps.push(self.exit_node());
-        }
-        ps.into_iter()
-    }
+
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
         // TODO filter out duplicate successors (and duplicate predecessors)
         // - but not duplicate (successor + predecessors) i.e. where edge directions are reversed
@@ -113,44 +109,46 @@ impl<'a> CfgView<'a> {
     fn port_owner(&self, p: Option<PortIndex>) -> NodeIndex {
         self.h.graph.port_node(p.unwrap()).unwrap()
     }
-    pub fn undirected_edges(&self, n: HalfNode) -> impl Iterator<Item = EdgeDest> + '_ {
+}
+
+impl CfgView<HalfNode> for HalfNodeView<'_> {
+    fn entry_node(&self) -> HalfNode {
+        HalfNode::N(self.h.hierarchy.first(self.parent).unwrap())
+    }
+    fn exit_node(&self) -> HalfNode {
+        self.resolve_out(self.h.hierarchy.last(self.parent).unwrap())
+    }
+    fn predecessors(&self, h: HalfNode) -> Box<dyn Iterator<Item = HalfNode>> {
+        let mut ps = Vec::new();
+        match h {
+            HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
+            HalfNode::X(ni) => ps.push(HalfNode::N(ni)),
+        };
+        if h == self.entry_node() {
+            ps.push(self.exit_node());
+        }
+        Box::new(ps.into_iter())
+    }
+    fn successors(&self, n: HalfNode) -> Box<dyn Iterator<Item = HalfNode>> {
         let mut succs = Vec::new();
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),
             HalfNode::N(ni) | HalfNode::X(ni) => succs.extend(self.bb_succs(ni).map(HalfNode::N)),
         };
-        if n == self.exit_node() {
-            succs.push(self.entry_node());
-        }
-        succs
-            .into_iter()
-            .map(EdgeDest::Forward)
-            .chain(self.predecessors(n).map(EdgeDest::Backward))
-    }
-    /// Computes equivalence class of each edge, i.e. two edges with the same value
-    /// are cycle-equivalent.
-    pub fn get_edge_classes(&self) -> HashMap<CFEdge, Option<CycleClass>> {
-        let tree = UndirectedDFSTree::new(self);
-        let mut st = TraversalState {
-            deleted_backedges: HashSet::new(),
-            capping_edges: HashMap::new(),
-            edge_classes: HashMap::new(),
-        };
-        tree.traverse(&mut st, self.entry_node());
-        assert!(st.capping_edges.is_empty());
-        st.edge_classes
-            .remove(&CFEdge(self.exit_node(), self.entry_node()));
-        st.edge_classes
+        Box::new(succs.into_iter())
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum EdgeDest {
-    Forward(HalfNode),
-    Backward(HalfNode),
+enum EdgeDest<T: Copy + Clone + PartialEq + Eq + Hash> {
+    Forward(T),
+    Backward(T),
 }
-impl EdgeDest {
-    pub fn target(&self) -> HalfNode {
+impl<T> EdgeDest<T>
+where
+    T: Copy + Clone + PartialEq + Eq + Hash,
+{
+    pub fn target(&self) -> T {
         match self {
             EdgeDest::Forward(i) => *i,
             EdgeDest::Backward(i) => *i,
@@ -158,17 +156,97 @@ impl EdgeDest {
     }
 }
 
-fn flip(src: HalfNode, d: EdgeDest) -> (HalfNode, EdgeDest) {
+fn undirected_edges<T: Copy + Clone + PartialEq + Eq + Hash>(
+    cfg: &dyn CfgView<T>,
+    n: T,
+) -> impl Iterator<Item = EdgeDest<T>> + '_ {
+    let mut succs: Vec<_> = cfg.successors(n).collect();
+    if n == cfg.exit_node() {
+        succs.push(cfg.entry_node());
+    }
+    succs
+        .into_iter()
+        .map(EdgeDest::Forward)
+        .chain(cfg.predecessors(n).map(EdgeDest::Backward))
+}
+
+fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, EdgeDest<T>) {
     match d {
         EdgeDest::Forward(tgt) => (tgt, EdgeDest::Backward(src)),
         EdgeDest::Backward(tgt) => (tgt, EdgeDest::Forward(src)),
     }
 }
 
+struct UndirectedDFSTree<T: Copy + Clone + PartialEq + Eq + Hash> {
+    dfs_num: HashMap<T, usize>,
+    dfs_parents: HashMap<T, EdgeDest<T>>, // value is direction + source of edge along which key was reached
+}
+
+impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
+    pub fn new(cfg: &dyn CfgView<T>) -> Self {
+        //1. Traverse backwards-only from exit building bitset of reachable nodes
+        let mut reachable = HashSet::new();
+        {
+            let mut pending = LinkedList::new();
+            pending.push_back(cfg.exit_node());
+            while let Some(n) = pending.pop_front() {
+                if reachable.insert(n) {
+                    pending.extend(cfg.predecessors(n));
+                }
+            }
+        }
+        //2. Traverse undirected from entry node, building dfs_num and setting dfs_parents
+        let mut dfs_num = HashMap::new();
+        let mut dfs_parents = HashMap::new();
+        {
+            // Node, and directed edge along which reached
+            let mut pending = vec![(cfg.entry_node(), EdgeDest::Backward(cfg.exit_node()))];
+            while let Some((n, p_edge)) = pending.pop() {
+                if !dfs_num.contains_key(&n) && reachable.contains(&n) {
+                    dfs_num.insert(n, dfs_num.len());
+                    dfs_parents.insert(n, p_edge);
+                    for e in undirected_edges(cfg, n) {
+                        pending.push(flip(n, e));
+                    }
+                }
+            }
+            dfs_parents.remove(&cfg.entry_node()).unwrap();
+        }
+        UndirectedDFSTree {
+            dfs_num,
+            dfs_parents,
+        }
+    }
+}
+
+struct TraversalState<T> {
+    deleted_backedges: HashSet<UDEdge<T>>, // Allows constant-time deletion
+    capping_edges: HashMap<usize, Vec<CappingEdge<T>>>, // Indexed by DFS num
+    edge_classes: HashMap<CFEdge<T>, Option<CycleClass<T>>>, // Accumulates result (never overwritten)
+}
+
+/// Computes equivalence class of each edge, i.e. two edges with the same value
+/// are cycle-equivalent.
+pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
+    cfg: &dyn CfgView<T>,
+) -> HashMap<CFEdge<T>, Option<CycleClass<T>>> {
+    let tree = UndirectedDFSTree::new(cfg);
+    let mut st = TraversalState {
+        deleted_backedges: HashSet::new(),
+        capping_edges: HashMap::new(),
+        edge_classes: HashMap::new(),
+    };
+    traverse(cfg, &tree, &mut st, cfg.entry_node());
+    assert!(st.capping_edges.is_empty());
+    st.edge_classes
+        .remove(&CFEdge(cfg.exit_node(), cfg.entry_node()));
+    st.edge_classes
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-struct CFEdge(HalfNode, HalfNode);
-impl CFEdge {
-    fn from(s: HalfNode, t: EdgeDest) -> Self {
+pub struct CFEdge<T>(T, T); // TODO use tuple?
+impl<T: Copy + Clone + PartialEq + Eq + Hash> CFEdge<T> {
+    fn from(s: T, t: EdgeDest<T>) -> Self {
         match t {
             EdgeDest::Forward(t) => Self(s, t),
             EdgeDest::Backward(t) => Self(t, s),
@@ -177,25 +255,27 @@ impl CFEdge {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct CappingEdge {
-    common_parent: HalfNode,
+pub struct CappingEdge<T> {
+    // TODO hide
+    common_parent: T,
     dfs_target: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum UDEdge {
-    RealEdge(CFEdge),
-    FakeEdge(CappingEdge),
+pub enum UDEdge<T> {
+    // TODO hide
+    RealEdge(CFEdge<T>),
+    FakeEdge(CappingEdge<T>),
 }
 
-type CycleClass = (UDEdge, usize);
+pub type CycleClass<T> = (UDEdge<T>, usize); // TODO hide (replace in output)
 
-struct BracketList {
-    items: LinkedList<UDEdge>,
+struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
+    items: LinkedList<UDEdge<T>>,
     size: usize, // deleted items already taken off
 }
 
-impl BracketList {
+impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     pub fn new() -> Self {
         BracketList {
             items: LinkedList::new(),
@@ -203,7 +283,7 @@ impl BracketList {
         }
     }
 
-    pub fn tag(&mut self, deleted: &HashSet<UDEdge>) -> Option<CycleClass> {
+    pub fn tag(&mut self, deleted: &HashSet<UDEdge<T>>) -> Option<CycleClass<T>> {
         while let Some(e) = self.items.front() {
             // Pop deleted elements to save time (and memory)
             if deleted.contains(e) {
@@ -216,14 +296,14 @@ impl BracketList {
         None
     }
 
-    pub fn concat(&mut self, other: BracketList) -> () {
+    pub fn concat(&mut self, other: BracketList<T>) -> () {
         let BracketList { mut items, size } = other;
         self.items.append(&mut items);
         assert!(items.len() == 0);
         self.size += size;
     }
 
-    pub fn delete(&mut self, b: &UDEdge, deleted: &mut HashSet<UDEdge>) {
+    pub fn delete(&mut self, b: &UDEdge<T>, deleted: &mut HashSet<UDEdge<T>>) {
         // Ideally, here we would also assert that no *other* BracketList contains b.
         debug_assert!(self.items.contains(b)); // Makes operation O(n), otherwise O(1)
         assert!(!deleted.contains(b));
@@ -231,141 +311,91 @@ impl BracketList {
         self.size -= 1;
     }
 
-    pub fn push(&mut self, e: UDEdge) {
+    pub fn push(&mut self, e: UDEdge<T>) {
         self.items.push_back(e);
         self.size += 1;
     }
 }
 
-struct UndirectedDFSTree<'a> {
-    h: &'a CfgView<'a>,
-    dfs_num: HashMap<HalfNode, usize>,
-    dfs_parents: HashMap<HalfNode, EdgeDest>, // value is direction + source of edge along which key was reached
-}
-
-struct TraversalState {
-    deleted_backedges: HashSet<UDEdge>, // Allows constant-time deletion
-    capping_edges: HashMap<usize, Vec<CappingEdge>>, // Indexed by DFS num
-    edge_classes: HashMap<CFEdge, Option<CycleClass>>, // Accumulates result (never overwritten)
-}
-
-impl<'a> UndirectedDFSTree<'a> {
-    pub fn new(h: &'a CfgView) -> Self {
-        //1. Traverse backwards-only from exit building bitset of reachable nodes
-        let mut reachable = HashSet::new();
-        {
-            let mut pending = LinkedList::new();
-            pending.push_back(h.exit_node());
-            while let Some(n) = pending.pop_front() {
-                if reachable.insert(n) {
-                    pending.extend(h.predecessors(n));
-                }
-            }
+fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
+    cfg: &dyn CfgView<T>,
+    tree: &UndirectedDFSTree<T>,
+    st: &mut TraversalState<T>,
+    n: T,
+) -> (usize, BracketList<T>) {
+    let n_dfs = *tree.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
+    let (children, non_capping_backedges): (Vec<_>, Vec<_>) = undirected_edges(cfg, n)
+        .filter(|e| tree.dfs_num.contains_key(&e.target()))
+        .partition(|e| {
+            // The tree edges are those whose *targets* list the edge as parent-edge
+            let (tgt, from) = flip(n, *e);
+            tree.dfs_parents.get(&tgt) == Some(&from)
+        });
+    let child_results: Vec<_> = children
+        .iter()
+        .map(|c| traverse(cfg, tree, st, c.target()))
+        .collect();
+    let mut min_dfs_target: [Option<usize>; 2] = [None, None]; // We want highest-but-one
+    let mut bs = BracketList::new();
+    for (tgt, brs) in child_results {
+        if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
+            min_dfs_target = [Some(tgt), min_dfs_target[0]]
+        } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
+            min_dfs_target[1] = Some(tgt)
         }
-        //2. Traverse undirected from entry node, building dfs_num and setting dfs_parents
-        let mut dfs_num = HashMap::new();
-        let mut dfs_parents = HashMap::new();
-        {
-            // Node, and edge along which reached
-            let mut pending = vec![(h.entry_node(), EdgeDest::Backward(h.exit_node()))];
-            while let Some((n, p_edge)) = pending.pop() {
-                if !dfs_num.contains_key(&n) && reachable.contains(&n) {
-                    dfs_num.insert(n, dfs_num.len());
-                    dfs_parents.insert(n, p_edge);
-                    for e in h.undirected_edges(n) {
-                        pending.push(flip(n, e));
-                    }
-                }
-            }
-            dfs_parents.remove(&h.entry_node()).unwrap();
-        }
-        UndirectedDFSTree {
-            h,
-            dfs_num,
-            dfs_parents,
+        bs.concat(brs);
+    }
+    // Add capping backedge
+    if let Some(min1dfs) = min_dfs_target[1] {
+        if min1dfs < n_dfs {
+            let capping_edge = CappingEdge {
+                common_parent: n,
+                dfs_target: min1dfs,
+            };
+            bs.push(UDEdge::FakeEdge(capping_edge.clone()));
+            // mark capping edge to be removed when we return out to the other end
+            st.capping_edges
+                .entry(min1dfs)
+                .or_insert(Vec::new())
+                .push(capping_edge);
         }
     }
 
-    pub fn children_backedges(&self, n: HalfNode) -> (Vec<EdgeDest>, Vec<EdgeDest>) {
-        self.h
-            .undirected_edges(n)
-            .filter(|e| self.dfs_num.contains_key(&e.target()))
-            .partition(|e| {
-                // The tree edges are those whose *targets* list the edge as parent-edge
-                let (tgt, from) = flip(n, *e);
-                self.dfs_parents.get(&tgt) == Some(&from)
-            })
+    let parent_edge = tree.dfs_parents.get(&n);
+    let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
+        .into_iter()
+        .map(|e| (*tree.dfs_num.get(&e.target()).unwrap(), e))
+        .partition(|(dfs, _)| *dfs < n_dfs);
+
+    // Remove edges to here from beneath
+    for (_, e) in be_down {
+        let e = UDEdge::RealEdge(CFEdge::from(n, e));
+        bs.delete(&e, &mut st.deleted_backedges);
+    }
+    // And capping backedges
+    for e in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+        bs.delete(&UDEdge::FakeEdge(e), &mut st.deleted_backedges)
     }
 
-    fn traverse(&self, st: &mut TraversalState, n: HalfNode) -> (usize, BracketList) {
-        let n_dfs = *self.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
-        let (children, non_capping_backedges) = self.children_backedges(n);
-        let child_results: Vec<_> = children
-            .iter()
-            .map(|c| self.traverse(st, c.target()))
-            .collect();
-        let mut min_dfs_target: [Option<usize>; 2] = [None, None]; // We want highest-but-one
-        let mut bs = BracketList::new();
-        for (tgt, brs) in child_results {
-            if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
-                min_dfs_target = [Some(tgt), min_dfs_target[0]]
-            } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
-                min_dfs_target[1] = Some(tgt)
-            }
-            bs.concat(brs);
-        }
-        // Add capping backedge
-        if let Some(min1dfs) = min_dfs_target[1] {
-            if min1dfs < n_dfs {
-                let capping_edge = CappingEdge {
-                    common_parent: n,
-                    dfs_target: min1dfs,
-                };
-                bs.push(UDEdge::FakeEdge(capping_edge.clone()));
-                // mark capping edge to be removed when we return out to the other end
-                st.capping_edges
-                    .entry(min1dfs)
-                    .or_insert(Vec::new())
-                    .push(capping_edge);
-            }
-        }
+    // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
+    be_up
+        .iter()
+        .filter(|(_, e)| Some(e) != parent_edge)
+        .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge::from(n, *e))));
 
-        let parent_edge = self.dfs_parents.get(&n);
-        let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
-            .into_iter()
-            .map(|e| (*self.dfs_num.get(&e.target()).unwrap(), e))
-            .partition(|(dfs, _)| *dfs < n_dfs);
-
-        // Remove edges to here from beneath
-        for (_, e) in be_down {
-            let e = UDEdge::RealEdge(CFEdge::from(n, e));
-            bs.delete(&e, &mut st.deleted_backedges);
-        }
-        // And capping backedges
-        for e in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
-            bs.delete(&UDEdge::FakeEdge(e), &mut st.deleted_backedges)
-        }
-
-        // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
-        be_up
-            .iter()
-            .filter(|(_, e)| Some(e) != parent_edge)
-            .for_each(|(_, e)| bs.push(UDEdge::RealEdge(CFEdge::from(n, *e))));
-
-        // Now calculate edge classes
-        let class = bs.tag(&st.deleted_backedges);
-        if let Some((UDEdge::RealEdge(e), 1)) = &class {
-            st.edge_classes.insert(e.clone(), class.clone());
-        }
-        if let Some(parent_edge) = self.dfs_parents.get(&n) {
-            st.edge_classes.insert(CFEdge::from(n, *parent_edge), class);
-        }
-        let highest_target = be_up
-            .into_iter()
-            .map(|(dfs, _)| dfs)
-            .chain(min_dfs_target[0].into_iter());
-        (highest_target.min().unwrap_or(usize::MAX), bs)
+    // Now calculate edge classes
+    let class = bs.tag(&st.deleted_backedges);
+    if let Some((UDEdge::RealEdge(e), 1)) = &class {
+        st.edge_classes.insert(e.clone(), class.clone());
     }
+    if let Some(parent_edge) = tree.dfs_parents.get(&n) {
+        st.edge_classes.insert(CFEdge::from(n, *parent_edge), class);
+    }
+    let highest_target = be_up
+        .into_iter()
+        .map(|(dfs, _)| dfs)
+        .chain(min_dfs_target[0].into_iter());
+    (highest_target.min().unwrap_or(usize::MAX), bs)
 }
 
 #[cfg(test)]
@@ -436,7 +466,7 @@ mod test {
         )?;
         let exit = add_block(&mut h, k, 1, 0)?;
         h.connect(loop_tail, 1, exit, 0)?;
-        let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
+        let classes = get_edge_classes(&HalfNodeView::new(&h, k).unwrap());
         let mut groups = HashMap::new();
         for (e, c) in classes {
             groups.entry(c).or_insert(HashSet::new()).insert(e);
@@ -487,7 +517,7 @@ mod test {
         h.connect(merge_tail, 0, split_header, 1)?;
         let exit = add_block(&mut h, k, 1, 0)?;
         h.connect(merge_tail, 1, exit, 0)?;
-        let classes = CfgView::new(&h, k).unwrap().get_edge_classes();
+        let classes = get_edge_classes(&HalfNodeView::new(&h, k).unwrap());
         let mut groups = HashMap::new();
         for (e, c) in classes {
             groups.entry(c).or_insert(HashSet::new()).insert(e);
