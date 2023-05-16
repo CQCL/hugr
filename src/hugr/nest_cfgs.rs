@@ -319,3 +319,71 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
         .chain(min_dfs_target[0].into_iter());
     (highest_target.min().unwrap_or(usize::MAX), bs)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::builder::{ModuleBuilder, BuildError, Dataflow, Container};
+    use crate::types::{ClassicType, SimpleType, Signature};
+    use crate::type_row;
+    use crate::ops::ConstValue;
+    //use crate::hugr::nest_cfgs::get_edge_classes;
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+
+    fn n_identity<T: Dataflow>(
+        dataflow_builder: T,
+    ) -> Result<T::ContainerHandle, BuildError> {
+        let w = dataflow_builder.input_wires();
+        dataflow_builder.finish_with_outputs(w)
+    }
+    #[test]
+    fn basic_cfg() -> Result<(), BuildError> {
+        let sum2_type = SimpleType::new_predicate(2);
+
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+            let main = module_builder.declare(
+                "main",
+                Signature::new_df(vec![sum2_type.clone(), NAT], type_row![NAT]),
+            )?;
+            let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
+            let _f_id = {
+                let mut func_builder = module_builder.define_function(&main)?;
+                let [flag, int] = func_builder.input_wires_arr();
+
+                let cfg_id = {
+                    let mut cfg_builder = func_builder
+                        .cfg_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
+                    let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
+
+                    let entry = n_identity(entry_b)?;
+
+                    let mut middle_b =
+                        cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
+
+                    let middle = {
+                        let c = middle_b.load_const(&s1)?;
+                        let [inw] = middle_b.input_wires_arr();
+                        middle_b.finish_with_outputs(c, [inw])?
+                    };
+
+                    let exit = cfg_builder.exit_block();
+
+                    cfg_builder.branch(&entry, 0, &middle)?;
+                    cfg_builder.branch(&middle, 0, &exit)?;
+                    cfg_builder.branch(&entry, 1, &exit)?;
+
+                    cfg_builder.finish()
+                };
+
+                func_builder.finish_with_outputs(cfg_id.outputs())?
+            };
+
+            module_builder.finish()
+        };
+
+        assert_eq!(build_result.err(), None);
+
+        Ok(())
+    }
+}
