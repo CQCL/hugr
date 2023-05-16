@@ -1,6 +1,6 @@
 //! Tags for sets of operation kinds.
 
-use std::fmt::Display;
+use std::{cmp, fmt::Display};
 
 /// Tags for sets of operation kinds.
 ///
@@ -137,6 +137,20 @@ impl OpTag {
 impl Display for OpTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl PartialOrd for OpTag {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        if self == other {
+            Some(cmp::Ordering::Equal)
+        } else if self.contains(*other) {
+            Some(cmp::Ordering::Greater)
+        } else if other.contains(*self) {
+            Some(cmp::Ordering::Less)
+        } else {
+            None
+        }
     }
 }
 
