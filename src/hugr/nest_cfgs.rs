@@ -63,7 +63,7 @@ where
     }
 }
 
-fn undirected_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
+fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
     cfg: &'a impl CfgView<T>,
     n: T,
 ) -> impl Iterator<Item = EdgeDest<T>> + '_ {
@@ -128,7 +128,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
                 if !dfs_num.contains_key(&n) && reachable.contains(&n) {
                     dfs_num.insert(n, dfs_num.len());
                     dfs_parents.insert(n, p_edge);
-                    for e in undirected_edges(cfg, n) {
+                    for e in all_edges(cfg, n) {
                         pending.push(flip(n, e));
                     }
                 }
@@ -242,7 +242,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     n: T,
 ) -> (usize, BracketList<T>) {
     let n_dfs = *tree.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
-    let (children, non_capping_backedges): (Vec<_>, Vec<_>) = undirected_edges(cfg, n)
+    let (children, non_capping_backedges): (Vec<_>, Vec<_>) = all_edges(cfg, n)
         .filter(|e| tree.dfs_num.contains_key(&e.target()))
         .partition(|e| {
             // The tree edges are those whose *targets* list the edge as parent-edge
