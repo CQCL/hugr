@@ -1,50 +1,26 @@
+use std::collections::HashMap;
+
 use portgraph::substitute::OpenGraph;
 use portgraph::{NodeIndex, PortIndex};
-use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::Hugr;
 
-/// A subset of the nodes in a sibling graph, i.e. all with the same parent,
-/// and the ports that it is connected to.
+/// A subset of the nodes in a graph, and the ports that it is connected to.
 #[derive(Debug, Clone, Default)]
-pub struct SiblingSubgraph {
+pub struct BoundedSubgraph {
     /// Nodes in the subgraph.
-    subgraph: portgraph::substitute::BoundedSubgraph,
+    pub subgraph: portgraph::substitute::BoundedSubgraph,
 }
 
-impl SiblingSubgraph {
+impl BoundedSubgraph {
     /// Creates a new bounded subgraph.
     ///
     /// TODO: We should be able to automatically detect dangling ports by
     /// finding inputs and outputs in `hugr` that are connected to things
     /// outside. Can we do that efficiently?
-    pub fn new(
-        hugr: &Hugr,
-        nodes: impl IntoIterator<Item = NodeIndex>,
-    ) -> Result<Self, SiblingError> {
-        let nodes: Vec<NodeIndex> = nodes.into_iter().collect();
-        SiblingSubgraph::validate_siblings(hugr, &nodes)?;
+    pub fn new(_hugr: &Hugr, _nodes: impl IntoIterator<Item = NodeIndex>) -> Self {
         todo!()
-    }
-
-    fn validate_siblings(hugr: &Hugr, nodes: &Vec<NodeIndex>) -> Result<(), SiblingError> {
-        let parent = hugr.get_parent(*nodes.first().ok_or(SiblingError::Empty)?);
-        match parent {
-            None => {
-                if nodes.len() != 1 || nodes[0] != hugr.root() {
-                    return Err(SiblingError::OnlyRoot);
-                }
-            }
-            Some(_) => {
-                for p_idx in nodes.iter().map(|n| hugr.get_parent(*n)) {
-                    if p_idx != parent {
-                        return Err(SiblingError::MultipleParents(parent, p_idx));
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
 
@@ -90,49 +66,31 @@ impl OpenHugr {
     }
 }
 
-/// Describes what to do with the nodes being replaced.
-#[derive(Clone, Debug)]
-pub enum ParentsMap {
-    /// Default: the replaced nodes should just be removed from the graph
-    DiscardAll,
-    /// All the replaced nodes should be made children of the specified node in the replacement.
-    /// TODO: clarify what happens to edges in/out of the replaced subgraph?
-    TransferAll(NodeIndex),
-    /// Each key identifies a (container) node N1 in the replaced subgraph;
-    /// the corresponding value identifies a (container) node N2 in the replacement.
-    /// All children of N1 should be transferred to become children of N2.
-    TransferSelectedChildren(HashMap<NodeIndex, NodeIndex>),
-}
-impl Default for ParentsMap {
-    fn default() -> Self {
-        Self::DiscardAll
-    }
-}
+pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 
 /// A rewrite operation that replaces a subgraph with another graph.
 /// Includes the new weights for the nodes in the replacement graph.
 #[derive(Debug, Clone)]
 pub struct Rewrite {
     /// The subgraph to be replaced.
-    subgraph: SiblingSubgraph,
-    /// The replacement graph. This should be a forest, i.e. the nodes without parents
-    /// will be assigned the same parent as the nodes in the subgraph being replaced.
+    subgraph: BoundedSubgraph,
+    /// The replacement graph.
     replacement: OpenHugr,
-    /// Specifies what to do with the replaced nodes.
-    transfers: ParentsMap,
+    /// A map from the nodes in the replacement graph to the target parents in the original graph.
+    parents: ParentsMap,
 }
 
 impl Rewrite {
     /// Creates a new rewrite operation.
     pub fn new(
-        subgraph: SiblingSubgraph,
+        subgraph: BoundedSubgraph,
         replacement: OpenHugr,
-        transfers: impl Into<ParentsMap>,
+        parents: impl Into<ParentsMap>,
     ) -> Self {
         Self {
             subgraph,
             replacement,
-            transfers: transfers.into(),
+            parents: parents.into(),
         }
     }
 
@@ -145,7 +103,7 @@ impl Rewrite {
         (
             portgraph::substitute::Rewrite::new(self.subgraph.subgraph, open_graph),
             replacement,
-            self.transfers,
+            self.parents,
         )
     }
 
@@ -194,14 +152,4 @@ impl From<portgraph::substitute::RewriteError> for RewriteError {
             portgraph::substitute::RewriteError::Link(e) => Self::ConnectionError(e),
         }
     }
-}
-
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum SiblingError {
-    #[error("No nodes in subgraph")]
-    Empty,
-    #[error("Only the root node may have no parent")]
-    OnlyRoot,
-    #[error("Nodes in the subgraph were not siblings")]
-    MultipleParents(Option<NodeIndex>, Option<NodeIndex>),
 }
