@@ -231,6 +231,8 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     }
 }
 
+/// Returns the lowest DFS num (highest ancestor) reached by any bracket leaving
+/// the subtree, and the list of said brackets.
 fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     cfg: &impl CfgView<T>,
     tree: &UndirectedDFSTree<T>,
