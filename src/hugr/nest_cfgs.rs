@@ -144,9 +144,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
 
 /// Mutable state updated during traversal of the UndirectedDFSTree by the cycle equivalence algorithm.
 struct TraversalState<T> {
-    deleted_backedges: HashSet<UDEdge<T>>, // Allows constant-time deletion
-    capping_edges: HashMap<usize, Vec<CappingEdge<T>>>, // Indexed by DFS num
-    edge_classes: HashMap<(T, T), Option<(UDEdge<T>, usize)>>, // Accumulates result (never overwritten)
+    /// Edges we have marked as deleted, allowing constant-time deletion without searching BracketList
+    deleted_backedges: HashSet<UDEdge<T>>,
+    /// Key is DFS num of highest ancestor
+    ///   to which backedges reached from >1 sibling subtree;
+    /// Value is the LCA i.e. parent of those siblings.
+    capping_edges: HashMap<usize, Vec<T>>,
+    /// Result of traversal - accumulated here, entries should never be overwritten
+    edge_classes: HashMap<(T, T), Option<(UDEdge<T>, usize)>>,
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
@@ -174,18 +179,9 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct CappingEdge<T> {
-    /// Node which is the root of the split in the DFS tree
-    common_parent: T,
-    /// Lowest number (highest ancestor)
-    /// to which backedges reached from >1 subtree of the split
-    dfs_target: usize,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
 enum UDEdge<T> {
     RealEdge((T, T)),
-    FakeEdge(CappingEdge<T>),
+    Capping(usize, T),
 }
 
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
@@ -266,16 +262,12 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     // Add capping backedge
     if let Some(min1dfs) = min_dfs_target[1] {
         if min1dfs < n_dfs {
-            let capping_edge = CappingEdge {
-                common_parent: n,
-                dfs_target: min1dfs,
-            };
-            bs.push(UDEdge::FakeEdge(capping_edge.clone()));
+            bs.push(UDEdge::Capping(min1dfs, n));
             // mark capping edge to be removed when we return out to the other end
             st.capping_edges
                 .entry(min1dfs)
                 .or_insert(Vec::new())
-                .push(capping_edge);
+                .push(n);
         }
     }
 
@@ -291,8 +283,8 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
         bs.delete(&e, &mut st.deleted_backedges);
     }
     // And capping backedges
-    for e in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
-        bs.delete(&UDEdge::FakeEdge(e), &mut st.deleted_backedges)
+    for src in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+        bs.delete(&UDEdge::Capping(n_dfs, src), &mut st.deleted_backedges)
     }
 
     // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
