@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use super::{controlflow::ControlFlowOp, LeafOp};
+use super::{controlflow::ControlFlowOp, tag::OpTag, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// A dataflow operation.
@@ -87,6 +87,19 @@ impl DataflowOp {
             DataflowOp::Leaf { op } => return op.description(),
             DataflowOp::DFG { .. } => "A simply nested dataflow graph",
             DataflowOp::ControlFlow { op } => return op.description(),
+        }
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            DataflowOp::Input { .. } => OpTag::Input,
+            DataflowOp::Output { .. } => OpTag::Output,
+            DataflowOp::Call { .. } | DataflowOp::CallIndirect { .. } => OpTag::FnCall,
+            DataflowOp::LoadConstant { .. } => OpTag::LoadConst,
+            DataflowOp::Leaf { .. } => OpTag::Leaf,
+            DataflowOp::DFG { .. } => OpTag::Dfg,
+            DataflowOp::ControlFlow { op } => op.tag(),
         }
     }
 
