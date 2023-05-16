@@ -5,16 +5,22 @@
 
 mod half_node;
 pub mod nest_cfgs;
-pub mod serialize;
 pub mod validate;
 
-use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
+use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
+use portgraph::hierarchy::Children;
+use portgraph::portgraph::NodePorts;
+use portgraph::{Hierarchy, NodeIndex, PortGraph, PortOffset, SecondaryMap};
 use thiserror::Error;
 
 use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
+use crate::types::EdgeKind;
 
 pub use validate::ValidationError;
+mod hugrmut;
+pub mod serialize;
+pub use hugrmut::HugrMut;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -28,7 +34,7 @@ pub struct Hugr {
     /// The single root node in the hierarchy.
     /// It must correspond to a [`ModuleOp::Root`] node.
     ///
-    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root
+    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
     root: NodeIndex,
 
     /// Operation types for each node.
@@ -58,48 +64,17 @@ impl Hugr {
         }
     }
 
-    /// Add a node to the graph.
-    pub fn add_node(&mut self, op: OpType) -> NodeIndex {
-        let sig = op.signature();
-        let node = self.graph.add_node(sig.input.len(), sig.output.len());
-        self.op_types[node] = op;
-        node
-    }
-
-    /// Connect two nodes at the given ports.
-    pub fn connect(
-        &mut self,
-        src: NodeIndex,
-        src_port: usize,
-        dst: NodeIndex,
-        dst_port: usize,
-    ) -> Result<(), HugrError> {
-        self.graph.link_nodes(src, src_port, dst, dst_port)?;
-        Ok(())
-    }
-
-    /// Sets the parent of a node.
-    ///
-    /// The node becomes the parent's last child.
-    pub(crate) fn set_parent(
-        &mut self,
-        node: NodeIndex,
-        parent: NodeIndex,
-    ) -> Result<(), HugrError> {
-        self.hierarchy.push_child(node, parent)?;
-        Ok(())
-    }
-
     /// Returns the parent of a node.
+    #[inline]
     pub fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
         self.hierarchy.parent(node)
     }
 
     /// Returns the operation type of a node.
+    #[inline]
     pub fn get_optype(&self, node: NodeIndex) -> &OpType {
         self.op_types.get(node)
     }
-
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
@@ -126,8 +101,80 @@ impl Hugr {
         Ok(())
     }
 
-    pub fn root(&self) -> NodeIndex {
-        self.root
+    /// Iterator over outputs of node.
+    #[inline]
+    pub fn node_outputs(&self, node: NodeIndex) -> NodePorts {
+        self.graph.outputs(node)
+    }
+
+    /// Iterator over inputs of node.
+    #[inline]
+    pub fn node_inputs(&self, node: NodeIndex) -> NodePorts {
+        self.graph.inputs(node)
+    }
+
+    /// Return node and port connected to provided port, if not connected return None.
+    #[inline]
+    pub fn linked_port(
+        &self,
+        node: NodeIndex,
+        offset: PortOffset,
+    ) -> Option<(NodeIndex, PortOffset)> {
+        let port = self.graph.port_index(node, offset)?;
+        let link = self.graph.port_link(port)?;
+        Some((self.graph.port_node(link)?, self.graph.port_offset(port)?))
+    }
+
+    /// Return dot string showing underlying graph and hierarchy side by side.
+    pub fn dot_string(&self) -> String {
+        hier_graph_dot_string_with(
+            &self.graph,
+            &self.hierarchy,
+            |n| {
+                format!(
+                    "({ni}) {name}",
+                    name = self.op_types[n].name(),
+                    ni = n.index()
+                )
+            },
+            |p| {
+                let src = self.graph.port_node(p).unwrap();
+                let Some(tgt_port) = self.graph.port_link(p) else {
+                        return ("".into(), DotEdgeStyle::None);
+                    };
+                let tgt = self.graph.port_node(tgt_port).unwrap();
+                let style = if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
+                    DotEdgeStyle::Some("dashed".into())
+                } else if self
+                    .get_optype(src)
+                    .port_kind(self.graph.port_offset(p).unwrap())
+                    == Some(EdgeKind::StateOrder)
+                {
+                    DotEdgeStyle::Some("dotted".into())
+                } else {
+                    DotEdgeStyle::None
+                };
+
+                ("".into(), style)
+            },
+        )
+    }
+
+    /// Number of inputs to node.
+    #[inline]
+    pub fn num_inputs(&self, node: NodeIndex) -> usize {
+        self.graph.num_inputs(node)
+    }
+
+    /// Number of outputs to node.
+    #[inline]
+    pub fn num_outputs(&self, node: NodeIndex) -> usize {
+        self.graph.num_outputs(node)
+    }
+
+    /// Return iterator over children of node.
+    pub fn children(&self, node: NodeIndex) -> Children<'_> {
+        self.hierarchy.children(node)
     }
 }
 

@@ -1,77 +1,164 @@
+//! Control flow operations.
+
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SignatureDescription, TypeRow};
+use crate::types::{EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
-    /// ɣ (gamma) node: conditional operation
-    Conditional { inputs: TypeRow, outputs: TypeRow },
-    /// θ (theta) node: tail-controlled loop. Here we assume the same inputs + outputs variant.
-    Loop { vars: TypeRow },
-    /// 𝛋 (kappa): a dataflow node which is defined by a child CFG
+    /// Conditional operation, defined by child `Case` nodes for each branch.
+    Conditional {
+        /// The branch predicate. It's len is equal to the number of cases.
+        predicate_inputs: TypeRow,
+        /// Other inputs passed to all cases.
+        inputs: TypeRow,
+        /// Common output of all cases.
+        outputs: TypeRow,
+    },
+    /// Tail-controlled loop.
+    #[allow(missing_docs)]
+    TailLoop { inputs: TypeRow, outputs: TypeRow },
+    /// A dataflow node which is defined by a child CFG.
+    #[allow(missing_docs)]
     CFG { inputs: TypeRow, outputs: TypeRow },
 }
 
 impl ControlFlowOp {
-    /// The name of the operation
+    /// The name of the operation.
     pub fn name(&self) -> SmolStr {
         match self {
-            ControlFlowOp::Conditional { .. } => "ɣ",
-            ControlFlowOp::Loop { .. } => "θ",
-            ControlFlowOp::CFG { .. } => "𝛋",
+            ControlFlowOp::Conditional { .. } => "Conditional",
+            ControlFlowOp::TailLoop { .. } => "TailLoop",
+            ControlFlowOp::CFG { .. } => "CFG",
         }
         .into()
     }
 
-    /// The description of the operation
+    /// The description of the operation.
     pub fn description(&self) -> &str {
         match self {
             ControlFlowOp::Conditional { .. } => "HUGR conditional operation",
-            ControlFlowOp::Loop { .. } => "A tail-controlled loop",
+            ControlFlowOp::TailLoop { .. } => "A tail-controlled loop",
             ControlFlowOp::CFG { .. } => "A dataflow node defined by a child CFG",
         }
     }
 
-    /// The signature of the operation
+    /// The signature of the operation.
     pub fn signature(&self) -> Signature {
         match self {
-            ControlFlowOp::Conditional { inputs, outputs } => {
+            ControlFlowOp::Conditional {
+                predicate_inputs,
+                inputs,
+                outputs,
+            } => {
+                let predicate = SimpleType::new_sum(predicate_inputs.clone());
+                let mut sig_in = vec![predicate];
+                sig_in.extend_from_slice(inputs);
+                Signature::new_df(sig_in, outputs.clone())
+            }
+            ControlFlowOp::TailLoop { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }
-            ControlFlowOp::Loop { vars } => Signature::new_linear(vars.clone()),
             ControlFlowOp::CFG { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }
         }
     }
 
-    /// Optional description of the ports in the signature
+    /// Optional description of the ports in the signature.
     pub fn signature_desc(&self) -> SignatureDescription {
         // TODO: add descriptions
         Default::default()
     }
 }
 
-/// β (beta): a CFG basic block node. The signature is that of the internal Dataflow graph.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct BasicBlockOp {
-    pub inputs: TypeRow,
-    pub outputs: TypeRow,
+/// Basic block ops - nodes valid in control flow graphs.
+#[allow(missing_docs)]
+pub enum BasicBlockOp {
+    /// A CFG basic block node. The signature is that of the internal Dataflow graph.
+    Block {
+        inputs: TypeRow,
+        outputs: TypeRow,
+        n_cases: usize,
+    },
+    /// The single exit node of the CFG, has no children,
+    /// stores the types of the CFG node output.
+    Exit { cfg_outputs: TypeRow },
 }
 
 impl BasicBlockOp {
+    /// The edge kind for the inputs and outputs of the operation not described
+    /// by the signature.
     pub fn other_edges(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
 
-    /// The name of the operation
+    /// The name of the operation.
     pub fn name(&self) -> SmolStr {
-        "β".into()
+        match self {
+            BasicBlockOp::Block { .. } => "BasicBlock".into(),
+            BasicBlockOp::Exit { .. } => "ExitBlock".into(),
+        }
     }
 
-    /// The description of the operation
+    /// The description of the operation.
     pub fn description(&self) -> &str {
-        "A CFG basic block node"
+        match self {
+            BasicBlockOp::Block { .. } => "A CFG basic block node",
+            BasicBlockOp::Exit { .. } => "A CFG exit block node",
+        }
+    }
+
+    /// The input signature of the contained dataflow graph.
+    pub fn dataflow_input(&self) -> &TypeRow {
+        match self {
+            BasicBlockOp::Block { inputs, .. } => inputs,
+            BasicBlockOp::Exit { cfg_outputs } => cfg_outputs,
+        }
+    }
+
+    /// The output signature of the contained dataflow graph.
+    pub fn dataflow_output(&self) -> &TypeRow {
+        match self {
+            BasicBlockOp::Block { outputs, .. } => outputs,
+            BasicBlockOp::Exit { cfg_outputs } => cfg_outputs,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Case ops - nodes valid inside Conditional nodes.
+pub struct CaseOp {
+    /// The signature of the contained dataflow graph.
+    pub signature: Signature,
+}
+
+impl CaseOp {
+    /// The edge kind for the inputs and outputs of the operation not described
+    /// by the signature.
+    pub fn other_edges(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    /// The name of the operation.
+    pub fn name(&self) -> SmolStr {
+        "Case".into()
+    }
+
+    /// The description of the operation.
+    pub fn description(&self) -> &str {
+        "A case node inside a conditional"
+    }
+
+    /// The input signature of the contained dataflow graph.
+    pub fn dataflow_input(&self) -> &TypeRow {
+        &self.signature.input
+    }
+
+    /// The output signature of the contained dataflow graph.
+    pub fn dataflow_output(&self) -> &TypeRow {
+        &self.signature.output
     }
 }

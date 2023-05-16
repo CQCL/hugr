@@ -1,9 +1,13 @@
+//! Dataflow operations.
+
 use smol_str::SmolStr;
 
 use super::{controlflow::ControlFlowOp, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
+/// A dataflow operation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub enum DataflowOp {
     /// An input node.
     /// The outputs of this node are the inputs to the function.
@@ -16,19 +20,24 @@ pub enum DataflowOp {
     /// called directly, with a `ConstE<Graph>` edge. The signature of the
     /// remaining ports matches the function being called.
     Call { signature: Signature },
-    /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type
+    /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
     CallIndirect { signature: Signature },
-    /// Load a static constant in to the local dataflow graph
+    /// Load a static constant in to the local dataflow graph.
     LoadConstant { datatype: ClassicType },
     /// Simple operation that has only value inputs+outputs and (potentially) StateOrder edges.
     Leaf { op: LeafOp },
-    /// δ (delta): a simply nested dataflow graph
-    Nested { signature: Signature },
-    /// Operation related to control flow
+    /// A simply nested dataflow graph.
+    DFG { signature: Signature },
+    /// Operation related to control flow.
     ControlFlow { op: ControlFlowOp },
 }
 
 impl DataflowOp {
+    /// The edge kind for the inputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         if let DataflowOp::Input { .. } = self {
             None
@@ -37,6 +46,11 @@ impl DataflowOp {
         }
     }
 
+    /// The edge kind for the outputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other
+    /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         if let DataflowOp::Output { .. } = self {
             None
@@ -54,13 +68,13 @@ impl DataflowOp {
             DataflowOp::CallIndirect { .. } => "call_indirect",
             DataflowOp::LoadConstant { .. } => "load",
             DataflowOp::Leaf { op } => return op.name(),
-            DataflowOp::Nested { .. } => "nested",
+            DataflowOp::DFG { .. } => "nested",
             DataflowOp::ControlFlow { op } => return op.name(),
         }
         .into()
     }
 
-    /// The description of the operation.
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             DataflowOp::Input { .. } => "The input node for this dataflow subgraph",
@@ -71,7 +85,7 @@ impl DataflowOp {
                 "Load a static constant in to the local dataflow graph"
             }
             DataflowOp::Leaf { op } => return op.description(),
-            DataflowOp::Nested { .. } => "A simply nested dataflow graph",
+            DataflowOp::DFG { .. } => "A simply nested dataflow graph",
             DataflowOp::ControlFlow { op } => return op.description(),
         }
     }
@@ -97,7 +111,7 @@ impl DataflowOp {
                 ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
             },
             DataflowOp::Leaf { op } => op.signature(),
-            DataflowOp::Nested { signature } => signature.clone(),
+            DataflowOp::DFG { signature } => signature.clone(),
             DataflowOp::ControlFlow { op } => op.signature(),
         }
     }

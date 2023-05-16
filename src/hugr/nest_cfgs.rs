@@ -1,45 +1,55 @@
+//! # Nest CFGs
+//! 
+//! Identify Single-Entry-Single-Exit regions in the CFG.
+//! These are pairs of edges (a,b) where
+//! a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
+//! (the third condition is necessary because loop backedges do not affect (post)dominance).
+//! 
+//! Algorithm here: https://dl.acm.org/doi/10.1145/773473.178258, approximately:
+//! 1. those three conditions are equivalent to:
+//! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
+//! where cycle-equivalent means every cycle has either both a and b, or neither
+//! 2. cycle equivalence is unaffected if all edges are considered *un*directed
+//!     (not obvious, see paper for proof)
+//! 3. take undirected CFG, perform depth-first traversal
+//!     => all edges are *tree edges* or *backedges* where one endpoint is an ancestor of the other
+//! 4. identify the "bracketlist" of each tree edge - the set of backedges going from a descendant to an ancestor
+//!     -- post-order traversal, merging bracketlists of children,
+//!            then delete backedges from below to here, add backedges from here to above
+//!     => tree edges with the same bracketlist are cycle-equivalent;
+//!        + a tree edge with a single-element bracketlist is cycle-equivalent with that single element
+//! 5. this would be expensive (comparing large sets of backedges) - so to optimize,
+//!     - the backedge most recently added (at the top) of the bracketlist, plus the size of the bracketlist,
+//!       is sufficient to identify the set *when the UDFS tree is linear*;
+//!     - when UDFS is treelike, any ancestor with backedges from >1 subtree cannot be cycle-equivalent with any descendant,
+//!       so add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
+//!       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
+
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
 
-/// Identify Single-Entry-Single-Exit regions in the CFG.
-/// These are pairs of edges (a,b) where
-/// a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
-/// (the third condition is necessary because loop backedges do not affect (post)dominance).
-/// Algorithm here: https://dl.acm.org/doi/10.1145/773473.178258, approximately:
-/// (1) those three conditions are equivalent to:
-/// >>>a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry<<<
-/// where cycle-equivalent means every cycle has either both a and b, or neither
-/// (2) cycle equivalence is unaffected if all edges are considered *un*directed
-///     (not obvious, see paper for proof)
-/// (3) take undirected CFG, perform depth-first traversal
-///     => all edges are *tree edges* or *backedges* where one endpoint is an ancestor of the other
-/// (4) identify the "bracketlist" of each tree edge - the set of backedges going from a descendant to an ancestor
-///     -- post-order traversal, merging bracketlists of children,
-///            then delete backedges from below to here, add backedges from here to above
-///     => tree edges with the same bracketlist are cycle-equivalent;
-///        + a tree edge with a single-element bracketlist is cycle-equivalent with that single element
-/// (5) this would be expensive (comparing large sets of backedges) - so to optimize,
-///     - the backedge most recently added (at the top) of the bracketlist, plus the size of the bracketlist,
-///       is sufficient to identify the set *when the UDFS tree is linear*;
-///     - when UDFS is treelike, any ancestor with backedges from >1 subtree cannot be cycle-equivalent with any descendant,
-///       so add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
-///       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
+// TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
+// (in a BB with one predecessor and one successor, which may then be merged
+//     and contents parallelized with predecessor or successor).
 
-/// TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
-/// (in a BB with one predecessor and one successor, which may then be merged
-///     and contents parallelized with predecessor or successor).
-
-// A view of a CFG. Although we can think of each T being a BasicBlock i.e. a NodeIndex in the HUGR,
-// this extra level of indirection allows "splitting" of one HUGR basic block into many (or vice versa).
-// Since regions are identified by edges between pairs of such T, such splitting may allow to identify
-// more regions than existed in the underlying CFG (without mutating the underlying CFG perhaps in vain).
+/// A view of a CFG. `T` is the type of basic block; one interpretation of `T` would be a BasicBlock (e.g.
+/// `NodeIndex`) in the Hugr, but this also extra level of indirection allows "splitting" of one HUGR BB
+/// into many (or vice versa). Since SESE regions are bounded by edges between pairs of such `T`, such
+/// splitting may allow the algorithm to identify more regions than existed in the underlying CFG
+/// (without mutating the underlying CFG perhaps in vain).
 pub trait CfgView<T> {
+    /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume an extra edge in "from outside"
     fn entry_node(&self) -> T;
+    /// The unique exit node of the CFG. The only node to have no successors.
     fn exit_node(&self) -> T;
+    /// Allows the trait implementor to define a type of iterator it will return from
+    /// `successors` and `predecessors`.
     type Iterator<'c>: Iterator<Item = T>
     where
         Self: 'c;
+    /// Returns an iterator over the successors of the specified basic block.
     fn successors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
+    /// Returns an iterator over the predecessors of the specified basic block.
     fn predecessors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
 }
 

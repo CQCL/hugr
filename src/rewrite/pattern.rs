@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Pattern matching operations on a HUGR.
 
 #[cfg(feature = "pyo3")]

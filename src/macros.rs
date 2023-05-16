@@ -44,10 +44,13 @@ pub(crate) use impl_box_clone;
 /// ```
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
-/// const B: SimpleType = SimpleType::Classic(ClassicType::Bit);
+/// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
 /// let static_row: TypeRow = type_row![B, B];
 /// let dynamic_row: TypeRow = vec![B, B, B].into();
-/// let sig: Signature = Signature::new_df(static_row, dynamic_row);
+/// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
+///
+/// let repeated_row: TypeRow = type_row![B; 2];
+/// assert_eq!(repeated_row, static_row);
 /// ```
 #[allow(unused_macros)]
 #[macro_export]
@@ -56,6 +59,14 @@ macro_rules! type_row {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$($t),*];
+            let row: types::TypeRow = ROW.into();
+            row
+        }
+    };
+    ($t:ident; $n:expr) => {
+        {
+            use $crate::types;
+            static ROW: &[types::SimpleType] = &[$t; $n];
             let row: types::TypeRow = ROW.into();
             row
         }

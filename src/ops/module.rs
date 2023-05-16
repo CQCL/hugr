@@ -1,68 +1,86 @@
+//! Module-level operations
 use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
-    types::{ClassicType, EdgeKind, Signature, SimpleType},
+    types::{ClassicType, Container, EdgeKind, Signature, SimpleType, TypeRow},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+/// Module-level operations.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub enum ModuleOp {
     #[default]
-    /// The root of a module, parent of all other `ModuleOp`s
+    /// The root of a module, parent of all other `ModuleOp`s.
     Root,
     /// A function definition.
-    /// Children nodes are the body of the definition
+    ///
+    /// Children nodes are the body of the definition.
     Def {
         signature: Signature,
     },
-    /// External function declaration, linked at runtime
+    /// External function declaration, linked at runtime.
     Declare {
         signature: Signature,
     },
-    /// Top level struct type definition
-    #[non_exhaustive] // TODO
-    Struct {},
-    /// A type alias
+    /// Top level struct type definition.
+    NewType {
+        name: SmolStr,
+        definition: SimpleType,
+    },
+    /// A type alias.
     #[non_exhaustive] // TODO
     Alias {},
-    // A constant value definition
+    // A constant value definition.
     Const(ConstValue),
 }
 
 impl ModuleOp {
+    /// The name of the operation.
     pub fn name(&self) -> SmolStr {
         match self {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",
             ModuleOp::Declare { .. } => "declare",
-            ModuleOp::Struct { .. } => "struct",
+            ModuleOp::NewType { .. } => "newtype",
             ModuleOp::Alias { .. } => "alias",
             ModuleOp::Const(val) => return val.name(),
         }
         .into()
     }
 
+    /// A human-readable description of the operation.
     pub fn description(&self) -> &str {
         match self {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
             ModuleOp::Def { .. } => "A function definition",
             ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
-            ModuleOp::Struct { .. } => "Top level struct type definition",
+            ModuleOp::NewType { .. } => "Top level new type definition",
             ModuleOp::Alias { .. } => "A type alias",
             ModuleOp::Const(val) => val.description(),
         }
     }
 
+    /// The edge kind for the inputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     pub fn other_inputs(&self) -> Option<EdgeKind> {
         None
     }
 
+    /// The edge kind for the outputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other
+    /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
-            ModuleOp::Root | ModuleOp::Struct { .. } | ModuleOp::Alias { .. } => None,
+            ModuleOp::Root | ModuleOp::NewType { .. } | ModuleOp::Alias { .. } => None,
             ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
                 ClassicType::graph_from_sig(signature.clone()),
             )),
@@ -74,20 +92,40 @@ impl ModuleOp {
 /// Value constants
 ///
 /// TODO: Add more constants
+/// TODO: bigger/smaller integers.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum ConstValue {
-    Bit(bool),
+    /// An arbitrary length integer constant.
     Int(i64),
+    /// A constant specifying a variant of a Sum type.
+    Sum {
+        tag: usize,
+        variants: TypeRow,
+        val: Box<ConstValue>,
+    },
+    /// A tuple of constant values.
+    Tuple(Vec<ConstValue>),
+    /// An opaque constant value.
     Opaque(SimpleType, Box<dyn CustomConst>),
 }
 
 impl PartialEq for ConstValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Bit(l0), Self::Bit(r0)) => l0 == r0,
             (Self::Int(l0), Self::Int(r0)) => l0 == r0,
             (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
+            (
+                Self::Sum { tag, variants, val },
+                Self::Sum {
+                    tag: t1,
+                    variants: type1,
+                    val: v1,
+                },
+            ) => tag == t1 && variants == type1 && val == v1,
+
+            (Self::Tuple(v1), Self::Tuple(v2)) => v1.eq(v2),
             _ => false,
         }
     }
@@ -97,33 +135,75 @@ impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
-        Self::Bit(false)
+        Self::Int(0)
     }
 }
 
 impl ConstValue {
-    /// Returns the datatype of the constant
+    /// Returns the datatype of the constant.
     pub fn const_type(&self) -> ClassicType {
         match self {
-            Self::Bit(_) => ClassicType::Bit,
-            Self::Int(_) => ClassicType::Int,
+            Self::Int(_) => ClassicType::i64(),
             Self::Opaque(_, b) => (*b).const_type(),
+            Self::Sum { variants, .. } => {
+                ClassicType::Container(Container::Sum(Box::new(variants.clone())))
+            }
+            Self::Tuple(vals) => {
+                let row: Vec<_> = vals
+                    .iter()
+                    .map(|val| SimpleType::Classic(val.const_type()))
+                    .collect();
+                ClassicType::Container(Container::Tuple(Box::new(row.into())))
+            }
         }
     }
 
-    /// Unique name of the constant
+    /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
-            Self::Bit(v) => format!("const:bit:{v}"),
             Self::Int(v) => format!("const:int:{v}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
+            Self::Sum { tag, val, .. } => {
+                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            }
+            Self::Tuple(vals) => {
+                let valstr: Vec<_> = vals.iter().map(|v| v.name()).collect();
+                let valstr = valstr.join(", ");
+                format!("const:tuple:{{{valstr}}}")
+            }
         }
         .into()
     }
 
-    /// Description of the constant
+    /// Description of the constant.
     pub fn description(&self) -> &str {
         "Constant value"
+    }
+
+    /// Constant unit type (empty Tuple).
+    pub const fn unit() -> ConstValue {
+        ConstValue::Tuple(vec![])
+    }
+
+    /// Constant "true" value, i.e. the second variant of Sum((), ()).
+    pub fn trueval() -> Self {
+        Self::predicate(1, 2)
+    }
+
+    /// Constant "true" value, i.e. the first variant of Sum((), ()).
+    pub fn falseval() -> Self {
+        Self::predicate(0, 2)
+    }
+
+    /// Constant Sum over units, used as predicates.
+    pub fn predicate(tag: usize, size: usize) -> Self {
+        let unit: SimpleType = SimpleType::new_unit();
+        let vars = vec![unit; size];
+        ConstValue::Sum {
+            tag,
+            variants: vars.into(),
+            val: Box::new(Self::unit()),
+        }
     }
 }
 
@@ -135,12 +215,13 @@ impl<T: CustomConst> From<T> for ConstValue {
 
 /// Constant value for opaque [`SimpleType`]s.
 ///
-// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
 #[typetag::serde]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
 {
+    /// An identifier for the constant.
     fn name(&self) -> SmolStr;
 
     /// Returns the type of the constant.

@@ -1,5 +1,4 @@
-//#![warn(missing_docs)] TODO: Re-enable this once the library is more mature
-//#![feature(rustc_attrs)]
+#![warn(missing_docs)]
 
 //! `hugr` is the Hierarchical Unified Graph Representation of quantum circuits
 //! and operations in the Quantinuum ecosystem.
@@ -18,6 +17,7 @@ pub mod ops;
 pub mod resource;
 pub mod rewrite;
 pub mod types;
+mod utils;
 
 pub use crate::hugr::Hugr;
 pub use portgraph::{NodeIndex, PortIndex};

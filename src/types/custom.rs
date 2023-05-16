@@ -4,10 +4,10 @@ use smol_str::SmolStr;
 use super::{ClassicType, SimpleType, TypeRow};
 
 /// An opaque type element. Contains an unique identifier and a reference to its definition.
-///
-/// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
-/// but it adds atomic ops and a serialization-deserialization roundtrip
-/// would still generate copies.
+//
+// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
+// but it adds atomic ops and a serialization-deserialization roundtrip
+// would still generate copies.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
     /// Unique identifier of the opaque type.
@@ -16,6 +16,7 @@ pub struct CustomType {
 }
 
 impl CustomType {
+    /// Creates a new opaque type.
     pub fn new(id: SmolStr, params: TypeRow) -> Self {
         Self {
             id,
@@ -23,14 +24,17 @@ impl CustomType {
         }
     }
 
+    /// Returns the unique identifier of the opaque type.
     pub fn id(&self) -> &str {
         &self.id
     }
 
+    /// Returns the parameters of the opaque type.
     pub fn params(&self) -> &TypeRow {
         &self.params
     }
 
+    /// Returns a [`ClassicType`] containing this opaque type.
     pub const fn classic_type(self) -> ClassicType {
         ClassicType::Opaque(self)
     }
