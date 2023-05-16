@@ -9,6 +9,8 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+use super::tag::OpTag;
+
 /// Module-level operations.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
@@ -61,6 +63,18 @@ impl ModuleOp {
             ModuleOp::NewType { .. } => "Top level new type definition",
             ModuleOp::Alias { .. } => "A type alias",
             ModuleOp::Const(val) => val.description(),
+        }
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            ModuleOp::Root => OpTag::ModuleRoot,
+            ModuleOp::Def { .. } => OpTag::Def,
+            ModuleOp::Declare { .. } => OpTag::Function,
+            ModuleOp::NewType { .. } => OpTag::NewType,
+            ModuleOp::Alias { .. } => OpTag::Alias,
+            ModuleOp::Const { .. } => OpTag::Const,
         }
     }
 

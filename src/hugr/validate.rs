@@ -8,9 +8,8 @@ use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTre
 use portgraph::{Direction, NodeIndex, PortIndex, PortOffset};
 use thiserror::Error;
 
-use crate::ops::validate::{
-    ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, ValidOpSet,
-};
+use crate::ops::tag::OpTag;
+use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
 use crate::types::{EdgeKind, SimpleType};
 use crate::Hugr;
@@ -99,7 +98,7 @@ impl<'a> ValidationContext<'a> {
 
             let parent_optype = self.hugr.get_optype(parent);
             let allowed_children = parent_optype.validity_flags().allowed_children;
-            if !allowed_children.contains(optype) {
+            if !allowed_children.contains(optype.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
                     child_optype: optype.clone(),
@@ -223,7 +222,7 @@ impl<'a> ValidationContext<'a> {
             let first_child = self
                 .hugr
                 .get_optype(self.hugr.hierarchy.first(node).unwrap());
-            if !flags.allowed_first_child.contains(first_child) {
+            if !flags.allowed_first_child.contains(first_child.tag()) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
                     parent_optype: optype.clone(),
@@ -236,7 +235,7 @@ impl<'a> ValidationContext<'a> {
             let last_child = self
                 .hugr
                 .get_optype(self.hugr.hierarchy.last(node).unwrap());
-            if !flags.allowed_last_child.contains(last_child) {
+            if !flags.allowed_last_child.contains(last_child.tag()) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
                     parent_optype: optype.clone(),
@@ -549,13 +548,13 @@ pub enum ValidationError {
     #[error("The node {node:?} has no parent.")]
     NoParent { node: NodeIndex },
     /// The parent node is not compatible with the child node.
-    #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a child. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.set_description())]
+    #[error("The operation {parent_optype:?} cannot contain a {child_optype:?} as a child. Allowed children: {}. In node {child:?} with parent {parent:?}.", allowed_children.description())]
     InvalidParentOp {
         child: NodeIndex,
         child_optype: OpType,
         parent: NodeIndex,
         parent_optype: OpType,
-        allowed_children: ValidOpSet,
+        allowed_children: OpTag,
     },
     /// Invalid first/last child.
     #[error("A {optype:?} operation cannot be the {position} child of a {parent_optype:?}. Expected {expected}. In parent node {parent:?}")]
@@ -563,7 +562,7 @@ pub enum ValidationError {
         parent: NodeIndex,
         parent_optype: OpType,
         optype: OpType,
-        expected: ValidOpSet,
+        expected: OpTag,
         position: &'static str,
     },
     /// The children list has invalid elements.

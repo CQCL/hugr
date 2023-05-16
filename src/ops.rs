@@ -6,6 +6,7 @@ pub mod dataflow;
 pub mod handle;
 pub mod leaf;
 pub mod module;
+pub mod tag;
 pub mod validate;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription};
@@ -17,6 +18,8 @@ pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
 use portgraph::{Direction, PortOffset};
 use smol_str::SmolStr;
+
+use self::tag::OpTag;
 
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -52,6 +55,16 @@ impl OpType {
             OpType::BasicBlock(op) => op.description(),
             OpType::Case(op) => op.description(),
             OpType::Dataflow(op) => op.description(),
+        }
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            OpType::Module(op) => op.tag(),
+            OpType::BasicBlock(op) => op.tag(),
+            OpType::Case(op) => op.tag(),
+            OpType::Dataflow(op) => op.tag(),
         }
     }
 

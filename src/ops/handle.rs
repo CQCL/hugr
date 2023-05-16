@@ -6,6 +6,8 @@ use derive_more::From as DerFrom;
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
+use super::tag::OpTag;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
@@ -31,9 +33,27 @@ impl Wire {
 /// Common trait for handles to a node.
 /// Typically wrappers around [`NodeIndex`].
 pub trait NodeHandle {
+    /// The most specific operation tag associated with the handle.
+    const TAG: OpTag;
+
     /// Index of underlying node.
     fn node(&self) -> NodeIndex;
+
+    /// Operation tag for the handle.
+    #[inline]
+    fn tag(&self) -> OpTag {
+        Self::TAG
+    }
+
+    /// Cast the handle to a different more general tag.
+    fn try_cast<T: NodeHandle + From<NodeIndex>>(&self) -> Option<T> {
+        T::TAG.contains(Self::TAG).then(|| self.node().into())
+    }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
+/// Handle to a [OpType](crate::ops::OpType).
+pub struct OpID(NodeIndex);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DataflowOp](crate::ops::dataflow::DataflowOp).
@@ -69,6 +89,15 @@ pub struct NewTypeID {
 }
 
 impl NewTypeID {
+    /// Create a new NewTypeID
+    pub fn new(node: NodeIndex, name: SmolStr, core_type: SimpleType) -> Self {
+        Self {
+            node,
+            name,
+            core_type,
+        }
+    }
+
     /// Retrieve the NewType
     pub fn get_new_type(&self) -> SimpleType {
         self.core_type.clone().into_new_type(self.name.clone())
@@ -113,31 +142,38 @@ pub struct TailLoopID(NodeIndex);
 pub struct ConditionalID(NodeIndex);
 
 /// Implements the `NodeHandle` trait for a tuple struct that contains just a
-/// NodeIndex.
+/// NodeIndex. Takes the name of the struct, and the corresponding OpTag.
+///
+/// Optionally, the name of the field containing the NodeIndex can be specified
+/// as a third argument. Otherwise, it is assumed to be a tuple struct 0th item.
 macro_rules! impl_transparent_nodehandle {
-    ($name:ident) => {
+    ($name:ident, $tag:expr) => {
+        impl_transparent_nodehandle!($name, $tag, 0);
+    };
+    ($name:ident, $tag:expr, $node_attr:tt) => {
         impl NodeHandle for $name {
+            const TAG: OpTag = $tag;
+
             #[inline]
             fn node(&self) -> NodeIndex {
-                self.0
+                self.$node_attr
             }
         }
     };
 }
-impl_transparent_nodehandle!(DataflowOpID);
-impl_transparent_nodehandle!(ConditionalID);
-impl_transparent_nodehandle!(DfgID);
-impl_transparent_nodehandle!(TailLoopID);
-impl_transparent_nodehandle!(CfgID);
-impl_transparent_nodehandle!(ModuleRootID);
-impl_transparent_nodehandle!(ModuleID);
-impl_transparent_nodehandle!(FuncID);
-impl_transparent_nodehandle!(BasicBlockID);
-impl_transparent_nodehandle!(ConstID);
 
-impl NodeHandle for NewTypeID {
-    #[inline]
-    fn node(&self) -> NodeIndex {
-        self.node
-    }
-}
+impl_transparent_nodehandle!(OpID, OpTag::Any);
+
+impl_transparent_nodehandle!(DataflowOpID, OpTag::DataflowOp);
+impl_transparent_nodehandle!(ConditionalID, OpTag::Conditional);
+impl_transparent_nodehandle!(DfgID, OpTag::Dfg);
+impl_transparent_nodehandle!(TailLoopID, OpTag::TailLoop);
+impl_transparent_nodehandle!(CfgID, OpTag::Cfg);
+
+impl_transparent_nodehandle!(ModuleRootID, OpTag::ModuleRoot);
+impl_transparent_nodehandle!(ModuleID, OpTag::ModuleOp);
+impl_transparent_nodehandle!(FuncID, OpTag::Function);
+impl_transparent_nodehandle!(ConstID, OpTag::Const);
+
+impl_transparent_nodehandle!(BasicBlockID, OpTag::BasicBlock);
+impl_transparent_nodehandle!(NewTypeID, OpTag::NewType, node);

@@ -4,6 +4,8 @@ use smol_str::SmolStr;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
+use super::tag::OpTag;
+
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
@@ -41,6 +43,15 @@ impl ControlFlowOp {
             ControlFlowOp::Conditional { .. } => "HUGR conditional operation",
             ControlFlowOp::TailLoop { .. } => "A tail-controlled loop",
             ControlFlowOp::CFG { .. } => "A dataflow node defined by a child CFG",
+        }
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            ControlFlowOp::Conditional { .. } => OpTag::Conditional,
+            ControlFlowOp::TailLoop { .. } => OpTag::TailLoop,
+            ControlFlowOp::CFG { .. } => OpTag::Cfg,
         }
     }
 
@@ -111,6 +122,14 @@ impl BasicBlockOp {
         }
     }
 
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            BasicBlockOp::Block { .. } => OpTag::BasicBlock,
+            BasicBlockOp::Exit { .. } => OpTag::BasicBlockExit,
+        }
+    }
+
     /// The input signature of the contained dataflow graph.
     pub fn dataflow_input(&self) -> &TypeRow {
         match self {
@@ -150,6 +169,11 @@ impl CaseOp {
     /// The description of the operation.
     pub fn description(&self) -> &str {
         "A case node inside a conditional"
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        OpTag::Case
     }
 
     /// The input signature of the contained dataflow graph.
