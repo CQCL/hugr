@@ -146,9 +146,9 @@ pub struct ConditionalID(NodeIndex);
 ///
 /// Optionally, the name of the field containing the NodeIndex can be specified
 /// as a third argument. Otherwise, it is assumed to be a tuple struct 0th item.
-macro_rules! impl_transparent_nodehandle {
+macro_rules! impl_nodehandle {
     ($name:ident, $tag:expr) => {
-        impl_transparent_nodehandle!($name, $tag, 0);
+        impl_nodehandle!($name, $tag, 0);
     };
     ($name:ident, $tag:expr, $node_attr:tt) => {
         impl NodeHandle for $name {
@@ -162,18 +162,18 @@ macro_rules! impl_transparent_nodehandle {
     };
 }
 
-impl_transparent_nodehandle!(OpID, OpTag::Any);
+impl_nodehandle!(OpID, OpTag::Any);
 
-impl_transparent_nodehandle!(DataflowOpID, OpTag::DataflowOp);
-impl_transparent_nodehandle!(ConditionalID, OpTag::Conditional);
-impl_transparent_nodehandle!(DfgID, OpTag::Dfg);
-impl_transparent_nodehandle!(TailLoopID, OpTag::TailLoop);
-impl_transparent_nodehandle!(CfgID, OpTag::Cfg);
+impl_nodehandle!(DataflowOpID, OpTag::DataflowOp);
+impl_nodehandle!(ConditionalID, OpTag::Conditional);
+impl_nodehandle!(DfgID, OpTag::Dfg);
+impl_nodehandle!(TailLoopID, OpTag::TailLoop);
+impl_nodehandle!(CfgID, OpTag::Cfg);
 
-impl_transparent_nodehandle!(ModuleRootID, OpTag::ModuleRoot);
-impl_transparent_nodehandle!(ModuleID, OpTag::ModuleOp);
-impl_transparent_nodehandle!(FuncID, OpTag::Function);
-impl_transparent_nodehandle!(ConstID, OpTag::Const);
+impl_nodehandle!(ModuleRootID, OpTag::ModuleRoot);
+impl_nodehandle!(ModuleID, OpTag::ModuleOp);
+impl_nodehandle!(FuncID, OpTag::Function);
+impl_nodehandle!(ConstID, OpTag::Const);
 
-impl_transparent_nodehandle!(BasicBlockID, OpTag::BasicBlock);
-impl_transparent_nodehandle!(NewTypeID, OpTag::NewType, node);
+impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
+impl_nodehandle!(NewTypeID, OpTag::NewType, node);
