@@ -395,6 +395,27 @@ pub trait Dataflow: Container {
         Ok(make_op.out_wire(0))
     }
 
+    /// Add a [`LeafOp::Tag`] node and wire in the `value` Wire,
+    /// to make a value with Sum type, with `tag` and possible types described
+    /// by `variants`.
+    /// Returns the Wire corresponding to the Sum value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the
+    /// Tag node.
+    fn make_predicate(
+        &mut self,
+        tag: usize,
+        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        values: impl IntoIterator<Item = Wire>,
+    ) -> Result<Wire, BuildError> {
+        let tuple = self.make_tuple(values)?;
+        let variants = TypeRow::predicate_variants_row(predicate_variants);
+        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
+        Ok(make_op.out_wire(0))
+    }
+
     /// Use the wires in `values` to return a wire corresponding to the
     /// "Continue" variant of a TailLoop with `loop_signature`.
     ///

@@ -4,7 +4,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, Wire,
 };
 
-use crate::types::SimpleType;
+use crate::{type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};
@@ -58,14 +58,14 @@ impl<'f> CFGBuilder<'f> {
     pub fn block_builder<'a: 'b, 'b>(
         &'a mut self,
         inputs: TypeRow,
-        outputs: TypeRow,
-        predicate_variants: TypeRow,
+        predicate_variants: Vec<TypeRow>,
+        other_outputs: TypeRow,
     ) -> Result<BlockBuilder<'b>, BuildError> {
         let n_cases = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlockOp::Block {
             inputs: inputs.clone(),
-            outputs: outputs.clone(),
-            n_cases,
+            other_outputs: other_outputs.clone(),
+            predicate_variants: predicate_variants.clone(),
         });
         let exit = self.exit_node;
         let block_n = self.base().add_op_before(exit, op)?;
@@ -73,8 +73,8 @@ impl<'f> CFGBuilder<'f> {
         self.base().set_num_ports(block_n, 0, n_cases);
 
         // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = SimpleType::new_sum(predicate_variants);
-        let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
+        let predicate_type = SimpleType::new_predicate(predicate_variants);
+        let node_outputs: TypeRow = [&[predicate_type], other_outputs.as_ref()].concat().into();
         let db = DFGBuilder::create_with_io(self.base(), block_n, inputs, node_outputs)?;
         Ok(BlockBuilder::new(db))
     }
@@ -91,9 +91,7 @@ impl<'f> CFGBuilder<'f> {
         outputs: TypeRow,
         n_cases: usize,
     ) -> Result<BlockBuilder<'b>, BuildError> {
-        let predicate_variants = vec![SimpleType::new_unit(); n_cases].into();
-
-        self.block_builder(inputs, outputs, predicate_variants)
+        self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
     /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
@@ -105,14 +103,14 @@ impl<'f> CFGBuilder<'f> {
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder<'a: 'b, 'b>(
         &'a mut self,
-        outputs: TypeRow,
-        predicate_variants: TypeRow,
+        predicate_variants: Vec<TypeRow>,
+        other_outputs: TypeRow,
     ) -> Result<BlockBuilder<'b>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.block_builder(inputs, outputs, predicate_variants)
+        self.block_builder(inputs, predicate_variants, other_outputs)
     }
 
     /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
@@ -126,9 +124,7 @@ impl<'f> CFGBuilder<'f> {
         outputs: TypeRow,
         n_cases: usize,
     ) -> Result<BlockBuilder<'b>, BuildError> {
-        let predicate_variants = vec![SimpleType::new_unit(); n_cases].into();
-
-        self.entry_builder(outputs, predicate_variants)
+        self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -187,10 +183,7 @@ impl<'b> BlockBuilder<'b> {
 #[cfg(test)]
 mod test {
     use crate::{
-        builder::{
-            module_builder::ModuleBuilder,
-            test::{n_identity, NAT},
-        },
+        builder::{module_builder::ModuleBuilder, test::NAT},
         ops::ConstValue,
         type_row,
         types::Signature,
@@ -199,26 +192,29 @@ mod test {
     use super::*;
     #[test]
     fn basic_cfg() -> Result<(), BuildError> {
-        let sum2_type = SimpleType::new_predicate(2);
+        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
 
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare(
-                "main",
-                Signature::new_df(vec![sum2_type.clone(), NAT], type_row![NAT]),
-            )?;
-            let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
+            let main =
+                module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+            let s1 = module_builder.constant(ConstValue::simple_predicate(0, 1))?;
             let _f_id = {
                 let mut func_builder = module_builder.define_function(&main)?;
-                let [flag, int] = func_builder.input_wires_arr();
+                let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {
-                    let mut cfg_builder = func_builder
-                        .cfg_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
-                    let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
+                    let mut cfg_builder =
+                        func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
+                    let mut entry_b =
+                        cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
 
-                    let entry = n_identity(entry_b)?;
+                    let entry = {
+                        let [inw] = entry_b.input_wires_arr();
 
+                        let sum = entry_b.make_predicate(1, sum2_variants, [inw])?;
+                        entry_b.finish_with_outputs(sum, [])?
+                    };
                     let mut middle_b =
                         cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
 
@@ -239,7 +235,6 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-
             module_builder.finish()
         };
 

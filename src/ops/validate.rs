@@ -213,13 +213,15 @@ impl BasicBlockOp {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlockOp::Block { n_cases, .. } => OpValidityFlags {
+            BasicBlockOp::Block {
+                predicate_variants, ..
+            } => OpValidityFlags {
                 allowed_children: OpTag::DataflowOp,
                 allowed_first_child: OpTag::Input,
                 allowed_last_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(*n_cases)),
+                non_df_ports: (None, Some(predicate_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -235,10 +237,10 @@ impl BasicBlockOp {
         match self {
             BasicBlockOp::Block {
                 inputs,
-                outputs,
-                n_cases,
+                other_outputs: outputs,
+                predicate_variants,
             } => {
-                let predicate_type = SimpleType::new_predicate(*n_cases);
+                let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
@@ -471,7 +473,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
             .expect("CFG sibling graphs can only contain basic block operations.")
     });
 
-    if source.dataflow_output() != target.dataflow_input() {
+    if source.successor_input(edge.source_port.index()).as_ref() != Some(target.dataflow_input()) {
         return Err(EdgeValidationError::CFGEdgeSignatureMismatch { edge });
     }
 

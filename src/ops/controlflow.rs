@@ -91,8 +91,8 @@ pub enum BasicBlockOp {
     /// A CFG basic block node. The signature is that of the internal Dataflow graph.
     Block {
         inputs: TypeRow,
-        outputs: TypeRow,
-        n_cases: usize,
+        other_outputs: TypeRow,
+        predicate_variants: Vec<TypeRow>,
     },
     /// The single exit node of the CFG, has no children,
     /// stores the types of the CFG node output.
@@ -138,11 +138,20 @@ impl BasicBlockOp {
         }
     }
 
-    /// The output signature of the contained dataflow graph.
-    pub fn dataflow_output(&self) -> &TypeRow {
+    /// The correct inputs of any successors. Returns None if successor is not a
+    /// valid index.
+    pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
         match self {
-            BasicBlockOp::Block { outputs, .. } => outputs,
-            BasicBlockOp::Exit { cfg_outputs } => cfg_outputs,
+            BasicBlockOp::Block {
+                other_outputs: outputs,
+                predicate_variants,
+                ..
+            } => {
+                let mut row = predicate_variants.get(successor)?.clone();
+                row.to_mut().extend_from_slice(outputs);
+                Some(row)
+            }
+            BasicBlockOp::Exit { .. } => panic!("Exit should have no successors"),
         }
     }
 }

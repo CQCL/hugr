@@ -131,7 +131,7 @@ mod test {
                 .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 
             let s2 = module_builder.constant(ConstValue::Int(2))?;
-            let tru_const = module_builder.constant(ConstValue::predicate(1, 2))?;
+            let tru_const = module_builder.constant(ConstValue::simple_predicate(1, 2))?;
 
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
