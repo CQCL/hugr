@@ -19,6 +19,7 @@ use portgraph::{Direction, PortOffset};
 use smol_str::SmolStr;
 
 /// The concrete operation types for a node in the HUGR.
+// TODO: Link the NodeHandles to the OpType.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum OpType {

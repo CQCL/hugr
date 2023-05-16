@@ -9,7 +9,7 @@ use super::{
 };
 
 use crate::{
-    ops::handle::{ConstID, FuncID, NewTypeID, NodeHandle, OpID},
+    ops::handle::{ConstID, DataflowOpID, FuncID, NewTypeID, NodeHandle},
     ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, LeafOp, ModuleOp, OpType},
     types::{ClassicType, EdgeKind},
 };
@@ -69,11 +69,11 @@ pub trait Dataflow: Container {
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
     /// Handle to input node.
-    fn input(&self) -> BuildHandle<OpID> {
+    fn input(&self) -> BuildHandle<DataflowOpID> {
         (self.io()[0], self.num_inputs()).into()
     }
     /// Handle to output node.
-    fn output(&self) -> OpID {
+    fn output(&self) -> DataflowOpID {
         self.io()[1].into()
     }
     /// Return iterator over all input Value wires.
@@ -90,7 +90,7 @@ pub trait Dataflow: Container {
         &mut self,
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<BuildHandle<OpID>, BuildError> {
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
@@ -343,7 +343,7 @@ pub trait Dataflow: Container {
         &mut self,
         wire: Wire,
         typ: ClassicType,
-    ) -> Result<BuildHandle<OpID>, BuildError> {
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
     }
 
@@ -354,7 +354,7 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if ther is an error when adding the
     /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<OpID>, BuildError> {
+    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let typ = self.get_wire_type(wire)?;
         let typ = match typ {
             SimpleType::Classic(typ) => typ,
@@ -455,7 +455,7 @@ pub trait Dataflow: Container {
         &mut self,
         function: &FuncID,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<BuildHandle<OpID>, BuildError> {
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();
         let signature = match def_op {
             Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),

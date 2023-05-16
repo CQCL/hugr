@@ -36,8 +36,8 @@ pub trait NodeHandle {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [LeafOp](crate::ops::leaf::LeafOp).
-pub struct OpID(NodeIndex);
+/// Handle to a [DataflowOp](crate::ops::dataflow::DataflowOp).
+pub struct DataflowOpID(NodeIndex);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node.
@@ -48,7 +48,11 @@ pub struct DfgID(NodeIndex);
 pub struct CfgID(NodeIndex);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [def](crate::ops::module::ModuleOp::Root) node.
+/// Handle to a module [Root](crate::ops::module::ModuleOp::Root) node.
+pub struct ModuleRootID(NodeIndex);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
+/// Handle to a [ModuleOp](crate::ops::module::ModuleOp) node.
 pub struct ModuleID(NodeIndex);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -120,25 +124,20 @@ macro_rules! impl_transparent_nodehandle {
         }
     };
 }
-impl_transparent_nodehandle!(OpID);
+impl_transparent_nodehandle!(DataflowOpID);
 impl_transparent_nodehandle!(ConditionalID);
 impl_transparent_nodehandle!(DfgID);
 impl_transparent_nodehandle!(TailLoopID);
 impl_transparent_nodehandle!(CfgID);
+impl_transparent_nodehandle!(ModuleRootID);
 impl_transparent_nodehandle!(ModuleID);
 impl_transparent_nodehandle!(FuncID);
 impl_transparent_nodehandle!(BasicBlockID);
+impl_transparent_nodehandle!(ConstID);
 
 impl NodeHandle for NewTypeID {
     #[inline]
     fn node(&self) -> NodeIndex {
         self.node
-    }
-}
-
-impl NodeHandle for ConstID {
-    #[inline]
-    fn node(&self) -> NodeIndex {
-        self.0
     }
 }
