@@ -145,13 +145,13 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
 /// Mutable state updated during traversal of the UndirectedDFSTree by the cycle equivalence algorithm.
 struct TraversalState<T> {
     /// Edges we have marked as deleted, allowing constant-time deletion without searching BracketList
-    deleted_backedges: HashSet<UDEdge<T>>,
+    deleted_backedges: HashSet<Bracket<T>>,
     /// Key is DFS num of highest ancestor
     ///   to which backedges reached from >1 sibling subtree;
     /// Value is the LCA i.e. parent of those siblings.
     capping_edges: HashMap<usize, Vec<T>>,
     /// Result of traversal - accumulated here, entries should never be overwritten
-    edge_classes: HashMap<(T, T), Option<(UDEdge<T>, usize)>>,
+    edge_classes: HashMap<(T, T), Option<(Bracket<T>, usize)>>,
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
@@ -179,13 +179,13 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum UDEdge<T> {
-    RealEdge((T, T)),
+enum Bracket<T> {
+    CfgEdge((T, T)),
     Capping(usize, T),
 }
 
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
-    items: LinkedList<UDEdge<T>>,
+    items: LinkedList<Bracket<T>>,
     size: usize, // deleted items already taken off
 }
 
@@ -197,7 +197,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
         }
     }
 
-    pub fn tag(&mut self, deleted: &HashSet<UDEdge<T>>) -> Option<(UDEdge<T>, usize)> {
+    pub fn tag(&mut self, deleted: &HashSet<Bracket<T>>) -> Option<(Bracket<T>, usize)> {
         while let Some(e) = self.items.front() {
             // Pop deleted elements to save time (and memory)
             if deleted.contains(e) {
@@ -217,7 +217,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
         self.size += size;
     }
 
-    pub fn delete(&mut self, b: &UDEdge<T>, deleted: &mut HashSet<UDEdge<T>>) {
+    pub fn delete(&mut self, b: &Bracket<T>, deleted: &mut HashSet<Bracket<T>>) {
         // Ideally, here we would also assert that no *other* BracketList contains b.
         debug_assert!(self.items.contains(b)); // Makes operation O(n), otherwise O(1)
         assert!(!deleted.contains(b));
@@ -225,7 +225,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
         self.size -= 1;
     }
 
-    pub fn push(&mut self, e: UDEdge<T>) {
+    pub fn push(&mut self, e: Bracket<T>) {
         self.items.push_back(e);
         self.size += 1;
     }
@@ -262,7 +262,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     // Add capping backedge
     if let Some(min1dfs) = min_dfs_target[1] {
         if min1dfs < n_dfs {
-            bs.push(UDEdge::Capping(min1dfs, n));
+            bs.push(Bracket::Capping(min1dfs, n));
             // mark capping edge to be removed when we return out to the other end
             st.capping_edges
                 .entry(min1dfs)
@@ -279,23 +279,23 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 
     // Remove edges to here from beneath
     for (_, e) in be_down {
-        let e = UDEdge::RealEdge(cfg_edge(n, e));
+        let e = Bracket::CfgEdge(cfg_edge(n, e));
         bs.delete(&e, &mut st.deleted_backedges);
     }
     // And capping backedges
     for src in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
-        bs.delete(&UDEdge::Capping(n_dfs, src), &mut st.deleted_backedges)
+        bs.delete(&Bracket::Capping(n_dfs, src), &mut st.deleted_backedges)
     }
 
     // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
     be_up
         .iter()
         .filter(|(_, e)| Some(e) != parent_edge)
-        .for_each(|(_, e)| bs.push(UDEdge::RealEdge(cfg_edge(n, *e))));
+        .for_each(|(_, e)| bs.push(Bracket::CfgEdge(cfg_edge(n, *e))));
 
     // Now calculate edge classes
     let class = bs.tag(&st.deleted_backedges);
-    if let Some((UDEdge::RealEdge(e), 1)) = &class {
+    if let Some((Bracket::CfgEdge(e), 1)) = &class {
         st.edge_classes.insert(e.clone(), class.clone());
     }
     if let Some(parent_edge) = tree.dfs_parents.get(&n) {
