@@ -152,7 +152,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let tru_const = module_builder.constant(ConstValue::simple_predicate(1, 2))?;
+            let tru_const = module_builder.constant(ConstValue::true_val())?;
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
 

@@ -225,6 +225,16 @@ impl ConstValue {
             val: Box::new(Self::unit()),
         }
     }
+
+    /// Constant Sum over Tuples with just one variant
+    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
+        Self::predicate(0, [row.into()])
+    }
+
+    /// Constant Sum over Tuples with just one variant of unit type
+    pub fn simple_unary_predicate() -> Self {
+        Self::simple_predicate(0, 1)
+    }
 }
 
 impl<T: CustomConst> From<T> for ConstValue {
