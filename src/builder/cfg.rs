@@ -169,7 +169,7 @@ impl<'b> BlockBuilder<'b> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
-    /// Set outputs and finish, see [`BlockBuilder::set_outputs`]
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish`).
     pub fn finish_with_outputs(
         mut self,
         branch_wire: Wire,
