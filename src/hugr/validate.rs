@@ -1014,8 +1014,8 @@ mod test {
                 cfg,
                 BasicBlockOp::Block {
                     inputs: type_row![B],
-                    other_outputs: type_row![B],
                     predicate_variants: vec![type_row![]],
+                    other_outputs: type_row![B],
                 },
             )
             .unwrap();
@@ -1054,8 +1054,8 @@ mod test {
             block,
             BasicBlockOp::Block {
                 inputs: type_row![Q],
-                other_outputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
+                other_outputs: type_row![Q],
             },
         );
         let mut block_children = b.hugr().hierarchy.children(block);

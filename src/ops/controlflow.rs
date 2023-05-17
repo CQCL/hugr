@@ -207,8 +207,8 @@ impl BasicBlockOp {
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
         match self {
             BasicBlockOp::Block {
-                other_outputs: outputs,
                 predicate_variants,
+                other_outputs: outputs,
                 ..
             } => {
                 let mut row = predicate_variants.get(successor)?.clone();
