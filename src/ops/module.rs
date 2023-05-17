@@ -203,12 +203,12 @@ impl ConstValue {
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).
-    pub fn trueval() -> Self {
+    pub fn true_val() -> Self {
         Self::simple_predicate(1, 2)
     }
 
-    /// Constant "true" value, i.e. the first variant of Sum((), ()).
-    pub fn falseval() -> Self {
+    /// Constant "false" value, i.e. the first variant of Sum((), ()).
+    pub fn false_val() -> Self {
         Self::simple_predicate(0, 2)
     }
 
