@@ -78,7 +78,7 @@ impl ModuleBuilder {
         self.base().replace_op(
             f_node,
             OpType::Module(ModuleOp::Def {
-                signature: Signature::new(inputs.clone(), outputs.clone(), None),
+                signature: Signature::new_df(inputs.clone(), outputs.clone()),
             }),
         );
 
