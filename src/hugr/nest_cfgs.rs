@@ -409,12 +409,18 @@ mod test {
     //use crate::hugr::nest_cfgs::get_edge_classes;
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
-    fn group_by<K: Eq + Hash, V: Eq + Hash>(h: HashMap<K, V>) -> HashSet<Vec<K>> {
+    fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
         for (k, v) in h.into_iter() {
             res.entry(v).or_insert_with(Vec::new).push(k);
         }
-        res.into_values().collect()
+        res.into_values().map(sorted).collect()
+    }
+
+    fn sorted<E: Ord>(items: impl IntoIterator<Item = E>) -> Vec<E> {
+        let mut v: Vec<_> = items.into_iter().collect();
+        v.sort();
+        v
     }
 
     #[test]
@@ -448,36 +454,50 @@ mod test {
         assert_eq!(
             classes,
             HashSet::from([
-                Vec::from([(split, left), (left, merge)]), // Region containing single BB 'left'
-                Vec::from([(split, right), (right, merge)]), // Region containing single BB 'right'
-                Vec::from([(head, split), (merge, tail)]), // "Conditional" region containing split+merge choosing between left/right
-                Vec::from([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
-                Vec::from([(tail, head)])                 // The loop back-edge
+                sorted([(split, left), (left, merge)]), // Region containing single BB 'left'
+                sorted([(split, right), (right, merge)]), // Region containing single BB 'right'
+                sorted([(head, split), (merge, tail)]), // "Conditional" region containing split+merge choosing between left/right
+                sorted([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([(tail, head)])              // The loop back-edge
             ])
         );
         Ok(())
     }
 
-    fn n_identity<T: Dataflow>(dataflow_builder: T) -> Result<T::ContainerHandle, BuildError> {
+    fn n_identity<T: Dataflow>(
+        mut dataflow_builder: T,
+        unit_const: &ConstID,
+    ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
-        dataflow_builder.finish_with_outputs(w)
+        let u = dataflow_builder.load_const(unit_const)?;
+        dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
     }
 
-    fn branch_block(cfg: &mut CFGBuilder, const_pred: ConstID) -> Result<BasicBlockID, BuildError> {
+    fn branch_block(
+        cfg: &mut CFGBuilder,
+        const_pred: &ConstID,
+    ) -> Result<BasicBlockID, BuildError> {
         let mut bldr = cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?;
-        let c = bldr.load_const(&const_pred)?;
+        let c = bldr.load_const(const_pred)?;
         let [inw] = bldr.input_wires_arr();
         bldr.finish_with_outputs(c, [inw])
     }
 
     fn build_if_then_else(
         cfg: &mut CFGBuilder,
-        const_pred: ConstID,
+        const_pred: &ConstID,
+        unit_const: &ConstID,
         merge: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
         let entry = branch_block(cfg, const_pred)?;
-        let left = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
-        let right = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
+        let left = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+            unit_const,
+        )?;
+        let right = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+            unit_const,
+        )?;
         cfg.branch(&entry, 0, &left)?;
         cfg.branch(&entry, 1, &right)?;
         cfg.branch(&left, 0, &merge)?;
@@ -487,10 +507,14 @@ mod test {
 
     fn build_if_then_else_merge(
         cfg: &mut CFGBuilder,
-        const_pred: ConstID,
+        const_pred: &ConstID,
+        unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let exit = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
-        let head = build_if_then_else(cfg, const_pred, exit)?;
+        let exit = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+            unit_const,
+        )?;
+        let head = build_if_then_else(cfg, const_pred, unit_const, exit)?;
         Ok((head, exit))
     }
 
@@ -498,14 +522,18 @@ mod test {
     // and give tail at least one predecessor.
     fn build_loop(
         cfg: &mut CFGBuilder,
-        const_pred: ConstID,
+        const_pred: &ConstID,
+        unit_const: &ConstID,
         body_in: Option<BasicBlockID>,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
         let header = match body_in {
             Some(i) => i,
             None => {
                 // Caller responsible for giving this node a successor
-                n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?
+                n_identity(
+                    cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+                    unit_const,
+                )?
             }
         };
         let tail = branch_block(cfg, const_pred)?;
@@ -521,22 +549,26 @@ mod test {
 
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
+        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
 
         let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
-        let entry = n_identity(cfg_builder.simple_entry_builder(type_row![NAT], 1)?)?;
-        let (split, merge) = build_if_then_else_merge(&mut cfg_builder, s1.clone())?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
+        let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
-            let (head, tail) = build_loop(&mut cfg_builder, s1, None)?;
+            let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit, None)?;
             cfg_builder.branch(&head, 0, &split)?;
             (head, tail)
         } else {
             // Combine loop header with split.
-            build_loop(&mut cfg_builder, s1, Some(split))?
+            build_loop(&mut cfg_builder, &pred_const, &const_unit, Some(split))?
         };
         cfg_builder.branch(&merge, 0, &tail)?;
 
