@@ -401,15 +401,8 @@ pub trait Dataflow: Container {
         Ok(make_op.out_wire(0))
     }
 
-    /// Add a [`LeafOp::Tag`] node and wire in the `value` Wire,
-    /// to make a value with Sum type, with `tag` and possible types described
-    /// by `variants`.
-    /// Returns the Wire corresponding to the Sum value.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error adding the
-    /// Tag node.
+    /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
+    /// `tag` variant of a predicate (sum-of-tuples) type.
     fn make_predicate(
         &mut self,
         tag: usize,
