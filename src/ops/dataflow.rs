@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use super::{controlflow::ControlFlowOp, LeafOp};
+use super::{controlflow::ControlFlowOp, tag::OpTag, LeafOp};
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// A dataflow operation.
@@ -90,13 +90,26 @@ impl DataflowOp {
         }
     }
 
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            DataflowOp::Input { .. } => OpTag::Input,
+            DataflowOp::Output { .. } => OpTag::Output,
+            DataflowOp::Call { .. } | DataflowOp::CallIndirect { .. } => OpTag::FnCall,
+            DataflowOp::LoadConstant { .. } => OpTag::LoadConst,
+            DataflowOp::Leaf { .. } => OpTag::Leaf,
+            DataflowOp::DFG { .. } => OpTag::Dfg,
+            DataflowOp::ControlFlow { op } => op.tag(),
+        }
+    }
+
     /// The signature of the operation.
     pub fn signature(&self) -> Signature {
         match self {
             DataflowOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             DataflowOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
             DataflowOp::Call { signature } => Signature {
-                const_input: ClassicType::graph_from_sig(signature.clone()).into(),
+                const_input: vec![ClassicType::graph_from_sig(signature.clone()).into()].into(),
                 ..signature.clone()
             },
             DataflowOp::CallIndirect { signature } => {
@@ -106,10 +119,11 @@ impl DataflowOp {
                     .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
                 s
             }
-            DataflowOp::LoadConstant { datatype } => Signature {
-                const_input: Some(datatype.clone()),
-                ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
-            },
+            DataflowOp::LoadConstant { datatype } => Signature::new(
+                TypeRow::new(),
+                vec![SimpleType::Classic(datatype.clone())],
+                vec![SimpleType::Classic(datatype.clone())],
+            ),
             DataflowOp::Leaf { op } => op.signature(),
             DataflowOp::DFG { signature } => signature.clone(),
             DataflowOp::ControlFlow { op } => op.signature(),

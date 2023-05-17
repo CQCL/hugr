@@ -1,6 +1,9 @@
 //! Handles to nodes in HUGR used during the building phase.
 //!
-use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID, Wire};
+use crate::ops::{
+    handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID, Wire},
+    tag::OpTag,
+};
 
 use itertools::Itertools;
 use portgraph::NodeIndex;
@@ -23,6 +26,8 @@ impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
 }
 
 impl<T: NodeHandle> NodeHandle for BuildHandle<T> {
+    const TAG: OpTag = T::TAG;
+
     fn node(&self) -> NodeIndex {
         self.node_handle.node()
     }

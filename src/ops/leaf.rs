@@ -60,13 +60,6 @@ pub enum LeafOp {
     MakeTuple(TypeRow),
     /// An operation that unpacks a tuple into its components.
     UnpackTuple(TypeRow),
-    /// An operation that wraps a value into a new type.
-    MakeNewType {
-        /// The new type name.
-        name: SmolStr,
-        /// The wrapped type.
-        typ: SimpleType,
-    },
     /// An operation that creates a tagged sum value from one of its variants.
     Tag {
         /// The variant to create.
@@ -114,7 +107,6 @@ impl LeafOp {
             LeafOp::Xor => "Xor",
             LeafOp::MakeTuple(_) => "MakeTuple",
             LeafOp::UnpackTuple(_) => "UnpackTuple",
-            LeafOp::MakeNewType { .. } => "MakeNewType",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::RzF64 => "RzF64",
         }
@@ -143,9 +135,6 @@ impl LeafOp {
             LeafOp::MakeTuple(_) => "MakeTuple operation",
             LeafOp::UnpackTuple(_) => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
-            LeafOp::MakeNewType { .. } => {
-                "Make a new type value from a value of the defining type."
-            }
             LeafOp::RzF64 => "Rz rotation.",
         }
     }
@@ -186,10 +175,6 @@ impl LeafOp {
             LeafOp::Tag { tag, variants } => Signature::new_df(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![SimpleType::new_sum(variants.clone())],
-            ),
-            LeafOp::MakeNewType { typ, name } => Signature::new_df(
-                vec![typ.clone()],
-                vec![typ.clone().into_new_type(name.clone())],
             ),
             LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
         }

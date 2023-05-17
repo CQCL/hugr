@@ -3,11 +3,14 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
+    type_row,
     types::{ClassicType, Container, EdgeKind, Signature, SimpleType, TypeRow},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
+
+use super::tag::OpTag;
 
 /// Module-level operations.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -26,14 +29,16 @@ pub enum ModuleOp {
     Declare {
         signature: Signature,
     },
-    /// Top level struct type definition.
-    NewType {
+    /// A type alias declaration. Resolved at link time.
+    AliasDeclare {
+        name: SmolStr,
+        linear: bool,
+    },
+    /// A type alias definition, used only for debug/metadata.
+    AliasDef {
         name: SmolStr,
         definition: SimpleType,
     },
-    /// A type alias.
-    #[non_exhaustive] // TODO
-    Alias {},
     // A constant value definition.
     Const(ConstValue),
 }
@@ -45,8 +50,8 @@ impl ModuleOp {
             ModuleOp::Root => "module",
             ModuleOp::Def { .. } => "def",
             ModuleOp::Declare { .. } => "declare",
-            ModuleOp::NewType { .. } => "newtype",
-            ModuleOp::Alias { .. } => "alias",
+            ModuleOp::AliasDeclare { .. } => "alias_declare",
+            ModuleOp::AliasDef { .. } => "alias_def",
             ModuleOp::Const(val) => return val.name(),
         }
         .into()
@@ -58,9 +63,21 @@ impl ModuleOp {
             ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
             ModuleOp::Def { .. } => "A function definition",
             ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
-            ModuleOp::NewType { .. } => "Top level new type definition",
-            ModuleOp::Alias { .. } => "A type alias",
+            ModuleOp::AliasDeclare { .. } => "A type alias declaration",
+            ModuleOp::AliasDef { .. } => "A type alias definition",
             ModuleOp::Const(val) => val.description(),
+        }
+    }
+
+    /// Tag identifying the operation.
+    pub fn tag(&self) -> OpTag {
+        match self {
+            ModuleOp::Root => OpTag::ModuleRoot,
+            ModuleOp::Def { .. } => OpTag::Def,
+            ModuleOp::Declare { .. } => OpTag::Function,
+            ModuleOp::AliasDeclare { .. } => OpTag::Alias,
+            ModuleOp::AliasDef { .. } => OpTag::Alias,
+            ModuleOp::Const { .. } => OpTag::Const,
         }
     }
 
@@ -80,7 +97,7 @@ impl ModuleOp {
     /// output edges will be of that kind.
     pub fn other_outputs(&self) -> Option<EdgeKind> {
         match self {
-            ModuleOp::Root | ModuleOp::NewType { .. } | ModuleOp::Alias { .. } => None,
+            ModuleOp::Root | ModuleOp::AliasDeclare { .. } | ModuleOp::AliasDef { .. } => None,
             ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
                 ClassicType::graph_from_sig(signature.clone()),
             )),
@@ -186,24 +203,37 @@ impl ConstValue {
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).
-    pub fn trueval() -> Self {
-        Self::predicate(1, 2)
+    pub fn true_val() -> Self {
+        Self::simple_predicate(1, 2)
     }
 
-    /// Constant "true" value, i.e. the first variant of Sum((), ()).
-    pub fn falseval() -> Self {
-        Self::predicate(0, 2)
+    /// Constant "false" value, i.e. the first variant of Sum((), ()).
+    pub fn false_val() -> Self {
+        Self::simple_predicate(0, 2)
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn predicate(tag: usize, size: usize) -> Self {
-        let unit: SimpleType = SimpleType::new_unit();
-        let vars = vec![unit; size];
+    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+        Self::predicate(tag, std::iter::repeat(type_row![]).take(size))
+    }
+
+    /// Constant Sum over Tuples, used as predicates.
+    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
         ConstValue::Sum {
             tag,
-            variants: vars.into(),
+            variants: TypeRow::predicate_variants_row(variant_rows),
             val: Box::new(Self::unit()),
         }
+    }
+
+    /// Constant Sum over Tuples with just one variant
+    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
+        Self::predicate(0, [row.into()])
+    }
+
+    /// Constant Sum over Tuples with just one variant of unit type
+    pub fn simple_unary_predicate() -> Self {
+        Self::simple_predicate(0, 1)
     }
 }
 

@@ -16,7 +16,7 @@ pub use portgraph::PortOffset;
 
 use smol_str::SmolStr;
 
-use crate::resource::ResourceSet;
+use crate::{resource::ResourceSet, type_row};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -47,7 +47,7 @@ pub struct Signature {
     /// Value outputs of the function.
     pub output: TypeRow,
     /// Possible constE input (for call / load-constant).
-    pub const_input: Option<ClassicType>,
+    pub const_input: TypeRow,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -55,7 +55,7 @@ impl Signature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
+        self.const_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear.
@@ -90,8 +90,13 @@ impl Signature {
 
     /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
     pub fn get(&self, offset: PortOffset) -> Option<EdgeKind> {
-        if offset.direction() == Direction::Incoming && offset.index() == self.input.len() {
-            self.const_input.clone().map(EdgeKind::Const)
+        if offset.direction() == Direction::Incoming && offset.index() >= self.input.len() {
+            self.const_input
+                .get(offset.index() - self.input.len())?
+                .clone()
+                .try_into()
+                .ok()
+                .map(EdgeKind::Const)
         } else {
             self.get_df(offset).cloned().map(EdgeKind::Value)
         }
@@ -119,7 +124,7 @@ impl Signature {
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-        const_input: impl Into<Option<ClassicType>>,
+        const_input: impl Into<TypeRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -136,7 +141,7 @@ impl Signature {
 
     /// Create a new signature with only dataflow inputs and outputs.
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Signature::new(input, output, None)
+        Signature::new(input, output, type_row![])
     }
 }
 
@@ -151,7 +156,7 @@ pub struct SignatureDescription {
     /// Output of the function.
     pub output: Vec<SmolStr>,
     /// Constant data references used by the function.
-    pub const_input: Option<SmolStr>,
+    pub const_input: Vec<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -159,7 +164,7 @@ impl SignatureDescription {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_none() && self.input.is_empty() && self.output.is_empty()
+        self.const_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 }
 
@@ -168,7 +173,7 @@ impl SignatureDescription {
     pub fn new(
         input: impl Into<Vec<SmolStr>>,
         output: impl Into<Vec<SmolStr>>,
-        const_input: impl Into<Option<SmolStr>>,
+        const_input: impl Into<Vec<SmolStr>>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -192,6 +197,16 @@ impl SignatureDescription {
         }
     }
 
+    fn row_zip<'a>(
+        type_row: &'a TypeRow,
+        name_row: &'a [SmolStr],
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a SimpleType)> {
+        name_row
+            .iter()
+            .chain(&EmptyStringIterator)
+            .zip(type_row.iter())
+    }
+
     /// Iterate over the input wires of the signature and their names.
     ///
     /// Unnamed wires are given an empty string name.
@@ -201,10 +216,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.input
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.input.iter())
+        Self::row_zip(&signature.input, &self.input)
     }
 
     /// Iterate over the output wires of the signature and their names.
@@ -214,21 +226,15 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        self.output
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(signature.output.iter())
+        Self::row_zip(&signature.output, &self.output)
     }
 
     /// Iterate over the constant input wires of the signature and their names.
     pub fn const_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> Option<(&'a SmolStr, &'a ClassicType)> {
-        signature
-            .const_input
-            .as_ref()
-            .map(|t| (self.const_input.as_ref().unwrap_or(EMPTY_STRING_REF), t))
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
+        Self::row_zip(&signature.const_input, &self.const_input)
     }
 }
 

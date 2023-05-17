@@ -5,7 +5,7 @@ use super::{
 
 use crate::types::SimpleType;
 
-use crate::ops::handle::{ConstID, FuncID, NewTypeID, NodeHandle};
+use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
 
 use crate::types::Signature;
@@ -78,7 +78,7 @@ impl ModuleBuilder {
         self.base().replace_op(
             f_node,
             OpType::Module(ModuleOp::Def {
-                signature: Signature::new(inputs.clone(), outputs.clone(), None),
+                signature: Signature::new_df(inputs.clone(), outputs.clone()),
             }),
         );
 
@@ -132,20 +132,35 @@ impl ModuleBuilder {
         Ok((const_n, typ).into())
     }
 
-    /// Add a [`ModuleOp::NewType`] node and return a handle to the NewType.
-    pub fn add_new_type(
+    /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
+    pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
         typ: SimpleType,
-    ) -> Result<NewTypeID, BuildError> {
+    ) -> Result<AliasID, BuildError> {
         let name: SmolStr = name.into();
-
-        let node = self.add_child_op(ModuleOp::NewType {
+        let linear = typ.is_linear();
+        let node = self.add_child_op(ModuleOp::AliasDef {
             name: name.clone(),
-            definition: typ.clone(),
+            definition: typ,
         })?;
 
-        Ok((node, name, typ).into())
+        Ok(AliasID::new(node, name, linear))
+    }
+
+    /// Add a [`ModuleOp::AliasDeclare`] node and return a handle to the Alias.
+    pub fn add_alias_declare(
+        &mut self,
+        name: impl Into<SmolStr>,
+        linear: bool,
+    ) -> Result<AliasID, BuildError> {
+        let name: SmolStr = name.into();
+        let node = self.add_child_op(ModuleOp::AliasDeclare {
+            name: name.clone(),
+            linear,
+        })?;
+
+        Ok(AliasID::new(node, name, linear))
     }
 }
 
@@ -155,7 +170,7 @@ mod test {
 
     use crate::{
         builder::{
-            test::{BIT, NAT, QB},
+            test::{n_identity, NAT},
             Dataflow,
         },
         type_row,
@@ -181,24 +196,20 @@ mod test {
     }
 
     #[test]
-    fn simple_newtype() -> Result<(), BuildError> {
-        let inputs = type_row![QB, BIT];
+    fn simple_alias() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type = module_builder
-                .add_new_type("qubit_state", SimpleType::new_tuple(inputs.clone()))?;
+            let qubit_state_type = module_builder.add_alias_declare("qubit_state", true)?;
 
-            let mut f_build = module_builder.declare_and_def(
+            let f_build = module_builder.declare_and_def(
                 "main",
-                Signature::new_df(inputs, vec![qubit_state_type.get_new_type()]),
+                Signature::new_df(
+                    vec![qubit_state_type.get_alias_type()],
+                    vec![qubit_state_type.get_alias_type()],
+                ),
             )?;
-            {
-                let tuple = f_build.make_tuple(f_build.input_wires())?;
-                let q_s_val = f_build.make_new_type(&qubit_state_type, tuple)?;
-                f_build.finish_with_outputs([q_s_val])?;
-            }
-
+            n_identity(f_build)?;
             module_builder.finish()
         };
         assert_matches!(build_result, Ok(_));
