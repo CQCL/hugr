@@ -1,10 +1,10 @@
 //! # Nest CFGs
-//! 
+//!
 //! Identify Single-Entry-Single-Exit regions in the CFG.
 //! These are pairs of edges (a,b) where
 //! a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
 //! (the third condition is necessary because loop backedges do not affect (post)dominance).
-//! 
+//!
 //! Algorithm here: https://dl.acm.org/doi/10.1145/773473.178258, approximately:
 //! 1. those three conditions are equivalent to:
 //! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
@@ -25,8 +25,14 @@
 //!       so add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
 //!       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
 
+use portgraph::portgraph::NodePorts;
+use portgraph::NodeIndex;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
+
+use crate::ops::handle::{CfgID, NodeHandle};
+use crate::ops::{controlflow::BasicBlockOp, OpType};
+use crate::Hugr;
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
 // (in a BB with one predecessor and one successor, which may then be merged
@@ -98,6 +104,75 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> (T
     match d {
         EdgeDest::Forward(t) => (s, t),
         EdgeDest::Backward(t) => (t, s),
+    }
+}
+
+/// A straightforward view of a Cfg as it appears in a Hugr
+pub struct SimpleCfgView<'a> {
+    h: &'a Hugr,
+    entry: NodeIndex,
+    exit: NodeIndex,
+}
+impl<'a> SimpleCfgView<'a> {
+    /// Creates a SimpleCfgView for the specified CSG of a Hugr
+    pub fn new(h: &'a Hugr, cfg: CfgID) -> Self {
+        let mut children = h.children(cfg.node());
+        let entry = children.next().unwrap(); // Panic if malformed
+        let exit = children.last().unwrap();
+        assert!(match h.get_optype(exit) {
+            OpType::BasicBlock(BasicBlockOp::Exit { .. }) => true,
+            _ => false,
+        });
+        Self { h, entry, exit }
+    }
+}
+impl CfgView<NodeIndex> for SimpleCfgView<'_> {
+    fn entry_node(&self) -> NodeIndex {
+        self.entry
+    }
+
+    fn exit_node(&self) -> NodeIndex {
+        self.exit
+    }
+
+    type Iterator<'c> = LinkIter<'c>
+    where
+        Self: 'c;
+
+    fn successors<'c>(&'c self, item: NodeIndex) -> Self::Iterator<'c> {
+        LinkIter {
+            node: item,
+            hugr: self.h,
+            ports: self.h.node_outputs(item),
+        }
+    }
+
+    fn predecessors<'c>(&'c self, item: NodeIndex) -> Self::Iterator<'c> {
+        LinkIter {
+            node: item,
+            hugr: self.h,
+            ports: self.h.node_inputs(item),
+        }
+    }
+}
+/// Iterates over the *nodes* at the other end of the edges from the ports in a NodePorts
+pub struct LinkIter<'a> {
+    node: NodeIndex,
+    hugr: &'a Hugr,
+    ports: NodePorts,
+}
+impl Iterator for LinkIter<'_> {
+    type Item = NodeIndex;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            // We'll skip over unlinked ports, but we could panic (returning None doesn't make sense)
+            let port = self.ports.next()?;
+            assert_eq!(self.hugr.graph.port_node(port), Some(self.node));
+            let po = self.hugr.graph.port_offset(port).unwrap();
+            if let Some((n, _)) = self.hugr.linked_port(self.node, po) {
+                return Some(n);
+            }
+        }
     }
 }
 
@@ -323,67 +398,159 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::builder::{ModuleBuilder, BuildError, Dataflow, Container};
-    use crate::types::{ClassicType, SimpleType, Signature};
-    use crate::type_row;
-    use crate::ops::ConstValue;
+    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, ModuleBuilder};
+    use crate::ops::{
+        handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
+        ConstValue,
+    };
+    use crate::types::{ClassicType, Signature, SimpleType};
+    use crate::{type_row, Hugr};
+    use itertools::Itertools;
     //use crate::hugr::nest_cfgs::get_edge_classes;
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
-    fn n_identity<T: Dataflow>(
-        dataflow_builder: T,
-    ) -> Result<T::ContainerHandle, BuildError> {
+    fn group_by<K: Eq + Hash, V: Eq + Hash>(h: HashMap<K, V>) -> HashSet<Vec<K>> {
+        let mut res = HashMap::new();
+        for (k, v) in h.into_iter() {
+            res.entry(v).or_insert_with(Vec::new).push(k);
+        }
+        res.into_values().collect()
+    }
+
+    #[test]
+    fn test_cond_in_loop_separate_headers() -> Result<(), BuildError> {
+        let (h, cfg_id, head, tail) = conditional_in_loop(true)?;
+        let head = head.node();
+        let tail = tail.node();
+        //                       /-> left  -\
+        //  entry -> head -> split           > merge -> tail -> exit
+        //             |          \-> right -/             |
+        //             \---<---<---<---<---<---<---<---<---/
+        let v = SimpleCfgView::new(&h, cfg_id);
+        let edge_classes = get_edge_classes(&v);
+        let SimpleCfgView { h: _, entry, exit } = v;
+        // split is unique successor of head
+        let split = *edge_classes
+            .keys()
+            .filter(|(s, _)| *s == head)
+            .map(|(_, t)| t)
+            .exactly_one()
+            .unwrap();
+        // merge is unique predecessor of tail
+        let merge = *edge_classes
+            .keys()
+            .filter(|(_, t)| *t == tail)
+            .map(|(s, _)| s)
+            .exactly_one()
+            .unwrap();
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
+        let classes = group_by(edge_classes);
+        assert_eq!(
+            classes,
+            HashSet::from([
+                Vec::from([(split, left), (left, merge)]), // Region containing single BB 'left'
+                Vec::from([(split, right), (right, merge)]), // Region containing single BB 'right'
+                Vec::from([(head, split), (merge, tail)]), // "Conditional" region containing split+merge choosing between left/right
+                Vec::from([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([(tail, head)])                 // The loop back-edge
+            ])
+        );
+        Ok(())
+    }
+
+    fn n_identity<T: Dataflow>(dataflow_builder: T) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
         dataflow_builder.finish_with_outputs(w)
     }
-    #[test]
-    fn basic_cfg() -> Result<(), BuildError> {
-        let sum2_type = SimpleType::new_predicate(2);
 
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare(
-                "main",
-                Signature::new_df(vec![sum2_type.clone(), NAT], type_row![NAT]),
-            )?;
-            let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
-            let _f_id = {
-                let mut func_builder = module_builder.define_function(&main)?;
-                let [flag, int] = func_builder.input_wires_arr();
+    fn branch_block(cfg: &mut CFGBuilder, const_pred: ConstID) -> Result<BasicBlockID, BuildError> {
+        let mut bldr = cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?;
+        let c = bldr.load_const(&const_pred)?;
+        let [inw] = bldr.input_wires_arr();
+        bldr.finish_with_outputs(c, [inw])
+    }
 
-                let cfg_id = {
-                    let mut cfg_builder = func_builder
-                        .cfg_builder(vec![(sum2_type, flag), (NAT, int)], type_row![NAT])?;
-                    let entry_b = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
+    fn build_if_then_else(
+        cfg: &mut CFGBuilder,
+        const_pred: ConstID,
+        merge: BasicBlockID,
+    ) -> Result<BasicBlockID, BuildError> {
+        let entry = branch_block(cfg, const_pred)?;
+        let left = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
+        let right = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
+        cfg.branch(&entry, 0, &left)?;
+        cfg.branch(&entry, 1, &right)?;
+        cfg.branch(&left, 0, &merge)?;
+        cfg.branch(&right, 0, &merge)?;
+        Ok(entry)
+    }
 
-                    let entry = n_identity(entry_b)?;
+    fn build_if_then_else_merge(
+        cfg: &mut CFGBuilder,
+        const_pred: ConstID,
+    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
+        let exit = n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?;
+        let head = build_if_then_else(cfg, const_pred, exit)?;
+        Ok((head, exit))
+    }
 
-                    let mut middle_b =
-                        cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
-
-                    let middle = {
-                        let c = middle_b.load_const(&s1)?;
-                        let [inw] = middle_b.input_wires_arr();
-                        middle_b.finish_with_outputs(c, [inw])?
-                    };
-
-                    let exit = cfg_builder.exit_block();
-
-                    cfg_builder.branch(&entry, 0, &middle)?;
-                    cfg_builder.branch(&middle, 0, &exit)?;
-                    cfg_builder.branch(&entry, 1, &exit)?;
-
-                    cfg_builder.finish()
-                };
-
-                func_builder.finish_with_outputs(cfg_id.outputs())?
-            };
-
-            module_builder.finish()
+    // Result is header (new or provided) and tail. Caller must provide 0th successor of header and tail,
+    // and give tail at least one predecessor.
+    fn build_loop(
+        cfg: &mut CFGBuilder,
+        const_pred: ConstID,
+        body_in: Option<BasicBlockID>,
+    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
+        let header = match body_in {
+            Some(i) => i,
+            None => {
+                // Caller responsible for giving this node a successor
+                n_identity(cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?)?
+            }
         };
+        let tail = branch_block(cfg, const_pred)?;
+        cfg.branch(&tail, 1, &header)?;
+        Ok((header, tail))
+    }
 
-        assert_eq!(build_result.err(), None);
+    // Build a CFG, returning the Hu
+    fn conditional_in_loop(
+        separate_headers: bool,
+    ) -> Result<(Hugr, CfgID, BasicBlockID, BasicBlockID), BuildError> {
+        //let sum2_type = SimpleType::new_predicate(2);
 
-        Ok(())
+        let mut module_builder = ModuleBuilder::new();
+        let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+        let s1 = module_builder.constant(ConstValue::predicate(0, 1))?;
+
+        let mut func_builder = module_builder.define_function(&main)?;
+        let [int] = func_builder.input_wires_arr();
+
+        let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
+        let entry = n_identity(cfg_builder.simple_entry_builder(type_row![NAT], 1)?)?;
+        let (split, merge) = build_if_then_else_merge(&mut cfg_builder, s1.clone())?;
+
+        let (head, tail) = if separate_headers {
+            let (head, tail) = build_loop(&mut cfg_builder, s1, None)?;
+            cfg_builder.branch(&head, 0, &split)?;
+            (head, tail)
+        } else {
+            // Combine loop header with split.
+            build_loop(&mut cfg_builder, s1, Some(split))?
+        };
+        cfg_builder.branch(&merge, 0, &tail)?;
+
+        let exit = cfg_builder.exit_block();
+
+        cfg_builder.branch(&entry, 0, &head)?;
+        cfg_builder.branch(&tail, 0, &exit)?;
+
+        let cfg_id = cfg_builder.finish();
+
+        func_builder.finish_with_outputs(cfg_id.outputs())?;
+
+        let h = module_builder.finish()?;
+
+        Ok((h, *cfg_id.handle(), head, tail))
     }
 }

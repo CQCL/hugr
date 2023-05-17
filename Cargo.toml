@@ -48,7 +48,6 @@ rstest = "0.17.0"
 portgraph = { version = "0.2.0", features = ["proptest"] }
 proptest = "1.1.0"
 rmp-serde = "1.1.1"
-test-case = "3.1.0"  # ALAN for halfnode tests only
 open = "4.1.0"
 url-escape = "0.1.1"
 cool_asserts = "2.0.3"
