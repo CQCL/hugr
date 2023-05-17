@@ -109,7 +109,7 @@ impl DataflowOp {
             DataflowOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
             DataflowOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
             DataflowOp::Call { signature } => Signature {
-                const_input: ClassicType::graph_from_sig(signature.clone()).into(),
+                const_input: vec![ClassicType::graph_from_sig(signature.clone()).into()].into(),
                 ..signature.clone()
             },
             DataflowOp::CallIndirect { signature } => {
@@ -119,10 +119,11 @@ impl DataflowOp {
                     .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
                 s
             }
-            DataflowOp::LoadConstant { datatype } => Signature {
-                const_input: Some(datatype.clone()),
-                ..Signature::new_df(TypeRow::new(), vec![SimpleType::Classic(datatype.clone())])
-            },
+            DataflowOp::LoadConstant { datatype } => Signature::new(
+                TypeRow::new(),
+                vec![SimpleType::Classic(datatype.clone())],
+                vec![SimpleType::Classic(datatype.clone())],
+            ),
             DataflowOp::Leaf { op } => op.signature(),
             DataflowOp::DFG { signature } => signature.clone(),
             DataflowOp::ControlFlow { op } => op.signature(),

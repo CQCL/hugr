@@ -119,7 +119,7 @@ impl<'a> ValidationContext<'a> {
                 df_ports <= actual
             }
         };
-        let df_const_input = sig.const_input.is_some() as usize;
+        let df_const_input = sig.const_input.len();
         if !check_extra_ports(
             sig.input.len() + df_const_input,
             flags.non_df_ports.0,

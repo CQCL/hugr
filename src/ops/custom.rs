@@ -146,13 +146,11 @@ impl OpDef {
         signature: Signature,
         port_names: SignatureDescription,
     ) -> Self {
-        let mut inputs: Vec<_> = port_names
+        let inputs: Vec<_> = port_names
             .input_zip(&signature)
+            .chain(port_names.const_input_zip(&signature))
             .map(|(n, t)| (Some(n.clone()), t.clone()))
             .collect();
-        if let Some((n, k)) = port_names.const_input_zip(&signature) {
-            inputs.push((Some(n.clone()), SimpleType::Classic(k.clone())))
-        }
 
         let outputs = port_names
             .output_zip(&signature)

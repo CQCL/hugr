@@ -156,7 +156,7 @@ pub trait Dataflow: Container {
         let (dfg_n, _) = add_op_with_wires(
             self,
             OpType::Dataflow(DataflowOp::DFG {
-                signature: Signature::new(input_types.clone(), output_types.clone(), None),
+                signature: Signature::new_df(input_types.clone(), output_types.clone()),
             }),
             input_wires,
         )?;
