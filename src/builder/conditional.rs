@@ -1,4 +1,4 @@
-use crate::types::{Signature, TypeRow};
+use crate::types::Signature;
 
 use crate::ops::handle::CaseID;
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
@@ -14,7 +14,6 @@ use crate::{hugr::HugrMut, Hugr};
 
 use std::collections::HashSet;
 
-use itertools::Itertools;
 use portgraph::NodeIndex;
 use thiserror::Error;
 
@@ -102,24 +101,16 @@ impl<'f> ConditionalBuilder<'f> {
             .clone()
             .try_into();
 
-        let Ok(ControlFlowOp::Conditional {
-            predicate_inputs,
-            inputs,
-            outputs,
-        }) = control_op else {panic!("Parent node does not have Conditional optype.")};
-        let sum_input = predicate_inputs
-            .get(case)
-            .ok_or(ConditionalBuildError::NotCase { conditional, case })?
-            .clone();
+        let Ok(ControlFlowOp::Conditional(cond_sig)) = control_op else {panic!("Parent node does not have Conditional optype.")};
+        let inputs = cond_sig
+            .case_input_row(case)
+            .ok_or(ConditionalBuildError::NotCase { conditional, case })?;
 
         if self.case_nodes.get(case).unwrap().is_some() {
             return Err(ConditionalBuildError::CaseBuilt { conditional, case }.into());
         }
 
-        let inputs: TypeRow = [vec![sum_input], inputs.iter().cloned().collect_vec()]
-            .concat()
-            .into();
-
+        let outputs = cond_sig.outputs;
         let bb_op = OpType::Case(CaseOp {
             signature: Signature::new_df(inputs.clone(), outputs.clone()),
         });
@@ -151,7 +142,6 @@ mod test {
         },
         ops::ConstValue,
         type_row,
-        types::SimpleType,
     };
 
     use super::*;
@@ -169,9 +159,9 @@ mod test {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
-                    let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
+                    let predicate_inputs = vec![type_row![]; 2];
                     let other_inputs = vec![(NAT, int)];
-                    let outputs = vec![SimpleType::new_unit(), NAT].into();
+                    let outputs = vec![NAT].into();
                     let mut conditional_b = fbuild.conditional_builder(
                         (predicate_inputs, const_wire),
                         other_inputs,
@@ -183,8 +173,7 @@ mod test {
 
                     conditional_b.finish()?
                 };
-                let [unit, int] = conditional_id.outputs_arr();
-                fbuild.discard(unit)?;
+                let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
             module_builder.finish()

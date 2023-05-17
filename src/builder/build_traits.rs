@@ -1,6 +1,6 @@
 use crate::{
     hugr::{validate::InterGraphEdgeError, ValidationError},
-    ops::controlflow::TailLoopSignature,
+    ops::controlflow::{ConditionalSignature, TailLoopSignature},
 };
 
 use std::iter;
@@ -283,7 +283,7 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder<'a: 'b, 'b>(
         &'a mut self,
-        (predicate_inputs, predicate_wire): (TypeRow, Wire),
+        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
     ) -> Result<ConditionalBuilder<'b>, BuildError> {
@@ -293,14 +293,16 @@ pub trait Dataflow: Container {
         input_wires.insert(0, predicate_wire);
 
         let inputs: TypeRow = input_types.into();
+        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
+
         let n_cases = predicate_inputs.len();
         let n_out_wires = output_types.len();
         let conditional_id = self.add_dataflow_op(
-            ControlFlowOp::Conditional {
+            ControlFlowOp::Conditional(ConditionalSignature {
                 predicate_inputs,
-                inputs,
+                other_inputs: inputs,
                 outputs: output_types,
-            },
+            }),
             input_wires,
         )?;
         Ok(ConditionalBuilder {

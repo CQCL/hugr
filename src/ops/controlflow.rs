@@ -51,20 +51,50 @@ impl TailLoopSignature {
     }
 }
 
+/// Type rows defining the inner and outer signatures of a [`ControlFlowOp::Conditional`]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ConditionalSignature {
+    /// The possible rows of the predicate input
+    pub predicate_inputs: Vec<TypeRow>,
+    /// Remaining input types
+    pub other_inputs: TypeRow,
+    /// Output types
+    pub outputs: TypeRow,
+}
+
+impl From<ConditionalSignature> for ControlFlowOp {
+    fn from(value: ConditionalSignature) -> Self {
+        ControlFlowOp::Conditional(value)
+    }
+}
+
+impl From<ConditionalSignature> for Signature {
+    fn from(conditional_sig: ConditionalSignature) -> Self {
+        let mut inputs = conditional_sig.other_inputs;
+        inputs.to_mut().insert(
+            0,
+            SimpleType::new_predicate(conditional_sig.predicate_inputs.clone().into_iter()),
+        );
+        Signature::new_df(inputs, conditional_sig.outputs)
+    }
+}
+
+impl ConditionalSignature {
+    /// Build the input TypeRow of the nth child graph of a Conditional node.
+    pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
+        let mut inputs = self.predicate_inputs.get(case)?.clone();
+
+        inputs.to_mut().extend_from_slice(&self.other_inputs);
+        Some(inputs)
+    }
+}
+
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
     /// Conditional operation, defined by child `Case` nodes for each branch.
-    Conditional {
-        /// The branch predicate. It's len is equal to the number of cases.
-        predicate_inputs: TypeRow,
-        /// Other inputs passed to all cases.
-        inputs: TypeRow,
-        /// Common output of all cases.
-        outputs: TypeRow,
-    },
+    Conditional(ConditionalSignature),
     /// Tail-controlled loop.
-    #[allow(missing_docs)]
     TailLoop(TailLoopSignature),
     /// A dataflow node which is defined by a child CFG.
     #[allow(missing_docs)]
@@ -103,16 +133,7 @@ impl ControlFlowOp {
     /// The signature of the operation.
     pub fn signature(&self) -> Signature {
         match self {
-            ControlFlowOp::Conditional {
-                predicate_inputs,
-                inputs,
-                outputs,
-            } => {
-                let predicate = SimpleType::new_sum(predicate_inputs.clone());
-                let mut sig_in = vec![predicate];
-                sig_in.extend_from_slice(inputs);
-                Signature::new_df(sig_in, outputs.clone())
-            }
+            ControlFlowOp::Conditional(conditional_sig) => conditional_sig.clone().into(),
             ControlFlowOp::TailLoop(tail_op_sig) => tail_op_sig.clone().into(),
             ControlFlowOp::CFG { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())

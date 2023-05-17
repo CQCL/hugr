@@ -84,7 +84,7 @@ mod test {
         },
         ops::ConstValue,
         type_row,
-        types::{Signature, SimpleType},
+        types::Signature,
     };
 
     use super::*;
@@ -140,7 +140,7 @@ mod test {
                     let const_wire = loop_b.load_const(&tru_const)?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
-                        let predicate_inputs = vec![SimpleType::new_unit(); 2].into();
+                        let predicate_inputs = vec![type_row![]; 2];
                         let output_row = loop_b.internal_output_row()?;
                         let mut conditional_b = loop_b.conditional_builder(
                             (predicate_inputs, const_wire),
@@ -149,16 +149,14 @@ mod test {
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;
-                        let [pred, b1] = branch_0.input_wires_arr();
-                        branch_0.discard(pred)?;
+                        let [b1] = branch_0.input_wires_arr();
 
                         let continue_wire = branch_0.make_continue(signature.clone(), [b1])?;
                         branch_0.finish_with_outputs([continue_wire])?;
 
                         let mut branch_1 = conditional_b.case_builder(1)?;
-                        let [pred, b1] = branch_1.input_wires_arr();
+                        let [b1] = branch_1.input_wires_arr();
 
-                        branch_1.discard(pred)?;
                         branch_1.discard(b1)?;
 
                         let wire = branch_1.load_const(&s2)?;

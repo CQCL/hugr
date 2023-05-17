@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 
 use super::{
-    controlflow::{CaseOp, TailLoopSignature},
+    controlflow::{CaseOp, ConditionalSignature, TailLoopSignature},
     tag::OpTag,
     BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType,
 };
@@ -112,12 +112,12 @@ pub enum ChildrenValidationError {
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
     /// The conditional container's branch predicate does not match the number of children.
-    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate type: {actual_predicate:?} ")]
+    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate rows: {actual_predicate_rows:?} ")]
     InvalidConditionalPredicate {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate: TypeRow,
+        actual_predicate_rows: Vec<TypeRow>,
     },
 }
 
@@ -351,11 +351,11 @@ impl ControlFlowOp {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            ControlFlowOp::Conditional {
+            ControlFlowOp::Conditional(ConditionalSignature {
                 predicate_inputs,
-                inputs,
+                other_inputs,
                 outputs,
-            } => {
+            }) => {
                 let children = children.collect_vec();
                 // The first input to the ɣ-node is a predicate of Sum type,
                 // whose arity matches the number of children of the ɣ-node.
@@ -364,11 +364,11 @@ impl ControlFlowOp {
                         child: children[0].0, // Pass an arbitrary child
                         expected_count: children.len(),
                         actual_count: predicate_inputs.len(),
-                        actual_predicate: predicate_inputs.clone(),
+                        actual_predicate_rows: predicate_inputs.clone(),
                     });
                 }
 
-                // Each child must have it's predicate variant and the rest of `inputs` as input,
+                // Each child must have it's predicate variant row and the rest of `inputs` as input,
                 // and matching output
                 for (i, (child, optype)) in children.into_iter().enumerate() {
                     let case_op: &CaseOp = optype
@@ -376,8 +376,8 @@ impl ControlFlowOp {
                         .expect("Child check should have already checked valid ops.");
                     let sig = &case_op.signature;
                     let predicate_value = &predicate_inputs[i];
-                    if sig.input[0] != *predicate_value
-                        || sig.input[1..] != inputs[..]
+                    if sig.input[0..predicate_value.len()] != predicate_value[..]
+                        || sig.input[predicate_value.len()..] != other_inputs[..]
                         || sig.output != *outputs
                     {
                         return Err(ChildrenValidationError::ConditionalCaseSignature {
