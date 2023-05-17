@@ -25,8 +25,8 @@ impl<'b> TailLoopBuilder<'b> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
             loop_node,
-            tail_loop_sig.loop_input_row(),
-            tail_loop_sig.loop_output_row(),
+            tail_loop_sig.body_input_row(),
+            tail_loop_sig.body_output_row(),
         )?;
 
         Ok(TailLoopBuilder::new(dfg_build))
@@ -75,7 +75,7 @@ impl<'b> TailLoopBuilder<'b> {
     /// The output types of the child graph, including the predicate as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature()
-            .map(TailLoopSignature::loop_output_row)
+            .map(TailLoopSignature::body_output_row)
     }
 }
 
