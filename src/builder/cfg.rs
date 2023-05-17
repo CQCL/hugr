@@ -160,6 +160,8 @@ impl<'f> CFGBuilder<'f> {
 pub type BlockBuilder<'b> = DFGWrapper<'b, BasicBlockID>;
 
 impl<'b> BlockBuilder<'b> {
+    /// Set the outputs of the block, with `branch_wire` being the value of the
+    /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
         &mut self,
         branch_wire: Wire,
@@ -167,6 +169,7 @@ impl<'b> BlockBuilder<'b> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
+    /// Set outputs and finish, see [`BlockBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,
         branch_wire: Wire,

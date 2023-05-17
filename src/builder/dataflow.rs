@@ -82,6 +82,7 @@ impl<'f> Dataflow for DFGBuilder<'f> {
     }
 }
 
+/// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
 pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node

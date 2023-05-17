@@ -14,7 +14,7 @@ mod build_traits;
 pub use build_traits::{Container, Dataflow};
 
 mod dataflow;
-pub use dataflow::{DFGBuilder, FunctionBuilder};
+pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
 
 mod module_builder;
 pub use module_builder::ModuleBuilder;

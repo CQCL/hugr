@@ -31,6 +31,8 @@ impl<'b> TailLoopBuilder<'b> {
 
         Ok(TailLoopBuilder::new(dfg_build))
     }
+    /// Set the outputs of the TailLoop, with `out_variant` as the value of the
+    /// termination predicate, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
         out_variant: Wire,
@@ -39,6 +41,7 @@ impl<'b> TailLoopBuilder<'b> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
+    /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,
         out_variant: Wire,
@@ -51,6 +54,8 @@ impl<'b> TailLoopBuilder<'b> {
         Ok(self.finish())
     }
 
+    /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
+    /// that defines the signature of the TailLoop
     pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
         let hugr = self.hugr();
 
@@ -67,6 +72,7 @@ impl<'b> TailLoopBuilder<'b> {
         }
     }
 
+    /// The output types of the child graph, including the predicate as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature()
             .map(TailLoopSignature::loop_output_row)
