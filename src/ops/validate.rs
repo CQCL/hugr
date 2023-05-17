@@ -239,8 +239,8 @@ impl BasicBlockOp {
         match self {
             BasicBlockOp::Block {
                 inputs,
-                other_outputs: outputs,
                 predicate_variants,
+                other_outputs: outputs,
             } => {
                 let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
@@ -368,7 +368,7 @@ impl ControlFlowOp {
                     });
                 }
 
-                // Each child must have it's predicate variant row and the rest of `inputs` as input,
+                // Each child must have its predicate variant's row and the rest of `inputs` as input,
                 // and matching output
                 for (i, (child, optype)) in children.into_iter().enumerate() {
                     let case_op: &CaseOp = optype
