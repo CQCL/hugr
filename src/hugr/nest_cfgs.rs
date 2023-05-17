@@ -12,8 +12,8 @@
 //! 2. cycle equivalence is unaffected if all edges are considered *un*directed
 //!     (not obvious, see paper for proof)
 //! 3. take undirected CFG, perform depth-first traversal
-//!     => all edges are *tree edges* or *backedges* where one endpoint is an ancestor of the other
-//! 4. identify the "bracketlist" of each tree edge - the set of backedges going from a descendant to an ancestor
+//!     => all edges are either *tree edges*, or *backedges* where one endpoint is an ancestor of the other
+//! 4. identify the "bracketlist" of each tree edge - the set of backedges going from a descendant of that edge to an ancestor
 //!     -- post-order traversal, merging bracketlists of children,
 //!            then delete backedges from below to here, add backedges from here to above
 //!     => tree edges with the same bracketlist are cycle-equivalent;
@@ -21,8 +21,9 @@
 //! 5. this would be expensive (comparing large sets of backedges) - so to optimize,
 //!     - the backedge most recently added (at the top) of the bracketlist, plus the size of the bracketlist,
 //!       is sufficient to identify the set *when the UDFS tree is linear*;
-//!     - when UDFS is treelike, any ancestor with backedges from >1 subtree cannot be cycle-equivalent with any descendant,
-//!       so add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
+//!     - when UDFS is treelike, any ancestor with brackets from >1 subtree cannot be cycle-equivalent with any descendant
+//!       (as the brackets of said descendant come from beneath it to its ancestors, not from any sibling/etc. in the other subtree).
+//!       So, add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
 //!       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
 
 use portgraph::portgraph::NodePorts;
@@ -38,8 +39,8 @@ use crate::Hugr;
 // (in a BB with one predecessor and one successor, which may then be merged
 //     and contents parallelized with predecessor or successor).
 
-/// A view of a CFG. `T` is the type of basic block; one interpretation of `T` would be a BasicBlock (e.g.
-/// `NodeIndex`) in the Hugr, but this also extra level of indirection allows "splitting" of one HUGR BB
+/// A view of a CFG. `T` is the type of basic block; one interpretation of `T` would be a BasicBlock
+/// (e.g. `NodeIndex`) in the Hugr, but this extra level of indirection allows "splitting" one HUGR BB
 /// into many (or vice versa). Since SESE regions are bounded by edges between pairs of such `T`, such
 /// splitting may allow the algorithm to identify more regions than existed in the underlying CFG
 /// (without mutating the underlying CFG perhaps in vain).
@@ -269,9 +270,9 @@ enum Bracket<T> {
     Capping(usize, T),
 }
 
-// Manages a list of brackets. The goal here is to allow constant-time deletion
-// out of the middle of the list - which isn't really possible, so instead we
-// track deleted items (in an external set) and the remaining number (here).
+/// Manages a list of brackets. The goal here is to allow constant-time deletion
+/// out of the middle of the list - which isn't really possible, so instead we
+/// track deleted items (in an external set) and the remaining number (here).
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
     items: LinkedList<Bracket<T>>,
     size: usize, // deleted items already taken off
