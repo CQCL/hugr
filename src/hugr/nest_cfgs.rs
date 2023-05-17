@@ -5,7 +5,7 @@
 //! a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
 //! (the third condition is necessary because loop backedges do not affect (post)dominance).
 //!
-//! Algorithm here: https://dl.acm.org/doi/10.1145/773473.178258, approximately:
+//! Algorithm here: <https://dl.acm.org/doi/10.1145/773473.178258>, approximately:
 //! 1. those three conditions are equivalent to:
 //! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
 //! where cycle-equivalent means every cycle has either both a and b, or neither
@@ -269,6 +269,9 @@ enum Bracket<T> {
     Capping(usize, T),
 }
 
+// Manages a list of brackets. The goal here is to allow constant-time deletion
+// out of the middle of the list - which isn't really possible, so instead we
+// track deleted items (in an external set) and the remaining number (here).
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
     items: LinkedList<Bracket<T>>,
     size: usize, // deleted items already taken off
