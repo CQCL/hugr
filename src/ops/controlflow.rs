@@ -6,6 +6,51 @@ use crate::types::{EdgeKind, Signature, SignatureDescription, SimpleType, TypeRo
 
 use super::tag::OpTag;
 
+/// Type rows defining the inner and outer signatures of a [`ControlFlowOp::TailLoop`]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TailLoopSignature {
+    /// Types that are only input
+    pub just_inputs: TypeRow,
+    /// Types that are only output
+    pub just_outputs: TypeRow,
+    /// Types that are appended to both input and output
+    pub rest: TypeRow,
+}
+
+impl From<TailLoopSignature> for ControlFlowOp {
+    fn from(value: TailLoopSignature) -> Self {
+        ControlFlowOp::TailLoop(value)
+    }
+}
+
+// Implement conversion to standard signature
+impl From<TailLoopSignature> for Signature {
+    fn from(tail_sig: TailLoopSignature) -> Self {
+        let [inputs, outputs] = [tail_sig.just_inputs, tail_sig.just_outputs].map(|mut row| {
+            row.to_mut().extend(tail_sig.rest.iter().cloned());
+            row
+        });
+        Signature::new_df(inputs, outputs)
+    }
+}
+impl TailLoopSignature {
+    /// Build the output TypeRow of the child graph of a TailLoop node.
+    pub(crate) fn loop_output_row(&self) -> TypeRow {
+        let predicate =
+            SimpleType::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
+        let mut outputs = self.rest.clone();
+        outputs.to_mut().insert(0, predicate);
+        outputs
+    }
+
+    /// Build the output TypeRow of the child graph of a TailLoop node.
+    pub(crate) fn loop_input_row(&self) -> TypeRow {
+        let mut inputs = self.just_inputs.clone();
+        inputs.to_mut().extend_from_slice(&self.rest);
+        inputs
+    }
+}
+
 /// Dataflow operations that are (informally) related to control flow.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ControlFlowOp {
@@ -20,7 +65,7 @@ pub enum ControlFlowOp {
     },
     /// Tail-controlled loop.
     #[allow(missing_docs)]
-    TailLoop { inputs: TypeRow, outputs: TypeRow },
+    TailLoop(TailLoopSignature),
     /// A dataflow node which is defined by a child CFG.
     #[allow(missing_docs)]
     CFG { inputs: TypeRow, outputs: TypeRow },
@@ -68,9 +113,7 @@ impl ControlFlowOp {
                 sig_in.extend_from_slice(inputs);
                 Signature::new_df(sig_in, outputs.clone())
             }
-            ControlFlowOp::TailLoop { inputs, outputs } => {
-                Signature::new_df(inputs.clone(), outputs.clone())
-            }
+            ControlFlowOp::TailLoop(tail_op_sig) => tail_op_sig.clone().into(),
             ControlFlowOp::CFG { inputs, outputs } => {
                 Signature::new_df(inputs.clone(), outputs.clone())
             }

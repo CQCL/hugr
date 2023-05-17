@@ -1,10 +1,12 @@
-use crate::hugr::{validate::InterGraphEdgeError, ValidationError};
+use crate::{
+    hugr::{validate::InterGraphEdgeError, ValidationError},
+    ops::controlflow::TailLoopSignature,
+};
 
 use std::iter;
 
 use super::{
     handle::{BuildHandle, Outputs},
-    tail_loop::loop_sum_variants,
     CircuitBuilder,
 };
 
@@ -229,9 +231,6 @@ pub trait Dataflow: Container {
             vec![Wire::new(cn, c_out)],
         )?;
 
-        // Add the required incoming order wire
-        self.set_order(&self.input(), &load_n)?;
-
         Ok(load_n.out_wire(0))
     }
 
@@ -246,23 +245,28 @@ pub trait Dataflow: Container {
     /// the TailLoop node.
     fn tail_loop_builder<'a: 'b, 'b>(
         &'a mut self,
-        inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        output_types: TypeRow,
+        just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        just_out_types: TypeRow,
     ) -> Result<TailLoopBuilder<'b>, BuildError> {
-        let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
+        let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
+            just_inputs.into_iter().unzip();
+        let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
+            inputs_outputs.into_iter().unzip();
+        input_wires.extend(rest_input_wires.into_iter());
+
+        let tail_loop_signature = TailLoopSignature {
+            just_inputs: input_types.into(),
+            just_outputs: just_out_types,
+            rest: rest_types.into(),
+        };
         let (loop_node, _) = add_op_with_wires(
             self,
-            OpType::Dataflow(
-                ControlFlowOp::TailLoop {
-                    inputs: input_types.clone().into(),
-                    outputs: output_types.clone(),
-                }
-                .into(),
-            ),
+            ControlFlowOp::TailLoop(tail_loop_signature.clone()),
             input_wires,
         )?;
-        let input: TypeRow = input_types.into();
-        TailLoopBuilder::create_with_io(self.base(), loop_node, input, output_types)
+
+        TailLoopBuilder::create_with_io(self.base(), loop_node, tail_loop_signature)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
@@ -427,10 +431,14 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_continue(
         &mut self,
-        loop_signature: Signature,
+        loop_signature: TailLoopSignature,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        make_out_variant::<0, Self>(self, loop_signature, values)
+        self.make_predicate(
+            0,
+            [loop_signature.just_inputs, loop_signature.just_outputs],
+            values,
+        )
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -444,10 +452,14 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_break(
         &mut self,
-        loop_signature: Signature,
+        loop_signature: TailLoopSignature,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        make_out_variant::<1, Self>(self, loop_signature, values)
+        self.make_predicate(
+            1,
+            [loop_signature.just_inputs, loop_signature.just_outputs],
+            values,
+        )
     }
 
     /// Add a [`DataflowOp::Call`] node, calling `function`, with inputs
@@ -489,21 +501,6 @@ pub trait Dataflow: Container {
     /// added using indices in to the vector.
     fn as_circuit(&mut self, wires: Vec<Wire>) -> CircuitBuilder<Self> {
         CircuitBuilder::new(wires, self)
-    }
-}
-
-#[inline]
-fn make_out_variant<const N: usize, T: Dataflow + ?Sized>(
-    container: &mut T,
-    signature: Signature,
-    values: impl IntoIterator<Item = Wire>,
-) -> Result<Wire, BuildError> {
-    let Signature { input, output, .. } = signature;
-    let variants = loop_sum_variants(input, output);
-    {
-        let tuple = container.make_tuple(values)?;
-
-        container.make_tag(N, variants, tuple)
     }
 }
 

@@ -13,7 +13,9 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 
 use super::{
-    controlflow::CaseOp, tag::OpTag, BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType,
+    controlflow::{CaseOp, TailLoopSignature},
+    tag::OpTag,
+    BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType,
 };
 
 /// A set of property flags required for an operation.
@@ -385,14 +387,24 @@ impl ControlFlowOp {
                     }
                 }
             }
-            ControlFlowOp::TailLoop { inputs, outputs } => {
+            ControlFlowOp::TailLoop(TailLoopSignature {
+                just_inputs,
+                just_outputs,
+                rest,
+            }) => {
                 let expected_output = SimpleType::new_sum(vec![
-                    SimpleType::new_tuple(inputs.clone()),
-                    SimpleType::new_tuple(outputs.clone()),
+                    SimpleType::new_tuple(just_inputs.clone()),
+                    SimpleType::new_tuple(just_outputs.clone()),
                 ]);
-                let expected_output: TypeRow = vec![expected_output].into();
+                let mut expected_output = vec![expected_output];
+                expected_output.extend_from_slice(rest);
+                let expected_output: TypeRow = expected_output.into();
+
+                let mut expected_input = just_inputs.clone();
+                expected_input.to_mut().extend_from_slice(rest);
+
                 validate_io_nodes(
-                    inputs,
+                    &expected_input,
                     &expected_output,
                     "tail-controlled loop graph",
                     children,

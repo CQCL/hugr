@@ -1,6 +1,7 @@
+use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::types::TypeRow;
 
 use super::handle::BuildHandle;
 use super::{
@@ -19,41 +20,45 @@ impl<'b> TailLoopBuilder<'b> {
     pub(super) fn create_with_io(
         base: &'b mut HugrMut,
         loop_node: NodeIndex,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        tail_loop_sig: TailLoopSignature,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
             loop_node,
-            inputs.clone(),
-            loop_output_row(inputs, outputs),
+            tail_loop_sig.loop_input_row(),
+            tail_loop_sig.loop_output_row(),
         )?;
 
         Ok(TailLoopBuilder::new(dfg_build))
     }
-    pub fn set_outputs(&mut self, out_variant: Wire) -> Result<(), BuildError> {
-        Dataflow::set_outputs(self, [out_variant])
+    pub fn set_outputs(
+        &mut self,
+        out_variant: Wire,
+        rest: impl IntoIterator<Item = Wire>,
+    ) -> Result<(), BuildError> {
+        Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
     pub fn finish_with_outputs(
         mut self,
         out_variant: Wire,
+        rest: impl IntoIterator<Item = Wire>,
     ) -> Result<<TailLoopBuilder<'b> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
-        self.set_outputs(out_variant)?;
+        self.set_outputs(out_variant, rest)?;
         Ok(self.finish())
     }
 
-    pub fn loop_signature(&self) -> Result<Signature, BuildError> {
+    pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
         let hugr = self.hugr();
 
         if let OpType::Dataflow(DataflowOp::ControlFlow {
-            op: ControlFlowOp::TailLoop { inputs, outputs },
+            op: ControlFlowOp::TailLoop(tail_sig),
         }) = hugr.get_optype(self.container_node())
         {
-            Ok(Signature::new_df(inputs.clone(), outputs.clone()))
+            Ok(tail_sig)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
@@ -63,20 +68,9 @@ impl<'b> TailLoopBuilder<'b> {
     }
 
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
-        let Signature { input, output, .. } = self.loop_signature()?;
-
-        Ok(loop_output_row(input, output))
+        self.loop_signature()
+            .map(TailLoopSignature::loop_output_row)
     }
-}
-
-/// Build the output TypeRow of the child graph of a TailLoop node.
-pub(super) fn loop_output_row(input: TypeRow, output: TypeRow) -> TypeRow {
-    vec![SimpleType::new_sum(loop_sum_variants(input, output))].into()
-}
-
-/// Build the row of variants for the single Sum output of a TailLoop child graph.
-pub(super) fn loop_sum_variants(input: TypeRow, output: TypeRow) -> TypeRow {
-    vec![SimpleType::new_tuple(input), SimpleType::new_tuple(output)].into()
 }
 
 #[cfg(test)]
@@ -90,6 +84,7 @@ mod test {
         },
         ops::ConstValue,
         type_row,
+        types::{Signature, SimpleType},
     };
 
     use super::*;
@@ -97,20 +92,23 @@ mod test {
     fn basic_loop() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main =
-                module_builder.declare("main", Signature::new_df(type_row![], type_row![NAT]))?;
+            let main = module_builder.declare(
+                "main",
+                Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
+            )?;
             let s1 = module_builder.constant(ConstValue::Int(1))?;
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
-
+                let [i1] = fbuild.input_wires_arr();
                 let loop_id = {
-                    let mut loop_b = fbuild.tail_loop_builder(vec![], type_row![NAT])?;
-
+                    let mut loop_b =
+                        fbuild.tail_loop_builder(vec![], vec![(BIT, i1)], type_row![NAT])?;
+                    let [i1] = loop_b.input_wires_arr();
                     let const_wire = loop_b.load_const(&s1)?;
 
-                    let break_wire = loop_b.make_break(loop_b.loop_signature()?, [const_wire])?;
-
-                    loop_b.finish_with_outputs(break_wire)?
+                    let break_wire =
+                        loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
+                    loop_b.finish_with_outputs(break_wire, [i1])?
                 };
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
@@ -119,7 +117,6 @@ mod test {
         };
 
         assert_matches!(build_result, Ok(_));
-
         Ok(())
     }
 
@@ -137,8 +134,9 @@ mod test {
                 let mut fbuild = module_builder.define_function(&main)?;
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
-                    let mut loop_b = fbuild.tail_loop_builder(vec![(BIT, b1)], type_row![NAT])?;
-                    let signature = loop_b.loop_signature()?;
+                    let mut loop_b =
+                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
+                    let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.load_const(&tru_const)?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
@@ -170,7 +168,7 @@ mod test {
                         conditional_b.finish()?
                     };
 
-                    loop_b.finish_with_outputs(conditional_id.out_wire(0))?
+                    loop_b.finish_with_outputs(conditional_id.out_wire(0), [])?
                 };
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
