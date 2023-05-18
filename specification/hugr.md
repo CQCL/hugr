@@ -1,37 +1,4 @@
-<div id="page">
-
-<div id="main" class="aui-page-panel">
-
-<div id="main-header">
-
-<div id="breadcrumb-section">
-
-1.  <span>[Scratch](index.html)</span>
-2.  <span>[Scratch Home](Scratch-Home_2647556410.html)</span>
-
-</div>
-
-# <span id="title-text"> Scratch : Copy of HUGR design document, Draft 3 </span>
-
-</div>
-
-<div id="content" class="view">
-
-<div class="page-metadata">
-
-Created by <span class="author"> Alec Edgington</span> on 18 May 2023
-
-</div>
-
-<div id="main-content" class="wiki-content group">
-
-<div class="contentLayout2">
-
-<div class="columnLayout fixed-width" data-layout="fixed-width">
-
-<div class="cell normal" data-type="normal">
-
-<div class="innerCell">
+# HUGR design document, Draft 4
 
 The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*
 ![(blue star)](images/icons/emoticons/72/1fac2.png)) is a proposed new
@@ -39,142 +6,9 @@ common internal representation used across TKET2, Tierkreis, and the L3
 compiler. The HUGR project aims to give a faithful representation of
 operations, that facilitates compilation and encodes complete programs,
 with subprograms that may execute on different (quantum and classical)
-targets .
+targets.
 
-<div class="table-wrap">
-
-<table>
-<tbody>
-<tr class="odd">
-<td><p><strong>In this document:</strong></p>
-<div class="toc-macro rbtoc1684418441959">
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Motivation">Motivation</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Goals">Goals</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Non-goals">Non-goals</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Mainrequirements">Main requirements</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Functionaldescription">Functional description</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-NodeOperations">Node Operations</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Module">Module</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Functions">Functions</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ControlFlow">Control Flow</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Conditionalnodes">Conditional nodes</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-TailLoopnodes">TailLoop nodes</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ControlFlowGraphs">Control Flow Graphs</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-HierarchicalRelationshipsandConstraints">Hierarchical Relationships and Constraints</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ExceptionHandling">Exception Handling</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Panic">Panic</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ErrorType">ErrorType</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Catch">Catch</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Inter-GraphValueEdges">Inter-Graph Value Edges</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-OperationExtensibility">Operation Extensibility</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Goalsandconstraints">Goals and constraints</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Extensionimplementation">Extension implementation</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Declarativeformat">Declarative format</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Extensiblemetadata">Extensible metadata</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-TypeSystem">Type System</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-TypeConstraints">Type Constraints</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Dealingwithlinearity">Dealing with linearity</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Resources">Resources</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Typesofbuilt-ins">Types of built-ins</a></li>
-</ul>
-<a href="#CopyofHUGRdesigndocument,Draft3-ReplacementandPatternMatching">Replacement and Pattern Matching</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Replacement">Replacement</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Definitions">Definitions</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-APImethods">API methods</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Replacementmethod">Replacement method</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Replace">Replace</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Outliningmethods">Outlining methods</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-OutlineDFG">OutlineDFG</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-OutlineCFG">OutlineCFG</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Inliningmethods">Inlining methods</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InlineDFG">InlineDFG</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InlineCFG">InlineCFG</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Identityinsertionandremovalmethods">Identity insertion and removal methods</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InsertIdentity">InsertIdentity</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-RemoveIdentity">RemoveIdentity</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Orderinsertionandremovalmethods">Order insertion and removal methods</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InsertOrder">InsertOrder</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-RemoveOrder">RemoveOrder</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Insertionandremovalofconstloads">Insertion and removal of const loads</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InsertConstIgnore">InsertConstIgnore</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-RemoveConstIgnore">RemoveConstIgnore</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Insertionandremovalofconstnodes">Insertion and removal of const nodes</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-InsertConst">InsertConst</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-RemoveConst">RemoveConst</a></li>
-</ul></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Usage">Usage</a></li>
-</ul></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Normalisation">Normalisation</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Metadataupdatesonreplacement">Metadata updates on replacement</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Patternmatching">Pattern matching</a></li>
-</ul>
-<a href="#CopyofHUGRdesigndocument,Draft3-Serialization">Serialization</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Goals.1">Goals</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Non-goals.1">Non-goals</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Schema">Schema</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Architecture">Architecture</a></li>
-</ul>
-<a href="#CopyofHUGRdesigndocument,Draft3-StandardLibrary">Standard Library</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ArithmeticResource">Arithmetic Resource</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-QuantumResource">Quantum Resource</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Higher-order(Tierkreis)Resource">Higher-order (Tierkreis) Resource</a></li>
-</ul>
-<a href="#CopyofHUGRdesigndocument,Draft3-Glossary">Glossary</a>
-<a href="#CopyofHUGRdesigndocument,Draft3-Appendix:RationaleforControlFlow">Appendix: Rationale for Control Flow</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-JustificationoftheneedforCFG-nodes">Justification of the need for CFG-nodes</a></li>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-Alternativerepresentationsconsideredbutrejected">Alternative representations considered but rejected</a>
-<ul>
-<li><a href="#CopyofHUGRdesigndocument,Draft3-ComparisonwithMLIR">Comparison with MLIR</a></li>
-</ul></li>
-</ul>
-<a href="#CopyofHUGRdesigndocument,Draft3-Unresolvedquestions">Unresolved questions</a>
-<a href="#CopyofHUGRdesigndocument,Draft3-Timeline">Timeline</a>
-<a href="#CopyofHUGRdesigndocument,Draft3-Relateddocuments">Related documents</a>
-</div></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-
------
-
-# Motivation
+## Motivation
 
 Multiple compilers and tools in the Quantinuum stack use some graph-like
 program representation; be it the quantum circuits encoded as DAGs in
@@ -277,9 +111,7 @@ represent (typed) data or control dependencies.
         later (for parameterized circuits)) should be embeddable into
         the HUGR.
 
------
-
-# Functional description
+## Functional description
 
 A HUGR is a directed graph with nodes and edges. The nodes represent
 processes that produce values - either statically, i.e. at compile time,
@@ -293,10 +125,6 @@ Resources](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+desi
 The edges encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 EdgeKind ::= Hierarchy | Value(Locality,
 [SimpleType](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Type-System))
 | Order |
@@ -304,10 +132,6 @@ ConstE([ClassicType](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458
 | ControlFlow
 
 Locality ::= Local | Ext | Dominator
-
-</div>
-
-</div>
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct
 parent of *b*. Only certain nodes, known as *container* nodes, may act
@@ -318,17 +142,9 @@ HUGR, with the unique
 [Module](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Module)
 node as root.
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 A **sibling graph** is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
 them.
-
-</div>
-
-</div>
 
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
@@ -343,17 +159,9 @@ relevant ports must have the same type”? Does the incoming port repeat
 the resource requirement of the outgoing port? Or are resources a
 property of the node?
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 **Inport**: an incoming port
 
 **Outport**: an outgoing port
-
-</div>
-
-</div>
 
 Value edges are parameterized by the locality and type; there are three
 possible localities:
@@ -370,20 +178,11 @@ possible localities:
 
 Note that the locality is not fixed or even specified by the signature.
 
-<div id="expander-943532080" class="expand-container">
+Simple HUGR example
 
-<div id="expander-control-943532080" class="expand-control">
-
-<span class="expand-control-icon">![](images/icons/grey_arrow_down.png)</span><span class="expand-control-text">Simple
-HUGR example</span>
-
-</div>
-
-<div id="expander-content-943532080" class="expand-content">
-
-<span class="confluence-embedded-file-wrapper image-center-wrapper confluence-embedded-manual-size">![Quantum
+![Quantum
 circuit with a Hadamard and CNOT
-operation](attachments/2647818241/2647818473.svg?width=442)</span>
+operation](attachments/2647818241/2647818473.svg?width=442)
 
 In the example above, a 2-qubit circuit is described as a dataflow
 region of a HUGR with one `H` operation and one `CNOT` operation. The
@@ -396,10 +195,6 @@ as *control* and the second as *target*.
 
 In this case, output 0 of the H operation is connected to input 0 of the
 CNOT. All other ports are disconnected.
-
-</div>
-
-</div>
 
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
@@ -422,13 +217,13 @@ Finally, **ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
 always *local*, i.e. source and target have the same parent.
 
-## Node Operations
+### Node Operations
 
 Here we describe we define some core operations required to represent
 full programs, including dataflow operations (in
 <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Functions>).
 
-### Module
+#### Module
 
 At the top level of the of the hierarchy is a single `module` node, the
 weight attached to this node contains module level data. There may also
@@ -467,10 +262,6 @@ compiler and target. Note that the operations defined can also be
 defined in graphs lower in the hierarchy - this limits the scope within
 which they can be used.
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 A **loadable HUGR** is one where all edges are connected and there are
 no `declare/alias_declare` nodes.
 
@@ -489,11 +280,7 @@ In
 we describe a “partial HUGR” - this is *not* a HUGR, though it is
 related.
 
-</div>
-
-</div>
-
-### Functions
+#### Functions
 
 Within functions the following basic dataflow operations are available,
 with signatures describing their value ports (note that some operations
@@ -536,16 +323,16 @@ additional outputs to a classical copy node):
     operation is the signature of the child graph. These nodes are
     parents in the hierarchy.
 
-<span class="confluence-embedded-file-wrapper">[![](attachments/thumbnails/2647818241/2647818467)](attachments/2647818241/2647818467.pdf)</span>
+![](attachments/2647818241/2647818467.png)
 
-### Control Flow
+#### Control Flow
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
 respecting the dataflow edges. The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
 
-#### `Conditional` nodes
+##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
 The first input to the Conditional-node is of Predicate type, whose
@@ -557,23 +344,15 @@ outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#TN))` (see [type
 system](#Type-System)), where `#Ti` is the *i*th Row defining it.
 
-</div>
-
-</div>
-
 **TODO: update below diagram now that Conditional is “match”**
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818344.png)</span>
+![](attachments/2647818241/2647818344.png)
 
-#### `TailLoop` nodes
+##### `TailLoop` nodes
 
 These provide tail-controlled loops: the data sibling graph within the
 TailLoop-node computes a value of 2-ary `Predicate(#I, #O)`; the first
@@ -582,12 +361,6 @@ and “fed” in at at the top; the second variant means to exit the loop
 with those values unpacked. The graph may additionally take in a row
 `#X` (appended to `#I`) and return the same row (appended to `#O`). The
 contained graph may thus be evaluated more than once.
-
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
 
 **Alternate TailLoop**
 
@@ -609,11 +382,7 @@ are:
 3.  Else execute `C` with inputs `F` and then restart loop with inputs
     `I`
 
-</div>
-
-</div>
-
-#### Control Flow Graphs
+##### Control Flow Graphs
 
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
 arbitrarily-complex (even irreducible) control flow via an explicit CFG,
@@ -650,9 +419,9 @@ Some normalizations are possible:
 
 **Example CFG (TODO update w/ Sum types)**
 
-<span class="confluence-embedded-file-wrapper">[![](attachments/thumbnails/2647818241/2647818461)](attachments/2647818241/2647818461.pdf)</span>
+![](attachments/2647818241/2647818461.png)
 
-### Hierarchical Relationships and Constraints
+#### Hierarchical Relationships and Constraints
 
 To clarify the possible hierarchical relationships, using the operation
 definitions above and also defining “*O”* to be all non-nested dataflow
@@ -660,27 +429,7 @@ operations, we can define the relationships in the following table.
 **D** and **C** are useful (and intersecting) groupings of operations:
 dataflow nodes and the nodes which contain them.
 
-<div class="table-wrap">
-
 **Hierarchy**
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
 
 **Edge kind**
 
@@ -759,10 +508,6 @@ First is main `def` for executable HUGR.
 These relationships allow to define two common varieties of sibling
 graph:
 
-<div class="panel" style="background-color: #FFFAE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFFAE6;">
-
 **Control Flow Sibling Graph (CSG)**: where all nodes are
 `BasicBlock`-nodes, and all edges are control-flow edges, which may have
 cycles. The common parent is a CFG-node.
@@ -772,24 +517,10 @@ cycles. The common parent is a CFG-node.
 must be acyclic. The common parent may be a `def`, `TailLoop`, `DFG`,
 `Case` or `BasicBlock` node.
 
-</div>
-
-</div>
-
-<div class="panel" style="background-color: #FFEBE6;border-width: 1px;">
-
-<div class="panelContent" style="background-color: #FFEBE6;">
-
 In a dataflow sibling graph, the edges (value and order considered
 together) must be acyclic. There is a unique Input node and Output node.
 All nodes must be reachable from the Input node, and must reach the
 Output node.
-
-</div>
-
-</div>
-
-<div class="table-wrap">
 
 | **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -798,11 +529,9 @@ Output node.
 | Value          | For local edges, source + target have same parent, but there are <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3?replyToComment=2632155170#Inter-Graph-Edges> |
 | ConstE         | Parent of source is ancestor of target                                                                                                                                                                  |
 
-</div>
+### Exception Handling
 
-## Exception Handling
-
-### Panic
+#### Panic
 
   - Any operation may panic, e.g. integer divide when denominator is
     zero
@@ -817,13 +546,13 @@ Output node.
     dependences on the other (including Order edges), it is at the
     discretion of the compiler as to which one panics first
 
-### `ErrorType`
+#### `ErrorType`
 
   - There is some type of errors, perhaps just a string, or
     `Tuple(Int,String)` with some errorcode, that is returned along with
     the fact that the graph/program panicked.
 
-### Catch
+#### Catch
 
   - At some point we expect to add a first-order `catch` node, somewhat
     like a DFG-node. This contains a DSG, and (like a DFG node) has
@@ -838,26 +567,16 @@ Output node.
     resource, taking a graph argument; and `run_circuit` will return the
     same way.
 
-### **Inter-Graph Value Edges**
+#### **Inter-Graph Value Edges**
 
 **For classical values only** we allow value edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is either Ext or Dom, as
 follows:
 
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
-
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
 execute \>=0 times.
-
-</div>
-
-</div>
 
 1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
     parent<sup>i</sup>(n<sub>2</sub>) for some i\>1 *and* there must be
@@ -878,7 +597,7 @@ execute \>=0 times.
     i\>1 allows the node to target an arbitrarily-deep descendant of the
     dominated block, similar to an Ext edge.)
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818338.png)</span>
+![](attachments/2647818241/2647818338.png)
 
 This mechanism allows for some values to be passed into a block
 bypassing the input/output nodes, and we expect this form to make
@@ -916,11 +635,11 @@ is found within a CFG (where block *a* dominates *b*, *b* postdominates
 be normalized by moving the region bracketted by *a…b* into its own
 CFG-node.
 
-<span class="confluence-embedded-file-wrapper">[![](attachments/thumbnails/2647818241/2647818458)](attachments/2647818241/2647818458.pdf)</span>
+![](attachments/2647818241/2647818458.png)
 
-## Operation Extensibility
+### Operation Extensibility
 
-### Goals and constraints
+#### Goals and constraints
 
 The goal here is to allow the use of operations and types in the
 representation that are user defined, or defined and used by extension
@@ -978,7 +697,7 @@ Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
 at runtime. In many cases this is desirable.
 
-### Extension implementation
+#### Extension implementation
 
 To strike a balance then, we implement three kinds of operation/type
 definition in tooling that processes the HUGR
@@ -1029,7 +748,7 @@ Python front end). Or like MLIR, we can in future write code generation
 tooling to generate specific `CustomOp` implementations from `Opdef`
 definitions.
 
-### Declarative format
+#### Declarative format
 
 The declarative format needs to specify some required data that is
 needed by the compiler to correctly treat the operation (the minimum
@@ -1041,11 +760,7 @@ illustrative example:
 
 See [Type System](#Type-System) for more on Resources.
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```yaml
 # may need some top level data, e.g. namespace?
 
 # Import other header files to use their custom types
@@ -1097,10 +812,6 @@ resources:
     outputs: [[null, Q], [null, Q]]
 ```
 
-</div>
-
-</div>
-
 Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
 Serialization section). It is also trivial to serialize these
@@ -1116,7 +827,7 @@ to perform commutation). The optional `args` field can be used to
 specify the types of parameters to the operation - for example the
 matrix needed to define an SU2 operation.
 
-## Extensible metadata
+### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
 is preserved during graph modifications, and copied when rewriting.
@@ -1165,22 +876,12 @@ TODO Do we want to reserve any top-level metadata keys, e.g. `Name`,
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
 
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
-
 **TODO** Do we allow per-port metadata (using the same mechanism?)
 
 **TODO** What about references to ports? Should we add a list of port
 indices after the list of node indices?
 
-</div>
-
-</div>
-
-# Type System
+## Type System
 
 The type system will resemble the tierkreis type system, but with some
 extensions. Namely, the things the tierkreis type system is missing are:
@@ -1188,12 +889,6 @@ extensions. Namely, the things the tierkreis type system is missing are:
   - User-defined types
 
   - Resource management - knowing what plugins a given graph depends on
-
-<div class="columnLayout two-equal" data-layout="two-equal">
-
-<div class="cell normal" data-type="normal">
-
-<div class="innerCell">
 
 A grammar of available types is shown on the right, which extends the
 list of types which exist in Tierkreis.
@@ -1218,19 +913,7 @@ types that have been proven to work for Tierkreis: `Graph`, `Map` and
 allows named newtypes to be used. Containers are linear if any of their
 components are linear.
 
-</div>
-
-</div>
-
-<div class="cell normal" data-type="normal">
-
-<div class="innerCell">
-
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 Type ::= [Resources]SimpleType
 -- Rows are ordered lists, not sets
 -- If a row contains linear types, they're first
@@ -1259,22 +942,6 @@ LinearType ::= Qubit
               | Container(SimpleType)
 ```
 
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="columnLayout fixed-width" data-layout="fixed-width">
-
-<div class="cell normal" data-type="normal">
-
-<div class="innerCell">
-
 Note: any array can be turned into an equivalent tuple, but arrays also
 support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
 out-of-range? Or by known-range `Sum( ()^N )`?)
@@ -1294,8 +961,8 @@ i.e. this does not affect behaviour of the HUGR. Row types are used
     extension-defined.
 
 **Resources** The type of `Graph` has been altered to add
-*<span style="color: rgb(0,102,68);">R</span>*: a resource requirement.
-The *<span style="color: rgb(0,102,68);">R</span>* here refer to a set
+*R*: a resource requirement.
+The *R* here refer to a set
 of [resources](#resources) which are required to produce a given type.
 Graphs are annotated with the resources that they need to run and, when
 run, their outputs are annotated with those resources. Keeping track of
@@ -1303,18 +970,18 @@ the resource requirements of graphs allows plugin designers and backends
 (like tierkreis) to control how/where a module is run.
 
 Concretely, if a plugin writer adds a resource
-*<span style="color: rgb(0,102,68);">X</span>*, then some function from
+*X*, then some function from
 a plugin needs to provide a mechanism to convert the
-*<span style="color: rgb(0,102,68);">X</span>* to some other resource
+*X* to some other resource
 requirement before it can interface with other plugins which don’t know
-about *<span style="color: rgb(0,102,68);">X</span>*.
+about *X*.
 
 A Tierkreis runtime could be connected to workers which provide means of
 running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
 
-#### Type Constraints
+### Type Constraints
 
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
@@ -1326,12 +993,6 @@ look for before wiring up a `copy` node. Finally there may be a
 put into a `const`-node: this implies the type is `Nonlinear` (but not
 vice versa).
 
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
-
 **TODO**: is this set of constraints (nonlinear, const-able, hashable)
 fixed? Then Map is in the core HUGR spec.
 
@@ -1341,11 +1002,7 @@ resource.
 
 (Or, can we do Map without hashable?)
 
-</div>
-
-</div>
-
-## Dealing with linearity
+### Dealing with linearity
 
 The type system will deal with linearity the same way that Tierkreis
 does. It will assume everything is linear by default (since this is
@@ -1363,7 +1020,7 @@ return the same number, with no discarding. See
 <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Quantum-Resource>
 for more.
 
-## Resources
+### Resources
 
 On top of the Tierkreis type system, will be a system of Resources. A
 resource is a collection of operations which are available to use in
@@ -1382,18 +1039,18 @@ Unification will demand that resource constraints are equal and, to make
 it so, we will have an operations called **lift** and **liftGraph**
 which can add a resource constraints to values.
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818335.png)</span>
+![](attachments/2647818241/2647818335.png)
 
 **lift** - Takes as a node weight parameter the single resource
-**<span style="color: rgb(0,102,68);">X </span>**which it adds to the
+**X **which it adds to the
 resource requirements of it’s argument.
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818332.png)</span>
+![](attachments/2647818241/2647818332.png)
 
 **liftGraph** - Like **lift**, takes a
-resource<span style="color: rgb(0,102,68);"> X</span> as a constant node
+resource X as a constant node
 weight parameter. Given a graph, it will add resource
-<span style="color: rgb(0,102,68);">X </span>to the requirements of the
+X to the requirements of the
 graph.
 
 Having these as explicit nodes on the graph allows us to search for the
@@ -1410,14 +1067,14 @@ which stands in for a row. Hence, when checking the inputs and outputs
 align, we’re introducing a *row equality constraint*, rather than the
 equality constraint of `typeof(b) ~ Bool`.
 
-## Types of built-ins
+### Types of built-ins
 
 We will provide some built in modules to provide basic functionality.
 I’m going to define them in terms of resources. We have the “builtin”
 resource which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `call`:
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818323.png)</span>
+![](attachments/2647818241/2647818323.png)
 
 **call** - This operation, like **to\_const**, uses it’s constE graph as
 a type parameter.
@@ -1433,53 +1090,29 @@ we can perform rewrites which remove the arithmetic.
 
 We would expect standard circuits to look something like
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 GraphType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
-
-</div>
-
-</div>
 
 A circuit built using our higher-order resource to manage control flow
 could then look like:
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 GraphType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
-
-</div>
-
-</div>
 
 So we’d need to perform some graph transformation pass to turn the
 graph-based control flow into a CFG node that a quantum computer could
 run, which removes the `HigherOrder` resource requirement:
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 precompute :: GraphType[](GraphType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          GraphType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
-</div>
-
-</div>
-
 Before we can run the circuit.
 
-# Replacement and Pattern Matching
+## Replacement and Pattern Matching
 
 We wish to define an API method on the HUGR that allows replacement of a
 specified subgraph with a specified replacement graph.
@@ -1496,18 +1129,8 @@ graph under n is *convex* (DFG-convex or CFG-convex respectively) if
 every node on every path in the sibling graph that starts and ends in S
 is itself in S.
 
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
-
 The meaning of “convex” is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
-
-</div>
-
-</div>
 
 A *partial hugr* is is a graph G satisfying all the constraints of a
 hugr except that:
@@ -1524,18 +1147,8 @@ hugr except that:
   - it may have empty container nodes (the set of IDs of these is
     denoted bot(G)).
 
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
-
 A “partial hugr” describes a set of nodes and well-formed edges between
 them that potentially occupies a region of a hugr.
-
-</div>
-
-</div>
 
 Given a set S of nodes in a hugr, let S\* be the set of all nodes
 descended from nodes in S, including S itself.
@@ -1777,9 +1390,9 @@ Patterns matching edges that traverse DSGs are also possible, but will
 be implemented in terms of the above replacement operations, making use
 of the child-rewiring lists.
 
-# Serialization
+## Serialization
 
-## Goals
+### Goals
 
   - Fast serialization/deserialization in Rust.
 
@@ -1791,8 +1404,7 @@ of the child-rewiring lists.
     
       - Store the program in a database
     
-      - Search the program
-        ![(question)](images/icons/emoticons/help_16.png) (Increasingly
+      - Search the program(?) (Increasingly
         unlikely with larger more complicated programs)
     
       - Validate the data
@@ -1800,7 +1412,7 @@ of the child-rewiring lists.
       - **Most important:** version the data for compiler/runtime
         compatibility
 
-## Non-goals
+### Non-goals
 
 Human-programmability: LLVM for example has exact correspondence between
 it's bitcode, in memory and human readable forms. This is quite handy
@@ -1811,7 +1423,7 @@ inspecting and modifying the in-memory structure will be enough. If not,
 in future we can add a human language and a standalone module for
 conversion to/from the binary serialised form.
 
-## Schema
+### Schema
 
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
@@ -1824,11 +1436,7 @@ have a special encoding outside `edges`, as an optional parent field
 payloads corresponding to arbitrary `Operations`. Metadata could also be
 included as a similar map.
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 struct HUGR {
   nodes: [Node]
   edges: [Edge]
@@ -1841,10 +1449,6 @@ Node = (Optional<Int>, Int, Int)
 Edge = ((Node, Int), (Node, Int))
 ```
 
-</div>
-
-</div>
-
 Node and edge indices, used as keys in the weight maps and within the
 definitions of nodes and indices, directly correspond to indices of the
 node/edge lists. An edge is defined by the source and target nodes, and
@@ -1854,7 +1458,7 @@ valid node - whereas in tooling implementations it may be necessary to
 implement stable indexing where removing a node invalidates that index
 while keeping all other indices pointing to the same node.
 
-## Architecture
+### Architecture
 
 The HUGR is implemented as a Rust crate named `quantinuum-hugr`. This
 crate is intended to be a common dependency for all projects, and is to
@@ -1865,16 +1469,14 @@ crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
 implementation of this design document is available on GitHub.
 
-<https://github.com/CQCL/hugr>
+<https://github.com/CQCL-DEV/hugr>
 
------
-
-# Standard Library
+## Standard Library
 
 `panic`: panics unconditionally; no inputs, any type of outputs (these
 are never produced)
 
-## Arithmetic Resource
+### Arithmetic Resource
 
 The Arithmetic Resource provides types and operations for integer and
 floating-point operations.
@@ -1913,18 +1515,12 @@ specification.
 
 Const nodes:
 
-<div class="table-wrap">
-
 | Name                   | Inputs | Outputs  | Meaning                                                               |
 | ---------------------- | ------ | -------- | --------------------------------------------------------------------- |
 | `iconst_u<N, x>`( \* ) | none   | `int<N>` | const node producing unsigned value x (where 0 \<= x \< 2^N)          |
 | `iconst_s<N, x>`( \* ) | none   | `int<N>` | const node producing signed value x (where -2^(N-1) \<= x \< 2^(N-1)) |
 
-</div>
-
 Casts:
-
-<div class="table-wrap">
 
 | Name                   | Inputs   | Outputs                  | Meaning                                                                                      |
 | ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
@@ -1935,11 +1531,7 @@ Casts:
 | `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
 | `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
 
-</div>
-
 Comparisons:
-
-<div class="table-wrap">
 
 | Name       | Inputs             | Outputs | Meaning                                      |
 | ---------- | ------------------ | ------- | -------------------------------------------- |
@@ -1954,11 +1546,7 @@ Comparisons:
 | `ige_u<N>` | `int<N>`, `int<N>` | `bool`  | "greater than or equal" as unsigned integers |
 | `ige_s<N>` | `int<N>`, `int<N>` | `bool`  | "greater than or equal" as signed integers   |
 
-</div>
-
 Other operations:
-
-<div class="table-wrap">
 
 | Name                   | Inputs             | Outputs                            | Meaning                                                                                                                                                  |
 | ---------------------- | ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1986,8 +1574,6 @@ Other operations:
 | `irotl<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                              |
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
 
-</div>
-
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
 
@@ -1995,8 +1581,6 @@ Floating-point operations are defined as follows. All operations below
 follow
 [WebAssembly](https://webassembly.github.io/spec/core/exec/numerics.html#floating-point-operations)
 except where stated.
-
-<div class="table-wrap">
 
 | Name              | Inputs               | Outputs   | Meaning                                                                  |
 | ----------------- | -------------------- | --------- | ------------------------------------------------------------------------ |
@@ -2018,11 +1602,7 @@ except where stated.
 | `ffloor`          | `float64`            | `float64` | floor                                                                    |
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
 
-</div>
-
 Conversions between integers and floats:
-
-<div class="table-wrap">
 
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
@@ -2031,27 +1611,17 @@ Conversions between integers and floats:
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
-</div>
-
-## Quantum Resource
+### Quantum Resource
 
 This is the resource that is designed to be natively understood by
 TKET2. Besides a range of quantum operations (like Hadamard, CX, etc.)
 that take and return `Qubit`, we note the following operations for
 allocating/deallocating `Qubit`s:
 
-<div class="code panel pdl" style="border-width: 1px;">
-
-<div class="codeContent panelContent pdl">
-
-``` syntaxhighlighter-pre
+```
 qalloc: () -> Qubit
 qfree: Qubit -> ()
 ```
-
-</div>
-
-</div>
 
 `qalloc` allocates a fresh, 0 state Qubit - if none is available at
 runtime it panics. `qfree` loses a handle to a Qubit (may be reallocated
@@ -2061,12 +1631,6 @@ target/compiler specific.
 Note there are also `measurez: Qubit -> (i1, Qubit)` and on supported
 targets `reset: Qubit -> Qubit` operations to measure or reset a qubit
 without losing a handle to it.
-
-<div class="confluence-information-macro confluence-information-macro-information">
-
-<span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span>
-
-<div class="confluence-information-macro-body">
 
 **Dynamic vs static allocation**
 
@@ -2081,11 +1645,7 @@ input and has one output of the same type (the same statically known
 size). If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
 
-</div>
-
-</div>
-
-## Higher-order (Tierkreis) Resource
+### Higher-order (Tierkreis) Resource
 
 In **some** contexts, notably the Tierkreis runtime, higher-order
 operations allow graphs to be valid dataflow values, and be executed.
@@ -2103,23 +1663,23 @@ These operations allow this.
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818326.png)</span>
+![](attachments/2647818241/2647818326.png)
 
 **loop** - In order to run the *body* graph, we need the resources
-<span style="color: rgb(0,102,68);">R</span> that the graph requires, so
+R that the graph requires, so
 calling the **loop** function requires those same resources. Since the
 result of the body is fed into the input of the graph, it needs to have
 the same resource requirements on its inputs and outputs. We require
 that *v* is lifted to have resource requirement
-<span style="color: rgb(0,102,68);">R</span> so that it matches the type
+R so that it matches the type
 of input to the next iterations of the loop.
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818329.png)</span>
+![](attachments/2647818241/2647818329.png)
 
 **call\_indirect** - This has the same feature as **loop**: running a
 graph requires it’s resources.
 
-<span class="confluence-embedded-file-wrapper image-center-wrapper">![](attachments/2647818241/2647818368.png)</span>
+![](attachments/2647818241/2647818368.png)
 
 **to\_const** - For operations which instantiate a graph (**to\_const**
 and **call**) the functions are given an extra parameter at graph
@@ -2128,9 +1688,7 @@ meant to instantiate. This type will be given by a typeless edge from
 the graph in question to the operation, with the graph’s type added as
 an edge weight.
 
------
-
-# Glossary
+## Glossary
 
   - **BasicBlock node**: A child of a CFG node (i.e. a basic block
     within a control-flow graph).
@@ -2262,9 +1820,9 @@ an edge weight.
   - **value edge:** An edge between data-dependency nodes. Has a fixed
     edge type.
 
-# Appendix: Rationale for Control Flow
+## Appendix: Rationale for Control Flow
 
-## **Justification of the need for CFG-nodes**
+### **Justification of the need for CFG-nodes**
 
   - Conditional + TailLoop are not able to express arbitrary control
     flow without introduction of extra variables (dynamic overhead, i.e.
@@ -2298,7 +1856,7 @@ an edge weight.
 `CFG` because we believe they are much easier to work with conceptually
 e.g. for authors of "rewrite rules" and other optimisations.
 
-## **Alternative representations considered but rejected**
+### **Alternative representations considered but rejected**
 
   - A [Google paper](https://dl.acm.org/doi/pdf/10.1145/2693261) allows
     for the introduction of extra variables into the DSG that can be
@@ -2334,7 +1892,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     inter-graph edges for called functions. TODO are those objections
     sufficient to rule this out?
 
-### Comparison with MLIR
+#### Comparison with MLIR
 
 There are a lot of broad similarities here, with MLIR’s regions
 providing hierarchy, and “graph” regions being like DSGs. Significant
@@ -2360,21 +1918,7 @@ differences include:
     sure any referenced values are kept ‘live’ for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
 
------
-
-# Unresolved questions
-
------
-
-# Timeline
-
-2023-03-23: 1st draft
-
-2023-03-27: forked 2nd draft
-
------
-
-# Related documents
+## Related documents
 
   - [The Graph Graph Unification
     proposal](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2506260512/The+Grand+Graph+Unification)
@@ -2387,152 +1931,3 @@ differences include:
 
   - [Portgraph design
     discussion](https://cqc.atlassian.net/wiki/spaces/~63abc5c4fa5fbde2ba44a214/pages/2590769170/Graph+Unification+Project)
-
-</div>
-
-</div>
-
-</div>
-
-<div class="pageSection group">
-
-<div class="pageSectionHeader">
-
-## Attachments:
-
-</div>
-
-<div class="greybox" data-align="left">
-
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-23
-15.44.06.png](attachments/2647818241/2647818323.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-23
-15.43.27.png](attachments/2647818241/2647818326.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-23
-15.43.51.png](attachments/2647818241/2647818329.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-23
-15.45.11.png](attachments/2647818241/2647818332.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-23
-15.45.21.png](attachments/2647818241/2647818335.png) (image/png)  
-![](images/icons/bullet_blue.gif)
-[hugr\_intergraphedges.png](attachments/2647818241/2647818338.png)
-(image/png)  
-![](images/icons/bullet_blue.gif)
-[hugr\_intergraphedges.pdf](attachments/2647818241/2647818341.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[hugr\_gamma.png](attachments/2647818241/2647818344.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-22
-9.46.35.png](attachments/2647818241/2647818347.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-17.13.40.png](attachments/2647818241/2647818350.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-17.10.18.png](attachments/2647818241/2647818353.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-17.07.42.png](attachments/2647818241/2647818356.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-16.33.08.png](attachments/2647818241/2647818359.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-10.13.48.png](attachments/2647818241/2647818362.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-10.03.40.png](attachments/2647818241/2647818365.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-10.03.17.png](attachments/2647818241/2647818368.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-21
-9.57.37.png](attachments/2647818241/2647818371.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-15.06.21.png](attachments/2647818241/2647818374.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-14.57.55.png](attachments/2647818241/2647818377.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-14.58.05.png](attachments/2647818241/2647818380.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-14.58.13.png](attachments/2647818241/2647818383.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-15.02.06.png](attachments/2647818241/2647818386.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-14.58.35.png](attachments/2647818241/2647818389.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-14.59.13.png](attachments/2647818241/2647818392.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-17
-12.21.49.png](attachments/2647818241/2647818395.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-14.28.24.png](attachments/2647818241/2647818398.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-14.22.25.png](attachments/2647818241/2647818401.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-14.10.28.png](attachments/2647818241/2647818404.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-10.58.12.png](attachments/2647818241/2647818407.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.56.02.png](attachments/2647818241/2647818410.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.56.11.png](attachments/2647818241/2647818413.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.56.23.png](attachments/2647818241/2647818416.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.56.32.png](attachments/2647818241/2647818419.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.56.41.png](attachments/2647818241/2647818422.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.54.40.png](attachments/2647818241/2647818425.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.54.31.png](attachments/2647818241/2647818428.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.54.23.png](attachments/2647818241/2647818431.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.54.08.png](attachments/2647818241/2647818434.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-13.53.52.png](attachments/2647818241/2647818437.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-11.22.58.png](attachments/2647818241/2647818440.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-11.22.45.png](attachments/2647818241/2647818443.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-11.22.33.png](attachments/2647818241/2647818446.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-11.19.50.png](attachments/2647818241/2647818449.png) (image/png)  
-![](images/icons/bullet_blue.gif) [スクリーンショット 2023-03-16
-11.14.42.png](attachments/2647818241/2647818452.png) (image/png)  
-![](images/icons/bullet_blue.gif)
-[cfg\_branch\_labels.pdf](attachments/2647818241/2647818455.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[hugr\_cfg2.pdf](attachments/2647818241/2647818458.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[hugr\_cfg.pdf](attachments/2647818241/2647818461.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[hugr\_gamma.pdf](attachments/2647818241/2647818464.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[hugr\_basic.pdf](attachments/2647818241/2647818467.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif)
-[graph\_ir.pdf](attachments/2647818241/2647818470.pdf)
-(application/pdf)  
-![](images/icons/bullet_blue.gif) [Untitled - Base
-circuit.svg](attachments/2647818241/2647818473.svg) (image/svg+xml)  
-![](images/icons/bullet_blue.gif) [Untitled - Base
-circuit.pdf](attachments/2647818241/2647818476.pdf) (application/pdf)  
-
-</div>
-
-</div>
-
-<div id="footer" role="contentinfo">
-
-<div class="section footer-body">
-
-Document generated by Confluence on 18 May 2023 14:00
-
-<div id="footer-logo">
-
-[Atlassian](http://www.atlassian.com/)
-
-</div>
-
-</div>
-
-</div>
