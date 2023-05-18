@@ -38,9 +38,9 @@ impl TailLoopSignature {
     pub(crate) fn body_output_row(&self) -> TypeRow {
         let predicate =
             SimpleType::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
-        let mut outputs = self.rest.clone();
-        outputs.to_mut().insert(0, predicate);
-        outputs
+        let mut outputs = vec![predicate];
+        outputs.extend_from_slice(&self.rest);
+        outputs.into()
     }
 
     /// Build the input TypeRow of the child graph of a TailLoop node.

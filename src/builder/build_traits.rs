@@ -287,11 +287,11 @@ pub trait Dataflow: Container {
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
     ) -> Result<ConditionalBuilder<'b>, BuildError> {
-        let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
+        let mut input_wires = vec![predicate_wire];
+        let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
-        input_wires.insert(0, predicate_wire);
-
+        input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
 
