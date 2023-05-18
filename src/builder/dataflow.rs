@@ -86,7 +86,10 @@ impl<'f> Dataflow for DFGBuilder<'f> {
 pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
-pub type FunctionBuilder<'b> = DFGWrapper<'b, BuildHandle<FuncID>>;
+///
+/// The `DEF` const generic is used to indicate whether the function is
+/// defined or just declared.
+pub type FunctionBuilder<'b, const DEF: bool> = DFGWrapper<'b, BuildHandle<FuncID<DEF>>>;
 
 impl<'b, T> DFGWrapper<'b, T> {
     pub(super) fn new(db: DFGBuilder<'b>) -> Self {
@@ -179,7 +182,7 @@ mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(FunctionBuilder) -> Result<BuildHandle<FuncID>, BuildError>,
+        F: FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();

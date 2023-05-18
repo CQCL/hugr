@@ -465,9 +465,9 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error adding the Call
     /// node, or if `function` does not refer to a [`ModuleOp::Declare`] or
     /// [`ModuleOp::Def`] node.
-    fn call(
+    fn call<const DEFINED: bool>(
         &mut self,
-        function: &FuncID,
+        function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();

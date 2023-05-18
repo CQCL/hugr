@@ -92,7 +92,7 @@ mod test {
 
     pub(super) fn build_main(
         signature: Signature,
-        f: impl FnOnce(FunctionBuilder) -> Result<BuildHandle<FuncID>, BuildError>,
+        f: impl FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let f_builder = module_builder.declare_and_def("main", signature)?;
