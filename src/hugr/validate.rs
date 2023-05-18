@@ -745,8 +745,8 @@ mod test {
         parent: NodeIndex,
         predicate_size: usize,
     ) -> (NodeIndex, NodeIndex, NodeIndex, NodeIndex) {
-        let const_op = ModuleOp::Const(ConstValue::predicate(0, predicate_size));
-        let tag_type = SimpleType::new_predicate(predicate_size);
+        let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
+        let tag_type = SimpleType::new_simple_predicate(predicate_size);
 
         let input = b
             .add_op_with_parent(
@@ -1014,8 +1014,8 @@ mod test {
                 cfg,
                 BasicBlockOp::Block {
                     inputs: type_row![B],
-                    outputs: type_row![B],
-                    n_cases: 1,
+                    predicate_variants: vec![type_row![]],
+                    other_outputs: type_row![B],
                 },
             )
             .unwrap();
@@ -1054,8 +1054,8 @@ mod test {
             block,
             BasicBlockOp::Block {
                 inputs: type_row![Q],
-                outputs: type_row![Q],
-                n_cases: 1,
+                predicate_variants: vec![type_row![]],
+                other_outputs: type_row![Q],
             },
         );
         let mut block_children = b.hugr().hierarchy.children(block);
@@ -1070,7 +1070,7 @@ mod test {
         b.replace_op(
             block_output,
             DataflowOp::Output {
-                types: vec![SimpleType::new_predicate(1), Q].into(),
+                types: vec![SimpleType::new_simple_predicate(1), Q].into(),
             },
         );
         assert_matches!(

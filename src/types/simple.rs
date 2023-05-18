@@ -5,12 +5,13 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use itertools::Itertools;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
-use crate::resource::ResourceSet;
+use crate::{resource::ResourceSet, type_row};
 
 /// A type that represents concrete data.
 ///
@@ -181,12 +182,17 @@ impl SimpleType {
         ))))
     }
 
-    /// New Sum of Unit types, used as predicates in branching.
-    pub fn new_predicate(size: usize) -> Self {
-        let rowvec = vec![Self::new_unit(); size];
+    /// New Sum of Tuple types, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
         Self::Classic(ClassicType::Container(Container::Sum(Box::new(
-            rowvec.into(),
+            TypeRow::predicate_variants_row(variant_rows),
         ))))
+    }
+
+    /// New simple predicate with empty Tuple variants
+    pub fn new_simple_predicate(size: usize) -> Self {
+        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
     }
 }
 
@@ -310,6 +316,17 @@ impl TypeRow {
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
     pub fn get_mut(&mut self, offset: usize) -> Option<&mut SimpleType> {
         self.types.to_mut().get_mut(offset)
+    }
+
+    #[inline]
+    /// Return the type row of variants required to define a Sum of Tuples type
+    /// given the rows of each tuple
+    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+        variant_rows
+            .into_iter()
+            .map(|row| SimpleType::Classic(ClassicType::Container(Container::Tuple(Box::new(row)))))
+            .collect_vec()
+            .into()
     }
 }
 

@@ -3,6 +3,7 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
+    type_row,
     types::{ClassicType, Container, EdgeKind, Signature, SimpleType, TypeRow},
 };
 
@@ -202,24 +203,37 @@ impl ConstValue {
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).
-    pub fn trueval() -> Self {
-        Self::predicate(1, 2)
+    pub fn true_val() -> Self {
+        Self::simple_predicate(1, 2)
     }
 
-    /// Constant "true" value, i.e. the first variant of Sum((), ()).
-    pub fn falseval() -> Self {
-        Self::predicate(0, 2)
+    /// Constant "false" value, i.e. the first variant of Sum((), ()).
+    pub fn false_val() -> Self {
+        Self::simple_predicate(0, 2)
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn predicate(tag: usize, size: usize) -> Self {
-        let unit: SimpleType = SimpleType::new_unit();
-        let vars = vec![unit; size];
+    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+        Self::predicate(tag, std::iter::repeat(type_row![]).take(size))
+    }
+
+    /// Constant Sum over Tuples, used as predicates.
+    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
         ConstValue::Sum {
             tag,
-            variants: vars.into(),
+            variants: TypeRow::predicate_variants_row(variant_rows),
             val: Box::new(Self::unit()),
         }
+    }
+
+    /// Constant Sum over Tuples with just one variant
+    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
+        Self::predicate(0, [row.into()])
+    }
+
+    /// Constant Sum over Tuples with just one variant of unit type
+    pub fn simple_unary_predicate() -> Self {
+        Self::simple_predicate(0, 1)
     }
 }
 
