@@ -23,7 +23,6 @@ jobs:
         issuetype: Bug
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"Labels": ["hugr"]}'
     - name: Create Task
       uses: atlassian/gajira-create@v3.0.1
       if: "! contains(github.event.issue.labels.*.name, 'bug')"
@@ -32,4 +31,3 @@ jobs:
         issuetype: Task
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"Labels": ["hugr"]}'
