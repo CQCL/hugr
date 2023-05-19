@@ -17,10 +17,12 @@ TKET, or the higher-order executable dataflow graphs in Tierkreis.
 The goal of the HUGR representation is to provide a unified structure
 that can be shared between the tools, allowing for more complex
 operations such as TKET optimizations across control-flow blocks, and
-nested quantum and classical programs in a single graph. For more see
+nested quantum and classical programs in a single graph. 
+<!--
+For more see
 the initial proposal: [The Grand Graph
 Unification](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2506260512/The+Grand+Graph+Unification).
-
+-->
 The HUGR should provide a generic graph representation of a program,
 where each node contains a specific kind of operation and wires
 represent (typed) data or control dependencies.
@@ -119,27 +121,23 @@ or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
 Each node is defined by its **operation**; the possible operations are
 outlined in [Node
-Operations](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Node-Operations)
+Operations](#node-operations)
 but may be [extended by
-Resources](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Operation-Extensibility).
+Resources](#operation-extensibility).
 The edges encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
-
-EdgeKind ::= Hierarchy | Value(Locality,
-[SimpleType](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Type-System))
-| Order |
-ConstE([ClassicType](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Type-System))
-| ControlFlow
+```
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | ConstE(ClassicType) | ControlFlow
 
 Locality ::= Local | Ext | Dominator
-
+```
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct
 parent of *b*. Only certain nodes, known as *container* nodes, may act
 as parents - these are listed in
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Hierarchical-node-relationships>.
+[hierarchical node relationships](#hierarchical-relationships-and-constraints).
 In a valid HUGR the hierarchy edges form a tree joining all nodes of the
 HUGR, with the unique
-[Module](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Module)
+[Module](#module)
 node as root.
 
 A **sibling graph** is a subgraph of the HUGR containing all nodes with
@@ -170,11 +168,11 @@ possible localities:
 
   - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
     parent<sup>i</sup>(dest) for i\>1; see
-    <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Inter-Graph-Edges>.
+    [inter-graph-edges](#inter-graph-value-edges).
 
   - Dom: edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
-    <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Inter-Graph-Edges>
+    [inter-graph-edges](#inter-graph-value-edges)
 
 Note that the locality is not fixed or even specified by the signature.
 
@@ -207,9 +205,9 @@ the source is a compile-time constant. (Hence, the types on these edges
 do not include a resource specification.) Only a few nodes may be
 sources (`def` and `const`) and targets (`call` and `load_const`) of
 these edges; see
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Module>
+[module](#module)
 and
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Functions>.
+[functions](#functions).
 For a ConstE edge from *a* to *b,* we require parent(*a*) ==
 parent<sup>i</sup>(*b*) for i\>=1 to satisfy valid scoping.
 
@@ -221,7 +219,7 @@ always *local*, i.e. source and target have the same parent.
 
 Here we describe we define some core operations required to represent
 full programs, including dataflow operations (in
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Functions>).
+[functions](#functions)).
 
 #### Module
 
@@ -276,7 +274,7 @@ not-a-HUGR.) For example, such may be processed by the linker to produce
 loadable HUGRs.
 
 In
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Replacement-and-Pattern-Matching>
+[replacement-and-pattern-matching](#replacement-and-pattern-matching)
 we describe a “partial HUGR” - this is *not* a HUGR, though it is
 related.
 
@@ -345,8 +343,8 @@ not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
 A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
-defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#TN))` (see [type
-system](#Type-System)), where `#Ti` is the *i*th Row defining it.
+defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
+system](#type-system)), where `#ti` is the *i*th Row defining it.
 
 **TODO: update below diagram now that Conditional is “match”**
 
@@ -355,11 +353,11 @@ system](#Type-System)), where `#Ti` is the *i*th Row defining it.
 ##### `TailLoop` nodes
 
 These provide tail-controlled loops: the data sibling graph within the
-TailLoop-node computes a value of 2-ary `Predicate(#I, #O)`; the first
+TailLoop-node computes a value of 2-ary `Predicate(#i, #o)`; the first
 variant means to repeat the loop with the values of the tuple unpacked
 and “fed” in at at the top; the second variant means to exit the loop
 with those values unpacked. The graph may additionally take in a row
-`#X` (appended to `#I`) and return the same row (appended to `#O`). The
+`#x` (appended to `#i`) and return the same row (appended to `#o`). The
 contained graph may thus be evaluated more than once.
 
 **Alternate TailLoop**
@@ -404,8 +402,8 @@ children of a CFG-node.
     the entry block.
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#T0, #T1,...#TN)`, where the node has `N` successors, and the
-remaining outputs are a row `#X`. `#Ti` with `#X` appended matches the
+`Predicate(#t0, #t1,...#tn)`, where the node has `N` successors, and the
+remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
 Some normalizations are possible:
@@ -462,7 +460,7 @@ Output node.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Source + target have same parent                                                                                                                                                                        |
-| Value          | For local edges, source + target have same parent, but there are <https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3?replyToComment=2632155170#Inter-Graph-Edges> |
+| Value          | For local edges, source + target have same parent, but there are [inter-graph edges](#inter-graph-value-edges) |
 | ConstE         | Parent of source is ancestor of target                                                                                                                                                                  |
 
 ### Exception Handling
@@ -560,7 +558,7 @@ Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
 **Example CFG (TODO update with** `Sum` **types)** the following CFG is
-equivalent to [the previous example](#). Besides the use of inter-block
+equivalent to the previous example. Besides the use of inter-block
 edges to reduce passing of P and X, I have also used the normalization
 of moving operations out of the exit-block into the surrounding graph;
 this results in the qubit being passed right through so can also be
@@ -645,7 +643,7 @@ definition in tooling that processes the HUGR
     memory form of the serialized structure). At deserialization time
     when a tool sees an operation it does not recognise, it can treat it
     as opaque (likewise any wire types it does not recognise) and store
-    the [serialized definition data](#Serialization): in this way
+    the [serialized definition data](#serialization): in this way
     subsequent tooling which does recognise the operation will receive
     it faithfully.
 
@@ -694,7 +692,7 @@ that may be used by compiler extensions. This suggests a flexible
 standard format such as YAML would be suitable. Here we provide an
 illustrative example:
 
-See [Type System](#Type-System) for more on Resources.
+See [Type System](#type-system) for more on Resources.
 
 ```yaml
 # may need some top level data, e.g. namespace?
@@ -953,7 +951,7 @@ gates behave just like other nodes on the graph with inputs and outputs,
 but adding copies to the input and output wires is disallowed. In fully
 qubit-counted contexts programs take in a number of qubits as input and
 return the same number, with no discarding. See
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2629468161/HUGR+design+document+Draft+3#Quantum-Resource>
+[quantum resource](#quantum-resource)
 for more.
 
 ### Resources
@@ -969,7 +967,7 @@ resource they pertain to as a requirement.
 
 Resources can be added and used by plugin writers. We will also have
 some built in resources, see
-<https://cqc.atlassian.net/wiki/spaces/TKET/pages/2619965458/HUGR+design+document+Draft+2#Standard-Library>
+[standard library](#standard-library)
 
 Unification will demand that resource constraints are equal and, to make
 it so, we will have an operations called **lift** and **liftGraph**
@@ -1437,12 +1435,12 @@ The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
 interpretations of a value:
 
-  - as a bit string $(a\_{N-1}, a\_{N-2}, \\ldots, a\_0)$ where $a\_i
-    \\in \\{0,1}$;
+  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where $a_i
+    \in {0,1}$;
 
-  - as an unsigned integer $\\sum\_{i\<N}i 2^i a\_i$;
+  - as an unsigned integer $\sum_{i<N}i 2^i a_i$;
 
-  - as a signed integer $\\sum\_{i\<N-1} 2^i a\_i - 2^{N-1} a\_{N-1}$.
+  - as a signed integer $\sum_{i<N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
 An asterix ( \* ) in the tables below indicates that the definition
 either differs from or is not part of the
@@ -1813,14 +1811,14 @@ e.g. for authors of "rewrite rules" and other optimisations.
     like WASM. However although this would allow removing the CFG, the
     DSG nodes get more complicated, and start to behave in very
     non-DSG-like ways.
-    
+<!--
       - In the limit, we have TailLoop node for loops, plus a node that
         contains an arbitrary *acyclic* CFG\! That was [considered
         here](#) but still requires extra variables and runs into
         similar problems with liveness as the Google paper. Also [The
         fully-expressive alternative to
         θ-nodes](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2623406136).
-
+-->
   - We could use function calls to avoid code duplication (essentially
     the return address is the extra boolean variable, likely to be very
     cheap). However, I think this means pattern-matching will want to
@@ -1853,17 +1851,3 @@ differences include:
   - I note re. closures that MLIR expects the enclosing scope to make
     sure any referenced values are kept ‘live’ for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
-
-## Related documents
-
-  - [The Graph Graph Unification
-    proposal](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2506260512/The+Grand+Graph+Unification)
-
-  - [Unified compiler architecture: 2023-03-03 Meeting
-    notes](https://cqc.atlassian.net/wiki/spaces/M/pages/2606235675/Unified+compiler+architecture+2023-03-03+Meeting+notes)
-
-  - [GuG Control flow - HM23
-    report](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2603712585/Graph+Unification+and+Control+Flow)
-
-  - [Portgraph design
-    discussion](https://cqc.atlassian.net/wiki/spaces/~63abc5c4fa5fbde2ba44a214/pages/2590769170/Graph+Unification+Project)
