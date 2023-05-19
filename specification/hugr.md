@@ -429,81 +429,17 @@ operations, we can define the relationships in the following table.
 **D** and **C** are useful (and intersecting) groupings of operations:
 dataflow nodes and the nodes which contain them.
 
-**Hierarchy**
-
-**Edge kind**
-
-**Node Operation**
-
-**Parent**
-
-**Children (\>=1)**
-
-**Child Constraints**
-
-Leaf
-
-**D:**
-
-Value (Data dependency)
-
-O, `Input/Output`
-
-**C**
-
-\-
-
-CFG container
-
-CFG
-
-`BasicBlock`/`ExitBlock`
-
-First(last) is entry(exit)
-
-Conditional
-
-`Conditional`
-
-`Case`
-
-No edges
-
-**C:**
-
-Dataflow container
-
-`TailLoop`
-
-**D**
-
-First(last) is `Input`(`Output`)
-
-`DFG`
-
-Const
-
-`def`
-
-ControlFlow
-
-`BasicBlock`
-
-CFG
-
-\-
-
-`Case`
-
-`Conditional`
-
-\-
-
-`module`
-
-\-
-
-First is main `def` for executable HUGR.
+| **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
+| ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
+| Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
+| CFG container             | "                              | CFG                | "             | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
+| Conditional               | "                              | `Conditional`      | "             | `Case`                   | No edges                                 |
+| **C:** Dataflow container | "                              | `TailLoop`         | "             |  **D**                   | First(last) is `Input`(`Output`)         |
+| "                         | "                              | `DFG`              | "             |  "                       | "                                        |
+| "                         | Const                          | `def`              | "             |  "                       | "                                        |
+| "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
+| "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
+| "                         | \-                             | `module`           | \-            |  "                       | First is main `def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
