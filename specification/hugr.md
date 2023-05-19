@@ -1,7 +1,7 @@
 # HUGR design document, Draft 4
 
-The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*
-![(blue star)](images/icons/emoticons/72/1fac2.png)) is a proposed new
+The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger* 
+🫂) is a proposed new
 common internal representation used across TKET2, Tierkreis, and the L3
 compiler. The HUGR project aims to give a faithful representation of
 operations, that facilitates compilation and encodes complete programs,
