@@ -72,7 +72,7 @@ pub trait CfgView<T> {
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
-type CfgEdge<T> = (T, T);
+type CfgEdge<T> = [T; 2];
 
 // The next enum + few functions allow to abstract over the edge directions
 // in a CfgView.
@@ -118,8 +118,8 @@ fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, 
 
 fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> CfgEdge<T> {
     match d {
-        EdgeDest::Forward(t) => (s, t),
-        EdgeDest::Backward(t) => (t, s),
+        EdgeDest::Forward(t) => [s, t],
+        EdgeDest::Backward(t) => [t, s],
     }
 }
 
@@ -250,7 +250,7 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     };
     traverse(cfg, &tree, &mut st, cfg.entry_node());
     assert!(st.capping_edges.is_empty());
-    st.edge_classes.remove(&(cfg.exit_node(), cfg.entry_node()));
+    st.edge_classes.remove(&[cfg.exit_node(), cfg.entry_node()]);
     let mut cycle_class_idxs = HashMap::new();
     st.edge_classes
         .into_iter()
@@ -443,27 +443,27 @@ mod test {
         // split is unique successor of head
         let split = *edge_classes
             .keys()
-            .filter(|(s, _)| *s == head)
-            .map(|(_, t)| t)
+            .filter(|[s, _]| *s == head)
+            .map(|[_, t]| t)
             .exactly_one()
             .unwrap();
         // merge is unique predecessor of tail
         let merge = *edge_classes
             .keys()
-            .filter(|(_, t)| *t == tail)
-            .map(|(s, _)| s)
+            .filter(|[_, t]| *t == tail)
+            .map(|[s, _]| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == split).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([(split, left), (left, merge)]), // Region containing single BB 'left'
-                sorted([(split, right), (right, merge)]), // Region containing single BB 'right'
-                sorted([(head, split), (merge, tail)]), // "Conditional" region containing split+merge choosing between left/right
-                sorted([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
-                Vec::from([(tail, head)])              // The loop back-edge
+                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
+                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
+                sorted([[head, split], [merge, tail]]), // "Conditional" region containing split+merge choosing between left/right
+                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([[tail, head]])              // The loop back-edge
             ])
         );
         Ok(())
