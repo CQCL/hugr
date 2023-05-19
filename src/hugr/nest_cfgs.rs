@@ -612,7 +612,7 @@ mod test {
         Ok(tail)
     }
 
-    // Result is header (new or provided) and tail. Caller must link header to tail, and provide 0th successor of tail.
+    // Result is header and tail. Caller must provide 0th successor of header (linking to tail), and 0th successor of tail.
     fn build_loop(
         cfg: &mut CFGBuilder,
         const_pred: &ConstID,
