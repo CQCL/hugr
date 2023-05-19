@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 use portgraph::{Direction, NodeIndex, PortOffset};
 
@@ -12,7 +13,7 @@ use crate::{
 };
 
 /// A low-level builder for a HUGR.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deref, DerefMut)]
 pub struct HugrMut {
     /// The partial HUGR being built.
     hugr: Hugr,

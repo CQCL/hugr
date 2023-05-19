@@ -1,3 +1,4 @@
+use crate::hugr::internal::HugrView;
 use crate::types::Signature;
 
 use crate::ops::handle::CaseID;
