@@ -151,4 +151,8 @@ mod test {
         );
         Ok(())
     }
+
+    // Sadly this HalfNode logic is too simple to fix the test_cond_then_loop_combined case
+    // (The "merge" node is not split, but needs to be split with the tail->merge edge incoming
+    // to the *second* node after splitting).
 }
