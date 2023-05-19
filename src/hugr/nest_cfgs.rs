@@ -135,10 +135,10 @@ impl<'a> SimpleCfgView<'a> {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
-        assert!(match h.get_optype(exit) {
-            OpType::BasicBlock(BasicBlockOp::Exit { .. }) => true,
-            _ => false,
-        });
+        assert!(matches!(
+            h.get_optype(exit),
+            OpType::BasicBlock(BasicBlockOp::Exit { .. })
+        ));
         Self { h, entry, exit }
     }
 }
