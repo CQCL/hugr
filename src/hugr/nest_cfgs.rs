@@ -427,12 +427,61 @@ mod test {
     }
 
     #[test]
+    fn test_cond_then_loop_separate() -> Result<(), BuildError> {
+        //               /-> left --\
+        // entry -> split            > merge -> head -> tail -> exit
+        //               \-> right -/             \-<--<-/
+        let mut module_builder = ModuleBuilder::new();
+        let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+
+        let mut func_builder = module_builder.define_function(&main)?;
+        let [int] = func_builder.input_wires_arr();
+
+        let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
+        let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
+        cfg_builder.branch(&entry, 0, &split)?;
+        let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
+        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
+        cfg_builder.branch(&merge, 0, &head)?;
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&tail, 0, &exit)?;
+        let cfg_id = cfg_builder.finish();
+
+        func_builder.finish_with_outputs(cfg_id.outputs())?;
+
+        let h = module_builder.finish()?;
+
+        let (entry, exit) = (entry.node(), exit.node());
+        let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
+        let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == split).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+
+        let classes = group_by(edge_classes);
+        assert_eq!(
+            classes,
+            HashSet::from([
+                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
+                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
+                Vec::from([[tail, head]]),              // Backedge in own class
+                sorted([[entry, split], [merge, head], [tail, exit]]), // Two regions, conditional and then loop
+            ])
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_cond_in_loop_separate_headers() -> Result<(), BuildError> {
         let (h, cfg_id, head, tail) = build_conditional_in_loop_cfg(true)?;
         let head = head.node();
         let tail = tail.node();
-        //                       /-> left --\
-        //  entry -> head -> split           > merge -> tail -> exit
+        //                        /-> left --\
+        //  entry -> head -> split            > merge -> tail -> exit
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
         let v = SimpleCfgView::new(&h, cfg_id);
