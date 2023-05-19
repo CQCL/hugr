@@ -428,7 +428,7 @@ mod test {
 
     #[test]
     fn test_cond_in_loop_separate_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, head, tail) = conditional_in_loop(true)?;
+        let (h, cfg_id, head, tail) = build_conditional_in_loop_cfg(true)?;
         let head = head.node();
         let tail = tail.node();
         //                       /-> left --\
@@ -469,7 +469,7 @@ mod test {
 
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, head, tail) = conditional_in_loop(false)?;
+        let (h, cfg_id, head, tail) = build_conditional_in_loop_cfg(false)?;
         let head = head.node();
         let tail = tail.node();
         //               /-> left --\
@@ -568,8 +568,8 @@ mod test {
         Ok((header, tail))
     }
 
-    // Build a CFG, returning the Hu
-    fn conditional_in_loop(
+    // Build a CFG, returning the Hugr
+    fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, CfgID, BasicBlockID, BasicBlockID), BuildError> {
         //let sum2_type = SimpleType::new_predicate(2);
