@@ -42,6 +42,7 @@ use portgraph::NodeIndex;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
 
+use crate::hugr::internal::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
 use crate::Hugr;

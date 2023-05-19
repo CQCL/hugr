@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
+use portgraph::NodeIndex;
+
+use crate::hugr::internal::HugrView;
 use crate::hugr::nest_cfgs::CfgView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
 use crate::Hugr;
-use portgraph::NodeIndex;
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).

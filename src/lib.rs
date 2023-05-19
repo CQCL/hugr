@@ -20,15 +20,6 @@ pub mod types;
 mod utils;
 
 pub use crate::hugr::Hugr;
-pub use portgraph::{NodeIndex, PortIndex};
-pub use resource::Resource;
-pub use rewrite::{Rewrite, RewriteError};
-
-#[cfg(test)]
-mod test {
-    // Example test
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use crate::resource::Resource;
+pub use crate::rewrite::{Rewrite, RewriteError};
+pub use portgraph::{Direction, NodeIndex, PortIndex};
