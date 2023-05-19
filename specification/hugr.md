@@ -608,7 +608,8 @@ compiling, and linking C++ code.
 
 We can do something similar in Rust, and we wouldn't even need to parse
 another format, sufficiently nice rust macros/proc\_macros should
-provide a human-friendly enough definition experience.
+provide a human-friendly-enough definition experience.  However, we also
+provide a declarative YAML format, below.
 
 Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
@@ -616,19 +617,46 @@ at runtime. In many cases this is desirable.
 
 #### Extension implementation
 
-To strike a balance then, we implement three kinds of operation/type
-definition in tooling that processes the HUGR
+**Typing** To strike a balance then, we implement three kinds of operation/type
+definition in tooling that processes the HUGR. Note these mechanisms only
+deal with specifying the *type* of the operation, allowing such operations
+to be passed through tools that do not understand what the operations *do*
+(that is, allowing new operations to be defined independently of any tool -
+so long as we do not need the tooling to understand them).
 
-1.  `native`: operations and types that are native to the tool, e.g. an
-    Enum of quantum gates in TKET2, or of higher order operations in
-    Tierkreis. Tools which do not share natives communicate over a
-    serialized interface (not necessarily binary, can just be the in
-    memory form of the serialized structure). At deserialization time
-    when a tool sees an operation it does not recognise, it can treat it
-    as opaque (likewise any wire types it does not recognise) and store
-    the [serialized definition data](#serialization): in this way
-    subsequent tooling which does recognise the operation will receive
-    it faithfully.
+In all cases the serialized representation is the same: the name of the definition (**"Op Factory"**??), a list of type arguments (see below), and optionally the type of the operation node that results. The three kinds of definition are:
+
+1.  `Opdef`: where the type of the operation is defined by a function
+    (aka type scheme) given in the declarative YAML format. The function
+    may take type arguments also specified in YAML. The code that turns the
+    actual type arguments provided, into the operation type, given the YAML
+    description, is referred to in this doc as the "YAML interpreter" and is
+    expected to be shared across tools and resources. (Note: here we generally do not serialize the computed type, as the YAML definition is passed along with the HUGR. However of course we *could* do so for tools that lack YAML interpreters...)
+
+2.  `CustomOp`: here the declarative YAML specifies the type arguments
+    (these may include statically-known values e.g. U64), but does not
+    specify how the operation type is computed from those. Instead the
+    resource/extension provider implements a Rust Trait providing a
+    function `compute_type` that takes the type arguments (for a particular
+    instance i.e. operation node) and returns the type. Here it is useful
+    to serialize the resulting (computed) type so the operation can be treated
+    opaquely by tools that do not have the extension's Rust code available.
+
+3.  `native`: a special case of the previous where the type argument is
+    a single `Opaque` value, provided as a serialized blob.
+
+Type arguments are given by a type language that is a distinct, simplified form of the [Type System](#type-system):
+```
+TypeArgs ::= TypeArg (,TypeArgs)?
+TypeArg ::= Type | ClassicType | F64 | U64 | I64 | Opaque(name, ...) | List(TypeArg)
+```
+<!--(`Type` and `ClassicType` here means the YAML declaration is literally "Type" or "ClassicType" but the argument will be one of those.)-->
+
+**Semantics** The *semantics* of any operation are necessarily specific to both operation *and* tool (e.g. compiler or runtime). However for each operation-definition resources (extension providers) *may* implement a different Rust Trait[^1] providing a function `try_lower` that takes the type arguments and a set of target resources and may return a subgraph/function-body-HUGR using only those target resources.
+
+[^1]: Whether a particular operation-definition provides Rust code for `try_lower` is independent of whether it provides Rust code for `compute_type`.
+
+<!-- Should we preserve some of this language about downcasting?
 
 2.  `CustomOp`: new operations defined in code that implement an
     extensible interface (Rust Trait), compiler operations/extensions
@@ -637,14 +665,6 @@ definition in tooling that processes the HUGR
     downcasting fails). For example, an SU4 unitary struct defined in
     matrix form. This is implemented in the TKET2 prototype.
 
-3.  `Opdef`: a struct where the operation type is identified by the name
-    it holds as a string. It also implements the `CustomOp` interface.
-    The struct is backed by a declarative format (e.g. YAML) for
-    defining it.
-
-Note all of these share the same representation in serialized HUGR - it
-is up to the tooling as to how to load that in to memory.
-
 We expect most compiler passes and rewrites to deal with `native`
 operations, with the other classes mostly being used at the start or end
 of the compilation flow. The `CustomOp` trait allows the option for
@@ -652,18 +672,7 @@ programs that extend the core toolchain to use strict typing for their
 new operations. While the `Opdef` allows users to specify extensions
 with a pre-compiled binary, and provide useful information for the
 compiler/runtime to use.
-
-The exact interface that should be specified by `CustomOp` is unclear,
-but should include at minimum a way to query the signature of the
-operation and a fallible interface for returning an equivalent program
-made of operations from some provided set of `Resources`.
-
-These classes of extension also allow greater flexibility in future. For
-instance, "header" files for both `native` or `CustomOp` operation sets
-can be written in the `OpDef` format for non-Rust tooling to use (e.g.
-Python front end). Or like MLIR, we can in future write code generation
-tooling to generate specific `CustomOp` implementations from `Opdef`
-definitions.
+-->
 
 #### Declarative format
 
@@ -683,50 +692,56 @@ See [Type System](#type-system) for more on Resources.
 # Import other header files to use their custom types
 imports: [Quantum]
 
-# Declare custom types
-types:
-- name: QubitVector
-  # Opaque types can take type arguments, with specified names
-  args: [size]
-
-# Declare operations which aren't associated to a resource
-operations:
-- name: measure
-  description: "measure a qubit"
-  # We're going to implement this using ops defined in the "Quantum" resource
-  resource_reqs: [Quantum] 
-  inputs: [[null, Q]]
-  # the first element of each pair is an optional parameter name
-  outputs: [[null, Q], [measured, B]]
-
-# Declare some resource interfaces which provide the rest of the operations
 resources:
 - name: MyGates
+  # Declare custom types
+  types:
+  - name: QubitVector
+    # Opaque types can take type arguments, with specified names
+    args: [["size", u64]]
   operations:
+  - name: measure
+    description: "measure a qubit"
+    inputs: [[null, Q]]  # Q is defined in Quantum resource
+    # the first element of each pair is an optional parameter name
+    outputs: [[null, Q], ["measured", B]]
   - name: ZZPhase
     description: "Apply a parametric ZZPhase gate"
-    resource_reqs: [] # The "MyGates" resource will automatically be added as a requirement
-    inputs: [[null, Q], [null, Q], [angle, Angle]]
+    inputs: [[null, Q], [null, Q], ["angle", Angle]]
     outputs: [[null, Q], [null, Q]]
     misc:
-      # extra data that may be used by some compiler passes
+      # extra data that may be used by some compiler passes and is passed to try_lower
       equivalent: [0, 1]
       basis: [Z, Z]
   - name: SU2
     description: "One qubit unitary matrix"
-    resource_reqs: []
     inputs: [[null, Q]]
     outputs: [[null, Q]]
     args:
-      - matrix: List(List(List(F64))))
-
-- name: MyResource
-  operations:
-  - name: MyCustom
-    description: "Custom op defined by a program"
-    resource_reqs: [MyGates] # Depend on operations defined in the other module
-    inputs: [[null, Q], [null, Q], [param, F64]]
-    outputs: [[null, Q], [null, Q]]
+      - matrix: Opaque(matrix3,F64) # Or do we specify sizes here? That requires dependent types?
+  - name: MatMul
+    description: "Multiply matrices of statically-known size"
+    args:
+      - i: U64
+      - j: U64
+      - k: U64
+    inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
+    outputs: [[null, Array<i>(Array<k>(F64))]]
+  - name: ArrayConcat
+    description: "Must provide Rust code to compute signature from argument values"
+    args:
+      - t: Type  # Classic or Quantum
+      - i: U64
+      - j: U64
+    # inputs could be: Array<i>(U64), Array<j>(U64)
+    # outputs would be, in principle: Array<i+j>(U64)
+    # However the YAML type-scheme interpreter does not support such addition,
+    # hence (the lack of inputs+outputs means) we must provide
+    # a Rust compute_type function instead
+  - name: EvenMoreAwkwardOp
+    description: "Inputs and outputs computed from the parameter blob"
+    args:
+      - matrix: Opaque(MyType) # Passed in as a blob?
 ```
 
 Reading this format into Rust is made easy by `serde` and
@@ -734,15 +749,19 @@ Reading this format into Rust is made easy by `serde` and
 Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
-Note the required `name`, `description`. `inputs` and `outputs` fields,
-the last two defining the signature of the operation, and optional
-parameter names as metadata. The optional `misc` field is used for
-arbitrary YAML, which is read in as-is (into the `serde_yaml Value`
+Note the only required fields are `name` and `description`.
+`inputs` and `outputs` must either be both specified or both absent;
+if absent, Rust code for `compute_type` must be instead. The optional
+`misc` field is used for arbitrary YAML, which is read in as-is (into
+the `serde_yaml Value`
 struct). The data held here can be used by compiler passes which expect
 to deal with this operation (e.g. a pass can use the `basis` information
 to perform commutation). The optional `args` field can be used to
 specify the types of parameters to the operation - for example the
-matrix needed to define an SU2 operation.
+matrix needed to define an SU2 operation. If `args` are not specified
+then it is assumed empty. (An operation with neither `args` nor
+`inputs` nor `outputs` must provide a `compute_type` which is essentially
+constant as it will receive no parameters.)
 
 ### Extensible metadata
 
