@@ -287,11 +287,11 @@ pub trait Dataflow: Container {
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
     ) -> Result<ConditionalBuilder<'b>, BuildError> {
-        let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
+        let mut input_wires = vec![predicate_wire];
+        let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
-        input_wires.insert(0, predicate_wire);
-
+        input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
 
@@ -465,9 +465,9 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error adding the Call
     /// node, or if `function` does not refer to a [`ModuleOp::Declare`] or
     /// [`ModuleOp::Def`] node.
-    fn call(
+    fn call<const DEFINED: bool>(
         &mut self,
-        function: &FuncID,
+        function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let def_op: Result<&ModuleOp, ()> = self.hugr().get_optype(function.node()).try_into();

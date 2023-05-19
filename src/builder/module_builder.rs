@@ -62,8 +62,8 @@ impl ModuleBuilder {
     /// This function will return an error if there is an error in adding the node.
     pub fn define_function<'a: 'b, 'b>(
         &'a mut self,
-        f_id: &FuncID,
-    ) -> Result<FunctionBuilder<'b>, BuildError> {
+        f_id: &FuncID<false>,
+    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.hugr().get_optype(f_node)
@@ -97,7 +97,7 @@ impl ModuleBuilder {
         &'a mut self,
         _name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<'b>, BuildError> {
+    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
         let fid = self.declare(_name, signature)?;
         self.define_function(&fid)
     }
@@ -112,7 +112,7 @@ impl ModuleBuilder {
         &mut self,
         _name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FuncID, BuildError> {
+    ) -> Result<FuncID<false>, BuildError> {
         // TODO add name and param names to metadata
         let declare_n = self.add_child_op(ModuleOp::Declare { signature })?;
 
@@ -137,7 +137,7 @@ impl ModuleBuilder {
         &mut self,
         name: impl Into<SmolStr>,
         typ: SimpleType,
-    ) -> Result<AliasID, BuildError> {
+    ) -> Result<AliasID<true>, BuildError> {
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
         let node = self.add_child_op(ModuleOp::AliasDef {
@@ -153,7 +153,7 @@ impl ModuleBuilder {
         &mut self,
         name: impl Into<SmolStr>,
         linear: bool,
-    ) -> Result<AliasID, BuildError> {
+    ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ModuleOp::AliasDeclare {
             name: name.clone(),

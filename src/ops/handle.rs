@@ -32,7 +32,7 @@ impl Wire {
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`NodeIndex`].
-pub trait NodeHandle {
+pub trait NodeHandle: Clone {
     /// The most specific operation tag associated with the handle.
     const TAG: OpTag;
 
@@ -49,6 +49,14 @@ pub trait NodeHandle {
     fn try_cast<T: NodeHandle + From<NodeIndex>>(&self) -> Option<T> {
         T::TAG.contains(Self::TAG).then(|| self.node().into())
     }
+}
+
+/// Trait for handles that contain children.
+///
+/// The allowed children handles are defined by the associated type.
+pub trait ContainerHandle: NodeHandle {
+    /// Handle type for the children of this node.
+    type ChildrenHandle: NodeHandle;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -78,18 +86,24 @@ pub struct ModuleID(NodeIndex);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [def](crate::ops::module::ModuleOp::Def)
 /// or [declare](crate::ops::module::ModuleOp::Declare) node.
-pub struct FuncID(NodeIndex);
+///
+/// The `DEF` const generic is used to indicate whether the function is
+/// defined or just declared.
+pub struct FuncID<const DEF: bool>(NodeIndex);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to a [AliasDef](crate::ops::module::ModuleOp::AliasDef)
+/// Handle to an [AliasDef](crate::ops::module::ModuleOp::AliasDef)
 /// or [AliasDeclare](crate::ops::module::ModuleOp::AliasDeclare) node.
-pub struct AliasID {
+///
+/// The `DEF` const generic is used to indicate whether the function is
+/// defined or just declared.
+pub struct AliasID<const DEF: bool> {
     node: NodeIndex,
     name: SmolStr,
     linear: bool,
 }
 
-impl AliasID {
+impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
     pub fn new(node: NodeIndex, name: SmolStr, linear: bool) -> Self {
         Self { node, name, linear }
@@ -161,14 +175,48 @@ impl_nodehandle!(OpID, OpTag::Any);
 
 impl_nodehandle!(DataflowOpID, OpTag::DataflowOp);
 impl_nodehandle!(ConditionalID, OpTag::Conditional);
+impl_nodehandle!(CaseID, OpTag::Case);
 impl_nodehandle!(DfgID, OpTag::Dfg);
 impl_nodehandle!(TailLoopID, OpTag::TailLoop);
 impl_nodehandle!(CfgID, OpTag::Cfg);
 
 impl_nodehandle!(ModuleRootID, OpTag::ModuleRoot);
 impl_nodehandle!(ModuleID, OpTag::ModuleOp);
-impl_nodehandle!(FuncID, OpTag::Function);
 impl_nodehandle!(ConstID, OpTag::Const);
 
 impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
-impl_nodehandle!(AliasID, OpTag::Alias, node);
+
+impl<const DEF: bool> NodeHandle for FuncID<DEF> {
+    const TAG: OpTag = OpTag::Function;
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.0
+    }
+}
+
+impl<const DEF: bool> NodeHandle for AliasID<DEF> {
+    const TAG: OpTag = OpTag::Alias;
+    #[inline]
+    fn node(&self) -> NodeIndex {
+        self.node
+    }
+}
+
+/// Implements the `ContainerHandle` trait, with the given child handle type.
+macro_rules! impl_containerHandle {
+    ($name:path, $children:ident) => {
+        impl ContainerHandle for $name {
+            type ChildrenHandle = $children;
+        }
+    };
+}
+
+impl_containerHandle!(DfgID, DataflowOpID);
+impl_containerHandle!(TailLoopID, DataflowOpID);
+impl_containerHandle!(ConditionalID, CaseID);
+impl_containerHandle!(CaseID, DataflowOpID);
+impl_containerHandle!(ModuleRootID, ModuleID);
+impl_containerHandle!(CfgID, BasicBlockID);
+impl_containerHandle!(BasicBlockID, DataflowOpID);
+impl_containerHandle!(FuncID<true>, DataflowOpID);
+impl_containerHandle!(AliasID<true>, DataflowOpID);

@@ -71,7 +71,7 @@ impl<T: NodeHandle> BuildHandle<T> {
     }
 }
 
-impl From<BuildHandle<DfgID>> for BuildHandle<FuncID> {
+impl From<BuildHandle<DfgID>> for BuildHandle<FuncID<true>> {
     #[inline]
     fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
