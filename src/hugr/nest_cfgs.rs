@@ -71,6 +71,9 @@ pub trait CfgView<T> {
     fn predecessors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
 }
 
+/// Directed edges in a Cfg - i.e. along which control flows from first to second only.
+type CfgEdge<T> = (T, T);
+
 // The next enum + few functions allow to abstract over the edge directions
 // in a CfgView.
 
@@ -113,7 +116,7 @@ fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, 
     }
 }
 
-fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> (T, T) {
+fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> CfgEdge<T> {
     match d {
         EdgeDest::Forward(t) => (s, t),
         EdgeDest::Backward(t) => (t, s),
@@ -229,7 +232,7 @@ struct TraversalState<T> {
     /// Value is the LCA i.e. parent of those siblings.
     capping_edges: HashMap<usize, Vec<T>>,
     /// Result of traversal - accumulated here, entries should never be overwritten
-    edge_classes: HashMap<(T, T), Option<(Bracket<T>, usize)>>,
+    edge_classes: HashMap<CfgEdge<T>, Option<(Bracket<T>, usize)>>,
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
@@ -238,7 +241,7 @@ struct TraversalState<T> {
 /// in a class all dominate + postdominate each other as part of defn of cycle equivalence).
 pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     cfg: &impl CfgView<T>,
-) -> HashMap<(T, T), usize> {
+) -> HashMap<CfgEdge<T>, usize> {
     let tree = UndirectedDFSTree::new(cfg);
     let mut st = TraversalState {
         deleted_backedges: HashSet::new(),
@@ -260,7 +263,7 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Bracket<T> {
-    CfgEdge((T, T)),
+    RealEdge(CfgEdge<T>),
     Capping(usize, T),
 }
 
@@ -368,7 +371,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 
     // Remove edges to here from beneath
     for (_, e) in be_down {
-        let e = Bracket::CfgEdge(cfg_edge(n, e));
+        let e = Bracket::RealEdge(cfg_edge(n, e));
         bs.delete(&e, &mut st.deleted_backedges);
     }
     // And capping backedges
@@ -380,11 +383,11 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     be_up
         .iter()
         .filter(|(_, e)| Some(e) != parent_edge)
-        .for_each(|(_, e)| bs.push(Bracket::CfgEdge(cfg_edge(n, *e))));
+        .for_each(|(_, e)| bs.push(Bracket::RealEdge(cfg_edge(n, *e))));
 
     // Now calculate edge classes
     let class = bs.tag(&st.deleted_backedges);
-    if let Some((Bracket::CfgEdge(e), 1)) = &class {
+    if let Some((Bracket::RealEdge(e), 1)) = &class {
         st.edge_classes.insert(e.clone(), class.clone());
     }
     if let Some(parent_edge) = tree.dfs_parents.get(&n) {
