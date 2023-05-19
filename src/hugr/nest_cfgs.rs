@@ -516,7 +516,7 @@ pub(crate) mod test {
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
         let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -558,7 +558,7 @@ pub(crate) mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -594,7 +594,7 @@ pub(crate) mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Loop header should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
