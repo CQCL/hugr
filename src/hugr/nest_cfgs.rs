@@ -26,7 +26,7 @@
 //!       So, add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
 //!       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
 
-use portgraph::portgraph::NodePorts;
+use portgraph::portgraph::Neighbours;
 use portgraph::NodeIndex;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
@@ -55,9 +55,9 @@ pub trait CfgView<T> {
     where
         Self: 'c;
     /// Returns an iterator over the successors of the specified basic block.
-    fn successors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
+    fn successors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
     /// Returns an iterator over the predecessors of the specified basic block.
-    fn predecessors<'c>(&'c self, item: T) -> Self::Iterator<'c>;
+    fn predecessors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
 }
 
 // The next enum + few functions allow to abstract over the edge directions
@@ -136,44 +136,16 @@ impl CfgView<NodeIndex> for SimpleCfgView<'_> {
         self.exit
     }
 
-    type Iterator<'c> = LinkIter<'c>
+    type Iterator<'c> = Neighbours<'c>
     where
         Self: 'c;
 
-    fn successors<'c>(&'c self, item: NodeIndex) -> Self::Iterator<'c> {
-        LinkIter {
-            node: item,
-            hugr: self.h,
-            ports: self.h.node_outputs(item),
-        }
+    fn successors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
+        self.h.graph.output_neighbours(node)
     }
 
-    fn predecessors<'c>(&'c self, item: NodeIndex) -> Self::Iterator<'c> {
-        LinkIter {
-            node: item,
-            hugr: self.h,
-            ports: self.h.node_inputs(item),
-        }
-    }
-}
-/// Iterates over the *nodes* at the other end of the edges from the ports in a NodePorts
-pub struct LinkIter<'a> {
-    node: NodeIndex,
-    hugr: &'a Hugr,
-    ports: NodePorts,
-}
-impl Iterator for LinkIter<'_> {
-    type Item = NodeIndex;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            // We'll skip over unlinked ports, but we could panic (returning None doesn't make sense)
-            let port = self.ports.next()?;
-            assert_eq!(self.hugr.graph.port_node(port), Some(self.node));
-            let po = self.hugr.graph.port_offset(port).unwrap();
-            if let Some((n, _)) = self.hugr.linked_port(self.node, po) {
-                return Some(n);
-            }
-        }
+    fn predecessors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
+        self.h.graph.input_neighbours(node)
     }
 }
 

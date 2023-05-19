@@ -3,7 +3,7 @@ use std::hash::Hash;
 use crate::hugr::nest_cfgs::CfgView;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 use crate::Hugr;
-use portgraph::{NodeIndex, PortIndex};
+use portgraph::NodeIndex;
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -54,21 +54,10 @@ impl<'a> HalfNodeView<'a> {
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
         // TODO filter out duplicate successors (and duplicate predecessors)
         // - but not duplicate (successor + predecessors) i.e. where edge directions are reversed
-        self.h
-            .graph
-            .output_links(n)
-            .into_iter()
-            .map(|p| self.port_owner(p))
+        self.h.graph.output_neighbours(n)
     }
     fn bb_preds(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h
-            .graph
-            .input_links(n)
-            .into_iter()
-            .map(|p| self.port_owner(p))
-    }
-    fn port_owner(&self, p: Option<PortIndex>) -> NodeIndex {
-        self.h.graph.port_node(p.unwrap()).unwrap()
+        self.h.graph.input_neighbours(n)
     }
 }
 
