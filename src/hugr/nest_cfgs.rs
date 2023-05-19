@@ -431,7 +431,7 @@ mod test {
         let (h, cfg_id, head, tail) = conditional_in_loop(true)?;
         let head = head.node();
         let tail = tail.node();
-        //                       /-> left  -\
+        //                       /-> left --\
         //  entry -> head -> split           > merge -> tail -> exit
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
@@ -460,6 +460,42 @@ mod test {
                 sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
                 sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
                 sorted([[head, split], [merge, tail]]), // "Conditional" region containing split+merge choosing between left/right
+                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([[tail, head]])              // The loop back-edge
+            ])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
+        let (h, cfg_id, head, tail) = conditional_in_loop(false)?;
+        let head = head.node();
+        let tail = tail.node();
+        //               /-> left --\
+        //  entry -> head            > merge -> tail -> exit
+        //            |  \-> right -/             |
+        //             \---<---<---<---<---<--<---/
+        // Here we would like an indication that we can make two nested regions,
+        // but there is no edge to act as entry to a region containing just the conditional :-(.
+        let v = SimpleCfgView::new(&h, cfg_id);
+        let edge_classes = get_edge_classes(&v);
+        let SimpleCfgView { h: _, entry, exit } = v;
+        // merge is unique predecessor of tail
+        let merge = *edge_classes
+            .keys()
+            .filter(|[_, t]| *t == tail)
+            .map(|[s, _]| s)
+            .exactly_one()
+            .unwrap();
+        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == head).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
+        let classes = group_by(edge_classes);
+        assert_eq!(
+            classes,
+            HashSet::from([
+                sorted([[head, left], [left, merge]]), // Region containing single BB 'left'
+                sorted([[head, right], [right, merge]]), // Region containing single BB 'right'
+                Vec::from([[merge, tail]]), // The edge "in the loop", but no other edge in its class to define SESE region
                 sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
                 Vec::from([[tail, head]])              // The loop back-edge
             ])
