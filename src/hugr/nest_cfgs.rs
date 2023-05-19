@@ -566,13 +566,22 @@ mod test {
         const_pred: &ConstID,
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
+        let split = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
+            const_pred,
+        )?;
+        let merge = build_then_else_merge_from_if(cfg, unit_const, split)?;
+        Ok((split, merge))
+    }
+
+    fn build_then_else_merge_from_if(
+        cfg: &mut CFGBuilder,
+        unit_const: &ConstID,
+        split: BasicBlockID,
+    ) -> Result<BasicBlockID, BuildError> {
         let merge = n_identity(
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
             unit_const,
-        )?;
-        let head = n_identity(
-            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
-            const_pred,
         )?;
         let left = n_identity(
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
@@ -582,11 +591,11 @@ mod test {
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
             unit_const,
         )?;
-        cfg.branch(&head, 0, &left)?;
-        cfg.branch(&head, 1, &right)?;
+        cfg.branch(&split, 0, &left)?;
+        cfg.branch(&split, 1, &right)?;
         cfg.branch(&left, 0, &merge)?;
         cfg.branch(&right, 0, &merge)?;
-        Ok((head, merge))
+        Ok(merge)
     }
 
     // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
