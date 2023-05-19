@@ -540,29 +540,31 @@ mod test {
         Ok((head, merge))
     }
 
-    // Result is header (new or provided) and tail. Caller must provide 0th successor of header and tail,
-    // and give tail at least one predecessor.
-    fn build_loop(
+    // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
+    fn build_loop_from_header(
         cfg: &mut CFGBuilder,
         const_pred: &ConstID,
-        unit_const: &ConstID,
-        body_in: Option<BasicBlockID>,
-    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let header = match body_in {
-            Some(i) => i,
-            None => {
-                // Caller responsible for giving this node a successor
-                n_identity(
-                    cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
-                    unit_const,
-                )?
-            }
-        };
+        header: BasicBlockID,
+    ) -> Result<BasicBlockID, BuildError> {
         let tail = n_identity(
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
             const_pred,
         )?;
         cfg.branch(&tail, 1, &header)?;
+        Ok(tail)
+    }
+
+    // Result is header (new or provided) and tail. Caller must link header to tail, and provide 0th successor of tail.
+    fn build_loop(
+        cfg: &mut CFGBuilder,
+        const_pred: &ConstID,
+        unit_const: &ConstID,
+    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
+        let header = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+            unit_const,
+        )?;
+        let tail = build_loop_from_header(cfg, const_pred, header)?;
         Ok((header, tail))
     }
 
@@ -588,12 +590,13 @@ mod test {
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
-            let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit, None)?;
+            let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
             cfg_builder.branch(&head, 0, &split)?;
             (head, tail)
         } else {
             // Combine loop header with split.
-            build_loop(&mut cfg_builder, &pred_const, &const_unit, Some(split))?
+            let tail = build_loop_from_header(&mut cfg_builder, &pred_const, split)?;
+            (split, tail)
         };
         cfg_builder.branch(&merge, 0, &tail)?;
 
