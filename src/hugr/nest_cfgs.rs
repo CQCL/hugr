@@ -78,14 +78,12 @@ type CfgEdge<T> = [T; 2];
 // in a CfgView.
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum EdgeDest<T: Copy + Clone + PartialEq + Eq + Hash> {
+enum EdgeDest<T> {
     Forward(T),
     Backward(T),
 }
-impl<T> EdgeDest<T>
-where
-    T: Copy + Clone + PartialEq + Eq + Hash,
-{
+
+impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeDest<T> {
     pub fn target(&self) -> T {
         match self {
             EdgeDest::Forward(i) => *i,
@@ -179,7 +177,7 @@ impl CfgView<NodeIndex> for SimpleCfgView<'_> {
 ///   * tree edges, which on their own (with the nodes) form a tree (minimum spanning tree);
 ///   * backedges, i.e. those for which, when DFS tried to traverse them, the other endpoint was an ancestor
 /// Moreover, we record *which way* along the underlying CFG edge we went.
-struct UndirectedDFSTree<T: Copy + Clone + PartialEq + Eq + Hash> {
+struct UndirectedDFSTree<T> {
     /// Pre-order traversal numbering
     dfs_num: HashMap<T, usize>,
     /// For each node, the edge along which it was reached from its parent
@@ -274,7 +272,7 @@ enum Bracket<T> {
 /// Note - we could put the items deleted from *this* BracketList here, and merge in concat().
 /// That would be cleaner, but repeated set-merging would be slower than adding the
 /// deleted items to a single set in the `TraversalState`
-struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
+struct BracketList<T> {
     items: LinkedList<Bracket<T>>,
     size: usize, // deleted items already taken off
 }
