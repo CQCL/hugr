@@ -1,4 +1,4 @@
-# HUGR design document, Draft 4
+# HUGR design document, Draft 3
 
 The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger* 
 🫂) is a proposed new
