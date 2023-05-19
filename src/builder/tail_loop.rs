@@ -1,6 +1,7 @@
 use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
+use crate::hugr::internal::HugrView;
 use crate::types::TypeRow;
 
 use super::handle::BuildHandle;
@@ -57,11 +58,9 @@ impl<'b> TailLoopBuilder<'b> {
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
     /// that defines the signature of the TailLoop
     pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
-        let hugr = self.hugr();
-
         if let OpType::Dataflow(DataflowOp::ControlFlow {
             op: ControlFlowOp::TailLoop(tail_sig),
-        }) = hugr.get_optype(self.container_node())
+        }) = self.hugr().get_optype(self.container_node())
         {
             Ok(tail_sig)
         } else {

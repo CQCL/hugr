@@ -14,6 +14,8 @@ use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
 use crate::types::{EdgeKind, SimpleType};
 use crate::Hugr;
 
+use super::internal::HugrView;
+
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
 ///

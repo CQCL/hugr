@@ -53,19 +53,21 @@ impl OpenHugr {
     /// The returned Hugr will have no graph information.
     pub fn into_parts(self) -> (OpenGraph, Hugr) {
         let OpenHugr {
-            mut hugr,
+            hugr,
             dangling_inputs,
             dangling_outputs,
         } = self;
-        let graph = std::mem::take(&mut hugr.graph);
-        (
-            OpenGraph {
-                graph,
-                dangling_inputs,
-                dangling_outputs,
-            },
-            hugr,
-        )
+        let _ = (hugr, dangling_inputs, dangling_outputs);
+        todo!("The internal graph of a hugr cannot be accessed directly. This needs updating.");
+        //let graph = std::mem::take(&mut hugr.graph);
+        //(
+        //    OpenGraph {
+        //        graph,
+        //        dangling_inputs,
+        //        dangling_outputs,
+        //    },
+        //    hugr,
+        //)
     }
 }
 
