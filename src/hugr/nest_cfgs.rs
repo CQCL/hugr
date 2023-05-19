@@ -505,21 +505,11 @@ mod test {
 
     fn n_identity<T: Dataflow>(
         mut dataflow_builder: T,
-        unit_const: &ConstID,
+        pred_const: &ConstID,
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
-        let u = dataflow_builder.load_const(unit_const)?;
+        let u = dataflow_builder.load_const(pred_const)?;
         dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
-    }
-
-    fn branch_block(
-        cfg: &mut CFGBuilder,
-        const_pred: &ConstID,
-    ) -> Result<BasicBlockID, BuildError> {
-        let mut bldr = cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?;
-        let c = bldr.load_const(const_pred)?;
-        let [inw] = bldr.input_wires_arr();
-        bldr.finish_with_outputs(c, [inw])
     }
 
     fn build_if_then_else(
@@ -528,7 +518,10 @@ mod test {
         unit_const: &ConstID,
         merge: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
-        let entry = branch_block(cfg, const_pred)?;
+        let entry = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
+            const_pred,
+        )?;
         let left = n_identity(
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
             unit_const,
@@ -575,7 +568,10 @@ mod test {
                 )?
             }
         };
-        let tail = branch_block(cfg, const_pred)?;
+        let tail = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
+            const_pred,
+        )?;
         cfg.branch(&tail, 1, &header)?;
         Ok((header, tail))
     }
