@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::hash::Hash;
 
 use crate::hugr::nest_cfgs::CfgView;
@@ -7,7 +8,8 @@ use portgraph::NodeIndex;
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
-/// So, for BBs with multiple preds + succs, we generate TWO HalfNode's.
+/// So for BBs with multiple preds + succs, we generate TWO HalfNode's with a single edge between
+/// them; that single edge can then be a region boundary that did not exist before.
 /// TODO: this unfortunately doesn't capture all cases: when a node has multiple preds and succs,
 /// we could "merge" *any subset* of the in-edges into a single in-edge via an extra empty BB;
 /// the in-edge from that extra/empty BB, might be the endpoint of a useful SESE region,
@@ -52,12 +54,18 @@ impl<'a> HalfNodeView<'a> {
     }
 
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        // TODO filter out duplicate successors (and duplicate predecessors)
-        // - but not duplicate (successor + predecessors) i.e. where edge directions are reversed
-        self.h.graph.output_neighbours(n)
+        self.h
+            .graph
+            .output_neighbours(n)
+            .collect::<HashSet<_>>()
+            .into_iter()
     }
     fn bb_preds(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h.graph.input_neighbours(n)
+        self.h
+            .graph
+            .input_neighbours(n)
+            .collect::<HashSet<_>>()
+            .into_iter()
     }
 }
 

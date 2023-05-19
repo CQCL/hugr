@@ -1,11 +1,14 @@
 //! # Nest CFGs
 //!
-//! Identify Single-Entry-Single-Exit regions in the CFG.
+//! Identify Single-Entry-Single-Exit (SESE) regions in the CFG.
 //! These are pairs of edges (a,b) where
-//! a dominates b, b postdominates a, and there are no other edges in/out of the nodes inbetween
-//! (the third condition is necessary because loop backedges do not affect (post)dominance).
+//! * a dominates b
+//! * b postdominates a
+//! * there are no other edges in/out of the nodes inbetween
+//!  (this last condition is necessary because loop backedges do not affect (post)dominance).
 //!
-//! Algorithm here: <https://dl.acm.org/doi/10.1145/773473.178258>, approximately:
+//! # Algorithm
+//! See paper: <https://dl.acm.org/doi/10.1145/773473.178258>, approximately:
 //! 1. those three conditions are equivalent to:
 //! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
 //! where cycle-equivalent means every cycle has either both a and b, or neither
@@ -25,8 +28,16 @@
 //!       (as the brackets of said descendant come from beneath it to its ancestors, not from any sibling/etc. in the other subtree).
 //!       So, add (onto top of bracketlist) a fake "capping" backedge from here to the highest ancestor reached by >1 subtree.
 //!       (Thus, edges from here up to that ancestor, cannot be cycle-equivalent with any edges elsewhere.)
+//!
+//! # Restrictions
+//! * The paper assumes that all CFG nodes are on paths from entry to exit, i.e. no loops without exits.
+//! HUGR assumes only that they are all reachable from entry, so we do a backward traversal from exit node
+//! first and restrict to the CFG nodes in the reachable set. (This means we will not discover SESE regions
+//! in exit-free loops, but that doesn't seem a major concern.)
+//! * Multiple edges in the same direction between the same BBs will "confuse" the algorithm in the paper.
+//! However it is straightforward for us to treat successors and predecessors as sets. (Two edges between
+//! the same BBs but in opposite directions must be distinct!)
 
-use portgraph::portgraph::Neighbours;
 use portgraph::NodeIndex;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
@@ -54,9 +65,9 @@ pub trait CfgView<T> {
     type Iterator<'c>: Iterator<Item = T>
     where
         Self: 'c;
-    /// Returns an iterator over the successors of the specified basic block.
+    /// Returns an iterator over the successors of the specified basic block (as a set).
     fn successors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
-    /// Returns an iterator over the predecessors of the specified basic block.
+    /// Returns an iterator over the predecessors of the specified basic block (as a set).
     fn predecessors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
 }
 
@@ -137,16 +148,24 @@ impl CfgView<NodeIndex> for SimpleCfgView<'_> {
         self.exit
     }
 
-    type Iterator<'c> = Neighbours<'c>
+    type Iterator<'c> = <HashSet<NodeIndex> as IntoIterator>::IntoIter
     where
         Self: 'c;
 
     fn successors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h.graph.output_neighbours(node)
+        self.h
+            .graph
+            .output_neighbours(node)
+            .collect::<HashSet<_>>()
+            .into_iter()
     }
 
     fn predecessors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h.graph.input_neighbours(node)
+        self.h
+            .graph
+            .input_neighbours(node)
+            .collect::<HashSet<_>>()
+            .into_iter()
     }
 }
 
@@ -214,7 +233,9 @@ struct TraversalState<T> {
 }
 
 /// Computes equivalence class of each edge, i.e. two edges with the same value
-/// are cycle-equivalent.
+/// are cycle-equivalent. Any two consecutive edges in the same class define a SESE region
+/// (where "consecutive" means on any path in the original directed CFG, as the edges
+/// in a class all dominate + postdominate each other as part of defn of cycle equivalence).
 pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     cfg: &impl CfgView<T>,
 ) -> HashMap<(T, T), usize> {
@@ -246,6 +267,10 @@ enum Bracket<T> {
 /// Manages a list of brackets. The goal here is to allow constant-time deletion
 /// out of the middle of the list - which isn't really possible, so instead we
 /// track deleted items (in an external set) and the remaining number (here).
+///
+/// Note - we could put the items deleted from *this* BracketList here, and merge in concat().
+/// That would be cleaner, but repeated set-merging would be slower than adding the
+/// deleted items to a single set in the `TraversalState`
 struct BracketList<T: Copy + Clone + PartialEq + Eq + Hash> {
     items: LinkedList<Bracket<T>>,
     size: usize, // deleted items already taken off
