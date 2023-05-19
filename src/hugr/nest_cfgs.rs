@@ -38,9 +38,10 @@
 //! However it is straightforward for us to treat successors and predecessors as sets. (Two edges between
 //! the same BBs but in opposite directions must be distinct!)
 
-use portgraph::NodeIndex;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
+
+use portgraph::NodeIndex;
 
 use crate::hugr::internal::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
