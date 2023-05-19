@@ -512,13 +512,16 @@ mod test {
         dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
     }
 
-    fn build_if_then_else(
+    fn build_if_then_else_merge(
         cfg: &mut CFGBuilder,
         const_pred: &ConstID,
         unit_const: &ConstID,
-        merge: BasicBlockID,
-    ) -> Result<BasicBlockID, BuildError> {
-        let entry = n_identity(
+    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
+        let merge = n_identity(
+            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+            unit_const,
+        )?;
+        let head = n_identity(
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 2)?,
             const_pred,
         )?;
@@ -530,24 +533,11 @@ mod test {
             cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
             unit_const,
         )?;
-        cfg.branch(&entry, 0, &left)?;
-        cfg.branch(&entry, 1, &right)?;
+        cfg.branch(&head, 0, &left)?;
+        cfg.branch(&head, 1, &right)?;
         cfg.branch(&left, 0, &merge)?;
         cfg.branch(&right, 0, &merge)?;
-        Ok(entry)
-    }
-
-    fn build_if_then_else_merge(
-        cfg: &mut CFGBuilder,
-        const_pred: &ConstID,
-        unit_const: &ConstID,
-    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let exit = n_identity(
-            cfg.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
-            unit_const,
-        )?;
-        let head = build_if_then_else(cfg, const_pred, unit_const, exit)?;
-        Ok((head, exit))
+        Ok((head, merge))
     }
 
     // Result is header (new or provided) and tail. Caller must provide 0th successor of header and tail,
