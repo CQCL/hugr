@@ -263,7 +263,7 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Bracket<T> {
-    RealEdge(CfgEdge<T>),
+    Real(CfgEdge<T>),
     Capping(usize, T),
 }
 
@@ -372,7 +372,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     // Remove edges to here from beneath
     for (_, e) in be_down {
         let e = cfg_edge(n, e);
-        let b = Bracket::RealEdge(e);
+        let b = Bracket::Real(e);
         bs.delete(&b, &mut st.deleted_backedges);
         // Last chance to assign an edge class! This will be a singleton class,
         // but assign for consistency with other singletons.
@@ -387,11 +387,11 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
     be_up
         .iter()
         .filter(|(_, e)| Some(e) != parent_edge)
-        .for_each(|(_, e)| bs.push(Bracket::RealEdge(cfg_edge(n, *e))));
+        .for_each(|(_, e)| bs.push(Bracket::Real(cfg_edge(n, *e))));
 
     // Now calculate edge classes
     let class = bs.tag(&st.deleted_backedges);
-    if let Some((Bracket::RealEdge(e), 1)) = &class {
+    if let Some((Bracket::Real(e), 1)) = &class {
         st.edge_classes.insert(e.clone(), class.clone());
     }
     if let Some(parent_edge) = tree.dfs_parents.get(&n) {
