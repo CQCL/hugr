@@ -399,7 +399,7 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, ModuleBuilder};
     use crate::ops::{
@@ -412,7 +412,7 @@ mod test {
     //use crate::hugr::nest_cfgs::get_edge_classes;
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
-    fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
+    pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
         for (k, v) in h.into_iter() {
             res.entry(v).or_insert_with(Vec::new).push(k);
@@ -420,7 +420,7 @@ mod test {
         res.into_values().map(sorted).collect()
     }
 
-    fn sorted<E: Ord>(items: impl IntoIterator<Item = E>) -> Vec<E> {
+    pub fn sorted<E: Ord>(items: impl IntoIterator<Item = E>) -> Vec<E> {
         let mut v: Vec<_> = items.into_iter().collect();
         v.sort();
         v
@@ -627,7 +627,7 @@ mod test {
     }
 
     // Build a CFG, returning the Hugr
-    fn build_conditional_in_loop_cfg(
+    pub fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, CfgID, BasicBlockID, BasicBlockID), BuildError> {
         //let sum2_type = SimpleType::new_predicate(2);
