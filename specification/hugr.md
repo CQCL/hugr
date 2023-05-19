@@ -1361,8 +1361,7 @@ conversion to/from the binary serialised form.
 
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
-[Serialization
-implementation](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2622914570/Serialization+implementation)).
+[Serialization implementation](serialization.md)).
 Note in particular that node and port weights are stored as separate
 maps to the graph structure itself, and that hierarchical relationships
 have a special encoding outside `edges`, as an optional parent field
@@ -1370,7 +1369,7 @@ have a special encoding outside `edges`, as an optional parent field
 payloads corresponding to arbitrary `Operations`. Metadata could also be
 included as a similar map.
 
-```
+```rust
 struct HUGR {
   nodes: [Node]
   edges: [Edge]
@@ -1378,9 +1377,9 @@ struct HUGR {
 }
 
 // (parent, #incoming, #outgoing)
-Node = (Optional<Int>, Int, Int)
+struct Node = (Optional<Int>, Int, Int)
 // ((source, offset), (target, offset)
-Edge = ((Node, Int), (Node, Int))
+struct Edge = ((Node, Int), (Node, Int))
 ```
 
 Node and edge indices, used as keys in the weight maps and within the
