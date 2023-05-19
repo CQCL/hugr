@@ -74,7 +74,7 @@ pub trait CfgView<T> {
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
-type CfgEdge<T> = [T; 2];
+type CfgEdge<T> = (T, T);
 
 // The next enum + few functions allow to abstract over the edge directions
 // in a CfgView.
@@ -118,8 +118,8 @@ fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, 
 
 fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> CfgEdge<T> {
     match d {
-        EdgeDest::Forward(t) => [s, t],
-        EdgeDest::Backward(t) => [t, s],
+        EdgeDest::Forward(t) => (s, t),
+        EdgeDest::Backward(t) => (t, s),
     }
 }
 
@@ -250,7 +250,7 @@ pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
     };
     traverse(cfg, &tree, &mut st, cfg.entry_node());
     assert!(st.capping_edges.is_empty());
-    st.edge_classes.remove(&[cfg.exit_node(), cfg.entry_node()]);
+    st.edge_classes.remove(&(cfg.exit_node(), cfg.entry_node()));
     let mut cycle_class_idxs = HashMap::new();
     st.edge_classes
         .into_iter()
@@ -466,17 +466,17 @@ pub(crate) mod test {
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
-        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == split).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'.
-                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'.
-                Vec::from([[head, tail]]), // Loop body and backedges are in their own classes because
-                Vec::from([[tail, head]]), // the path executing the loop exactly once skips the backedge.
-                sorted([[entry, split], [merge, head], [tail, exit]]), // Two regions, conditional and then loop.
+                sorted([(split, left), (left, merge)]), // Region containing single BB 'left'.
+                sorted([(split, right), (right, merge)]), // Region containing single BB 'right'.
+                Vec::from([(head, tail)]), // Loop body and backedges are in their own classes because
+                Vec::from([(tail, head)]), // the path executing the loop exactly once skips the backedge.
+                sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
         Ok(())
@@ -516,17 +516,17 @@ pub(crate) mod test {
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
         let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
-        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == entry).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[entry, left], [left, merge]]), // Region containing single BB 'left'.
-                sorted([[entry, right], [right, merge]]), // Region containing single BB 'right'.
-                Vec::from([[tail, exit]]), // The only edge in neither conditional nor loop.
-                Vec::from([[merge, tail]]), // Loop body (at least once per execution).
-                Vec::from([[tail, merge]]), // Loop backedge (0 or more times per execution).
+                sorted([(entry, left), (left, merge)]), // Region containing single BB 'left'.
+                sorted([(entry, right), (right, merge)]), // Region containing single BB 'right'.
+                Vec::from([(tail, exit)]), // The only edge in neither conditional nor loop.
+                Vec::from([(merge, tail)]), // Loop body (at least once per execution).
+                Vec::from([(tail, merge)]), // Loop backedge (0 or more times per execution).
             ])
         );
         Ok(())
@@ -547,27 +547,27 @@ pub(crate) mod test {
         // split is unique successor of head
         let split = *edge_classes
             .keys()
-            .filter(|[s, _]| *s == head)
-            .map(|[_, t]| t)
+            .filter(|(s, _)| *s == head)
+            .map(|(_, t)| t)
             .exactly_one()
             .unwrap();
         // merge is unique predecessor of tail
         let merge = *edge_classes
             .keys()
-            .filter(|[_, t]| *t == tail)
-            .map(|[s, _]| s)
+            .filter(|(_, t)| *t == tail)
+            .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == split).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
-                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
-                sorted([[head, split], [merge, tail]]), // "Conditional" region containing split+merge choosing between left/right
-                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
-                Vec::from([[tail, head]])              // The loop back-edge
+                sorted([(split, left), (left, merge)]), // Region containing single BB 'left'
+                sorted([(split, right), (right, merge)]), // Region containing single BB 'right'
+                sorted([(head, split), (merge, tail)]), // "Conditional" region containing split+merge choosing between left/right
+                sorted([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([(tail, head)])              // The loop back-edge
             ])
         );
         Ok(())
@@ -590,20 +590,20 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = *edge_classes
             .keys()
-            .filter(|[_, t]| *t == tail)
-            .map(|[s, _]| s)
+            .filter(|(_, t)| *t == tail)
+            .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == head).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[head, left], [left, merge]]), // Region containing single BB 'left'
-                sorted([[head, right], [right, merge]]), // Region containing single BB 'right'
-                Vec::from([[merge, tail]]), // The edge "in the loop", but no other edge in its class to define SESE region
-                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
-                Vec::from([[tail, head]])              // The loop back-edge
+                sorted([(head, left), (left, merge)]), // Region containing single BB 'left'
+                sorted([(head, right), (right, merge)]), // Region containing single BB 'right'
+                Vec::from([(merge, tail)]), // The edge "in the loop", but no other edge in its class to define SESE region
+                sorted([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge
+                Vec::from([(tail, head)])              // The loop back-edge
             ])
         );
         Ok(())

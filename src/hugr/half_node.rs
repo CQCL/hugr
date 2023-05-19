@@ -135,20 +135,20 @@ mod test {
         // merge is unique predecessor of tail
         let merge = *edge_classes
             .keys()
-            .filter(|[_, t]| *t == tail)
-            .map(|[s, _]| s)
+            .filter(|(_, t)| *t == tail)
+            .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|[s,_]| *s == split).map(|[_,t]|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
+        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Head should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'.
-                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'.
-                sorted([[head, split], [merge, tail]]), // The inner "conditional" region.
-                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge.
-                Vec::from([[tail, head]])              // The loop back-edge.
+                sorted([(split, left), (left, merge)]), // Region containing single BB 'left'.
+                sorted([(split, right), (right, merge)]), // Region containing single BB 'right'.
+                sorted([(head, split), (merge, tail)]), // The inner "conditional" region.
+                sorted([(entry, head), (tail, exit)]), // "Loop" region containing body (conditional) + back-edge.
+                Vec::from([(tail, head)])              // The loop back-edge.
             ])
         );
         Ok(())
