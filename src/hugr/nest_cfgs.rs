@@ -84,12 +84,13 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
     cfg: &'a impl CfgView<T>,
     n: T,
 ) -> impl Iterator<Item = EdgeDest<T>> + '_ {
-    let mut succs: Vec<_> = cfg.successors(n).collect();
-    if n == cfg.exit_node() {
-        succs.push(cfg.entry_node());
-    }
-    succs
-        .into_iter()
+    let extra = if n == cfg.exit_node() {
+        vec![cfg.entry_node()]
+    } else {
+        vec![]
+    };
+    cfg.successors(n)
+        .chain(extra.into_iter())
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
 }
