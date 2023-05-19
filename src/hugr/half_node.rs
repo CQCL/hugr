@@ -142,11 +142,11 @@ mod test {
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
-                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
-                sorted([[head, split], [merge, tail]]), // The inner "conditional" region
-                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge
-                //FIXME //Vec::from([[tail, head]])              // The loop back-edge
+                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'.
+                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'.
+                sorted([[head, split], [merge, tail]]), // The inner "conditional" region.
+                sorted([[entry, head], [tail, exit]]), // "Loop" region containing body (conditional) + back-edge.
+                Vec::from([[tail, head]])              // The loop back-edge.
             ])
         );
         Ok(())

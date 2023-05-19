@@ -369,8 +369,12 @@ fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
 
     // Remove edges to here from beneath
     for (_, e) in be_down {
-        let e = Bracket::RealEdge(cfg_edge(n, e));
-        bs.delete(&e, &mut st.deleted_backedges);
+        let e = cfg_edge(n, e);
+        let b = Bracket::RealEdge(e);
+        bs.delete(&b, &mut st.deleted_backedges);
+        // Last chance to assign an edge class! This will be a singleton class,
+        // but assign for consistency with other singletons.
+        st.edge_classes.entry(e).or_insert_with(|| Some((b, 0)));
     }
     // And capping backedges
     for src in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
@@ -466,10 +470,11 @@ pub(crate) mod test {
         assert_eq!(
             classes,
             HashSet::from([
-                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'
-                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'
-                Vec::from([[tail, head]]),              // Backedge in own class
-                sorted([[entry, split], [merge, head], [tail, exit]]), // Two regions, conditional and then loop
+                sorted([[split, left], [left, merge]]), // Region containing single BB 'left'.
+                sorted([[split, right], [right, merge]]), // Region containing single BB 'right'.
+                Vec::from([[head, tail]]), // Loop body and backedges are in their own classes because
+                Vec::from([[tail, head]]), // the path executing the loop exactly once skips the backedge.
+                sorted([[entry, split], [merge, head], [tail, exit]]), // Two regions, conditional and then loop.
             ])
         );
         Ok(())
