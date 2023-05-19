@@ -106,7 +106,7 @@ mod test {
     use super::super::nest_cfgs::test::*;
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
-    use crate::hugr::nest_cfgs::get_edge_classes;
+    use crate::hugr::nest_cfgs::EdgeClassifier;
     use crate::ops::handle::NodeHandle;
     use itertools::Itertools;
     use std::collections::HashSet;
@@ -125,7 +125,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
         let v = HalfNodeView::new(&h, cfg_id);
-        let edge_classes = get_edge_classes(&v);
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
 
         let head = HalfNode::N(main.node());

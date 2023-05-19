@@ -223,44 +223,6 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
     }
 }
 
-/// Mutable state updated during traversal of the UndirectedDFSTree by the cycle equivalence algorithm.
-struct TraversalState<T> {
-    /// Edges we have marked as deleted, allowing constant-time deletion without searching BracketList
-    deleted_backedges: HashSet<Bracket<T>>,
-    /// Key is DFS num of highest ancestor
-    ///   to which backedges reached from >1 sibling subtree;
-    /// Value is the LCA i.e. parent of those siblings.
-    capping_edges: HashMap<usize, Vec<T>>,
-    /// Result of traversal - accumulated here, entries should never be overwritten
-    edge_classes: HashMap<CfgEdge<T>, Option<(Bracket<T>, usize)>>,
-}
-
-/// Computes equivalence class of each edge, i.e. two edges with the same value
-/// are cycle-equivalent. Any two consecutive edges in the same class define a SESE region
-/// (where "consecutive" means on any path in the original directed CFG, as the edges
-/// in a class all dominate + postdominate each other as part of defn of cycle equivalence).
-pub fn get_edge_classes<T: Copy + Clone + PartialEq + Eq + Hash>(
-    cfg: &impl CfgView<T>,
-) -> HashMap<CfgEdge<T>, usize> {
-    let tree = UndirectedDFSTree::new(cfg);
-    let mut st = TraversalState {
-        deleted_backedges: HashSet::new(),
-        capping_edges: HashMap::new(),
-        edge_classes: HashMap::new(),
-    };
-    traverse(cfg, &tree, &mut st, cfg.entry_node());
-    assert!(st.capping_edges.is_empty());
-    st.edge_classes.remove(&(cfg.exit_node(), cfg.entry_node()));
-    let mut cycle_class_idxs = HashMap::new();
-    st.edge_classes
-        .into_iter()
-        .map(|(k, v)| {
-            let l = cycle_class_idxs.len();
-            (k, *cycle_class_idxs.entry(v).or_insert(l))
-        })
-        .collect()
-}
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum Bracket<T> {
     Real(CfgEdge<T>),
@@ -321,87 +283,125 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     }
 }
 
-/// Returns the lowest DFS num (highest ancestor) reached by any bracket leaving
-/// the subtree, and the list of said brackets.
-fn traverse<T: Copy + Clone + PartialEq + Eq + Hash>(
-    cfg: &impl CfgView<T>,
-    tree: &UndirectedDFSTree<T>,
-    st: &mut TraversalState<T>,
-    n: T,
-) -> (usize, BracketList<T>) {
-    let n_dfs = *tree.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
-    let (children, non_capping_backedges): (Vec<_>, Vec<_>) = all_edges(cfg, n)
-        .filter(|e| tree.dfs_num.contains_key(&e.target()))
-        .partition(|e| {
-            // The tree edges are those whose *targets* list the edge as parent-edge
-            let (tgt, from) = flip(n, *e);
-            tree.dfs_parents.get(&tgt) == Some(&from)
-        });
-    let child_results: Vec<_> = children
-        .iter()
-        .map(|c| traverse(cfg, tree, st, c.target()))
-        .collect();
-    let mut min_dfs_target: [Option<usize>; 2] = [None, None]; // We want highest-but-one
-    let mut bs = BracketList::new();
-    for (tgt, brs) in child_results {
-        if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
-            min_dfs_target = [Some(tgt), min_dfs_target[0]]
-        } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
-            min_dfs_target[1] = Some(tgt)
+/// Mutable state updated during traversal of the UndirectedDFSTree by the cycle equivalence algorithm.
+pub struct EdgeClassifier<T> {
+    /// Edges we have marked as deleted, allowing constant-time deletion without searching BracketList
+    deleted_backedges: HashSet<Bracket<T>>,
+    /// Key is DFS num of highest ancestor
+    ///   to which backedges reached from >1 sibling subtree;
+    /// Value is the LCA i.e. parent of those siblings.
+    capping_edges: HashMap<usize, Vec<T>>,
+    /// Result of traversal - accumulated here, entries should never be overwritten
+    edge_classes: HashMap<CfgEdge<T>, Option<(Bracket<T>, usize)>>,
+}
+
+impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
+    /// Computes equivalence class of each edge, i.e. two edges with the same value
+    /// are cycle-equivalent. Any two consecutive edges in the same class define a SESE region
+    /// (where "consecutive" means on any path in the original directed CFG, as the edges
+    /// in a class all dominate + postdominate each other as part of defn of cycle equivalence).
+    pub fn get_edge_classes(cfg: &impl CfgView<T>) -> HashMap<CfgEdge<T>, usize> {
+        let tree = UndirectedDFSTree::new(cfg);
+        let mut s = Self {
+            deleted_backedges: HashSet::new(),
+            capping_edges: HashMap::new(),
+            edge_classes: HashMap::new(),
+        };
+        s.traverse(cfg, &tree, cfg.entry_node());
+        assert!(s.capping_edges.is_empty());
+        s.edge_classes.remove(&(cfg.exit_node(), cfg.entry_node()));
+        let mut cycle_class_idxs = HashMap::new();
+        s.edge_classes
+            .into_iter()
+            .map(|(k, v)| {
+                let l = cycle_class_idxs.len();
+                (k, *cycle_class_idxs.entry(v).or_insert(l))
+            })
+            .collect()
+    }
+
+    /// Returns the lowest DFS num (highest ancestor) reached by any bracket leaving
+    /// the subtree, and the list of said brackets.
+    fn traverse(
+        &mut self,
+        cfg: &impl CfgView<T>,
+        tree: &UndirectedDFSTree<T>,
+        n: T,
+    ) -> (usize, BracketList<T>) {
+        let n_dfs = *tree.dfs_num.get(&n).unwrap(); // should only be called for nodes on path to exit
+        let (children, non_capping_backedges): (Vec<_>, Vec<_>) = all_edges(cfg, n)
+            .filter(|e| tree.dfs_num.contains_key(&e.target()))
+            .partition(|e| {
+                // The tree edges are those whose *targets* list the edge as parent-edge
+                let (tgt, from) = flip(n, *e);
+                tree.dfs_parents.get(&tgt) == Some(&from)
+            });
+        let child_results: Vec<_> = children
+            .iter()
+            .map(|c| self.traverse(cfg, tree, c.target()))
+            .collect();
+        let mut min_dfs_target: [Option<usize>; 2] = [None, None]; // We want highest-but-one
+        let mut bs = BracketList::new();
+        for (tgt, brs) in child_results {
+            if tgt < min_dfs_target[0].unwrap_or(usize::MAX) {
+                min_dfs_target = [Some(tgt), min_dfs_target[0]]
+            } else if tgt < min_dfs_target[1].unwrap_or(usize::MAX) {
+                min_dfs_target[1] = Some(tgt)
+            }
+            bs.concat(brs);
         }
-        bs.concat(brs);
-    }
-    // Add capping backedge
-    if let Some(min1dfs) = min_dfs_target[1] {
-        if min1dfs < n_dfs {
-            bs.push(Bracket::Capping(min1dfs, n));
-            // mark capping edge to be removed when we return out to the other end
-            st.capping_edges
-                .entry(min1dfs)
-                .or_insert(Vec::new())
-                .push(n);
+        // Add capping backedge
+        if let Some(min1dfs) = min_dfs_target[1] {
+            if min1dfs < n_dfs {
+                bs.push(Bracket::Capping(min1dfs, n));
+                // mark capping edge to be removed when we return out to the other end
+                self.capping_edges
+                    .entry(min1dfs)
+                    .or_insert(Vec::new())
+                    .push(n);
+            }
         }
-    }
 
-    let parent_edge = tree.dfs_parents.get(&n);
-    let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
-        .into_iter()
-        .map(|e| (*tree.dfs_num.get(&e.target()).unwrap(), e))
-        .partition(|(dfs, _)| *dfs < n_dfs);
+        let parent_edge = tree.dfs_parents.get(&n);
+        let (be_up, be_down): (Vec<_>, Vec<_>) = non_capping_backedges
+            .into_iter()
+            .map(|e| (*tree.dfs_num.get(&e.target()).unwrap(), e))
+            .partition(|(dfs, _)| *dfs < n_dfs);
 
-    // Remove edges to here from beneath
-    for (_, e) in be_down {
-        let e = cfg_edge(n, e);
-        let b = Bracket::Real(e);
-        bs.delete(&b, &mut st.deleted_backedges);
-        // Last chance to assign an edge class! This will be a singleton class,
-        // but assign for consistency with other singletons.
-        st.edge_classes.entry(e).or_insert_with(|| Some((b, 0)));
-    }
-    // And capping backedges
-    for src in st.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
-        bs.delete(&Bracket::Capping(n_dfs, src), &mut st.deleted_backedges)
-    }
+        // Remove edges to here from beneath
+        for (_, e) in be_down {
+            let e = cfg_edge(n, e);
+            let b = Bracket::Real(e);
+            bs.delete(&b, &mut self.deleted_backedges);
+            // Last chance to assign an edge class! This will be a singleton class,
+            // but assign for consistency with other singletons.
+            self.edge_classes.entry(e).or_insert_with(|| Some((b, 0)));
+        }
+        // And capping backedges
+        for src in self.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+            bs.delete(&Bracket::Capping(n_dfs, src), &mut self.deleted_backedges)
+        }
 
-    // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
-    be_up
-        .iter()
-        .filter(|(_, e)| Some(e) != parent_edge)
-        .for_each(|(_, e)| bs.push(Bracket::Real(cfg_edge(n, *e))));
+        // Add backedges from here to ancestors (not the parent edge, but perhaps other edges to the same node)
+        be_up
+            .iter()
+            .filter(|(_, e)| Some(e) != parent_edge)
+            .for_each(|(_, e)| bs.push(Bracket::Real(cfg_edge(n, *e))));
 
-    // Now calculate edge classes
-    let class = bs.tag(&st.deleted_backedges);
-    if let Some((Bracket::Real(e), 1)) = &class {
-        st.edge_classes.insert(e.clone(), class.clone());
+        // Now calculate edge classes
+        let class = bs.tag(&self.deleted_backedges);
+        if let Some((Bracket::Real(e), 1)) = &class {
+            self.edge_classes.insert(e.clone(), class.clone());
+        }
+        if let Some(parent_edge) = tree.dfs_parents.get(&n) {
+            self.edge_classes.insert(cfg_edge(n, *parent_edge), class);
+        }
+        let highest_target = be_up
+            .into_iter()
+            .map(|(dfs, _)| dfs)
+            .chain(min_dfs_target[0].into_iter());
+        (highest_target.min().unwrap_or(usize::MAX), bs)
     }
-    if let Some(parent_edge) = tree.dfs_parents.get(&n) {
-        st.edge_classes.insert(cfg_edge(n, *parent_edge), class);
-    }
-    let highest_target = be_up
-        .into_iter()
-        .map(|(dfs, _)| dfs)
-        .chain(min_dfs_target[0].into_iter());
-    (highest_target.min().unwrap_or(usize::MAX), bs)
 }
 
 #[cfg(test)]
@@ -465,7 +465,8 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let edge_classes =
+            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -515,7 +516,8 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
-        let edge_classes = get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let edge_classes =
+            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -542,7 +544,7 @@ pub(crate) mod test {
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
         let v = SimpleCfgView::new(&h, cfg_id);
-        let edge_classes = get_edge_classes(&v);
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // split is unique successor of head
         let split = *edge_classes
@@ -585,7 +587,7 @@ pub(crate) mod test {
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
         let v = SimpleCfgView::new(&h, cfg_id);
-        let edge_classes = get_edge_classes(&v);
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
         let merge = *edge_classes
