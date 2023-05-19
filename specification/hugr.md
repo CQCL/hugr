@@ -296,21 +296,21 @@ additional outputs to a classical copy node):
     `ConstE<Graph>` edge to specify the graph being called. The
     signature of the `Value` edges matches the function being called.
 
-  - `load_constant<T>`: has an incoming `ConstE<T>` edge, and a
+  - `load_constant<T>`: has an incoming `ConstE<T>` edge, where `T` is non-linear, and a
     `Value<*,T>` output, used to load a static constant in to the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all stateful operations that
     take no dataflow input, to ensure they lie in the causal cone of the
     `Input` node when traversing.
 
-  - `copy<T, N>`: explicit copy, has a single `Value<*,T>` input, and
+  - `copy<T, N>`: explicit copy, where `T` is non-linear, has a single `Value<*,T>` input, and
     `N` `Value<*,T>` outputs, where `N` \>=0. A `copy<T, 0>` is
     interpreted as a discard. A `copy<T,1>` is an identity operation and
     can be trivially removed.
 
   - `identity<T>`: pass-through, no operation is performed.
 
-  - `lookup<T,N>`, where T in {Int, Nat} and N\>0. Has a `Value<*,T>`
+  - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
     input, and a single `Value<*,Sum((),...,())>` output with N elements
     each of type unit `()`. The value is (1) a list of pairs of type
     `(T,Sum((),...,())` used as a lookup table on the input value, the
