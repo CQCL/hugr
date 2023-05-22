@@ -2,8 +2,8 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{HugrError, Node, ValidationError};
-use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID, Wire};
+use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::LinearType;
 
 pub mod handle;

@@ -1,10 +1,10 @@
 //! Handles to nodes in HUGR used during the building phase.
 //!
 use crate::ops::{
-    handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID, Wire},
+    handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID},
     tag::OpTag,
 };
-use crate::Node;
+use crate::{Node, Wire};
 
 use itertools::Itertools;
 use std::iter::FusedIterator;

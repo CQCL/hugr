@@ -1,4 +1,4 @@
-//! The Hugr data structure.
+//! The Hugr data structure, and its basic component handles.
 
 mod hugrmut;
 pub(crate) mod internal;
@@ -54,6 +54,11 @@ pub struct Port(portgraph::PortOffset);
 
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// A DataFlow wire, defined by a Value-kind output port of a node
+// Stores node and offset to output port
+pub struct Wire(Node, usize);
 
 /// Public API for HUGRs.
 impl Hugr {
@@ -172,6 +177,23 @@ impl Port {
     #[inline(always)]
     pub fn index(self) -> usize {
         self.0.index()
+    }
+}
+
+impl Wire {
+    /// Create a new wire from a node and an offset.
+    pub fn new(node: Node, offset: usize) -> Self {
+        Self(node, offset)
+    }
+
+    /// The node that this wire is connected to.
+    pub fn node(&self) -> Node {
+        self.0
+    }
+
+    /// The offset of the output port that this wire is connected to.
+    pub fn source(&self) -> Port {
+        Port::new_outgoing(self.1)
     }
 }
 

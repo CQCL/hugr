@@ -4,7 +4,8 @@ use thiserror::Error;
 
 use crate::ops::OpType;
 
-use super::{BuildError, Dataflow, Wire};
+use super::{BuildError, Dataflow};
+use crate::Wire;
 
 /// Builder to build regions of dataflow graphs that look like Circuits,
 /// where some inputs of operations directly correspond to some outputs.

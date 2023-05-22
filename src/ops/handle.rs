@@ -8,28 +8,6 @@ use smol_str::SmolStr;
 
 use super::tag::OpTag;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// A DataFlow wire, defined by a Value-kind output port of a node
-// Stores node and offset to output port
-pub struct Wire(Node, usize);
-
-impl Wire {
-    /// Create a new wire from a node and an offset.
-    pub fn new(node: Node, offset: usize) -> Self {
-        Self(node, offset)
-    }
-
-    /// The node that this wire is connected to.
-    pub fn node(&self) -> Node {
-        self.0
-    }
-
-    /// The offset of the output port that this wire is connected to.
-    pub fn offset(&self) -> usize {
-        self.1
-    }
-}
-
 /// Common trait for handles to a node.
 /// Typically wrappers around [`NodeIndex`].
 pub trait NodeHandle: Clone {
@@ -58,10 +36,6 @@ pub trait ContainerHandle: NodeHandle {
     /// Handle type for the children of this node.
     type ChildrenHandle: NodeHandle;
 }
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [OpType](crate::ops::OpType).
-pub struct OpID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DataflowOp](crate::ops::dataflow::DataflowOp).
@@ -171,8 +145,6 @@ macro_rules! impl_nodehandle {
     };
 }
 
-impl_nodehandle!(OpID, OpTag::Any);
-
 impl_nodehandle!(DataflowOpID, OpTag::DataflowOp);
 impl_nodehandle!(ConditionalID, OpTag::Conditional);
 impl_nodehandle!(CaseID, OpTag::Case);
@@ -199,6 +171,14 @@ impl<const DEF: bool> NodeHandle for AliasID<DEF> {
     #[inline]
     fn node(&self) -> Node {
         self.node
+    }
+}
+
+impl NodeHandle for Node {
+    const TAG: OpTag = OpTag::Any;
+    #[inline]
+    fn node(&self) -> Node {
+        *self
     }
 }
 

@@ -326,10 +326,7 @@ pub trait Dataflow: Container {
 
     /// Get the type of a Value [`Wire`]. If not valid port or of Value kind, returns None.
     fn get_wire_type(&self, wire: Wire) -> Result<SimpleType, BuildError> {
-        let kind = self
-            .hugr()
-            .get_optype(wire.node())
-            .port_kind(Port::new_outgoing(wire.offset()));
+        let kind = self.hugr().get_optype(wire.node()).port_kind(wire.source());
 
         if let Some(EdgeKind::Value(typ)) = kind {
             Ok(typ)
@@ -523,7 +520,13 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 ) -> Result<(), BuildError> {
     let mut any_local_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        any_local_inputs |= wire_up(data_builder, wire.node(), wire.offset(), op_node, dst_port)?;
+        any_local_inputs |= wire_up(
+            data_builder,
+            wire.node(),
+            wire.source().index(),
+            op_node,
+            dst_port,
+        )?;
     }
 
     if !any_local_inputs {
