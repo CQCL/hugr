@@ -22,14 +22,14 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
 enum Versioned {
-    /// First version of the HUGR serialization format.
+    /// Version 0 of the HUGR serialization format.
     V0(SerHugrV0),
 
     #[serde(other)]
     Unsupported,
 }
 
-/// First version of the HUGR serialization format.
+/// Version 0 of the HUGR serialization format.
 #[derive(Serialize, Deserialize)]
 struct SerHugrV0 {
     nodes: Vec<(NodeIndex, usize, usize)>,
