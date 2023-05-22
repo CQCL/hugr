@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::hash::Hash;
 
 use portgraph::NodeIndex;
@@ -45,6 +44,7 @@ impl<'a> HalfNodeView<'a> {
 
     fn is_multi_node(&self, n: NodeIndex) -> bool {
         // TODO if <n> is the entry-node, should we pretend there's an extra predecessor? (The "outside")
+        // We could also setify here before counting, but never
         self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
     }
     fn resolve_out(&self, n: NodeIndex) -> HalfNode {
@@ -56,18 +56,10 @@ impl<'a> HalfNodeView<'a> {
     }
 
     fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h
-            .graph
-            .output_neighbours(n)
-            .collect::<HashSet<_>>()
-            .into_iter()
+        self.h.graph.output_neighbours(n)
     }
     fn bb_preds(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h
-            .graph
-            .input_neighbours(n)
-            .collect::<HashSet<_>>()
-            .into_iter()
+        self.h.graph.input_neighbours(n)
     }
 }
 

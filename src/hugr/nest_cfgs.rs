@@ -41,6 +41,8 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
 
+use itertools::Itertools;
+use portgraph::portgraph::Neighbours;
 use portgraph::NodeIndex;
 
 use crate::hugr::internal::HugrView;
@@ -58,7 +60,7 @@ use crate::Hugr;
 /// splitting may allow the algorithm to identify more regions than existed in the underlying CFG
 /// (without mutating the underlying CFG perhaps in vain).
 pub trait CfgView<T> {
-    /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume an extra edge in "from outside"
+    /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
     fn entry_node(&self) -> T;
     /// The unique exit node of the CFG. The only node to have no successors.
     fn exit_node(&self) -> T;
@@ -67,9 +69,9 @@ pub trait CfgView<T> {
     type Iterator<'c>: Iterator<Item = T>
     where
         Self: 'c;
-    /// Returns an iterator over the successors of the specified basic block (as a set).
+    /// Returns an iterator over the successors of the specified basic block.
     fn successors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
-    /// Returns an iterator over the predecessors of the specified basic block (as a set).
+    /// Returns an iterator over the predecessors of the specified basic block.
     fn predecessors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
 }
 
@@ -107,6 +109,7 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
         .chain(extra.into_iter())
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
+        .unique()
 }
 
 fn flip<T: Copy + Clone + PartialEq + Eq + Hash>(src: T, d: EdgeDest<T>) -> (T, EdgeDest<T>) {
@@ -151,24 +154,16 @@ impl CfgView<NodeIndex> for SimpleCfgView<'_> {
         self.exit
     }
 
-    type Iterator<'c> = <HashSet<NodeIndex> as IntoIterator>::IntoIter
+    type Iterator<'c> = Neighbours<'c>
     where
         Self: 'c;
 
     fn successors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h
-            .graph
-            .output_neighbours(node)
-            .collect::<HashSet<_>>()
-            .into_iter()
+        self.h.graph.output_neighbours(node)
     }
 
     fn predecessors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h
-            .graph
-            .input_neighbours(node)
-            .collect::<HashSet<_>>()
-            .into_iter()
+        self.h.graph.input_neighbours(node)
     }
 }
 
@@ -414,8 +409,6 @@ pub(crate) mod test {
     };
     use crate::types::{ClassicType, Signature, SimpleType};
     use crate::{type_row, Hugr};
-    use itertools::Itertools;
-    //use crate::hugr::nest_cfgs::get_edge_classes;
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
