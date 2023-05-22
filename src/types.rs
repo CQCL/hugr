@@ -86,7 +86,7 @@ impl Signature {
         self.input.iter().filter(|t| t.is_linear())
     }
 
-    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
     pub fn get(&self, offset: Port) -> Option<EdgeKind> {
         if offset.direction() == Direction::Incoming && offset.index() >= self.input.len() {
             self.const_input
@@ -100,7 +100,7 @@ impl Signature {
         }
     }
 
-    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
     pub fn get_df(&self, offset: Port) -> Option<&SimpleType> {
         match offset.direction() {
             Direction::Incoming => self.input.get(offset.index()),
@@ -108,7 +108,7 @@ impl Signature {
         }
     }
 
-    /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
+    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
     pub fn get_df_mut(&mut self, offset: Port) -> Option<&mut SimpleType> {
         match offset.direction() {
             Direction::Incoming => self.input.get_mut(offset.index()),

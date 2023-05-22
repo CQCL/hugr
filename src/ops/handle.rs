@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 use super::tag::OpTag;
 
 /// Common trait for handles to a node.
-/// Typically wrappers around [`NodeIndex`].
+/// Typically wrappers around [`Node`].
 pub trait NodeHandle: Clone {
     /// The most specific operation tag associated with the handle.
     const TAG: OpTag;
