@@ -6,11 +6,12 @@ pub(crate) mod internal;
 pub mod serialize;
 pub mod validate;
 
+use derive_more::From;
 pub use hugrmut::HugrMut;
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
+use portgraph::{Hierarchy, PortGraph, SecondaryMap};
 use thiserror::Error;
 
 use self::internal::HugrView;
@@ -31,10 +32,10 @@ pub struct Hugr {
     /// It must correspond to a [`ModuleOp::Root`] node.
     ///
     /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
-    root: NodeIndex,
+    root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: SecondaryMap<NodeIndex, OpType>,
+    op_types: SecondaryMap<portgraph::NodeIndex, OpType>,
 }
 
 impl Default for Hugr {
@@ -42,6 +43,17 @@ impl Default for Hugr {
         Self::new(ModuleOp::Root)
     }
 }
+
+/// A handle to a node in the HUGR.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
+pub struct Node(portgraph::NodeIndex);
+
+/// A handle to a port for a node in the HUGR.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
+pub struct Port(portgraph::PortOffset);
+
+/// The direction of a port.
+pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
@@ -97,7 +109,7 @@ impl Hugr {
                 let style = if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
                     DotEdgeStyle::Some("dashed".into())
                 } else if self
-                    .get_optype(src)
+                    .get_optype(src.into())
                     .port_kind(self.graph.port_offset(p).unwrap())
                     == Some(EdgeKind::StateOrder)
                 {
@@ -128,6 +140,38 @@ impl Hugr {
             root,
             op_types,
         }
+    }
+}
+
+impl Port {
+    /// Creates a new port offset.
+    #[inline]
+    pub fn new(direction: Direction, offset: usize) -> Self {
+        Self(portgraph::PortOffset::new(direction, offset))
+    }
+
+    /// Creates a new incoming port offset.
+    #[inline]
+    pub fn new_incoming(offset: usize) -> Self {
+        Self(portgraph::PortOffset::new_incoming(offset))
+    }
+
+    /// Creates a new outgoing port offset.
+    #[inline]
+    pub fn new_outgoing(offset: usize) -> Self {
+        Self(portgraph::PortOffset::new_outgoing(offset))
+    }
+
+    /// Returns the direction of the port.
+    #[inline]
+    pub fn direction(self) -> Direction {
+        self.0.direction()
+    }
+
+    /// Returns the offset of the port.
+    #[inline(always)]
+    pub fn index(self) -> usize {
+        self.0.index()
     }
 }
 

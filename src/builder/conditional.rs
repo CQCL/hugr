@@ -11,11 +11,11 @@ use super::{
     BuildError, ConditionalID,
 };
 
+use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
 use std::collections::HashSet;
 
-use portgraph::NodeIndex;
 use thiserror::Error;
 
 /// Builder for a [`CaseOp`] child graph.
@@ -25,14 +25,14 @@ pub type CaseBuilder<'b> = DFGWrapper<'b, BuildHandle<CaseID>>;
 pub enum ConditionalBuildError {
     /// Case already built.
     #[error("Case {case} of Conditional node {conditional:?} has already been built.")]
-    CaseBuilt { conditional: NodeIndex, case: usize },
+    CaseBuilt { conditional: Node, case: usize },
     /// Case already built.
     #[error("Conditional node {conditional:?} has no case with index {case}.")]
-    NotCase { conditional: NodeIndex, case: usize },
+    NotCase { conditional: Node, case: usize },
     /// Not all cases of Conditional built.
     #[error("Cases {cases:?} of Conditional node {conditional:?} have not been built.")]
     NotAllCasesBuilt {
-        conditional: NodeIndex,
+        conditional: Node,
         cases: HashSet<usize>,
     },
 }
@@ -40,16 +40,16 @@ pub enum ConditionalBuildError {
 /// Builder for a [`ControlFlowOp::Conditional`] node's children.
 pub struct ConditionalBuilder<'f> {
     pub(super) base: &'f mut HugrMut,
-    pub(super) conditional_node: NodeIndex,
+    pub(super) conditional_node: Node,
     pub(super) n_out_wires: usize,
-    pub(super) case_nodes: Vec<Option<NodeIndex>>,
+    pub(super) case_nodes: Vec<Option<Node>>,
 }
 
 impl<'f> Container for ConditionalBuilder<'f> {
     type ContainerHandle = Result<BuildHandle<ConditionalID>, ConditionalBuildError>;
 
     #[inline]
-    fn container_node(&self) -> NodeIndex {
+    fn container_node(&self) -> Node {
         self.conditional_node
     }
 

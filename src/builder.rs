@@ -1,9 +1,8 @@
 //! Tools for building valid HUGRs.
 //!
-use portgraph::NodeIndex;
 use thiserror::Error;
 
-use crate::hugr::{HugrError, ValidationError};
+use crate::hugr::{HugrError, Node, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID, Wire};
 use crate::types::LinearType;
 
@@ -42,12 +41,12 @@ pub enum BuildError {
     ConstructError(#[from] HugrError),
     /// CFG can only have one entry.
     #[error("CFG entry node already built for CFG node: {0:?}.")]
-    EntryBuiltError(NodeIndex),
+    EntryBuiltError(Node),
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
     UnexpectedType {
         /// Index of node where error occurred.
-        node: NodeIndex,
+        node: Node,
         /// Description of expected node.
         op_desc: &'static str,
     },

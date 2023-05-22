@@ -1,7 +1,7 @@
-use crate::{
-    hugr::{internal::HugrView, validate::InterGraphEdgeError, ValidationError},
-    ops::controlflow::{ConditionalSignature, TailLoopSignature},
-};
+use crate::hugr::internal::HugrView;
+use crate::hugr::validate::InterGraphEdgeError;
+use crate::hugr::{Direction, Node, Port, ValidationError};
+use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
 
 use std::iter;
 
@@ -19,7 +19,6 @@ use crate::{
 use crate::types::{Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
-use portgraph::{Direction, NodeIndex, PortOffset};
 
 use super::{
     cfg::CFGBuilder, conditional::ConditionalBuilder, dataflow::DFGBuilder,
@@ -39,13 +38,13 @@ pub trait Container {
     /// child graph has been finished.
     type ContainerHandle;
     /// The container node.
-    fn container_node(&self) -> NodeIndex;
+    fn container_node(&self) -> Node;
     /// The underlying [`HugrMut`] being used to build the HUGR.
     fn base(&mut self) -> &mut HugrMut;
     /// Immutable reference to HUGR being built.
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
-    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<NodeIndex, BuildError> {
+    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.base().add_op_with_parent(parent, op)?)
     }
@@ -54,7 +53,7 @@ pub trait Container {
     ///
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
-    fn add_other_wire(&mut self, src: NodeIndex, dst: NodeIndex) -> Result<Wire, BuildError> {
+    fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
         Ok(Wire::new(src, src_port))
     }
@@ -67,7 +66,7 @@ pub trait Container {
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
     /// Return indices of input and output nodes.
-    fn io(&self) -> [NodeIndex; 2];
+    fn io(&self) -> [Node; 2];
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
     /// Handle to input node.
@@ -330,7 +329,7 @@ pub trait Dataflow: Container {
         let kind = self
             .hugr()
             .get_optype(wire.node())
-            .port_kind(PortOffset::new_outgoing(wire.offset()));
+            .port_kind(Port::new_outgoing(wire.offset()));
 
         if let Some(EdgeKind::Value(typ)) = kind {
             Ok(typ)
@@ -504,7 +503,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
-) -> Result<(NodeIndex, usize), BuildError> {
+) -> Result<(Node, usize), BuildError> {
     let [inp, out] = data_builder.io();
 
     let op: OpType = op.into();
@@ -518,9 +517,9 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 
 fn wire_up_inputs<T: Dataflow + ?Sized>(
     inputs: Vec<Wire>,
-    op_node: NodeIndex,
+    op_node: Node,
     data_builder: &mut T,
-    inp: NodeIndex,
+    inp: Node,
 ) -> Result<(), BuildError> {
     let mut any_local_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
@@ -538,13 +537,13 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 /// Add edge from src to dst and report back if they do share a parent
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    mut src: NodeIndex,
+    mut src: Node,
     mut src_port: usize,
-    dst: NodeIndex,
+    dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
     let base = data_builder.base();
-    let src_offset = PortOffset::new_outgoing(src_port);
+    let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.hugr().get_parent(src);
     let dst_parent = base.hugr().get_parent(dst);
@@ -572,9 +571,9 @@ fn wire_up<T: Dataflow + ?Sized>(
                 }) else {
                     let val_err: ValidationError = InterGraphEdgeError::NoRelation {
                         from: src,
-                        from_offset: PortOffset::new_outgoing(src_port),
+                        from_offset: Port::new_outgoing(src_port),
                         to: dst,
-                        to_offset: PortOffset::new_incoming(dst_port),
+                        to_offset: Port::new_incoming(dst_port),
                     }.into();
                     return Err(val_err.into());
                 };
@@ -616,8 +615,8 @@ fn wire_up<T: Dataflow + ?Sized>(
 /// Panics if port not valid for Op or port is not Const/Value
 fn check_classical_value(
     base: &HugrMut,
-    src: NodeIndex,
-    src_offset: PortOffset,
+    src: Node,
+    src_offset: Port,
 ) -> Result<Option<ClassicType>, BuildError> {
     let wire_kind = base.hugr().get_optype(src).port_kind(src_offset).unwrap();
     let typ = match wire_kind {
@@ -635,7 +634,7 @@ fn check_classical_value(
 }
 
 // Return newly added port to copy node if src node is a copy
-fn if_copy_add_port(base: &mut HugrMut, src: NodeIndex) -> Option<usize> {
+fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
     let src_op: Result<&LeafOp, ()> = base.hugr().get_optype(src).try_into();
     if let Ok(LeafOp::Copy { n_copies, typ }) = src_op {
         let copy_node = src;

@@ -4,9 +4,9 @@ use crate::ops::{
     handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID, Wire},
     tag::OpTag,
 };
+use crate::Node;
 
 use itertools::Itertools;
-use portgraph::NodeIndex;
 use std::iter::FusedIterator;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -16,8 +16,8 @@ pub struct BuildHandle<T> {
     num_value_outputs: usize,
 }
 
-impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
-    fn from((node, num_value_outputs): (NodeIndex, usize)) -> Self {
+impl<T: From<Node>> From<(Node, usize)> for BuildHandle<T> {
+    fn from((node, num_value_outputs): (Node, usize)) -> Self {
         Self {
             node_handle: node.into(),
             num_value_outputs,
@@ -28,7 +28,7 @@ impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
 impl<T: NodeHandle> NodeHandle for BuildHandle<T> {
     const TAG: OpTag = T::TAG;
 
-    fn node(&self) -> NodeIndex {
+    fn node(&self) -> Node {
         self.node_handle.node()
     }
 }
@@ -111,7 +111,7 @@ impl From<BuildHandle<DfgID>> for BuildHandle<TailLoopID> {
 #[derive(Debug, Clone)]
 /// Iterator over output wires of a [`BuildHandle`].
 pub struct Outputs {
-    node: NodeIndex,
+    node: Node,
     range: std::ops::Range<usize>,
 }
 

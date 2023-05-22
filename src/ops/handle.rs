@@ -1,9 +1,9 @@
 //! Handles to nodes in HUGR.
 //!
 use crate::types::{ClassicType, Container, LinearType, SimpleType};
+use crate::Node;
 
 use derive_more::From as DerFrom;
-use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
 use super::tag::OpTag;
@@ -11,16 +11,16 @@ use super::tag::OpTag;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
-pub struct Wire(NodeIndex, usize);
+pub struct Wire(Node, usize);
 
 impl Wire {
     /// Create a new wire from a node and an offset.
-    pub fn new(node: NodeIndex, offset: usize) -> Self {
+    pub fn new(node: Node, offset: usize) -> Self {
         Self(node, offset)
     }
 
     /// The node that this wire is connected to.
-    pub fn node(&self) -> NodeIndex {
+    pub fn node(&self) -> Node {
         self.0
     }
 
@@ -37,7 +37,7 @@ pub trait NodeHandle: Clone {
     const TAG: OpTag;
 
     /// Index of underlying node.
-    fn node(&self) -> NodeIndex;
+    fn node(&self) -> Node;
 
     /// Operation tag for the handle.
     #[inline]
@@ -46,7 +46,7 @@ pub trait NodeHandle: Clone {
     }
 
     /// Cast the handle to a different more general tag.
-    fn try_cast<T: NodeHandle + From<NodeIndex>>(&self) -> Option<T> {
+    fn try_cast<T: NodeHandle + From<Node>>(&self) -> Option<T> {
         T::TAG.contains(Self::TAG).then(|| self.node().into())
     }
 }
@@ -61,27 +61,27 @@ pub trait ContainerHandle: NodeHandle {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [OpType](crate::ops::OpType).
-pub struct OpID(NodeIndex);
+pub struct OpID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DataflowOp](crate::ops::dataflow::DataflowOp).
-pub struct DataflowOpID(NodeIndex);
+pub struct DataflowOpID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node.
-pub struct DfgID(NodeIndex);
+pub struct DfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node.
-pub struct CfgID(NodeIndex);
+pub struct CfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a module [Root](crate::ops::module::ModuleOp::Root) node.
-pub struct ModuleRootID(NodeIndex);
+pub struct ModuleRootID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [ModuleOp](crate::ops::module::ModuleOp) node.
-pub struct ModuleID(NodeIndex);
+pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [def](crate::ops::module::ModuleOp::Def)
@@ -89,7 +89,7 @@ pub struct ModuleID(NodeIndex);
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
-pub struct FuncID<const DEF: bool>(NodeIndex);
+pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Handle to an [AliasDef](crate::ops::module::ModuleOp::AliasDef)
@@ -98,14 +98,14 @@ pub struct FuncID<const DEF: bool>(NodeIndex);
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct AliasID<const DEF: bool> {
-    node: NodeIndex,
+    node: Node,
     name: SmolStr,
     linear: bool,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: NodeIndex, name: SmolStr, linear: bool) -> Self {
+    pub fn new(node: Node, name: SmolStr, linear: bool) -> Self {
         Self { node, name, linear }
     }
 
@@ -125,7 +125,7 @@ impl<const DEF: bool> AliasID<DEF> {
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
 /// Handle to a [Const](crate::ops::module::ModuleOp::Const) node.
-pub struct ConstID(NodeIndex, ClassicType);
+pub struct ConstID(Node, ClassicType);
 
 impl ConstID {
     /// Return the type of the constant.
@@ -136,19 +136,19 @@ impl ConstID {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node.
-pub struct BasicBlockID(NodeIndex);
+pub struct BasicBlockID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [Case](crate::ops::controlflow::CaseOp) node.
-pub struct CaseID(NodeIndex);
+pub struct CaseID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node.
-pub struct TailLoopID(NodeIndex);
+pub struct TailLoopID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node.
-pub struct ConditionalID(NodeIndex);
+pub struct ConditionalID(Node);
 
 /// Implements the `NodeHandle` trait for a tuple struct that contains just a
 /// NodeIndex. Takes the name of the struct, and the corresponding OpTag.
@@ -164,7 +164,7 @@ macro_rules! impl_nodehandle {
             const TAG: OpTag = $tag;
 
             #[inline]
-            fn node(&self) -> NodeIndex {
+            fn node(&self) -> Node {
                 self.$node_attr
             }
         }
@@ -189,7 +189,7 @@ impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
 impl<const DEF: bool> NodeHandle for FuncID<DEF> {
     const TAG: OpTag = OpTag::Function;
     #[inline]
-    fn node(&self) -> NodeIndex {
+    fn node(&self) -> Node {
         self.0
     }
 }
@@ -197,7 +197,7 @@ impl<const DEF: bool> NodeHandle for FuncID<DEF> {
 impl<const DEF: bool> NodeHandle for AliasID<DEF> {
     const TAG: OpTag = OpTag::Alias;
     #[inline]
-    fn node(&self) -> NodeIndex {
+    fn node(&self) -> Node {
         self.node
     }
 }

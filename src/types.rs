@@ -5,17 +5,15 @@ pub mod simple;
 
 use std::ops::Index;
 
-use portgraph::Direction;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
 pub use simple::{ClassicType, Container, LinearType, SimpleType, TypeRow};
 
-pub use portgraph::PortOffset;
-
 use smol_str::SmolStr;
 
+use crate::hugr::{Direction, Port};
 use crate::{resource::ResourceSet, type_row};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
@@ -89,7 +87,7 @@ impl Signature {
     }
 
     /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: PortOffset) -> Option<EdgeKind> {
+    pub fn get(&self, offset: Port) -> Option<EdgeKind> {
         if offset.direction() == Direction::Incoming && offset.index() >= self.input.len() {
             self.const_input
                 .get(offset.index() - self.input.len())?
@@ -103,7 +101,7 @@ impl Signature {
     }
 
     /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
-    pub fn get_df(&self, offset: PortOffset) -> Option<&SimpleType> {
+    pub fn get_df(&self, offset: Port) -> Option<&SimpleType> {
         match offset.direction() {
             Direction::Incoming => self.input.get(offset.index()),
             Direction::Outgoing => self.output.get(offset.index()),
@@ -111,7 +109,7 @@ impl Signature {
     }
 
     /// Returns the port type given a [`PortOffset`]. Returns `None` if the offset is out of bounds.
-    pub fn get_df_mut(&mut self, offset: PortOffset) -> Option<&mut SimpleType> {
+    pub fn get_df_mut(&mut self, offset: Port) -> Option<&mut SimpleType> {
         match offset.direction() {
             Direction::Incoming => self.input.get_mut(offset.index()),
             Direction::Outgoing => self.output.get_mut(offset.index()),
@@ -238,10 +236,10 @@ impl SignatureDescription {
     }
 }
 
-impl Index<PortOffset> for SignatureDescription {
+impl Index<Port> for SignatureDescription {
     type Output = SmolStr;
 
-    fn index(&self, index: PortOffset) -> &Self::Output {
+    fn index(&self, index: Port) -> &Self::Output {
         match index.direction() {
             Direction::Incoming => self.input.get(index.index()).unwrap_or(EMPTY_STRING_REF),
             Direction::Outgoing => self.output.get(index.index()).unwrap_or(EMPTY_STRING_REF),

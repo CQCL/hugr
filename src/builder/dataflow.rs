@@ -7,23 +7,22 @@ use crate::ops::{DataflowOp, OpType};
 
 use crate::types::TypeRow;
 
-use portgraph::NodeIndex;
-
+use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node.
 pub struct DFGBuilder<'f> {
     pub(crate) base: &'f mut HugrMut,
-    pub(crate) dfg_node: NodeIndex,
+    pub(crate) dfg_node: Node,
     pub(crate) num_in_wires: usize,
     pub(crate) num_out_wires: usize,
-    pub(crate) io: [NodeIndex; 2],
+    pub(crate) io: [Node; 2],
 }
 
 impl<'f> DFGBuilder<'f> {
     pub(super) fn create_with_io(
         base: &'f mut HugrMut,
-        parent: NodeIndex,
+        parent: Node,
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<Self, BuildError> {
@@ -51,7 +50,7 @@ impl<'f> DFGBuilder<'f> {
 impl<'f> Container for DFGBuilder<'f> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
-    fn container_node(&self) -> NodeIndex {
+    fn container_node(&self) -> Node {
         self.dfg_node
     }
 
@@ -72,7 +71,7 @@ impl<'f> Container for DFGBuilder<'f> {
 
 impl<'f> Dataflow for DFGBuilder<'f> {
     #[inline]
-    fn io(&self) -> [NodeIndex; 2] {
+    fn io(&self) -> [Node; 2] {
         self.io
     }
 
@@ -101,7 +100,7 @@ impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
     type ContainerHandle = T;
 
     #[inline]
-    fn container_node(&self) -> NodeIndex {
+    fn container_node(&self) -> Node {
         self.0.container_node()
     }
 
@@ -122,7 +121,7 @@ impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
 
 impl<'b, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<'b, T> {
     #[inline]
-    fn io(&self) -> [NodeIndex; 2] {
+    fn io(&self) -> [Node; 2] {
         self.0.io
     }
 
