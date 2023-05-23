@@ -19,7 +19,6 @@ pub mod rewrite;
 pub mod types;
 mod utils;
 
-pub use crate::hugr::Hugr;
+pub use crate::hugr::{Direction, Hugr, Node, Port, Wire};
 pub use crate::resource::Resource;
 pub use crate::rewrite::{Rewrite, RewriteError};
-pub use portgraph::{Direction, NodeIndex, PortIndex};

@@ -11,8 +11,27 @@ use portgraph::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 
+/// A wrapper over the available HUGR serialization formats.
+///
+/// The implementation of `Serialize` for `Hugr` encodes the graph in the most
+/// recent version of the format. We keep the `Deserialize` implementations for
+/// older versions to allow for backwards compatibility.
+///
+/// Make sure to order the variants from newest to oldest, as the deserializer
+/// will try to deserialize them in order.
 #[derive(Serialize, Deserialize)]
-struct SerHugr {
+#[serde(tag = "version", rename_all = "lowercase")]
+enum Versioned {
+    /// Version 0 of the HUGR serialization format.
+    V0(SerHugrV0),
+
+    #[serde(other)]
+    Unsupported,
+}
+
+/// Version 0 of the HUGR serialization format.
+#[derive(Serialize, Deserialize)]
+struct SerHugrV0 {
     nodes: Vec<(NodeIndex, usize, usize)>,
     edges: Vec<[(NodeIndex, usize); 2]>,
     root: NodeIndex,
@@ -33,7 +52,33 @@ pub enum HUGRSerializationError {
     LinkError(#[from] LinkError),
 }
 
-impl TryFrom<&Hugr> for SerHugr {
+impl Serialize for Hugr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let shg: SerHugrV0 = self.try_into().map_err(serde::ser::Error::custom)?;
+        let versioned = Versioned::V0(shg);
+        versioned.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Hugr {
+    fn deserialize<D>(deserializer: D) -> Result<Hugr, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let shg = Versioned::deserialize(deserializer)?;
+        match shg {
+            Versioned::V0(shg) => shg.try_into().map_err(serde::de::Error::custom),
+            Versioned::Unsupported => Err(serde::de::Error::custom(
+                "Unsupported HUGR serialization format.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<&Hugr> for SerHugrV0 {
     type Error = HUGRSerializationError;
 
     fn try_from(
@@ -60,7 +105,7 @@ impl TryFrom<&Hugr> for SerHugr {
                 let opt = &op_types[n];
                 // secondary map holds default values for empty positions
                 // whether or not the default value is present or not - the
-                // serializaion roundtrip will be correct
+                // serialization roundtrip will be correct
                 if opt != &OpType::default() {
                     op_types_hsh.insert(n, opt.clone());
                 }
@@ -98,15 +143,15 @@ impl TryFrom<&Hugr> for SerHugr {
     }
 }
 
-impl TryFrom<SerHugr> for Hugr {
+impl TryFrom<SerHugrV0> for Hugr {
     type Error = HUGRSerializationError;
     fn try_from(
-        SerHugr {
+        SerHugrV0 {
             nodes,
             edges,
             root,
             mut op_types,
-        }: SerHugr,
+        }: SerHugrV0,
     ) -> Result<Self, Self::Error> {
         let mut hierarchy = Hierarchy::new();
 
@@ -134,26 +179,6 @@ impl TryFrom<SerHugr> for Hugr {
             root,
             op_types: op_types_sec,
         })
-    }
-}
-
-impl Serialize for Hugr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let shg: SerHugr = self.try_into().map_err(serde::ser::Error::custom)?;
-        shg.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Hugr {
-    fn deserialize<D>(deserializer: D) -> Result<Hugr, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let shg = SerHugr::deserialize(deserializer)?;
-        shg.try_into().map_err(serde::de::Error::custom)
     }
 }
 

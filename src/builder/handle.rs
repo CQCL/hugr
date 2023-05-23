@@ -1,12 +1,15 @@
 //! Handles to nodes in HUGR used during the building phase.
 //!
-use crate::ops::{
-    handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID, Wire},
-    tag::OpTag,
+use crate::{
+    ops::{
+        handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID},
+        tag::OpTag,
+    },
+    Port,
 };
+use crate::{Node, Wire};
 
 use itertools::Itertools;
-use portgraph::NodeIndex;
 use std::iter::FusedIterator;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -16,8 +19,8 @@ pub struct BuildHandle<T> {
     num_value_outputs: usize,
 }
 
-impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
-    fn from((node, num_value_outputs): (NodeIndex, usize)) -> Self {
+impl<T: From<Node>> From<(Node, usize)> for BuildHandle<T> {
+    fn from((node, num_value_outputs): (Node, usize)) -> Self {
         Self {
             node_handle: node.into(),
             num_value_outputs,
@@ -28,7 +31,7 @@ impl<T: From<NodeIndex>> From<(NodeIndex, usize)> for BuildHandle<T> {
 impl<T: NodeHandle> NodeHandle for BuildHandle<T> {
     const TAG: OpTag = T::TAG;
 
-    fn node(&self) -> NodeIndex {
+    fn node(&self) -> Node {
         self.node_handle.node()
     }
 }
@@ -61,7 +64,7 @@ impl<T: NodeHandle> BuildHandle<T> {
     /// Retrieve a [`Wire`] corresponding to the given offset.
     /// Does not check whether such a wire is valid for this node.
     pub fn out_wire(&self, offset: usize) -> Wire {
-        Wire::new(self.node(), offset)
+        Wire::new(self.node(), Port::new_outgoing(offset))
     }
 
     #[inline]
@@ -111,7 +114,7 @@ impl From<BuildHandle<DfgID>> for BuildHandle<TailLoopID> {
 #[derive(Debug, Clone)]
 /// Iterator over output wires of a [`BuildHandle`].
 pub struct Outputs {
-    node: NodeIndex,
+    node: Node,
     range: std::ops::Range<usize>,
 }
 
@@ -119,12 +122,16 @@ impl Iterator for Outputs {
     type Item = Wire;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.range.next().map(|offset| Wire::new(self.node, offset))
+        self.range
+            .next()
+            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.range.nth(n).map(|offset| Wire::new(self.node, offset))
+        self.range
+            .nth(n)
+            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
     }
 
     #[inline]
@@ -150,7 +157,7 @@ impl DoubleEndedIterator for Outputs {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.range
             .next_back()
-            .map(|offset| Wire::new(self.node, offset))
+            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
     }
 }
 

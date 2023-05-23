@@ -10,7 +10,7 @@ use crate::ops::{ConstValue, ModuleOp, OpType};
 
 use crate::types::Signature;
 
-use portgraph::NodeIndex;
+use crate::Node;
 use smol_str::SmolStr;
 
 use crate::{hugr::HugrMut, Hugr};
@@ -32,7 +32,7 @@ impl Container for ModuleBuilder {
     type ContainerHandle = Result<Hugr, BuildError>;
 
     #[inline]
-    fn container_node(&self) -> NodeIndex {
+    fn container_node(&self) -> Node {
         self.0.root()
     }
 

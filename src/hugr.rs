@@ -1,4 +1,4 @@
-//! The Hugr data structure.
+//! The Hugr data structure, and its basic component handles.
 
 mod hugrmut;
 pub(crate) mod internal;
@@ -8,11 +8,12 @@ pub mod nest_cfgs;
 pub mod serialize;
 pub mod validate;
 
+use derive_more::From;
 pub use hugrmut::HugrMut;
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::{Hierarchy, NodeIndex, PortGraph, SecondaryMap};
+use portgraph::{Hierarchy, PortGraph, SecondaryMap};
 use thiserror::Error;
 
 use self::internal::HugrView;
@@ -33,10 +34,10 @@ pub struct Hugr {
     /// It must correspond to a [`ModuleOp::Root`] node.
     ///
     /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
-    root: NodeIndex,
+    root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: SecondaryMap<NodeIndex, OpType>,
+    op_types: SecondaryMap<portgraph::NodeIndex, OpType>,
 }
 
 impl Default for Hugr {
@@ -44,6 +45,26 @@ impl Default for Hugr {
         Self::new(ModuleOp::Root)
     }
 }
+
+/// A handle to a node in the HUGR.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
+pub struct Node {
+    index: portgraph::NodeIndex,
+}
+
+/// A handle to a port for a node in the HUGR.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
+pub struct Port {
+    offset: portgraph::PortOffset,
+}
+
+/// The direction of a port.
+pub type Direction = portgraph::Direction;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// A DataFlow wire, defined by a Value-kind output port of a node
+// Stores node and offset to output port
+pub struct Wire(Node, usize);
 
 /// Public API for HUGRs.
 impl Hugr {
@@ -99,7 +120,7 @@ impl Hugr {
                 let style = if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
                     DotEdgeStyle::Some("dashed".into())
                 } else if self
-                    .get_optype(src)
+                    .get_optype(src.into())
                     .port_kind(self.graph.port_offset(p).unwrap())
                     == Some(EdgeKind::StateOrder)
                 {
@@ -130,6 +151,64 @@ impl Hugr {
             root,
             op_types,
         }
+    }
+}
+
+impl Port {
+    /// Creates a new port.
+    #[inline]
+    pub fn new(direction: Direction, port: usize) -> Self {
+        Self {
+            offset: portgraph::PortOffset::new(direction, port),
+        }
+    }
+
+    /// Creates a new incoming port.
+    #[inline]
+    pub fn new_incoming(port: usize) -> Self {
+        Self {
+            offset: portgraph::PortOffset::new_incoming(port),
+        }
+    }
+
+    /// Creates a new outgoing port.
+    #[inline]
+    pub fn new_outgoing(port: usize) -> Self {
+        Self {
+            offset: portgraph::PortOffset::new_outgoing(port),
+        }
+    }
+
+    /// Returns the direction of the port.
+    #[inline]
+    pub fn direction(self) -> Direction {
+        self.offset.direction()
+    }
+
+    /// Returns the offset of the port.
+    #[inline(always)]
+    pub fn index(self) -> usize {
+        self.offset.index()
+    }
+}
+
+impl Wire {
+    /// Create a new wire from a node and a port.
+    #[inline]
+    pub fn new(node: Node, port: Port) -> Self {
+        Self(node, port.index())
+    }
+
+    /// The node that this wire is connected to.
+    #[inline]
+    pub fn node(&self) -> Node {
+        self.0
+    }
+
+    /// The output port that this wire is connected to.
+    #[inline]
+    pub fn source(&self) -> Port {
+        Port::new_outgoing(self.1)
     }
 }
 

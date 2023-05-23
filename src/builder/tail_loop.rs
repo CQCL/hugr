@@ -2,7 +2,9 @@ use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::hugr::internal::HugrView;
+use crate::hugr::HugrMut;
 use crate::types::TypeRow;
+use crate::Node;
 
 use super::handle::BuildHandle;
 use super::{
@@ -10,17 +12,13 @@ use super::{
     BuildError, Container, Dataflow, TailLoopID, Wire,
 };
 
-use portgraph::NodeIndex;
-
-use crate::hugr::HugrMut;
-
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
 pub type TailLoopBuilder<'b> = DFGWrapper<'b, BuildHandle<TailLoopID>>;
 
 impl<'b> TailLoopBuilder<'b> {
     pub(super) fn create_with_io(
         base: &'b mut HugrMut,
-        loop_node: NodeIndex,
+        loop_node: Node,
         tail_loop_sig: TailLoopSignature,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(

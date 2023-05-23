@@ -178,9 +178,7 @@ Note that the locality is not fixed or even specified by the signature.
 
 Simple HUGR example
 
-![Quantum
-circuit with a Hadamard and CNOT
-operation](attachments/2647818241/2647818473.svg?width=442)
+<img src="attachments/2647818241/2647818473.svg" width="512px">
 
 In the example above, a 2-qubit circuit is described as a dataflow
 region of a HUGR with one `H` operation and one `CNOT` operation. The
@@ -321,7 +319,7 @@ additional outputs to a classical copy node):
     operation is the signature of the child graph. These nodes are
     parents in the hierarchy.
 
-![](attachments/2647818241/2647818467.png)
+<img src="attachments/2647818241/2647818467.png" width="1024px">
 
 #### Control Flow
 
@@ -348,7 +346,7 @@ system](#type-system)), where `#ti` is the *i*th Row defining it.
 
 **TODO: update below diagram now that Conditional is “match”**
 
-![](attachments/2647818241/2647818344.png)
+<img src="attachments/2647818241/2647818344.png" width="1024px">
 
 ##### `TailLoop` nodes
 
@@ -417,7 +415,7 @@ Some normalizations are possible:
 
 **Example CFG (TODO update w/ Sum types)**
 
-![](attachments/2647818241/2647818461.png)
+<img src="attachments/2647818241/2647818461.png" width="768px">
 
 #### Hierarchical Relationships and Constraints
 
@@ -531,7 +529,7 @@ execute \>=0 times.
     i\>1 allows the node to target an arbitrarily-deep descendant of the
     dominated block, similar to an Ext edge.)
 
-![](attachments/2647818241/2647818338.png)
+<img src="attachments/2647818241/2647818338.png" width="768px">
 
 This mechanism allows for some values to be passed into a block
 bypassing the input/output nodes, and we expect this form to make
@@ -569,7 +567,7 @@ is found within a CFG (where block *a* dominates *b*, *b* postdominates
 be normalized by moving the region bracketted by *a…b* into its own
 CFG-node.
 
-![](attachments/2647818241/2647818458.png)
+<img src="attachments/2647818241/2647818458.png" width="512px">
 
 ### Operation Extensibility
 
@@ -973,13 +971,13 @@ Unification will demand that resource constraints are equal and, to make
 it so, we will have an operations called **lift** and **liftGraph**
 which can add a resource constraints to values.
 
-![](attachments/2647818241/2647818335.png)
+<img src="attachments/2647818241/2647818335.png" height="64px">
 
 **lift** - Takes as a node weight parameter the single resource
-**X **which it adds to the
+**X** which it adds to the
 resource requirements of it’s argument.
 
-![](attachments/2647818241/2647818332.png)
+<img src="attachments/2647818241/2647818332.png" height="64px">
 
 **liftGraph** - Like **lift**, takes a
 resource X as a constant node
@@ -1008,7 +1006,7 @@ I’m going to define them in terms of resources. We have the “builtin”
 resource which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `call`:
 
-![](attachments/2647818241/2647818323.png)
+<img src="attachments/2647818241/2647818323.png" height="64px">
 
 **call** - This operation, like **to\_const**, uses it’s constE graph as
 a type parameter.
@@ -1596,7 +1594,7 @@ These operations allow this.
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-![](attachments/2647818241/2647818326.png)
+<img src="attachments/2647818241/2647818326.png" height="64px">
 
 **loop** - In order to run the *body* graph, we need the resources
 R that the graph requires, so
@@ -1607,12 +1605,12 @@ that *v* is lifted to have resource requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-![](attachments/2647818241/2647818329.png)
+<img src="attachments/2647818241/2647818329.png" height="64px">
 
 **call\_indirect** - This has the same feature as **loop**: running a
 graph requires it’s resources.
 
-![](attachments/2647818241/2647818368.png)
+<img src="attachments/2647818241/2647818368.png" height="64px">
 
 **to\_const** - For operations which instantiate a graph (**to\_const**
 and **call**) the functions are given an extra parameter at graph
