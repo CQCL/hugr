@@ -117,13 +117,13 @@ impl OpType {
         }
     }
 
-    /// Returns the edge kind for the given port offset.
-    pub fn port_kind(&self, offset: impl Into<Port>) -> Option<EdgeKind> {
+    /// Returns the edge kind for the given port.
+    pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
-        let offset = offset.into();
-        if let Some(port_kind) = signature.get(offset) {
+        let port = port.into();
+        if let Some(port_kind) = signature.get(port) {
             Some(port_kind)
-        } else if offset.direction() == Direction::Incoming {
+        } else if port.direction() == Direction::Incoming {
             self.other_inputs()
         } else {
             self.other_outputs()

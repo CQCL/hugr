@@ -86,33 +86,35 @@ impl Signature {
         self.input.iter().filter(|t| t.is_linear())
     }
 
-    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: Port) -> Option<EdgeKind> {
-        if offset.direction() == Direction::Incoming && offset.index() >= self.input.len() {
+    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    pub fn get(&self, port: Port) -> Option<EdgeKind> {
+        if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
             self.const_input
-                .get(offset.index() - self.input.len())?
+                .get(port.index() - self.input.len())?
                 .clone()
                 .try_into()
                 .ok()
                 .map(EdgeKind::Const)
         } else {
-            self.get_df(offset).cloned().map(EdgeKind::Value)
+            self.get_df(port).cloned().map(EdgeKind::Value)
         }
     }
 
-    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
-    pub fn get_df(&self, offset: Port) -> Option<&SimpleType> {
-        match offset.direction() {
-            Direction::Incoming => self.input.get(offset.index()),
-            Direction::Outgoing => self.output.get(offset.index()),
+    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    #[inline]
+    pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
+        match port.direction() {
+            Direction::Incoming => self.input.get(port.index()),
+            Direction::Outgoing => self.output.get(port.index()),
         }
     }
 
-    /// Returns the port type given a [`Port`]. Returns `None` if the offset is out of bounds.
-    pub fn get_df_mut(&mut self, offset: Port) -> Option<&mut SimpleType> {
-        match offset.direction() {
-            Direction::Incoming => self.input.get_mut(offset.index()),
-            Direction::Outgoing => self.output.get_mut(offset.index()),
+    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    #[inline]
+    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
+        match port.direction() {
+            Direction::Incoming => self.input.get_mut(port.index()),
+            Direction::Outgoing => self.output.get_mut(port.index()),
         }
     }
 }

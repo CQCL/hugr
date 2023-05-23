@@ -149,22 +149,22 @@ impl Hugr {
 }
 
 impl Port {
-    /// Creates a new port offset.
+    /// Creates a new port.
     #[inline]
-    pub fn new(direction: Direction, offset: usize) -> Self {
-        Self(portgraph::PortOffset::new(direction, offset))
+    pub fn new(direction: Direction, port: usize) -> Self {
+        Self(portgraph::PortOffset::new(direction, port))
     }
 
-    /// Creates a new incoming port offset.
+    /// Creates a new incoming port.
     #[inline]
-    pub fn new_incoming(offset: usize) -> Self {
-        Self(portgraph::PortOffset::new_incoming(offset))
+    pub fn new_incoming(port: usize) -> Self {
+        Self(portgraph::PortOffset::new_incoming(port))
     }
 
-    /// Creates a new outgoing port offset.
+    /// Creates a new outgoing port.
     #[inline]
-    pub fn new_outgoing(offset: usize) -> Self {
-        Self(portgraph::PortOffset::new_outgoing(offset))
+    pub fn new_outgoing(port: usize) -> Self {
+        Self(portgraph::PortOffset::new_outgoing(port))
     }
 
     /// Returns the direction of the port.
@@ -181,17 +181,20 @@ impl Port {
 }
 
 impl Wire {
-    /// Create a new wire from a node and an offset.
-    pub fn new(node: Node, offset: usize) -> Self {
-        Self(node, offset)
+    /// Create a new wire from a node and a port.
+    #[inline]
+    pub fn new(node: Node, port: Port) -> Self {
+        Self(node, port.index())
     }
 
     /// The node that this wire is connected to.
+    #[inline]
     pub fn node(&self) -> Node {
         self.0
     }
 
-    /// The offset of the output port that this wire is connected to.
+    /// The output port that this wire is connected to.
+    #[inline]
     pub fn source(&self) -> Port {
         Port::new_outgoing(self.1)
     }

@@ -55,7 +55,7 @@ pub trait Container {
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
-        Ok(Wire::new(src, src_port))
+        Ok(Wire::new(src, Port::new_outgoing(src_port)))
     }
 
     /// Consume the container builder and return the handle, may perform some
@@ -227,7 +227,7 @@ pub trait Dataflow: Container {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
-            vec![Wire::new(cn, c_out)],
+            vec![Wire::new(cn, Port::new_outgoing(c_out))],
         )?;
 
         Ok(load_n.out_wire(0))
@@ -600,7 +600,7 @@ fn wire_up<T: Dataflow + ?Sized>(
 
             let copy = data_builder.add_dataflow_op(
                 LeafOp::Copy { n_copies: 2, typ },
-                [Wire::new(src, src_port)],
+                [Wire::new(src, Port::new_outgoing(src_port))],
             )?;
 
             let base = data_builder.base();
