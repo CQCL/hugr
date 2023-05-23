@@ -1086,7 +1086,8 @@ Given a DFG node $P$, let:
 The method takes as input:
 
   - the ID of a DFG node $P$ in $\Gamma$;
-  - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$;
+  - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
+    including the Input and Output nodes);
   - a "modular hugr" with DFG root $R$ and only leaf nodes as children;
   - a map $\nu_\textrm{inp}: \textrm{inp}(R) \to \textrm{inp}(S)$;
   - a map $\nu_\textrm{out}: \textrm{out}(S) \to \textrm{out}(R)$.
