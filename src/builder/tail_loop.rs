@@ -1,7 +1,7 @@
 use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
-use crate::hugr::view::HugrView;
+use crate::hugr::internal::HugrView;
 use crate::hugr::HugrMut;
 use crate::types::TypeRow;
 use crate::Node;

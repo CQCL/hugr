@@ -4,7 +4,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
+use crate::{hugr::internal::HugrView, type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};

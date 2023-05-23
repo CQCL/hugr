@@ -1,5 +1,5 @@
+use crate::hugr::internal::HugrView;
 use crate::hugr::validate::InterGraphEdgeError;
-use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
 use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
 
