@@ -10,13 +10,14 @@ pub mod tag;
 pub mod validate;
 
 use crate::types::{EdgeKind, Signature, SignatureDescription};
+use crate::{Direction, Port};
 
 pub use controlflow::{BasicBlockOp, CaseOp, ControlFlowOp};
 pub use custom::{CustomOp, OpDef, OpaqueOp};
 pub use dataflow::DataflowOp;
 pub use leaf::LeafOp;
 pub use module::{ConstValue, ModuleOp};
-use portgraph::{Direction, PortOffset};
+
 use smol_str::SmolStr;
 
 use self::tag::OpTag;
@@ -116,12 +117,13 @@ impl OpType {
         }
     }
 
-    /// Returns the edge kind for the given port offset.
-    pub fn port_kind(&self, offset: PortOffset) -> Option<EdgeKind> {
+    /// Returns the edge kind for the given port.
+    pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
-        if let Some(port_kind) = signature.get(offset) {
+        let port = port.into();
+        if let Some(port_kind) = signature.get(port) {
             Some(port_kind)
-        } else if offset.direction() == Direction::Incoming {
+        } else if port.direction() == Direction::Incoming {
             self.other_inputs()
         } else {
             self.other_outputs()
