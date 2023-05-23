@@ -1088,18 +1088,18 @@ The method takes as input:
   - the ID of a DFG node $P$ in $\Gamma$;
   - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$;
   - a "modular hugr" with DFG root $R$ and only leaf nodes as children;
-  - a map $\nu_\textrm{inp}: \textrm{inp}(S) \to \textrm{inp}(R)$;
-  - a map $\nu_\textrm{out}: \textrm{out}(R) \to \textrm{out}(S)$.
+  - a map $\nu_\textrm{inp}: \textrm{inp}(R) \to \textrm{inp}(S)$;
+  - a map $\nu_\textrm{out}: \textrm{out}(S) \to \textrm{out}(R)$.
   
 The new hugr is then derived by:
   
   - adding all children of $R$, and all edges between them, to $\Gamma$;
   - making $P$ the parent of all the newly added nodes except for the Input and
     Output nodes;
-  - for each $p \in \textrm{inp}(S)$, adding an edge from the predecessor of $p$
-    to $\nu_\textrm{inp}(p)$;
-  - for each $p \in \textrm{out}(R)$, adding an edge from the predecessor of $p$
-    to $\nu_\textrm{out}(p)$
+  - for each $p \in \textrm{inp}(R)$, adding an edge from the predecessor of
+    $\nu_\textrm{inp}(p)$ to $p$;
+  - for each $p \in \textrm{out}(S)$, adding an edge from the predecessor of
+    $\nu_\textrm{out}(p)$ to $p$.
   - removing all nodes in $S$ and edges between them;
   - removing the Input and Output nodes of $R$ and all edges from them.
 
