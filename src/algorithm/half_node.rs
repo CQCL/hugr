@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
+use super::nest_cfgs::CfgView;
 use crate::hugr::internal::HugrView;
-use crate::hugr::nest_cfgs::CfgView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
 use crate::{Direction, Node};
@@ -29,7 +29,7 @@ struct HalfNodeView<'a> {
 }
 
 impl<'a> HalfNodeView<'a> {
-    pub fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
+    pub(crate) fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
@@ -93,10 +93,9 @@ impl CfgView<HalfNode> for HalfNodeView<'_> {
 
 #[cfg(test)]
 mod test {
-    use super::super::nest_cfgs::test::*;
+    use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
-    use crate::hugr::nest_cfgs::EdgeClassifier;
     use crate::ops::handle::NodeHandle;
     use itertools::Itertools;
     use std::collections::HashSet;
