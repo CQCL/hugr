@@ -4,7 +4,7 @@ use crate::hugr::nest_cfgs::CfgView;
 use crate::hugr::view::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
-use crate::{Direction, Hugr, Node};
+use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -23,13 +23,13 @@ enum HalfNode {
 }
 
 struct HalfNodeView<'a> {
-    h: &'a Hugr,
+    h: &'a dyn HugrView,
     entry: Node,
     exit: Node,
 }
 
 impl<'a> HalfNodeView<'a> {
-    pub fn new(h: &'a Hugr, cfg: CfgID) -> Self {
+    pub fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();

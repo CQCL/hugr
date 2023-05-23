@@ -46,7 +46,7 @@ use itertools::Itertools;
 use crate::hugr::view::{HugrView, Neighbours};
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
-use crate::{Direction, Hugr, Node};
+use crate::{Direction, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
 // (in a BB with one predecessor and one successor, which may then be merged
@@ -126,13 +126,13 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 
 /// A straightforward view of a Cfg as it appears in a Hugr
 pub struct SimpleCfgView<'a> {
-    h: &'a Hugr,
+    h: &'a dyn HugrView,
     entry: Node,
     exit: Node,
 }
 impl<'a> SimpleCfgView<'a> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub fn new(h: &'a Hugr, cfg: CfgID) -> Self {
+    pub fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
