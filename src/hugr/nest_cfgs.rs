@@ -42,20 +42,18 @@ use std::collections::{HashMap, HashSet, LinkedList};
 use std::hash::Hash;
 
 use itertools::Itertools;
-use portgraph::portgraph::Neighbours;
-use portgraph::NodeIndex;
 
-use crate::hugr::internal::HugrView;
+use crate::hugr::internal::{HugrView, Neighbours};
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
-use crate::Hugr;
+use crate::{Direction, Hugr, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
 // (in a BB with one predecessor and one successor, which may then be merged
 //     and contents parallelized with predecessor or successor).
 
 /// A view of a CFG. `T` is the type of basic block; one interpretation of `T` would be a BasicBlock
-/// (e.g. `NodeIndex`) in the Hugr, but this extra level of indirection allows "splitting" one HUGR BB
+/// (e.g. `Node`) in the Hugr, but this extra level of indirection allows "splitting" one HUGR BB
 /// into many (or vice versa). Since SESE regions are bounded by edges between pairs of such `T`, such
 /// splitting may allow the algorithm to identify more regions than existed in the underlying CFG
 /// (without mutating the underlying CFG perhaps in vain).
@@ -129,8 +127,8 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 /// A straightforward view of a Cfg as it appears in a Hugr
 pub struct SimpleCfgView<'a> {
     h: &'a Hugr,
-    entry: NodeIndex,
-    exit: NodeIndex,
+    entry: Node,
+    exit: Node,
 }
 impl<'a> SimpleCfgView<'a> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
@@ -145,12 +143,12 @@ impl<'a> SimpleCfgView<'a> {
         Self { h, entry, exit }
     }
 }
-impl CfgView<NodeIndex> for SimpleCfgView<'_> {
-    fn entry_node(&self) -> NodeIndex {
+impl CfgView<Node> for SimpleCfgView<'_> {
+    fn entry_node(&self) -> Node {
         self.entry
     }
 
-    fn exit_node(&self) -> NodeIndex {
+    fn exit_node(&self) -> Node {
         self.exit
     }
 
@@ -158,12 +156,12 @@ impl CfgView<NodeIndex> for SimpleCfgView<'_> {
     where
         Self: 'c;
 
-    fn successors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h.graph.output_neighbours(node)
+    fn successors<'c>(&'c self, node: Node) -> Self::Iterator<'c> {
+        self.h.neighbours(node, Direction::Outgoing)
     }
 
-    fn predecessors<'c>(&'c self, node: NodeIndex) -> Self::Iterator<'c> {
-        self.h.graph.input_neighbours(node)
+    fn predecessors<'c>(&'c self, node: Node) -> Self::Iterator<'c> {
+        self.h.neighbours(node, Direction::Incoming)
     }
 }
 

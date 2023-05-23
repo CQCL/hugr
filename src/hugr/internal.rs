@@ -8,8 +8,10 @@ use portgraph::portgraph::NodePorts;
 use super::Hugr;
 use super::{Node, Port};
 use crate::ops::OpType;
+use crate::Direction;
 
-type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
+pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
+pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 
 /// Internal API for HUGRs, not intended for use by users.
 ///
@@ -79,6 +81,11 @@ pub(crate) trait HugrView: DerefHugr {
     #[inline]
     fn children(&self, node: Node) -> Children<'_> {
         self.hugr().hierarchy.children(node.index).map_into()
+    }
+
+    /// Return iterator over neighbouring nodes, in a particular direction
+    fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_> {
+        self.hugr().graph.neighbours(node.index, dir).map_into()
     }
 }
 

@@ -1,12 +1,10 @@
 use std::hash::Hash;
 
-use portgraph::NodeIndex;
-
 use crate::hugr::internal::HugrView;
 use crate::hugr::nest_cfgs::CfgView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
-use crate::Hugr;
+use crate::{Direction, Hugr, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -19,15 +17,15 @@ use crate::Hugr;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum HalfNode {
     /// All predecessors of original BB; successors if this does not break rule, else the X
-    N(NodeIndex),
+    N(Node),
     // Exists only for BBs with multiple preds _and_ succs; has a single pred (the N), plus original succs
-    X(NodeIndex),
+    X(Node),
 }
 
 struct HalfNodeView<'a> {
     h: &'a Hugr,
-    entry: NodeIndex,
-    exit: NodeIndex,
+    entry: Node,
+    exit: Node,
 }
 
 impl<'a> HalfNodeView<'a> {
@@ -42,12 +40,12 @@ impl<'a> HalfNodeView<'a> {
         Self { h, entry, exit }
     }
 
-    fn is_multi_node(&self, n: NodeIndex) -> bool {
+    fn is_multi_node(&self, n: Node) -> bool {
         // TODO if <n> is the entry-node, should we pretend there's an extra predecessor? (The "outside")
         // We could also setify here before counting, but never
         self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
     }
-    fn resolve_out(&self, n: NodeIndex) -> HalfNode {
+    fn resolve_out(&self, n: Node) -> HalfNode {
         if self.is_multi_node(n) {
             HalfNode::X(n)
         } else {
@@ -55,11 +53,11 @@ impl<'a> HalfNodeView<'a> {
         }
     }
 
-    fn bb_succs(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h.graph.output_neighbours(n)
+    fn bb_succs(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+        self.h.neighbours(n, Direction::Outgoing)
     }
-    fn bb_preds(&self, n: NodeIndex) -> impl Iterator<Item = NodeIndex> + '_ {
-        self.h.graph.input_neighbours(n)
+    fn bb_preds(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+        self.h.neighbours(n, Direction::Incoming)
     }
 }
 
