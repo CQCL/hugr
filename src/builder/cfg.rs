@@ -9,17 +9,16 @@ use crate::{hugr::internal::HugrView, type_row, types::SimpleType};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};
 
-use portgraph::NodeIndex;
-
+use crate::Node;
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] child control
 /// flow graph
 pub struct CFGBuilder<'f> {
     pub(super) base: &'f mut HugrMut,
-    pub(super) cfg_node: NodeIndex,
+    pub(super) cfg_node: Node,
     pub(super) inputs: Option<TypeRow>,
-    pub(super) exit_node: NodeIndex,
+    pub(super) exit_node: Node,
     pub(super) n_out_wires: usize,
 }
 
@@ -27,7 +26,7 @@ impl<'f> Container for CFGBuilder<'f> {
     type ContainerHandle = BuildHandle<CfgID>;
 
     #[inline]
-    fn container_node(&self) -> NodeIndex {
+    fn container_node(&self) -> Node {
         self.cfg_node
     }
 

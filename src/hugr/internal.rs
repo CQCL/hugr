@@ -2,12 +2,14 @@
 
 use std::ops::Deref;
 
-use portgraph::hierarchy::Children;
+use itertools::{Itertools, MapInto};
 use portgraph::portgraph::NodePorts;
-use portgraph::{NodeIndex, PortOffset};
 
 use super::Hugr;
+use super::{Node, Port};
 use crate::ops::OpType;
+
+type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 
 /// Internal API for HUGRs, not intended for use by users.
 ///
@@ -15,55 +17,68 @@ use crate::ops::OpType;
 /// non-linear ports can be connected to multiple nodes via implicit copies
 /// (which correspond to copy nodes in the internal graph).
 pub(crate) trait HugrView: DerefHugr {
+    /// Return index of HUGR root node.
+    #[inline]
+    fn root(&self) -> Node {
+        self.hugr().root.into()
+    }
+
     /// Returns the parent of a node.
     #[inline]
-    fn get_parent(&self, node: NodeIndex) -> Option<NodeIndex> {
-        self.hugr().hierarchy.parent(node)
+    fn get_parent(&self, node: Node) -> Option<Node> {
+        self.hugr().hierarchy.parent(node.index).map(Into::into)
     }
 
     /// Returns the operation type of a node.
     #[inline]
-    fn get_optype(&self, node: NodeIndex) -> &OpType {
-        self.hugr().op_types.get(node)
+    fn get_optype(&self, node: Node) -> &OpType {
+        self.hugr().op_types.get(node.index)
     }
 
     /// Iterator over outputs of node.
+    ///
+    /// TODO: In the future this will return hugr ports, not `PortIndices`.
     #[inline]
-    fn node_outputs(&self, node: NodeIndex) -> NodePorts {
-        self.hugr().graph.outputs(node)
+    fn node_outputs(&self, node: Node) -> NodePorts {
+        self.hugr().graph.outputs(node.index)
     }
 
     /// Iterator over inputs of node.
+    ///
+    /// TODO: In the future this will return hugr ports, not `PortIndices`.
     #[inline]
-    fn node_inputs(&self, node: NodeIndex) -> NodePorts {
-        self.hugr().graph.inputs(node)
+    fn node_inputs(&self, node: Node) -> NodePorts {
+        self.hugr().graph.inputs(node.index)
     }
 
     /// Return node and port connected to provided port, if not connected return None.
     #[inline]
-    fn linked_port(&self, node: NodeIndex, offset: PortOffset) -> Option<(NodeIndex, PortOffset)> {
+    fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)> {
         let raw = self.hugr();
-        let port = raw.graph.port_index(node, offset)?;
+        let port = raw.graph.port_index(node.index, port.offset)?;
         let link = raw.graph.port_link(port)?;
-        Some((raw.graph.port_node(link)?, raw.graph.port_offset(port)?))
+        Some((
+            raw.graph.port_node(link).map(Into::into)?,
+            raw.graph.port_offset(port).map(Into::into)?,
+        ))
     }
 
     /// Number of inputs to node.
     #[inline]
-    fn num_inputs(&self, node: NodeIndex) -> usize {
-        self.hugr().graph.num_inputs(node)
+    fn num_inputs(&self, node: Node) -> usize {
+        self.hugr().graph.num_inputs(node.index)
     }
 
     /// Number of outputs to node.
     #[inline]
-    fn num_outputs(&self, node: NodeIndex) -> usize {
-        self.hugr().graph.num_outputs(node)
+    fn num_outputs(&self, node: Node) -> usize {
+        self.hugr().graph.num_outputs(node.index)
     }
 
     /// Return iterator over children of node.
     #[inline]
-    fn children(&self, node: NodeIndex) -> Children<'_> {
-        self.hugr().hierarchy.children(node)
+    fn children(&self, node: Node) -> Children<'_> {
+        self.hugr().hierarchy.children(node.index).map_into()
     }
 }
 
