@@ -7,6 +7,6 @@ pub(crate) mod test {
     pub(crate) fn viz_dotstr(dotstr: &str) {
         let mut base: String = "https://dreampuf.github.io/GraphvizOnline/#".into();
         url_escape::encode_query_to_string(dotstr, &mut base);
-        open::that(&base).unwrap();
+        webbrowser::open(&base).unwrap();
     }
 }
