@@ -70,7 +70,7 @@ impl<'a> ValidationContext<'a> {
     /// May compute the dominator tree if it has not been computed yet.
     fn dominator_tree(&mut self, node: Node) -> &DominatorTree {
         self.dominators.entry(node).or_insert_with(|| {
-            let entry = self.hugr.hierarchy.first(node.0).unwrap();
+            let entry = self.hugr.hierarchy.first(node.index).unwrap();
             dominators_filtered(
                 &self.hugr.graph,
                 entry,
@@ -124,11 +124,11 @@ impl<'a> ValidationContext<'a> {
         if !check_extra_ports(
             sig.input.len() + df_const_input,
             flags.non_df_ports.0,
-            self.hugr.graph.num_inputs(node.0),
+            self.hugr.graph.num_inputs(node.index),
         ) || !check_extra_ports(
             sig.output.len(),
             flags.non_df_ports.1,
-            self.hugr.graph.num_outputs(node.0),
+            self.hugr.graph.num_outputs(node.index),
         ) {
             return Err(ValidationError::WrongNumberOfPorts {
                 node,
@@ -139,11 +139,11 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Check port connections
-        for (i, port_index) in self.hugr.graph.inputs(node.0).enumerate() {
+        for (i, port_index) in self.hugr.graph.inputs(node.index).enumerate() {
             let port = Port::new_incoming(i);
             self.validate_port(node, port, port_index, optype)?;
         }
-        for (i, port_index) in self.hugr.graph.outputs(node.0).enumerate() {
+        for (i, port_index) in self.hugr.graph.outputs(node.index).enumerate() {
             let port = Port::new_outgoing(i);
             self.validate_port(node, port, port_index, optype)?;
         }
@@ -212,7 +212,7 @@ impl<'a> ValidationContext<'a> {
     fn validate_operation(&self, node: Node, optype: &OpType) -> Result<(), ValidationError> {
         let flags = optype.validity_flags();
 
-        if self.hugr.hierarchy.child_count(node.0) > 0 {
+        if self.hugr.hierarchy.child_count(node.index) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -222,7 +222,7 @@ impl<'a> ValidationContext<'a> {
 
             let first_child = self
                 .hugr
-                .get_optype(self.hugr.hierarchy.first(node.0).unwrap().into());
+                .get_optype(self.hugr.hierarchy.first(node.index).unwrap().into());
             if !flags.allowed_first_child.contains(first_child.tag()) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
@@ -235,7 +235,7 @@ impl<'a> ValidationContext<'a> {
 
             let last_child = self
                 .hugr
-                .get_optype(self.hugr.hierarchy.last(node.0).unwrap().into());
+                .get_optype(self.hugr.hierarchy.last(node.index).unwrap().into());
             if !flags.allowed_last_child.contains(last_child.tag()) {
                 return Err(ValidationError::InvalidBoundaryChild {
                     parent: node,
@@ -250,7 +250,7 @@ impl<'a> ValidationContext<'a> {
             let children_optypes = self
                 .hugr
                 .hierarchy
-                .children(node.0)
+                .children(node.index)
                 .map(|c| (c, self.hugr.get_optype(c.into())));
             if let Err(source) = optype.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
@@ -262,9 +262,9 @@ impl<'a> ValidationContext<'a> {
 
             // Additional validations running over the edges of the contained graph
             if let Some(edge_check) = flags.edge_check {
-                for source in self.hugr.hierarchy.children(node.0) {
+                for source in self.hugr.hierarchy.children(node.index) {
                     for target in self.hugr.graph.output_neighbours(source) {
-                        if self.hugr.hierarchy.parent(target) != Some(node.0) {
+                        if self.hugr.hierarchy.parent(target) != Some(node.index) {
                             continue;
                         }
                         let source_op = self.hugr.get_optype(source.into());
@@ -311,7 +311,7 @@ impl<'a> ValidationContext<'a> {
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
     fn validate_children_dag(&self, parent: Node, optype: &OpType) -> Result<(), ValidationError> {
-        let Some(first_child) = self.hugr.hierarchy.first(parent.0) else {
+        let Some(first_child) = self.hugr.hierarchy.first(parent.index) else {
             // No children, nothing to do
             return Ok(());
         };
@@ -327,8 +327,8 @@ impl<'a> ValidationContext<'a> {
         // Compute the number of nodes visited and keep the last one.
         let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| (n + 1, Some(node)));
 
-        if nodes_visited != self.hugr.hierarchy.child_count(parent.0)
-            || last_node != self.hugr.hierarchy.last(parent.0)
+        if nodes_visited != self.hugr.hierarchy.child_count(parent.index)
+            || last_node != self.hugr.hierarchy.last(parent.index)
         {
             return Err(ValidationError::NotADag {
                 node: parent,
@@ -415,7 +415,7 @@ impl<'a> ValidationContext<'a> {
                 // External edge. Must have an order edge.
                 self.hugr
                     .graph
-                    .get_connections(from.0, ancestor.0)
+                    .get_connections(from.index, ancestor.index)
                     .find(|&(p, _)| {
                         let offset = self.hugr.graph.port_offset(p).unwrap();
                         from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
@@ -451,9 +451,10 @@ impl<'a> ValidationContext<'a> {
                 //
                 // TODO: Add a more efficient lookup for dominator trees.
                 let dominator_tree = self.dominator_tree(ancestor_parent);
-                let mut dominators =
-                    iter::successors(Some(ancestor.0), |&n| dominator_tree.immediate_dominator(n))
-                        .map_into();
+                let mut dominators = iter::successors(Some(ancestor.index), |&n| {
+                    dominator_tree.immediate_dominator(n)
+                })
+                .map_into();
                 if !dominators.any(|n: Node| n == from_parent) {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,
@@ -808,7 +809,7 @@ mod test {
         // Make the hugr root not a hierarchy root
         {
             let mut hugr = b.hugr().clone();
-            hugr.root = other.0;
+            hugr.root = other.index;
             assert_matches!(
                 hugr.validate(),
                 Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
@@ -828,7 +829,7 @@ mod test {
         let (_input, copy, output) = b
             .hugr()
             .hierarchy
-            .children(def.0)
+            .children(def.index)
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -876,7 +877,7 @@ mod test {
         let (_input, copy, _output) = b
             .hugr()
             .hierarchy
-            .children(def.0)
+            .children(def.index)
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -918,7 +919,7 @@ mod test {
         let (_input, copy, output) = b
             .hugr()
             .hierarchy
-            .children(def.0)
+            .children(def.index)
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -946,7 +947,7 @@ mod test {
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-                => {assert_eq!(parent, def); assert_eq!(child, output.0)}
+                => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
         b.replace_op(
             output,
@@ -965,7 +966,7 @@ mod test {
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-                => {assert_eq!(parent, def); assert_eq!(child, copy.0)}
+                => {assert_eq!(parent, def); assert_eq!(child, copy.index)}
         );
     }
 
@@ -975,7 +976,7 @@ mod test {
         let (_input, copy, _output) = b
             .hugr()
             .hierarchy
-            .children(def.0)
+            .children(def.index)
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -1014,7 +1015,7 @@ mod test {
         let (_input, copy, _output) = b
             .hugr()
             .hierarchy
-            .children(def.0)
+            .children(def.index)
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -1069,7 +1070,7 @@ mod test {
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.0)}
+                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
         );
         b.remove_op(exit2).unwrap();
 
@@ -1082,7 +1083,7 @@ mod test {
                 other_outputs: type_row![Q],
             },
         );
-        let mut block_children = b.hugr().hierarchy.children(block.0);
+        let mut block_children = b.hugr().hierarchy.children(block.index);
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
         b.replace_op(

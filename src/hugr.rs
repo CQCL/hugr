@@ -46,11 +46,15 @@ impl Default for Hugr {
 
 /// A handle to a node in the HUGR.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
-pub struct Node(portgraph::NodeIndex);
+pub struct Node {
+    index: portgraph::NodeIndex,
+}
 
 /// A handle to a port for a node in the HUGR.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
-pub struct Port(portgraph::PortOffset);
+pub struct Port {
+    offset: portgraph::PortOffset,
+}
 
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
@@ -152,31 +156,37 @@ impl Port {
     /// Creates a new port.
     #[inline]
     pub fn new(direction: Direction, port: usize) -> Self {
-        Self(portgraph::PortOffset::new(direction, port))
+        Self {
+            offset: portgraph::PortOffset::new(direction, port),
+        }
     }
 
     /// Creates a new incoming port.
     #[inline]
     pub fn new_incoming(port: usize) -> Self {
-        Self(portgraph::PortOffset::new_incoming(port))
+        Self {
+            offset: portgraph::PortOffset::new_incoming(port),
+        }
     }
 
     /// Creates a new outgoing port.
     #[inline]
     pub fn new_outgoing(port: usize) -> Self {
-        Self(portgraph::PortOffset::new_outgoing(port))
+        Self {
+            offset: portgraph::PortOffset::new_outgoing(port),
+        }
     }
 
     /// Returns the direction of the port.
     #[inline]
     pub fn direction(self) -> Direction {
-        self.0.direction()
+        self.offset.direction()
     }
 
     /// Returns the offset of the port.
     #[inline(always)]
     pub fn index(self) -> usize {
-        self.0.index()
+        self.offset.index()
     }
 }
 

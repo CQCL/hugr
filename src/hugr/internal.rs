@@ -26,13 +26,13 @@ pub(crate) trait HugrView: DerefHugr {
     /// Returns the parent of a node.
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hugr().hierarchy.parent(node.0).map(Into::into)
+        self.hugr().hierarchy.parent(node.index).map(Into::into)
     }
 
     /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.hugr().op_types.get(node.0)
+        self.hugr().op_types.get(node.index)
     }
 
     /// Iterator over outputs of node.
@@ -40,7 +40,7 @@ pub(crate) trait HugrView: DerefHugr {
     /// TODO: In the future this will return hugr ports, not `PortIndices`.
     #[inline]
     fn node_outputs(&self, node: Node) -> NodePorts {
-        self.hugr().graph.outputs(node.0)
+        self.hugr().graph.outputs(node.index)
     }
 
     /// Iterator over inputs of node.
@@ -48,14 +48,14 @@ pub(crate) trait HugrView: DerefHugr {
     /// TODO: In the future this will return hugr ports, not `PortIndices`.
     #[inline]
     fn node_inputs(&self, node: Node) -> NodePorts {
-        self.hugr().graph.inputs(node.0)
+        self.hugr().graph.inputs(node.index)
     }
 
     /// Return node and port connected to provided port, if not connected return None.
     #[inline]
-    fn linked_port(&self, node: Node, offset: Port) -> Option<(Node, Port)> {
+    fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)> {
         let raw = self.hugr();
-        let port = raw.graph.port_index(node.0, offset.0)?;
+        let port = raw.graph.port_index(node.index, port.offset)?;
         let link = raw.graph.port_link(port)?;
         Some((
             raw.graph.port_node(link).map(Into::into)?,
@@ -66,19 +66,19 @@ pub(crate) trait HugrView: DerefHugr {
     /// Number of inputs to node.
     #[inline]
     fn num_inputs(&self, node: Node) -> usize {
-        self.hugr().graph.num_inputs(node.0)
+        self.hugr().graph.num_inputs(node.index)
     }
 
     /// Number of outputs to node.
     #[inline]
     fn num_outputs(&self, node: Node) -> usize {
-        self.hugr().graph.num_outputs(node.0)
+        self.hugr().graph.num_outputs(node.index)
     }
 
     /// Return iterator over children of node.
     #[inline]
     fn children(&self, node: Node) -> Children<'_> {
-        self.hugr().hierarchy.children(node.0).map_into()
+        self.hugr().hierarchy.children(node.index).map_into()
     }
 }
 
