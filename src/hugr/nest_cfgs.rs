@@ -43,7 +43,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::internal::{HugrView, Neighbours};
+use crate::hugr::view::{HugrView, Neighbours};
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::{controlflow::BasicBlockOp, OpType};
 use crate::{Direction, Hugr, Node};
