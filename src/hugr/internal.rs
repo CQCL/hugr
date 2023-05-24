@@ -116,7 +116,7 @@ pub(crate) trait HugrView: DerefHugr {
         self.hugr().hierarchy.children(node.index).map_into()
     }
 
-    /// Iterates over neighbour nodes in the given `direction`.
+    /// Iterates over neighbour nodes in the given direction.
     /// May contain duplicates if the graph has multiple links between nodes.
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_> {
