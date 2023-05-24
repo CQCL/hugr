@@ -137,9 +137,14 @@ impl Hugr {
 impl Hugr {
     /// Create a new Hugr, with a single root node.
     pub(crate) fn new(root_op: impl Into<OpType>) -> Self {
-        let mut graph = PortGraph::default();
+        Self::with_capacity(root_op, 0, 0)
+    }
+
+    /// Create a new Hugr, with a single root node and preallocated capacity.
+    pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
+        let mut graph = PortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
-        let mut op_types = SecondaryMap::new();
+        let mut op_types = SecondaryMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
         op_types[root] = root_op.into();
 
