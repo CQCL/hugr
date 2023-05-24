@@ -45,7 +45,7 @@ pub(crate) trait HugrView: DerefHugr {
         self.hugr().graph.node_count()
     }
 
-    /// Returns the number of edge in the hugr.
+    /// Returns the number of edges in the hugr.
     #[inline]
     fn edge_count(&self) -> usize {
         self.hugr().graph.link_count()
