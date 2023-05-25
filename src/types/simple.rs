@@ -156,14 +156,14 @@ impl Display for ClassicType {
             ClassicType::Int(i) => {
                 f.write_char('I')?;
                 f.write_str(&i.to_string())
-            },
+            }
             ClassicType::F64 => f.write_str("F64"),
             ClassicType::String => f.write_str("String"),
             ClassicType::Graph(data) => {
                 let (rs, sig) = data.as_ref();
                 write!(f, "[{:?}]", rs)?;
                 sig.fmt(f)
-            },
+            }
             ClassicType::Container(c) => c.fmt(f),
             ClassicType::Opaque(custom) => custom.fmt(f),
         }
@@ -307,7 +307,7 @@ pub struct TypeRow {
 }
 
 impl Display for TypeRow {
-    fn fmt(&self, f:  &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tys = self.types.as_ref();
         if tys.is_empty() {
             f.write_str("[]")

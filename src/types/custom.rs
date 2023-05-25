@@ -1,6 +1,6 @@
 //! Opaque types, used to represent a user-defined [`SimpleType`].
 use smol_str::SmolStr;
-use std::fmt::{self,Display};
+use std::fmt::{self, Display};
 
 use super::{ClassicType, SimpleType, TypeRow};
 
