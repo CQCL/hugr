@@ -1,5 +1,6 @@
 //! Opaque types, used to represent a user-defined [`SimpleType`].
 use smol_str::SmolStr;
+use std::fmt::{self,Display};
 
 use super::{ClassicType, SimpleType, TypeRow};
 
@@ -43,6 +44,12 @@ impl CustomType {
 impl PartialEq for CustomType {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
+    }
+}
+
+impl Display for CustomType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}({})", self.id, self.params.as_ref())
     }
 }
 

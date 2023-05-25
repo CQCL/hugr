@@ -3,6 +3,7 @@
 pub mod custom;
 pub mod simple;
 
+use std::fmt::{self, Display, Write};
 use std::ops::Index;
 
 #[cfg(feature = "pyo3")]
@@ -142,6 +143,21 @@ impl Signature {
     /// Create a new signature with only dataflow inputs and outputs.
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Signature::new(input, output, type_row![])
+    }
+}
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let has_inputs = !(self.const_input.is_empty() && self.input.is_empty());
+        if has_inputs {
+            if !self.const_input.is_empty() {
+                self.const_input.fmt(f)?;
+                f.write_str(", ")?;
+            }
+            self.input.fmt(f)?;
+            f.write_str(" -> ")?;
+        }
+        self.output.fmt(f)
     }
 }
 

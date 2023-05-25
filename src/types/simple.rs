@@ -13,6 +13,8 @@ use smol_str::SmolStr;
 use super::{custom::CustomType, Signature};
 use crate::{resource::ResourceSet, type_row};
 
+use std::fmt::{self, Display, Formatter, Write};
+
 /// A type that represents concrete data.
 ///
 // TODO: Derive pyclass
@@ -25,6 +27,15 @@ pub enum SimpleType {
     Classic(ClassicType),
     /// A type containing linear data. Elements of this type must be used exactly once.
     Linear(LinearType),
+}
+
+impl Display for SimpleType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SimpleType::Classic(ty) => ty.fmt(f),
+            SimpleType::Linear(ty) => ty.fmt(f),
+        }
+    }
 }
 
 /// Trait of primitive types (ClassicType or LinearType).
@@ -52,6 +63,19 @@ pub enum Container<T: PrimType> {
     Array(Box<T>, usize),
     /// Alias defined in AliasDef or AliasDeclare nodes.
     Alias(SmolStr),
+}
+
+impl<T: Display + PrimType> Display for Container<T> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Container::List(ty) => write!(f, "List({})", ty.as_ref()),
+            Container::Map(tys) => write!(f, "Map({}, {})", tys.as_ref().0, tys.as_ref().1),
+            Container::Tuple(row) => write!(f, "Tuple({})", row.as_ref()),
+            Container::Sum(row) => write!(f, "Sum({})", row.as_ref()),
+            Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
+            Container::Alias(str) => f.write_str(str),
+        }
+    }
 }
 
 impl From<Container<ClassicType>> for SimpleType {
@@ -125,6 +149,27 @@ impl Default for ClassicType {
     }
 }
 
+impl Display for ClassicType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ClassicType::Variable(x) => f.write_str(x),
+            ClassicType::Int(i) => {
+                f.write_char('I')?;
+                f.write_str(&i.to_string())
+            },
+            ClassicType::F64 => f.write_str("F64"),
+            ClassicType::String => f.write_str("String"),
+            ClassicType::Graph(data) => {
+                let (rs, sig) = data.as_ref();
+                write!(f, "[{:?}]", rs)?;
+                sig.fmt(f)
+            },
+            ClassicType::Container(c) => c.fmt(f),
+            ClassicType::Opaque(custom) => custom.fmt(f),
+        }
+    }
+}
+
 impl PrimType for ClassicType {}
 
 /// A type that represents concrete linear data.
@@ -140,6 +185,16 @@ pub enum LinearType {
     Qpaque(CustomType),
     /// A nested definition containing other linear types.
     Container(Container<LinearType>),
+}
+
+impl Display for LinearType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            LinearType::Qubit => f.write_str("Qubit"),
+            LinearType::Qpaque(custom) => custom.fmt(f),
+            LinearType::Container(c) => c.fmt(f),
+        }
+    }
 }
 
 impl PrimType for LinearType {}
@@ -249,6 +304,26 @@ impl_from_into_simple_type!(LinearType, SimpleType::Linear(typ), typ, SimpleType
 pub struct TypeRow {
     /// The datatypes in the row.
     types: Cow<'static, [SimpleType]>,
+}
+
+impl Display for TypeRow {
+    fn fmt(&self, f:  &mut fmt::Formatter) -> fmt::Result {
+        let tys = self.types.as_ref();
+        if tys.is_empty() {
+            f.write_str("[]")
+        } else {
+            f.write_char('[')?;
+            let mut first = true;
+            for ty in tys.iter() {
+                if !first {
+                    f.write_str(", ")?;
+                }
+                write!(f, "{}", ty)?;
+                first = false;
+            }
+            f.write_char(']')
+        }
+    }
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
