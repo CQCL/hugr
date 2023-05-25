@@ -305,8 +305,9 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Ensure that the children of a node form a direct acyclic graph. That is,
-    /// their edges do not form cycles in the graph.
+    /// Ensure that the children of a node form a direct acyclic graph with a
+    /// single source and source. That is, their edges do not form cycles in the
+    /// graph and there are no dangling nodes.
     ///
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
@@ -593,8 +594,8 @@ pub enum ValidationError {
     /// The node must have children, but has none.
     #[error("The node {node:?} with optype {optype:?} must have children, but has none.")]
     ContainerWithoutChildren { node: Node, optype: OpType },
-    /// The children of a node have cycles.
-    #[error("The operation {optype:?} does not allow cycles in its children. In node {node:?}.")]
+    /// The children of a node do not form a dag with single source and sink.
+    #[error("The children of an operation {optype:?} must form a dag with single source and sink. Loops are not allowed, nor are dangling nodes not in the path between the input and output. In node {node:?}.")]
     NotADag { node: Node, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
