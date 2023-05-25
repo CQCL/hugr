@@ -16,9 +16,9 @@ pub enum DataflowOp {
     Output { types: TypeRow },
     /// Call a function directly.
     ///
-    /// The first port is connected to the def/declare of the function being
-    /// called directly, with a `ConstE<Graph>` edge. The signature of the
-    /// remaining ports matches the function being called.
+    /// The first ports correspond to the signature of the function being
+    /// called. Immediately following those ports, the first input port is
+    /// connected to the def/declare block with a `ConstE<Graph>` edge.
     Call { signature: Signature },
     /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
     CallIndirect { signature: Signature },
