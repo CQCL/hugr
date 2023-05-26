@@ -88,7 +88,7 @@ pub(crate) trait HugrView: DerefHugr {
         let link = raw.graph.port_link(port)?;
         Some((
             raw.graph.port_node(link).map(Into::into)?,
-            raw.graph.port_offset(port).map(Into::into)?,
+            raw.graph.port_offset(link).map(Into::into)?,
         ))
     }
 
