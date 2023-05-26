@@ -20,7 +20,7 @@ type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 /// TODO: Wraps the underlying graph and hierarchy, producing a view where
 /// non-linear ports can be connected to multiple nodes via implicit copies
 /// (which correspond to copy nodes in the internal graph).
-pub(crate) trait HugrView: DerefHugr {
+pub trait HugrView: DerefHugr {
     /// Return index of HUGR root node.
     #[inline]
     fn root(&self) -> Node {
@@ -144,11 +144,12 @@ pub(crate) trait HugrView: DerefHugr {
 
 impl<T> HugrView for T where T: DerefHugr {}
 
-/// Trait for converting a reference to a Hugr into a RawHugr.
+/// Trait for things that can be converted into a reference to a Hugr.
 ///
 /// This is equivalent to `Deref<Target=Hugr>`, but we use a local definition to
 /// be able to write blanket implementations.
-pub(crate) trait DerefHugr: Sized {
+pub trait DerefHugr: Sized {
+    /// Gets the reference to a Hugr
     fn hugr(&self) -> &Hugr;
 }
 
