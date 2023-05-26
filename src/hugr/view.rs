@@ -43,11 +43,11 @@ pub trait HugrView {
     fn node_ports(&self, node: Node, dir: Direction) -> NodePorts;
 
     /// Iterator over output ports of node.
-    /// Shorthand for [`Hugr::node_ports`(node, `Direction::Forward`)].
+    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
     fn node_outputs(&self, node: Node) -> NodePorts;
 
     /// Iterator over inputs ports of node.
-    /// Shorthand for [`Hugr::node_ports`(node, `Direction::Backward`)].
+    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
     fn node_inputs(&self, node: Node) -> NodePorts;
 
     /// Iterator over both the input and output ports of node.
@@ -60,11 +60,11 @@ pub trait HugrView {
     fn num_ports(&self, node: Node, dir: Direction) -> usize;
 
     /// Number of inputs to a node.
-    /// Shorthand for [`Hugr::num_ports`(node, `Direction::Backward`)].
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Incoming)`.
     fn num_inputs(&self, node: Node) -> usize;
 
     /// Number of outputs from a node.
-    /// Shorthand for [`Hugr::num_ports`(node, `Direction::Forward`)].
+    /// Shorthand for [`num_ports`][HugrView::num_ports]`(node, Direction::Outgoing)`.
     fn num_outputs(&self, node: Node) -> usize;
 
     /// Return iterator over children of node.
@@ -75,18 +75,21 @@ pub trait HugrView {
     fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_>;
 
     /// Iterates over the input neighbours of the `node`.
-    /// Shorthand for [`Hugr::neighbours`(node, `Direction::Backward`)].
+    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Incoming)`.
     fn input_neighbours(&self, node: Node) -> Neighbours<'_>;
 
     /// Iterates over the output neighbours of the `node`.
-    /// Shorthand for [`Hugr::neighbours`(node, `Direction::Forward`)].
+    /// Shorthand for [`neighbours`][HugrView::neighbours]`(node, Direction::Outgoing)`.
     fn output_neighbours(&self, node: Node) -> Neighbours<'_>;
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
     fn all_neighbours(&self, node: Node) -> Neighbours<'_>;
 }
 
-impl<T> HugrView for T where T: DerefHugr {
+impl<T> HugrView for T
+where
+    T: DerefHugr,
+{
     #[inline]
     fn root(&self) -> Node {
         self.hugr().root.into()
@@ -112,36 +115,31 @@ impl<T> HugrView for T where T: DerefHugr {
         self.hugr().graph.link_count()
     }
 
-    /// Iterates over the nodes in the port graph.
+    #[inline]
     fn nodes(&self) -> Nodes<'_> {
         self.hugr().graph.nodes_iter().map_into()
     }
 
-    /// Iterator over ports of node in a given direction.
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> NodePorts {
         self.hugr().graph.port_offsets(node.index, dir).map_into()
     }
 
-    /// Iterator over output ports of node. Shorthand for [`Hugr::node_ports`].
     #[inline]
     fn node_outputs(&self, node: Node) -> NodePorts {
         self.hugr().graph.output_offsets(node.index).map_into()
     }
 
-    /// Iterator over inputs ports of node. Shorthand for [`Hugr::node_ports`].
     #[inline]
     fn node_inputs(&self, node: Node) -> NodePorts {
         self.hugr().graph.input_offsets(node.index).map_into()
     }
 
-    /// Iterator over both the input and output ports of node.
     #[inline]
     fn all_node_ports(&self, node: Node) -> NodePorts {
         self.hugr().graph.all_port_offsets(node.index).map_into()
     }
 
-    /// Return node and port connected to provided port, if not connected return None.
     #[inline]
     fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)> {
         let raw = self.hugr();
@@ -153,50 +151,41 @@ impl<T> HugrView for T where T: DerefHugr {
         ))
     }
 
-    /// Number of ports in node for a given direction.
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.hugr().graph.num_ports(node.index, dir)
     }
 
-    /// Number of inputs to a node. Shorthand for [`Hugr::num_ports`].
     #[inline]
     fn num_inputs(&self, node: Node) -> usize {
         self.hugr().graph.num_inputs(node.index)
     }
 
-    /// Number of outputs from a node. Shorthand for [`Hugr::num_ports`].
     #[inline]
     fn num_outputs(&self, node: Node) -> usize {
         self.hugr().graph.num_outputs(node.index)
     }
 
-    /// Return iterator over children of node.
     #[inline]
     fn children(&self, node: Node) -> Children<'_> {
         self.hugr().hierarchy.children(node.index).map_into()
     }
 
-    /// Iterates over neighbour nodes in the given direction.
-    /// May contain duplicates if the graph has multiple links between nodes.
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_> {
         self.hugr().graph.neighbours(node.index, dir).map_into()
     }
 
-    /// Iterates over the input neighbours of the `node`. Shorthand for [`Hugr::neighbours`].
     #[inline]
     fn input_neighbours(&self, node: Node) -> Neighbours<'_> {
         self.hugr().graph.input_neighbours(node.index).map_into()
     }
 
-    /// Iterates over the output neighbours of the `node`. Shorthand for [`Hugr::neighbours`].
     #[inline]
     fn output_neighbours(&self, node: Node) -> Neighbours<'_> {
         self.hugr().graph.output_neighbours(node.index).map_into()
     }
 
-    /// Iterates over the input and output neighbours of the `node` in sequence.
     #[inline]
     fn all_neighbours(&self, node: Node) -> Neighbours<'_> {
         self.hugr().graph.all_neighbours(node.index).map_into()
