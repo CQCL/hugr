@@ -1,5 +1,5 @@
 #![allow(unused)]
-//! Internal API for HUGRs, not intended for use by users.
+//! A Trait for "read-only" HUGRs.
 
 use std::ops::Deref;
 
@@ -15,7 +15,8 @@ type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
 type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 
-/// Internal API for HUGRs, not intended for use by users.
+/// A trait for inspecting HUGRs.
+/// For end users we intend this to be superceded by region-specific APIs.
 ///
 /// TODO: Wraps the underlying graph and hierarchy, producing a view where
 /// non-linear ports can be connected to multiple nodes via implicit copies
