@@ -20,32 +20,93 @@ type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 /// TODO: Wraps the underlying graph and hierarchy, producing a view where
 /// non-linear ports can be connected to multiple nodes via implicit copies
 /// (which correspond to copy nodes in the internal graph).
-pub trait HugrView: DerefHugr {
+pub trait HugrView {
     /// Return index of HUGR root node.
+    fn root(&self) -> Node;
+
+    /// Returns the parent of a node.
+    fn get_parent(&self, node: Node) -> Option<Node>;
+
+    /// Returns the operation type of a node.
+    fn get_optype(&self, node: Node) -> &OpType;
+
+    /// Returns the number of nodes in the hugr.
+    fn node_count(&self) -> usize;
+
+    /// Returns the number of edges in the hugr.
+    fn edge_count(&self) -> usize;
+
+    /// Iterates over the nodes in the port graph.
+    fn nodes(&self) -> Nodes<'_>;
+
+    /// Iterator over ports of node in a given direction.
+    fn node_ports(&self, node: Node, dir: Direction) -> NodePorts;
+
+    /// Iterator over output ports of node.
+    /// Shorthand for [`Hugr::node_ports`(node, `Direction::Forward`)].
+    fn node_outputs(&self, node: Node) -> NodePorts;
+
+    /// Iterator over inputs ports of node.
+    /// Shorthand for [`Hugr::node_ports`(node, `Direction::Backward`)].
+    fn node_inputs(&self, node: Node) -> NodePorts;
+
+    /// Iterator over both the input and output ports of node.
+    fn all_node_ports(&self, node: Node) -> NodePorts;
+
+    /// Return node and port connected to provided port, if not connected return None.
+    fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)>;
+
+    /// Number of ports in node for a given direction.
+    fn num_ports(&self, node: Node, dir: Direction) -> usize;
+
+    /// Number of inputs to a node.
+    /// Shorthand for [`Hugr::num_ports`(node, `Direction::Backward`)].
+    fn num_inputs(&self, node: Node) -> usize;
+
+    /// Number of outputs from a node.
+    /// Shorthand for [`Hugr::num_ports`(node, `Direction::Forward`)].
+    fn num_outputs(&self, node: Node) -> usize;
+
+    /// Return iterator over children of node.
+    fn children(&self, node: Node) -> Children<'_>;
+
+    /// Iterates over neighbour nodes in the given direction.
+    /// May contain duplicates if the graph has multiple links between nodes.
+    fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_>;
+
+    /// Iterates over the input neighbours of the `node`.
+    /// Shorthand for [`Hugr::neighbours`(node, `Direction::Backward`)].
+    fn input_neighbours(&self, node: Node) -> Neighbours<'_>;
+
+    /// Iterates over the output neighbours of the `node`.
+    /// Shorthand for [`Hugr::neighbours`(node, `Direction::Forward`)].
+    fn output_neighbours(&self, node: Node) -> Neighbours<'_>;
+
+    /// Iterates over the input and output neighbours of the `node` in sequence.
+    fn all_neighbours(&self, node: Node) -> Neighbours<'_>;
+}
+
+impl<T> HugrView for T where T: DerefHugr {
     #[inline]
     fn root(&self) -> Node {
         self.hugr().root.into()
     }
 
-    /// Returns the parent of a node.
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
         self.hugr().hierarchy.parent(node.index).map(Into::into)
     }
 
-    /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         self.hugr().op_types.get(node.index)
     }
 
-    /// Returns the number of nodes in the hugr.
     #[inline]
     fn node_count(&self) -> usize {
         self.hugr().graph.node_count()
     }
 
-    /// Returns the number of edges in the hugr.
     #[inline]
     fn edge_count(&self) -> usize {
         self.hugr().graph.link_count()
@@ -142,14 +203,11 @@ pub trait HugrView: DerefHugr {
     }
 }
 
-impl<T> HugrView for T where T: DerefHugr {}
-
 /// Trait for things that can be converted into a reference to a Hugr.
 ///
 /// This is equivalent to `Deref<Target=Hugr>`, but we use a local definition to
 /// be able to write blanket implementations.
-pub trait DerefHugr: Sized {
-    /// Gets the reference to a Hugr
+pub(crate) trait DerefHugr: Sized {
     fn hugr(&self) -> &Hugr;
 }
 
