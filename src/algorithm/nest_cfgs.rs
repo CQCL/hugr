@@ -247,7 +247,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
             // Pop deleted elements to save time (and memory)
             if deleted.contains(e) {
                 self.items.pop_front();
-                //deleted.remove(e); // Only saves memory
+                //deleted.remove(e); // Would only save memory, so keep as immutable
             } else {
                 return Some((e.clone(), self.size));
             }
