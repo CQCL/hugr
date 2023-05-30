@@ -185,7 +185,7 @@ mod test {
 
     use crate::{
         builder::{
-            test::{n_identity, NAT},
+            test::{n_identity, I2, NAT},
             Dataflow,
         },
         type_row,
@@ -228,6 +228,42 @@ mod test {
             module_builder.finish()
         };
         assert_matches!(build_result, Ok(_));
+        Ok(())
+    }
+
+    // Helper function for `bad_const` and `good_const`
+    fn load_const_graph(ty: Option<ClassicType>) -> Result<Hugr, BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+        // The type `I<64>` will be inferred if `ty` is `None`
+        let const_id = module_builder.constant(ConstValue::Int(1), ty)?;
+
+        let mut main_builder = module_builder
+            .declare_and_def("main", Signature::new_df(type_row![], type_row![I2]))?;
+        let const_wire = main_builder.load_const(&const_id)?;
+        main_builder.finish_with_outputs([const_wire])?;
+
+        module_builder.finish()
+    }
+
+    #[test]
+    fn bad_const() -> Result<(), BuildError> {
+        use crate::hugr::ValidationError;
+
+        // Building should fail because I2 != NAT
+        let handle = load_const_graph(None);
+
+        assert_matches!(
+            handle,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::IncompatiblePorts { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn good_const() -> Result<(), BuildError> {
+        load_const_graph(Some(ClassicType::Int(2)))?;
         Ok(())
     }
 }

@@ -81,6 +81,7 @@ mod test {
     use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    pub(super) const I2: SimpleType = SimpleType::Classic(ClassicType::Int(2));
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
     pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
