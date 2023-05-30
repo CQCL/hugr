@@ -136,7 +136,7 @@ impl<'a, H: HugrView> SimpleCfgView<'a, H> {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
-        assert!(matches!(
+        debug_assert!(matches!(
             h.get_optype(exit),
             OpType::BasicBlock(BasicBlockOp::Exit { .. })
         ));
@@ -255,7 +255,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
         None
     }
 
-    pub fn concat(&mut self, other: BracketList<T>) -> () {
+    pub fn concat(&mut self, other: BracketList<T>) {
         let BracketList { mut items, size } = other;
         self.items.append(&mut items);
         assert!(items.len() == 0);
@@ -265,8 +265,8 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     pub fn delete(&mut self, b: &Bracket<T>, deleted: &mut HashSet<Bracket<T>>) {
         // Ideally, here we would also assert that no *other* BracketList contains b.
         debug_assert!(self.items.contains(b)); // Makes operation O(n), otherwise O(1)
-        assert!(!deleted.contains(b));
-        deleted.insert(b.clone());
+        let was_new = deleted.insert(b.clone());
+        assert!(was_new);
         self.size -= 1;
     }
 
