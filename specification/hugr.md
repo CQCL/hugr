@@ -1419,7 +1419,7 @@ interpretations of a value:
   - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
     $a_i \in \{0,1\}$;
 
-  - as an unsigned integer $\sum_{i \lt N}i 2^i a_i$;
+  - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
 
   - as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
