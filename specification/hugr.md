@@ -624,14 +624,19 @@ to be passed through tools that do not understand what the operations *do*
 (that is, allowing new operations to be defined independently of any tool -
 so long as we do not need the tooling to understand them).
 
-In all cases the serialized representation is the same: the name of the definition (**"Op Factory"**??), a list of type arguments (see below), and optionally the type of the operation node that results. The three kinds of definition are:
+In all cases the serialized representation is the same: the name of the definition
+(**"Op Factory"**??), a list of type arguments (see below), and optionally the type
+of the operation node that results. The three kinds of definition are:
 
 1.  `Opdef`: where the type of the operation is defined by a function
     (aka type scheme) given in the declarative YAML format. The function
     may take type arguments also specified in YAML. The code that turns the
     actual type arguments provided, into the operation type, given the YAML
     description, is referred to in this doc as the "YAML interpreter" and is
-    expected to be shared across tools and resources. (Note: here we generally do not serialize the computed type, as the YAML definition is passed along with the HUGR. However of course we *could* do so for tools that lack YAML interpreters...)
+    expected to be shared across tools and resources. (Note: here we generally
+    do not serialize the computed type, as the YAML definition is passed along
+    with the HUGR. However of course we *could* do so for tools that lack YAML
+    interpreters...)
 
 2.  `CustomOp`: here the declarative YAML specifies the type arguments
     (these may include statically-known values e.g. U64), but does not
@@ -645,16 +650,23 @@ In all cases the serialized representation is the same: the name of the definiti
 3.  `native`: a special case of the previous where the type argument is
     a single `Opaque` value, provided as a serialized blob.
 
-Type arguments are given by a type language that is a distinct, simplified form of the [Type System](#type-system):
+Type arguments are given by a type language that is a distinct, simplified
+form of the [Type System](#type-system):
 ```
 TypeArgs ::= TypeArg (,TypeArgs)?
 TypeArg ::= Type | ClassicType | F64 | U64 | I64 | Opaque(name, ...) | List(TypeArg)
 ```
 <!--(`Type` and `ClassicType` here means the YAML declaration is literally "Type" or "ClassicType" but the argument will be one of those.)-->
 
-**Semantics** The *semantics* of any operation are necessarily specific to both operation *and* tool (e.g. compiler or runtime). However for each operation-definition resources (extension providers) *may* implement a different Rust Trait[^1] providing a function `try_lower` that takes the type arguments and a set of target resources and may return a subgraph/function-body-HUGR using only those target resources.
+**Semantics** The *semantics* of any operation are necessarily specific
+to both operation *and* tool (e.g. compiler or runtime). However for each
+operation-definition resources (extension providers) *may* implement a
+different Rust Trait[^1] providing a function `try_lower` that takes the
+type arguments and a set of target resources and may return a subgraph /
+function-body-HUGR using only those target resources.
 
-[^1]: Whether a particular operation-definition provides Rust code for `try_lower` is independent of whether it provides Rust code for `compute_type`.
+[^1]: Whether a particular operation-definition provides Rust code for
+`try_lower` is independent of whether it provides Rust code for `compute_type`.
 
 <!-- Should we preserve some of this language about downcasting?
 
