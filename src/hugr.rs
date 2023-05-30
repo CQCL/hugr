@@ -19,6 +19,8 @@ use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
 
+use html_escape::encode_text_to_string;
+
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
@@ -127,7 +129,11 @@ impl Hugr {
                     DotEdgeStyle::None
                 };
 
-                ("".into(), style)
+                let optype = self.op_types.get(src);
+                let mut label = String::new();
+                encode_text_to_string(&format!("{}", optype.signature()), &mut label);
+
+                (label, style)
             },
         )
     }
