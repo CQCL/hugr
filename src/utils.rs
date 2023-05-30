@@ -1,15 +1,21 @@
 use std::fmt::{self, Display};
 
 pub fn display_list<T>(ts: &[T], f: &mut fmt::Formatter) -> fmt::Result
-  where T: Display {
-    if ts.is_empty() { return Ok(()) }
+where
+    T: Display,
+{
+    if ts.is_empty() {
+        return Ok(());
+    }
     let mut first = true;
     for t in ts.iter() {
         if !first {
             f.write_str(", ")?;
         }
         t.fmt(f)?;
-        if first { first = false }
+        if first {
+            first = false;
+        }
     }
     Ok(())
 }

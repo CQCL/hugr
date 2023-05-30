@@ -2,8 +2,8 @@
 
 use std::{
     borrow::Cow,
+    fmt::{self, Display, Formatter, Write},
     ops::{Deref, DerefMut},
-    fmt::{self, Display, Formatter, Write}
 };
 
 use itertools::Itertools;
@@ -12,8 +12,8 @@ use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
-use crate::{resource::ResourceSet, type_row};
 use crate::utils::display_list;
+use crate::{resource::ResourceSet, type_row};
 
 /// A type that represents concrete data.
 ///

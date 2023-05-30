@@ -15,8 +15,8 @@ pub use simple::{ClassicType, Container, LinearType, SimpleType, TypeRow};
 use smol_str::SmolStr;
 
 use crate::hugr::{Direction, Port};
-use crate::{resource::ResourceSet, type_row};
 use crate::utils::display_list;
+use crate::{resource::ResourceSet, type_row};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
