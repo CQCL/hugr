@@ -19,7 +19,7 @@ pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
 /// An Iterator over the children of a node
 pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 
-/// An Iterator over the nodes neighbouring a node
+/// An Iterator over (some or all) the nodes neighbouring a node
 pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
