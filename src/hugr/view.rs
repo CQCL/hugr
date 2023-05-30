@@ -10,10 +10,17 @@ use super::{Node, Port};
 use crate::ops::OpType;
 use crate::Direction;
 
-type Nodes<'a> = MapInto<portgraph::portgraph::Nodes<'a>, Node>;
-type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
-type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
-type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
+/// An Iterator over the nodes in a Hugr(View)
+pub type Nodes<'a> = MapInto<portgraph::portgraph::Nodes<'a>, Node>;
+
+/// An Iterator over (some or all) ports of a node
+pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
+
+/// An Iterator over the children of a node
+pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
+
+/// An Iterator over the nodes neighbouring a node
+pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superceded by region-specific APIs.
