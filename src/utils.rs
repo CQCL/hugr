@@ -1,7 +1,8 @@
 use std::fmt::{self, Display};
 
-/// Write a comma seperated list of of some types
-/// Like debug_list, but using the Display instance rather than Debug
+/// Write a comma seperated list of of some types.
+/// Like debug_list, but using the Display instance rather than Debug,
+/// and not adding surrounding square brackets.
 pub fn display_list<T>(ts: &[T], f: &mut fmt::Formatter) -> fmt::Result
 where
     T: Display,
