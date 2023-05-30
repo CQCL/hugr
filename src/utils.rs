@@ -6,9 +6,6 @@ pub fn display_list<T>(ts: &[T], f: &mut fmt::Formatter) -> fmt::Result
 where
     T: Display,
 {
-    if ts.is_empty() {
-        return Ok(());
-    }
     let mut first = true;
     for t in ts.iter() {
         if !first {
