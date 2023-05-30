@@ -150,11 +150,20 @@ impl Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let has_inputs = !(self.const_input.is_empty() && self.input.is_empty());
         if has_inputs {
-            if !self.const_input.is_empty() {
-                self.const_input.fmt(f)?;
-                f.write_str(", ")?;
-            }
             self.input.fmt(f)?;
+            if !self.const_input.is_empty() {
+                f.write_char('<')?;
+                self.const_input.fmt(f)?;
+                let mut first = true;
+                for const_ty in self.const_input.iter() {
+                    if !first {
+                        f.write_str(", ")?;
+                    }
+                    const_ty.fmt(f)?;
+                    first = false;
+                }
+                f.write_char('>')?;
+            }
             f.write_str(" -> ")?;
         }
         self.output.fmt(f)
