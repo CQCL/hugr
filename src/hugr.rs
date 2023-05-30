@@ -1,7 +1,7 @@
 //! The Hugr data structure, and its basic component handles.
 
 mod hugrmut;
-pub(crate) mod internal;
+pub mod view;
 
 pub mod serialize;
 pub mod validate;
@@ -14,7 +14,7 @@ use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::{Hierarchy, PortGraph, SecondaryMap};
 use thiserror::Error;
 
-use self::internal::HugrView;
+pub use self::view::HugrView;
 use crate::ops::{ModuleOp, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
