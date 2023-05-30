@@ -132,7 +132,7 @@ pub struct SimpleCfgView<'a, H> {
 }
 impl<'a, H: HugrView> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
+    pub fn new(h: &'a H, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
