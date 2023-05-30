@@ -8,7 +8,7 @@ use crate::{hugr::view::HugrView, types::SimpleType};
 use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
 
-use crate::types::Signature;
+use crate::types::{ClassicType, Signature};
 
 use crate::Node;
 use smol_str::SmolStr;
@@ -120,16 +120,22 @@ impl ModuleBuilder {
     }
 
     /// Add a constant value to the module and return a handle to it.
+    /// If the constant's type parameter is None, the type will be inferred
+    /// In the case of numbers of type `I<n>` where n != 64, the type needs to
+    /// be specified.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ModuleOp::Const`] node.
-    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
-        let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val))?;
-
-        Ok((const_n, typ).into())
+    pub fn constant(
+        &mut self,
+        val: ConstValue,
+        typ: Option<ClassicType>,
+    ) -> Result<ConstID, BuildError> {
+        let typ = typ.unwrap_or(val.const_type());
+        let const_node = self.add_child_op(ModuleOp::Const(val))?;
+        Ok((const_node, typ).into())
     }
 
     /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
