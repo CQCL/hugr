@@ -3,6 +3,7 @@
 use std::{
     borrow::Cow,
     ops::{Deref, DerefMut},
+    fmt::{self, Display, Formatter, Write}
 };
 
 use itertools::Itertools;
@@ -12,8 +13,6 @@ use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
 use crate::{resource::ResourceSet, type_row};
-
-use std::fmt::{self, Display, Formatter, Write};
 
 /// A type that represents concrete data.
 ///
