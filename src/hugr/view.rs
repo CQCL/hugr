@@ -204,7 +204,7 @@ where
 ///
 /// This is equivalent to `Deref<Target=Hugr>`, but we use a local definition to
 /// be able to write blanket implementations.
-pub(crate) trait DerefHugr: Sized {
+pub(crate) trait DerefHugr {
     fn hugr(&self) -> &Hugr;
 }
 
