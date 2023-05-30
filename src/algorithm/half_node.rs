@@ -22,14 +22,14 @@ enum HalfNode {
     X(Node),
 }
 
-struct HalfNodeView<'a> {
-    h: &'a dyn HugrView,
+struct HalfNodeView<'a, H> {
+    h: &'a H,
     entry: Node,
     exit: Node,
 }
 
-impl<'a> HalfNodeView<'a> {
-    pub(crate) fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
+impl<'a, H: HugrView> HalfNodeView<'a, H> {
+    pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
@@ -61,7 +61,7 @@ impl<'a> HalfNodeView<'a> {
     }
 }
 
-impl CfgView<HalfNode> for HalfNodeView<'_> {
+impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)

@@ -125,14 +125,14 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 }
 
 /// A straightforward view of a Cfg as it appears in a Hugr
-pub struct SimpleCfgView<'a> {
-    h: &'a dyn HugrView,
+pub struct SimpleCfgView<'a, H> {
+    h: &'a H,
     entry: Node,
     exit: Node,
 }
-impl<'a> SimpleCfgView<'a> {
+impl<'a, H: HugrView> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub(crate) fn new(h: &'a dyn HugrView, cfg: CfgID) -> Self {
+    pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
@@ -143,7 +143,7 @@ impl<'a> SimpleCfgView<'a> {
         Self { h, entry, exit }
     }
 }
-impl CfgView<Node> for SimpleCfgView<'_> {
+impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
     fn entry_node(&self) -> Node {
         self.entry
     }
