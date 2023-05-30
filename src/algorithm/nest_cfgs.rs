@@ -38,7 +38,7 @@
 //! However it is straightforward for us to treat successors and predecessors as sets. (Two edges between
 //! the same BBs but in opposite directions must be distinct!)
 
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use std::hash::Hash;
 
 use itertools::Itertools;
@@ -184,7 +184,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
-            let mut pending = LinkedList::new();
+            let mut pending = VecDeque::new();
             pending.push_back(cfg.exit_node());
             while let Some(n) = pending.pop_front() {
                 if reachable.insert(n) {
@@ -230,8 +230,8 @@ enum Bracket<T> {
 /// That would be cleaner, but repeated set-merging would be slower than adding the
 /// deleted items to a single set in the `TraversalState`
 struct BracketList<T> {
-    items: LinkedList<Bracket<T>>,
-    size: usize, // deleted items already taken off
+    items: LinkedList<Bracket<T>>, // Allows O(1) `append` of two lists.
+    size: usize,                   // Not counting deleted items.
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
