@@ -101,19 +101,21 @@ but may be [extended by
 Resources](#operation-extensibility).
 The edges encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
+
 ```
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | ConstE(ClassicType) | ControlFlow
 
 Locality ::= Local | Ext | Dominator
 ```
-A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct
-parent of *b*. Only certain nodes, known as *container* nodes, may act
-as parents - these are listed in
+
+A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
+of *b*. Only certain nodes, known as *container* nodes, may act as parents -
+these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
-In a valid HUGR the hierarchy edges form a tree joining all nodes of the
-HUGR, with the unique
-[Module](#module)
-node as root.
+In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
+with a unique root node. The HUGR is characterized by the type of its root node.
+The root node has no edges (and this supercedes any other requirements on the
+edges of specific node types).
 
 A **sibling graph** is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
@@ -201,12 +203,13 @@ full programs, including dataflow operations (in
 
 #### Module
 
-At the top level of the of the hierarchy is a single `module` node, the
-weight attached to this node contains module level data. There may also
-be additional metadata (e.g. source file, module name). The children of
-a `module` correspond to "module level" operation types. Neither
-`module` nor these module-level operations have signatures or value
-ports, but some have constE or other edges.
+If the HUGR contains a `module` node then it is unique and sits at the top level
+of the of the hierarchy. In this case we call it a **module HUGR**. The weight
+attached to this node contains module level data. There may also be additional
+metadata (e.g. source file, module name). The children of a `module` correspond
+to "module level" operation types. Neither `module` nor these module-level
+operations have signatures or value ports, but some have constE or other
+edges.
 
 Taking lots of inspiration from the MLIR
 [builtin](https://mlir.llvm.org/docs/Dialects/Builtin/) and
@@ -238,13 +241,13 @@ compiler and target. Note that the operations defined can also be
 defined in graphs lower in the hierarchy - this limits the scope within
 which they can be used.
 
-A **loadable HUGR** is one where all edges are connected and there are
+A **loadable HUGR** is a module HUGR where all edges are connected and there are
 no `declare/alias_declare` nodes.
 
-An **executable HUGR** or **executable module** is a loadable HUGR where
-the first child of the root `module` is a `def` called “main”, that is
-the designated entry point. Modules that act as libraries need not be
-executable.
+An **executable HUGR** or **executable module** is a loadable HUGR where the
+root node is a [Module](#module) node whose first child is a `def` called
+“main”, that is the designated entry point. Modules that act as libraries need
+not be executable.
 
 Even non-loadable HUGRs are HUGRs so long as they satisfy (all) other
 requirements such as acyclicity. (Anything not satisfying those is
@@ -403,19 +406,21 @@ To clarify the possible hierarchical relationships, using the operation
 definitions above and also defining “*O”* to be all non-nested dataflow
 operations, we can define the relationships in the following table.
 **D** and **C** are useful (and intersecting) groupings of operations:
-dataflow nodes and the nodes which contain them.
+dataflow nodes and the nodes which contain them. The "Parent" column in the
+table applies unless the node in question is a root node of the HUGR (when it
+has no parent).
 
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | "             | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
-| Conditional               | "                              | `Conditional`      | "             | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | "             |  **D**                   | First(last) is `Input`(`Output`)         |
-| "                         | "                              | `DFG`              | "             |  "                       | "                                        |
-| "                         | Const                          | `def`              | "             |  "                       | "                                        |
+| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
+| Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
+| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
+| "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
+| "                         | Const                          | `def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| "                         | \-                             | `module`           | \-            |  "                       | First is main `def` for executable HUGR. |
+| "                         | \-                             | `module`           | none          |  "                       | First is main `def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -1273,9 +1278,8 @@ Other policies could include:
         replacement appends to the list (or creates a new list if
         `Replaced` doesn't yet exist);
 
-  - to the root (module) node of Γ, attach metadata capturing a
-    serialization of the replacement (both the set of nodes replaced and
-    its replacement):
+  - to the root node of Γ, attach metadata capturing a serialization of the
+    replacement (both the set of nodes replaced and its replacement):
     
       - `History: {Replacements: [...]}`
 
@@ -1292,7 +1296,7 @@ implementation of such an algorithm that works on flat
 (non-hierarchical) port-graphs.
 
 It can be applied separately to each DSG within the HUGR, matching the
-various node types within it. Starting from the root module, we can
+various node types within it. Starting from the root node, we can
 recurse down to other DSGs within the HUGR.
 
 It should also be possible to specify a particular DSG on which to run
@@ -1637,9 +1641,9 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **declare node**: child of a module, indicates that an external
-    function exists but without giving a definition. May be the source
-    of constE-edges to call nodes and others.
+  - **declare node**: child of a module node, indicates that an external
+    function exists but without giving a definition. May be the source of
+    constE-edges to call nodes and others.
 
   - **def node**: child of a module node, defines a function (by being
     parent to the function’s body). May be the source of constE-edges to
@@ -1664,12 +1668,11 @@ an edge weight.
 
   - **Conditional node:** TODO
 
-  - **hierarchy**: A rooted tree whose nodes are all nodes of the HUGR,
-    rooted at the module node.
+  - **hierarchy**: A tree whose nodes comprise all nodes of the HUGR,
+    rooted at the HUGR's root node.
 
-  - **hierarchy edge**: An edge in the hierarchy tree. The edge is
-    considered to be directed, with the source node the parent of the
-    target node.
+  - **hierarchy edge**: An edge in the hierarchy tree. The edge is considered to
+    be directed, with the source node the parent of the target node.
 
   - **input node**: The distinguished node of a DSG representing the
     point where data processing begins.
