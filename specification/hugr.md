@@ -103,7 +103,7 @@ The edges encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
 ```
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | ConstE(ClassicType) | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | Static(ClassicType) | ControlFlow
 
 Locality ::= Local | Ext | Dominator
 ```
@@ -129,7 +129,7 @@ have at most one edge, and the port types of a node are described by its
 **Signature**. (In fact, each port must have exactly one edge, but ports
 whose edge has not yet been specified, may be useful as an intermediate
 form whilst building a HUGR.) The **Signature** may also specify a row
-of `ClassicType`s for incoming `ConstE` edges. **TODO** “…and the
+of `ClassicType`s for incoming `Static` edges. **TODO** “…and the
 relevant ports must have the same type”? Does the incoming port repeat
 the resource requirement of the outgoing port? Or are resources a
 property of the node?
@@ -180,7 +180,7 @@ local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
 
-A **ConstE** edge represents dataflow that is statically knowable - i.e.
+A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant. (Hence, the types on these edges
 do not include a resource specification.) Only a few nodes may be
 sources (`def` and `const`) and targets (`call` and `load_const`) of
@@ -188,7 +188,7 @@ these edges; see
 [module](#module)
 and
 [functions](#functions).
-For a ConstE edge from *a* to *b,* we require parent(*a*) ==
+For a Static edge from *a* to *b,* we require parent(*a*) ==
 parent<sup>i</sup>(*b*) for i\>=1 to satisfy valid scoping.
 
 Finally, **ControlFlow** edges represent all possible flows of control
@@ -208,7 +208,7 @@ of the of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
 metadata (e.g. source file, module name). The children of a `module` correspond
 to "module level" operation types. Neither `module` nor these module-level
-operations have signatures or value ports, but some have constE or other
+operations have signatures or value ports, but some have Static or other
 edges.
 
 Taking lots of inspiration from the MLIR
@@ -218,14 +218,14 @@ operations include:
 
   - `constN<T>` : a static constant value of type T stored in the node
     weight (perhaps a computation of some `Graph` type represented as a
-    HUGR). Has no ports, but may have any number of `ConstE<T>`
+    HUGR). Has no ports, but may have any number of `Static<T>`
     out-edges - one for each use.
 
   - `def` : a function definition. The name of the function is specified
     in the metadata and function attributes (relevant for compilation)
     define the node weight. The function body is defined by its children
     (the child graph forms the body). The node has no ports but may have
-    any number of `ConstE<Graph>` out-edges - one for each use.
+    any number of `Static<Graph>` out-edges - one for each use.
 
   - `declare`: an external function declaration. Like `def`, but with no
     body, the name is used at link time to lookup definitions in linked
@@ -274,10 +274,10 @@ additional outputs to a classical copy node):
     edges.
 
   - `call`: Call a function directly. There is an incoming
-    `ConstE<Graph>` edge to specify the graph being called. The
+    `Static<Graph>` edge to specify the graph being called. The
     signature of the `Value` edges matches the function being called.
 
-  - `load_constant<T>`: has an incoming `ConstE<T>` edge, where `T` is non-linear, and a
+  - `load_constant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
     `Value<*,T>` output, used to load a static constant in to the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all stateful operations that
@@ -444,7 +444,7 @@ Output node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Source + target have same parent                                                                                                                                                                        |
 | Value          | For local edges, source + target have same parent, but there are [inter-graph edges](#inter-graph-value-edges) |
-| ConstE         | Parent of source is ancestor of target                                                                                                                                                                  |
+| Static         | Parent of source is ancestor of target                                                                                                                                                                  |
 
 ### Exception Handling
 
@@ -812,7 +812,7 @@ list of types which exist in Tierkreis.
 
 SimpleTypes are the types of *values* which can be sent down wires,
 except for type variables `Var`. All of the ClassicTypes can also be
-sent down ConstE edges.
+sent down Static edges.
 
 Function signatures are made up of *rows* (\#), which consist of an
 arbitrary number of SimpleTypes, plus a resource spec.
@@ -993,7 +993,7 @@ This includes Conditional and TailLoop nodes, and nodes like `call`:
 
 <img src="attachments/2647818241/2647818323.png" height="64px">
 
-**call** - This operation, like **to\_const**, uses it’s constE graph as
+**call** - This operation, like **to\_const**, uses it’s Static graph as
 a type parameter.
 
 On top of that, we're definitely going to want modules which handle
@@ -1180,7 +1180,7 @@ remove it. (If there is an intergraph edge from `n0` to a descendent of
 ###### `InsertConstIgnore`
 
 Given a `ConstN<T>` node `c`, and optionally a DSG `P`, add a new
-`load_constant<T>` node `n` as a child of `P` with a `ConstE<T>` edge
+`load_constant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
@@ -1641,21 +1641,21 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **declare node**: child of a module node, indicates that an external
-    function exists but without giving a definition. May be the source of
-    constE-edges to call nodes and others.
+  - **declare node**: child of a module, indicates that an external
+    function exists but without giving a definition. May be the source
+    of Static-edges to call nodes and others.
 
   - **def node**: child of a module node, defines a function (by being
-    parent to the function’s body). May be the source of constE-edges to
+    parent to the function’s body). May be the source of Static-edges to
     call nodes and others.
 
   - **DFG node**: A node representing a data-flow graph. Its children
     are all data-dependency nodes.
 
   - **edge kind**: There are five kinds of edge: value edge, order edge,
-    control-flow edge, constE edge, and hierarchy edge.
+    control-flow edge, Static edge, and hierarchy edge.
 
-  - **edge type:** Typing information attached to a value edge or constE
+  - **edge type:** Typing information attached to a value edge or Static
     edge (representing the data type of value that the edge carries).
 
   - **entry node**: The distinguished node of a CFG representing the
