@@ -13,6 +13,7 @@ use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
 use crate::{resource::ResourceSet, type_row};
+use crate::utils::display_list;
 
 /// A type that represents concrete data.
 ///
@@ -307,21 +308,9 @@ pub struct TypeRow {
 
 impl Display for TypeRow {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tys = self.types.as_ref();
-        if tys.is_empty() {
-            f.write_str("[]")
-        } else {
-            f.write_char('[')?;
-            let mut first = true;
-            for ty in tys.iter() {
-                if !first {
-                    f.write_str(", ")?;
-                }
-                write!(f, "{}", ty)?;
-                first = false;
-            }
-            f.write_char(']')
-        }
+        f.write_char('[')?;
+        display_list(self.types.as_ref(), f)?;
+        f.write_char(']')
     }
 }
 

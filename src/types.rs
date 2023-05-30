@@ -16,6 +16,7 @@ use smol_str::SmolStr;
 
 use crate::hugr::{Direction, Port};
 use crate::{resource::ResourceSet, type_row};
+use crate::utils::display_list;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -153,15 +154,7 @@ impl Display for Signature {
             self.input.fmt(f)?;
             if !self.const_input.is_empty() {
                 f.write_char('<')?;
-                self.const_input.fmt(f)?;
-                let mut first = true;
-                for const_ty in self.const_input.iter() {
-                    if !first {
-                        f.write_str(", ")?;
-                    }
-                    const_ty.fmt(f)?;
-                    first = false;
-                }
+                display_list(&self.const_input, f)?;
                 f.write_char('>')?;
             }
             f.write_str(" -> ")?;
