@@ -2,7 +2,7 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::hugr::{typecheck::TypeError, HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::LinearType;
 
@@ -65,6 +65,10 @@ pub enum BuildError {
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit_builder::CircuitBuildError),
+
+    /// Type error for constant values
+    #[error("Type error for constant value: {0}.")]
+    ConstTypeError(#[from] TypeError),
 }
 
 #[cfg(test)]

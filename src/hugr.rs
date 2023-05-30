@@ -4,6 +4,7 @@ mod hugrmut;
 pub mod view;
 
 pub mod serialize;
+pub mod typecheck;
 pub mod validate;
 
 use derive_more::From;

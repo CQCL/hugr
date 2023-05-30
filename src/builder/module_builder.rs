@@ -3,7 +3,10 @@ use super::{
     BuildError, Container,
 };
 
-use crate::{hugr::view::HugrView, types::SimpleType};
+use crate::{
+    hugr::{typecheck::typecheck_const, view::HugrView},
+    types::SimpleType,
+};
 
 use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
@@ -133,7 +136,13 @@ impl ModuleBuilder {
         val: ConstValue,
         typ: Option<ClassicType>,
     ) -> Result<ConstID, BuildError> {
-        let typ = typ.unwrap_or(val.const_type());
+        let typ = match typ {
+            Some(typ) => {
+                typecheck_const(&typ, &val)?;
+                typ
+            }
+            None => val.const_type(),
+        };
         let const_node = self.add_child_op(ModuleOp::Const(val))?;
         Ok((const_node, typ).into())
     }
