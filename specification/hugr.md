@@ -176,10 +176,15 @@ possible localities:
 
 Note that the locality is not fixed or even specified by the signature.
 
-Simple HUGR example
-
-<img src="attachments/2647818241/2647818473.svg" width="512px">
-
+### Simple HUGR example
+```mermaid
+graph  LR
+    Input -->|0:Q| H
+    H -->|0:Q| CNOT
+    Input -->|1:Q| CNOT
+    CNOT -->|0:Q| Output
+    CNOT -->|1:Q| Output
+```
 In the example above, a 2-qubit circuit is described as a dataflow
 region of a HUGR with one `H` operation and one `CNOT` operation. The
 operations have an incoming and outgoing list of ports, with each
