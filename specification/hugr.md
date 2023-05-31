@@ -1417,7 +1417,7 @@ Semantics are defined by the operations. There are three possible
 interpretations of a value:
 
   - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
-    $a_i \in \{0,1\}$;
+    $a_i \in \\{0,1\\}$;
 
   - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
 
