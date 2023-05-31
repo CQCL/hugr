@@ -1341,13 +1341,14 @@ struct HUGR {
 // (parent, #incoming, #outgoing)
 struct Node = (Optional<Int>, Int, Int)
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Int), (Node, Int))
+struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
 ```
 
-Node and edge indices, used as keys in the weight maps and within the
-definitions of nodes and indices, directly correspond to indices of the
-node/edge lists. An edge is defined by the source and target nodes, and
-the offset of the output/input ports within those nodes. This scheme
+Node indices, used as keys in the weight maps and within the
+definitions of nodes and edges, directly correspond to indices of the
+node list. An edge is defined by the source and target nodes, and
+optionally the offset of the output/input ports within those nodes, if the edge
+kind is one that connects to a port. This scheme
 enforces that nodes are contiguous - a node index must always point to a
 valid node - whereas in tooling implementations it may be necessary to
 implement stable indexing where removing a node invalidates that index
