@@ -475,10 +475,6 @@ Output node.
     like a DFG-node. This contains a DSG, and (like a DFG node) has
     inputs matching the child DSG; but one output, of type
     `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-    
-      - At this point L3 will have to compile potentially-panicking
-        operations into an explicit check and branch to the end (exit
-        block) of the nearest containing `catch`
 
   - There is also a higher-order `catch` operation in the Tierkreis
     resource, taking a graph argument; and `run_circuit` will return the
