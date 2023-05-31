@@ -129,7 +129,7 @@ of edge for different relationships, and some edges have types:
 ```
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
 
-Locality ::= Local | Ext | Dominator
+Locality ::= Local | Ext | Dom
 ```
 #### Hierarchy
 
@@ -182,7 +182,7 @@ Note that the locality is not fixed or even specified by the signature.
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def` and `Const`) and targets (`Call` and `load_const`) of
+sources (`Def` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
@@ -222,10 +222,10 @@ edges. The following operations are *only* valid as immediate children of a
     and function attributes (relevant for compilation)
     define the node weight. The node has an outgoing `Static<Graph>`
     edge for each use of the function. The function name is used at link time to
-    lookup definitions in linked
+    look up definitions in linked
     modules (other hugr instances specified to the linker).
   
-  - `AliasDeclare`: an external type alias declaration. At link time can be
+  - `AliasDeclare`: an external type alias declaration. At link time this can be
     replaced with the definition. An alias declared with `AliasDeclare` is equivalent to a
     named opaque type.
 
@@ -233,7 +233,7 @@ The following operations are valid at the module level, but *also* in dataflow
 regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
-    weight. Like `Declare/Def` has one `Static<T>` out-edge per use.
+    weight. Like `Declare` and `Def` this has one `Static<T>` out-edge per use.
 
   - `Def` : a function definition. Like `Declare` but with a function body.
     The function body is defined by the sibling graph formed by its children.
@@ -269,7 +269,7 @@ operations valid at both Module level and within dataflow regions):
     signature of the `Value` edges matches the function being called.
 
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
-    `Value<Local,T>` output, used to load a static constant in to the local
+    `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
     take no dataflow input, to ensure they lie in the causal cone of the
@@ -827,8 +827,8 @@ sent down Static edges.
 Function signatures are made up of *rows* (\#), which consist of an
 arbitrary number of SimpleTypes, plus a resource spec.
 
-ClassicTypes `int<N>, float64` are all fixed-size (where `N` is the bit-width),
-as are QuantumTypes.
+ClassicTypes such as `int<N>` (where `N` is the bit-width) and `float64` are both fixed-size,
+as is Qubit.
 `Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
 statically-known number and type of elements, as does `Array<N>` (where
 N is a static constant). These types are also fixed-size if their
@@ -836,7 +836,7 @@ components are.
 
 Container types are defined in terms of statically-known element types.
 Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
-types that have been proven to work for Tierkreis: `Graph`, `Map` and
+types: `Graph`, `Map` and
 `List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
 allows named newtypes to be used. Containers are linear if any of their
 components are linear.
