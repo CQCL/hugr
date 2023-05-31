@@ -177,7 +177,7 @@ Note that the locality is not fixed or even specified by the signature.
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`def` and `const`) and targets (`call` and `load_const`) of
+sources (`Def` and `Const`) and targets (`Call` and `load_const`) of
 these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
@@ -204,68 +204,52 @@ full programs, including dataflow operations (in
 
 #### Module
 
-If the HUGR contains a `module` node then it is unique and sits at the top level
+If the HUGR contains a `Module` node then it is unique and sits at the top level
 of the of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
-metadata (e.g. source file, module name). The children of a `module` correspond
-to "module level" operation types. Neither `module` nor these module-level
-operations have signatures or value ports, but some have Static or other
-edges.
+metadata (e.g. source file). The children of a `Module` correspond
+to "module level" operation types. Neither `Module` nor these module-level
+operations have value ports, but some have Static or other
+edges. The following operations are *only* valid as immediate children of a
+`Module` node.
 
-Taking lots of inspiration from the MLIR
-[builtin](https://mlir.llvm.org/docs/Dialects/Builtin/) and
-[func](https://mlir.llvm.org/docs/Dialects/Func/) dialects, these node
-operations include:
-
-  - `Const<T>` : a static constant value of type T stored in the node
-    weight (perhaps a computation of some `Graph` type represented as a
-    HUGR). Has no ports, but may have any number of `Static<T>`
-    out-edges - one for each use.
-
-  - `def` : a function definition. The name of the function is specified
-    in the metadata and function attributes (relevant for compilation)
-    define the node weight. The function body is defined by its children
-    (the child graph forms the body). The node has no ports but may have
-    any number of `Static<Graph>` out-edges - one for each use.
-
-  - `declare`: an external function declaration. Like `def`, but with no
-    body, the name is used at link time to lookup definitions in linked
+  - `Declare`: an external function declaration. The name of the function 
+    and function attributes (relevant for compilation)
+    define the node weight. The node has an outgoing `Static<Graph>`
+    edge for each use of the function. The function name is used at link time to
+    lookup definitions in linked
     modules (other hugr instances specified to the linker).
-
-  - `alias_declare/alias_def`: analogous to `declare` and `def` but with
-    type aliases. At link time `alias_declare` can be replaced with
-    `alias_def`. An alias declared with `declare` is equivalent to a
+  
+  - `AliasDeclare`: an external type alias declaration. At link time can be
+    replaced with the definition. An alias declared with `AliasDeclare` is equivalent to a
     named opaque type.
 
-Exactly which nodes are valid at this top level is dependent on the
-compiler and target. Note that the operations defined can also be
-defined in graphs lower in the hierarchy - this limits the scope within
-which they can be used.
+The following operations are valid at the module level, but *also* in dataflow
+regions:
+
+  - `Const<T>` : a static constant value of type T stored in the node
+    weight. Like `Declare/Def` has one `Static<T>` out-edge per use.
+
+  - `Def` : a function definition. Like `Declare` but with a function body.
+    The function body is defined by the sibling graph formed by its children.
+    At link time `Declare` nodes are replaced by `Def`.
+
+  - `AliasDef`: type alias definition. At link time `AliasDeclare` can be replaced with
+    `AliasDef`.
+
 
 A **loadable HUGR** is a module HUGR where all edges are connected and there are
-no `declare/alias_declare` nodes.
+no `Declare/AliasDeclare` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
-root node is a [Module](#module) node whose first child is a `def` called
+root Module node has a `Def` child with function name
 “main”, that is the designated entry point. Modules that act as libraries need
 not be executable.
 
-Even non-loadable HUGRs are HUGRs so long as they satisfy (all) other
-requirements such as acyclicity. (Anything not satisfying those is
-not-a-HUGR.) For example, such may be processed by the linker to produce
-loadable HUGRs.
+#### Dataflow
 
-In
-[replacement-and-pattern-matching](#replacement-and-pattern-matching)
-we describe a “partial HUGR” - this is *not* a HUGR, though it is
-related.
-
-#### Functions
-
-Within functions the following basic dataflow operations are available,
-with signatures describing their value ports (note that some operations
-support many different signatures. For example, optimization may add
-additional outputs to a classical copy node):
+Within dataflow regions, which include function definitions,
+the following basic dataflow operations are available:
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
@@ -274,12 +258,12 @@ additional outputs to a classical copy node):
     nodes starting from `Input` with respect to the Value and Order
     edges.
 
-  - `call`: Call a function directly. There is an incoming
+  - `Call`: Call a statically defined function. There is an incoming
     `Static<Graph>` edge to specify the graph being called. The
     signature of the `Value` edges matches the function being called.
 
-  - `load_constant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
-    `Value<*,T>` output, used to load a static constant in to the local
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
+    `Value<Local,T>` output, used to load a static constant in to the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all stateful operations that
     take no dataflow input, to ensure they lie in the causal cone of the
@@ -291,13 +275,13 @@ additional outputs to a classical copy node):
     can be trivially removed.
 
   - `identity<T>`: pass-through, no operation is performed.
-
+<!-- 
   - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
     input, and a single `Value<*,Sum((),...,())>` output with N elements
     each of type unit `()`. The value is (1) a list of pairs of type
     `(T,Sum((),...,())` used as a lookup table on the input value, the
     first element being key and the second as the return value; and (2)
-    an optional default value of the same `Sum` type.
+    an optional default value of the same `Sum` type. -->
 
   - `DFG`: a simply nested dataflow graph, the signature of this
     operation is the signature of the child graph. These nodes are
@@ -418,10 +402,10 @@ has no parent).
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Const                          | `def`              | **C**         |  "                       | "                                        |
+| "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| "                         | \-                             | `module`           | none          |  "                       | First is main `def` for executable HUGR. |
+| "                         | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -432,7 +416,7 @@ cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
 `Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. The common parent may be a `def`, `TailLoop`, `DFG`,
+must be acyclic. The common parent may be a `Def`, `TailLoop`, `DFG`,
 `Case` or `BasicBlock` node.
 
 In a dataflow sibling graph, the edges (value and order considered
@@ -988,11 +972,11 @@ equality constraint of `typeof(b) ~ Bool`.
 We will provide some built in modules to provide basic functionality.
 I’m going to define them in terms of resources. We have the “builtin”
 resource which should always be available when writing hugr plugins.
-This includes Conditional and TailLoop nodes, and nodes like `call`:
+This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
 <img src="attachments/2647818241/2647818323.png" height="64px">
 
-**call** - This operation, like **to\_const**, uses it’s Static graph as
+**Call** - This operation, like **to\_const**, uses it’s Static graph as
 a type parameter.
 
 On top of that, we're definitely going to want modules which handle
@@ -1179,7 +1163,7 @@ remove it. (If there is an intergraph edge from `n0` to a descendent of
 ###### `InsertConstIgnore`
 
 Given a `Const<T>` node `c`, and optionally a DSG `P`, add a new
-`load_constant<T>` node `n` as a child of `P` with a `Static<T>` edge
+`LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
@@ -1188,7 +1172,7 @@ provided, it must be a descendent of the parent of `c`.
 
 ###### `RemoveConstIgnore`
 
-Given a `load_constant<T>` node `n` that has no outgoing edges, remove
+Given a `LoadConstant<T>` node `n` that has no outgoing edges, remove
 it (and its incoming value and Order edges) from the hugr.
 
 ##### Insertion and removal of const nodes
@@ -1565,11 +1549,11 @@ In **some** contexts, notably the Tierkreis runtime, higher-order
 operations allow graphs to be valid dataflow values, and be executed.
 These operations allow this.
 
-  - `call_indirect`: Call a function indirectly. Like `call`, but the
+  - `CallIndirect`: Call a function indirectly. Like `Call`, but the
     first input is a standard dataflow graph type. This is essentially
     `eval` in Tierkreis.
 
-  - `catch`: like `call_indirect`, the first argument is of type
+  - `catch`: like `CallIndirect`, the first argument is of type
     `Graph[R]<I,O>` and the rest of the arguments are of type `I`.
     However the result is not `O` but `Sum(O,ErrorType)`
 
@@ -1590,13 +1574,13 @@ of input to the next iterations of the loop.
 
 <img src="attachments/2647818241/2647818329.png" height="64px">
 
-**call\_indirect** - This has the same feature as **loop**: running a
+**CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s resources.
 
 <img src="attachments/2647818241/2647818368.png" height="64px">
 
-**to\_const** - For operations which instantiate a graph (**to\_const**
-and **call**) the functions are given an extra parameter at graph
+**to_const** - For operations which instantiate a graph (**to\_const**
+and **Call**) the functions are given an extra parameter at graph
 construction time which corresponds to the graph type that they are
 meant to instantiate. This type will be given by a typeless edge from
 the graph in question to the operation, with the graph’s type added as
@@ -1607,7 +1591,7 @@ an edge weight.
   - **BasicBlock node**: A child of a CFG node (i.e. a basic block
     within a control-flow graph).
 
-  - **call node**: TODO
+  - **Call node**: TODO
 
   - **child node**: A child of a node is an adjacent node in the
     hierarchy that is further from the root node; equivalently, the
@@ -1640,13 +1624,13 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **declare node**: child of a module, indicates that an external
+  - **Declare node**: child of a module, indicates that an external
     function exists but without giving a definition. May be the source
-    of Static-edges to call nodes and others.
+    of Static-edges to Call nodes and others.
 
-  - **def node**: child of a module node, defines a function (by being
+  - **Def node**: child of a module node, defines a function (by being
     parent to the function’s body). May be the source of Static-edges to
-    call nodes and others.
+    Call nodes and others.
 
   - **DFG node**: A node representing a data-flow graph. Its children
     are all data-dependency nodes.
