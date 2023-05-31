@@ -1416,12 +1416,12 @@ The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
 interpretations of a value:
 
-  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where $a_i
-    \in {0,1}$;
+  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
+    $a_i \in \\{0,1\\}$;
 
-  - as an unsigned integer $\sum_{i<N}i 2^i a_i$;
+  - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
 
-  - as a signed integer $\sum_{i<N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
+  - as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
 An asterix ( \* ) in the tables below indicates that the definition
 either differs from or is not part of the
