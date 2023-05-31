@@ -99,61 +99,8 @@ outlined in [Node
 Operations](#node-operations)
 but may be [extended by
 Resources](#operation-extensibility).
-The edges encode relationships between nodes; there are several *kinds*
-of edge for different relationships, and some edges have types:
 
-```
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | Static(ClassicType) | ControlFlow
-
-Locality ::= Local | Ext | Dominator
-```
-
-A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
-of *b*. Only certain nodes, known as *container* nodes, may act as parents -
-these are listed in
-[hierarchical node relationships](#hierarchical-relationships-and-constraints).
-In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
-with a unique root node. The HUGR is characterized by the type of its root node.
-The root node has no edges (and this supercedes any other requirements on the
-edges of specific node types).
-
-A **sibling graph** is a subgraph of the HUGR containing all nodes with
-a particular parent, plus the Order, Value and ControlFlow edges between
-them.
-
-A **Value** edge represents dataflow that happens at runtime - i.e. the
-source of the edge will, at runtime, produce a value that is consumed by
-the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; each port may
-have at most one edge, and the port types of a node are described by its
-**Signature**. (In fact, each port must have exactly one edge, but ports
-whose edge has not yet been specified, may be useful as an intermediate
-form whilst building a HUGR.) The **Signature** may also specify a row
-of `ClassicType`s for incoming `Static` edges. **TODO** “…and the
-relevant ports must have the same type”? Does the incoming port repeat
-the resource requirement of the outgoing port? Or are resources a
-property of the node?
-
-**Inport**: an incoming port
-
-**Outport**: an outgoing port
-
-Value edges are parameterized by the locality and type; there are three
-possible localities:
-
-  - Local: both source and target nodes must have the same parent
-
-  - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
-    parent<sup>i</sup>(dest) for i\>1; see
-    [inter-graph-edges](#inter-graph-value-edges).
-
-  - Dom: edges from a dominating basic block in a control-flow graph
-    that is the parent of the source; see
-    [inter-graph-edges](#inter-graph-value-edges)
-
-Note that the locality is not fixed or even specified by the signature.
-
-### Simple HUGR example
+**Simple HUGR example**
 ```mermaid
 graph  LR
     Input -->|0:Q| H
@@ -172,7 +119,70 @@ Qubit]`. Further information in the metadata may label the first qubit
 as *control* and the second as *target*.
 
 In this case, output 0 of the H operation is connected to input 0 of the
-CNOT. All other ports are disconnected.
+CNOT.
+
+### Edges
+The edges of a HUGR encode relationships between nodes; there are several *kinds*
+of edge for different relationships, and some edges have types:
+
+```
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
+
+Locality ::= Local | Ext | Dominator
+```
+#### Hierarchy
+
+A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
+of *b*. Only certain nodes, known as *container* nodes, may act as parents -
+these are listed in
+[hierarchical node relationships](#hierarchical-relationships-and-constraints).
+In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
+with a unique root node. The HUGR is characterized by the type of its root node.
+The root node has no edges (and this supercedes any other requirements on the
+edges of specific node types).
+
+A **sibling graph** is a subgraph of the HUGR containing all nodes with
+a particular parent, plus the Order, Value and ControlFlow edges between
+them.
+
+#### Value
+
+A **Value** edge represents dataflow that happens at runtime - i.e. the
+source of the edge will, at runtime, produce a value that is consumed by
+the edge’s target. Value edges are from an outgoing **Port** of the
+source node, to an incoming **Port** of the target node; each port may
+have at most one edge, and the port types of a node are described by its
+**Signature**. The **Signature** may also specify a row
+of `ClassicType`s for incoming `Static` edges. These correspond to incoming
+ports that always follow `Value` ports.
+
+
+Value edges are parameterized by the locality and type; there are three
+possible localities:
+
+  - Local: both source and target nodes must have the same parent
+
+  - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
+    parent<sup>i</sup>(dest) for i\>1; see
+    [inter-graph-edges](#inter-graph-value-edges).
+
+  - Dom: edges from a dominating basic block in a control-flow graph
+    that is the parent of the source; see
+    [inter-graph-edges](#inter-graph-value-edges)
+
+Note that the locality is not fixed or even specified by the signature.
+
+#### Static
+
+A **Static** edge represents dataflow that is statically knowable - i.e.
+the source is a compile-time constant defined in the program. Hence, the types on these edges
+do not include a resource specification. Only a few nodes may be
+sources (`def` and `const`) and targets (`call` and `load_const`) of
+these edges; see
+[operations](#node-operations).
+Static edges may have any of the valid `Value` localities.
+
+#### Order
 
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
@@ -180,18 +190,9 @@ local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
 
-A **Static** edge represents dataflow that is statically knowable - i.e.
-the source is a compile-time constant. (Hence, the types on these edges
-do not include a resource specification.) Only a few nodes may be
-sources (`def` and `const`) and targets (`call` and `load_const`) of
-these edges; see
-[module](#module)
-and
-[functions](#functions).
-For a Static edge from *a* to *b,* we require parent(*a*) ==
-parent<sup>i</sup>(*b*) for i\>=1 to satisfy valid scoping.
+#### Controlflow
 
-Finally, **ControlFlow** edges represent all possible flows of control
+**ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
 always *local*, i.e. source and target have the same parent.
 
@@ -501,6 +502,8 @@ execute \>=0 times.
     order+value edges together must be acyclic). We record the
     relationship between the inter-graph value edge and the
     corresponding order edge via metadata on each edge.
+    For Static edges this order edge is not required since the source is
+    guaranteed to causally precede the target.
 
 2.  For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
     == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
@@ -520,8 +523,8 @@ remain as before.
 HUGRs without inter-graph edges may still be useful for e.g. register
 allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
-outside, we add an outport to the Input node of each subgraph, a
-corresponding inport to the Conditional-node, and discard nodes to each
+outside, we add an outgoing port to the Input node of each subgraph, a
+corresponding incoming port to the Conditional-node, and discard nodes to each
 subgraph that doesn’t use the value. It is straightforward to turn an
 edge between graphs into a combination of intra-graph edges and extra
 input/output ports+nodes in such a way, but this is akin to
