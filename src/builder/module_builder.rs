@@ -24,7 +24,7 @@ pub struct ModuleBuilder(HugrMut);
 impl ModuleBuilder {
     /// New builder for a new HUGR.
     pub fn new() -> Self {
-        Self(HugrMut::new())
+        Self(HugrMut::new_module())
     }
 }
 

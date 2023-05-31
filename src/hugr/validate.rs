@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, OpType};
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -51,12 +51,6 @@ impl<'a> ValidationContext<'a> {
                 node: self.hugr.root(),
             });
         }
-        if self.hugr.get_optype(self.hugr.root()) != &OpType::Module(ModuleOp::Root) {
-            return Err(ValidationError::InvalidRootOpType {
-                node: self.hugr.root(),
-                optype: self.hugr.get_optype(self.hugr.root()).clone(),
-            });
-        }
 
         // Node-specific checks
         for node in self.hugr.graph.nodes_iter().map_into() {
@@ -95,6 +89,7 @@ impl<'a> ValidationContext<'a> {
         let flags = optype.validity_flags();
 
         // The Hugr can have only one root node.
+        // The root node has no edges.
         if node != self.hugr.root() {
             let Some(parent) = self.hugr.get_parent(node) else {
                 return Err(ValidationError::NoParent { node });
@@ -111,44 +106,44 @@ impl<'a> ValidationContext<'a> {
                     allowed_children,
                 });
             }
-        }
 
-        // Check that we have enough ports. If the `non_df_ports` flag is set
-        // for the direction, we require exactly that number of ports after the
-        // dataflow ports. Otherwise, we allow any number of extra ports.
-        let check_extra_ports = |df_ports: usize, non_df_ports, actual| {
-            if let Some(non_df) = non_df_ports {
-                df_ports + non_df == actual
-            } else {
-                df_ports <= actual
+            // Check that we have enough ports. If the `non_df_ports` flag is set
+            // for the direction, we require exactly that number of ports after the
+            // dataflow ports. Otherwise, we allow any number of extra ports.
+            let check_extra_ports = |df_ports: usize, non_df_ports, actual| {
+                if let Some(non_df) = non_df_ports {
+                    df_ports + non_df == actual
+                } else {
+                    df_ports <= actual
+                }
+            };
+            let df_const_input = sig.const_input.len();
+            if !check_extra_ports(
+                sig.input.len() + df_const_input,
+                flags.non_df_ports.0,
+                self.hugr.graph.num_inputs(node.index),
+            ) || !check_extra_ports(
+                sig.output.len(),
+                flags.non_df_ports.1,
+                self.hugr.graph.num_outputs(node.index),
+            ) {
+                return Err(ValidationError::WrongNumberOfPorts {
+                    node,
+                    optype: optype.clone(),
+                    actual_inputs: sig.input.len(),
+                    actual_outputs: sig.output.len(),
+                });
             }
-        };
-        let df_const_input = sig.const_input.len();
-        if !check_extra_ports(
-            sig.input.len() + df_const_input,
-            flags.non_df_ports.0,
-            self.hugr.graph.num_inputs(node.index),
-        ) || !check_extra_ports(
-            sig.output.len(),
-            flags.non_df_ports.1,
-            self.hugr.graph.num_outputs(node.index),
-        ) {
-            return Err(ValidationError::WrongNumberOfPorts {
-                node,
-                optype: optype.clone(),
-                actual_inputs: sig.input.len(),
-                actual_outputs: sig.output.len(),
-            });
-        }
 
-        // Check port connections
-        for (i, port_index) in self.hugr.graph.inputs(node.index).enumerate() {
-            let port = Port::new_incoming(i);
-            self.validate_port(node, port, port_index, optype)?;
-        }
-        for (i, port_index) in self.hugr.graph.outputs(node.index).enumerate() {
-            let port = Port::new_outgoing(i);
-            self.validate_port(node, port, port_index, optype)?;
+            // Check port connections
+            for (i, port_index) in self.hugr.graph.inputs(node.index).enumerate() {
+                let port = Port::new_incoming(i);
+                self.validate_port(node, port, port_index, optype)?;
+            }
+            for (i, port_index) in self.hugr.graph.outputs(node.index).enumerate() {
+                let port = Port::new_outgoing(i);
+                self.validate_port(node, port, port_index, optype)?;
+            }
         }
 
         // Check operation-specific constraints
@@ -521,9 +516,6 @@ pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
     #[error("The root node of the Hugr {node:?} is not a root in the hierarchy.")]
     RootNotRoot { node: Node },
-    /// Invalid root operation type.
-    #[error("The operation type {optype:?} is not allowed as a root node. Expected Optype::Module(ModuleType::Root). In node {node:?}.")]
-    InvalidRootOpType { node: Node, optype: OpType },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
@@ -689,7 +681,7 @@ mod test {
         }
         .into();
 
-        let mut b = HugrMut::new();
+        let mut b = HugrMut::new_module();
         let root = b.root();
 
         let def = b.add_op_with_parent(root, def_op).unwrap();
@@ -791,7 +783,7 @@ mod test {
         }
         .into();
 
-        let mut b = HugrMut::new();
+        let mut b = HugrMut::new_module();
         let root = b.root();
         assert_eq!(b.hugr().validate(), Ok(()));
 
@@ -802,15 +794,8 @@ mod test {
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
-        b.replace_op(other, declare_op.clone());
+        b.replace_op(other, declare_op);
         assert_eq!(b.hugr().validate(), Ok(()));
-
-        // Change the root type
-        b.replace_op(root, declare_op);
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::InvalidRootOpType { node, .. }) => assert_eq!(node, root)
-        );
 
         // Make the hugr root not a hierarchy root
         {
@@ -821,6 +806,27 @@ mod test {
                 Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
             );
         }
+    }
+
+    #[test]
+    fn leaf_root() {
+        let leaf_op: OpType = LeafOp::Noop(ClassicType::F64.into()).into();
+
+        let b = HugrMut::new(leaf_op);
+        assert_eq!(b.hugr().validate(), Ok(()));
+    }
+
+    #[test]
+    fn dfg_root() {
+        let dfg_op: OpType = DataflowOp::DFG {
+            signature: Signature::new_linear(type_row![B]),
+        }
+        .into();
+
+        let mut b = HugrMut::new(dfg_op);
+        let root = b.root();
+        add_df_children(&mut b, root, 1);
+        assert_eq!(b.hugr().validate(), Ok(()));
     }
 
     #[test]
