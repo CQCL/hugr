@@ -68,6 +68,9 @@ impl<'a> ValidationContext<'a> {
 
     /// Returns the dominator tree for a CFG region, identified by its container node.
     /// May compute the dominator tree if it has not been computed yet.
+    //
+    // TODO: Use a `DominatorTree<HashMap>` once that's supported
+    //   see https://github.com/CQCL/portgraph/issues/55
     fn dominator_tree(&mut self, node: Node) -> &DominatorTree {
         self.dominators.entry(node).or_insert_with(|| {
             let entry = self.hugr.hierarchy.first(node.index).unwrap();
@@ -317,6 +320,8 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
+        // TODO: Use a `TopoSort<HashSet>` once that's supported
+        //   see https://github.com/CQCL/portgraph/issues/55
         let topo = toposort_filtered(
             &self.hugr.graph,
             [first_child],

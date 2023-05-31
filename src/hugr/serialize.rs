@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::{hugr::Hugr, ops::OpType};
 use portgraph::{
     hierarchy::AttachError, Direction, Hierarchy, LinkError, NodeIndex, PortGraph, PortIndex,
-    SecondaryMap,
+    UnmanagedDenseMap,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -158,7 +158,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports the capacity will be an
         // underestimate
         let mut graph = PortGraph::with_capacity(nodes.len(), edges.len() * 2);
-        let mut op_types_sec = SecondaryMap::new();
+        let mut op_types_sec = UnmanagedDenseMap::with_capacity(nodes.len());
         for (parent, incoming, outgoing) in nodes {
             let ni = graph.add_node(incoming, outgoing);
             if parent != ni {
@@ -239,7 +239,7 @@ pub mod test {
             graph: g,
             hierarchy: h,
             root,
-            op_types: SecondaryMap::new(),
+            op_types: UnmanagedDenseMap::new(),
         };
 
         let v = rmp_serde::to_vec_named(&hg).unwrap();
