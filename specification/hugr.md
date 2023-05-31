@@ -151,11 +151,15 @@ them.
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; each port may
-have at most one edge, and the port types of a node are described by its
-**Signature**. The **Signature** may also specify a row
+source node, to an incoming **Port** of the target node; the port types of a node are described by its
+**Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
+of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
+must have exactly one. See [Linearity](#linearity).
+
+
+The **Signature** may also specify a row
 of `ClassicType`s for incoming `Static` edges. These correspond to incoming
-ports that always follow `Value` ports.
+ports that always follow `Value` ports. 
 
 
 Value edges are parameterized by the locality and type; there are three
@@ -250,7 +254,8 @@ not be executable.
 #### Dataflow
 
 Within dataflow regions, which include function definitions,
-the following basic dataflow operations are available:
+the following basic dataflow operations are available (in addition to the
+operations valid at both Module level and within dataflow regions):
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
@@ -266,7 +271,7 @@ the following basic dataflow operations are available:
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
     `Value<Local,T>` output, used to load a static constant in to the local
     dataflow graph. They also have an incoming `Order` edge connecting
-    them to the `Input` node, as should all stateful operations that
+    them to the `Input` node, as should all operations that
     take no dataflow input, to ensure they lie in the causal cone of the
     `Input` node when traversing.
 
