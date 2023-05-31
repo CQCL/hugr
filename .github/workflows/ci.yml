@@ -29,7 +29,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
       - name: Build docs
         run: cargo doc --no-deps --all-features
         env:
@@ -43,6 +43,9 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: v0-rust-nightly
       - name: Run miri
         run: cargo miri test
 
@@ -65,7 +68,7 @@ jobs:
     strategy:
       matrix:
         include:
-          #- rust: 1.68.0  # Update once MSRV != stable
+          #- rust: 1.69.0  # Update once MSRV != stable
           - rust: stable
             cache: true
           - rust: beta

@@ -68,9 +68,9 @@ pub trait CfgView<T> {
     where
         Self: 'c;
     /// Returns an iterator over the successors of the specified basic block.
-    fn successors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
+    fn successors(&self, node: T) -> Self::Iterator<'_>;
     /// Returns an iterator over the predecessors of the specified basic block.
-    fn predecessors<'c>(&'c self, node: T) -> Self::Iterator<'c>;
+    fn predecessors(&self, node: T) -> Self::Iterator<'_>;
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
@@ -156,11 +156,11 @@ impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
     where
         Self: 'c;
 
-    fn successors<'c>(&'c self, node: Node) -> Self::Iterator<'c> {
+    fn successors(&self, node: Node) -> Self::Iterator<'_> {
         self.h.neighbours(node, Direction::Outgoing)
     }
 
-    fn predecessors<'c>(&'c self, node: Node) -> Self::Iterator<'c> {
+    fn predecessors(&self, node: Node) -> Self::Iterator<'_> {
         self.h.neighbours(node, Direction::Incoming)
     }
 }
@@ -258,7 +258,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> BracketList<T> {
     pub fn concat(&mut self, other: BracketList<T>) {
         let BracketList { mut items, size } = other;
         self.items.append(&mut items);
-        assert!(items.len() == 0);
+        assert!(items.is_empty());
         self.size += size;
     }
 
@@ -384,7 +384,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         // Now calculate edge classes
         let class = bs.tag(&self.deleted_backedges);
         if let Some((Bracket::Real(e), 1)) = &class {
-            self.edge_classes.insert(e.clone(), class.clone());
+            self.edge_classes.insert(*e, class.clone());
         }
         if let Some(parent_edge) = tree.dfs_parents.get(&n) {
             self.edge_classes.insert(cfg_edge(n, *parent_edge), class);
