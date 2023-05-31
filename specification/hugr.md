@@ -217,7 +217,7 @@ Taking lots of inspiration from the MLIR
 [func](https://mlir.llvm.org/docs/Dialects/Func/) dialects, these node
 operations include:
 
-  - `constN<T>` : a static constant value of type T stored in the node
+  - `Const<T>` : a static constant value of type T stored in the node
     weight (perhaps a computation of some `Graph` type represented as a
     HUGR). Has no ports, but may have any number of `Static<T>`
     out-edges - one for each use.
@@ -1178,7 +1178,7 @@ remove it. (If there is an intergraph edge from `n0` to a descendent of
 
 ###### `InsertConstIgnore`
 
-Given a `ConstN<T>` node `c`, and optionally a DSG `P`, add a new
+Given a `Const<T>` node `c`, and optionally a DSG `P`, add a new
 `load_constant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
@@ -1195,12 +1195,12 @@ it (and its incoming value and Order edges) from the hugr.
 
 ###### `InsertConst`
 
-Given a `constN<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
+Given a `Const<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
 inserting an Order edge from the Input under `P` to `c`.
 
 ###### `RemoveConst`
 
-Given a `constN<T>` node `c` having no outgoing edges, remove `c`
+Given a `Const<T>` node `c` having no outgoing edges, remove `c`
 together with its incoming `Order` edge.
 
 #### Usage
