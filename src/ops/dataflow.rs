@@ -68,7 +68,7 @@ impl DataflowOp {
             DataflowOp::CallIndirect { .. } => "call_indirect",
             DataflowOp::LoadConstant { .. } => "load",
             DataflowOp::Leaf { op } => return op.name(),
-            DataflowOp::DFG { .. } => "nested",
+            DataflowOp::DFG { .. } => "DFG",
             DataflowOp::ControlFlow { op } => return op.name(),
         }
         .into()
