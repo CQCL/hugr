@@ -269,13 +269,8 @@ the following basic dataflow operations are available:
     take no dataflow input, to ensure they lie in the causal cone of the
     `Input` node when traversing.
 
-  - `copy<T, N>`: explicit copy, where `T` is non-linear, has a single `Value<*,T>` input, and
-    `N` `Value<*,T>` outputs, where `N` \>=0. A `copy<T, 0>` is
-    interpreted as a discard. A `copy<T,1>` is an identity operation and
-    can be trivially removed.
-
   - `identity<T>`: pass-through, no operation is performed.
-<!-- 
+<!-- this isn't referred to anywhere else
   - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
     input, and a single `Value<*,Sum((),...,())>` output with N elements
     each of type unit `()`. The value is (1) a list of pairs of type
@@ -790,8 +785,34 @@ extensions. Namely, the things the tierkreis type system is missing are:
 
   - Resource management - knowing what plugins a given graph depends on
 
-A grammar of available types is shown on the right, which extends the
-list of types which exist in Tierkreis.
+A grammar of available types is defined below.
+
+```haskell
+Type ::= [Resources]SimpleType
+-- Rows are ordered lists, not sets
+#    ::= #(LinearType), #(ClassicType) 
+#(T) ::= (T)*
+
+Resources ::= (Resource)* -- set not list
+
+SimpleType  ::= ClassicType | LinearType
+Container(T) ::= List(T)
+              | Tuple(#(T))
+              | Array<u64>(T)
+              | Map<ClassicType, T>
+              | NewType(Name, T)
+              | Sum (#(T))
+ClassicType ::= int<N>
+              | float64
+              | Var(X)
+              | String
+              | Graph[R](#, #)
+              | Opaque(Name, #)
+              | Container(ClassicType)
+LinearType ::= Qubit
+              | QPaque(Name, #)
+              | Container(SimpleType)
+```
 
 SimpleTypes are the types of *values* which can be sent down wires,
 except for type variables `Var`. All of the ClassicTypes can also be
@@ -800,7 +821,8 @@ sent down Static edges.
 Function signatures are made up of *rows* (\#), which consist of an
 arbitrary number of SimpleTypes, plus a resource spec.
 
-ClassicTypes `u64, i64, Float` are all fixed-size, as are QuantumTypes.
+ClassicTypes `int<N>, float64` are all fixed-size (where `N` is the bit-width),
+as are QuantumTypes.
 `Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
 statically-known number and type of elements, as does `Array<N>` (where
 N is a static constant). These types are also fixed-size if their
@@ -813,34 +835,7 @@ types that have been proven to work for Tierkreis: `Graph`, `Map` and
 allows named newtypes to be used. Containers are linear if any of their
 components are linear.
 
-```
-Type ::= [Resources]SimpleType
--- Rows are ordered lists, not sets
--- If a row contains linear types, they're first
-#    ::= #(LinearType), #(ClassicType) | x⃗
-#(T) ::= (T)*
 
-Resources ::= (Resource)* -- set not list
-
-SimpleType  ::= ClassicType | LinearType
-Container(T) ::= List(T)
-              | Tuple(#(T))
-              | Array<u64>(T)
-              | Map<ClassicType, T>
-              | NewType(Name, T)
-              | Sum (#(T))
-ClassicType ::= u64
-              | i64
-              | Float
-              | Var(X)
-              | String
-              | Graph[R](#, #)
-              | Opaque(Name, #)
-              | Container(ClassicType)
-LinearType ::= Qubit
-              | QPaque(Name, #)
-              | Container(SimpleType)
-```
 
 Note: any array can be turned into an equivalent tuple, but arrays also
 support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
@@ -860,7 +855,26 @@ i.e. this does not affect behaviour of the HUGR. Row types are used
   - Arguments to `Opaque` types - where their meaning is
     extension-defined.
 
-**Resources** The type of `Graph` has been altered to add
+
+### Linearity
+
+For expressing and rewriting quantum programs we draw a distinction between
+`ClassicType` and `LinearType`, the latter being values which must be used
+exactly once. This leads to a constraint on the HUGR that outgoing ports
+of `LinearType` must have exactly one edge leaving them. `ClassicType` outgoing
+ports can have any number of connected edges (0 is equivalent to a discard).
+
+Our linear types behave like other values passed down a wire. Quantum
+gates behave just like other nodes on the graph with inputs and outputs,
+but there is only one edge leaving or entering each port. In fully
+qubit-counted contexts programs take in a number of qubits as input and
+return the same number, with no discarding. See
+[quantum resource](#quantum-resource)
+for more.
+
+### Resources
+
+The type of `Graph` has been altered to add
 *R*: a resource requirement.
 The *R* here refer to a set
 of [resources](#resources) which are required to produce a given type.
@@ -881,14 +895,15 @@ running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
 
+
+
 ### Type Constraints
 
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
 example, the `Map` type can only be constructed when the type that we
 map from is `Hashable`. For the Hugr, we may need this `Hashable`
-constraint, as well as a `Nonlinear` constraint that the typechecker can
-look for before wiring up a `copy` node. Finally there may be a
+constraint, as well as a `Nonlinear` constraint. Finally there may be a
 `const-able` or `serializable` constraint meaning that the value can be
 put into a `const`-node: this implies the type is `Nonlinear` (but not
 vice versa).
@@ -901,24 +916,6 @@ complex, but then both hashable and Map could be in the Tierkreis
 resource.
 
 (Or, can we do Map without hashable?)
-
-### Dealing with linearity
-
-The type system will deal with linearity the same way that Tierkreis
-does. It will assume everything is linear by default (since this is
-implied by the implementation of edges as “links” anyway), and allow
-non-linearity via a **copy** node which most types can be passed into.
-
-This requires some magic from the typechecker to disallow copying linear
-types.
-
-Our linear types behave like other values passed down a wire. Quantum
-gates behave just like other nodes on the graph with inputs and outputs,
-but adding copies to the input and output wires is disallowed. In fully
-qubit-counted contexts programs take in a number of qubits as input and
-return the same number, with no discarding. See
-[quantum resource](#quantum-resource)
-for more.
 
 ### Resources
 
@@ -1225,7 +1222,7 @@ using `Replace` (with a set of `identity<T>` nodes) followed by
 
 We envisage that some kind of pass can be used after a rewrite or series
 of rewrites to automatically apply RemoveConstIgnore for any unused
-load\_constants, merging copies (and discards of copies), and other such
+load\_constants, and other such
 tidies. This might be global, or by tracking which parts of the Hugr
 have been touched.
 
@@ -1611,8 +1608,6 @@ an edge weight.
     and one exit node. Nodes are basic blocks, edges point to possible
     successors.
 
-  - **copy node**: TODO
-
   - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
     Dataflow container node, with all edges between them. Includes
     exactly one input node (unique node having no input edges) and one
@@ -1796,8 +1791,7 @@ providing hierarchy, and “graph” regions being like DSGs. Significant
 differences include:
 
   - MLIR uses names everywhere, which internally are mapped to some kind
-    of hyperedge; we have explicit edges in the structure (and copy
-    nodes rather than hyperedges).
+    of hyperedge; we have explicit edges in the structure.
     
       - However, we can think of every output nodeport being a unique
         SSA/SSI name.
