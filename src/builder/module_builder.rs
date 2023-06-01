@@ -143,7 +143,7 @@ impl ModuleBuilder {
             }
             None => val.const_type(),
         };
-        let const_node = self.add_child_op(ModuleOp::Const(val))?;
+        let const_node = self.add_child_op(ModuleOp::Const(val, typ.clone()))?;
         Ok((const_node, typ).into())
     }
 

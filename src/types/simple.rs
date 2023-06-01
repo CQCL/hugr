@@ -141,6 +141,19 @@ impl ClassicType {
     pub const fn bit() -> Self {
         Self::int::<1>()
     }
+
+    /// New Sum of Tuple types, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+        Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
+            variant_rows,
+        ))))
+    }
+
+    /// New simple predicate with empty Tuple variants
+    pub fn new_simple_predicate(size: usize) -> Self {
+        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
+    }
 }
 
 impl Default for ClassicType {
@@ -240,14 +253,12 @@ impl SimpleType {
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
-        Self::Classic(ClassicType::Container(Container::Sum(Box::new(
-            TypeRow::predicate_variants_row(variant_rows),
-        ))))
+        Self::Classic(ClassicType::new_predicate(variant_rows))
     }
 
     /// New simple predicate with empty Tuple variants
     pub fn new_simple_predicate(size: usize) -> Self {
-        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
+        Self::Classic(ClassicType::new_simple_predicate(size))
     }
 }
 

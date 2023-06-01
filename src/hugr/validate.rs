@@ -746,8 +746,12 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
-        let tag_type = SimpleType::new_simple_predicate(predicate_size);
+        let tag_classic_type = ClassicType::new_simple_predicate(predicate_size);
+        let const_op = ModuleOp::Const(
+            ConstValue::simple_predicate(0, predicate_size),
+            tag_classic_type.clone(),
+        );
+        let tag_type = SimpleType::Classic(tag_classic_type);
 
         let input = b
             .add_op_with_parent(
