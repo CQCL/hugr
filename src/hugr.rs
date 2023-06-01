@@ -132,9 +132,9 @@ impl Hugr {
                 let optype = self.op_types.get(src);
                 let mut label = String::new();
                 let offset = self.graph.port_offset(p).unwrap();
-                let type_string = match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Const(ty) => format!("{}", ty),
-                    EdgeKind::Value(ty) => format!("{}", ty),
+                let type_string = match optype.port_kind(offset) {
+                    Some(EdgeKind::Const(ty)) => format!("{}", ty),
+                    Some(EdgeKind::Value(ty)) => format!("{}", ty),
                     _ => String::new(),
                 };
                 encode_text_to_string(type_string, &mut label);
