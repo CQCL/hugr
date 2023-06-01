@@ -184,12 +184,8 @@ impl<'b> BlockBuilder<'b> {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        builder::{module_builder::ModuleBuilder, test::NAT},
-        ops::ConstValue,
-        type_row,
-        types::Signature,
-    };
+    use crate::builder::HugrBuilder;
+    use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
 
     use super::*;
     #[test]
@@ -197,7 +193,8 @@ mod test {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
 
         let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = HugrBuilder::new();
+            let mut module_builder = builder.module_builder();
             let main =
                 module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
             let s1 = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -237,7 +234,8 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish()
+            module_builder.finish()?;
+            builder.finish()
         };
 
         assert_eq!(build_result.err(), None);

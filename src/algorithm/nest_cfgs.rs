@@ -400,7 +400,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, ModuleBuilder};
+    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder};
     use crate::ops::{
         handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
         ConstValue,
@@ -428,7 +428,8 @@ pub(crate) mod test {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
-        let mut module_builder = ModuleBuilder::new();
+        let mut builder = HugrBuilder::new();
+        let mut module_builder = builder.module_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -452,7 +453,7 @@ pub(crate) mod test {
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
-        let h = module_builder.finish()?;
+        let h = builder.finish()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -481,7 +482,8 @@ pub(crate) mod test {
         //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let mut module_builder = ModuleBuilder::new();
+        let mut builder = HugrBuilder::new();
+        let mut module_builder = builder.module_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -503,7 +505,7 @@ pub(crate) mod test {
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
-        let h = module_builder.finish()?;
+        let h = builder.finish()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
@@ -682,7 +684,8 @@ pub(crate) mod test {
     ) -> Result<(Hugr, CfgID, BasicBlockID, BasicBlockID), BuildError> {
         //let sum2_type = SimpleType::new_predicate(2);
 
-        let mut module_builder = ModuleBuilder::new();
+        let mut builder = HugrBuilder::new();
+        let mut module_builder = builder.module_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -717,7 +720,7 @@ pub(crate) mod test {
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
-        let h = module_builder.finish()?;
+        let h = builder.finish()?;
 
         Ok((h, *cfg_id.handle(), head, tail))
     }

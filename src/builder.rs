@@ -2,9 +2,11 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, HugrMut, HugrView, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-use crate::types::LinearType;
+use crate::ops::DataflowOp;
+use crate::types::{LinearType, Signature, TypeRow};
+use crate::Hugr;
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -67,14 +69,60 @@ pub enum BuildError {
     CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
 
+#[derive(Default)]
+/// Base builder, can generate builders for containers
+pub struct HugrBuilder {
+    base: HugrMut,
+}
+
+impl HugrBuilder {
+    /// Initialize a new builder
+    pub fn new() -> Self {
+        // initially assume to be a module root, will be replaced if not.
+        Self {
+            base: HugrMut::new_module(),
+        }
+    }
+
+    /// Use this builder to build a module HUGR
+    pub fn module_builder(&mut self) -> ModuleBuilder {
+        ModuleBuilder(&mut self.base)
+    }
+
+    /// Use this builder to build a DFG HUGR
+    pub fn root_dfg_builder(
+        &mut self,
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+    ) -> Result<DFGBuilder, BuildError> {
+        let input = input.into();
+        let output = output.into();
+        let root = self.base.hugr().root();
+        let dfg_op = DataflowOp::DFG {
+            signature: Signature::new_df(input.clone(), output.clone()),
+        };
+        self.base.replace_op(root, dfg_op);
+
+        DFGBuilder::create_with_io(&mut self.base, root, input, output)
+    }
+
+    // TODO: CFG, BasicBlock, Def, Conditional, TailLoop, Case
+
+    /// Complete building and return HUGR, performing validation.
+    pub fn finish(self) -> Result<Hugr, BuildError> {
+        Ok(self.base.finish()?)
+    }
+}
+
 #[cfg(test)]
 mod test {
 
     use crate::types::{ClassicType, LinearType, Signature, SimpleType};
-    use crate::{builder::ModuleBuilder, Hugr};
+    use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
+    use super::HugrBuilder;
+    use super::{BuildError, Dataflow, FuncID, FunctionBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
@@ -93,11 +141,12 @@ mod test {
         signature: Signature,
         f: impl FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
-        let mut module_builder = ModuleBuilder::new();
+        let mut builder = HugrBuilder::new();
+        let mut module_builder = builder.module_builder();
         let f_builder = module_builder.declare_and_def("main", signature)?;
 
         f(f_builder)?;
 
-        module_builder.finish()
+        builder.finish()
     }
 }

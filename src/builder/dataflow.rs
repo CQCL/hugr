@@ -135,9 +135,10 @@ impl<'b, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<'b, T> {
 mod test {
     use cool_asserts::assert_matches;
 
+    use crate::builder::HugrBuilder;
+    use crate::hugr::HugrView;
     use crate::{
         builder::{
-            module_builder::ModuleBuilder,
             test::{n_identity, BIT, NAT, QB},
             BuildError,
         },
@@ -150,7 +151,8 @@ mod test {
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = HugrBuilder::new();
+            let mut module_builder = builder.module_builder();
 
             let _f_id = {
                 let mut func_builder = module_builder.declare_and_def(
@@ -170,7 +172,8 @@ mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish()
+            module_builder.finish()?;
+            builder.finish()
         };
 
         assert_eq!(build_result.err(), None);
@@ -184,7 +187,8 @@ mod test {
         F: FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = HugrBuilder::new();
+            let mut module_builder = builder.module_builder();
 
             let f_build = module_builder.declare_and_def(
                 "main",
@@ -193,7 +197,8 @@ mod test {
 
             f(f_build)?;
 
-            module_builder.finish()
+            module_builder.finish()?;
+            builder.finish()
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -234,7 +239,8 @@ mod test {
     #[test]
     fn copy_insertion_qubit() {
         let builder = || {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = HugrBuilder::new();
+            let mut module_builder = builder.module_builder();
 
             let f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
@@ -242,7 +248,8 @@ mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            module_builder.finish()
+            module_builder.finish()?;
+            builder.finish()
         };
 
         assert_eq!(builder(), Err(BuildError::NoCopyLinear(LinearType::Qubit)));
@@ -251,7 +258,8 @@ mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = HugrBuilder::new();
+            let mut module_builder = builder.module_builder();
 
             let mut f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
@@ -268,9 +276,25 @@ mod test {
 
             f_build.finish_with_outputs([nested.out_wire(0)])?;
 
-            module_builder.finish()
+            module_builder.finish()?;
+            builder.finish()
         };
 
         assert_matches!(builder(), Ok(_));
+    }
+
+    #[test]
+    fn dfg_hugr() -> Result<(), BuildError> {
+        let mut builder = HugrBuilder::new();
+
+        let dfg_builder = builder.root_dfg_builder(type_row![BIT], type_row![BIT])?;
+
+        n_identity(dfg_builder)?;
+
+        let hugr = builder.finish()?;
+        assert_eq!(hugr.node_count(), 3);
+        assert_matches!(hugr.root_type(), OpType::Dataflow(DataflowOp::DFG { .. }));
+
+        Ok(())
     }
 }
