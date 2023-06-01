@@ -46,7 +46,7 @@ pub struct ConditionalBuilder<'f> {
 }
 
 impl<'f> Container for ConditionalBuilder<'f> {
-    type ContainerHandle = Result<BuildHandle<ConditionalID>, ConditionalBuildError>;
+    type ContainerHandle = BuildHandle<ConditionalID>;
 
     #[inline]
     fn container_node(&self) -> Node {
@@ -63,7 +63,7 @@ impl<'f> Container for ConditionalBuilder<'f> {
         self.base.hugr()
     }
 
-    fn finish(self) -> Self::ContainerHandle {
+    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
         let cases: HashSet<usize> = self
             .case_nodes
             .iter()
@@ -74,7 +74,8 @@ impl<'f> Container for ConditionalBuilder<'f> {
             return Err(ConditionalBuildError::NotAllCasesBuilt {
                 conditional: self.conditional_node,
                 cases,
-            });
+            }
+            .into());
         }
         Ok((self.conditional_node, self.n_out_wires).into())
     }

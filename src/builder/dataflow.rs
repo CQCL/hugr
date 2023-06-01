@@ -59,8 +59,8 @@ impl<'f> Container for DFGBuilder<'f> {
         self.base
     }
     #[inline]
-    fn finish(self) -> BuildHandle<DfgID> {
-        (self.dfg_node, self.num_out_wires).into()
+    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+        Ok((self.dfg_node, self.num_out_wires).into())
     }
 
     #[inline]
@@ -115,9 +115,9 @@ impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
         self.0.as_ref().unwrap().hugr()
     }
     #[inline]
-    fn finish(mut self) -> Self::ContainerHandle {
+    fn finish(mut self) -> Result<Self::ContainerHandle, BuildError> {
         let dfg = self.0.take().expect("Already finished.");
-        dfg.finish().into()
+        dfg.finish().map(Into::into)
     }
 }
 

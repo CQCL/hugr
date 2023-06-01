@@ -19,7 +19,8 @@ use crate::{hugr::HugrMut, Hugr};
 pub struct ModuleBuilder<'f>(pub(super) &'f mut HugrMut);
 
 impl<'f> Container for ModuleBuilder<'f> {
-    type ContainerHandle = Result<(), BuildError>;
+    // TODO ModuleID
+    type ContainerHandle = ();
 
     #[inline]
     fn container_node(&self) -> Node {
@@ -32,7 +33,7 @@ impl<'f> Container for ModuleBuilder<'f> {
     }
 
     #[inline]
-    fn finish(self) -> Self::ContainerHandle {
+    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
         Ok(())
     }
 

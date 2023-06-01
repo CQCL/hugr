@@ -41,8 +41,8 @@ impl<'f> Container for CFGBuilder<'f> {
     }
 
     #[inline]
-    fn finish(self) -> Self::ContainerHandle {
-        (self.cfg_node, self.n_out_wires).into()
+    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+        Ok((self.cfg_node, self.n_out_wires).into())
     }
 }
 
@@ -178,7 +178,7 @@ impl<'b> BlockBuilder<'b> {
         Self: Sized,
     {
         self.set_outputs(branch_wire, outputs)?;
-        Ok(self.finish())
+        self.finish()
     }
 }
 
@@ -229,7 +229,7 @@ mod test {
                     cfg_builder.branch(&middle, 0, &exit)?;
                     cfg_builder.branch(&entry, 1, &exit)?;
 
-                    cfg_builder.finish()
+                    cfg_builder.finish()?
                 };
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?

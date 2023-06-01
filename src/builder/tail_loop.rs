@@ -50,7 +50,7 @@ impl<'b> TailLoopBuilder<'b> {
         Self: Sized,
     {
         self.set_outputs(out_variant, rest)?;
-        Ok(self.finish())
+        self.finish()
     }
 
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]

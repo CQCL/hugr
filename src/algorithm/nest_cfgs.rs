@@ -449,7 +449,7 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
         module_builder.finish()?;
@@ -501,7 +501,7 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
         module_builder.finish()?;
@@ -717,7 +717,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
         module_builder.finish()?;
