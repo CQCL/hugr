@@ -57,9 +57,12 @@ impl Display for TypeError {
 /// a const node
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeError> {
     match (typ, val) {
-        (ClassicType::Int(width), ConstValue::Int(n)) => match u32::try_from(*width) {
+        // If the width is larger than u8, our const type (which takes an i64 arg)
+        // wont be able to accomodate the value
+        // N.B. This diverges from the spec, which allows arbitrary ints as constants
+        (ClassicType::Int(width), ConstValue::Int(n)) => match u8::try_from(*width) {
             Ok(width) => {
-                if isize::abs(*n as isize) < isize::pow(2, width) {
+                if isize::abs(*n as isize) < isize::pow(2, width as u32) {
                     Ok(())
                 } else {
                     Err(TypeError::IntTooLarge)
