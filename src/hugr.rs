@@ -11,7 +11,7 @@ pub use hugrmut::HugrMut;
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::{Hierarchy, PortGraph, SecondaryMap};
+use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
@@ -37,7 +37,7 @@ pub struct Hugr {
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: SecondaryMap<portgraph::NodeIndex, OpType>,
+    op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 }
 
 impl Default for Hugr {
@@ -131,7 +131,13 @@ impl Hugr {
 
                 let optype = self.op_types.get(src);
                 let mut label = String::new();
-                encode_text_to_string(&format!("{}", optype.signature()), &mut label);
+                let offset = self.graph.port_offset(p).unwrap();
+                let type_string = match optype.port_kind(offset) {
+                    Some(EdgeKind::Const(ty)) => format!("{}", ty),
+                    Some(EdgeKind::Value(ty)) => format!("{}", ty),
+                    _ => String::new(),
+                };
+                encode_text_to_string(type_string, &mut label);
 
                 (label, style)
             },
@@ -150,7 +156,7 @@ impl Hugr {
     pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
         let mut graph = PortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
-        let mut op_types = SecondaryMap::with_capacity(nodes);
+        let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
         op_types[root] = root_op.into();
 

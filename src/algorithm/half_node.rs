@@ -29,6 +29,7 @@ struct HalfNodeView<'a, H> {
 }
 
 impl<'a, H: HugrView> HalfNodeView<'a, H> {
+    #[allow(unused)]
     pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
@@ -70,7 +71,7 @@ impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
         assert!(self.bb_succs(self.exit).count() == 0);
         HalfNode::N(self.exit)
     }
-    fn predecessors<'a>(&'a self, h: HalfNode) -> Self::Iterator<'a> {
+    fn predecessors(&self, h: HalfNode) -> Self::Iterator<'_> {
         let mut ps = Vec::new();
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
@@ -81,7 +82,7 @@ impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
         }
         ps.into_iter()
     }
-    fn successors<'a>(&'a self, n: HalfNode) -> Self::Iterator<'a> {
+    fn successors(&self, n: HalfNode) -> Self::Iterator<'_> {
         let mut succs = Vec::new();
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),

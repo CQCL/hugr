@@ -99,14 +99,39 @@ outlined in [Node
 Operations](#node-operations)
 but may be [extended by
 Resources](#operation-extensibility).
-The edges encode relationships between nodes; there are several *kinds*
+
+**Simple HUGR example**
+```mermaid
+graph  LR
+    Input -->|0:0| H
+    H -->|0:0| CNOT
+    Input -->|1:1| CNOT
+    CNOT -->|0:0| Output
+    CNOT -->|1:1| Output
+```
+In the example above, a 2-qubit circuit is described as a dataflow
+region of a HUGR with one `H` operation and one `CNOT` operation. The
+operations have an incoming and outgoing list of ports, with each
+element identified by its offset and labelled with a type.
+In the diagram the edge label includes the source and target port indices as `<source>:<target>`.
+
+The signature of the `CNOT` operation is `[Qubit, Qubit] → [Qubit,
+Qubit]`. Further information in the metadata may label the first qubit
+as *control* and the second as *target*.
+
+In this case, output 0 of the H operation is connected to input 0 of the
+CNOT.
+
+### Edges
+The edges of a HUGR encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
 ```
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Order | ConstE(ClassicType) | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
 
-Locality ::= Local | Ext | Dominator
+Locality ::= Local | Ext | Dom
 ```
+#### Hierarchy
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
 of *b*. Only certain nodes, known as *container* nodes, may act as parents -
@@ -121,22 +146,21 @@ A **sibling graph** is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
 them.
 
+#### Value
+
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; each port may
-have at most one edge, and the port types of a node are described by its
-**Signature**. (In fact, each port must have exactly one edge, but ports
-whose edge has not yet been specified, may be useful as an intermediate
-form whilst building a HUGR.) The **Signature** may also specify a row
-of `ClassicType`s for incoming `ConstE` edges. **TODO** “…and the
-relevant ports must have the same type”? Does the incoming port repeat
-the resource requirement of the outgoing port? Or are resources a
-property of the node?
+source node, to an incoming **Port** of the target node; the port types of a node are described by its
+**Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
+of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
+must have exactly one. See [Linearity](#linearity).
 
-**Inport**: an incoming port
 
-**Outport**: an outgoing port
+The **Signature** may also specify a row
+of `ClassicType`s for incoming `Static` edges. These correspond to incoming
+ports that always follow `Value` ports. 
+
 
 Value edges are parameterized by the locality and type; there are three
 possible localities:
@@ -153,26 +177,17 @@ possible localities:
 
 Note that the locality is not fixed or even specified by the signature.
 
-### Simple HUGR example
-```mermaid
-graph  LR
-    Input -->|0:Q| H
-    H -->|0:Q| CNOT
-    Input -->|1:Q| CNOT
-    CNOT -->|0:Q| Output
-    CNOT -->|1:Q| Output
-```
-In the example above, a 2-qubit circuit is described as a dataflow
-region of a HUGR with one `H` operation and one `CNOT` operation. The
-operations have an incoming and outgoing list of ports, with each
-element identified by its offset and labelled with a type.
+#### Static
 
-The signature of the `CNOT` operation is `[Qubit, Qubit] → [Qubit,
-Qubit]`. Further information in the metadata may label the first qubit
-as *control* and the second as *target*.
+A **Static** edge represents dataflow that is statically knowable - i.e.
+the source is a compile-time constant defined in the program. Hence, the types on these edges
+do not include a resource specification. Only a few nodes may be
+sources (`Def` and `Const`) and targets (`Call` and `LoadConstant`) of
+these edges; see
+[operations](#node-operations).
+Static edges may have any of the valid `Value` localities.
 
-In this case, output 0 of the H operation is connected to input 0 of the
-CNOT. All other ports are disconnected.
+#### Order
 
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
@@ -180,18 +195,9 @@ local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
 
-A **ConstE** edge represents dataflow that is statically knowable - i.e.
-the source is a compile-time constant. (Hence, the types on these edges
-do not include a resource specification.) Only a few nodes may be
-sources (`def` and `const`) and targets (`call` and `load_const`) of
-these edges; see
-[module](#module)
-and
-[functions](#functions).
-For a ConstE edge from *a* to *b,* we require parent(*a*) ==
-parent<sup>i</sup>(*b*) for i\>=1 to satisfy valid scoping.
+#### Controlflow
 
-Finally, **ControlFlow** edges represent all possible flows of control
+**ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
 always *local*, i.e. source and target have the same parent.
 
@@ -203,68 +209,53 @@ full programs, including dataflow operations (in
 
 #### Module
 
-If the HUGR contains a `module` node then it is unique and sits at the top level
+If the HUGR contains a `Module` node then it is unique and sits at the top level
 of the of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
-metadata (e.g. source file, module name). The children of a `module` correspond
-to "module level" operation types. Neither `module` nor these module-level
-operations have signatures or value ports, but some have constE or other
-edges.
+metadata (e.g. source file). The children of a `Module` correspond
+to "module level" operation types. Neither `Module` nor these module-level
+operations have value ports, but some have Static or other
+edges. The following operations are *only* valid as immediate children of a
+`Module` node.
 
-Taking lots of inspiration from the MLIR
-[builtin](https://mlir.llvm.org/docs/Dialects/Builtin/) and
-[func](https://mlir.llvm.org/docs/Dialects/Func/) dialects, these node
-operations include:
-
-  - `constN<T>` : a static constant value of type T stored in the node
-    weight (perhaps a computation of some `Graph` type represented as a
-    HUGR). Has no ports, but may have any number of `ConstE<T>`
-    out-edges - one for each use.
-
-  - `def` : a function definition. The name of the function is specified
-    in the metadata and function attributes (relevant for compilation)
-    define the node weight. The function body is defined by its children
-    (the child graph forms the body). The node has no ports but may have
-    any number of `ConstE<Graph>` out-edges - one for each use.
-
-  - `declare`: an external function declaration. Like `def`, but with no
-    body, the name is used at link time to lookup definitions in linked
+  - `Declare`: an external function declaration. The name of the function 
+    and function attributes (relevant for compilation)
+    define the node weight. The node has an outgoing `Static<Graph>`
+    edge for each use of the function. The function name is used at link time to
+    look up definitions in linked
     modules (other hugr instances specified to the linker).
-
-  - `alias_declare/alias_def`: analogous to `declare` and `def` but with
-    type aliases. At link time `alias_declare` can be replaced with
-    `alias_def`. An alias declared with `declare` is equivalent to a
+  
+  - `AliasDeclare`: an external type alias declaration. At link time this can be
+    replaced with the definition. An alias declared with `AliasDeclare` is equivalent to a
     named opaque type.
 
-Exactly which nodes are valid at this top level is dependent on the
-compiler and target. Note that the operations defined can also be
-defined in graphs lower in the hierarchy - this limits the scope within
-which they can be used.
+The following operations are valid at the module level, but *also* in dataflow
+regions:
+
+  - `Const<T>` : a static constant value of type T stored in the node
+    weight. Like `Declare` and `Def` this has one `Static<T>` out-edge per use.
+
+  - `Def` : a function definition. Like `Declare` but with a function body.
+    The function body is defined by the sibling graph formed by its children.
+    At link time `Declare` nodes are replaced by `Def`.
+
+  - `AliasDef`: type alias definition. At link time `AliasDeclare` can be replaced with
+    `AliasDef`.
+
 
 A **loadable HUGR** is a module HUGR where all edges are connected and there are
-no `declare/alias_declare` nodes.
+no `Declare/AliasDeclare` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
-root node is a [Module](#module) node whose first child is a `def` called
+root Module node has a `Def` child with function name
 “main”, that is the designated entry point. Modules that act as libraries need
 not be executable.
 
-Even non-loadable HUGRs are HUGRs so long as they satisfy (all) other
-requirements such as acyclicity. (Anything not satisfying those is
-not-a-HUGR.) For example, such may be processed by the linker to produce
-loadable HUGRs.
+#### Dataflow
 
-In
-[replacement-and-pattern-matching](#replacement-and-pattern-matching)
-we describe a “partial HUGR” - this is *not* a HUGR, though it is
-related.
-
-#### Functions
-
-Within functions the following basic dataflow operations are available,
-with signatures describing their value ports (note that some operations
-support many different signatures. For example, optimization may add
-additional outputs to a classical copy node):
+Within dataflow regions, which include function definitions,
+the following basic dataflow operations are available (in addition to the
+operations valid at both Module level and within dataflow regions):
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
@@ -273,30 +264,25 @@ additional outputs to a classical copy node):
     nodes starting from `Input` with respect to the Value and Order
     edges.
 
-  - `call`: Call a function directly. There is an incoming
-    `ConstE<Graph>` edge to specify the graph being called. The
+  - `Call`: Call a statically defined function. There is an incoming
+    `Static<Graph>` edge to specify the graph being called. The
     signature of the `Value` edges matches the function being called.
 
-  - `load_constant<T>`: has an incoming `ConstE<T>` edge, where `T` is non-linear, and a
-    `Value<*,T>` output, used to load a static constant in to the local
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
+    `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
-    them to the `Input` node, as should all stateful operations that
+    them to the `Input` node, as should all operations that
     take no dataflow input, to ensure they lie in the causal cone of the
     `Input` node when traversing.
 
-  - `copy<T, N>`: explicit copy, where `T` is non-linear, has a single `Value<*,T>` input, and
-    `N` `Value<*,T>` outputs, where `N` \>=0. A `copy<T, 0>` is
-    interpreted as a discard. A `copy<T,1>` is an identity operation and
-    can be trivially removed.
-
   - `identity<T>`: pass-through, no operation is performed.
-
+<!-- this isn't referred to anywhere else
   - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
     input, and a single `Value<*,Sum((),...,())>` output with N elements
     each of type unit `()`. The value is (1) a list of pairs of type
     `(T,Sum((),...,())` used as a lookup table on the input value, the
     first element being key and the second as the return value; and (2)
-    an optional default value of the same `Sum` type.
+    an optional default value of the same `Sum` type. -->
 
   - `DFG`: a simply nested dataflow graph, the signature of this
     operation is the signature of the child graph. These nodes are
@@ -417,10 +403,10 @@ has no parent).
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Const                          | `def`              | **C**         |  "                       | "                                        |
+| "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| "                         | \-                             | `module`           | none          |  "                       | First is main `def` for executable HUGR. |
+| "                         | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -431,7 +417,7 @@ cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
 `Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. The common parent may be a `def`, `TailLoop`, `DFG`,
+must be acyclic. The common parent may be a `Def`, `TailLoop`, `DFG`,
 `Case` or `BasicBlock` node.
 
 In a dataflow sibling graph, the edges (value and order considered
@@ -444,7 +430,7 @@ Output node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Source + target have same parent                                                                                                                                                                        |
 | Value          | For local edges, source + target have same parent, but there are [inter-graph edges](#inter-graph-value-edges) |
-| ConstE         | Parent of source is ancestor of target                                                                                                                                                                  |
+| Static         | Parent of source is ancestor of target                                                                                                                                                                  |
 
 ### Exception Handling
 
@@ -475,10 +461,6 @@ Output node.
     like a DFG-node. This contains a DSG, and (like a DFG node) has
     inputs matching the child DSG; but one output, of type
     `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-    
-      - At this point L3 will have to compile potentially-panicking
-        operations into an explicit check and branch to the end (exit
-        block) of the nearest containing `catch`
 
   - There is also a higher-order `catch` operation in the Tierkreis
     resource, taking a graph argument; and `run_circuit` will return the
@@ -505,6 +487,8 @@ execute \>=0 times.
     order+value edges together must be acyclic). We record the
     relationship between the inter-graph value edge and the
     corresponding order edge via metadata on each edge.
+    For Static edges this order edge is not required since the source is
+    guaranteed to causally precede the target.
 
 2.  For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
     == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
@@ -524,8 +508,8 @@ remain as before.
 HUGRs without inter-graph edges may still be useful for e.g. register
 allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
-outside, we add an outport to the Input node of each subgraph, a
-corresponding inport to the Conditional-node, and discard nodes to each
+outside, we add an outgoing port to the Input node of each subgraph, a
+corresponding incoming port to the Conditional-node, and discard nodes to each
 subgraph that doesn’t use the value. It is straightforward to turn an
 edge between graphs into a combination of intra-graph edges and extra
 input/output ports+nodes in such a way, but this is akin to
@@ -838,34 +822,12 @@ extensions. Namely, the things the tierkreis type system is missing are:
 
   - Resource management - knowing what plugins a given graph depends on
 
-A grammar of available types is shown on the right, which extends the
-list of types which exist in Tierkreis.
+A grammar of available types is defined below.
 
-SimpleTypes are the types of *values* which can be sent down wires,
-except for type variables `Var`. All of the ClassicTypes can also be
-sent down ConstE edges.
-
-Function signatures are made up of *rows* (\#), which consist of an
-arbitrary number of SimpleTypes, plus a resource spec.
-
-ClassicTypes `u64, i64, Float` are all fixed-size, as are QuantumTypes.
-`Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
-statically-known number and type of elements, as does `Array<N>` (where
-N is a static constant). These types are also fixed-size if their
-components are.
-
-Container types are defined in terms of statically-known element types.
-Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
-types that have been proven to work for Tierkreis: `Graph`, `Map` and
-`List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
-allows named newtypes to be used. Containers are linear if any of their
-components are linear.
-
-```
+```haskell
 Type ::= [Resources]SimpleType
 -- Rows are ordered lists, not sets
--- If a row contains linear types, they're first
-#    ::= #(LinearType), #(ClassicType) | x⃗
+#    ::= #(LinearType), #(ClassicType) 
 #(T) ::= (T)*
 
 Resources ::= (Resource)* -- set not list
@@ -877,9 +839,8 @@ Container(T) ::= List(T)
               | Map<ClassicType, T>
               | NewType(Name, T)
               | Sum (#(T))
-ClassicType ::= u64
-              | i64
-              | Float
+ClassicType ::= int<N>
+              | float64
               | Var(X)
               | String
               | Graph[R](#, #)
@@ -889,6 +850,29 @@ LinearType ::= Qubit
               | QPaque(Name, #)
               | Container(SimpleType)
 ```
+
+SimpleTypes are the types of *values* which can be sent down wires,
+except for type variables `Var`. All of the ClassicTypes can also be
+sent down Static edges.
+
+Function signatures are made up of *rows* (\#), which consist of an
+arbitrary number of SimpleTypes, plus a resource spec.
+
+ClassicTypes such as `int<N>` (where `N` is the bit-width) and `float64` are both fixed-size,
+as is Qubit.
+`Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
+statically-known number and type of elements, as does `Array<N>` (where
+N is a static constant). These types are also fixed-size if their
+components are.
+
+Container types are defined in terms of statically-known element types.
+Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
+types: `Graph`, `Map` and
+`List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
+allows named newtypes to be used. Containers are linear if any of their
+components are linear.
+
+
 
 Note: any array can be turned into an equivalent tuple, but arrays also
 support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
@@ -908,7 +892,26 @@ i.e. this does not affect behaviour of the HUGR. Row types are used
   - Arguments to `Opaque` types - where their meaning is
     extension-defined.
 
-**Resources** The type of `Graph` has been altered to add
+
+### Linearity
+
+For expressing and rewriting quantum programs we draw a distinction between
+`ClassicType` and `LinearType`, the latter being values which must be used
+exactly once. This leads to a constraint on the HUGR that outgoing ports
+of `LinearType` must have exactly one edge leaving them. `ClassicType` outgoing
+ports can have any number of connected edges (0 is equivalent to a discard).
+
+Our linear types behave like other values passed down a wire. Quantum
+gates behave just like other nodes on the graph with inputs and outputs,
+but there is only one edge leaving or entering each port. In fully
+qubit-counted contexts programs take in a number of qubits as input and
+return the same number, with no discarding. See
+[quantum resource](#quantum-resource)
+for more.
+
+### Resources
+
+The type of `Graph` has been altered to add
 *R*: a resource requirement.
 The *R* here refer to a set
 of [resources](#resources) which are required to produce a given type.
@@ -929,14 +932,15 @@ running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
 
+
+
 ### Type Constraints
 
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
 example, the `Map` type can only be constructed when the type that we
 map from is `Hashable`. For the Hugr, we may need this `Hashable`
-constraint, as well as a `Nonlinear` constraint that the typechecker can
-look for before wiring up a `copy` node. Finally there may be a
+constraint, as well as a `Nonlinear` constraint. Finally there may be a
 `const-able` or `serializable` constraint meaning that the value can be
 put into a `const`-node: this implies the type is `Nonlinear` (but not
 vice versa).
@@ -949,24 +953,6 @@ complex, but then both hashable and Map could be in the Tierkreis
 resource.
 
 (Or, can we do Map without hashable?)
-
-### Dealing with linearity
-
-The type system will deal with linearity the same way that Tierkreis
-does. It will assume everything is linear by default (since this is
-implied by the implementation of edges as “links” anyway), and allow
-non-linearity via a **copy** node which most types can be passed into.
-
-This requires some magic from the typechecker to disallow copying linear
-types.
-
-Our linear types behave like other values passed down a wire. Quantum
-gates behave just like other nodes on the graph with inputs and outputs,
-but adding copies to the input and output wires is disallowed. In fully
-qubit-counted contexts programs take in a number of qubits as input and
-return the same number, with no discarding. See
-[quantum resource](#quantum-resource)
-for more.
 
 ### Resources
 
@@ -1020,11 +1006,11 @@ equality constraint of `typeof(b) ~ Bool`.
 We will provide some built in modules to provide basic functionality.
 I’m going to define them in terms of resources. We have the “builtin”
 resource which should always be available when writing hugr plugins.
-This includes Conditional and TailLoop nodes, and nodes like `call`:
+This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
 <img src="attachments/2647818241/2647818323.png" height="64px">
 
-**call** - This operation, like **to\_const**, uses it’s constE graph as
+**Call** - This operation, like **to\_const**, uses it’s Static graph as
 a type parameter.
 
 On top of that, we're definitely going to want modules which handle
@@ -1210,8 +1196,8 @@ remove it. (If there is an intergraph edge from `n0` to a descendent of
 
 ###### `InsertConstIgnore`
 
-Given a `ConstN<T>` node `c`, and optionally a DSG `P`, add a new
-`load_constant<T>` node `n` as a child of `P` with a `ConstE<T>` edge
+Given a `Const<T>` node `c`, and optionally a DSG `P`, add a new
+`LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
@@ -1220,19 +1206,19 @@ provided, it must be a descendent of the parent of `c`.
 
 ###### `RemoveConstIgnore`
 
-Given a `load_constant<T>` node `n` that has no outgoing edges, remove
+Given a `LoadConstant<T>` node `n` that has no outgoing edges, remove
 it (and its incoming value and Order edges) from the hugr.
 
 ##### Insertion and removal of const nodes
 
 ###### `InsertConst`
 
-Given a `constN<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
+Given a `Const<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
 inserting an Order edge from the Input under `P` to `c`.
 
 ###### `RemoveConst`
 
-Given a `constN<T>` node `c` having no outgoing edges, remove `c`
+Given a `Const<T>` node `c` having no outgoing edges, remove `c`
 together with its incoming `Order` edge.
 
 #### Usage
@@ -1273,7 +1259,7 @@ using `Replace` (with a set of `identity<T>` nodes) followed by
 
 We envisage that some kind of pass can be used after a rewrite or series
 of rewrites to automatically apply RemoveConstIgnore for any unused
-load\_constants, merging copies (and discards of copies), and other such
+load\_constants, and other such
 tidies. This might be global, or by tracking which parts of the Hugr
 have been touched.
 
@@ -1392,13 +1378,14 @@ struct HUGR {
 // (parent, #incoming, #outgoing)
 struct Node = (Optional<Int>, Int, Int)
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Int), (Node, Int))
+struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
 ```
 
-Node and edge indices, used as keys in the weight maps and within the
-definitions of nodes and indices, directly correspond to indices of the
-node/edge lists. An edge is defined by the source and target nodes, and
-the offset of the output/input ports within those nodes. This scheme
+Node indices, used as keys in the weight maps and within the
+definitions of nodes and edges, directly correspond to indices of the
+node list. An edge is defined by the source and target nodes, and
+optionally the offset of the output/input ports within those nodes, if the edge
+kind is one that connects to a port. This scheme
 enforces that nodes are contiguous - a node index must always point to a
 valid node - whereas in tooling implementations it may be necessary to
 implement stable indexing where removing a node invalidates that index
@@ -1447,12 +1434,12 @@ The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
 interpretations of a value:
 
-  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where $a_i
-    \in {0,1}$;
+  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
+    $a_i \in \\{0,1\\}$;
 
-  - as an unsigned integer $\sum_{i<N}i 2^i a_i$;
+  - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
 
-  - as a signed integer $\sum_{i<N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
+  - as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
 An asterix ( \* ) in the tables below indicates that the definition
 either differs from or is not part of the
@@ -1597,11 +1584,11 @@ In **some** contexts, notably the Tierkreis runtime, higher-order
 operations allow graphs to be valid dataflow values, and be executed.
 These operations allow this.
 
-  - `call_indirect`: Call a function indirectly. Like `call`, but the
+  - `CallIndirect`: Call a function indirectly. Like `Call`, but the
     first input is a standard dataflow graph type. This is essentially
     `eval` in Tierkreis.
 
-  - `catch`: like `call_indirect`, the first argument is of type
+  - `catch`: like `CallIndirect`, the first argument is of type
     `Graph[R]<I,O>` and the rest of the arguments are of type `I`.
     However the result is not `O` but `Sum(O,ErrorType)`
 
@@ -1622,13 +1609,13 @@ of input to the next iterations of the loop.
 
 <img src="attachments/2647818241/2647818329.png" height="64px">
 
-**call\_indirect** - This has the same feature as **loop**: running a
+**CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s resources.
 
 <img src="attachments/2647818241/2647818368.png" height="64px">
 
-**to\_const** - For operations which instantiate a graph (**to\_const**
-and **call**) the functions are given an extra parameter at graph
+**to_const** - For operations which instantiate a graph (**to\_const**
+and **Call**) the functions are given an extra parameter at graph
 construction time which corresponds to the graph type that they are
 meant to instantiate. This type will be given by a typeless edge from
 the graph in question to the operation, with the graph’s type added as
@@ -1639,7 +1626,7 @@ an edge weight.
   - **BasicBlock node**: A child of a CFG node (i.e. a basic block
     within a control-flow graph).
 
-  - **call node**: TODO
+  - **Call node**: TODO
 
   - **child node**: A child of a node is an adjacent node in the
     hierarchy that is further from the root node; equivalently, the
@@ -1659,8 +1646,6 @@ an edge weight.
     and one exit node. Nodes are basic blocks, edges point to possible
     successors.
 
-  - **copy node**: TODO
-
   - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
     Dataflow container node, with all edges between them. Includes
     exactly one input node (unique node having no input edges) and one
@@ -1672,21 +1657,21 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **declare node**: child of a module node, indicates that an external
-    function exists but without giving a definition. May be the source of
-    constE-edges to call nodes and others.
+  - **Declare node**: child of a module, indicates that an external
+    function exists but without giving a definition. May be the source
+    of Static-edges to Call nodes and others.
 
-  - **def node**: child of a module node, defines a function (by being
-    parent to the function’s body). May be the source of constE-edges to
-    call nodes and others.
+  - **Def node**: child of a module node, defines a function (by being
+    parent to the function’s body). May be the source of Static-edges to
+    Call nodes and others.
 
   - **DFG node**: A node representing a data-flow graph. Its children
     are all data-dependency nodes.
 
   - **edge kind**: There are five kinds of edge: value edge, order edge,
-    control-flow edge, constE edge, and hierarchy edge.
+    control-flow edge, Static edge, and hierarchy edge.
 
-  - **edge type:** Typing information attached to a value edge or constE
+  - **edge type:** Typing information attached to a value edge or Static
     edge (representing the data type of value that the edge carries).
 
   - **entry node**: The distinguished node of a CFG representing the
@@ -1844,8 +1829,7 @@ providing hierarchy, and “graph” regions being like DSGs. Significant
 differences include:
 
   - MLIR uses names everywhere, which internally are mapped to some kind
-    of hyperedge; we have explicit edges in the structure (and copy
-    nodes rather than hyperedges).
+    of hyperedge; we have explicit edges in the structure.
     
       - However, we can think of every output nodeport being a unique
         SSA/SSI name.
