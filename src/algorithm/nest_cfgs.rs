@@ -452,7 +452,7 @@ pub(crate) mod test {
         let cfg_id = cfg_builder.finish();
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
-
+        module_builder.finish()?;
         let h = builder.finish()?;
 
         let (entry, exit) = (entry.node(), exit.node());
@@ -504,6 +504,7 @@ pub(crate) mod test {
         let cfg_id = cfg_builder.finish();
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
+        module_builder.finish()?;
 
         let h = builder.finish()?;
 
@@ -719,6 +720,7 @@ pub(crate) mod test {
         let cfg_id = cfg_builder.finish();
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
+        module_builder.finish()?;
 
         let h = builder.finish()?;
 

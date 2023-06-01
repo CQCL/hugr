@@ -82,7 +82,8 @@ impl<'f> Dataflow for DFGBuilder<'f> {
 }
 
 /// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
-pub struct DFGWrapper<'b, T>(DFGBuilder<'b>, PhantomData<T>);
+// Stores option of DFGBuilder so it can be taken out without moving.
+pub struct DFGWrapper<'b, T>(Option<DFGBuilder<'b>>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
 ///
@@ -92,7 +93,7 @@ pub type FunctionBuilder<'b, const DEF: bool> = DFGWrapper<'b, BuildHandle<FuncI
 
 impl<'b, T> DFGWrapper<'b, T> {
     pub(super) fn new(db: DFGBuilder<'b>) -> Self {
-        Self(db, PhantomData)
+        Self(Some(db), PhantomData)
     }
 }
 
@@ -101,33 +102,34 @@ impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
 
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.container_node()
+        self.0.as_ref().unwrap().container_node()
     }
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.0.base()
+        self.0.as_mut().unwrap().base()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.0.hugr()
+        self.0.as_ref().unwrap().hugr()
     }
     #[inline]
-    fn finish(self) -> Self::ContainerHandle {
-        self.0.finish().into()
+    fn finish(mut self) -> Self::ContainerHandle {
+        let dfg = self.0.take().expect("Already finished.");
+        dfg.finish().into()
     }
 }
 
 impl<'b, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<'b, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
-        self.0.io
+        self.0.as_ref().unwrap().io
     }
 
     #[inline]
     fn num_inputs(&self) -> usize {
-        self.0.num_inputs()
+        self.0.as_ref().unwrap().num_inputs()
     }
 }
 

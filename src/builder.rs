@@ -114,6 +114,23 @@ impl HugrBuilder {
     }
 }
 
+// macro to implement empty drop for builders
+// forces use of value (through calling finish) before automatic drop
+macro_rules! impl_builder_drop {
+    ($name:ident) => {
+        impl<'f> Drop for $name<'f> {
+            fn drop(&mut self) {}
+        }
+    };
+}
+impl_builder_drop!(ModuleBuilder);
+impl_builder_drop!(DFGBuilder);
+impl_builder_drop!(CFGBuilder);
+impl_builder_drop!(ConditionalBuilder);
+impl<'f, T> Drop for DFGWrapper<'f, T> {
+    fn drop(&mut self) {}
+}
+
 #[cfg(test)]
 mod test {
 
@@ -121,8 +138,8 @@ mod test {
     use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::HugrBuilder;
     use super::{BuildError, Dataflow, FuncID, FunctionBuilder};
+    use super::{Container, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
@@ -146,7 +163,7 @@ mod test {
         let f_builder = module_builder.declare_and_def("main", signature)?;
 
         f(f_builder)?;
-
+        module_builder.finish()?;
         builder.finish()
     }
 }
