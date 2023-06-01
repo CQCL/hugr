@@ -9,8 +9,8 @@ use crate::{
     types::SimpleType,
 };
 
-use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
-use crate::ops::{ConstValue, ModuleOp, OpType};
+use crate::ops::handle::{AliasID, FuncID, NodeHandle};
+use crate::ops::{ModuleOp, OpType};
 
 use crate::types::Signature;
 
@@ -131,19 +131,6 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         let declare_n = self.add_child_op(ModuleOp::Declare { signature })?;
 
         Ok(declare_n.into())
-    }
-
-    /// Add a constant value to the module and return a handle to it.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
-    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
-        let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val))?;
-
-        Ok((const_n, typ).into())
     }
 
     /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.

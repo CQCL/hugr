@@ -232,7 +232,6 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let main =
                 module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-            let s1 = module_builder.constant(ConstValue::simple_unary_predicate())?;
             let _f_id = {
                 let mut func_builder = module_builder.define_function(&main)?;
                 let [int] = func_builder.input_wires_arr();
@@ -253,7 +252,7 @@ mod test {
                         cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
 
                     let middle = {
-                        let c = middle_b.load_const(&s1)?;
+                        let c = middle_b.add_load_const(ConstValue::simple_unary_predicate())?;
                         let [inw] = middle_b.input_wires_arr();
                         middle_b.finish_with_outputs(c, [inw])?
                     };

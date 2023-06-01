@@ -186,7 +186,6 @@ impl<'a> ValidationContext<'a> {
         let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
         let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
         let other_op = self.hugr.get_optype(other_node);
-
         let Some(other_kind) = other_op.port_kind(other_offset) else {
             // The number of ports in `other_node` does not match the operation definition.
             // This should be caught by `validate_node`.
@@ -331,7 +330,28 @@ impl<'a> ValidationContext<'a> {
         );
 
         // Compute the number of nodes visited and keep the last one.
-        let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| (n + 1, Some(node)));
+        let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| {
+            // If there is a LoadConstant with a local constant, count that node too
+            match self.hugr.get_optype(node.into()) {
+                OpType::Dataflow(DataflowOp::LoadConstant { .. })
+                    if self
+                        .hugr
+                        .get_parent(
+                            self.hugr
+                                .graph
+                                .input_neighbours(node)
+                                .next()
+                                .unwrap()
+                                .into(),
+                        )
+                        .unwrap()
+                        == parent =>
+                {
+                    (n + 2, Some(node))
+                }
+                _ => (n + 1, Some(node)),
+            }
+        });
 
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index)
             || last_node != self.hugr.hierarchy.last(parent.index)

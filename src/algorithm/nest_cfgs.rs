@@ -432,8 +432,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
@@ -484,8 +484,8 @@ pub(crate) mod test {
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
@@ -685,8 +685,8 @@ pub(crate) mod test {
 
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();

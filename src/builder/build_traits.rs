@@ -2,6 +2,7 @@ use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
 use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
+use crate::ops::ConstValue;
 
 use std::iter;
 
@@ -56,6 +57,19 @@ pub trait Container {
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
         Ok(Wire::new(src, Port::new_outgoing(src_port)))
+    }
+
+    /// Add a constant value to the container and return a handle to it.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Const`] node.
+    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
+        let typ = val.const_type();
+        let const_n = self.add_child_op(ModuleOp::Const(val))?;
+
+        Ok((const_n, typ).into())
     }
 
     /// Consume the container builder and return the handle, may perform some
@@ -224,6 +238,28 @@ pub trait Dataflow: Container {
         )?;
 
         Ok(load_n.out_wire(0))
+    }
+
+    /// Add a constant value to the Dataflow container and return a handle to it.
+    /// Adds a state edge from input to the constant node.
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Const`] node.
+    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
+        let typ = val.const_type();
+        let const_n = self.add_dataflow_op(ModuleOp::Const(val), [])?;
+
+        Ok((const_n.node(), typ).into())
+    }
+    /// Load a static constant and return the local dataflow wire for that constant.
+    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the node.
+    fn add_load_const(&mut self, val: ConstValue) -> Result<Wire, BuildError> {
+        let cid = Dataflow::add_constant(self, val)?;
+        self.load_const(&cid)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
@@ -511,9 +547,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     inp: Node,
 ) -> Result<(), BuildError> {
-    let mut any_local_inputs = false;
+    let mut any_local_df_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        any_local_inputs |= wire_up(
+        any_local_df_inputs |= wire_up(
             data_builder,
             wire.node(),
             wire.source().index(),
@@ -521,8 +557,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-
-    if !any_local_inputs {
+    let op = data_builder.base().hugr().get_optype(op_node);
+    let some_df_outputs = !op.signature().output.is_empty();
+    if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node
         data_builder.add_other_wire(inp, op_node)?;
@@ -603,7 +640,16 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
     data_builder.base().connect(src, src_port, dst, dst_port)?;
-    Ok(local_source)
+    Ok(local_source
+        && matches!(
+            data_builder
+                .base()
+                .hugr()
+                .get_optype(dst)
+                .port_kind(Port::new_incoming(dst_port))
+                .unwrap(),
+            EdgeKind::Value(_)
+        ))
 }
 
 /// Check the kind of a port is a classical Value and return it
