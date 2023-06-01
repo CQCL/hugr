@@ -604,43 +604,39 @@ at runtime. In many cases this is desirable.
 **Typing** To strike a balance then, we implement three kinds of operation/type
 definition in tooling that processes the HUGR. Note these mechanisms only
 deal with specifying the *type* of the operation, allowing such operations
-to be passed through tools that do not understand what the operations *do*
-(that is, allowing new operations to be defined independently of any tool -
-so long as we do not need the tooling to understand them).
+to be passed through tools that do not understand what the operations *do* -
+that is, these allow new operations to be defined independently of any tool,
+but do not provide any way for the tooling to treat them as anything other than a black box.
 
-In all cases the serialized representation is the same: the name of the definition
-(**"Op Factory"**??), a list of type arguments (see below), and optionally the type
-of the operation node that results. The three kinds of definition are:
+In all cases the operation type may depend upon type arguments that are also
+*declared* in the YAML - that is, the YAML declares the *parameters*, and
+individual nodes in a HUGR provide *arguments* i.e. statically-constant values
+for these parameters. (For many parameters, the corresponding argument is a type!)
+The serialized representation of a node is thus the name of the operation-definition
+(aka **"Op Factory"**??), the type arguments (a list, see below), and optionally
+the type of the operation node that results.
+
+The three kinds of operation-definition are:
 
 1.  `Opdef`: where the type of the operation is defined by a function
-    (aka type scheme) given in the declarative YAML format. The function
-    may take type arguments also specified in YAML. The code that turns the
-    actual type arguments provided, into the operation type, given the YAML
+    (aka type scheme) given in the declarative YAML format. The function that turns
+    the actual type arguments provided, into the operation type, given the YAML
     description, is referred to in this doc as the "YAML interpreter" and is
-    expected to be shared across tools and resources. (Note: here we generally
-    do not serialize the computed type, as the YAML definition is passed along
-    with the HUGR. However of course we *could* do so for tools that lack YAML
-    interpreters...)
+    expected to be shared across tools and resources. (Note there is generally
+    no need to serialize the computed type, as the YAML definition is passed along
+    with the HUGR.)
 
-2.  `CustomOp`: here the declarative YAML specifies the type arguments
-    (these may include statically-known values e.g. U64), but does not
-    specify how the operation type is computed from those. Instead the
-    resource/extension provider implements a Rust Trait providing a
-    function `compute_type` that takes the type arguments (for a particular
-    instance i.e. operation node) and returns the type. Here it is useful
-    to serialize the resulting (computed) type so the operation can be treated
-    opaquely by tools that do not have the extension's Rust code available.
+2.  `CustomOp`: here the declarative YAML specifies the type parameters
+    (for example, a Type and a U64), but does not specify how the operation type
+    is computed from those. Instead the resource/extension provider self-registers
+    binary code (e.g. a Rust Trait) providing a function `compute_signature` that
+    takes the type arguments from the operation node and returns the operation type.
+    Here it is useful to serialize the resulting (computed) type so the operation
+    can be treated opaquely by tools that have only the YAML definition of the extension.
 
 3.  `native`: a special case of the previous where the type argument is
-    a single `Opaque` value, provided as a serialized blob.
-
-Type arguments are given by a type language that is a distinct, simplified
-form of the [Type System](#type-system):
-```
-TypeArgs ::= TypeArg (,TypeArgs)?
-TypeArg ::= Type | ClassicType | F64 | U64 | I64 | Opaque(name, ...) | List(TypeArg)
-```
-<!--(`Type` and `ClassicType` here means the YAML declaration is literally "Type" or "ClassicType" but the argument will be one of those.)-->
+    a single `Opaque` value, provided as a serialized blob, given which the
+    `compute_signature` function returns a type.
 
 **Semantics** The *semantics* of any operation are necessarily specific
 to both operation *and* tool (e.g. compiler or runtime). However for each
@@ -650,7 +646,7 @@ type arguments and a set of target resources and may return a subgraph /
 function-body-HUGR using only those target resources.
 
 [^1]: Whether a particular operation-definition provides Rust code for
-`try_lower` is independent of whether it provides Rust code for `compute_type`.
+`try_lower` is independent of whether it provides Rust code for `compute_signature`.
 
 <!-- Should we preserve some of this language about downcasting?
 
@@ -698,23 +694,27 @@ resources:
   operations:
   - name: measure
     description: "measure a qubit"
-    inputs: [[null, Q]]  # Q is defined in Quantum resource
-    # the first element of each pair is an optional parameter name
-    outputs: [[null, Q], ["measured", B]]
+    type_scheme:
+      inputs: [[null, Q]]  # Q is defined in Quantum resource
+      # the first element of each pair is an optional parameter name
+      outputs: [[null, Q], ["measured", B]]
   - name: ZZPhase
     description: "Apply a parametric ZZPhase gate"
-    inputs: [[null, Q], [null, Q], ["angle", Angle]]
-    outputs: [[null, Q], [null, Q]]
+    type_scheme:
+      inputs: [[null, Q], [null, Q], ["angle", Angle]]
+      outputs: [[null, Q], [null, Q]]
     misc:
-      # extra data that may be used by some compiler passes and is passed to try_lower
+      # extra data that may be used by some compiler passes
+      # and is passed to try_lower and compute_signature
       equivalent: [0, 1]
       basis: [Z, Z]
   - name: SU2
     description: "One qubit unitary matrix"
-    inputs: [[null, Q]]
-    outputs: [[null, Q]]
-    args:
-      - matrix: Opaque(matrix3,F64) # Or do we specify sizes here? That requires dependent types?
+    type_scheme:
+      inputs: [[null, Q]]
+      outputs: [[null, Q]]
+    args: # These will be passed to the type-scheme interpreter, but ignored
+      - matrix: Opaque(complex_matrix,2,2)
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     args:
@@ -724,20 +724,27 @@ resources:
     inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
     outputs: [[null, Array<i>(Array<k>(F64))]]
   - name: ArrayConcat
-    description: "Must provide Rust code to compute signature from argument values"
-    args:
+    description: "Concatenate two arrays. Must provide a compute_signature implementation."
+    args: # These will be passed to compute_signature
       - t: Type  # Classic or Quantum
       - i: U64
       - j: U64
-    # inputs could be: Array<i>(U64), Array<j>(U64)
-    # outputs would be, in principle: Array<i+j>(U64)
+    # inputs could be: Array<i>(t), Array<j>(t)
+    # outputs would be, in principle: Array<i+j>(t)
     # However the YAML type-scheme interpreter does not support such addition,
-    # hence (the lack of inputs+outputs means) we must provide
-    # a Rust compute_type function instead
+    # hence (the lack of a type_scheme means) we must provide
+    # a Rust compute_signature function instead
   - name: EvenMoreAwkwardOp
     description: "Inputs and outputs computed from the parameter blob"
     args:
       - matrix: Opaque(MyType) # Passed in as a blob?
+```
+
+The declaration of the `args` uses a language that is a distinct, simplified
+form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes:
+```
+args ::= TypeParam (,TypeParam)*
+TypeParam ::= "Type" | "ClassicType" | "F64" | "U64" | "I64" | "Opaque"(name, ...) | "List"(TypeParam)
 ```
 
 Reading this format into Rust is made easy by `serde` and
@@ -746,18 +753,15 @@ Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
 Note the only required fields are `name` and `description`.
-`inputs` and `outputs` must either be both specified or both absent;
-if absent, Rust code for `compute_type` must be instead. The optional
-`misc` field is used for arbitrary YAML, which is read in as-is (into
-the `serde_yaml Value`
-struct). The data held here can be used by compiler passes which expect
-to deal with this operation (e.g. a pass can use the `basis` information
-to perform commutation). The optional `args` field can be used to
-specify the types of parameters to the operation - for example the
+`type_scheme` may be present (containing both `inputs` and `outputs`) but
+if absent, the extension must register code for `compute_signature` instead.
+The optional `misc` field is used for arbitrary YAML, which is read in as-is
+(into the `serde_yaml Value` struct). The data held here can be used by compiler
+passes which expect to deal with this operation (e.g. a pass can use the `basis`
+information to perform commutation). The optional `args` field can be used to
+specify the types of static+const arguments to the operation - for example the
 matrix needed to define an SU2 operation. If `args` are not specified
-then it is assumed empty. (An operation with neither `args` nor
-`inputs` nor `outputs` must provide a `compute_type` which is essentially
-constant as it will receive no parameters.)
+then it is assumed empty.
 
 ### Extensible metadata
 
