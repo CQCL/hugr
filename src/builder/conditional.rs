@@ -151,7 +151,7 @@ mod test {
     fn basic_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
             let tru_const = module_builder.constant(ConstValue::true_val())?;

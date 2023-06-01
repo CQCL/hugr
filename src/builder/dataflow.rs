@@ -152,7 +152,7 @@ mod test {
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let _f_id = {
                 let mut func_builder = module_builder.declare_and_def(
@@ -188,7 +188,7 @@ mod test {
     {
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let f_build = module_builder.declare_and_def(
                 "main",
@@ -240,7 +240,7 @@ mod test {
     fn copy_insertion_qubit() {
         let builder = || {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
@@ -259,7 +259,7 @@ mod test {
     fn simple_inter_graph_edge() {
         let builder = || {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let mut f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
@@ -287,7 +287,7 @@ mod test {
     fn dfg_hugr() -> Result<(), BuildError> {
         let mut builder = HugrBuilder::new();
 
-        let dfg_builder = builder.root_dfg_builder(type_row![BIT], type_row![BIT])?;
+        let dfg_builder = builder.dfg_hugr_builder(type_row![BIT], type_row![BIT])?;
 
         n_identity(dfg_builder)?;
 

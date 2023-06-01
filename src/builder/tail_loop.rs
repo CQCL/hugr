@@ -95,7 +95,7 @@ mod test {
     fn basic_loop() -> Result<(), BuildError> {
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
             let main = module_builder.declare(
                 "main",
                 Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
@@ -129,7 +129,7 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 

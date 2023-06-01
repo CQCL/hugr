@@ -85,12 +85,12 @@ impl HugrBuilder {
     }
 
     /// Use this builder to build a module HUGR
-    pub fn module_builder(&mut self) -> ModuleBuilder {
+    pub fn module_hugr_builder(&mut self) -> ModuleBuilder {
         ModuleBuilder(&mut self.base)
     }
 
     /// Use this builder to build a DFG HUGR
-    pub fn root_dfg_builder(
+    pub fn dfg_hugr_builder(
         &mut self,
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
@@ -142,7 +142,7 @@ mod test {
         f: impl FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut builder = HugrBuilder::new();
-        let mut module_builder = builder.module_builder();
+        let mut module_builder = builder.module_hugr_builder();
         let f_builder = module_builder.declare_and_def("main", signature)?;
 
         f(f_builder)?;

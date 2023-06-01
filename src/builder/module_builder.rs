@@ -171,7 +171,7 @@ mod test {
     fn basic_recurse() -> Result<(), BuildError> {
         let mut builder = HugrBuilder::new();
         let build_result = {
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let f_id = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
@@ -192,7 +192,7 @@ mod test {
         let mut builder = HugrBuilder::new();
 
         let build_result = {
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
 
             let qubit_state_type = module_builder.add_alias_declare("qubit_state", true)?;
 

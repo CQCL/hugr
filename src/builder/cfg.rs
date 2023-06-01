@@ -194,7 +194,7 @@ mod test {
 
         let build_result = {
             let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_builder();
+            let mut module_builder = builder.module_hugr_builder();
             let main =
                 module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
             let s1 = module_builder.constant(ConstValue::simple_unary_predicate())?;

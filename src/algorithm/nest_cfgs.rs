@@ -429,7 +429,7 @@ pub(crate) mod test {
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
         let mut builder = HugrBuilder::new();
-        let mut module_builder = builder.module_builder();
+        let mut module_builder = builder.module_hugr_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -483,7 +483,7 @@ pub(crate) mod test {
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
         let mut builder = HugrBuilder::new();
-        let mut module_builder = builder.module_builder();
+        let mut module_builder = builder.module_hugr_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -685,7 +685,7 @@ pub(crate) mod test {
         //let sum2_type = SimpleType::new_predicate(2);
 
         let mut builder = HugrBuilder::new();
-        let mut module_builder = builder.module_builder();
+        let mut module_builder = builder.module_hugr_builder();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
         let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
