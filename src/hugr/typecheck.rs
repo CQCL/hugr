@@ -2,7 +2,7 @@
 //! the types at the sources of each wire match those of the targets
 
 use crate::hugr::*;
-use crate::types::SimpleType;
+use crate::types::{SimpleType, TypeRow};
 
 // For static typechecking
 use crate::ops::ConstValue;
@@ -13,16 +13,16 @@ use std::fmt::{self, Display};
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum TypeError {
-    /// This case hasn't been implemented (possibly because we don't have value
-    /// variants to check against it
-    Unimplemented,
+    /// This case hasn't been implemented. Possibly because we don't have value
+    /// constructors to check against it
+    Unimplemented(ClassicType),
     /// The given type and term are incompatible
-    Failed,
+    Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
-    IntTooLarge,
+    IntTooLarge(u8, isize),
     /// Width (n) of an `I<n>` type doesn't fit into a u32
-    IntTypeTooLarge,
+    IntTypeTooLarge(usize),
     /// Found a Var type constructor when we're checking a const val
     ConstCantBeVar,
     /// The length of the tuple value doesn't match the length of the tuple type
@@ -33,23 +33,37 @@ pub enum TypeError {
     InvalidSumTag,
     /// For a value which embeds its type (e.g. sum or opaque) - a mismatch
     /// between the embedded type and the type we're checking against
-    TypeMismatch,
+    TypeMismatch(ClassicType, ClassicType),
+    /// A mismatch between the embedded type and the type we're checking
+    /// against, as above, but for rows instead of simple types
+    TypeRowMismatch(TypeRow, TypeRow),
 }
 
 impl Display for TypeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let str = match self {
-            TypeError::Unimplemented => "Unimplemented",
-            TypeError::Failed => "Typechecking failed",
-            TypeError::IntTooLarge => "Int too large for type",
-            TypeError::IntTypeTooLarge => "Int type too large",
-            TypeError::ConstCantBeVar => "Type of a const value can't be Var",
-            TypeError::TupleWrongLength => "Tuple of wrong length",
-            TypeError::LinearTypeDisallowed => "Linear types not allowed in const nodes",
-            TypeError::InvalidSumTag => "Tag of Sum value is invalid",
-            TypeError::TypeMismatch => "Type mismatch",
+            TypeError::Unimplemented(ty) => {
+                format!("Const type checking unimplemented for {}", ty)
+            }
+            TypeError::Failed(typ) => format!("Invalid const value for type {}", typ),
+            TypeError::IntTooLarge(width, val) => {
+                format!("Const int {} too large for type I{}", val, width)
+            }
+            TypeError::IntTypeTooLarge(w) => format!("Int type too large: I{}", w),
+            TypeError::ConstCantBeVar => "Type of a const value can't be Var".to_string(),
+            TypeError::TupleWrongLength => "Tuple of wrong length".to_string(),
+            TypeError::LinearTypeDisallowed => {
+                "Linear types not allowed in const nodes".to_string()
+            }
+            TypeError::InvalidSumTag => "Tag of Sum value is invalid".to_string(),
+            TypeError::TypeMismatch(exp, act) => {
+                format!("Type mismatch for const - expected {}, found {}", exp, act)
+            }
+            TypeError::TypeRowMismatch(exp, act) => {
+                format!("Type mismatch for const - expected {}, found {}", exp, act)
+            }
         };
-        f.write_str(str)
+        f.write_str(&str)
     }
 }
 
@@ -65,13 +79,13 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeEr
                 if isize::abs(*n as isize) < isize::pow(2, width as u32) {
                     Ok(())
                 } else {
-                    Err(TypeError::IntTooLarge)
+                    Err(TypeError::IntTooLarge(width, *n as isize))
                 }
             }
-            Err(_) => Err(TypeError::IntTypeTooLarge),
+            Err(_) => Err(TypeError::IntTypeTooLarge(*width)),
         },
-        (ClassicType::F64, _) => Err(TypeError::Unimplemented),
-        (ClassicType::Container(c), tm) => match (c, tm) {
+        (ty @ ClassicType::F64, _) => Err(TypeError::Unimplemented(ty.clone())),
+        (ty @ ClassicType::Container(c), tm) => match (c, tm) {
             (Container::Tuple(row), ConstValue::Tuple(xs)) => {
                 if row.len() != xs.len() {
                     return Err(TypeError::TupleWrongLength);
@@ -89,7 +103,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeEr
                     return Err(TypeError::InvalidSumTag);
                 }
                 if **row != *variants {
-                    return Err(TypeError::TypeMismatch);
+                    return Err(TypeError::TypeRowMismatch(*row.clone(), variants.clone()));
                 }
                 let ty = variants.get(*tag).unwrap();
                 match ty {
@@ -97,17 +111,20 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeEr
                     _ => Err(TypeError::LinearTypeDisallowed),
                 }
             }
-            _ => Err(TypeError::Unimplemented),
+            _ => Err(TypeError::Unimplemented(ty.clone())),
         },
-        (ClassicType::Graph(_), _) => Err(TypeError::Unimplemented),
-        (ClassicType::String, _) => Err(TypeError::Unimplemented),
+        (ty @ ClassicType::Graph(_), _) => Err(TypeError::Unimplemented(ty.clone())),
+        (ty @ ClassicType::String, _) => Err(TypeError::Unimplemented(ty.clone())),
         (ClassicType::Variable(_), _) => Err(TypeError::ConstCantBeVar),
         (ClassicType::Opaque(ty), ConstValue::Opaque(_tm, ty2)) => {
-            if ty.clone().classic_type() != ty2.const_type() {
-                return Err(TypeError::TypeMismatch);
+            // The type we're checking against
+            let ty_exp = ty.clone().classic_type();
+            let ty_act = ty2.const_type();
+            if ty_exp != ty_act {
+                return Err(TypeError::TypeMismatch(ty_exp, ty_act));
             }
             Ok(())
         }
-        _ => Err(TypeError::Failed),
+        (ty, _) => Err(TypeError::Failed(ty.clone())),
     }
 }
