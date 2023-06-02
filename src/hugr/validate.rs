@@ -45,7 +45,7 @@ impl<'a> ValidationContext<'a> {
 
     /// Check the validity of the HUGR.
     pub fn validate(&mut self) -> Result<(), ValidationError> {
-        // Root node must be a root in the hierarchy, and a module root operation.
+        // Root node must be a root in the hierarchy.
         if !self.hugr.hierarchy.is_root(self.hugr.root) {
             return Err(ValidationError::RootNotRoot {
                 node: self.hugr.root(),
