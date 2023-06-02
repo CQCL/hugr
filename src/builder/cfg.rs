@@ -1,7 +1,7 @@
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, Wire,
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrMutRef, Wire,
 };
 
 use crate::{hugr::view::HugrView, type_row, types::SimpleType};
@@ -14,15 +14,15 @@ use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] child control
 /// flow graph
-pub struct CFGBuilder<'f> {
-    pub(super) base: &'f mut HugrMut,
+pub struct CFGBuilder<T> {
+    pub(super) base: T,
     pub(super) cfg_node: Node,
     pub(super) inputs: Option<TypeRow>,
     pub(super) exit_node: Node,
     pub(super) n_out_wires: usize,
 }
 
-impl<'f> Container for CFGBuilder<'f> {
+impl<B: HugrMutRef> Container for CFGBuilder<B> {
     type ContainerHandle = BuildHandle<CfgID>;
 
     #[inline]
@@ -32,12 +32,12 @@ impl<'f> Container for CFGBuilder<'f> {
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.base
+        self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.hugr()
+        self.base.as_ref().hugr()
     }
 
     #[inline]
@@ -46,7 +46,7 @@ impl<'f> Container for CFGBuilder<'f> {
     }
 }
 
-impl<'f> CFGBuilder<'f> {
+impl<B: HugrMutRef> CFGBuilder<B> {
     /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
@@ -59,7 +59,7 @@ impl<'f> CFGBuilder<'f> {
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<'b>, BuildError> {
+    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
         let n_cases = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlockOp::Block {
             inputs: inputs.clone(),
@@ -89,7 +89,7 @@ impl<'f> CFGBuilder<'f> {
         inputs: TypeRow,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<'b>, BuildError> {
+    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -104,7 +104,7 @@ impl<'f> CFGBuilder<'f> {
         &'a mut self,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<'b>, BuildError> {
+    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
         let inputs = self
             .inputs
             .take()
@@ -122,7 +122,7 @@ impl<'f> CFGBuilder<'f> {
         &'a mut self,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<'b>, BuildError> {
+    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
@@ -145,7 +145,7 @@ impl<'f> CFGBuilder<'f> {
         let predecessor: &BasicBlockID = predecessor.into();
         let from = predecessor.node();
         let to = successor.node();
-        let base = &mut self.base;
+        let base = self.base();
         let hugr = base.hugr();
         let tin = hugr.num_inputs(to);
         let tout = hugr.num_outputs(to);
@@ -156,9 +156,9 @@ impl<'f> CFGBuilder<'f> {
 }
 
 /// Builder for a [`BasicBlockOp::Block`] child graph.
-pub type BlockBuilder<'b> = DFGWrapper<'b, BasicBlockID>;
+pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<'b> BlockBuilder<'b> {
+impl<B: HugrMutRef> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
     /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -173,7 +173,7 @@ impl<'b> BlockBuilder<'b> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<<BlockBuilder<'b> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<BlockBuilder<B> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {

@@ -5,6 +5,7 @@ use crate::ops::handle::CaseID;
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
 use super::handle::BuildHandle;
+use super::HugrMutRef;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -19,7 +20,7 @@ use std::collections::HashSet;
 use thiserror::Error;
 
 /// Builder for a [`CaseOp`] child graph.
-pub type CaseBuilder<'b> = DFGWrapper<'b, BuildHandle<CaseID>>;
+pub type CaseBuilder<B> = DFGWrapper<B, BuildHandle<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ConditionalBuildError {
@@ -38,14 +39,14 @@ pub enum ConditionalBuildError {
 }
 
 /// Builder for a [`ControlFlowOp::Conditional`] node's children.
-pub struct ConditionalBuilder<'f> {
-    pub(super) base: &'f mut HugrMut,
+pub struct ConditionalBuilder<T> {
+    pub(super) base: T,
     pub(super) conditional_node: Node,
     pub(super) n_out_wires: usize,
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<'f> Container for ConditionalBuilder<'f> {
+impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     #[inline]
@@ -55,12 +56,12 @@ impl<'f> Container for ConditionalBuilder<'f> {
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.base
+        self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.hugr()
+        self.base.as_ref().hugr()
     }
 
     fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -81,7 +82,7 @@ impl<'f> Container for ConditionalBuilder<'f> {
     }
 }
 
-impl<'f> ConditionalBuilder<'f> {
+impl<B: HugrMutRef> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics
@@ -95,7 +96,7 @@ impl<'f> ConditionalBuilder<'f> {
     pub fn case_builder<'a: 'b, 'b>(
         &'a mut self,
         case: usize,
-    ) -> Result<CaseBuilder<'b>, BuildError> {
+    ) -> Result<CaseBuilder<&mut HugrMut>, BuildError> {
         let conditional = self.conditional_node;
         let control_op: Result<ControlFlowOp, ()> = self
             .hugr()

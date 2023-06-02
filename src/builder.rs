@@ -85,7 +85,7 @@ impl HugrBuilder {
     }
 
     /// Use this builder to build a module HUGR
-    pub fn module_hugr_builder(&mut self) -> ModuleBuilder {
+    pub fn module_hugr_builder(&mut self) -> ModuleBuilder<&mut HugrMut> {
         ModuleBuilder(&mut self.base)
     }
 
@@ -94,7 +94,7 @@ impl HugrBuilder {
         &mut self,
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-    ) -> Result<DFGBuilder, BuildError> {
+    ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
         let input = input.into();
         let output = output.into();
         let root = self.base.hugr().root();
@@ -118,22 +118,40 @@ impl HugrBuilder {
 // forces use of value (through calling finish) before automatic drop
 macro_rules! impl_builder_drop {
     ($name:ident) => {
-        impl<'f> Drop for $name<'f> {
+        impl<T> Drop for $name<T> {
             fn drop(&mut self) {}
         }
     };
 }
+
+impl AsMut<HugrMut> for HugrMut {
+    fn as_mut(&mut self) -> &mut HugrMut {
+        self
+    }
+}
+impl AsRef<HugrMut> for HugrMut {
+    fn as_ref(&self) -> &HugrMut {
+        self
+    }
+}
+
+/// Trait allowing treating type as (im)mutable reference to HugrMut
+pub trait HugrMutRef: AsMut<HugrMut> + AsRef<HugrMut> {}
+impl HugrMutRef for HugrMut {}
+impl HugrMutRef for &mut HugrMut {}
+
 impl_builder_drop!(ModuleBuilder);
 impl_builder_drop!(DFGBuilder);
 impl_builder_drop!(CFGBuilder);
 impl_builder_drop!(ConditionalBuilder);
-impl<'f, T> Drop for DFGWrapper<'f, T> {
+impl<B, T> Drop for DFGWrapper<B, T> {
     fn drop(&mut self) {}
 }
 
 #[cfg(test)]
 mod test {
 
+    use crate::hugr::HugrMut;
     use crate::types::{ClassicType, LinearType, Signature, SimpleType};
     use crate::Hugr;
 
@@ -156,7 +174,9 @@ mod test {
 
     pub(super) fn build_main(
         signature: Signature,
-        f: impl FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        f: impl FnOnce(
+            FunctionBuilder<&mut HugrMut, true>,
+        ) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut builder = HugrBuilder::new();
         let mut module_builder = builder.module_hugr_builder();

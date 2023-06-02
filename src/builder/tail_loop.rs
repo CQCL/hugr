@@ -2,22 +2,22 @@ use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::hugr::HugrMut;
 use crate::types::TypeRow;
 use crate::Node;
 
 use super::handle::BuildHandle;
+use super::HugrMutRef;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
 };
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
-pub type TailLoopBuilder<'b> = DFGWrapper<'b, BuildHandle<TailLoopID>>;
+pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<'b> TailLoopBuilder<'b> {
+impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
-        base: &'b mut HugrMut,
+        base: B,
         loop_node: Node,
         tail_loop_sig: TailLoopSignature,
     ) -> Result<Self, BuildError> {
@@ -45,7 +45,7 @@ impl<'b> TailLoopBuilder<'b> {
         mut self,
         out_variant: Wire,
         rest: impl IntoIterator<Item = Wire>,
-    ) -> Result<<TailLoopBuilder<'b> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<TailLoopBuilder<B> as Container>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {

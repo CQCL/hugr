@@ -1,5 +1,5 @@
 use super::handle::BuildHandle;
-use super::{BuildError, Container, Dataflow, DfgID, FuncID};
+use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 
 use std::marker::PhantomData;
 
@@ -11,28 +11,28 @@ use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node.
-pub struct DFGBuilder<'f> {
-    pub(crate) base: &'f mut HugrMut,
+pub struct DFGBuilder<T> {
+    pub(crate) base: T,
     pub(crate) dfg_node: Node,
     pub(crate) num_in_wires: usize,
     pub(crate) num_out_wires: usize,
     pub(crate) io: [Node; 2],
 }
 
-impl<'f> DFGBuilder<'f> {
+impl<T: HugrMutRef> DFGBuilder<T> {
     pub(super) fn create_with_io(
-        base: &'f mut HugrMut,
+        mut base: T,
         parent: Node,
         inputs: TypeRow,
         outputs: TypeRow,
     ) -> Result<Self, BuildError> {
         let num_in_wires = inputs.len();
         let num_out_wires = outputs.len();
-        let i = base.add_op_with_parent(
+        let i = base.as_mut().add_op_with_parent(
             parent,
             OpType::Dataflow(DataflowOp::Input { types: inputs }),
         )?;
-        let o = base.add_op_with_parent(
+        let o = base.as_mut().add_op_with_parent(
             parent,
             OpType::Dataflow(DataflowOp::Output { types: outputs }),
         )?;
@@ -47,7 +47,7 @@ impl<'f> DFGBuilder<'f> {
     }
 }
 
-impl<'f> Container for DFGBuilder<'f> {
+impl<T: HugrMutRef> Container for DFGBuilder<T> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn container_node(&self) -> Node {
@@ -56,7 +56,7 @@ impl<'f> Container for DFGBuilder<'f> {
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.base
+        self.base.as_mut()
     }
     #[inline]
     fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -65,11 +65,11 @@ impl<'f> Container for DFGBuilder<'f> {
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.hugr()
+        self.base.as_ref().hugr()
     }
 }
 
-impl<'f> Dataflow for DFGBuilder<'f> {
+impl<T: HugrMutRef> Dataflow for DFGBuilder<T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.io
@@ -83,21 +83,21 @@ impl<'f> Dataflow for DFGBuilder<'f> {
 
 /// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
 // Stores option of DFGBuilder so it can be taken out without moving.
-pub struct DFGWrapper<'b, T>(Option<DFGBuilder<'b>>, PhantomData<T>);
+pub struct DFGWrapper<B, T>(Option<DFGBuilder<B>>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
-pub type FunctionBuilder<'b, const DEF: bool> = DFGWrapper<'b, BuildHandle<FuncID<DEF>>>;
+pub type FunctionBuilder<B, const DEF: bool> = DFGWrapper<B, BuildHandle<FuncID<DEF>>>;
 
-impl<'b, T> DFGWrapper<'b, T> {
-    pub(super) fn new(db: DFGBuilder<'b>) -> Self {
+impl<B, T> DFGWrapper<B, T> {
+    pub(super) fn new(db: DFGBuilder<B>) -> Self {
         Self(Some(db), PhantomData)
     }
 }
 
-impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
+impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<B, T> {
     type ContainerHandle = T;
 
     #[inline]
@@ -121,7 +121,7 @@ impl<'b, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<'b, T> {
     }
 }
 
-impl<'b, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<'b, T> {
+impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.0.as_ref().unwrap().io
@@ -186,7 +186,9 @@ mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        F: FnOnce(
+            FunctionBuilder<&mut HugrMut, true>,
+        ) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
             let mut builder = HugrBuilder::new();

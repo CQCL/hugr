@@ -1,6 +1,6 @@
 use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container,
+    BuildError, Container, HugrMutRef,
 };
 
 use crate::{hugr::view::HugrView, types::SimpleType};
@@ -16,20 +16,20 @@ use smol_str::SmolStr;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a HUGR module.
-pub struct ModuleBuilder<'f>(pub(super) &'f mut HugrMut);
+pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<'f> Container for ModuleBuilder<'f> {
+impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     // TODO ModuleID
     type ContainerHandle = ();
 
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.root()
+        self.0.as_ref().root()
     }
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.0
+        self.0.as_mut()
     }
 
     #[inline]
@@ -38,11 +38,11 @@ impl<'f> Container for ModuleBuilder<'f> {
     }
 
     fn hugr(&self) -> &Hugr {
-        self.0.hugr()
+        self.0.as_ref().hugr()
     }
 }
 
-impl<'f> ModuleBuilder<'f> {
+impl<T: HugrMutRef> ModuleBuilder<T> {
     /// Generate a builder for defining a function body graph.
     ///
     /// Replaces a [`ModuleOp::Declare`] node as specified by `f_id`
@@ -54,7 +54,7 @@ impl<'f> ModuleBuilder<'f> {
     pub fn define_function<'a: 'b, 'b>(
         &'a mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut HugrMut, true>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.hugr().get_optype(f_node)
@@ -88,7 +88,7 @@ impl<'f> ModuleBuilder<'f> {
         &'a mut self,
         _name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut HugrMut, true>, BuildError> {
         let fid = self.declare(_name, signature)?;
         self.define_function(&fid)
     }

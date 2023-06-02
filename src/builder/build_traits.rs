@@ -152,7 +152,7 @@ pub trait Dataflow: Container {
         &'a mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<DFGBuilder<'b>, BuildError> {
+    ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
@@ -179,7 +179,7 @@ pub trait Dataflow: Container {
         &'a mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<CFGBuilder<'b>, BuildError> {
+    ) -> Result<CFGBuilder<&mut HugrMut>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -247,7 +247,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: TypeRow,
-    ) -> Result<TailLoopBuilder<'b>, BuildError> {
+    ) -> Result<TailLoopBuilder<&mut HugrMut>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -285,7 +285,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<ConditionalBuilder<'b>, BuildError> {
+    ) -> Result<ConditionalBuilder<&mut HugrMut>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
