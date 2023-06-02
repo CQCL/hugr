@@ -117,12 +117,19 @@ impl HugrBuilder {
 // macro to implement empty drop for builders
 // forces use of value (through calling finish) before automatic drop
 macro_rules! impl_builder_drop {
-    ($name:ident) => {
-        impl<T> Drop for $name<T> {
-            fn drop(&mut self) {}
+    ($name:ident, $($t:ident),+) => {
+        impl<$($t),+> Drop for $name< $($t),+> {
+            fn drop(&mut self) {
+                // panic!("Builder dropped before calling finish().");
+            }
         }
     };
 }
+impl_builder_drop!(ModuleBuilder, T);
+impl_builder_drop!(DFGBuilder, T);
+impl_builder_drop!(CFGBuilder, T);
+impl_builder_drop!(ConditionalBuilder, T);
+impl_builder_drop!(DFGWrapper, B, T);
 
 impl AsMut<HugrMut> for HugrMut {
     fn as_mut(&mut self) -> &mut HugrMut {
@@ -139,14 +146,6 @@ impl AsRef<HugrMut> for HugrMut {
 pub trait HugrMutRef: AsMut<HugrMut> + AsRef<HugrMut> {}
 impl HugrMutRef for HugrMut {}
 impl HugrMutRef for &mut HugrMut {}
-
-impl_builder_drop!(ModuleBuilder);
-impl_builder_drop!(DFGBuilder);
-impl_builder_drop!(CFGBuilder);
-impl_builder_drop!(ConditionalBuilder);
-impl<B, T> Drop for DFGWrapper<B, T> {
-    fn drop(&mut self) {}
-}
 
 #[cfg(test)]
 mod test {
