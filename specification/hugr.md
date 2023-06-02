@@ -606,11 +606,11 @@ and may provide (binary) code that computes signatures of operations, or use a d
 "type scheme interpreter" that processes a type scheme included in the YAML - this is
 expected to be built into most tools that process the HUGR and used across many resources.
 
-Each *operation-definition* (aka **OpFactory** ?? Or just **OpDef**??) has a name, and may declare named type
-parameters - if so then the individual operation nodes in a HUGR will provide static-constant
-"type arguments" (values) for these---in many cases these values will be types. It also
-identifies the function that will be used (for each operation/node of that definition) to
-compute the type - this may be built-in or self-registered, see below.
+Each *operation-definition* (aka **OpFactory** ?? Or just **OpDef**??) has a name, and
+may declare named type parameters---if so then the individual operation nodes in a HUGR
+will provide for each a static-constant "type argument": a value that in many cases
+ will be a type. The operation-definition also identifies the function that will be used
+compute the type of each operation; this may be built-in or self-registered, see below.
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the OpDef
@@ -619,20 +619,22 @@ opaquely by tools that do not have the binary code available. (The YAML definiti
 be sent with the HUGR).
 
 This mechanism allows new operations to be passed through tools that do not understand
-what the operations *do* - that is, new operations may be be defined independently of
+what the operations *do*---that is, new operations may be be defined independently of
 any tool, but without providing any way for the tooling to treat them as anything other
 than a black box. The *semantics* of any operation are necessarily specific to both
 operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
 resources to provide semantics portable across tools.
 
 1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
-   that takes the type arguments and a set of target resources and may return a subgraph /
-   function-body-HUGR using only those target resources.
+   that takes the type arguments and a set of target resources and may fallibly return
+   a subgraph or function-body-HUGR using only those target resources.
 
-2. They may provide a HUGR, that declares functions implementing those operations.
-   Note this will only be possible for operations with sufficiently simple type (schemes),
-   and is considered a "fallback" for use when a higher-performance (e.g. native HW)
-   implementation is not available. Such a HUGR may itself require other resources.
+2. They may provide a HUGR, that declares functions implementing those operations. This
+   is a simple case of the above (where the binary code is a constant function) but
+   easy to pass between tools. However note this will only be possible for operations
+   with sufficiently simple type (schemes), and is considered a "fallback" for use
+   when a higher-performance (e.g. native HW) implementation is not available.
+   Such a HUGR may itself require other resources.
 
 Whether a particular operation-definition provides Rust code for `try_lower` is
 independent of how its type is computed, but it will not generally be possible to
