@@ -125,8 +125,8 @@ macro_rules! impl_builder_drop {
         }
     };
 }
-impl_builder_drop!(ModuleBuilder, T);
-impl_builder_drop!(DFGBuilder, T);
+// impl_builder_drop!(ModuleBuilder, T);
+// impl_builder_drop!(DFGBuilder, T);
 impl_builder_drop!(CFGBuilder, T);
 impl_builder_drop!(ConditionalBuilder, T);
 impl_builder_drop!(DFGWrapper, B, T);

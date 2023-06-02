@@ -3,7 +3,10 @@ use super::{
     BuildError, Container, HugrMutRef,
 };
 
-use crate::{hugr::view::HugrView, types::SimpleType};
+use crate::{
+    hugr::{view::HugrView, ValidationError},
+    types::SimpleType,
+};
 
 use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
@@ -39,6 +42,15 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
 
     fn hugr(&self) -> &Hugr {
         self.0.as_ref().hugr()
+    }
+}
+
+impl ModuleBuilder<HugrMut> {
+    fn new() -> Self {
+        Self(HugrMut::new_module())
+    }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+        self.0.finish()
     }
 }
 
@@ -170,9 +182,9 @@ mod test {
     use super::*;
     #[test]
     fn basic_recurse() -> Result<(), BuildError> {
-        let mut builder = HugrBuilder::new();
+        // let mut builder = HugrBuilder::new();
         let build_result = {
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
 
             let f_id = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
@@ -181,8 +193,7 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -190,10 +201,8 @@ mod test {
 
     #[test]
     fn simple_alias() -> Result<(), BuildError> {
-        let mut builder = HugrBuilder::new();
-
         let build_result = {
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type = module_builder.add_alias_declare("qubit_state", true)?;
 
@@ -205,8 +214,7 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

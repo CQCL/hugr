@@ -3,9 +3,10 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 
 use std::marker::PhantomData;
 
+use crate::hugr::{HugrView, ValidationError};
 use crate::ops::{DataflowOp, OpType};
 
-use crate::types::TypeRow;
+use crate::types::{Signature, TypeRow};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
@@ -44,6 +45,24 @@ impl<T: HugrMutRef> DFGBuilder<T> {
             num_in_wires,
             num_out_wires,
         })
+    }
+}
+impl DFGBuilder<HugrMut> {
+    pub fn new(
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+    ) -> Result<DFGBuilder<HugrMut>, BuildError> {
+        let input = input.into();
+        let output = output.into();
+        let dfg_op = DataflowOp::DFG {
+            signature: Signature::new_df(input.clone(), output.clone()),
+        };
+        let base = HugrMut::new(dfg_op);
+        let root = base.hugr().root();
+        DFGBuilder::create_with_io(base, root, input, output)
+    }
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+        self.base.finish()
     }
 }
 
@@ -289,13 +308,11 @@ mod test {
 
     #[test]
     fn dfg_hugr() -> Result<(), BuildError> {
-        let mut builder = HugrBuilder::new();
+        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
 
-        let dfg_builder = builder.dfg_hugr_builder(type_row![BIT], type_row![BIT])?;
+        dfg_builder.set_outputs(dfg_builder.input_wires())?;
 
-        n_identity(dfg_builder)?;
-
-        let hugr = builder.finish()?;
+        let hugr = dfg_builder.finish_hugr()?;
         assert_eq!(hugr.node_count(), 3);
         assert_matches!(hugr.root_type(), OpType::Dataflow(DataflowOp::DFG { .. }));
 
