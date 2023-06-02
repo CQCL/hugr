@@ -89,8 +89,13 @@ impl<'a> ValidationContext<'a> {
         let flags = optype.validity_flags();
 
         // The Hugr can have only one root node.
-        // The root node has no edges.
-        if node != self.hugr.root() {
+        if node == self.hugr.root() {
+            // The root node has no edges.
+            if self.hugr.graph.num_outputs(node.index) + self.hugr.graph.num_inputs(node.index) != 0
+            {
+                return Err(ValidationError::RootWithEdges { node });
+            }
+        } else {
             let Some(parent) = self.hugr.get_parent(node) else {
                 return Err(ValidationError::NoParent { node });
             };
@@ -516,6 +521,9 @@ pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
     #[error("The root node of the Hugr {node:?} is not a root in the hierarchy.")]
     RootNotRoot { node: Node },
+    /// The root node of the Hugr should not have any edges.
+    #[error("The root node of the Hugr {node:?} has edges when it should not.")]
+    RootWithEdges { node: Node },
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
     WrongNumberOfPorts {
