@@ -599,58 +599,44 @@ Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
 at runtime. In many cases this is desirable.
 
-#### Extension Interfaces
-
-To strike a balance then, we implement two ways for resources to specify the
-types of new operations. In both cases, a declarative YAML format (see below)
-is used to declare the operations. Each *operation-definition* has a name, and
-may declare type parameters - if so then the individual operation nodes in a HUGR
-will provide static-constant argument values (in many cases, types) for these.
-These type arguments are then turned into a concrete type for the operation (node)
-in either of two ways:
-
-1.  By specifying a type-scheme in declarative YAML format. This, along with the
-    actual type arguments provided, will be turned into the operation type by code,
-    referred to in this doc as the "YAML interpreter", expected to be shared across
-    tools and resources. Named alternative "YAML interpreters" may be added in future.
-
-2.  By the resource/extension provider self-registering binary code for the specific
-    operation---a function `compute_signature` that takes the type arguments and returns
-    the operation type, e.g. in a Rust trait. The declarative YAML still specifies the
-    type parameters (allowing frontends to validate and/or choose type arguments).
-
-When serializing the node, we also serialize the type arguments; we can also serialize
-the resulting (computed) type with the operation, and this will be useful when the YAML
-does not declare a type scheme[^1] to allow the operation to be treated opaquely by tools
-that do not have the binary code available. (The YAML definition can be sent with the HUGR).
-
-[^1]: similar logic applies for "alternative" YAML interpreters if these can be provided
-by third parties. In such cases the distinction between the two categories breaks down: the
-type scheme is merely extra (constant) data, not part of the node, passed to the function;
-the "name" of the YAML interpreter just serves to identify code rather than it being registered
-specifically for the operation. Perhaps these notions of registration should be combined? (TODO)
-
 #### Extension Implementation
 
-The above allows new operations to be passed through tools that do not understand
-what the operations *do* - that is, these allow new operations to be defined independently
-of any tool, but do not provide any way for the tooling to treat them as anything other
-than a black box. The *semantics* of any operation are necessarily specific to both
-operation *and* tool (e.g. compiler or runtime). However there are two ways for resources
-to provide semantics portable across tools.
+To strike a balance then, every resource provides a YAML declaration of its operations,
+and may provide (binary) code that computes signatures of operations, or use a default
+"type scheme interpreter" that processes a type scheme included in the YAML - this is
+expected to be built into most tools that process the HUGR and used across many resources.
 
-1. They *may* provide binary (e.g. a different Rust trait) providing a function `try_lower`
+Each *operation-definition* (aka **OpFactory** ?? Or just **OpDef**??) has a name, and may declare named type
+parameters - if so then the individual operation nodes in a HUGR will provide static-constant
+"type arguments" (values) for these---in many cases these values will be types. It also
+identifies the function that will be used (for each operation/node of that definition) to
+compute the type - this may be built-in or self-registered, see below.
+
+When serializing the node, we also serialize the type arguments; we can also serialize
+the resulting (computed) type with the operation, and this will be useful when the OpDef
+does not use the default type scheme interpreter, to allow the operation to be treated
+opaquely by tools that do not have the binary code available. (The YAML definition can
+be sent with the HUGR).
+
+This mechanism allows new operations to be passed through tools that do not understand
+what the operations *do* - that is, new operations may be be defined independently of
+any tool, but without providing any way for the tooling to treat them as anything other
+than a black box. The *semantics* of any operation are necessarily specific to both
+operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
+resources to provide semantics portable across tools.
+
+1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
    that takes the type arguments and a set of target resources and may return a subgraph /
    function-body-HUGR using only those target resources.
 
 2. They may provide a HUGR, that declares functions implementing those operations.
-   Note this will only be possible for operations with sufficiently simple type schemes,
+   Note this will only be possible for operations with sufficiently simple type (schemes),
    and is considered a "fallback" for use when a higher-performance (e.g. native HW)
    implementation is not available. Such a HUGR may itself require other resources.
 
 Whether a particular operation-definition provides Rust code for `try_lower` is
-independent of whether it provides Rust code for `compute_signature`, but there would be
-no possibility of providing a HUGR for a function whose type cannot be expressed in YAML.
+independent of how its type is computed, but it will not generally be possible to
+provide a HUGR for a function whose type cannot be expressed in YAML.
 
 <!-- Should we preserve some of this language about downcasting?
 
@@ -700,12 +686,13 @@ resources:
   - name: measure
     description: "measure a qubit"
     signature:
+      # No 'function' specified - use default type scheme interpreter.
+      # The first element of each pair is an optional parameter name.
       inputs: [[null, Q]]  # Q is defined in Quantum resource
-      # the first element of each pair is an optional parameter name
       outputs: [[null, Q], ["measured", B]]
   - name: ZZPhase
     description: "Apply a parametric ZZPhase gate"
-    signature:
+    signature:  # using default type scheme interpreter
       inputs: [[null, Q], [null, Q], ["angle", Angle]]
       outputs: [[null, Q], [null, Q]]
     misc:
@@ -715,39 +702,38 @@ resources:
       basis: [Z, Z]
   - name: SU2
     description: "One qubit unitary matrix"
-    signature:
+    args: # per-node values passed to the type-scheme interpreter, but not used in signature
+      - matrix: Opaque(complex_matrix,2,2)
+    signature:  # using default type scheme interpreter
       inputs: [[null, Q]]
       outputs: [[null, Q]]
-    args: # These will be passed to the type-scheme interpreter, but ignored
-      - matrix: Opaque(complex_matrix,2,2)
   - name: MatMul
     description: "Multiply matrices of statically-known size"
-    args:
+    args:  # per-node values passed to type-scheme-interpreter and used in signature
       - i: U64
       - j: U64
       - k: U64
-    signature:
+    signature:  # using default type scheme interpreter
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
-  - name: ArrayConcat
-    description: "Concatenate two arrays. Must provide a compute_signature implementation."
-    args: # These will be passed to compute_signature
-      - t: Type  # Classic or Quantum
-      - i: U64
-      - j: U64
-    # inputs could be: Array<i>(t), Array<j>(t)
-    # outputs would be, in principle: Array<i+j>(t)
-    # However the YAML type-scheme interpreter does not support such addition,
-    # hence (the lack of a signature means) we must provide
-    # a Rust compute_signature function instead
   - name: max_float
     description: "Variable number of inputs"
     args:
       - n: U64
     signature:
-      scheme_type: with_repeats
+      function: with_repeats  # Name used to look up compute_signature impl in registry
       inputs: [[null, F64, n]] # input is repeated n times
       outputs: [[null, F64, 1]]
+  - name: ArrayConcat
+    description: "Concatenate two arrays. Resource provides a compute_signature implementation."
+    args:
+      - t: Type  # Classic or Quantum
+      - i: U64
+      - j: U64
+    # inputs could be: Array<i>(t), Array<j>(t)
+    # outputs would be, in principle: Array<i+j>(t)
+    # - but default type scheme interpreter does not support
+    # No signature block: will look up a compute_signature based on resource name
 ```
 
 The declaration of the `args` uses a language that is a distinct, simplified
@@ -757,22 +743,32 @@ the value of each member of `args` is given by the following production:
 TypeParam ::= "Type" | "ClassicType" | "F64" | "U64" | "I64" | "Opaque"(name, ...) | "List"(TypeParam)
 ```
 
+The structure of the `signature` block is as follows.
+* It may contain a `function` of string type. This is used to look up a `compute_signature`
+  among implementations that have self-registered (e.g. impl's of a Rust trait).
+* If the `signature` block is present but no `function` is provided, the default
+  type-scheme-interpreter is used
+* Any *other* members of the `signature` block (i.e. properties of the OpDef, the same for
+  all operation nodes) are passed to `compute_signature` too, along with the OpDef name, the
+  `misc` data (also passed to other compiler passes) and the node's values for the `args`
+   * For the default type scheme interpreter, the `signature` block will have to include
+     both `inputs` and `outputs`
+* If the signature block is absent, this is equivalent to a signature block containing only
+  `function: <name-of-resource>`.
+
 Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
 Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
-Note the only required fields are `name` and `description`.
-`signature` may be present (containing both `inputs` and `outputs`, and optionally
-`scheme_type`) but if absent, the extension must register code for `compute_signature`
-instead[^1]. The optional `misc` field is used for arbitrary YAML, which is read in as-is
+Note the only required fields are `name` and `description`. `signature` is optional, as
+above. The optional `misc` field is used for arbitrary YAML, which is read in as-is
 (into the `serde_yaml Value` struct). The data held here can be used by compiler
 passes which expect to deal with this operation (e.g. a pass can use the `basis`
 information to perform commutation). The optional `args` field can be used to
 specify the types of static+const arguments to the operation - for example the
 matrix needed to define an SU2 operation. If `args` are not specified
 then it is assumed empty.
-[^1]: TODO: unify with `scheme_type` i.e. named "YAML Interpreters"
 
 ### Extensible metadata
 
