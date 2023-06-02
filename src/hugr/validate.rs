@@ -410,10 +410,7 @@ impl<'a> ValidationContext<'a> {
         //
         // This search could be sped-up with a pre-computed LCA structure, but
         // for valid Hugrs this search should be very short.
-        let from_parent_parent = self
-            .hugr
-            .get_parent(from_parent)
-            .expect("Copy nodes cannot have a root parent.");
+        let from_parent_parent = self.hugr.get_parent(from_parent);
         for (ancestor, ancestor_parent) in
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
@@ -434,7 +431,7 @@ impl<'a> ValidationContext<'a> {
                         to_ancestor: ancestor,
                     })?;
                 return Ok(());
-            } else if ancestor_parent == from_parent_parent {
+            } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
                 if !matches!(
