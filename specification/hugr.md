@@ -1063,7 +1063,41 @@ in {a}\* (i.e. there is no hierarchy relation between them).
 
 There are the following primitive operations.
 
-##### Replacement method
+##### Replacement methods
+
+###### `SimpleReplace`
+
+This method is used for simple replacement of dataflow subgraphs consisting of
+leaf nodes.
+
+Given a set $S$ of nodes in a hugr $H$, let:
+
+  - $\textrm{inp}_H(S)$ be the set of input ports of nodes in $S$ whose source
+    is in $H \setminus S$;
+  - $\textrm{out}_H(S)$ be the set of input ports of nodes in $H \setminus S$
+    whose source is in $S$.
+
+The method takes as input:
+
+  - the ID of a DFG node $P$ in $\Gamma$;
+  - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
+    including the Input and Output nodes), and that have no incoming or outgoing
+    Ext edges;
+  - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
+    let $T$ be the set of children of $R$;
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
+  
+The new hugr is then derived by:
+  
+  - adding copies of all children of $R$, except for Input and Output nodes, to
+    $\Gamma$, and make them all children of $P$;
+  - adding edges between all newly added nodes matching those in $R$;
+  - for each $p \in \textrm{inp}\_H(T)$, adding an edge from the predecessor of
+    $\nu\_\textrm{inp}(p)$ to the new copy of $p$;
+  - for each $p \in \textrm{out}\_{\Gamma}(S)$, adding an edge from the new copy
+    of the predecessor of $\nu\_\textrm{out}(p)$ to $p$.
+  - removing all nodes in $S$ and edges between them.
 
 ###### `Replace`
 
