@@ -113,8 +113,7 @@ impl Hugr {
         let self_input_node_index: NodeIndex = self.hierarchy.first(r.p.index).unwrap();
         let n_output_node_index: NodeIndex = n_indices[n_sz - 1];
         for n_index in n_non_io_indices {
-            let n_node = Node { index: *n_index };
-            let op: &OpType = r.n.get_optype(n_node);
+            let op: &OpType = r.n.get_optype((*n_index).into());
             let sig = op.signature();
             if !sig.const_input.is_empty() {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
