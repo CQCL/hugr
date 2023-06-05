@@ -1070,37 +1070,33 @@ There are the following primitive operations.
 This method is used for simple replacement of dataflow subgraphs consisting of
 leaf nodes.
 
-Given a DFG-convex set $S$ of IDs of leaf nodes in a DSG, let:
+Given a set $S$ of nodes in a hugr $H$, let:
 
-  - $\textrm{inp}(S)$ be the set of input ports of nodes in $S$ whose source is
-    in $\Gamma \setminus S$;
-  - $\textrm{out}(S)$ be the set of input ports of nodes in $\Gamma \setminus S$
+  - $\textrm{inp}_H(S)$ be the set of input ports of nodes in $S$ whose source
+    is in $H \setminus S$;
+  - $\textrm{out}_H(S)$ be the set of input ports of nodes in $H \setminus S$
     whose source is in $S$.
-
-Given a DFG node $P$, let:
-
-  - $\textrm{inp}(P)$ be the set of successor ports of edges from output ports
-    of the Input node of $P$;
-  - $\textrm{out}(P)$ be the set of input ports of the Output node of $P$.
 
 The method takes as input:
 
   - the ID of a DFG node $P$ in $\Gamma$;
   - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
-    including the Input and Output nodes);
-  - a hugr whose root is a DFG node $R$ with only leaf nodes as children;
-  - a map $\nu_\textrm{inp}: \textrm{inp}(R) \to \textrm{inp}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}(S) \to \textrm{out}(R)$.
+    including the Input and Output nodes), and that have no incoming or outgoing
+    Ext edges;
+  - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
+    let $T$ be the set of non-Input/Output children of $R$;
+  - a map $\nu_\textrm{inp}: \textrm{inp}_H(T) \to \textrm{inp}_{\Gamma}(S)$;
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(R)$.
   
 The new hugr is then derived by:
   
   - adding copies of all children of $R$, except for Input and Output nodes, to
     $\Gamma$, and make them all children of $P$;
   - adding edges between all newly added nodes matching those in $R$;
-  - for each $p \in \textrm{inp}(R)$, adding an edge from the predecessor of
+  - for each $p \in \textrm{inp}_H(T)$, adding an edge from the predecessor of
     $\nu_\textrm{inp}(p)$ to the new copy of $p$;
-  - for each $p \in \textrm{out}(S)$, adding an edge from the new copy of the
-    predecessor of $\nu_\textrm{out}(p)$ to $p$.
+  - for each $p \in \textrm{out}_{\Gamma}(S)$, adding an edge from the new copy
+    of the predecessor of $\nu_\textrm{out}(p)$ to $p$.
   - removing all nodes in $S$ and edges between them.
 
 ###### `Replace`
