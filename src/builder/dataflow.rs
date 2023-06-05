@@ -119,9 +119,6 @@ impl<B, T> DFGWrapper<B, T> {
 }
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
-///
-/// The `DEF` const generic is used to indicate whether the function is
-/// defined or just declared.
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<HugrMut> {
