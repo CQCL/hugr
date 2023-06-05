@@ -1086,7 +1086,7 @@ The method takes as input:
   - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
     let $T$ be the set of non-Input/Output children of $R$;
   - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T) \to \textrm{inp}\_{\Gamma}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(R)$.
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T)$.
   
 The new hugr is then derived by:
   
