@@ -120,7 +120,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let node_outputs: TypeRow = [&[predicate_type], other_outputs.as_ref()].concat().into();
         let db = DFGBuilder::create_with_io(self.base(), block_n, inputs, node_outputs)?;
-        Ok(BlockBuilder::new(db))
+        Ok(BlockBuilder::from_dfg_builder(db))
     }
 
     /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`

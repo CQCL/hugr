@@ -110,7 +110,7 @@ impl<T: HugrMutRef> Dataflow for DFGBuilder<T> {
 
 /// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
 // Stores option of DFGBuilder so it can be taken out without moving.
-pub struct DFGWrapper<B, T>(Option<DFGBuilder<B>>, PhantomData<T>);
+pub struct DFGWrapper<B, T>(DFGBuilder<B>, PhantomData<T>);
 
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
 ///
@@ -119,37 +119,37 @@ pub struct DFGWrapper<B, T>(Option<DFGBuilder<B>>, PhantomData<T>);
 pub type FunctionBuilder<B, const DEF: bool> = DFGWrapper<B, BuildHandle<FuncID<DEF>>>;
 
 impl<B, T> DFGWrapper<B, T> {
-    pub(super) fn new(db: DFGBuilder<B>) -> Self {
-        Self(Some(db), PhantomData)
+    pub(super) fn from_dfg_builder(db: DFGBuilder<B>) -> Self {
+        Self(db, PhantomData)
     }
 }
 
 impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().unwrap().container_node()
+        self.0.container_node()
     }
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        self.0.as_mut().unwrap().base()
+        self.0.base()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.0.as_ref().unwrap().hugr()
+        self.0.hugr()
     }
 }
 
 impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
-        self.0.as_ref().unwrap().io
+        self.0.io
     }
 
     #[inline]
     fn num_inputs(&self) -> usize {
-        self.0.as_ref().unwrap().num_inputs()
+        self.0.num_inputs()
     }
 }
 
@@ -157,9 +157,14 @@ impl<T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<&mut HugrMut, T> {
     type ContainerHandle = T;
 
     #[inline]
-    fn finish_sub_container(mut self) -> Result<Self::ContainerHandle, BuildError> {
-        let dfg = self.0.take().expect("Already finished.");
-        dfg.finish_sub_container().map(Into::into)
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
+        self.0.finish_sub_container().map(Into::into)
+    }
+}
+
+impl<T> HugrBuilder for DFGWrapper<HugrMut, T> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+        self.0.finish_hugr()
     }
 }
 

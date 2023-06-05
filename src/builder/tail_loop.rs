@@ -30,7 +30,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
             tail_loop_sig.body_output_row(),
         )?;
 
-        Ok(TailLoopBuilder::new(dfg_build))
+        Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
     /// Set the outputs of the TailLoop, with `out_variant` as the value of the
     /// termination predicate, and `rest` being the remaining outputs
@@ -80,6 +80,25 @@ impl TailLoopBuilder<&mut HugrMut> {
     }
 }
 
+impl TailLoopBuilder<HugrMut> {
+    /// Initialize new builder for a TailLoop rooted HUGR
+    pub fn new(
+        just_inputs: impl Into<TypeRow>,
+        inputs_outputs: impl Into<TypeRow>,
+        just_outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let tail_loop_sig = TailLoopSignature {
+            just_inputs: just_inputs.into(),
+            just_outputs: just_outputs.into(),
+            rest: inputs_outputs.into(),
+        };
+        let op = ControlFlowOp::TailLoop(tail_loop_sig.clone());
+        let base = HugrMut::new(op);
+        let root = base.hugr().root();
+        Self::create_with_io(base, root, tail_loop_sig)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
@@ -100,29 +119,13 @@ mod test {
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare(
-                "main",
-                Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
-            )?;
-            let s1 = module_builder.add_constant(ConstValue::i64(1))?;
-            let _fdef = {
-                let mut fbuild = module_builder.define_function(&main)?;
-                let [i1] = fbuild.input_wires_arr();
-                let loop_id = {
-                    let mut loop_b =
-                        fbuild.tail_loop_builder(vec![], vec![(BIT, i1)], type_row![NAT])?;
-                    let [i1] = loop_b.input_wires_arr();
-                    let const_wire = loop_b.load_const(&s1)?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], type_row![NAT])?;
+            let [i1] = loop_b.input_wires_arr();
+            let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
 
-                    let break_wire =
-                        loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
-                    loop_b.finish_with_outputs(break_wire, [i1])?
-                };
-
-                fbuild.finish_with_outputs(loop_id.outputs())?
-            };
-            Ok(module_builder.finish_hugr()?)
+            let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
+            loop_b.set_outputs(break_wire, [i1])?;
+            loop_b.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

@@ -89,7 +89,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         );
 
         let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
-        Ok(FunctionBuilder::new(db))
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
     /// Add a [`ModuleOp::Def`] node and returns a builder to define the function

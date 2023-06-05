@@ -131,7 +131,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
 
         let dfg_builder = DFGBuilder::create_with_io(self.base(), case_node, inputs, outputs)?;
 
-        Ok(CaseBuilder::new(dfg_builder))
+        Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }
 }
 
