@@ -1,15 +1,16 @@
 //! The Hugr data structure, and its basic component handles.
 
 mod hugrmut;
-pub mod view;
 
+pub mod multiportgraph;
 pub mod serialize;
 pub mod validate;
+pub mod view;
+
+pub use self::hugrmut::HugrMut;
+pub use self::validate::ValidationError;
 
 use derive_more::From;
-pub use hugrmut::HugrMut;
-pub use validate::ValidationError;
-
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
 use thiserror::Error;

@@ -39,6 +39,7 @@ smol_str = {version = "0.1.24", features = ["serde"]}
 derive_more = "0.99.17"
 itertools = "0.10.5"
 html-escape = "0.2.13"
+bitvec = { version = "1.0.1", features = ["serde"] }
 
 [features]
 pyo3 = ["dep:pyo3"]
