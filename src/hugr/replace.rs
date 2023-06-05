@@ -6,9 +6,9 @@ use crate::Hugr;
 pub use rewrite::{OpenHugr, Rewrite, RewriteError};
 
 /// An operation that can be applied to mutate a Hugr
-pub trait RewriteOp {
-    /// Mutate the specified Hugr, or fail with a RewriteError.
+pub trait RewriteOp<E> {
+    /// Mutate the specified Hugr, or fail with an error.
     /// Implementations are strongly encouraged not to mutate the Hugr
     /// if they return an Err.
-    fn apply(self, h: &mut Hugr) -> Result<(), RewriteError>;
+    fn apply(self, h: &mut Hugr) -> Result<(), E>;
 }

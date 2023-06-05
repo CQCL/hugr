@@ -132,7 +132,7 @@ impl Rewrite {
     }
 }
 
-impl RewriteOp for Rewrite {
+impl RewriteOp<RewriteError> for Rewrite {
     /// Applies a ReplacementOp to the graph.
     fn apply(self, h: &mut Hugr) -> Result<(), RewriteError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
