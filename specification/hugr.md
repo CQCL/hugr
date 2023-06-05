@@ -1094,15 +1094,14 @@ The method takes as input:
   
 The new hugr is then derived by:
   
-  - adding all children of $R$, and all edges between them, to $\Gamma$;
-  - making $P$ the parent of all the newly added nodes except for the Input and
-    Output nodes;
+  - adding copies of all children of $R$, except for Input and Output nodes, to
+    $\Gamma$, and make them all children of $P$;
+  - adding edges between all newly added nodes matching those in $R$;
   - for each $p \in \textrm{inp}(R)$, adding an edge from the predecessor of
-    $\nu_\textrm{inp}(p)$ to $p$;
-  - for each $p \in \textrm{out}(S)$, adding an edge from the predecessor of
-    $\nu_\textrm{out}(p)$ to $p$.
-  - removing all nodes in $S$ and edges between them;
-  - removing the Input and Output nodes of $R$ and all edges from them.
+    $\nu_\textrm{inp}(p)$ to the new copy of $p$;
+  - for each $p \in \textrm{out}(S)$, adding an edge from the new copy of the
+    predecessor of $\nu_\textrm{out}(p)$ to $p$.
+  - removing all nodes in $S$ and edges between them.
 
 ###### `Replace`
 
