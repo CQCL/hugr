@@ -7,8 +7,8 @@ use portgraph::substitute::OpenGraph;
 use portgraph::{NodeIndex, PortIndex};
 use thiserror::Error;
 
-use crate::Hugr;
 use super::RewriteOp;
+use crate::Hugr;
 
 /// A subset of the nodes in a graph, and the ports that it is connected to.
 #[derive(Debug, Clone, Default)]
@@ -158,7 +158,6 @@ impl RewriteOp<RewriteError> for Rewrite {
         Ok(())
     }
 }
-
 
 /// Error generated when a rewrite fails.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
