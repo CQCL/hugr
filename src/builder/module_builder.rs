@@ -235,7 +235,7 @@ mod test {
     fn load_const_graph(ty: Option<ClassicType>) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         // The type `I<64>` will be inferred if `ty` is `None`
-        let const_id = module_builder.constant(ConstValue::Int(1), ty)?;
+        let const_id = module_builder.constant(ConstValue::i64(1), ty)?;
 
         let mut main_builder = module_builder
             .declare_and_def("main", Signature::new_df(type_row![], type_row![I2]))?;
@@ -250,10 +250,10 @@ mod test {
         use crate::hugr::ValidationError;
 
         // Building should fail because I2 != NAT
-        let handle = load_const_graph(None);
+        let opt = load_const_graph(None);
 
         assert_matches!(
-            handle,
+            opt,
             Err(BuildError::InvalidHUGR(
                 ValidationError::IncompatiblePorts { .. }
             ))
@@ -263,7 +263,15 @@ mod test {
 
     #[test]
     fn good_const() -> Result<(), BuildError> {
-        load_const_graph(Some(ClassicType::Int(2)))?;
+        use crate::hugr::typecheck::TypeError;
+
+        let opt = load_const_graph(Some(ClassicType::Int(2)));
+        assert_matches!(
+            opt,
+            Err(BuildError::ConstTypeError(
+                TypeError::IntWidthMismatch(_,_)
+            ))
+        );
         Ok(())
     }
 }

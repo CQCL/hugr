@@ -115,7 +115,7 @@ impl ModuleOp {
 #[allow(missing_docs)]
 pub enum ConstValue {
     /// An arbitrary length integer constant.
-    Int(i64),
+    Int { value: i64, width: usize },
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
@@ -131,7 +131,16 @@ pub enum ConstValue {
 impl PartialEq for ConstValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            (
+                Self::Int {
+                    value: l0,
+                    width: l_width,
+                },
+                Self::Int {
+                    value: r0,
+                    width: r_width,
+                },
+            ) => l0 == r0 && l_width == r_width,
             (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
             (
                 Self::Sum { tag, variants, val },
@@ -152,7 +161,10 @@ impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
-        Self::Int(0)
+        Self::Int {
+            value: 0,
+            width: 64,
+        }
     }
 }
 
@@ -160,7 +172,7 @@ impl ConstValue {
     /// Returns the datatype of the constant.
     pub fn const_type(&self) -> ClassicType {
         match self {
-            Self::Int(_) => ClassicType::i64(),
+            Self::Int { value: _, width } => ClassicType::Int(*width),
             Self::Opaque(_, b) => (*b).const_type(),
             Self::Sum { variants, .. } => {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
@@ -178,7 +190,7 @@ impl ConstValue {
     /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
-            Self::Int(v) => format!("const:int:{v}"),
+            Self::Int { value, width } => format!("const:int<{width}>:{value}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
             Self::Sum { tag, val, .. } => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
@@ -234,6 +246,11 @@ impl ConstValue {
     /// Constant Sum over Tuples with just one variant of unit type
     pub fn simple_unary_predicate() -> Self {
         Self::simple_predicate(0, 1)
+    }
+
+    /// New 64 bit integer constant
+    pub fn i64(value: i64) -> Self {
+        Self::Int { value, width: 64 }
     }
 }
 
