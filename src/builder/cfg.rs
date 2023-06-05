@@ -116,11 +116,13 @@ impl<B: HugrMutRef> CFGBuilder<B> {
 
         self.base().set_num_ports(block_n, 0, n_cases);
 
-        // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = SimpleType::new_predicate(predicate_variants);
-        let node_outputs: TypeRow = [&[predicate_type], other_outputs.as_ref()].concat().into();
-        let db = DFGBuilder::create_with_io(self.base(), block_n, inputs, node_outputs)?;
-        Ok(BlockBuilder::from_dfg_builder(db))
+        BlockBuilder::create(
+            self.base(),
+            block_n,
+            predicate_variants,
+            other_outputs,
+            inputs,
+        )
     }
 
     /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
@@ -213,6 +215,19 @@ impl<B: HugrMutRef> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
+    fn create(
+        base: B,
+        block_n: Node,
+        predicate_variants: Vec<TypeRow>,
+        other_outputs: TypeRow,
+        inputs: TypeRow,
+    ) -> Result<Self, BuildError> {
+        // The node outputs a predicate before the data outputs of the block node
+        let predicate_type = SimpleType::new_predicate(predicate_variants);
+        let node_outputs: TypeRow = [&[predicate_type], other_outputs.as_ref()].concat().into();
+        let db = DFGBuilder::create_with_io(base, block_n, inputs, node_outputs)?;
+        Ok(BlockBuilder::from_dfg_builder(db))
+    }
 }
 impl BlockBuilder<&mut HugrMut> {
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_container`).
@@ -228,6 +243,29 @@ impl BlockBuilder<&mut HugrMut> {
         self.finish_sub_container()
     }
 }
+
+impl BlockBuilder<HugrMut> {
+    /// Initialize a BasicBlock rooted HUGR builder
+    pub fn new(
+        inputs: impl Into<TypeRow>,
+        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        other_outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let inputs = inputs.into();
+        let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
+        let other_outputs = other_outputs.into();
+        let op = BasicBlockOp::Block {
+            inputs: inputs.clone(),
+            other_outputs: other_outputs.clone(),
+            predicate_variants: predicate_variants.clone(),
+        };
+
+        let base = HugrMut::new(op);
+        let root = base.root();
+        Self::create(base, root, predicate_variants, other_outputs, inputs)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
