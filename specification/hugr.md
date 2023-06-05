@@ -1084,9 +1084,9 @@ The method takes as input:
     including the Input and Output nodes), and that have no incoming or outgoing
     Ext edges;
   - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
-    let $T$ be the set of non-Input/Output children of $R$;
-  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T) \to \textrm{inp}\_{\Gamma}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T)$.
+    let $T$ be the set of children of $R$;
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
   
 The new hugr is then derived by:
   
