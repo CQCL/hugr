@@ -110,11 +110,11 @@ impl Hugr {
                 .collect::<Vec<NodeIndex>>();
         let n_sz = n_indices.len(); // number of replacement nodes including Input and Output
         let n_non_io_indices = &n_indices[1..n_sz - 1]; // omit Input and Output
-        for n_index in n_non_io_indices {
+        for &n_index in n_non_io_indices {
             // 3.1.1. Check there are no const inputs.
             if !r
                 .n
-                .get_optype((*n_index).into())
+                .get_optype((n_index).into())
                 .signature()
                 .const_input
                 .is_empty()
@@ -124,9 +124,9 @@ impl Hugr {
         }
         let self_input_node_index: NodeIndex = self.hierarchy.first(r.p.index).unwrap();
         let n_output_node_index: NodeIndex = n_indices[n_sz - 1];
-        for n_index in n_non_io_indices {
+        for &n_index in n_non_io_indices {
             // 3.1.2. Add the nodes.
-            let op: &OpType = r.n.get_optype((*n_index).into());
+            let op: &OpType = r.n.get_optype((n_index).into());
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
@@ -134,16 +134,16 @@ impl Hugr {
             self.hierarchy
                 .insert_after(new_node_index, self_input_node_index)
                 .ok();
-            index_map.insert(*n_index, new_node_index);
+            index_map.insert(n_index, new_node_index);
         }
         // 3.2. Add edges between all newly added nodes matching those in n_dfg_node.
-        for n_index in n_non_io_indices {
-            let n_node = Node { index: *n_index };
-            let new_node_index = index_map.get(n_index).unwrap();
+        for &n_index in n_non_io_indices {
+            let n_node = Node { index: n_index };
+            let new_node_index = index_map.get(&n_index).unwrap();
             for n_node_succ in r.n.output_neighbours(n_node) {
                 if r.n.get_optype(n_node_succ).tag() != OpTag::Output {
                     let new_node_succ_index = index_map.get(&n_node_succ.index).unwrap();
-                    for connection in r.n.graph.get_connections(*n_index, n_node_succ.index) {
+                    for connection in r.n.graph.get_connections(n_index, n_node_succ.index) {
                         let src_offset = r.n.graph.port_offset(connection.0).unwrap().index();
                         let tgt_offset = r.n.graph.port_offset(connection.1).unwrap().index();
                         self.graph
