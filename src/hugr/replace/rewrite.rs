@@ -8,6 +8,7 @@ use portgraph::{NodeIndex, PortIndex};
 use thiserror::Error;
 
 use crate::Hugr;
+use super::RewriteOp;
 
 /// A subset of the nodes in a graph, and the ports that it is connected to.
 #[derive(Debug, Clone, Default)]
@@ -130,6 +131,34 @@ impl Rewrite {
         todo!()
     }
 }
+
+impl RewriteOp for Rewrite {
+    /// Applies a ReplacementOp to the graph.
+    fn apply(self, h: &mut Hugr) -> Result<(), RewriteError> {
+        // Get the open graph for the rewrites, and a HUGR with the additional components.
+        let (rewrite, mut replacement, parents) = self.into_parts();
+
+        // TODO: Use `parents` to update the hierarchy, and keep the internal hierarchy from `replacement`.
+        let _ = parents;
+
+        let node_inserted = |old, new| {
+            std::mem::swap(&mut h.op_types[new], &mut replacement.op_types[old]);
+            // TODO: metadata (Fn parameter ?)
+        };
+        rewrite.apply_with_callbacks(
+            &mut h.graph,
+            |_| {},
+            |_| {},
+            node_inserted,
+            |_, _| {},
+            |_, _| {},
+        )?;
+
+        // TODO: Check types
+        Ok(())
+    }
+}
+
 
 /// Error generated when a rewrite fails.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]

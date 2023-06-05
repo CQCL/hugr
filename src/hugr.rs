@@ -75,7 +75,7 @@ impl Hugr {
     }
 
     /// Applies a rewrite to the graph.
-    pub fn apply(&mut self, op: RewriteOp) -> Result<(), RewriteError> {
+    pub fn apply(&mut self, op: impl RewriteOp) -> Result<(), RewriteError> {
         op.apply(self)
     }
 
