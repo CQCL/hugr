@@ -1085,7 +1085,7 @@ The method takes as input:
     Ext edges;
   - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
     let $T$ be the set of non-Input/Output children of $R$;
-  - a map $\nu_\textrm{inp}: \textrm{inp}_H(T) \to \textrm{inp}_{\Gamma}(S)$;
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T) \to \textrm{inp}\_{\Gamma}(S)$;
   - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(R)$.
   
 The new hugr is then derived by:
@@ -1093,10 +1093,10 @@ The new hugr is then derived by:
   - adding copies of all children of $R$, except for Input and Output nodes, to
     $\Gamma$, and make them all children of $P$;
   - adding edges between all newly added nodes matching those in $R$;
-  - for each $p \in \textrm{inp}_H(T)$, adding an edge from the predecessor of
-    $\nu_\textrm{inp}(p)$ to the new copy of $p$;
-  - for each $p \in \textrm{out}_{\Gamma}(S)$, adding an edge from the new copy
-    of the predecessor of $\nu_\textrm{out}(p)$ to $p$.
+  - for each $p \in \textrm{inp}\_H(T)$, adding an edge from the predecessor of
+    $\nu\_\textrm{inp}(p)$ to the new copy of $p$;
+  - for each $p \in \textrm{out}\_{\Gamma}(S)$, adding an edge from the new copy
+    of the predecessor of $\nu\_\textrm{out}(p)$ to $p$.
   - removing all nodes in $S$ and edges between them.
 
 ###### `Replace`
