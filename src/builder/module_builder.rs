@@ -69,7 +69,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     pub fn define_function<'a: 'b, 'b>(
         &'a mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut HugrMut, true>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.hugr().get_optype(f_node)
@@ -103,7 +103,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         &'a mut self,
         _name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut HugrMut, true>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let fid = self.declare(_name, signature)?;
         self.define_function(&fid)
     }

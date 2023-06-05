@@ -5,7 +5,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{DataflowOp, OpType};
+use crate::ops::{DataflowOp, ModuleOp, OpType};
 
 use crate::types::{Signature, TypeRow};
 
@@ -112,15 +112,30 @@ impl<T: HugrMutRef> Dataflow for DFGBuilder<T> {
 // Stores option of DFGBuilder so it can be taken out without moving.
 pub struct DFGWrapper<B, T>(DFGBuilder<B>, PhantomData<T>);
 
+impl<B, T> DFGWrapper<B, T> {
+    pub(super) fn from_dfg_builder(db: DFGBuilder<B>) -> Self {
+        Self(db, PhantomData)
+    }
+}
+
 /// Builder for a [`crate::ops::module::ModuleOp::Def`] node
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
-pub type FunctionBuilder<B, const DEF: bool> = DFGWrapper<B, BuildHandle<FuncID<DEF>>>;
+pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
-impl<B, T> DFGWrapper<B, T> {
-    pub(super) fn from_dfg_builder(db: DFGBuilder<B>) -> Self {
-        Self(db, PhantomData)
+impl FunctionBuilder<HugrMut> {
+    /// Initialize a builder for a Def rooted HUGR
+    pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
+        let inputs = signature.input.clone();
+        let outputs = signature.output.clone();
+        let op = ModuleOp::Def { signature };
+
+        let base = HugrMut::new(op);
+        let root = base.hugr().root();
+
+        let db = DFGBuilder::create_with_io(base, root, inputs, outputs)?;
+        Ok(Self::from_dfg_builder(db))
     }
 }
 
@@ -220,9 +235,7 @@ mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(
-            FunctionBuilder<&mut HugrMut, true>,
-        ) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        F: FnOnce(FunctionBuilder<&mut HugrMut>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
@@ -292,10 +305,8 @@ mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut module_builder = ModuleBuilder::new();
-
-            let mut f_build = module_builder
-                .declare_and_def("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
@@ -307,9 +318,7 @@ mod test {
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_with_outputs([nested.out_wire(0)])?;
-
-            Ok(module_builder.finish_hugr()?)
+            f_build.finish_hugr_with_outputs([nested.out_wire(0)])
         };
 
         assert_matches!(builder(), Ok(_));
