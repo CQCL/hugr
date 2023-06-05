@@ -230,7 +230,7 @@ impl<B: HugrMutRef> BlockBuilder<B> {
     }
 }
 impl BlockBuilder<&mut HugrMut> {
-    /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_container`).
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
         branch_wire: Wire,
