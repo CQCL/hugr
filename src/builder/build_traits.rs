@@ -307,9 +307,9 @@ pub trait Dataflow: Container {
         input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
-
         let n_cases = predicate_inputs.len();
         let n_out_wires = output_types.len();
+
         let conditional_id = self.add_dataflow_op(
             ControlFlowOp::Conditional(ConditionalSignature {
                 predicate_inputs,
@@ -318,6 +318,7 @@ pub trait Dataflow: Container {
             }),
             input_wires,
         )?;
+
         Ok(ConditionalBuilder {
             base: self.base(),
             conditional_node: conditional_id.node(),

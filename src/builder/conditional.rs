@@ -1,17 +1,18 @@
 use crate::hugr::view::HugrView;
-use crate::types::Signature;
+use crate::ops::controlflow::ConditionalSignature;
+use crate::types::{Signature, TypeRow};
 
 use crate::ops::handle::CaseID;
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
-use super::HugrMutRef;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, ConditionalID,
 };
+use super::{HugrBuilder, HugrMutRef};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
@@ -135,6 +136,42 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     }
 }
 
+impl HugrBuilder for ConditionalBuilder<HugrMut> {
+    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
+        self.base.finish()
+    }
+}
+
+impl ConditionalBuilder<HugrMut> {
+    /// Initialize a Conditional rooted HUGR builder
+    pub fn new(
+        predicate_inputs: impl IntoIterator<Item = TypeRow>,
+        other_inputs: impl Into<TypeRow>,
+        outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
+        let other_inputs = other_inputs.into();
+        let outputs = outputs.into();
+
+        let n_out_wires = outputs.len();
+        let n_cases = predicate_inputs.len();
+
+        let op = ControlFlowOp::Conditional(ConditionalSignature {
+            predicate_inputs,
+            other_inputs,
+            outputs,
+        });
+        let base = HugrMut::new(op);
+        let conditional_node = base.root();
+
+        Ok(ConditionalBuilder {
+            base,
+            conditional_node,
+            n_out_wires,
+            case_nodes: vec![None; n_cases],
+        })
+    }
+}
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
@@ -153,6 +190,18 @@ mod test {
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut conditional_b =
+            ConditionalBuilder::new(predicate_inputs, type_row![NAT], type_row![NAT])?;
+
+        n_identity(conditional_b.case_builder(0)?)?;
+        n_identity(conditional_b.case_builder(1)?)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_conditional_module() -> Result<(), BuildError> {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
             let main = module_builder
