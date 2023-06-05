@@ -172,6 +172,22 @@ impl ConditionalBuilder<HugrMut> {
         })
     }
 }
+
+impl CaseBuilder<HugrMut> {
+    /// Initialize a Case rooted HUGR
+    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
+        let input = input.into();
+        let output = output.into();
+        let op = CaseOp {
+            signature: Signature::new_df(input.clone(), output.clone()),
+        };
+        let base = HugrMut::new(op);
+        let root = base.hugr().root();
+        let dfg_builder = DFGBuilder::create_with_io(base, root, input, output)?;
+
+        Ok(CaseBuilder::from_dfg_builder(dfg_builder))
+    }
+}
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
