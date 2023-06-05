@@ -99,7 +99,7 @@ mod test {
                 "main",
                 Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
             )?;
-            let s1 = module_builder.constant(ConstValue::Int(1))?;
+            let s1 = module_builder.constant(ConstValue::i64(1))?;
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
                 let [i1] = fbuild.input_wires_arr();
@@ -130,7 +130,7 @@ mod test {
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 
-            let s2 = module_builder.constant(ConstValue::Int(2))?;
+            let s2 = module_builder.constant(ConstValue::i64(2))?;
             let tru_const = module_builder.constant(ConstValue::true_val())?;
 
             let _fdef = {
