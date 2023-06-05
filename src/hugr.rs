@@ -84,13 +84,15 @@ impl Hugr {
         r: SimpleReplacement,
     ) -> Result<(), SimpleReplacementError> {
         // 1. Check the parent node exists.
-        if !self.graph.contains_node(r.p.index) || self.get_optype(r.p).tag() != OpTag::Dfg {
+        if !self.graph.contains_node(r.region.index)
+            || self.get_optype(r.region).tag() != OpTag::Dfg
+        {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
-        for node in &r.s {
+        for node in &r.removal {
             if self.hierarchy.is_root(node.index)
-                || self.hierarchy.parent(node.index).unwrap() != r.p.index
+                || self.hierarchy.parent(node.index).unwrap() != r.region.index
                 || self.hierarchy.has_children(node.index)
             {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
@@ -98,31 +100,39 @@ impl Hugr {
         }
         // 3. Do the replacement.
         // First locate the DFG in r.n. TODO this won't be necessary when we have DFG-rooted HUGRs.
-        let n_dfg_node =
-            r.n.nodes()
-                .find(|node: &Node| r.n.get_optype(*node).tag() == OpTag::Dfg)
-                .unwrap();
+        let n_dfg_node = r
+            .replacement
+            .nodes()
+            .find(|node: &Node| r.replacement.get_optype(*node).tag() == OpTag::Dfg)
+            .unwrap();
         // 3.1. Add copies of all children of n_dfg_node to self. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in r.n) to new NodeIndex (in self).
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
-        let n_nodes =
-            r.n.hierarchy
-                .children(n_dfg_node.index)
-                .map_into::<Node>()
-                .collect::<Vec<Node>>();
+        let n_nodes = r
+            .replacement
+            .hierarchy
+            .children(n_dfg_node.index)
+            .map_into::<Node>()
+            .collect::<Vec<Node>>();
         let n_sz = n_nodes.len(); // number of replacement nodes including Input and Output
         let n_non_io_nodes = &n_nodes[1..n_sz - 1]; // omit Input and Output
         for &n_node in n_non_io_nodes {
             // 3.1.1. Check there are no const inputs.
-            if !r.n.get_optype(n_node).signature().const_input.is_empty() {
+            if !r
+                .replacement
+                .get_optype(n_node)
+                .signature()
+                .const_input
+                .is_empty()
+            {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
-        let self_input_node_index: NodeIndex = self.hierarchy.first(r.p.index).unwrap();
+        let self_input_node_index: NodeIndex = self.hierarchy.first(r.region.index).unwrap();
         let n_output_node = n_nodes[n_sz - 1];
         for &n_node in n_non_io_nodes {
             // 3.1.2. Add the nodes.
-            let op: &OpType = r.n.get_optype(n_node);
+            let op: &OpType = r.replacement.get_optype(n_node);
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
@@ -136,12 +146,26 @@ impl Hugr {
         // TODO This will probably change when implicit copies are implemented.
         for &n_node in n_non_io_nodes {
             let new_node_index = index_map.get(&n_node.index).unwrap();
-            for n_node_succ in r.n.output_neighbours(n_node) {
-                if r.n.get_optype(n_node_succ).tag() != OpTag::Output {
+            for n_node_succ in r.replacement.output_neighbours(n_node) {
+                if r.replacement.get_optype(n_node_succ).tag() != OpTag::Output {
                     let new_node_succ_index = index_map.get(&n_node_succ.index).unwrap();
-                    for connection in r.n.graph.get_connections(n_node.index, n_node_succ.index) {
-                        let src_offset = r.n.graph.port_offset(connection.0).unwrap().index();
-                        let tgt_offset = r.n.graph.port_offset(connection.1).unwrap().index();
+                    for connection in r
+                        .replacement
+                        .graph
+                        .get_connections(n_node.index, n_node_succ.index)
+                    {
+                        let src_offset = r
+                            .replacement
+                            .graph
+                            .port_offset(connection.0)
+                            .unwrap()
+                            .index();
+                        let tgt_offset = r
+                            .replacement
+                            .graph
+                            .port_offset(connection.1)
+                            .unwrap()
+                            .index();
                         self.graph
                             .link_nodes(
                                 *new_node_index,
@@ -178,13 +202,18 @@ impl Hugr {
                 .graph
                 .port_index(s_exit_node.index, s_exit_port.offset)
                 .unwrap();
-            let n_out_portindex =
-                r.n.graph
-                    .port_index(n_output_node.index, n_out_port.offset)
-                    .unwrap();
-            let n_preexit_portindex = r.n.graph.port_link(n_out_portindex).unwrap();
-            let n_preexit_nodeindex = r.n.graph.port_node(n_preexit_portindex).unwrap();
-            let n_preexit_portoffset = r.n.graph.port_offset(n_preexit_portindex).unwrap();
+            let n_out_portindex = r
+                .replacement
+                .graph
+                .port_index(n_output_node.index, n_out_port.offset)
+                .unwrap();
+            let n_preexit_portindex = r.replacement.graph.port_link(n_out_portindex).unwrap();
+            let n_preexit_nodeindex = r.replacement.graph.port_node(n_preexit_portindex).unwrap();
+            let n_preexit_portoffset = r
+                .replacement
+                .graph
+                .port_offset(n_preexit_portindex)
+                .unwrap();
             let new_out_nodeindex = index_map.get(&n_preexit_nodeindex).unwrap();
             let new_out_portindex = self
                 .graph
@@ -196,7 +225,7 @@ impl Hugr {
                 .ok();
         }
         // 3.5. Remove all nodes in r.s and edges between them.
-        for node in &r.s {
+        for node in &r.removal {
             self.graph.remove_node(node.index);
             self.hierarchy.remove(node.index);
         }
