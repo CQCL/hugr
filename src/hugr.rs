@@ -110,14 +110,24 @@ impl Hugr {
                 .collect::<Vec<NodeIndex>>();
         let n_sz = n_indices.len(); // number of replacement nodes including Input and Output
         let n_non_io_indices = &n_indices[1..n_sz - 1]; // omit Input and Output
+        for n_index in n_non_io_indices {
+            // 3.1.1. Check there are no const inputs.
+            if !r
+                .n
+                .get_optype((*n_index).into())
+                .signature()
+                .const_input
+                .is_empty()
+            {
+                return Err(SimpleReplacementError::InvalidReplacementNode());
+            }
+        }
         let self_input_node_index: NodeIndex = self.hierarchy.first(r.p.index).unwrap();
         let n_output_node_index: NodeIndex = n_indices[n_sz - 1];
         for n_index in n_non_io_indices {
+            // 3.1.2. Add the nodes.
             let op: &OpType = r.n.get_optype((*n_index).into());
             let sig = op.signature();
-            if !sig.const_input.is_empty() {
-                return Err(SimpleReplacementError::InvalidReplacementNode());
-            }
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
             // Make r.p the parent
