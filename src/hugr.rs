@@ -3,14 +3,14 @@
 mod hugrmut;
 pub mod view;
 
+pub mod replace;
 pub mod serialize;
 pub mod validate;
-pub mod replace;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
+pub use replace::{Rewrite, RewriteError, RewriteOp};
 pub use validate::ValidationError;
-pub use replace::{Rewrite, RewriteError};
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
@@ -75,29 +75,8 @@ impl Hugr {
     }
 
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
-        // Get the open graph for the rewrites, and a HUGR with the additional components.
-        let (rewrite, mut replacement, parents) = rewrite.into_parts();
-
-        // TODO: Use `parents` to update the hierarchy, and keep the internal hierarchy from `replacement`.
-        let _ = parents;
-
-        let node_inserted = |old, new| {
-            std::mem::swap(&mut self.op_types[new], &mut replacement.op_types[old]);
-            // TODO: metadata (Fn parameter ?)
-        };
-        rewrite.apply_with_callbacks(
-            &mut self.graph,
-            |_| {},
-            |_| {},
-            node_inserted,
-            |_, _| {},
-            |_, _| {},
-        )?;
-
-        // TODO: Check types
-
-        Ok(())
+    pub fn apply(&mut self, op: RewriteOp) -> Result<(), RewriteError> {
+        op.apply(self)
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side.
