@@ -5,10 +5,12 @@ pub mod view;
 
 pub mod serialize;
 pub mod validate;
+pub mod replace;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
 pub use validate::ValidationError;
+pub use replace::{Rewrite, RewriteError};
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
@@ -16,7 +18,6 @@ use thiserror::Error;
 
 pub use self::view::HugrView;
 use crate::ops::{ModuleOp, OpType};
-use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
 
 use html_escape::encode_text_to_string;

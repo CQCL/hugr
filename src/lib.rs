@@ -16,10 +16,8 @@ pub mod hugr;
 pub mod macros;
 pub mod ops;
 pub mod resource;
-pub mod rewrite;
 pub mod types;
 mod utils;
 
-pub use crate::hugr::{Direction, Hugr, Node, Port, Wire};
+pub use crate::hugr::{Direction, Hugr, Node, Port, Wire, Rewrite, RewriteError};
 pub use crate::resource::Resource;
-pub use crate::rewrite::{Rewrite, RewriteError};
