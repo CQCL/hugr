@@ -23,9 +23,6 @@ use crate::{hugr::HugrMut, Hugr};
 pub struct ModuleBuilder<T>(pub(super) T);
 
 impl<T: HugrMutRef> Container for ModuleBuilder<T> {
-    // TODO ModuleID
-    type ContainerHandle = ();
-
     #[inline]
     fn container_node(&self) -> Node {
         self.0.as_ref().root()
@@ -34,11 +31,6 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
         self.0.as_mut()
-    }
-
-    #[inline]
-    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
-        Ok(())
     }
 
     fn hugr(&self) -> &Hugr {
@@ -172,7 +164,7 @@ mod test {
     use crate::{
         builder::{
             test::{n_identity, NAT},
-            Dataflow,
+            Dataflow, DataflowSubContainer,
         },
         type_row,
     };

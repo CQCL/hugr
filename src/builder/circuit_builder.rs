@@ -148,7 +148,7 @@ mod test {
     use crate::{
         builder::{
             test::{build_main, BIT, F64, QB},
-            Dataflow, Wire,
+            Dataflow, DataflowSubContainer, Wire,
         },
         ops::LeafOp,
         type_row,

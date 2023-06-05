@@ -11,7 +11,9 @@ pub mod handle;
 pub use handle::BuildHandle;
 
 mod build_traits;
-pub use build_traits::{Container, Dataflow, HugrBuilder};
+pub use build_traits::{
+    Container, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
+};
 
 mod dataflow;
 pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
@@ -92,8 +94,8 @@ mod test {
     use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::HugrBuilder;
-    use super::{BuildError, Dataflow, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{BuildError, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
@@ -101,7 +103,7 @@ mod test {
     pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
     /// Wire up inputs of a Dataflow container to the outputs.
-    pub(super) fn n_identity<T: Dataflow>(
+    pub(super) fn n_identity<T: DataflowSubContainer>(
         dataflow_builder: T,
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();

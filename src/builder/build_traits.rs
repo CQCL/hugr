@@ -35,9 +35,6 @@ use crate::hugr::HugrMut;
 /// Implementations of this trait allow the child sibling graph to be added to
 /// the HUGR.
 pub trait Container {
-    /// A handle to the finished container node, typically returned when the
-    /// child graph has been finished.
-    type ContainerHandle;
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`HugrMut`] being used to build the HUGR.
@@ -71,10 +68,6 @@ pub trait Container {
 
         Ok((const_n, typ).into())
     }
-
-    /// Consume the container builder and return the handle, may perform some
-    /// checks before finishing.
-    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError>;
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
@@ -84,6 +77,15 @@ pub trait HugrBuilder: Container {
     fn finish_hugr(self) -> Result<Hugr, ValidationError>;
 }
 
+/// Type implementing this trait build a container graph region by borrowing a HUGR
+pub trait SubContainer: Container {
+    /// A handle to the finished container node, typically returned when the
+    /// child graph has been finished.
+    type ContainerHandle;
+    /// Consume the container builder and return the handle, may perform some
+    /// checks before finishing.
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError>;
+}
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
     /// Return indices of input and output nodes.
@@ -129,23 +131,6 @@ pub trait Dataflow: Container {
     ) -> Result<(), BuildError> {
         let [inp, out] = self.io();
         wire_up_inputs(output_wires.into_iter().collect_vec(), out, self, inp)
-    }
-
-    /// Set the outputs of the graph and consume the builder, while returning a
-    /// handle to the parent.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when setting outputs.
-    fn finish_with_outputs(
-        mut self,
-        outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Self::ContainerHandle, BuildError>
-    where
-        Self: Sized,
-    {
-        self.set_outputs(outputs)?;
-        self.finish_container()
     }
 
     /// Return an array of the input wires.
@@ -695,7 +680,12 @@ fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
     }
 }
 
-pub trait DataflowHugrBuilder: HugrBuilder + Dataflow {
+/// Trait implemented by builders of Dataflow Hugrs
+pub trait DataflowHugr: HugrBuilder + Dataflow {
+    /// Set outputs of dataflow HUGR and return HUGR
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when setting outputs.
     fn finish_hugr_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
@@ -708,4 +698,25 @@ pub trait DataflowHugrBuilder: HugrBuilder + Dataflow {
     }
 }
 
-impl<T: HugrBuilder + Dataflow> DataflowHugrBuilder for T {}
+/// Trait implemented by builders of Dataflow container regions of a HUGR
+pub trait DataflowSubContainer: SubContainer + Dataflow {
+    /// Set the outputs of the graph and consume the builder, while returning a
+    /// handle to the parent.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when setting outputs.
+    fn finish_with_outputs(
+        mut self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Self::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(outputs)?;
+        self.finish_sub_container()
+    }
+}
+
+impl<T: HugrBuilder + Dataflow> DataflowHugr for T {}
+impl<T: SubContainer + Dataflow> DataflowSubContainer for T {}

@@ -1,4 +1,4 @@
-use super::build_traits::HugrBuilder;
+use super::build_traits::{HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 
@@ -72,7 +72,6 @@ impl HugrBuilder for DFGBuilder<HugrMut> {
 }
 
 impl<T: HugrMutRef> Container for DFGBuilder<T> {
-    type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
@@ -82,14 +81,18 @@ impl<T: HugrMutRef> Container for DFGBuilder<T> {
     fn base(&mut self) -> &mut HugrMut {
         self.base.as_mut()
     }
-    #[inline]
-    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
-        Ok((self.dfg_node, self.num_out_wires).into())
-    }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
         self.base.as_ref().hugr()
+    }
+}
+
+impl SubContainer for DFGBuilder<&mut HugrMut> {
+    type ContainerHandle = BuildHandle<DfgID>;
+    #[inline]
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
+        Ok((self.dfg_node, self.num_out_wires).into())
     }
 }
 
@@ -121,9 +124,7 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<B, T> {
-    type ContainerHandle = T;
-
+impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.as_ref().unwrap().container_node()
@@ -138,14 +139,9 @@ impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<B, T> 
     fn hugr(&self) -> &Hugr {
         self.0.as_ref().unwrap().hugr()
     }
-    #[inline]
-    fn finish_container(mut self) -> Result<Self::ContainerHandle, BuildError> {
-        let dfg = self.0.take().expect("Already finished.");
-        dfg.finish_container().map(Into::into)
-    }
 }
 
-impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<B, T> {
+impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.0.as_ref().unwrap().io
@@ -157,12 +153,22 @@ impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<B, T> {
     }
 }
 
+impl<T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<&mut HugrMut, T> {
+    type ContainerHandle = T;
+
+    #[inline]
+    fn finish_sub_container(mut self) -> Result<Self::ContainerHandle, BuildError> {
+        let dfg = self.0.take().expect("Already finished.");
+        dfg.finish_sub_container().map(Into::into)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::build_traits::DataflowHugrBuilder;
-    use crate::builder::ModuleBuilder;
+    use crate::builder::build_traits::DataflowHugr;
+    use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::HugrView;
     use crate::{
         builder::{

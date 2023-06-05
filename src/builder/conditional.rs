@@ -4,6 +4,7 @@ use crate::types::Signature;
 use crate::ops::handle::CaseID;
 use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
 
+use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
 use super::HugrMutRef;
 use super::{
@@ -47,8 +48,6 @@ pub struct ConditionalBuilder<T> {
 }
 
 impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
-    type ContainerHandle = BuildHandle<ConditionalID>;
-
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node
@@ -63,8 +62,12 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
     fn hugr(&self) -> &Hugr {
         self.base.as_ref().hugr()
     }
+}
 
-    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
+impl SubContainer for ConditionalBuilder<&mut HugrMut> {
+    type ContainerHandle = BuildHandle<ConditionalID>;
+
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
         let cases: HashSet<usize> = self
             .case_nodes
             .iter()
@@ -81,7 +84,6 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-
 impl<B: HugrMutRef> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
@@ -137,7 +139,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::{HugrBuilder, ModuleBuilder};
+    use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::{
         builder::{
             test::{n_identity, NAT},
@@ -174,7 +176,7 @@ mod test {
                     n_identity(conditional_b.case_builder(0)?)?;
                     n_identity(conditional_b.case_builder(1)?)?;
 
-                    conditional_b.finish_container()?
+                    conditional_b.finish_sub_container()?
                 };
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?

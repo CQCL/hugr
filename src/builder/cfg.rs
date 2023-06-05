@@ -1,4 +1,5 @@
 use super::{
+    build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, HugrMutRef, Wire,
@@ -23,8 +24,6 @@ pub struct CFGBuilder<T> {
 }
 
 impl<B: HugrMutRef> Container for CFGBuilder<B> {
-    type ContainerHandle = BuildHandle<CfgID>;
-
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
@@ -39,9 +38,12 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     fn hugr(&self) -> &Hugr {
         self.base.as_ref().hugr()
     }
+}
 
+impl SubContainer for CFGBuilder<&mut HugrMut> {
+    type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
-    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
         Ok((self.cfg_node, self.n_out_wires).into())
     }
 }
@@ -211,26 +213,27 @@ impl<B: HugrMutRef> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
+}
+impl BlockBuilder<&mut HugrMut> {
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_container`).
     pub fn finish_with_outputs(
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<<BlockBuilder<B> as Container>::ContainerHandle, BuildError>
+    ) -> Result<<Self as SubContainer>::ContainerHandle, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(branch_wire, outputs)?;
-        self.finish_container()
+        self.finish_sub_container()
     }
 }
-
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
 
     use crate::builder::build_traits::HugrBuilder;
-    use crate::builder::ModuleBuilder;
+    use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
 
     use super::*;
@@ -249,7 +252,7 @@ mod test {
                         func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
                     build_basic_cfg(&mut cfg_builder)?;
 
-                    cfg_builder.finish_container()?
+                    cfg_builder.finish_sub_container()?
                 };
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?

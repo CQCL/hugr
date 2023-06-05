@@ -401,7 +401,8 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{
-        BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, HugrMutRef, ModuleBuilder,
+        BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder, HugrMutRef,
+        ModuleBuilder, SubContainer,
     };
     use crate::ops::{
         handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
@@ -450,7 +451,7 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish_container()?;
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
         let h = module_builder.finish_hugr()?;
@@ -500,7 +501,7 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish_container()?;
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
@@ -603,7 +604,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    fn n_identity<T: Dataflow>(
+    fn n_identity<T: DataflowSubContainer>(
         mut dataflow_builder: T,
         pred_const: &ConstID,
     ) -> Result<T::ContainerHandle, BuildError> {
@@ -714,7 +715,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let cfg_id = cfg_builder.finish_container()?;
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 

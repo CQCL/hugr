@@ -1,3 +1,4 @@
+use crate::hugr::HugrMut;
 use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
@@ -5,6 +6,7 @@ use crate::hugr::view::HugrView;
 use crate::types::TypeRow;
 use crate::Node;
 
+use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
 use super::HugrMutRef;
 use super::{
@@ -40,19 +42,6 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
-    /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
-    pub fn finish_with_outputs(
-        mut self,
-        out_variant: Wire,
-        rest: impl IntoIterator<Item = Wire>,
-    ) -> Result<<TailLoopBuilder<B> as Container>::ContainerHandle, BuildError>
-    where
-        Self: Sized,
-    {
-        self.set_outputs(out_variant, rest)?;
-        self.finish_container()
-    }
-
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
     /// that defines the signature of the TailLoop
     pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
@@ -76,6 +65,21 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     }
 }
 
+impl TailLoopBuilder<&mut HugrMut> {
+    /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
+    pub fn finish_with_outputs(
+        mut self,
+        out_variant: Wire,
+        rest: impl IntoIterator<Item = Wire>,
+    ) -> Result<<Self as SubContainer>::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(out_variant, rest)?;
+        self.finish_sub_container()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
@@ -83,7 +87,7 @@ mod test {
     use crate::{
         builder::{
             test::{BIT, NAT},
-            HugrBuilder, ModuleBuilder,
+            DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
         hugr::ValidationError,
         ops::ConstValue,
@@ -168,7 +172,7 @@ mod test {
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 
-                        conditional_b.finish_container()?
+                        conditional_b.finish_sub_container()?
                     };
 
                     loop_b.finish_with_outputs(conditional_id.out_wire(0), [])?
