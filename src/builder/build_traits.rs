@@ -60,7 +60,7 @@ pub trait Container {
 
     /// Consume the container builder and return the handle, may perform some
     /// checks before finishing.
-    fn finish(self) -> Result<Self::ContainerHandle, BuildError>;
+    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError>;
 }
 
 /// Trait for building dataflow regions of a HUGR.
@@ -124,7 +124,7 @@ pub trait Dataflow: Container {
         Self: Sized,
     {
         self.set_outputs(outputs)?;
-        self.finish()
+        self.finish_container()
     }
 
     /// Return an array of the input wires.

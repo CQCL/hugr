@@ -64,7 +64,7 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
         self.base.as_ref().hugr()
     }
 
-    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
         let cases: HashSet<usize> = self
             .case_nodes
             .iter()
@@ -175,12 +175,12 @@ mod test {
                     n_identity(conditional_b.case_builder(0)?)?;
                     n_identity(conditional_b.case_builder(1)?)?;
 
-                    conditional_b.finish()?
+                    conditional_b.finish_container()?
                 };
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 

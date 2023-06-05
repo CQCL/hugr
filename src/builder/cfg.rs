@@ -41,7 +41,7 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     }
 
     #[inline]
-    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
         Ok((self.cfg_node, self.n_out_wires).into())
     }
 }
@@ -178,7 +178,7 @@ impl<B: HugrMutRef> BlockBuilder<B> {
         Self: Sized,
     {
         self.set_outputs(branch_wire, outputs)?;
-        self.finish()
+        self.finish_container()
     }
 }
 
@@ -229,12 +229,12 @@ mod test {
                     cfg_builder.branch(&middle, 0, &exit)?;
                     cfg_builder.branch(&entry, 1, &exit)?;
 
-                    cfg_builder.finish()?
+                    cfg_builder.finish_container()?
                 };
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 

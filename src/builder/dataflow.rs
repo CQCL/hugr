@@ -78,7 +78,7 @@ impl<T: HugrMutRef> Container for DFGBuilder<T> {
         self.base.as_mut()
     }
     #[inline]
-    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
         Ok((self.dfg_node, self.num_out_wires).into())
     }
 
@@ -134,9 +134,9 @@ impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Container for DFGWrapper<B, T> 
         self.0.as_ref().unwrap().hugr()
     }
     #[inline]
-    fn finish(mut self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_container(mut self) -> Result<Self::ContainerHandle, BuildError> {
         let dfg = self.0.take().expect("Already finished.");
-        dfg.finish().map(Into::into)
+        dfg.finish_container().map(Into::into)
     }
 }
 
@@ -193,7 +193,7 @@ mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 
@@ -220,7 +220,7 @@ mod test {
 
             f(f_build)?;
 
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
@@ -271,7 +271,7 @@ mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 
@@ -299,7 +299,7 @@ mod test {
 
             f_build.finish_with_outputs([nested.out_wire(0)])?;
 
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 

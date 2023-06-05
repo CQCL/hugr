@@ -36,7 +36,7 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     }
 
     #[inline]
-    fn finish(self) -> Result<Self::ContainerHandle, BuildError> {
+    fn finish_container(self) -> Result<Self::ContainerHandle, BuildError> {
         Ok(())
     }
 

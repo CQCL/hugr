@@ -165,7 +165,7 @@ mod test {
         let f_builder = module_builder.declare_and_def("main", signature)?;
 
         f(f_builder)?;
-        module_builder.finish()?;
+        module_builder.finish_container()?;
         builder.finish()
     }
 }

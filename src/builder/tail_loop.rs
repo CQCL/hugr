@@ -50,7 +50,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         Self: Sized,
     {
         self.set_outputs(out_variant, rest)?;
-        self.finish()
+        self.finish_container()
     }
 
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
@@ -117,7 +117,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 
@@ -169,7 +169,7 @@ mod test {
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 
-                        conditional_b.finish()?
+                        conditional_b.finish_container()?
                     };
 
                     loop_b.finish_with_outputs(conditional_id.out_wire(0), [])?
@@ -177,7 +177,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish()?;
+            module_builder.finish_container()?;
             builder.finish()
         };
 
