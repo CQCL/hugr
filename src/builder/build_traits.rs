@@ -12,7 +12,7 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, LeafOp, ModuleOp, OpType},
+    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType},
     types::{ClassicType, EdgeKind},
 };
 
@@ -201,21 +201,7 @@ pub trait Dataflow: Container {
             }),
             input_wires,
         )?;
-
-        let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
-            cfg_outputs: output_types.clone(),
-        });
-        let exit_node = self.base().add_op_with_parent(cfg_node, exit_block_type)?;
-        let n_out_wires = output_types.len();
-        let cfg_builder = CFGBuilder {
-            base: self.base(),
-            cfg_node,
-            n_out_wires,
-            exit_node,
-            inputs: Some(inputs),
-        };
-
-        Ok(cfg_builder)
+        CFGBuilder::create(self.base(), cfg_node, inputs, output_types)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.

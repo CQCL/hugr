@@ -4,7 +4,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrMutRef, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
+use crate::{hugr::view::HugrView, ops::ControlFlowOp, type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};
@@ -46,7 +46,42 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     }
 }
 
+impl CFGBuilder<HugrMut> {
+    /// New CFG rooted HUGR builder
+    pub fn new(input: TypeRow, output: TypeRow) -> Result<Self, BuildError> {
+        let cfg_op = ControlFlowOp::CFG {
+            inputs: input.clone(),
+            outputs: output.clone(),
+        };
+
+        let base = HugrMut::new(cfg_op);
+        let cfg_node = base.root();
+        CFGBuilder::create(base, cfg_node, input, output)
+    }
+}
+
 impl<B: HugrMutRef> CFGBuilder<B> {
+    pub(super) fn create(
+        mut base: B,
+        cfg_node: Node,
+        input: TypeRow,
+        output: TypeRow,
+    ) -> Result<Self, BuildError> {
+        let n_out_wires = output.len();
+        let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
+            cfg_outputs: output,
+        });
+        let exit_node = base
+            .as_mut()
+            .add_op_with_parent(cfg_node, exit_block_type)?;
+        Ok(Self {
+            base,
+            cfg_node,
+            n_out_wires,
+            exit_node,
+            inputs: Some(input),
+        })
+    }
     /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
