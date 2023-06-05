@@ -33,7 +33,7 @@ pub struct MultiPortGraph {
     subport_count: usize,
 }
 
-/// Index of a multi port within a `PortGraph`.
+/// Index of a multi port within a `MultiPortGraph`.
 ///
 /// Note that the offsets of the subport indices are not guaranteed to be
 /// contiguous nor well-ordered. They are not invalidated by adding or removing
@@ -77,9 +77,9 @@ impl MultiPortGraph {
     /// # Example
     ///
     /// ```
-    /// # use portgraph::PortGraph;
-    /// # use portgraph::Direction;
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::MultiPortGraph;
+    /// # use hugr::Direction;
+    /// let mut g = MultiPortGraph::new();
     /// let node = g.add_node(4, 3);
     /// assert_eq!(g.inputs(node).count(), 4);
     /// assert_eq!(g.outputs(node).count(), 3);
@@ -95,28 +95,20 @@ impl MultiPortGraph {
     /// # Example
     ///
     /// ```
-    /// # use portgraph::PortGraph;
-    /// # use portgraph::Direction;
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::MultiPortGraph;
+    /// # use hugr::Direction;
+    /// let mut g = MultiPortGraph::new();
     /// let node0 = g.add_node(1, 1);
     /// let node1 = g.add_node(1, 1);
     /// g.link_ports(g.outputs(node0).nth(0).unwrap(), g.inputs(node1).nth(0).unwrap());
     /// g.link_ports(g.outputs(node1).nth(0).unwrap(), g.inputs(node0).nth(0).unwrap());
     /// g.remove_node(node0);
     /// assert!(!g.contains_node(node0));
-    /// assert!(g.port_link(g.outputs(node1).nth(0).unwrap()).is_none());
-    /// assert!(g.port_link(g.inputs(node1).nth(0).unwrap()).is_none());
     /// ```
     pub fn remove_node(&mut self, node: NodeIndex) {
         for port in self.graph.all_ports(node) {
             if *self.multiport.get(port) {
-                self.multiport.set(port, false);
-                let link = self
-                    .graph
-                    .port_link(port)
-                    .expect("MultiPortGraph error: a port marked as multiport has no link.");
-                let copy_node = self.graph.port_node(link).unwrap();
-                self.remove_copy_node(copy_node, link);
+                self.unlink_port(port);
             }
         }
         self.graph.remove_node(node);
@@ -127,16 +119,14 @@ impl MultiPortGraph {
     /// # Example
     ///
     /// ```
-    /// # use portgraph::PortGraph;
-    /// # use portgraph::Direction;
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::MultiPortGraph;
+    /// # use hugr::Direction;
+    /// let mut g = MultiPortGraph::new();
     /// let node0 = g.add_node(0, 1);
     /// let node1 = g.add_node(1, 0);
     /// let node0_output = g.output(node0, 0).unwrap();
     /// let node1_input = g.input(node1, 0).unwrap();
     /// g.link_ports(node0_output, node1_input).unwrap();
-    /// assert_eq!(g.port_link(node0_output), Some(node1_input));
-    /// assert_eq!(g.port_link(node1_input), Some(node0_output));
     /// ```
     ///
     /// # Errors
@@ -268,7 +258,7 @@ impl MultiPortGraph {
 
     /// Returns the input port at the given offset in the `node`.
     ///
-    /// Shorthand for [`PortGraph::port_index`].
+    /// Shorthand for [`MultiPortGraph::port_index`].
     #[inline]
     pub fn input(&self, node: NodeIndex, offset: usize) -> Option<PortIndex> {
         self.graph.input(node, offset)
@@ -276,7 +266,7 @@ impl MultiPortGraph {
 
     /// Returns the output port at the given offset in the `node`.
     ///
-    /// Shorthand for [`PortGraph::ports`].
+    /// Shorthand for [`MultiPortGraph::ports`].
     #[inline]
     pub fn output(&self, node: NodeIndex, offset: usize) -> Option<PortIndex> {
         self.graph.output(node, offset)
@@ -284,7 +274,7 @@ impl MultiPortGraph {
 
     /// Iterates over all the input ports of the `node`.
     ///
-    /// Shorthand for [`PortGraph::ports`].
+    /// Shorthand for [`MultiPortGraph::ports`].
     #[inline]
     pub fn inputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.inputs(node)
@@ -292,7 +282,7 @@ impl MultiPortGraph {
 
     /// Iterates over all the output ports of the `node`.
     ///
-    /// Shorthand for [`PortGraph::ports`].
+    /// Shorthand for [`MultiPortGraph::ports`].
     #[inline]
     pub fn outputs(&self, node: NodeIndex) -> NodePorts {
         self.graph.outputs(node)
@@ -464,8 +454,6 @@ impl MultiPortGraph {
     /// Shrinks the underlying buffers to the fit the data.
     ///
     /// This does not move nodes or ports, which might prevent freeing up more capacity.
-    /// To shrink the buffers as much as possible, call [`PortGraph::compact_nodes`] and
-    /// [`PortGraph::compact_ports`] first.
     pub fn shrink_to_fit(&mut self) {
         self.graph.shrink_to_fit();
         self.multiport.shrink_to_fit();
@@ -478,6 +466,7 @@ impl MultiPortGraph {
     /// Remove an internal copy node.
     fn remove_copy_node(&mut self, copy_node: NodeIndex, from: PortIndex) {
         let dir = self.port_direction(from).unwrap();
+        debug_assert!(self.copy_node.get(copy_node));
         let mut subports = self.graph.ports(copy_node, dir.reverse());
         self.multiport.set(from, false);
         self.copy_node.set(copy_node, false);
@@ -590,7 +579,6 @@ impl MultiPortGraph {
     }
 
     /// Returns the PortIndex from the main node that connects to this copy node.
-    #[inline]
     fn copy_node_main_port(&self, copy_node: NodeIndex) -> Option<PortIndex> {
         debug_assert!(self.copy_node.get(copy_node));
         let mut incoming = self.graph.inputs(copy_node);
@@ -650,7 +638,7 @@ impl MultiPortGraph {
     /// If the port is not a multiport, returns the port index in the operation node.
     fn get_subport_index(&self, subport: SubportIndex) -> Option<PortIndex> {
         let port_index = subport.port();
-        if self.is_multiport(subport.port()) {
+        if self.is_multiport(port_index) {
             let copy_node = self.get_copy_node(port_index)?;
             let dir = self.graph.port_direction(port_index)?;
             let subport_offset = portgraph::PortOffset::new(dir, subport.offset());
@@ -750,7 +738,7 @@ pub mod test {
         let node1_input = g.input(node1, 0).unwrap();
         assert_eq!(g.link_count(), 0);
 
-        // Link the same ports twice
+        // Link the same ports thrice
         let (from0, to0) = g.link_ports(node0_output, node1_input).unwrap();
         let (from1, to1) = g.link_ports(node0_output, node1_input).unwrap();
         let (from2, to2) = g.link_ports(node0_output, node1_input).unwrap();
