@@ -133,6 +133,7 @@ impl Hugr {
             index_map.insert(n_node.index, new_node_index);
         }
         // 3.2. Add edges between all newly added nodes matching those in n_dfg_node.
+        // TODO This will probably change when implicit copies are implemented.
         for &n_node in n_non_io_nodes {
             let new_node_index = index_map.get(&n_node.index).unwrap();
             for n_node_succ in r.n.output_neighbours(n_node) {
