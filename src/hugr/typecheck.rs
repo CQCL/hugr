@@ -52,7 +52,10 @@ impl Display for TypeError {
                 format!("Const int {} too large for type I{}", val, width)
             }
             TypeError::IntTypeTooLarge(w) => format!("Int type too large: I{}", w),
-            TypeError::IntWidthMismatch(exp, act) => format!("Type mismatch for int: expected I{}, but found I{}", exp, act),
+            TypeError::IntWidthMismatch(exp, act) => format!(
+                "Type mismatch for int: expected I{}, but found I{}",
+                exp, act
+            ),
             TypeError::ConstCantBeVar => "Type of a const value can't be Var".to_string(),
             TypeError::TupleWrongLength => "Tuple of wrong length".to_string(),
             TypeError::LinearTypeDisallowed => {

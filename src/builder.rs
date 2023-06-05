@@ -2,7 +2,7 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{typecheck::TypeError, HugrError, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::LinearType;
 
@@ -65,10 +65,6 @@ pub enum BuildError {
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit_builder::CircuitBuildError),
-
-    /// Type error for constant values
-    #[error("Type error for constant value: {0}.")]
-    ConstTypeError(#[from] TypeError),
 }
 
 #[cfg(test)]
@@ -81,7 +77,6 @@ mod test {
     use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    pub(super) const I2: SimpleType = SimpleType::Classic(ClassicType::Int(2));
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
     pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);

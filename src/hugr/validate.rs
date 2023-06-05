@@ -7,6 +7,7 @@ use itertools::Itertools;
 use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
 use thiserror::Error;
 
+use crate::hugr::typecheck::{typecheck_const, TypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
