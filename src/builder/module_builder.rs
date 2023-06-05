@@ -1,4 +1,5 @@
 use super::{
+    build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
     BuildError, Container, HugrMutRef,
 };
@@ -46,9 +47,19 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
 }
 
 impl ModuleBuilder<HugrMut> {
-    fn new() -> Self {
+    /// Begin building a new module.
+    pub fn new() -> Self {
         Self(HugrMut::new_module())
     }
+}
+
+impl Default for ModuleBuilder<HugrMut> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HugrBuilder for ModuleBuilder<HugrMut> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.0.finish()
     }
@@ -174,7 +185,7 @@ mod test {
     use crate::{
         builder::{
             test::{n_identity, NAT},
-            Dataflow, HugrBuilder,
+            Dataflow,
         },
         type_row,
     };

@@ -168,7 +168,7 @@ impl<B: HugrMutRef> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
-    /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish`).
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_container`).
     pub fn finish_with_outputs(
         mut self,
         branch_wire: Wire,
@@ -184,7 +184,8 @@ impl<B: HugrMutRef> BlockBuilder<B> {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::HugrBuilder;
+    use crate::builder::build_traits::HugrBuilder;
+    use crate::builder::ModuleBuilder;
     use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
 
     use super::*;
@@ -193,8 +194,7 @@ mod test {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
 
         let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
             let main =
                 module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
             let s1 = module_builder.constant(ConstValue::simple_unary_predicate())?;
@@ -234,8 +234,7 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_container()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
 
         assert_eq!(build_result.err(), None);

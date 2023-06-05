@@ -83,19 +83,20 @@ mod test {
     use crate::{
         builder::{
             test::{BIT, NAT},
-            HugrBuilder,
+            HugrBuilder, ModuleBuilder,
         },
+        hugr::ValidationError,
         ops::ConstValue,
         type_row,
         types::Signature,
+        Hugr,
     };
 
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
-        let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+        let build_result: Result<Hugr, ValidationError> = {
+            let mut module_builder = ModuleBuilder::new();
             let main = module_builder.declare(
                 "main",
                 Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
@@ -117,8 +118,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_container()?;
-            builder.finish()
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_matches!(build_result, Ok(_));
@@ -128,8 +128,7 @@ mod test {
     #[test]
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 
@@ -177,8 +176,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_container()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

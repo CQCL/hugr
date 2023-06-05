@@ -1,3 +1,4 @@
+use super::build_traits::HugrBuilder;
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 
@@ -48,6 +49,7 @@ impl<T: HugrMutRef> DFGBuilder<T> {
     }
 }
 impl DFGBuilder<HugrMut> {
+    /// Begin building a new DFG rooted HUGR.
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
@@ -61,6 +63,9 @@ impl DFGBuilder<HugrMut> {
         let root = base.hugr().root();
         DFGBuilder::create_with_io(base, root, input, output)
     }
+}
+
+impl HugrBuilder for DFGBuilder<HugrMut> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.base.finish()
     }
@@ -156,7 +161,8 @@ impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> Dataflow for DFGWrapper<B, T> {
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::HugrBuilder;
+    use crate::builder::build_traits::DataflowHugrBuilder;
+    use crate::builder::ModuleBuilder;
     use crate::hugr::HugrView;
     use crate::{
         builder::{
@@ -172,8 +178,7 @@ mod test {
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
 
             let _f_id = {
                 let mut func_builder = module_builder.declare_and_def(
@@ -193,8 +198,7 @@ mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish_container()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
 
         assert_eq!(build_result.err(), None);
@@ -210,8 +214,7 @@ mod test {
         ) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
 
             let f_build = module_builder.declare_and_def(
                 "main",
@@ -220,8 +223,7 @@ mod test {
 
             f(f_build)?;
 
-            module_builder.finish_container()?;
-            builder.finish()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -262,8 +264,7 @@ mod test {
     #[test]
     fn copy_insertion_qubit() {
         let builder = || {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+            let mut module_builder = ModuleBuilder::new();
 
             let f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
@@ -271,8 +272,7 @@ mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            module_builder.finish_container()?;
-            builder.finish()
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_eq!(builder(), Err(BuildError::NoCopyLinear(LinearType::Qubit)));
@@ -280,9 +280,8 @@ mod test {
 
     #[test]
     fn simple_inter_graph_edge() {
-        let builder = || {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+        let builder = || -> Result<Hugr, BuildError> {
+            let mut module_builder = ModuleBuilder::new();
 
             let mut f_build = module_builder
                 .declare_and_def("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
@@ -299,8 +298,7 @@ mod test {
 
             f_build.finish_with_outputs([nested.out_wire(0)])?;
 
-            module_builder.finish_container()?;
-            builder.finish()
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_matches!(builder(), Ok(_));
@@ -308,11 +306,11 @@ mod test {
 
     #[test]
     fn dfg_hugr() -> Result<(), BuildError> {
-        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
 
-        dfg_builder.set_outputs(dfg_builder.input_wires())?;
+        let [i1] = dfg_builder.input_wires_arr();
+        let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
-        let hugr = dfg_builder.finish_hugr()?;
         assert_eq!(hugr.node_count(), 3);
         assert_matches!(hugr.root_type(), OpType::Dataflow(DataflowOp::DFG { .. }));
 

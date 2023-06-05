@@ -63,6 +63,13 @@ pub trait Container {
     fn finish_container(self) -> Result<Self::ContainerHandle, BuildError>;
 }
 
+/// Types implementing this trait can be used to build complete HUGRs
+/// (with varying root node types)
+pub trait HugrBuilder: Container {
+    /// Finish building the HUGR, perform any validation checks and return it.
+    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+}
+
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
     /// Return indices of input and output nodes.
@@ -655,3 +662,18 @@ fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
         None
     }
 }
+
+pub trait DataflowHugrBuilder: HugrBuilder + Dataflow {
+    fn finish_hugr_with_outputs(
+        mut self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(outputs)?;
+        Ok(self.finish_hugr()?)
+    }
+}
+
+impl<T: HugrBuilder + Dataflow> DataflowHugrBuilder for T {}

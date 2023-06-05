@@ -137,7 +137,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::HugrBuilder;
+    use crate::builder::{HugrBuilder, ModuleBuilder};
     use crate::{
         builder::{
             test::{n_identity, NAT},
@@ -151,9 +151,8 @@ mod test {
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
-        let build_result = {
-            let mut builder = HugrBuilder::new();
-            let mut module_builder = builder.module_hugr_builder();
+        let build_result: Result<Hugr, BuildError> = {
+            let mut module_builder = ModuleBuilder::new();
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
             let tru_const = module_builder.constant(ConstValue::true_val())?;
@@ -180,8 +179,7 @@ mod test {
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            module_builder.finish_container()?;
-            builder.finish()
+            Ok(module_builder.finish_hugr()?)
         };
 
         assert_matches!(build_result, Ok(_));
