@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
+use itertools::Itertools;
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
@@ -104,29 +105,24 @@ impl Hugr {
         // 3.1. Add copies of all children of n_dfg_node to self. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in r.n) to new NodeIndex (in self).
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
-        let n_indices =
+        let n_nodes =
             r.n.hierarchy
                 .children(n_dfg_node.index)
-                .collect::<Vec<NodeIndex>>();
-        let n_sz = n_indices.len(); // number of replacement nodes including Input and Output
-        let n_non_io_indices = &n_indices[1..n_sz - 1]; // omit Input and Output
-        for &n_index in n_non_io_indices {
+                .map_into::<Node>()
+                .collect::<Vec<Node>>();
+        let n_sz = n_nodes.len(); // number of replacement nodes including Input and Output
+        let n_non_io_nodes = &n_nodes[1..n_sz - 1]; // omit Input and Output
+        for &n_node in n_non_io_nodes {
             // 3.1.1. Check there are no const inputs.
-            if !r
-                .n
-                .get_optype((n_index).into())
-                .signature()
-                .const_input
-                .is_empty()
-            {
+            if !r.n.get_optype(n_node).signature().const_input.is_empty() {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
         let self_input_node_index: NodeIndex = self.hierarchy.first(r.p.index).unwrap();
-        let n_output_node_index: NodeIndex = n_indices[n_sz - 1];
-        for &n_index in n_non_io_indices {
+        let n_output_node = n_nodes[n_sz - 1];
+        for &n_node in n_non_io_nodes {
             // 3.1.2. Add the nodes.
-            let op: &OpType = r.n.get_optype((n_index).into());
+            let op: &OpType = r.n.get_optype(n_node);
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
@@ -134,16 +130,15 @@ impl Hugr {
             self.hierarchy
                 .insert_after(new_node_index, self_input_node_index)
                 .ok();
-            index_map.insert(n_index, new_node_index);
+            index_map.insert(n_node.index, new_node_index);
         }
         // 3.2. Add edges between all newly added nodes matching those in n_dfg_node.
-        for &n_index in n_non_io_indices {
-            let n_node = Node { index: n_index };
-            let new_node_index = index_map.get(&n_index).unwrap();
+        for &n_node in n_non_io_nodes {
+            let new_node_index = index_map.get(&n_node.index).unwrap();
             for n_node_succ in r.n.output_neighbours(n_node) {
                 if r.n.get_optype(n_node_succ).tag() != OpTag::Output {
                     let new_node_succ_index = index_map.get(&n_node_succ.index).unwrap();
-                    for connection in r.n.graph.get_connections(n_index, n_node_succ.index) {
+                    for connection in r.n.graph.get_connections(n_node.index, n_node_succ.index) {
                         let src_offset = r.n.graph.port_offset(connection.0).unwrap().index();
                         let tgt_offset = r.n.graph.port_offset(connection.1).unwrap().index();
                         self.graph
@@ -184,7 +179,7 @@ impl Hugr {
                 .unwrap();
             let n_out_portindex =
                 r.n.graph
-                    .port_index(n_output_node_index, n_out_port.offset)
+                    .port_index(n_output_node.index, n_out_port.offset)
                     .unwrap();
             let n_preexit_portindex = r.n.graph.port_link(n_out_portindex).unwrap();
             let n_preexit_nodeindex = r.n.graph.port_node(n_preexit_portindex).unwrap();
