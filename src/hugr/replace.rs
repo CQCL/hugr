@@ -1,9 +1,9 @@
 //! Rewrite operations on the HUGR.
 
 #[allow(clippy::module_inception)] // TODO: Rename?
-pub mod rewrite;
+pub mod replace;
 use crate::Hugr;
-pub use rewrite::{OpenHugr, Rewrite, RewriteError};
+pub use replace::{OpenHugr, Rewrite, RewriteError};
 
 /// An operation that can be applied to mutate a Hugr
 pub trait RewriteOp<E> {
