@@ -11,8 +11,9 @@ use thiserror::Error;
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, ModuleOp, OpType};
-use crate::types::{ClassicType, EdgeKind, SimpleType};
+use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::resource::ResourceSet;
+use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::view::HugrView;
@@ -26,6 +27,7 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
+    resources: HashMap<PortIndex, ResourceSet>,
 }
 
 impl Hugr {
@@ -42,6 +44,7 @@ impl<'a> ValidationContext<'a> {
         Self {
             hugr,
             dominators: HashMap::new(),
+            resources: HashMap::new(),
         }
     }
 
