@@ -158,6 +158,23 @@ mod test {
         dfg_builder.finish_hugr_with_outputs(wire45.outputs())
     }
 
+    /// Creates a hugr with a DFG root like the following:
+    /// ─────
+    /// ┌───┐
+    /// ┤ H ├
+    /// └───┘
+    fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
+        let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
+        let [wire0, wire1] = dfg_builder.input_wires_arr();
+        let wire2 = dfg_builder.add_dataflow_op(
+            OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
+            vec![wire1],
+        )?;
+        let wire2out = wire2.outputs().exactly_one().ok().unwrap();
+        let wireoutvec = vec![wire0, wire2out];
+        dfg_builder.finish_hugr_with_outputs(wireoutvec)
+    }
+
     #[test]
     /// Replace the
     ///      ┌───┐
@@ -261,6 +278,101 @@ mod test {
         // ┤ H ├┤ H ├──■──
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
+        // └───┘└───┘└───┘
+        // crate::utils::test::viz_dotstr(&h.dot_string());
+        assert_eq!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Replace the
+    ///
+    /// ──■──
+    /// ┌─┴─┐
+    /// ┤ X ├
+    /// └───┘
+    /// part of
+    /// ┌───┐     ┌───┐
+    /// ┤ H ├──■──┤ H ├
+    /// ├───┤┌─┴─┐├───┤
+    /// ┤ H ├┤ X ├┤ H ├
+    /// └───┘└───┘└───┘
+    /// with
+    /// ─────
+    /// ┌───┐
+    /// ┤ H ├
+    /// └───┘
+    fn test_simple_replacement_with_empty_wires() {
+        let mut h: Hugr = make_hugr().ok().unwrap();
+        // 1. Find the DFG node for the inner circuit
+        let p: Node = h
+            .nodes()
+            .find(|node: &Node| h.get_optype(*node).tag() == OpTag::Dfg)
+            .unwrap();
+        // 2. Locate the CX in h
+        let h_node_cx: Node = h
+            .nodes()
+            .find(|node: &Node| {
+                *h.get_optype(*node) == OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::CX })
+            })
+            .unwrap();
+        let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
+        // 3. Construct a new DFG-rooted hugr for the replacement
+        let n: Hugr = make_dfg_hugr2().ok().unwrap();
+        // crate::utils::test::viz_dotstr(&n.dot_string());
+        // 4. Construct the input and output matchings
+        // 4.1. Locate the Output and its predecessor H in n
+        let n_node_output = n
+            .nodes()
+            .find(|node: &Node| n.get_optype(*node).tag() == OpTag::Output)
+            .unwrap();
+        let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
+        // 4.2. Locate the ports we need to specify as "glue" in n
+        let (n_port_0, n_port_1) = n
+            .node_ports(n_node_output, Direction::Incoming)
+            .collect_tuple()
+            .unwrap();
+        let n_port_2 = n
+            .node_ports(n_node_h, Direction::Incoming)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        // 4.3. Locate the ports we need to specify as "glue" in h
+        let (h_port_0, h_port_1) = h
+            .node_ports(h_node_cx, Direction::Incoming)
+            .collect_tuple()
+            .unwrap();
+        let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
+        let h_port_2 = h
+            .node_ports(h_node_h0, Direction::Incoming)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let h_port_3 = h
+            .node_ports(h_node_h1, Direction::Incoming)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        // 4.4. Construct the maps
+        let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
+        let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
+        nu_inp.insert((n_node_output, n_port_0), (h_node_cx, h_port_0));
+        nu_inp.insert((n_node_h, n_port_2), (h_node_cx, h_port_1));
+        nu_out.insert((h_node_h0, h_port_2), n_port_0);
+        nu_out.insert((h_node_h1, h_port_3), n_port_1);
+        // 5. Define the replacement
+        let r = SimpleReplacement {
+            region: p,
+            removal: s,
+            replacement: n,
+            nu_inp,
+            nu_out,
+        };
+        h.apply_simple_replacement(r).ok();
+        // Expect [DFG] to be replaced with:
+        // ┌───┐┌───┐
+        // ┤ H ├┤ H ├
+        // ├───┤├───┤┌───┐
+        // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
         // crate::utils::test::viz_dotstr(&h.dot_string());
         assert_eq!(h.validate(), Ok(()));
