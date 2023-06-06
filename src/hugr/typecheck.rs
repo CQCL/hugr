@@ -10,6 +10,10 @@ use crate::types::{ClassicType, Container};
 
 use std::fmt::{self, Display};
 
+use cgmath::num_traits::Signed;
+use num_bigint::BigInt;
+use num_traits::pow::Pow;
+
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum TypeError {
@@ -20,7 +24,7 @@ pub enum TypeError {
     Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
-    IntTooLarge(u32, isize),
+    IntTooLarge(usize, isize),
     /// Width (n) of an `I<n>` type doesn't fit into a u32
     IntTypeTooLarge(usize),
     /// Expected width (packed with const int) doesn't match type
@@ -77,22 +81,20 @@ impl Display for TypeError {
 /// a const node
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeError> {
     match (typ, val) {
-        // Const int widths are here being limited to the range of u32, but if
-        // the width is larger than u6, our const type (which takes an i64 arg)
+        // N.B. If the width is larger than u6, our const value (backed by an i64)
         // wont be able to accomodate the value anyway.
-        // N.B. This diverges from the spec, which allows arbitrary ints as constants
-        (ClassicType::Int(exp_width), ConstValue::Int { value, width }) => if exp_width == width {
-            match u32::try_from(*width) {
-                Ok(width) => if isize::abs(*value as isize) < isize::pow(2, width as u32) {
+        (ClassicType::Int(exp_width), ConstValue::Int { value, width }) => {
+            if exp_width == width {
+                let max_value = BigInt::from(2).pow(*width);
+                if BigInt::from(*value).abs() < max_value {
                     Ok(())
                 } else {
-                    Err(TypeError::IntTooLarge(width, *value as isize))
-                },
-                _ => Err(TypeError::IntTypeTooLarge(*width))
+                    Err(TypeError::IntTooLarge(*width, *value as isize))
+                }
+            } else {
+                Err(TypeError::IntWidthMismatch(*exp_width, *width))
             }
-        } else {
-            Err(TypeError::IntWidthMismatch(*exp_width, *width))
-        },
+        }
         (ty @ ClassicType::F64, _) => Err(TypeError::Unimplemented(ty.clone())),
         (ty @ ClassicType::Container(c), tm) => match (c, tm) {
             (Container::Tuple(row), ConstValue::Tuple(xs)) => {
