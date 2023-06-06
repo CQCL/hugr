@@ -103,7 +103,7 @@ pub enum ClassicType {
     /// A type variable identified by a name.
     Variable(SmolStr),
     /// An arbitrary size integer.
-    Int(usize),
+    Int(u8),
     /// A 64-bit floating point number.
     F64,
     /// An arbitrary length string.
@@ -126,7 +126,7 @@ impl ClassicType {
 
     /// Returns a new integer type with the given number of bits.
     #[inline]
-    pub const fn int<const N: usize>() -> Self {
+    pub const fn int<const N: u8>() -> Self {
         Self::Int(N)
     }
 

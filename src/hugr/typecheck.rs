@@ -10,10 +10,6 @@ use crate::types::{ClassicType, Container};
 
 use std::fmt::{self, Display};
 
-use cgmath::num_traits::Signed;
-use num_bigint::BigInt;
-use num_traits::pow::Pow;
-
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum TypeError {
@@ -24,11 +20,13 @@ pub enum TypeError {
     Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
-    IntTooLarge(usize, isize),
+    IntTooLarge(u8, u128),
     /// Width (n) of an `I<n>` type doesn't fit into a u32
-    IntTypeTooLarge(usize),
+    IntWidthTooLarge(u8),
+    /// The width of an integer type wasn't a power of 2
+    IntWidthInvalid(u8),
     /// Expected width (packed with const int) doesn't match type
-    IntWidthMismatch(usize, usize),
+    IntWidthMismatch(u8, u8),
     /// Found a Var type constructor when we're checking a const val
     ConstCantBeVar,
     /// The length of the tuple value doesn't match the length of the tuple type
@@ -55,7 +53,13 @@ impl Display for TypeError {
             TypeError::IntTooLarge(width, val) => {
                 format!("Const int {} too large for type I{}", val, width)
             }
-            TypeError::IntTypeTooLarge(w) => format!("Int type too large: I{}", w),
+            TypeError::IntWidthTooLarge(w) => format!("Int type too large: I{}", w),
+            TypeError::IntWidthInvalid(w) => {
+                format!(
+                    "The int type I{} is invalid, because {} is not a power of 2",
+                    w, w
+                )
+            }
             TypeError::IntWidthMismatch(exp, act) => format!(
                 "Type mismatch for int: expected I{}, but found I{}",
                 exp, act
@@ -77,6 +81,20 @@ impl Display for TypeError {
     }
 }
 
+/// Per the spec, valid widths for integers are 2^n for all n in [0,7]
+fn check_valid_width(width: u8) -> Result<(), TypeError> {
+    if width > 128 {
+        return Err(TypeError::IntWidthTooLarge(width));
+    }
+
+    let valid_widths: Vec<u8> = (0..8).map(|a| u8::pow(2, a)).collect();
+    if valid_widths.contains(&width) {
+        Ok(())
+    } else {
+        Err(TypeError::IntWidthInvalid(width))
+    }
+}
+
 /// Typecheck a constant value - for ensuring that it's valid before creating
 /// a const node
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeError> {
@@ -84,12 +102,16 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeEr
         // N.B. If the width is larger than u6, our const value (backed by an i64)
         // wont be able to accomodate the value anyway.
         (ClassicType::Int(exp_width), ConstValue::Int { value, width }) => {
+            // Check that the types make sense
+            check_valid_width(*exp_width)?;
+            check_valid_width(*width)?;
+            // Check that the terms make sense against the types
             if exp_width == width {
-                let max_value = BigInt::from(2).pow(*width);
-                if BigInt::from(*value).abs() < max_value {
+                let max_value = u128::pow(2, *width as u32);
+                if value < &max_value {
                     Ok(())
                 } else {
-                    Err(TypeError::IntTooLarge(*width, *value as isize))
+                    Err(TypeError::IntTooLarge(*width, *value))
                 }
             } else {
                 Err(TypeError::IntWidthMismatch(*exp_width, *width))

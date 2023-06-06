@@ -115,7 +115,7 @@ impl ModuleOp {
 #[allow(missing_docs)]
 pub enum ConstValue {
     /// An arbitrary length integer constant.
-    Int { value: i64, width: usize },
+    Int { value: u128, width: u8 },
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
@@ -250,7 +250,10 @@ impl ConstValue {
 
     /// New 64 bit integer constant
     pub fn i64(value: i64) -> Self {
-        Self::Int { value, width: 64 }
+        Self::Int {
+            value: value as u128,
+            width: 64,
+        }
     }
 }
 
