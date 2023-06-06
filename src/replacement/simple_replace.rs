@@ -60,7 +60,7 @@ mod test {
     use itertools::Itertools;
     use portgraph::Direction;
 
-    use crate::builder::{BuildError, Container, Dataflow, ModuleBuilder};
+    use crate::builder::{BuildError, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::tag::OpTag;
@@ -118,7 +118,7 @@ mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        module_builder.finish()
+        Ok(module_builder.finish_hugr()?)
     }
 
     /// Creates a hugr with a DFG with which to replace a subgraph.
@@ -155,7 +155,7 @@ mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs())?
         };
-        module_builder.finish()
+        Ok(module_builder.finish_hugr()?)
     }
 
     #[test]
