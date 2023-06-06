@@ -155,7 +155,7 @@ mod test {
             OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::CX }),
             wire2.outputs().chain(wire3.outputs()),
         )?;
-        Ok(dfg_builder.finish_hugr_with_outputs(wire45.outputs())?)
+        dfg_builder.finish_hugr_with_outputs(wire45.outputs())
     }
 
     #[test]
