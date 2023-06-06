@@ -57,11 +57,39 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
+        for node in self.hugr.graph.nodes_iter().map_into() {
+            self.gather_resources(&node)?;
+        }
+
         // Node-specific checks
         for node in self.hugr.graph.nodes_iter().map_into() {
             self.validate_node(node)?;
         }
 
+        Ok(())
+    }
+
+    fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
+        let op = self.hugr.op_types.get(node.index);
+        let sig = op.signature();
+        let input_ports = self.hugr.node_ports(node.clone(), Direction::Incoming);
+
+        for p in input_ports.into_iter() {
+            let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
+            assert!(self
+                .resources
+                .insert(port_ix, sig.input_resources.clone())
+                .is_none());
+        }
+
+        let output_ports = self.hugr.node_ports(node.clone(), Direction::Outgoing);
+        for p in output_ports.into_iter() {
+            let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
+            assert!(self
+                .resources
+                .insert(port_ix, sig.output_resources.clone())
+                .is_none());
+        }
         Ok(())
     }
 
@@ -168,6 +196,33 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
+    /// Check that two `PortIndex` have compatible resource requirements,
+    /// according to the information accumulated by `gather_resources`
+    fn check_resources_compatible(
+        &self,
+        port: &PortIndex,
+        link: &PortIndex,
+    ) -> Result<(), ValidationError> {
+        let d1 = self.hugr.graph.port_direction(*port).unwrap();
+        let d2 = self.hugr.graph.port_direction(*link).unwrap();
+        let (src, tgt) = match (d1, d2) {
+            (Direction::Outgoing, Direction::Incoming) => (port, link),
+            (Direction::Incoming, Direction::Outgoing) => (link, port),
+            _ => panic!("Fucked ports"), // TODO: return a ValidationError here
+        };
+        let rs_src = self.resources.get(src).unwrap();
+        let rs_tgt = self.resources.get(tgt).unwrap();
+        if rs_src == rs_tgt {
+            Ok(())
+        } else if rs_src.is_subset(rs_tgt) {
+            // The extra resource requirements reside in the target node.
+            // If so, we can fix this mismatch with a lift node
+            Err(ValidationError::TgtExceedsSrcResources)
+        } else {
+            Err(ValidationError::SrcExceedsTgtResources)
+        }
+    }
+
     /// Check whether a port is valid.
     /// - Input ports and output linear ports must be connected
     /// - The linked port must have a compatible type.
@@ -190,6 +245,8 @@ impl<'a> ValidationContext<'a> {
                 port_kind,
             });
         }
+
+        self.check_resources_compatible(&port_index, &link)?;
 
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
@@ -703,6 +760,12 @@ pub enum ValidationError {
     /// Type error for constant values
     #[error("Type error for constant value: {0}.")]
     ConstTypeError(#[from] ConstTypeError),
+    /// Missing lift node
+    #[error("Tgt exceeds src")]
+    TgtExceedsSrcResources,
+    /// Too many resource requirements coming from src
+    #[error("Src exceeds tgt")]
+    SrcExceedsTgtResources,
 }
 
 /// Errors related to the inter-graph edge validations.
