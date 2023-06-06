@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
-//! Replace operations on Hugr graphs.
+//! Replace operations on Hugr graphs. This is a nonfunctional
+//! dummy implementation just to demonstrate design principles.
 
 use std::collections::HashMap;
 
@@ -117,6 +118,7 @@ impl Replace {
     ///
     /// This includes having a convex subgraph (TODO: include definition), and
     /// having matching numbers of ports on the boundaries.
+    /// TODO does this relate to [Rewrite::may_fail_destructively]? It probably should!
     pub fn verify(&self) -> Result<(), ReplaceError> {
         self.verify_convexity()?;
         self.verify_boundaries()?;
@@ -145,6 +147,7 @@ impl Rewrite<ReplaceError> for Replace {
             std::mem::swap(&mut h.op_types[new], &mut replacement.op_types[old]);
             // TODO: metadata (Fn parameter ?)
         };
+        // Our (default) may_fail_destructively() returns true, so no guarantees here
         rewrite.apply_with_callbacks(
             &mut h.graph,
             |_| {},
