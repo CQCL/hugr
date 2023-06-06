@@ -834,6 +834,8 @@ statically-known number and type of elements, as does `Array<N>` (where
 N is a static constant). These types are also fixed-size if their
 components are.
 
+For integer types, the width is provided in the type, and signedness is left unspecified to be interpreted by operations. The width is allowed to be 2^i for i in the range [0,7], so the allowed integer types are [I1, I2, I4, ... , I128].
+
 Container types are defined in terms of statically-known element types.
 Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
 types: `Graph`, `Map` and
@@ -1430,8 +1432,7 @@ below).
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
 
-The possible values of `N` are at least 1, 32 and 64. We could trivially
-extend this list. (TODO decide.)
+The possible values of `N` are powers of two in the range [0,7].
 
 The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
