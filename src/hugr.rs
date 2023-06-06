@@ -3,13 +3,13 @@
 mod hugrmut;
 pub mod view;
 
-pub mod replace;
+pub mod rewrite;
 pub mod serialize;
 pub mod validate;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
-pub use replace::{Rewrite, RewriteError, RewriteOp};
+pub use rewrite::{Rewrite, RewriteError, RewriteOp};
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
