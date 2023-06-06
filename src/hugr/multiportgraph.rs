@@ -4,7 +4,7 @@ use bitvec::vec::BitVec;
 
 use itertools::Itertools;
 use portgraph::{
-    portgraph::{NodePortOffsets, NodePorts},
+    portgraph::{NodePortOffsets, NodePorts, PortOperation},
     Direction, LinkError, NodeIndex, PortGraph, PortIndex, PortOffset, SecondaryMap,
 };
 
@@ -106,6 +106,7 @@ impl MultiPortGraph {
     /// assert!(!g.contains_node(node0));
     /// ```
     pub fn remove_node(&mut self, node: NodeIndex) {
+        debug_assert!(!self.copy_node.get(node));
         for port in self.graph.all_ports(node) {
             if *self.multiport.get(port) {
                 self.unlink_port(port);
@@ -131,28 +132,26 @@ impl MultiPortGraph {
     ///
     /// # Errors
     ///
-    ///  - When `port_from` or `port_to` does not exist.
-    ///  - When `port_from` is not an output port.
-    ///  - When `port_to` is not an input port.
+    ///  - If `port_a` or `port_b` does not exist.
+    ///  - If `port_a` and `port_b` have the same direction.
     pub fn link_ports(
         &mut self,
-        port_from: PortIndex,
-        port_to: PortIndex,
+        port_a: PortIndex,
+        port_b: PortIndex,
     ) -> Result<(SubportIndex, SubportIndex), LinkError> {
-        let (multiport_from, from_index) = self.get_free_multiport(port_from)?;
-        let (multiport_to, to_index) = self.get_free_multiport(port_to)?;
-        self.graph.link_ports(from_index, to_index)?;
-        Ok((multiport_from, multiport_to))
+        let (multiport_a, index_a) = self.get_free_multiport(port_a)?;
+        let (multiport_b, index_b) = self.get_free_multiport(port_b)?;
+        self.graph.link_ports(index_a, index_b)?;
+        Ok((multiport_a, multiport_b))
     }
 
     /// Link an output subport to an input subport.
     ///
     /// # Errors
     ///
-    ///  - When `subport_from` or `subport_to` does not exist.
-    ///  - When `subport_from` is not an output port.
-    ///  - When `subport_to` is not an input port.
-    ///  - When `port_from` or `port_to` is already linked.
+    ///  - If `subport_from` or `subport_to` does not exist.
+    ///  - If `subport_a` and `subport_b` have the same direction.
+    ///  - If `subport_from` or `subport_to` is already linked.
     pub fn link_subports(
         &mut self,
         subport_from: SubportIndex,
@@ -198,20 +197,43 @@ impl MultiPortGraph {
     pub fn link_nodes(
         &mut self,
         from: NodeIndex,
-        from_offset: usize,
+        from_output: usize,
         to: NodeIndex,
-        to_offset: usize,
+        to_input: usize,
+    ) -> Result<(SubportIndex, SubportIndex), LinkError> {
+        self.link_offsets(
+            from,
+            PortOffset::new_outgoing(from_output),
+            to,
+            PortOffset::new_incoming(to_input),
+        )
+    }
+
+    /// Links two nodes at an input and output port offsets.
+    ///
+    /// # Errors
+    ///
+    ///  - If the ports and nodes do not exist.
+    ///  - If the ports have the same direction.
+    pub fn link_offsets(
+        &mut self,
+        node_a: NodeIndex,
+        offset_a: PortOffset,
+        node_b: NodeIndex,
+        offset_b: PortOffset,
     ) -> Result<(SubportIndex, SubportIndex), LinkError> {
         let from_port = self
-            .output(from, from_offset)
+            .port_index(node_a, offset_a)
             .ok_or(LinkError::UnknownOffset {
-                node: from,
-                offset: PortOffset::new_outgoing(from_offset),
+                node: node_a,
+                offset: offset_a,
             })?;
-        let to_port = self.input(to, to_offset).ok_or(LinkError::UnknownOffset {
-            node: to,
-            offset: PortOffset::new_incoming(to_offset),
-        })?;
+        let to_port = self
+            .port_index(node_b, offset_b)
+            .ok_or(LinkError::UnknownOffset {
+                node: node_b,
+                offset: offset_b,
+            })?;
         self.link_ports(from_port, to_port)
     }
 
@@ -434,20 +456,24 @@ impl MultiPortGraph {
         outgoing: usize,
         mut rekey: F,
     ) where
-        F: FnMut(PortIndex, Option<PortIndex>),
+        F: FnMut(PortIndex, PortOperation),
     {
         let mut dropped_ports = Vec::new();
-        let rekey_wrapper = |port, op: Option<PortIndex>| {
-            if op.is_none() {
-                dropped_ports.push(port);
+        let rekey_wrapper = |port, op| {
+            if let PortOperation::Removed { old_link } = op {
+                dropped_ports.push((port, old_link))
             }
             rekey(port, op);
         };
         self.graph
             .set_num_ports(node, incoming, outgoing, rekey_wrapper);
-        for port in dropped_ports {
-            // TODO: Delete any copy node. That requires https://github.com/CQCL/portgraph/pull/57.
-            self.multiport.set(port, false);
+        for (port, old_link) in dropped_ports {
+            if self.is_multiport(port) {
+                self.multiport.set(port, false);
+                let link = old_link.expect("Multiport node has no link");
+                let copy_node = self.graph.port_node(link).unwrap();
+                self.remove_copy_node(copy_node, link)
+            }
         }
     }
 
