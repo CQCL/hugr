@@ -3,10 +3,7 @@ use super::{
     BuildError, Container,
 };
 
-use crate::{
-    hugr::view::HugrView,
-    types::SimpleType,
-};
+use crate::{hugr::view::HugrView, types::SimpleType};
 
 use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
 use crate::ops::{ConstValue, ModuleOp, OpType};
