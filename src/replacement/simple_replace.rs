@@ -60,7 +60,10 @@ mod test {
     use itertools::Itertools;
     use portgraph::Direction;
 
-    use crate::builder::{BuildError, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder,
+    };
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::tag::OpTag;
@@ -121,41 +124,23 @@ mod test {
         Ok(module_builder.finish_hugr()?)
     }
 
-    /// Creates a hugr with a DFG with which to replace a subgraph.
+    /// Creates a hugr with a DFG root with which to replace a subgraph.
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        // TODO This will change when we have DFG-rooted HUGRs implemented. For now, this is a
-        // module HUGR with one DFG node inside it.
-        let mut module_builder = ModuleBuilder::new();
-        let _f_id = {
-            let mut func_builder = module_builder.declare_and_def(
-                "main",
-                Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
-            )?;
-
-            let [qb0, qb1] = func_builder.input_wires_arr();
-
-            let mut inner_builder =
-                func_builder.dfg_builder(vec![(QB, qb0), (QB, qb1)], type_row![QB, QB])?;
-            let inner_graph = {
-                let [wire0, wire1] = inner_builder.input_wires_arr();
-                let wire2 = inner_builder.add_dataflow_op(
-                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
-                    vec![wire0],
-                )?;
-                let wire3 = inner_builder.add_dataflow_op(
-                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
-                    vec![wire1],
-                )?;
-                let wire45 = inner_builder.add_dataflow_op(
-                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::CX }),
-                    wire2.outputs().chain(wire3.outputs()),
-                )?;
-                inner_builder.finish_with_outputs(wire45.outputs())
-            }?;
-
-            func_builder.finish_with_outputs(inner_graph.outputs())?
-        };
-        Ok(module_builder.finish_hugr()?)
+        let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
+        let [wire0, wire1] = dfg_builder.input_wires_arr();
+        let wire2 = dfg_builder.add_dataflow_op(
+            OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
+            vec![wire0],
+        )?;
+        let wire3 = dfg_builder.add_dataflow_op(
+            OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
+            vec![wire1],
+        )?;
+        let wire45 = dfg_builder.add_dataflow_op(
+            OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::CX }),
+            wire2.outputs().chain(wire3.outputs()),
+        )?;
+        Ok(dfg_builder.finish_hugr_with_outputs(wire45.outputs())?)
     }
 
     #[test]

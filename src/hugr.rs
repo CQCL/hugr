@@ -100,19 +100,13 @@ impl Hugr {
             }
         }
         // 3. Do the replacement.
-        // First locate the DFG in r.n. TODO this won't be necessary when we have DFG-rooted HUGRs.
-        let n_dfg_node = r
-            .replacement
-            .nodes()
-            .find(|node: &Node| r.replacement.get_optype(*node).tag() == OpTag::Dfg)
-            .unwrap();
-        // 3.1. Add copies of all children of n_dfg_node to self. Exclude Input/Output nodes.
+        // 3.1. Add copies of all replacement nodes to self. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in r.n) to new NodeIndex (in self).
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
         let replacement_nodes = r
             .replacement
             .hierarchy
-            .children(n_dfg_node.index)
+            .children(r.replacement.root().index)
             .map_into::<Node>()
             .collect::<Vec<Node>>();
         let replacement_sz = replacement_nodes.len(); // number of replacement nodes including Input and Output
@@ -143,7 +137,7 @@ impl Hugr {
                 .ok();
             index_map.insert(node.index, new_node_index);
         }
-        // 3.2. Add edges between all newly added nodes matching those in n_dfg_node.
+        // 3.2. Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
             let new_node_index = index_map.get(&node.index).unwrap();
@@ -179,7 +173,7 @@ impl Hugr {
                 }
             }
         }
-        // 3.3. For each p in inp(n_dfg_node), add an edge from the predecessor of r.nu_inp[p] to (new copy of) p.
+        // 3.3. For each p in inp(replacement), add an edge from the predecessor of r.nu_inp[p] to (new copy of) p.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in r.nu_inp {
             let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
             // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
