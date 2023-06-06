@@ -109,8 +109,10 @@ impl Hugr {
             .children(r.replacement.root().index)
             .map_into::<Node>()
             .collect::<Vec<Node>>();
-        let replacement_sz = replacement_nodes.len(); // number of replacement nodes including Input and Output
-        let replacement_inner_nodes = &replacement_nodes[1..replacement_sz - 1]; // omit Input and Output
+        // number of replacement nodes including Input and Output:
+        let replacement_sz = replacement_nodes.len();
+        // slice of nodes omitting Input and Output:
+        let replacement_inner_nodes = &replacement_nodes[1..replacement_sz - 1];
         for &node in replacement_inner_nodes {
             // 3.1.1. Check there are no const inputs.
             if !r
@@ -173,7 +175,8 @@ impl Hugr {
                 }
             }
         }
-        // 3.3. For each p in inp(replacement), add an edge from the predecessor of r.nu_inp[p] to (new copy of) p.
+        // 3.3. For each p in inp(replacement), add an edge from the predecessor of r.nu_inp[p] to
+        // (new copy of) p.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in r.nu_inp {
             let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
             // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
@@ -191,7 +194,8 @@ impl Hugr {
                 .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
                 .ok();
         }
-        // 3.4. For each p in out(r.s), add an edge from (new copy of) the predecessor of r.nu_out[p] to p.
+        // 3.4. For each p in out(r.s), add an edge from (new copy of) the predecessor of
+        // r.nu_out[p] to p.
         for ((rem_out_node, rem_out_port), rep_out_port) in r.nu_out {
             let rem_out_port_index = self
                 .graph
