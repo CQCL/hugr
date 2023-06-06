@@ -99,7 +99,7 @@ impl Hugr {
         }
         // 3. Do the replacement.
         // 3.1. Add copies of all replacement nodes to self. Exclude Input/Output nodes.
-        // Create map from old NodeIndex (in r.n) to new NodeIndex (in self).
+        // Create map from old NodeIndex (in r.replacement) to new NodeIndex (in self).
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
         let replacement_nodes = r
             .replacement
@@ -192,7 +192,7 @@ impl Hugr {
                 .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
                 .ok();
         }
-        // 3.4. For each p in out(r.s), add an edge from (new copy of) the predecessor of
+        // 3.4. For each p in out(r.removal), add an edge from (new copy of) the predecessor of
         // r.nu_out[p] to p.
         for ((rem_out_node, rem_out_port), rep_out_port) in r.nu_out {
             let rem_out_port_index = self
@@ -226,7 +226,7 @@ impl Hugr {
                 .link_ports(new_out_port_index, rem_out_port_index)
                 .ok();
         }
-        // 3.5. Remove all nodes in r.s and edges between them.
+        // 3.5. Remove all nodes in r.removal and edges between them.
         for node in &r.removal {
             self.graph.remove_node(node.index);
             self.hierarchy.remove(node.index);
