@@ -96,8 +96,8 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn case_builder(
+        &mut self,
         case: usize,
     ) -> Result<CaseBuilder<&mut HugrMut>, BuildError> {
         let conditional = self.conditional_node;

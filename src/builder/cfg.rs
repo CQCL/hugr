@@ -99,8 +99,8 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the node.
-    pub fn block_builder<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn block_builder(
+        &mut self,
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
@@ -131,8 +131,8 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the node.
-    pub fn simple_block_builder<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn simple_block_builder(
+        &mut self,
         inputs: TypeRow,
         outputs: TypeRow,
         n_cases: usize,
@@ -147,8 +147,8 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     /// # Errors
     ///
     /// This function will return an error if an entry block has already been built.
-    pub fn entry_builder<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn entry_builder(
+        &mut self,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
@@ -165,8 +165,8 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the node.
-    pub fn simple_entry_builder<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn simple_entry_builder(
+        &mut self,
         outputs: TypeRow,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
@@ -183,13 +183,12 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     /// # Errors
     ///
     /// This function will return an error if there is an error connecting the blocks.
-    pub fn branch<'a>(
+    pub fn branch(
         &mut self,
-        predecessor: impl Into<&'a BasicBlockID>,
+        predecessor: &BasicBlockID,
         branch: usize,
         successor: &BasicBlockID,
     ) -> Result<(), BuildError> {
-        let predecessor: &BasicBlockID = predecessor.into();
         let from = predecessor.node();
         let to = successor.node();
         let base = self.base();

@@ -66,8 +66,8 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the node.
-    pub fn define_function<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn define_function(
+        &mut self,
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
@@ -99,8 +99,8 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ModuleOp::Def`] node.
-    pub fn declare_and_def<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn declare_and_def(
+        &mut self,
         _name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {

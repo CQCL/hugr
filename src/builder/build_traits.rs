@@ -154,8 +154,8 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the DFG node.
-    fn dfg_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn dfg_builder(
+        &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
     ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
@@ -181,8 +181,8 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the CFG node.
-    fn cfg_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn cfg_builder(
+        &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
     ) -> Result<CFGBuilder<&mut HugrMut>, BuildError> {
@@ -256,8 +256,8 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the TailLoop node.
-    fn tail_loop_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn tail_loop_builder(
+        &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: TypeRow,
@@ -294,8 +294,8 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the Conditional node.
-    fn conditional_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn conditional_builder(
+        &mut self,
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
@@ -369,7 +369,7 @@ pub trait Dataflow: Container {
     ///
     /// # Errors
     ///
-    /// This function will return an error if ther is an error when adding the
+    /// This function will return an error if there is an error when adding the
     /// copy node.
     fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let typ = self.get_wire_type(wire)?;
