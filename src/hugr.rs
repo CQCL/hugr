@@ -9,7 +9,7 @@ pub mod validate;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
-pub use rewrite::{Replace, ReplaceError, RewriteOp};
+pub use rewrite::{Replace, ReplaceError, Rewrite};
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
@@ -75,7 +75,7 @@ impl Hugr {
     }
 
     /// Applies a rewrite to the graph.
-    pub fn apply<E>(&mut self, op: impl RewriteOp<E>) -> Result<(), E> {
+    pub fn apply<E>(&mut self, op: impl Rewrite<E>) -> Result<(), E> {
         op.apply(self)
     }
 

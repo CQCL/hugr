@@ -7,7 +7,7 @@ use portgraph::substitute::OpenGraph;
 use portgraph::{NodeIndex, PortIndex};
 use thiserror::Error;
 
-use super::RewriteOp;
+use super::Rewrite;
 use crate::Hugr;
 
 /// A subset of the nodes in a graph, and the ports that it is connected to.
@@ -132,7 +132,7 @@ impl Replace {
     }
 }
 
-impl RewriteOp<ReplaceError> for Replace {
+impl Rewrite<ReplaceError> for Replace {
     /// Performs a Replace operation on the graph.
     fn apply(self, h: &mut Hugr) -> Result<(), ReplaceError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
