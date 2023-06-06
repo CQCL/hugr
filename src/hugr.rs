@@ -75,8 +75,8 @@ impl Hugr {
     }
 
     /// Applies a rewrite to the graph.
-    pub fn apply<E>(&mut self, op: impl Rewrite<E>) -> Result<(), E> {
-        op.apply(self)
+    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<E>) -> Result<(), E> {
+        rw.apply(self)
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side.
