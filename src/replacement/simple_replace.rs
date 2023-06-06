@@ -1,3 +1,5 @@
+//! Implementation of the `SimpleReplace` operation.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::{hugr::Node, Hugr, Port};
