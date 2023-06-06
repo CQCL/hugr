@@ -223,8 +223,9 @@ impl<B: HugrMutRef> BlockBuilder<B> {
     ) -> Result<Self, BuildError> {
         // The node outputs a predicate before the data outputs of the block node
         let predicate_type = SimpleType::new_predicate(predicate_variants);
-        let node_outputs: TypeRow = [&[predicate_type], other_outputs.as_ref()].concat().into();
-        let db = DFGBuilder::create_with_io(base, block_n, inputs, node_outputs)?;
+        let mut node_outputs = vec![predicate_type];
+        node_outputs.extend_from_slice(&other_outputs);
+        let db = DFGBuilder::create_with_io(base, block_n, inputs, node_outputs.into())?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 }
@@ -244,7 +245,7 @@ impl BlockBuilder<&mut HugrMut> {
 }
 
 impl BlockBuilder<HugrMut> {
-    /// Initialize a BasicBlock rooted HUGR builder
+    /// Initialize a [`BasicBlockOp::Block`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,

@@ -40,6 +40,7 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
 
 impl ModuleBuilder<HugrMut> {
     /// Begin building a new module.
+    #[must_use]
     pub fn new() -> Self {
         Self(HugrMut::new_module())
     }
@@ -101,10 +102,10 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     /// [`ModuleOp::Def`] node.
     pub fn declare_and_def(
         &mut self,
-        _name: impl Into<String>,
+        name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
-        let fid = self.declare(_name, signature)?;
+        let fid = self.declare(name, signature)?;
         self.define_function(&fid)
     }
 
@@ -126,6 +127,10 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     }
 
     /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding [`ModuleOp::AliasDef`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
@@ -142,6 +147,9 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     }
 
     /// Add a [`ModuleOp::AliasDeclare`] node and return a handle to the Alias.
+    /// # Errors
+    ///
+    /// Error in adding [`ModuleOp::AliasDeclare`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,

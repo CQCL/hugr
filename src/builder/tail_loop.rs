@@ -21,7 +21,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
-        tail_loop_sig: TailLoopSignature,
+        tail_loop_sig: &TailLoopSignature,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
@@ -32,7 +32,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
-    /// Set the outputs of the TailLoop, with `out_variant` as the value of the
+    /// Set the outputs of the [`ControlFlowOp::TailLoop`], with `out_variant` as the value of the
     /// termination predicate, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
@@ -43,7 +43,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     }
 
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
-    /// that defines the signature of the TailLoop
+    /// that defines the signature of the [`ControlFlowOp::TailLoop`]
     pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
         if let OpType::Dataflow(DataflowOp::ControlFlow {
             op: ControlFlowOp::TailLoop(tail_sig),
@@ -81,7 +81,7 @@ impl TailLoopBuilder<&mut HugrMut> {
 }
 
 impl TailLoopBuilder<HugrMut> {
-    /// Initialize new builder for a TailLoop rooted HUGR
+    /// Initialize new builder for a [`ControlFlowOp::TailLoop`] rooted HUGR
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
@@ -95,7 +95,7 @@ impl TailLoopBuilder<HugrMut> {
         let op = ControlFlowOp::TailLoop(tail_loop_sig.clone());
         let base = HugrMut::new(op);
         let root = base.hugr().root();
-        Self::create_with_io(base, root, tail_loop_sig)
+        Self::create_with_io(base, root, &tail_loop_sig)
     }
 }
 

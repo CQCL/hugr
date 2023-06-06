@@ -50,6 +50,10 @@ impl<T: HugrMutRef> DFGBuilder<T> {
 }
 impl DFGBuilder<HugrMut> {
     /// Begin building a new DFG rooted HUGR.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
@@ -123,6 +127,9 @@ pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<HugrMut> {
     /// Initialize a builder for a Def rooted HUGR
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
         let inputs = signature.input.clone();
         let outputs = signature.output.clone();

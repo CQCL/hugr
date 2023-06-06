@@ -81,7 +81,7 @@ impl AsRef<HugrMut> for HugrMut {
     }
 }
 
-/// Trait allowing treating type as (im)mutable reference to HugrMut
+/// Trait allowing treating type as (im)mutable reference to [`HugrMut`]
 pub trait HugrMutRef: AsMut<HugrMut> + AsRef<HugrMut> {}
 impl HugrMutRef for HugrMut {}
 impl HugrMutRef for &mut HugrMut {}

@@ -104,7 +104,7 @@ pub trait Dataflow: Container {
     fn input_wires(&self) -> Outputs {
         self.input().outputs()
     }
-    /// Add a dataflow op to the sibling graph, wiring up the input_wires to the
+    /// Add a dataflow op to the sibling graph, wiring up the `input_wires` to the
     /// incoming ports of the resulting node.
     ///
     /// # Errors
@@ -120,7 +120,7 @@ pub trait Dataflow: Container {
         Ok(outs.into())
     }
 
-    /// Wire up the output_wires to the input ports of the Output node.
+    /// Wire up the `output_wires` to the input ports of the Output node.
     ///
     /// # Errors
     ///
@@ -142,7 +142,7 @@ pub trait Dataflow: Container {
         self.input_wires()
             .collect_vec()
             .try_into()
-            .expect(&format!("Incorrect number of wires: {}", N)[..])
+            .expect(&format!("Incorrect number of wires: {N}")[..])
     }
 
     /// Return a builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node, i.e. a nested dataflow subgraph.
@@ -255,7 +255,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when building
-    /// the TailLoop node.
+    /// the [`ControlFlowOp::TailLoop`] node.
     fn tail_loop_builder(
         &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
@@ -279,7 +279,7 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        TailLoopBuilder::create_with_io(self.base(), loop_node, tail_loop_signature)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop_signature)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
@@ -386,7 +386,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the
-    /// MakeTuple node.
+    /// [`LeafOp::MakeTuple`] node.
     fn make_tuple(&mut self, values: impl IntoIterator<Item = Wire>) -> Result<Wire, BuildError> {
         let values = values.into_iter().collect_vec();
         let types: Result<Vec<SimpleType>, _> = values
@@ -427,7 +427,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Continue" variant of a TailLoop with `loop_signature`.
+    /// "Continue" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -448,7 +448,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Break" variant of a TailLoop with `loop_signature`.
+    /// "Break" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
