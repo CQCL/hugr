@@ -38,7 +38,7 @@ impl<E, R: Rewrite<E>> Rewrite<E> for Transactional<R> {
         // note that if underlying.may_fail_destructively(h) is false, we don't need a backup...
         let backup = h.clone();
         let r = self.underlying.apply(h);
-        if let Err(_) = r {
+        if r.is_err() {
             // drop the old h, it was undefined
             let _ = mem::replace(h, backup);
         }
