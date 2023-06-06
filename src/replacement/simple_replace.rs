@@ -8,15 +8,15 @@ use thiserror::Error;
 pub struct SimpleReplacement {
     /// The common DFG parent of all nodes to be replaced.
     pub region: Node,
-    /// The set of nodes to remove (a convex set of leaf children of `p`).
+    /// The set of nodes to remove (a convex set of leaf children of `region`).
     pub removal: HashSet<Node>,
     /// A hugr with DFG root (consisting of replacement nodes).
     pub replacement: Hugr,
-    /// A map from (target ports of edges from the Input node of n) to (target ports of edges from
-    /// non-s nodes to s nodes).
+    /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
+    /// edges from nodes not in `removal` to nodes in `removal`).
     pub nu_inp: HashMap<(Node, Port), (Node, Port)>,
-    /// A map from (target ports of edges from s nodes to non-s nodes) to (input ports of the Output
-    /// node of n).
+    /// A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
+    /// (input ports of the Output node of `replacement`).
     pub nu_out: HashMap<(Node, Port), Port>,
 }
 
