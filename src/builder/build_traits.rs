@@ -2,6 +2,7 @@ use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
 use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
+use crate::ops::ConstValue;
 
 use std::iter;
 
@@ -12,7 +13,7 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    ops::{controlflow::ControlFlowOp, BasicBlockOp, DataflowOp, LeafOp, ModuleOp, OpType},
+    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType},
     types::{ClassicType, EdgeKind},
 };
 
@@ -34,9 +35,6 @@ use crate::hugr::HugrMut;
 /// Implementations of this trait allow the child sibling graph to be added to
 /// the HUGR.
 pub trait Container {
-    /// A handle to the finished container node, typically returned when the
-    /// child graph has been finished.
-    type ContainerHandle;
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`HugrMut`] being used to build the HUGR.
@@ -58,11 +56,36 @@ pub trait Container {
         Ok(Wire::new(src, Port::new_outgoing(src_port)))
     }
 
-    /// Consume the container builder and return the handle, may perform some
-    /// checks before finishing.
-    fn finish(self) -> Self::ContainerHandle;
+    /// Add a constant value to the container and return a handle to it.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Const`] node.
+    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
+        let typ = val.const_type();
+        let const_n = self.add_child_op(ModuleOp::Const(val))?;
+
+        Ok((const_n, typ).into())
+    }
 }
 
+/// Types implementing this trait can be used to build complete HUGRs
+/// (with varying root node types)
+pub trait HugrBuilder: Container {
+    /// Finish building the HUGR, perform any validation checks and return it.
+    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+}
+
+/// Types implementing this trait build a container graph region by borrowing a HUGR
+pub trait SubContainer: Container {
+    /// A handle to the finished container node, typically returned when the
+    /// child graph has been finished.
+    type ContainerHandle;
+    /// Consume the container builder and return the handle, may perform some
+    /// checks before finishing.
+    fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError>;
+}
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
     /// Return indices of input and output nodes.
@@ -81,7 +104,7 @@ pub trait Dataflow: Container {
     fn input_wires(&self) -> Outputs {
         self.input().outputs()
     }
-    /// Add a dataflow op to the sibling graph, wiring up the input_wires to the
+    /// Add a dataflow op to the sibling graph, wiring up the `input_wires` to the
     /// incoming ports of the resulting node.
     ///
     /// # Errors
@@ -97,7 +120,7 @@ pub trait Dataflow: Container {
         Ok(outs.into())
     }
 
-    /// Wire up the output_wires to the input ports of the Output node.
+    /// Wire up the `output_wires` to the input ports of the Output node.
     ///
     /// # Errors
     ///
@@ -110,23 +133,6 @@ pub trait Dataflow: Container {
         wire_up_inputs(output_wires.into_iter().collect_vec(), out, self, inp)
     }
 
-    /// Set the outputs of the graph and consume the builder, while returning a
-    /// handle to the parent.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when setting outputs.
-    fn finish_with_outputs(
-        mut self,
-        outputs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Self::ContainerHandle, BuildError>
-    where
-        Self: Sized,
-    {
-        self.set_outputs(outputs)?;
-        Ok(self.finish())
-    }
-
     /// Return an array of the input wires.
     ///
     /// # Panics
@@ -136,7 +142,7 @@ pub trait Dataflow: Container {
         self.input_wires()
             .collect_vec()
             .try_into()
-            .expect(&format!("Incorrect number of wires: {}", N)[..])
+            .expect(&format!("Incorrect number of wires: {N}")[..])
     }
 
     /// Return a builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node, i.e. a nested dataflow subgraph.
@@ -148,11 +154,11 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the DFG node.
-    fn dfg_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn dfg_builder(
+        &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<DFGBuilder<'b>, BuildError> {
+    ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
@@ -175,11 +181,11 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the CFG node.
-    fn cfg_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn cfg_builder(
+        &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<CFGBuilder<'b>, BuildError> {
+    ) -> Result<CFGBuilder<&mut HugrMut>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -194,21 +200,7 @@ pub trait Dataflow: Container {
             }),
             input_wires,
         )?;
-
-        let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
-            cfg_outputs: output_types.clone(),
-        });
-        let exit_node = self.base().add_op_with_parent(cfg_node, exit_block_type)?;
-        let n_out_wires = output_types.len();
-        let cfg_builder = CFGBuilder {
-            base: self.base(),
-            cfg_node,
-            n_out_wires,
-            exit_node,
-            inputs: Some(inputs),
-        };
-
-        Ok(cfg_builder)
+        CFGBuilder::create(self.base(), cfg_node, inputs, output_types)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.
@@ -233,6 +225,28 @@ pub trait Dataflow: Container {
         Ok(load_n.out_wire(0))
     }
 
+    /// Add a constant value to the Dataflow container and return a handle to it.
+    /// Adds a state edge from input to the constant node.
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ModuleOp::Const`] node.
+    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
+        let typ = val.const_type();
+        let const_n = self.add_dataflow_op(ModuleOp::Const(val), [])?;
+
+        Ok((const_n.node(), typ).into())
+    }
+    /// Load a static constant and return the local dataflow wire for that constant.
+    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the node.
+    fn add_load_const(&mut self, val: ConstValue) -> Result<Wire, BuildError> {
+        let cid = Dataflow::add_constant(self, val)?;
+        self.load_const(&cid)
+    }
+
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -241,13 +255,13 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when building
-    /// the TailLoop node.
-    fn tail_loop_builder<'a: 'b, 'b>(
-        &'a mut self,
+    /// the [`ControlFlowOp::TailLoop`] node.
+    fn tail_loop_builder(
+        &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: TypeRow,
-    ) -> Result<TailLoopBuilder<'b>, BuildError> {
+    ) -> Result<TailLoopBuilder<&mut HugrMut>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -265,7 +279,7 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        TailLoopBuilder::create_with_io(self.base(), loop_node, tail_loop_signature)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop_signature)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
@@ -280,12 +294,12 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the Conditional node.
-    fn conditional_builder<'a: 'b, 'b>(
-        &'a mut self,
+    fn conditional_builder(
+        &mut self,
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<ConditionalBuilder<'b>, BuildError> {
+    ) -> Result<ConditionalBuilder<&mut HugrMut>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -293,9 +307,9 @@ pub trait Dataflow: Container {
         input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
-
         let n_cases = predicate_inputs.len();
         let n_out_wires = output_types.len();
+
         let conditional_id = self.add_dataflow_op(
             ControlFlowOp::Conditional(ConditionalSignature {
                 predicate_inputs,
@@ -304,6 +318,7 @@ pub trait Dataflow: Container {
             }),
             input_wires,
         )?;
+
         Ok(ConditionalBuilder {
             base: self.base(),
             conditional_node: conditional_id.node(),
@@ -354,7 +369,7 @@ pub trait Dataflow: Container {
     ///
     /// # Errors
     ///
-    /// This function will return an error if ther is an error when adding the
+    /// This function will return an error if there is an error when adding the
     /// copy node.
     fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let typ = self.get_wire_type(wire)?;
@@ -371,7 +386,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the
-    /// MakeTuple node.
+    /// [`LeafOp::MakeTuple`] node.
     fn make_tuple(&mut self, values: impl IntoIterator<Item = Wire>) -> Result<Wire, BuildError> {
         let values = values.into_iter().collect_vec();
         let types: Result<Vec<SimpleType>, _> = values
@@ -412,7 +427,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Continue" variant of a TailLoop with `loop_signature`.
+    /// "Continue" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -433,7 +448,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Break" variant of a TailLoop with `loop_signature`.
+    /// "Break" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -518,9 +533,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     inp: Node,
 ) -> Result<(), BuildError> {
-    let mut any_local_inputs = false;
+    let mut any_local_df_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        any_local_inputs |= wire_up(
+        any_local_df_inputs |= wire_up(
             data_builder,
             wire.node(),
             wire.source().index(),
@@ -528,8 +543,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-
-    if !any_local_inputs {
+    let op = data_builder.base().hugr().get_optype(op_node);
+    let some_df_outputs = !op.signature().output.is_empty();
+    if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node
         data_builder.add_other_wire(inp, op_node)?;
@@ -610,7 +626,16 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
     data_builder.base().connect(src, src_port, dst, dst_port)?;
-    Ok(local_source)
+    Ok(local_source
+        && matches!(
+            data_builder
+                .base()
+                .hugr()
+                .get_optype(dst)
+                .port_kind(Port::new_incoming(dst_port))
+                .unwrap(),
+            EdgeKind::Value(_)
+        ))
 }
 
 /// Check the kind of a port is a classical Value and return it
@@ -655,3 +680,44 @@ fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
         None
     }
 }
+
+/// Trait implemented by builders of Dataflow Hugrs
+pub trait DataflowHugr: HugrBuilder + Dataflow {
+    /// Set outputs of dataflow HUGR and return HUGR
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when setting outputs.
+    fn finish_hugr_with_outputs(
+        mut self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(outputs)?;
+        Ok(self.finish_hugr()?)
+    }
+}
+
+/// Trait implemented by builders of Dataflow container regions of a HUGR
+pub trait DataflowSubContainer: SubContainer + Dataflow {
+    /// Set the outputs of the graph and consume the builder, while returning a
+    /// handle to the parent.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when setting outputs.
+    fn finish_with_outputs(
+        mut self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Self::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(outputs)?;
+        self.finish_sub_container()
+    }
+}
+
+impl<T: HugrBuilder + Dataflow> DataflowHugr for T {}
+impl<T: SubContainer + Dataflow> DataflowSubContainer for T {}
