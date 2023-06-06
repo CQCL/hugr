@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-//! Rewrite operations on Hugr graphs.
+//! Replace operations on Hugr graphs.
 
 use std::collections::HashMap;
 
@@ -77,7 +77,7 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 /// A rewrite operation that replaces a subgraph with another graph.
 /// Includes the new weights for the nodes in the replacement graph.
 #[derive(Debug, Clone)]
-pub struct Rewrite {
+pub struct Replace {
     /// The subgraph to be replaced.
     subgraph: BoundedSubgraph,
     /// The replacement graph.
@@ -86,7 +86,7 @@ pub struct Rewrite {
     parents: ParentsMap,
 }
 
-impl Rewrite {
+impl Replace {
     /// Creates a new rewrite operation.
     pub fn new(
         subgraph: BoundedSubgraph,
@@ -117,24 +117,24 @@ impl Rewrite {
     ///
     /// This includes having a convex subgraph (TODO: include definition), and
     /// having matching numbers of ports on the boundaries.
-    pub fn verify(&self) -> Result<(), RewriteError> {
+    pub fn verify(&self) -> Result<(), ReplaceError> {
         self.verify_convexity()?;
         self.verify_boundaries()?;
         Ok(())
     }
 
-    pub fn verify_convexity(&self) -> Result<(), RewriteError> {
+    pub fn verify_convexity(&self) -> Result<(), ReplaceError> {
         todo!()
     }
 
-    pub fn verify_boundaries(&self) -> Result<(), RewriteError> {
+    pub fn verify_boundaries(&self) -> Result<(), ReplaceError> {
         todo!()
     }
 }
 
-impl RewriteOp<RewriteError> for Rewrite {
-    /// Applies a ReplacementOp to the graph.
-    fn apply(self, h: &mut Hugr) -> Result<(), RewriteError> {
+impl RewriteOp<ReplaceError> for Replace {
+    /// Performs a Replace operation on the graph.
+    fn apply(self, h: &mut Hugr) -> Result<(), ReplaceError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
         let (rewrite, mut replacement, parents) = self.into_parts();
 
@@ -161,9 +161,9 @@ impl RewriteOp<RewriteError> for Rewrite {
 
 /// Error generated when a rewrite fails.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum RewriteError {
-    /// The rewrite failed because the boundary defined by the
-    /// [`Rewrite`] could not be matched to the dangling ports of the
+pub enum ReplaceError {
+    /// The replacement failed because the boundary defined by the
+    /// [`Replace`] could not be matched to the dangling ports of the
     /// [`OpenHugr`].
     #[error("The boundary defined by the rewrite could not be matched to the dangling ports of the OpenHugr")]
     BoundarySize(#[source] portgraph::substitute::RewriteError),
@@ -178,7 +178,7 @@ pub enum RewriteError {
     NotConvex(),
 }
 
-impl From<portgraph::substitute::RewriteError> for RewriteError {
+impl From<portgraph::substitute::RewriteError> for ReplaceError {
     fn from(e: portgraph::substitute::RewriteError) -> Self {
         match e {
             portgraph::substitute::RewriteError::BoundarySize => Self::BoundarySize(e),

@@ -9,7 +9,7 @@ pub mod validate;
 
 use derive_more::From;
 pub use hugrmut::HugrMut;
-pub use rewrite::{Rewrite, RewriteError, RewriteOp};
+pub use rewrite::{Replace, ReplaceError, RewriteOp};
 pub use validate::ValidationError;
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
