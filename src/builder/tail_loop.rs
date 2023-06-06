@@ -1,25 +1,27 @@
+use crate::hugr::HugrMut;
 use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::hugr::HugrMut;
 use crate::types::TypeRow;
 use crate::Node;
 
+use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
+use super::HugrMutRef;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
 };
 
 /// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
-pub type TailLoopBuilder<'b> = DFGWrapper<'b, BuildHandle<TailLoopID>>;
+pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<'b> TailLoopBuilder<'b> {
+impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
-        base: &'b mut HugrMut,
+        base: B,
         loop_node: Node,
-        tail_loop_sig: TailLoopSignature,
+        tail_loop_sig: &TailLoopSignature,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
@@ -28,9 +30,9 @@ impl<'b> TailLoopBuilder<'b> {
             tail_loop_sig.body_output_row(),
         )?;
 
-        Ok(TailLoopBuilder::new(dfg_build))
+        Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
-    /// Set the outputs of the TailLoop, with `out_variant` as the value of the
+    /// Set the outputs of the [`ControlFlowOp::TailLoop`], with `out_variant` as the value of the
     /// termination predicate, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
@@ -40,21 +42,8 @@ impl<'b> TailLoopBuilder<'b> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
-    /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
-    pub fn finish_with_outputs(
-        mut self,
-        out_variant: Wire,
-        rest: impl IntoIterator<Item = Wire>,
-    ) -> Result<<TailLoopBuilder<'b> as Container>::ContainerHandle, BuildError>
-    where
-        Self: Sized,
-    {
-        self.set_outputs(out_variant, rest)?;
-        Ok(self.finish())
-    }
-
     /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
-    /// that defines the signature of the TailLoop
+    /// that defines the signature of the [`ControlFlowOp::TailLoop`]
     pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
         if let OpType::Dataflow(DataflowOp::ControlFlow {
             op: ControlFlowOp::TailLoop(tail_sig),
@@ -76,47 +65,67 @@ impl<'b> TailLoopBuilder<'b> {
     }
 }
 
+impl TailLoopBuilder<&mut HugrMut> {
+    /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
+    pub fn finish_with_outputs(
+        mut self,
+        out_variant: Wire,
+        rest: impl IntoIterator<Item = Wire>,
+    ) -> Result<<Self as SubContainer>::ContainerHandle, BuildError>
+    where
+        Self: Sized,
+    {
+        self.set_outputs(out_variant, rest)?;
+        self.finish_sub_container()
+    }
+}
+
+impl TailLoopBuilder<HugrMut> {
+    /// Initialize new builder for a [`ControlFlowOp::TailLoop`] rooted HUGR
+    pub fn new(
+        just_inputs: impl Into<TypeRow>,
+        inputs_outputs: impl Into<TypeRow>,
+        just_outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let tail_loop_sig = TailLoopSignature {
+            just_inputs: just_inputs.into(),
+            just_outputs: just_outputs.into(),
+            rest: inputs_outputs.into(),
+        };
+        let op = ControlFlowOp::TailLoop(tail_loop_sig.clone());
+        let base = HugrMut::new(op);
+        let root = base.hugr().root();
+        Self::create_with_io(base, root, &tail_loop_sig)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
 
     use crate::{
         builder::{
-            module_builder::ModuleBuilder,
             test::{BIT, NAT},
+            DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
+        hugr::ValidationError,
         ops::ConstValue,
         type_row,
         types::Signature,
+        Hugr,
     };
 
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-            let main = module_builder.declare(
-                "main",
-                Signature::new_df(type_row![BIT], type_row![NAT, BIT]),
-            )?;
-            let s1 = module_builder.constant(ConstValue::i64(1))?;
-            let _fdef = {
-                let mut fbuild = module_builder.define_function(&main)?;
-                let [i1] = fbuild.input_wires_arr();
-                let loop_id = {
-                    let mut loop_b =
-                        fbuild.tail_loop_builder(vec![], vec![(BIT, i1)], type_row![NAT])?;
-                    let [i1] = loop_b.input_wires_arr();
-                    let const_wire = loop_b.load_const(&s1)?;
+        let build_result: Result<Hugr, ValidationError> = {
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], type_row![NAT])?;
+            let [i1] = loop_b.input_wires_arr();
+            let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
 
-                    let break_wire =
-                        loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
-                    loop_b.finish_with_outputs(break_wire, [i1])?
-                };
-
-                fbuild.finish_with_outputs(loop_id.outputs())?
-            };
-            module_builder.finish()
+            let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
+            loop_b.set_outputs(break_wire, [i1])?;
+            loop_b.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));
@@ -130,8 +139,8 @@ mod test {
             let main = module_builder
                 .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
 
-            let s2 = module_builder.constant(ConstValue::i64(2))?;
-            let tru_const = module_builder.constant(ConstValue::true_val())?;
+            let s2 = module_builder.add_constant(ConstValue::i64(2))?;
+            let tru_const = module_builder.add_constant(ConstValue::true_val())?;
 
             let _fdef = {
                 let mut fbuild = module_builder.define_function(&main)?;
@@ -166,7 +175,7 @@ mod test {
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 
-                        conditional_b.finish()?
+                        conditional_b.finish_sub_container()?
                     };
 
                     loop_b.finish_with_outputs(conditional_id.out_wire(0), [])?
@@ -174,7 +183,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish()
+            module_builder.finish_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

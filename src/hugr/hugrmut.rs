@@ -4,10 +4,11 @@ use std::ops::Range;
 
 use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
+use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node, ValidationError};
 use crate::ops::OpType;
-use crate::Hugr;
+use crate::{Hugr, Port};
 
 /// A low-level builder for a HUGR.
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
@@ -17,15 +18,16 @@ pub struct HugrMut {
 }
 
 impl HugrMut {
-    /// Initialize a new builder.
-    pub fn new() -> Self {
+    /// Initialize a new module HUGR builder.
+    pub fn new_module() -> Self {
         Default::default()
     }
 
-    /// Return index of HUGR root node.
-    #[inline]
-    pub fn root(&self) -> Node {
-        self.hugr.root.into()
+    /// Initialize a new HUGR builder with `root_op` as the root node.
+    pub fn new(root_op: impl Into<OpType>) -> Self {
+        Self {
+            hugr: Hugr::new(root_op),
+        }
     }
 
     /// Add a node to the graph.
@@ -50,8 +52,14 @@ impl HugrMut {
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
         }
-        self.hugr.hierarchy.detach(node.index);
+        self.remove_node(node)
+    }
+
+    /// Remove a node from the graph
+    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
+        self.hugr.hierarchy.remove(node.index);
         self.hugr.graph.remove_node(node.index);
+        self.hugr.op_types.remove(node.index);
         Ok(())
     }
 
@@ -77,13 +85,8 @@ impl HugrMut {
     /// Disconnects the given ports.
     ///
     /// The port is left in place.
-    pub fn disconnect(
-        &mut self,
-        node: Node,
-        port: usize,
-        direction: Direction,
-    ) -> Result<(), HugrError> {
-        let offset = portgraph::PortOffset::new(direction, port);
+    pub fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
+        let offset = port.offset;
         let port = self.hugr.graph.port_index(node.index, offset).ok_or(
             portgraph::LinkError::UnknownOffset {
                 node: node.index,
@@ -257,6 +260,7 @@ impl HugrMut {
 #[cfg(test)]
 mod test {
     use crate::{
+        hugr::HugrView,
         macros::type_row,
         ops::{DataflowOp, LeafOp, ModuleOp},
         types::{ClassicType, Signature, SimpleType},
@@ -269,10 +273,10 @@ mod test {
     #[test]
     fn simple_function() {
         // Starts an empty builder
-        let mut builder = HugrMut::new();
+        let mut builder = HugrMut::new_module();
 
         // Create the root module definition
-        let module: Node = builder.root();
+        let module: Node = builder.hugr().root();
 
         // Start a main function with two nat inputs.
         //

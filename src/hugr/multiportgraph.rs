@@ -110,6 +110,7 @@ impl MultiPortGraph {
     /// assert!(g.port_link(g.inputs(node1).nth(0).unwrap()).is_none());
     /// ```
     pub fn remove_node(&mut self, node: NodeIndex) {
+        debug_assert!(!self.copy_node.get(node));
         for port in self.graph.all_ports(node) {
             if *self.multiport.get(port) {
                 self.unlink_port(port);
@@ -131,34 +132,32 @@ impl MultiPortGraph {
     /// let node0_output = g.output(node0, 0).unwrap();
     /// let node1_input = g.input(node1, 0).unwrap();
     /// g.link_ports(node0_output, node1_input).unwrap();
-    /// assert_eq!(g.port_link(node0_output), Some(node1_input));
-    /// assert_eq!(g.port_link(node1_input), Some(node0_output));
+    /// assert_eq!(g.port_link(node0_output).unwrap().port(), node1_input);
+    /// assert_eq!(g.port_link(node1_input).unwrap().port(), node0_output);
     /// ```
     ///
     /// # Errors
     ///
-    ///  - When `port_from` or `port_to` does not exist.
-    ///  - When `port_from` is not an output port.
-    ///  - When `port_to` is not an input port.
+    ///  - If `port_a` or `port_b` does not exist.
+    ///  - If `port_a` and `port_b` have the same direction.
     pub fn link_ports(
         &mut self,
-        port_from: PortIndex,
-        port_to: PortIndex,
+        port_a: PortIndex,
+        port_b: PortIndex,
     ) -> Result<(SubportIndex, SubportIndex), LinkError> {
-        let (multiport_from, from_index) = self.get_free_multiport(port_from)?;
-        let (multiport_to, to_index) = self.get_free_multiport(port_to)?;
-        self.graph.link_ports(from_index, to_index)?;
-        Ok((multiport_from, multiport_to))
+        let (multiport_a, index_a) = self.get_free_multiport(port_a)?;
+        let (multiport_b, index_b) = self.get_free_multiport(port_b)?;
+        self.graph.link_ports(index_a, index_b)?;
+        Ok((multiport_a, multiport_b))
     }
 
     /// Link an output subport to an input subport.
     ///
     /// # Errors
     ///
-    ///  - When `subport_from` or `subport_to` does not exist.
-    ///  - When `subport_from` is not an output port.
-    ///  - When `subport_to` is not an input port.
-    ///  - When `port_from` or `port_to` is already linked.
+    ///  - If `subport_from` or `subport_to` does not exist.
+    ///  - If `subport_a` and `subport_b` have the same direction.
+    ///  - If `subport_from` or `subport_to` is already linked.
     pub fn link_subports(
         &mut self,
         subport_from: SubportIndex,
@@ -272,20 +271,43 @@ impl MultiPortGraph {
     pub fn link_nodes(
         &mut self,
         from: NodeIndex,
-        from_offset: usize,
+        from_output: usize,
         to: NodeIndex,
-        to_offset: usize,
+        to_input: usize,
+    ) -> Result<(SubportIndex, SubportIndex), LinkError> {
+        self.link_offsets(
+            from,
+            PortOffset::new_outgoing(from_output),
+            to,
+            PortOffset::new_incoming(to_input),
+        )
+    }
+
+    /// Links two nodes at an input and output port offsets.
+    ///
+    /// # Errors
+    ///
+    ///  - If the ports and nodes do not exist.
+    ///  - If the ports have the same direction.
+    pub fn link_offsets(
+        &mut self,
+        node_a: NodeIndex,
+        offset_a: PortOffset,
+        node_b: NodeIndex,
+        offset_b: PortOffset,
     ) -> Result<(SubportIndex, SubportIndex), LinkError> {
         let from_port = self
-            .output(from, from_offset)
+            .port_index(node_a, offset_a)
             .ok_or(LinkError::UnknownOffset {
-                node: from,
-                offset: PortOffset::new_outgoing(from_offset),
+                node: node_a,
+                offset: offset_a,
             })?;
-        let to_port = self.input(to, to_offset).ok_or(LinkError::UnknownOffset {
-            node: to,
-            offset: PortOffset::new_incoming(to_offset),
-        })?;
+        let to_port = self
+            .port_index(node_b, offset_b)
+            .ok_or(LinkError::UnknownOffset {
+                node: node_b,
+                offset: offset_b,
+            })?;
         self.link_ports(from_port, to_port)
     }
 

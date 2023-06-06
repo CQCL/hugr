@@ -23,7 +23,7 @@ pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
-/// For end users we intend this to be superceded by region-specific APIs.
+/// For end users we intend this to be superseded by region-specific APIs.
 ///
 /// TODO: Wraps the underlying graph and hierarchy, producing a view where
 /// non-linear ports can be connected to multiple nodes via implicit copies
@@ -31,6 +31,11 @@ pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
 pub trait HugrView {
     /// Return index of HUGR root node.
     fn root(&self) -> Node;
+
+    /// Return the type of the HUGR root node.
+    fn root_type(&self) -> &OpType {
+        self.get_optype(self.root())
+    }
 
     /// Returns the parent of a node.
     fn get_parent(&self, node: Node) -> Option<Node>;
