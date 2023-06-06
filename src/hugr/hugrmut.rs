@@ -260,7 +260,7 @@ mod test {
     use crate::{
         hugr::HugrView,
         macros::type_row,
-        ops::{DataflowOp, LeafOp, ModuleOp},
+        ops::{DataflowOp, LeafOp},
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -282,7 +282,7 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ModuleOp::Def {
+                OpType::Def {
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },
             )

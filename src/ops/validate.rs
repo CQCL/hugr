@@ -15,7 +15,7 @@ use crate::types::{SimpleType, TypeRow};
 use super::{
     controlflow::{CaseOp, ConditionalSignature, TailLoopSignature},
     tag::OpTag,
-    BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType,
+    BasicBlockOp, ControlFlowOp, DataflowOp, OpType,
 };
 
 /// A set of property flags required for an operation.
@@ -63,10 +63,28 @@ impl OpType {
     #[inline]
     pub fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            OpType::Module(op) => op.validity_flags(),
+            OpType::Root { .. } => OpValidityFlags {
+                allowed_children: OpTag::ModuleOp,
+                requires_children: false,
+                ..Default::default()
+            },
+            OpType::Def { .. } => OpValidityFlags {
+                allowed_children: OpTag::DataflowOp,
+                allowed_first_child: OpTag::Input,
+                allowed_last_child: OpTag::Output,
+                requires_children: true,
+                requires_dag: true,
+                ..Default::default()
+            },
+            // Default flags are valid for non-container operations
+            // _ => Default::default(),
             OpType::Dataflow(op) => op.validity_flags(),
             OpType::BasicBlock(op) => op.validity_flags(),
             OpType::Case(op) => op.validity_flags(),
+            OpType::Declare { .. }
+            | OpType::AliasDeclare { .. }
+            | OpType::AliasDef { .. }
+            | OpType::Const(_) => Default::default(),
         }
     }
 
@@ -77,10 +95,16 @@ impl OpType {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            OpType::Module(op) => op.validate_children(children),
+            OpType::Def { signature } => validate_io_nodes(
+                &signature.input,
+                &signature.output,
+                "function definition",
+                children,
+            ),
             OpType::Dataflow(op) => op.validate_children(children),
             OpType::BasicBlock(op) => op.validate_children(children),
             OpType::Case(op) => op.validate_children(children),
+            _ => Ok(()),
         }
     }
 }
@@ -170,45 +194,6 @@ pub struct ChildrenEdgeData {
     pub source_port: PortOffset,
     /// Target port.
     pub target_port: PortOffset,
-}
-
-impl ModuleOp {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            ModuleOp::Root { .. } => OpValidityFlags {
-                allowed_children: OpTag::ModuleOp,
-                requires_children: false,
-                ..Default::default()
-            },
-            ModuleOp::Def { .. } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
-                allowed_first_child: OpTag::Input,
-                allowed_last_child: OpTag::Output,
-                requires_children: true,
-                requires_dag: true,
-                ..Default::default()
-            },
-            // Default flags are valid for non-container operations
-            _ => Default::default(),
-        }
-    }
-
-    /// Validate the ordered list of children.
-    fn validate_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        match self {
-            ModuleOp::Def { signature } => validate_io_nodes(
-                &signature.input,
-                &signature.output,
-                "function definition",
-                children,
-            ),
-            _ => Ok(()),
-        }
-    }
 }
 
 impl BasicBlockOp {

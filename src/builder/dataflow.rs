@@ -5,7 +5,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{DataflowOp, ModuleOp, OpType};
+use crate::ops::{DataflowOp,  OpType};
 
 use crate::types::{Signature, TypeRow};
 
@@ -122,7 +122,7 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-/// Builder for a [`crate::ops::module::ModuleOp::Def`] node
+/// Builder for a [`crate::ops::module::OpType::Def`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<HugrMut> {
@@ -133,7 +133,7 @@ impl FunctionBuilder<HugrMut> {
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
         let inputs = signature.input.clone();
         let outputs = signature.output.clone();
-        let op = ModuleOp::Def { signature };
+        let op = OpType::Def { signature };
 
         let base = HugrMut::new(op);
         let root = base.hugr().root();

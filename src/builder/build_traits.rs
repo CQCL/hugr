@@ -13,7 +13,7 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType},
+    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, OpType},
     types::{ClassicType, EdgeKind},
 };
 
@@ -61,10 +61,10 @@ pub trait Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
+    /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val))?;
+        let const_n = self.add_child_op(OpType::Const(val))?;
 
         Ok((const_n, typ).into())
     }
@@ -230,10 +230,10 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
+    /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_dataflow_op(ModuleOp::Const(val), [])?;
+        let const_n = self.add_dataflow_op(OpType::Const(val), [])?;
 
         Ok((const_n.node(), typ).into())
     }
@@ -474,17 +474,17 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the Call
-    /// node, or if `function` does not refer to a [`ModuleOp::Declare`] or
-    /// [`ModuleOp::Def`] node.
+    /// node, or if `function` does not refer to a [`OpType::Declare`] or
+    /// [`OpType::Def`] node.
     fn call<const DEFINED: bool>(
         &mut self,
         function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
-        let def_op: Result<&ModuleOp, ()> = hugr.get_optype(function.node()).try_into();
+        let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
-            Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),
+            OpType::Def { signature } | OpType::Declare { signature } => signature.clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),

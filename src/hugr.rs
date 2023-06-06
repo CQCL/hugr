@@ -16,7 +16,7 @@ use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{ModuleOp, OpType};
+use crate::ops::{OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
 
@@ -32,9 +32,9 @@ pub struct Hugr {
     hierarchy: Hierarchy,
 
     /// The single root node in the hierarchy.
-    /// It must correspond to a [`ModuleOp::Root`] node.
+    /// It must correspond to a [`OpType::Root`] node.
     ///
-    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
+    /// [`OpType::Root`]: crate::ops::OpType::Root.
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
@@ -43,7 +43,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(ModuleOp::Root)
+        Self::new(OpType::Root)
     }
 }
 

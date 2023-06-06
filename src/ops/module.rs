@@ -12,99 +12,99 @@ use smol_str::SmolStr;
 
 use super::tag::OpTag;
 
-/// Module-level operations.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[allow(missing_docs)]
-pub enum ModuleOp {
-    #[default]
-    /// The root of a module, parent of all other `ModuleOp`s.
-    Root,
-    /// A function definition.
-    ///
-    /// Children nodes are the body of the definition.
-    Def {
-        signature: Signature,
-    },
-    /// External function declaration, linked at runtime.
-    Declare {
-        signature: Signature,
-    },
-    /// A type alias declaration. Resolved at link time.
-    AliasDeclare {
-        name: SmolStr,
-        linear: bool,
-    },
-    /// A type alias definition, used only for debug/metadata.
-    AliasDef {
-        name: SmolStr,
-        definition: SimpleType,
-    },
-    // A constant value definition.
-    Const(ConstValue),
-}
+// /// Module-level operations.
+// #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+// #[allow(missing_docs)]
+// pub enum ModuleOp {
+//     #[default]
+//     /// The root of a module, parent of all other `ModuleOp`s.
+//     Root,
+//     /// A function definition.
+//     ///
+//     /// Children nodes are the body of the definition.
+//     Def {
+//         signature: Signature,
+//     },
+//     /// External function declaration, linked at runtime.
+//     Declare {
+//         signature: Signature,
+//     },
+//     /// A type alias declaration. Resolved at link time.
+//     AliasDeclare {
+//         name: SmolStr,
+//         linear: bool,
+//     },
+//     /// A type alias definition, used only for debug/metadata.
+//     AliasDef {
+//         name: SmolStr,
+//         definition: SimpleType,
+//     },
+//     // A constant value definition.
+//     Const(ConstValue),
+// }
 
-impl ModuleOp {
-    /// The name of the operation.
-    pub fn name(&self) -> SmolStr {
-        match self {
-            ModuleOp::Root => "module",
-            ModuleOp::Def { .. } => "def",
-            ModuleOp::Declare { .. } => "declare",
-            ModuleOp::AliasDeclare { .. } => "alias_declare",
-            ModuleOp::AliasDef { .. } => "alias_def",
-            ModuleOp::Const(val) => return val.name(),
-        }
-        .into()
-    }
+// impl ModuleOp {
+//     /// The name of the operation.
+//     pub fn name(&self) -> SmolStr {
+//         match self {
+//             OpType::Root => "module",
+//             OpType::Def { .. } => "def",
+//             OpType::Declare { .. } => "declare",
+//             OpType::AliasDeclare { .. } => "alias_declare",
+//             OpType::AliasDef { .. } => "alias_def",
+//             OpType::Const(val) => return val.name(),
+//         }
+//         .into()
+//     }
 
-    /// A human-readable description of the operation.
-    pub fn description(&self) -> &str {
-        match self {
-            ModuleOp::Root => "The root of a module, parent of all other `ModuleOp`s",
-            ModuleOp::Def { .. } => "A function definition",
-            ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
-            ModuleOp::AliasDeclare { .. } => "A type alias declaration",
-            ModuleOp::AliasDef { .. } => "A type alias definition",
-            ModuleOp::Const(val) => val.description(),
-        }
-    }
+//     /// A human-readable description of the operation.
+//     pub fn description(&self) -> &str {
+//         match self {
+//             OpType::Root => "The root of a module, parent of all other `ModuleOp`s",
+//             OpType::Def { .. } => "A function definition",
+//             OpType::Declare { .. } => "External function declaration, linked at runtime",
+//             OpType::AliasDeclare { .. } => "A type alias declaration",
+//             OpType::AliasDef { .. } => "A type alias definition",
+//             OpType::Const(val) => val.description(),
+//         }
+//     }
 
-    /// Tag identifying the operation.
-    pub fn tag(&self) -> OpTag {
-        match self {
-            ModuleOp::Root => OpTag::ModuleRoot,
-            ModuleOp::Def { .. } => OpTag::Def,
-            ModuleOp::Declare { .. } => OpTag::Function,
-            ModuleOp::AliasDeclare { .. } => OpTag::Alias,
-            ModuleOp::AliasDef { .. } => OpTag::Alias,
-            ModuleOp::Const { .. } => OpTag::Const,
-        }
-    }
+//     /// Tag identifying the operation.
+//     pub fn tag(&self) -> OpTag {
+//         match self {
+//             OpType::Root => OpTag::ModuleRoot,
+//             OpType::Def { .. } => OpTag::Def,
+//             OpType::Declare { .. } => OpTag::Function,
+//             OpType::AliasDeclare { .. } => OpTag::Alias,
+//             OpType::AliasDef { .. } => OpTag::Alias,
+//             OpType::Const { .. } => OpTag::Const,
+//         }
+//     }
 
-    /// The edge kind for the inputs of the operation not described by the
-    /// signature.
-    ///
-    /// If None, there will be no other input edges. Otherwise, all other input
-    /// edges will be of that kind.
-    pub fn other_inputs(&self) -> Option<EdgeKind> {
-        None
-    }
+//     /// The edge kind for the inputs of the operation not described by the
+//     /// signature.
+//     ///
+//     /// If None, there will be no other input edges. Otherwise, all other input
+//     /// edges will be of that kind.
+//     pub fn other_inputs(&self) -> Option<EdgeKind> {
+//         None
+//     }
 
-    /// The edge kind for the outputs of the operation not described by the
-    /// signature.
-    ///
-    /// If None, there will be no other output edges. Otherwise, all other
-    /// output edges will be of that kind.
-    pub fn other_outputs(&self) -> Option<EdgeKind> {
-        match self {
-            ModuleOp::Root | ModuleOp::AliasDeclare { .. } | ModuleOp::AliasDef { .. } => None,
-            ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
-                ClassicType::graph_from_sig(signature.clone()),
-            )),
-            ModuleOp::Const(v) => Some(EdgeKind::Const(v.const_type())),
-        }
-    }
-}
+//     /// The edge kind for the outputs of the operation not described by the
+//     /// signature.
+//     ///
+//     /// If None, there will be no other output edges. Otherwise, all other
+//     /// output edges will be of that kind.
+//     pub fn other_outputs(&self) -> Option<EdgeKind> {
+//         match self {
+//             OpType::Root | OpType::AliasDeclare { .. } | OpType::AliasDef { .. } => None,
+//             OpType::Def { signature } | OpType::Declare { signature } => Some(EdgeKind::Const(
+//                 ClassicType::graph_from_sig(signature.clone()),
+//             )),
+//             OpType::Const(v) => Some(EdgeKind::Const(v.const_type())),
+//         }
+//     }
+// }
 
 /// Value constants
 ///

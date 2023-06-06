@@ -691,7 +691,7 @@ mod test {
 
     use super::*;
     use crate::hugr::HugrMut;
-    use crate::ops::{BasicBlockOp, ConstValue, ModuleOp, OpType};
+    use crate::ops::{BasicBlockOp, ConstValue, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
 
@@ -702,7 +702,7 @@ mod test {
     ///
     /// Returns the hugr and the node index of the definition.
     fn make_simple_hugr(copies: usize) -> (HugrMut, Node) {
-        let def_op: OpType = ModuleOp::Def {
+        let def_op: OpType = OpType::Def {
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
         .into();
@@ -764,7 +764,7 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
+        let const_op = OpType::Const(ConstValue::simple_predicate(0, predicate_size));
         let tag_type = SimpleType::new_simple_predicate(predicate_size);
 
         let input = b
@@ -804,7 +804,7 @@ mod test {
 
     #[test]
     fn invalid_root() {
-        let declare_op: OpType = ModuleOp::Declare {
+        let declare_op: OpType = OpType::Declare {
             signature: Default::default(),
         }
         .into();
@@ -814,7 +814,7 @@ mod test {
         assert_eq!(b.hugr().validate(), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(ModuleOp::Root);
+        let other = b.add_op(OpType::Root);
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -923,7 +923,7 @@ mod test {
         // Add a definition without children
         let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
         let new_def = b
-            .add_op_with_parent(root, ModuleOp::Def { signature: def_sig })
+            .add_op_with_parent(root, OpType::Def { signature: def_sig })
             .unwrap();
         assert_matches!(
             b.hugr().validate(),

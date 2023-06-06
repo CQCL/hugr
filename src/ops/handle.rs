@@ -50,7 +50,7 @@ pub struct DfgID(Node);
 pub struct CfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a module [Root](crate::ops::module::ModuleOp::Root) node.
+/// Handle to a module [Root](crate::ops::module::OpType::Root) node.
 pub struct ModuleRootID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
@@ -58,16 +58,16 @@ pub struct ModuleRootID(Node);
 pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [def](crate::ops::module::ModuleOp::Def)
-/// or [declare](crate::ops::module::ModuleOp::Declare) node.
+/// Handle to a [def](crate::ops::module::OpType::Def)
+/// or [declare](crate::ops::module::OpType::Declare) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDef](crate::ops::module::ModuleOp::AliasDef)
-/// or [AliasDeclare](crate::ops::module::ModuleOp::AliasDeclare) node.
+/// Handle to an [AliasDef](crate::ops::module::OpType::AliasDef)
+/// or [AliasDeclare](crate::ops::module::OpType::AliasDeclare) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
@@ -98,7 +98,7 @@ impl<const DEF: bool> AliasID<DEF> {
 }
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
-/// Handle to a [Const](crate::ops::module::ModuleOp::Const) node.
+/// Handle to a [Const](crate::ops::module::OpType::Const) node.
 pub struct ConstID(Node, ClassicType);
 
 impl ConstID {
