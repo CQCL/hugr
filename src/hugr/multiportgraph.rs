@@ -663,10 +663,37 @@ impl MultiPortGraph {
         }
     }
 
-    /* TODO:
-        compact_nodes
-        compact_ports
-    */
+    /// Compacts the storage of nodes in the portgraph. Note that indices won't
+    /// necessarily be consecutively after this process, as there may be
+    /// hidden copy nodes.
+    ///
+    /// Every time a node is moved, the `rekey` function will be called with its
+    /// old and new index.
+    pub fn compact_nodes<F>(&mut self, mut rekey: F)
+    where
+        F: FnMut(NodeIndex, NodeIndex),
+    {
+        self.graph.compact_nodes(|node, new_node| {
+            self.copy_node.swap(node, new_node);
+            rekey(node, new_node);
+        });
+    }
+
+    /// Compacts the storage of ports in the portgraph. Note that indices won't
+    /// necessarily be consecutively after this process, as there may be hidden
+    /// copy nodes.
+    ///
+    /// Every time a port is moved, the `rekey` function will be called with is
+    /// old and new index.
+    pub fn compact_ports<F>(&mut self, mut rekey: F)
+    where
+        F: FnMut(PortIndex, PortIndex),
+    {
+        self.graph.compact_ports(|port, new_port| {
+            self.multiport.swap(port, new_port);
+            rekey(port, new_port);
+        });
+    }
 
     /// Shrinks the underlying buffers to the fit the data.
     ///
