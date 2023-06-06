@@ -37,7 +37,7 @@ impl From<Wire> for AppendWire {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-/// Error in CircuitBuilder
+/// Error in [`CircuitBuilder`]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
     #[error("Invalid wire index.")]
@@ -45,13 +45,14 @@ pub enum CircuitBuildError {
 }
 
 impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
-    /// Construct a new CircuitBuilder from a vector of incoming wires and the
+    /// Construct a new [`CircuitBuilder`] from a vector of incoming wires and the
     /// builder for the graph
     pub fn new(wires: Vec<Wire>, builder: &'a mut T) -> Self {
         Self { wires, builder }
     }
 
     /// Number of wires tracked, upper bound of valid wire indices
+    #[must_use]
     pub fn n_wires(&self) -> usize {
         self.wires.len()
     }
@@ -148,7 +149,7 @@ mod test {
     use crate::{
         builder::{
             test::{build_main, BIT, F64, QB},
-            Dataflow, Wire,
+            Dataflow, DataflowSubContainer, Wire,
         },
         ops::LeafOp,
         type_row,
@@ -184,7 +185,7 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
-        use AppendWire::*;
+        use AppendWire::{I, W};
         let build_res = build_main(
             Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
             |mut f_build| {

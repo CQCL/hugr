@@ -1,12 +1,16 @@
 use super::{
+    build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container,
+    BuildError, Container, HugrMutRef,
 };
 
-use crate::{hugr::view::HugrView, types::SimpleType};
+use crate::{
+    hugr::{view::HugrView, ValidationError},
+    types::SimpleType,
+};
 
-use crate::ops::handle::{AliasID, ConstID, FuncID, NodeHandle};
-use crate::ops::{ConstValue, ModuleOp, OpType};
+use crate::ops::handle::{AliasID, FuncID, NodeHandle};
+use crate::ops::{ModuleOp, OpType};
 
 use crate::types::Signature;
 
@@ -15,43 +19,46 @@ use smol_str::SmolStr;
 
 use crate::{hugr::HugrMut, Hugr};
 
-#[derive(Default)]
 /// Builder for a HUGR module.
-/// Top level builder which can generate sub-builders.
-/// Validates and returns the HUGR on `finish`.
-pub struct ModuleBuilder(HugrMut);
+pub struct ModuleBuilder<T>(pub(super) T);
 
-impl ModuleBuilder {
-    /// New builder for a new HUGR.
-    pub fn new() -> Self {
-        Self(HugrMut::new())
-    }
-}
-
-impl Container for ModuleBuilder {
-    type ContainerHandle = Result<Hugr, BuildError>;
-
+impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.root()
+        self.0.as_ref().root()
     }
 
     #[inline]
     fn base(&mut self) -> &mut HugrMut {
-        &mut self.0
-    }
-
-    #[inline]
-    fn finish(self) -> Self::ContainerHandle {
-        Ok(self.0.finish()?)
+        self.0.as_mut()
     }
 
     fn hugr(&self) -> &Hugr {
-        self.0.hugr()
+        self.0.as_ref().hugr()
     }
 }
 
-impl ModuleBuilder {
+impl ModuleBuilder<HugrMut> {
+    /// Begin building a new module.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(HugrMut::new_module())
+    }
+}
+
+impl Default for ModuleBuilder<HugrMut> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HugrBuilder for ModuleBuilder<HugrMut> {
+    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+        self.0.finish()
+    }
+}
+
+impl<T: HugrMutRef> ModuleBuilder<T> {
     /// Generate a builder for defining a function body graph.
     ///
     /// Replaces a [`ModuleOp::Declare`] node as specified by `f_id`
@@ -60,10 +67,10 @@ impl ModuleBuilder {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the node.
-    pub fn define_function<'a: 'b, 'b>(
-        &'a mut self,
+    pub fn define_function(
+        &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.hugr().get_optype(f_node)
@@ -83,7 +90,7 @@ impl ModuleBuilder {
         );
 
         let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
-        Ok(FunctionBuilder::new(db))
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
     /// Add a [`ModuleOp::Def`] node and returns a builder to define the function
@@ -93,12 +100,12 @@ impl ModuleBuilder {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ModuleOp::Def`] node.
-    pub fn declare_and_def<'a: 'b, 'b>(
-        &'a mut self,
-        _name: impl Into<String>,
+    pub fn declare_and_def(
+        &mut self,
+        name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<'b, true>, BuildError> {
-        let fid = self.declare(_name, signature)?;
+    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
+        let fid = self.declare(name, signature)?;
         self.define_function(&fid)
     }
 
@@ -119,20 +126,11 @@ impl ModuleBuilder {
         Ok(declare_n.into())
     }
 
-    /// Add a constant value to the module and return a handle to it.
+    /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
-    pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
-        let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val))?;
-
-        Ok((const_n, typ).into())
-    }
-
-    /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
+    /// Error in adding [`ModuleOp::AliasDef`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
@@ -149,6 +147,9 @@ impl ModuleBuilder {
     }
 
     /// Add a [`ModuleOp::AliasDeclare`] node and return a handle to the Alias.
+    /// # Errors
+    ///
+    /// Error in adding [`ModuleOp::AliasDeclare`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
@@ -171,7 +172,7 @@ mod test {
     use crate::{
         builder::{
             test::{n_identity, NAT},
-            Dataflow,
+            Dataflow, DataflowSubContainer,
         },
         type_row,
     };
@@ -189,7 +190,7 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -210,7 +211,7 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish()
+            module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

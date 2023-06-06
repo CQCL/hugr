@@ -17,15 +17,16 @@ pub struct HugrMut {
 }
 
 impl HugrMut {
-    /// Initialize a new builder.
-    pub fn new() -> Self {
+    /// Initialize a new module HUGR builder.
+    pub fn new_module() -> Self {
         Default::default()
     }
 
-    /// Return index of HUGR root node.
-    #[inline]
-    pub fn root(&self) -> Node {
-        self.hugr.root.into()
+    /// Initialize a new HUGR builder with `root_op` as the root node.
+    pub fn new(root_op: impl Into<OpType>) -> Self {
+        Self {
+            hugr: Hugr::new(root_op),
+        }
     }
 
     /// Add a node to the graph.
@@ -257,6 +258,7 @@ impl HugrMut {
 #[cfg(test)]
 mod test {
     use crate::{
+        hugr::HugrView,
         macros::type_row,
         ops::{DataflowOp, LeafOp, ModuleOp},
         types::{ClassicType, Signature, SimpleType},
@@ -269,10 +271,10 @@ mod test {
     #[test]
     fn simple_function() {
         // Starts an empty builder
-        let mut builder = HugrMut::new();
+        let mut builder = HugrMut::new_module();
 
         // Create the root module definition
-        let module: Node = builder.root();
+        let module: Node = builder.hugr().root();
 
         // Start a main function with two nat inputs.
         //

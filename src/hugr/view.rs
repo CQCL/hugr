@@ -32,6 +32,11 @@ pub trait HugrView {
     /// Return index of HUGR root node.
     fn root(&self) -> Node;
 
+    /// Return the type of the HUGR root node.
+    fn root_type(&self) -> &OpType {
+        self.get_optype(self.root())
+    }
+
     /// Returns the parent of a node.
     fn get_parent(&self, node: Node) -> Option<Node>;
 
