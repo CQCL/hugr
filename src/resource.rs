@@ -6,6 +6,7 @@
 //! [`OpDef`]: crate::ops::custom::OpDef
 
 use std::collections::HashSet;
+use std::fmt::{self, Display};
 
 use smol_str::SmolStr;
 
@@ -109,6 +110,12 @@ impl ResourceSet {
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
         self
+    }
+}
+
+impl Display for ResourceSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
