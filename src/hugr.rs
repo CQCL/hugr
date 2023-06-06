@@ -84,10 +84,8 @@ impl Hugr {
         &mut self,
         r: SimpleReplacement,
     ) -> Result<(), SimpleReplacementError> {
-        // 1. Check the parent node exists.
-        if !self.graph.contains_node(r.region.index)
-            || self.get_optype(r.region).tag() != OpTag::Dfg
-        {
+        // 1. Check the parent node exists and is a DFG node.
+        if self.get_optype(r.region).tag() != OpTag::Dfg {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
