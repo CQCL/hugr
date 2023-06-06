@@ -77,7 +77,7 @@ pub trait HugrBuilder: Container {
     fn finish_hugr(self) -> Result<Hugr, ValidationError>;
 }
 
-/// Type implementing this trait build a container graph region by borrowing a HUGR
+/// Types implementing this trait build a container graph region by borrowing a HUGR
 pub trait SubContainer: Container {
     /// A handle to the finished container node, typically returned when the
     /// child graph has been finished.

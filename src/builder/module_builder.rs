@@ -172,7 +172,6 @@ mod test {
     use super::*;
     #[test]
     fn basic_recurse() -> Result<(), BuildError> {
-        // let mut builder = HugrBuilder::new();
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
