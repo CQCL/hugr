@@ -205,8 +205,16 @@ mod test {
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
-        let n_port_0 = n.node_ports(n_node_h0, Direction::Incoming).next().unwrap();
-        let n_port_1 = n.node_ports(n_node_h1, Direction::Incoming).next().unwrap();
+        let n_port_0 = n
+            .node_ports(n_node_h0, Direction::Incoming)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let n_port_1 = n
+            .node_ports(n_node_h1, Direction::Incoming)
+            .exactly_one()
+            .ok()
+            .unwrap();
         let (n_cx_out_0, n_cx_out_1) = n
             .node_ports(n_node_cx, Direction::Outgoing)
             .collect_tuple()
@@ -218,8 +226,16 @@ mod test {
             .node_ports(h_node_cx, Direction::Incoming)
             .collect_tuple()
             .unwrap();
-        let h_h0_out = h.node_ports(h_node_h0, Direction::Outgoing).next().unwrap();
-        let h_h1_out = h.node_ports(h_node_h1, Direction::Outgoing).next().unwrap();
+        let h_h0_out = h
+            .node_ports(h_node_h0, Direction::Outgoing)
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let h_h1_out = h
+            .node_ports(h_node_h1, Direction::Outgoing)
+            .exactly_one()
+            .ok()
+            .unwrap();
         let (h_outp_node, h_port_2) = h.linked_port(h_node_h0, h_h0_out).unwrap();
         let h_port_3 = h.linked_port(h_node_h1, h_h1_out).unwrap().1;
         // 4.4. Construct the maps
