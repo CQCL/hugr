@@ -75,7 +75,15 @@ mod test {
 
     const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
-    /// Creates a hugr with a DFG.
+    /// Creates a hugr like the following:
+    /// --   H   --
+    /// -- [DFG] --
+    /// where [DFG] is:
+    /// ┌───┐     ┌───┐
+    /// ┤ H ├──■──┤ H ├
+    /// ├───┤┌─┴─┐├───┤
+    /// ┤ H ├┤ X ├┤ H ├
+    /// └───┘└───┘└───┘
     fn make_hugr() -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let _f_id = {
@@ -124,7 +132,12 @@ mod test {
         Ok(module_builder.finish_hugr()?)
     }
 
-    /// Creates a hugr with a DFG root with which to replace a subgraph.
+    /// Creates a hugr with a DFG root like the following:
+    /// ┌───┐
+    /// ┤ H ├──■──
+    /// ├───┤┌─┴─┐
+    /// ┤ H ├┤ X ├
+    /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
         let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
@@ -144,6 +157,24 @@ mod test {
     }
 
     #[test]
+    /// Replace the
+    ///      ┌───┐
+    /// ──■──┤ H ├
+    /// ┌─┴─┐├───┤
+    /// ┤ X ├┤ H ├
+    /// └───┘└───┘
+    /// part of
+    /// ┌───┐     ┌───┐
+    /// ┤ H ├──■──┤ H ├
+    /// ├───┤┌─┴─┐├───┤
+    /// ┤ H ├┤ X ├┤ H ├
+    /// └───┘└───┘└───┘
+    /// with
+    /// ┌───┐
+    /// ┤ H ├──■──
+    /// ├───┤┌─┴─┐
+    /// ┤ H ├┤ X ├
+    /// └───┘└───┘
     fn test_simple_replacement() {
         let mut h: Hugr = make_hugr().ok().unwrap();
         // crate::utils::test::viz_dotstr(&h.dot_string());
@@ -207,6 +238,12 @@ mod test {
             nu_out,
         };
         h.apply_simple_replacement(r).ok();
+        // Expect [DFG] to be replaced with:
+        // ┌───┐┌───┐
+        // ┤ H ├┤ H ├──■──
+        // ├───┤├───┤┌─┴─┐
+        // ┤ H ├┤ H ├┤ X ├
+        // └───┘└───┘└───┘
         // crate::utils::test::viz_dotstr(&h.dot_string());
         assert_eq!(h.validate(), Ok(()));
     }
