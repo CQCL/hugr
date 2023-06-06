@@ -332,25 +332,26 @@ impl<'a> ValidationContext<'a> {
         // Compute the number of nodes visited and keep the last one.
         let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| {
             // If there is a LoadConstant with a local constant, count that node too
-            match self.hugr.get_optype(node.into()) {
-                OpType::Dataflow(DataflowOp::LoadConstant { .. })
-                    if self
-                        .hugr
-                        .get_parent(
-                            self.hugr
-                                .graph
-                                .input_neighbours(node)
-                                .next()
-                                .unwrap()
-                                .into(),
-                        )
-                        .unwrap()
-                        == parent =>
-                {
-                    (n + 2, Some(node))
+            if let OpType::Dataflow(DataflowOp::LoadConstant { .. }) =
+                self.hugr.get_optype(node.into())
+            {
+                let const_node = self
+                    .hugr
+                    .graph
+                    .input_neighbours(node)
+                    .next()
+                    .expect("LoadConstant must be connected to a Cont node.")
+                    .into();
+                let const_parent = self
+                    .hugr
+                    .get_parent(const_node)
+                    .expect("Const can't be root.");
+
+                if const_parent == parent {
+                    return (n + 2, Some(node));
                 }
-                _ => (n + 1, Some(node)),
             }
+            (n + 1, Some(node))
         });
 
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index)
