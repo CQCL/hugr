@@ -1079,6 +1079,8 @@ Given a set $S$ of nodes in a hugr $H$, let:
   - $\textrm{out}_H(S)$ be the set of input ports of nodes in $H \setminus S$
     whose source is in $S$.
 
+Notation: given an input port $p$, let $p^-$ be its unique predecessor port.
+
 The method takes as input:
 
   - the ID of a DFG node $P$ in $\Gamma$;
@@ -1090,16 +1092,20 @@ The method takes as input:
   - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
   - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
   
-The new hugr is then derived by:
+The new hugr is then derived as follows:
   
-  - adding copies of all children of $R$, except for Input and Output nodes, to
-    $\Gamma$, and make them all children of $P$;
-  - adding edges between all newly added nodes matching those in $R$;
-  - for each $p \in \textrm{inp}\_H(T)$, adding an edge from the predecessor of
-    $\nu\_\textrm{inp}(p)$ to the new copy of $p$;
-  - for each $p \in \textrm{out}\_{\Gamma}(S)$, adding an edge from the new copy
-    of the predecessor of $\nu\_\textrm{out}(p)$ to $p$.
-  - removing all nodes in $S$ and edges between them.
+  1. Make a copy in $\Gamma$ of all children of $R$, excluding Input and Output,
+     and all edges between them. Make all the newly added nodes children of $P$.
+     Notation: if $p$ is a port of a node in $R$, write $p^*$ for the copy of
+     the port in $\Gamma$.
+  2. For each $(q, p = \nu_\textrm{inp}(q))$ such that $q \notin \texttt{Output}$,
+     add an edge from $p^-$ to $q^*$.
+  3. For each $(p, q = \nu_\textrm{out}(p))$ such that $q^- \notin \texttt{Input}$,
+     add an edge from $(q^-)^*$ to $p$.
+  4. For each $p_1, q, p_0$ such that
+     $q = \nu_\textrm{out}(p_1), p_0 = \nu_\textrm{inp}(q)$, add an edge from
+     $p_0^-$ to $p_1$. (Sanity check: $q^-$ must be an Input node in this case.)
+  5. Remove all nodes in $S$ and edges between them.
 
 ###### `Replace`
 
