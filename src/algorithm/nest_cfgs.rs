@@ -400,7 +400,10 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, ModuleBuilder};
+    use crate::builder::{
+        BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder, HugrMutRef,
+        ModuleBuilder, SubContainer,
+    };
     use crate::ops::{
         handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
         ConstValue,
@@ -430,8 +433,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
@@ -448,11 +451,10 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
-
-        let h = module_builder.finish()?;
+        let h = module_builder.finish_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -483,8 +485,8 @@ pub(crate) mod test {
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
@@ -499,11 +501,11 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
-        let h = module_builder.finish()?;
+        let h = module_builder.finish_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
@@ -602,7 +604,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    fn n_identity<T: Dataflow>(
+    fn n_identity<T: DataflowSubContainer>(
         mut dataflow_builder: T,
         pred_const: &ConstID,
     ) -> Result<T::ContainerHandle, BuildError> {
@@ -611,8 +613,8 @@ pub(crate) mod test {
         dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
     }
 
-    fn build_if_then_else_merge(
-        cfg: &mut CFGBuilder,
+    fn build_if_then_else_merge<T: HugrMutRef>(
+        cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
@@ -624,8 +626,8 @@ pub(crate) mod test {
         Ok((split, merge))
     }
 
-    fn build_then_else_merge_from_if(
-        cfg: &mut CFGBuilder,
+    fn build_then_else_merge_from_if<T: HugrMutRef>(
+        cfg: &mut CFGBuilder<T>,
         unit_const: &ConstID,
         split: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
@@ -649,8 +651,8 @@ pub(crate) mod test {
     }
 
     // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
-    fn build_loop_from_header(
-        cfg: &mut CFGBuilder,
+    fn build_loop_from_header<T: HugrMutRef>(
+        cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         header: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
@@ -663,8 +665,8 @@ pub(crate) mod test {
     }
 
     // Result is header and tail. Caller must provide 0th successor of header (linking to tail), and 0th successor of tail.
-    fn build_loop(
-        cfg: &mut CFGBuilder,
+    fn build_loop<T: HugrMutRef>(
+        cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
@@ -684,8 +686,8 @@ pub(crate) mod test {
 
         let mut module_builder = ModuleBuilder::new();
         let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
         let mut func_builder = module_builder.define_function(&main)?;
         let [int] = func_builder.input_wires_arr();
@@ -713,11 +715,11 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let cfg_id = cfg_builder.finish();
+        let cfg_id = cfg_builder.finish_sub_container()?;
 
         func_builder.finish_with_outputs(cfg_id.outputs())?;
 
-        let h = module_builder.finish()?;
+        let h = module_builder.finish_hugr()?;
 
         Ok((h, *cfg_id.handle(), head, tail))
     }

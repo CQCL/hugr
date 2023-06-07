@@ -9,13 +9,14 @@ pub mod validate;
 pub mod view;
 
 pub use self::hugrmut::HugrMut;
+use self::multiportgraph::MultiPortGraph;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
 pub use rewrite::{Replace, ReplaceError, Rewrite};
 
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
+use portgraph::{Hierarchy, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
@@ -28,7 +29,7 @@ use html_escape::encode_text_to_string;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
-    graph: PortGraph,
+    graph: MultiPortGraph,
 
     /// The node hierarchy.
     hierarchy: Hierarchy,
@@ -71,11 +72,6 @@ pub struct Wire(Node, usize);
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Returns an immutable view over the graph.
-    pub fn view(&self) {
-        unimplemented!()
-    }
-
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<E>) -> Result<(), E> {
         rw.apply(self)
@@ -84,7 +80,7 @@ impl Hugr {
     /// Return dot string showing underlying graph and hierarchy side by side.
     pub fn dot_string(&self) -> String {
         hier_graph_dot_string_with(
-            &self.graph,
+            self.graph.as_portgraph(),
             &self.hierarchy,
             |n| {
                 format!(
@@ -136,7 +132,7 @@ impl Hugr {
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
     pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
-        let mut graph = PortGraph::with_capacity(nodes, ports);
+        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);

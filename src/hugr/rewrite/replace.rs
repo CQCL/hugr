@@ -78,6 +78,7 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 /// A rewrite operation that replaces a subgraph with another graph.
 /// Includes the new weights for the nodes in the replacement graph.
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct Replace {
     /// The subgraph to be replaced.
     subgraph: BoundedSubgraph,
@@ -105,6 +106,7 @@ impl Replace {
     /// with additional components on the side.
     ///
     /// The returned Hugr will have no graph information.
+    #[allow(unused)]
     pub(crate) fn into_parts(self) -> (portgraph::substitute::Rewrite, Hugr, ParentsMap) {
         let (open_graph, replacement) = self.replacement.into_parts();
         (
@@ -139,29 +141,8 @@ impl Rewrite<ReplaceError> for Replace {
     }
 
     /// Performs a Replace operation on the graph.
-    fn apply(self, h: &mut Hugr) -> Result<(), ReplaceError> {
-        // Get the open graph for the rewrites, and a HUGR with the additional components.
-        let (rewrite, mut replacement, parents) = self.into_parts();
-
-        // TODO: Use `parents` to update the hierarchy, and keep the internal hierarchy from `replacement`.
-        let _ = parents;
-
-        let node_inserted = |old, new| {
-            std::mem::swap(&mut h.op_types[new], &mut replacement.op_types[old]);
-            // TODO: metadata (Fn parameter ?)
-        };
-        // unchanged_on_failure is false, so no guarantees here
-        rewrite.apply_with_callbacks(
-            &mut h.graph,
-            |_| {},
-            |_| {},
-            node_inserted,
-            |_, _| {},
-            |_, _| {},
-        )?;
-
-        // TODO: Check types
-        Ok(())
+    fn apply(self, _h: &mut Hugr) -> Result<(), ReplaceError> {
+        unimplemented!()
     }
 }
 
