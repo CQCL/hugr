@@ -76,6 +76,7 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 /// A rewrite operation that replaces a subgraph with another graph.
 /// Includes the new weights for the nodes in the replacement graph.
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct Rewrite {
     /// The subgraph to be replaced.
     subgraph: BoundedSubgraph,
@@ -103,6 +104,7 @@ impl Rewrite {
     /// with additional components on the side.
     ///
     /// The returned Hugr will have no graph information.
+    #[allow(unused)]
     pub(crate) fn into_parts(self) -> (portgraph::substitute::Rewrite, Hugr, ParentsMap) {
         let (open_graph, replacement) = self.replacement.into_parts();
         (

@@ -82,7 +82,7 @@ impl HugrMut {
         Ok(())
     }
 
-    /// Disconnects the given ports.
+    /// Disconnects all edges from the given port.
     ///
     /// The port is left in place.
     pub fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
