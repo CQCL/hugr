@@ -70,7 +70,7 @@ pub enum BuildError {
     CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
 
-/// Trait allowing treating type as (im)mutable reference to [`HugrMut`]
+/// Trait allowing treating type as (im)mutable reference to [`Hugr`]
 pub trait HugrMutRef: AsMut<Hugr> + AsRef<Hugr> {}
 impl<H: HugrMut> HugrMutRef for H {}
 impl HugrMutRef for &mut Hugr {}

@@ -37,9 +37,9 @@ use crate::hugr::HugrMut;
 pub trait Container {
     /// The container node.
     fn container_node(&self) -> Node;
-    /// The underlying [`Hugr`] being built...TODO: should we just require AsMut<Hugr>?
+    /// The underlying [`Hugr`] being built...TODO: should we just require `AsMut<Hugr>`?
     fn base(&mut self) -> &mut Hugr;
-    /// Immutable reference to HUGR being built...TODO: should we just require AsRef<Hugr>? Or combine with previous?
+    /// Immutable reference to HUGR being built...TODO: should we just require `AsRef<Hugr>`? Or combine with previous?
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
