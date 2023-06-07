@@ -10,12 +10,13 @@ pub mod view;
 use std::collections::HashMap;
 
 pub use self::hugrmut::HugrMut;
+use self::multiportgraph::MultiPortGraph;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
 use itertools::Itertools;
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
-use portgraph::{Hierarchy, NodeIndex, PortGraph, UnmanagedDenseMap};
+use portgraph::{Hierarchy, NodeIndex, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
@@ -31,7 +32,7 @@ use html_escape::encode_text_to_string;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
-    graph: PortGraph,
+    graph: MultiPortGraph,
 
     /// The node hierarchy.
     hierarchy: Hierarchy,
@@ -74,11 +75,6 @@ pub struct Wire(Node, usize);
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Returns an immutable view over the graph.
-    pub fn view(&self) {
-        unimplemented!()
-    }
-
     /// Apply a simple replacement operation to the HUGR.
     pub fn apply_simple_replacement(
         &mut self,
@@ -267,35 +263,14 @@ impl Hugr {
     }
 
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite(mut self, rewrite: Rewrite) -> Result<(), RewriteError> {
-        // Get the open graph for the rewrites, and a HUGR with the additional components.
-        let (rewrite, mut replacement, parents) = rewrite.into_parts();
-
-        // TODO: Use `parents` to update the hierarchy, and keep the internal hierarchy from `replacement`.
-        let _ = parents;
-
-        let node_inserted = |old, new| {
-            std::mem::swap(&mut self.op_types[new], &mut replacement.op_types[old]);
-            // TODO: metadata (Fn parameter ?)
-        };
-        rewrite.apply_with_callbacks(
-            &mut self.graph,
-            |_| {},
-            |_| {},
-            node_inserted,
-            |_, _| {},
-            |_, _| {},
-        )?;
-
-        // TODO: Check types
-
-        Ok(())
+    pub fn apply_rewrite(self, _rewrite: Rewrite) -> Result<(), RewriteError> {
+        unimplemented!()
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     pub fn dot_string(&self) -> String {
         hier_graph_dot_string_with(
-            &self.graph,
+            self.graph.as_portgraph(),
             &self.hierarchy,
             |n| {
                 format!(
@@ -347,7 +322,7 @@ impl Hugr {
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
     pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
-        let mut graph = PortGraph::with_capacity(nodes, ports);
+        let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);

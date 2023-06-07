@@ -35,6 +35,16 @@ pub enum EdgeKind {
     Resource(ResourceSet),
 }
 
+impl EdgeKind {
+    /// Returns whether the type contains only linear data.
+    pub fn is_linear(&self) -> bool {
+        match self {
+            EdgeKind::Value(t) => t.is_linear(),
+            _ => false,
+        }
+    }
+}
+
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (constant).
 ///
