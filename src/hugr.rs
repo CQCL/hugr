@@ -180,7 +180,7 @@ impl Hugr {
                     .port_index(rem_inp_node.index, rem_inp_port.offset)
                     .unwrap();
                 let rem_inp_predecessor_port_index =
-                    self.graph.port_link(rem_inp_port_index).unwrap();
+                    self.graph.port_link(rem_inp_port_index).unwrap().port();
                 let new_inp_port_index = self
                     .graph
                     .port_index(*new_inp_node_index, rep_inp_port.offset)
@@ -242,7 +242,7 @@ impl Hugr {
                     .port_index(rem_inp_node.index, rem_inp_port.offset)
                     .unwrap();
                 let rem_inp_predecessor_port_index =
-                    self.graph.port_link(rem_inp_port_index).unwrap();
+                    self.graph.port_link(rem_inp_port_index).unwrap().port();
                 let rem_out_port_index = self
                     .graph
                     .port_index(rem_out_node.index, rem_out_port.offset)
