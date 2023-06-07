@@ -114,17 +114,6 @@ impl Replace {
         )
     }
 
-    /// Checks that the rewrite is valid.
-    ///
-    /// This includes having a convex subgraph (TODO: include definition), and
-    /// having matching numbers of ports on the boundaries.
-    /// TODO does this relate to [Rewrite::may_fail_destructively]? It probably should!
-    pub fn verify(&self) -> Result<(), ReplaceError> {
-        self.verify_convexity()?;
-        self.verify_boundaries()?;
-        Ok(())
-    }
-
     pub fn verify_convexity(&self) -> Result<(), ReplaceError> {
         todo!()
     }
@@ -135,6 +124,20 @@ impl Replace {
 }
 
 impl Rewrite<ReplaceError> for Replace {
+    const UNCHANGED_ON_FAILURE: bool = false;
+
+    /// Checks that the rewrite is valid.
+    ///
+    /// This includes having a convex subgraph (TODO: include definition), and
+    /// having matching numbers of ports on the boundaries.
+    /// TODO not clear this implementation really provides much guarantee about [self.apply]
+    /// but this class is not really working anyway.
+    fn verify(&self, _h: &Hugr) -> Result<(), ReplaceError> {
+        self.verify_convexity()?;
+        self.verify_boundaries()?;
+        Ok(())
+    }
+
     /// Performs a Replace operation on the graph.
     fn apply(self, h: &mut Hugr) -> Result<(), ReplaceError> {
         // Get the open graph for the rewrites, and a HUGR with the additional components.
@@ -147,7 +150,7 @@ impl Rewrite<ReplaceError> for Replace {
             std::mem::swap(&mut h.op_types[new], &mut replacement.op_types[old]);
             // TODO: metadata (Fn parameter ?)
         };
-        // Our (default) may_fail_destructively() returns true, so no guarantees here
+        // unchanged_on_failure is false, so no guarantees here
         rewrite.apply_with_callbacks(
             &mut h.graph,
             |_| {},
