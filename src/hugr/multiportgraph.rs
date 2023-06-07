@@ -2,12 +2,15 @@
 
 mod iter;
 
+pub use self::iter::{
+    Neighbours, NodeConnections, NodeLinks, NodeSubports, Nodes, PortLinks, Ports,
+};
+
 use portgraph::{
     portgraph::{NodePortOffsets, NodePorts, PortOperation},
     Direction, LinkError, NodeIndex, PortGraph, PortIndex, PortOffset, SecondaryMap,
 };
 
-use self::iter::{Neighbours, NodeConnections, NodeLinks, NodeSubports, Nodes, PortLinks, Ports};
 use bitvec::vec::BitVec;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -68,6 +71,14 @@ impl MultiPortGraph {
             copy_node_count: 0,
             subport_count: 0,
         }
+    }
+
+    /// Returns a reference to the internal plain portgraph.
+    ///
+    /// This graph exposes the copy nodes as well as the main nodes.
+    pub fn as_portgraph(&self) -> &PortGraph {
+        // Return the internal graph, exposing the copy nodes
+        &self.graph
     }
 
     /// Adds a node to the portgraph with a given number of input and output ports.
@@ -542,13 +553,15 @@ impl MultiPortGraph {
     /// Returns whether the port graph contains the `node`.
     #[inline]
     pub fn contains_node(&self, node: NodeIndex) -> bool {
-        self.graph.contains_node(node)
+        self.graph.contains_node(node) && !self.copy_node.get(node)
     }
 
     /// Returns whether the port graph contains the `port`.
     #[inline]
     pub fn contains_port(&self, port: PortIndex) -> bool {
-        self.graph.contains_port(port)
+        self.graph
+            .port_node(port)
+            .map_or(false, |node| !self.copy_node.get(node))
     }
 
     /// Returns whether the port graph has no nodes nor ports.

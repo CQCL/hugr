@@ -172,7 +172,7 @@ impl<'a> Iterator for Neighbours<'a> {
 impl<'a> FusedIterator for Neighbours<'a> {}
 
 /// Iterator over the links from a node, created by
-/// [`MultiPortGraph::node_links`].
+/// [`MultiPortGraph::links`].
 ///
 /// In contrast to [`portgraph::portgraph::NodeLinks`], this iterator
 /// only returns linked subports, and includes the source subport.

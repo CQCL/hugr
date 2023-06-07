@@ -11,7 +11,7 @@ use crate::ops::OpType;
 use crate::Direction;
 
 /// An Iterator over the nodes in a Hugr(View)
-pub type Nodes<'a> = MapInto<portgraph::portgraph::Nodes<'a>, Node>;
+pub type Nodes<'a> = MapInto<crate::hugr::multiportgraph::Nodes<'a>, Node>;
 
 /// An Iterator over (some or all) ports of a node
 pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
@@ -20,7 +20,7 @@ pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
 pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 
 /// An Iterator over (some or all) the nodes neighbouring a node
-pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
+pub type Neighbours<'a> = MapInto<crate::hugr::multiportgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
