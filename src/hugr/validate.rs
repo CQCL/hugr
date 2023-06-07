@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, OpType};
 use crate::resource::ResourceSet;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
@@ -1227,5 +1227,106 @@ mod test {
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
+    }
+
+    use crate::builder::{BuildError, ModuleBuilder};
+    use crate::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
+    use crate::resource::ResourceSet;
+    use crate::Direction;
+
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+
+    #[test]
+    fn missing_lift_node() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+        let mut main = module_builder
+            .declare_and_def("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+        let [main_input] = main.input_wires_arr();
+
+        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+
+        // Inner DFG has resource requirements that the wire wont satisfy
+        let rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+        inner_sig.input_resources = rs.clone();
+        inner_sig.output_resources = rs;
+
+        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        let handle = module_builder.finish_hugr();
+
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources));
+        Ok(())
+    }
+
+    #[test]
+    // Should be fine?
+    fn too_many_resources() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let mut main_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+        main_sig.output_resources.insert(&"A".into());
+
+        let mut main = module_builder.declare_and_def("main", main_sig)?;
+        let [main_input] = main.input_wires_arr();
+
+        let inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+
+        // Inner DFG has resource requirements that the wire wont satisfy
+        //let rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+        //inner_sig.inputresources = rs.clone();
+        //inner_sig.output_resources = rs;
+
+        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        module_builder.finish_hugr()?;
+        Ok(())
+    }
+
+    #[test]
+    fn resource_mismatch() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        //let all_rs = ResourceSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+
+        let mut main_sig = Signature::new_df(type_row![], type_row![NAT]);
+        main_sig.output_resources = all_rs.clone();
+
+        let mut main = module_builder.declare_and_def("main", main_sig)?;
+
+        let mut inner_left_sig = Signature::new_df(type_row![], type_row![NAT]);
+        inner_left_sig.output_resources.insert(&"A".into());
+
+        let mut inner_right_sig = Signature::new_df(type_row![], type_row![NAT]);
+        inner_right_sig.output_resources.insert(&"B".into());
+
+        let mut inner_mult_sig = Signature::new_df(type_row![NAT, NAT], type_row![NAT]);
+        inner_mult_sig.input_resources = all_rs.clone();
+        inner_mult_sig.output_resources = all_rs.clone();
+
+        let [left_wire] = main
+            .dfg_builder(inner_left_sig, [])?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let [right_wire] = main
+            .dfg_builder(inner_right_sig, [])?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let builder = main.dfg_builder(inner_mult_sig, [left_wire, right_wire])?;
+        let [_left, _right] = builder.input_wires_arr();
+        let [output] = builder.finish_with_outputs([])?.outputs_arr();
+
+        main.finish_with_outputs([output])?;
+        let handle = module_builder.finish_hugr();
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources));
+        Ok(())
     }
 }
