@@ -40,6 +40,7 @@ derive_more = "0.99.17"
 itertools = "0.10.5"
 html-escape = "0.2.13"
 bitvec = { version = "1.0.1", features = ["serde"] }
+enum_dispatch = "0.3.11"
 
 [features]
 pyo3 = ["dep:pyo3"]

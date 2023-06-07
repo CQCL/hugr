@@ -814,7 +814,7 @@ mod test {
         assert_eq!(b.hugr().validate(), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(OpType::Root);
+        let other = b.add_op(OpType::Module);
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)

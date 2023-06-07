@@ -4,11 +4,11 @@ mod hugrmut;
 
 pub mod multiportgraph;
 pub mod serialize;
-pub mod validate;
+// pub mod validate;
 pub mod view;
 
 pub use self::hugrmut::HugrMut;
-pub use self::validate::ValidationError;
+// pub use self::validate::ValidationError;
 
 use derive_more::From;
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
@@ -16,7 +16,7 @@ use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{OpType};
+use crate::ops::{OpType, OpTrait, OpName};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
 
@@ -43,7 +43,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(OpType::Root)
+        Self::new(crate::ops::Module)
     }
 }
 
