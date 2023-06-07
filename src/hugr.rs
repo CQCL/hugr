@@ -98,7 +98,7 @@ impl Hugr {
             }
         }
         // 3. Do the replacement.
-        // 3.1. Add copies of all replacement nodes to self. Exclude Input/Output nodes.
+        // 3.1. Add copies of all replacement nodes and edges to self. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in r.replacement) to new NodeIndex (in self).
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
         let replacement_nodes = r
@@ -112,7 +112,7 @@ impl Hugr {
         // slice of nodes omitting Input and Output:
         let replacement_inner_nodes = &replacement_nodes[1..replacement_sz - 1];
         for &node in replacement_inner_nodes {
-            // 3.1.1. Check there are no const inputs.
+            // Check there are no const inputs.
             if !r
                 .replacement
                 .get_optype(node)
@@ -126,7 +126,7 @@ impl Hugr {
         let self_input_node_index = self.hierarchy.first(r.region.index).unwrap();
         let replacement_output_node = replacement_nodes[replacement_sz - 1];
         for &node in replacement_inner_nodes {
-            // 3.1.2. Add the nodes.
+            // Add the nodes.
             let op: &OpType = r.replacement.get_optype(node);
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
@@ -137,7 +137,7 @@ impl Hugr {
                 .ok();
             index_map.insert(node.index, new_node_index);
         }
-        // 3.2. Add edges between all newly added nodes matching those in replacement.
+        // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
             let new_node_index = index_map.get(&node.index).unwrap();
@@ -173,28 +173,31 @@ impl Hugr {
                 }
             }
         }
-        // 3.3. For each p in inp(replacement), add an edge from the predecessor of r.nu_inp[p] to
-        // (new copy of) p.
-        for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in r.nu_inp {
-            let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
-            // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
-            let rem_inp_port_index = self
-                .graph
-                .port_index(rem_inp_node.index, rem_inp_port.offset)
-                .unwrap();
-            let rem_inp_predecessor_port_index = self.graph.port_link(rem_inp_port_index).unwrap();
-            let new_inp_port_index = self
-                .graph
-                .port_index(*new_inp_node_index, rep_inp_port.offset)
-                .unwrap();
-            self.graph.unlink_port(rem_inp_predecessor_port_index);
-            self.graph
-                .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
-                .ok();
+        // 3.2. For each p = r.nu_inp[q] such that q is not an Output port, add an edge from the
+        // predecessor of p to (the new copy of) q.
+        for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &r.nu_inp {
+            if r.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
+                let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
+                // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
+                let rem_inp_port_index = self
+                    .graph
+                    .port_index(rem_inp_node.index, rem_inp_port.offset)
+                    .unwrap();
+                let rem_inp_predecessor_port_index =
+                    self.graph.port_link(rem_inp_port_index).unwrap();
+                let new_inp_port_index = self
+                    .graph
+                    .port_index(*new_inp_node_index, rep_inp_port.offset)
+                    .unwrap();
+                self.graph.unlink_port(rem_inp_predecessor_port_index);
+                self.graph
+                    .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
+                    .ok();
+            }
         }
-        // 3.4. For each p in out(r.removal), add an edge from (new copy of) the predecessor of
-        // r.nu_out[p] to p.
-        for ((rem_out_node, rem_out_port), rep_out_port) in r.nu_out {
+        // 3.3. For each q = r.nu_out[p] such that the predecessor of q is not an Input port, add an
+        // edge from (the new copy of) the predecessor of q to p.
+        for ((rem_out_node, rem_out_port), rep_out_port) in &r.nu_out {
             let rem_out_port_index = self
                 .graph
                 .port_index(rem_out_node.index, rem_out_port.offset)
@@ -211,20 +214,49 @@ impl Hugr {
                 .graph
                 .port_node(rep_out_predecessor_port_index)
                 .unwrap();
-            let rep_out_predecessor_port_offset = r
-                .replacement
-                .graph
-                .port_offset(rep_out_predecessor_port_index)
-                .unwrap();
-            let new_out_node_index = index_map.get(&rep_out_predecessor_node_index).unwrap();
-            let new_out_port_index = self
-                .graph
-                .port_index(*new_out_node_index, rep_out_predecessor_port_offset)
-                .unwrap();
-            self.graph.unlink_port(rem_out_port_index);
-            self.graph
-                .link_ports(new_out_port_index, rem_out_port_index)
-                .ok();
+            if r.replacement
+                .get_optype(rep_out_predecessor_node_index.into())
+                .tag()
+                != OpTag::Input
+            {
+                let rep_out_predecessor_port_offset = r
+                    .replacement
+                    .graph
+                    .port_offset(rep_out_predecessor_port_index)
+                    .unwrap();
+                let new_out_node_index = index_map.get(&rep_out_predecessor_node_index).unwrap();
+                let new_out_port_index = self
+                    .graph
+                    .port_index(*new_out_node_index, rep_out_predecessor_port_offset)
+                    .unwrap();
+                self.graph.unlink_port(rem_out_port_index);
+                self.graph
+                    .link_ports(new_out_port_index, rem_out_port_index)
+                    .ok();
+            }
+        }
+        // 3.4. For each q = r.nu_out[p1], p0 = r.nu_inp[q], add an edge from the predecessor of p0
+        // to p1.
+        for ((rem_out_node, rem_out_port), &rep_out_port) in &r.nu_out {
+            let rem_inp_nodeport = r.nu_inp.get(&(replacement_output_node, rep_out_port));
+            if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
+                // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
+                let rem_inp_port_index = self
+                    .graph
+                    .port_index(rem_inp_node.index, rem_inp_port.offset)
+                    .unwrap();
+                let rem_inp_predecessor_port_index =
+                    self.graph.port_link(rem_inp_port_index).unwrap();
+                let rem_out_port_index = self
+                    .graph
+                    .port_index(rem_out_node.index, rem_out_port.offset)
+                    .unwrap();
+                self.graph.unlink_port(rem_inp_port_index);
+                self.graph.unlink_port(rem_out_port_index);
+                self.graph
+                    .link_ports(rem_inp_predecessor_port_index, rem_out_port_index)
+                    .ok();
+            }
         }
         // 3.5. Remove all nodes in r.removal and edges between them.
         for node in &r.removal {
