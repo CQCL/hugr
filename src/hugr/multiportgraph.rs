@@ -204,17 +204,24 @@ impl MultiPortGraph {
     ///
     /// # Example
     /// ```
-    /// # use portgraph::{PortGraph, NodeIndex, PortIndex, Direction};
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::{MultiPortGraph, SubportIndex};
+    /// # use portgraph::{NodeIndex, PortIndex, Direction};
+    /// let mut g = MultiPortGraph::new();
     /// let a = g.add_node(0, 2);
     /// let b = g.add_node(2, 0);
     ///
     /// g.link_nodes(a, 0, b, 0).unwrap();
+    /// g.link_nodes(a, 0, b, 1).unwrap();
     /// g.link_nodes(a, 1, b, 1).unwrap();
     ///
     /// let mut connections = g.get_connections(a, b);
-    /// assert_eq!(connections.next(), Some((g.output(a,0).unwrap(), g.input(b,0).unwrap())));
-    /// assert_eq!(connections.next(), Some((g.output(a,1).unwrap(), g.input(b,1).unwrap())));
+    /// let out0 = g.output(a, 0).unwrap();
+    /// let out1 = g.output(a, 1).unwrap();
+    /// let in0 = g.input(b, 0).unwrap();
+    /// let in1 = g.input(b, 1).unwrap();
+    /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out0,0), SubportIndex::new_multi(in0,0)));
+    /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out0,1), SubportIndex::new_multi(in1,0)));
+    /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out1,0), SubportIndex::new_multi(in1,1)));
     /// assert_eq!(connections.next(), None);
     /// ```
     #[must_use]
@@ -228,15 +235,18 @@ impl MultiPortGraph {
     ///
     /// # Example
     /// ```
-    /// # use portgraph::{PortGraph, NodeIndex, PortIndex, Direction};
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::{MultiPortGraph, SubportIndex};
+    /// # use portgraph::{NodeIndex, PortIndex, Direction};
+    /// let mut g = MultiPortGraph::new();
     /// let a = g.add_node(0, 2);
     /// let b = g.add_node(2, 0);
     ///
     /// g.link_nodes(a, 0, b, 0).unwrap();
     /// g.link_nodes(a, 1, b, 1).unwrap();
     ///
-    /// assert_eq!(g.get_connection(a, b), Some((g.output(a,0).unwrap(), g.input(b,0).unwrap())));
+    /// let out0 = g.output(a, 0).unwrap();
+    /// let in0 = g.input(b, 0).unwrap();
+    /// assert_eq!(g.get_connection(a, b), Some((SubportIndex::new_multi(out0,0), SubportIndex::new_multi(in0,0))));
     /// ```
     #[must_use]
     #[inline]
@@ -252,8 +262,9 @@ impl MultiPortGraph {
     ///
     /// # Example
     /// ```
-    /// # use portgraph::{PortGraph, NodeIndex, PortIndex, Direction};
-    /// let mut g = PortGraph::new();
+    /// # use hugr::hugr::multiportgraph::MultiPortGraph;
+    /// # use portgraph::{NodeIndex, PortIndex, Direction};
+    /// let mut g = MultiPortGraph::new();
     /// let a = g.add_node(0, 2);
     /// let b = g.add_node(2, 0);
     ///
