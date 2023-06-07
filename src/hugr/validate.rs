@@ -72,7 +72,7 @@ impl<'a> ValidationContext<'a> {
     fn compute_dominator(&self, node: Node) -> DominatorTree {
         let entry = self.hugr.hierarchy.first(node.index).unwrap();
         dominators_filtered(
-            self.hugr.graph.as_graph(),
+            self.hugr.graph.as_portgraph(),
             entry,
             Direction::Outgoing,
             |n| {
@@ -342,7 +342,7 @@ impl<'a> ValidationContext<'a> {
         // so we can be more efficient and avoid the `contains_node` filter.
         // https://github.com/CQCL-DEV/hugr/issues/125
         let topo = toposort_filtered::<HashSet<PortIndex>>(
-            self.hugr.graph.as_graph(),
+            self.hugr.graph.as_portgraph(),
             [first_child],
             Direction::Outgoing,
             |_| true,
@@ -543,7 +543,7 @@ impl<'a> ValidationContext<'a> {
     /// state order edge.
     fn df_port_filter(&self, node: portgraph::NodeIndex, port: portgraph::PortIndex) -> bool {
         // Toposort operates on the internal portgraph. It may traverse copy nodes.
-        let portgraph = self.hugr.graph.as_graph();
+        let portgraph = self.hugr.graph.as_portgraph();
 
         let offset = self.hugr.graph.port_offset(port).unwrap();
 

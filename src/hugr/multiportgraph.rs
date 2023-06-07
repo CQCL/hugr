@@ -76,7 +76,7 @@ impl MultiPortGraph {
     /// Returns a reference to the internal plain portgraph.
     ///
     /// This graph exposes the copy nodes as well as the main nodes.
-    pub fn as_graph(&self) -> &PortGraph {
+    pub fn as_portgraph(&self) -> &PortGraph {
         // Return the internal graph, exposing the copy nodes
         &self.graph
     }

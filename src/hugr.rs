@@ -78,7 +78,7 @@ impl Hugr {
     /// Return dot string showing underlying graph and hierarchy side by side.
     pub fn dot_string(&self) -> String {
         hier_graph_dot_string_with(
-            self.graph.as_graph(),
+            self.graph.as_portgraph(),
             &self.hierarchy,
             |n| {
                 format!(
