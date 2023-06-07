@@ -22,7 +22,7 @@ use self::tag::OpTag;
 use enum_dispatch::enum_dispatch;
 
 pub use self::constant::{Const, ConstValue};
-pub use self::dataflow::{Input, Output};
+pub use self::dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use self::module::{AliasDeclare, AliasDef, Declare, Def, Module};
 
 #[enum_dispatch(OpTrait, OpName)]
@@ -40,6 +40,10 @@ pub enum OpType {
     Const,
     Input,
     Output,
+    Call,
+    CallIndirect,
+    LoadConstant,
+    DFG,
 }
 
 impl Default for OpType {
