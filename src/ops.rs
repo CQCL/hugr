@@ -14,16 +14,16 @@ use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, Simpl
 use crate::{Direction, Port};
 
 pub use custom::{CustomOp, OpDef, OpaqueOp};
-pub use leaf::LeafOp;
 
 use smol_str::SmolStr;
 
 use self::tag::OpTag;
 use enum_dispatch::enum_dispatch;
 
-pub use self::constant::{Const, ConstValue};
-pub use self::dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
-pub use self::module::{AliasDeclare, AliasDef, Declare, Def, Module};
+pub use constant::{Const, ConstValue};
+pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
+pub use leaf::LeafOp;
+pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 
 #[enum_dispatch(OpTrait, OpName)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -44,6 +44,7 @@ pub enum OpType {
     CallIndirect,
     LoadConstant,
     DFG,
+    LeafOp,
 }
 
 impl Default for OpType {
