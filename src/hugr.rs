@@ -131,7 +131,7 @@ impl Hugr {
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
-            // Make r.p the parent
+            // Make r.region the parent
             self.hierarchy
                 .insert_after(new_node_index, self_input_node_index)
                 .ok();
