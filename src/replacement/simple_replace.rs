@@ -9,8 +9,8 @@ use thiserror::Error;
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
     /// The common DFG parent of all nodes to be replaced.
-    pub region: Node,
-    /// The set of nodes to remove (a convex set of leaf children of `region`).
+    pub parent: Node,
+    /// The set of nodes to remove (a convex set of leaf children of `parent`).
     pub removal: HashSet<Node>,
     /// A hugr with DFG root (consisting of replacement nodes).
     pub replacement: Hugr,
@@ -25,14 +25,14 @@ pub struct SimpleReplacement {
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
     pub fn new(
-        region: Node,
+        parent: Node,
         removal: HashSet<Node>,
         replacement: Hugr,
         nu_inp: HashMap<(Node, Port), (Node, Port)>,
         nu_out: HashMap<(Node, Port), Port>,
     ) -> Self {
         Self {
-            region,
+            parent,
             removal,
             replacement,
             nu_inp,
@@ -266,7 +266,7 @@ mod test {
         nu_out.insert((h_outp_node, h_port_3), n_port_3);
         // 5. Define the replacement
         let r = SimpleReplacement {
-            region: p,
+            parent: p,
             removal: s,
             replacement: n,
             nu_inp,
@@ -361,7 +361,7 @@ mod test {
         nu_out.insert((h_node_h1, h_port_3), n_port_1);
         // 5. Define the replacement
         let r = SimpleReplacement {
-            region: p,
+            parent: p,
             removal: s,
             replacement: n,
             nu_inp,

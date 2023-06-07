@@ -81,13 +81,13 @@ impl Hugr {
         r: SimpleReplacement,
     ) -> Result<(), SimpleReplacementError> {
         // 1. Check the parent node exists and is a DFG node.
-        if self.get_optype(r.region).tag() != OpTag::Dfg {
+        if self.get_optype(r.parent).tag() != OpTag::Dfg {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
         for node in &r.removal {
             if self.hierarchy.is_root(node.index)
-                || self.hierarchy.parent(node.index).unwrap() != r.region.index
+                || self.hierarchy.parent(node.index).unwrap() != r.parent.index
                 || self.hierarchy.has_children(node.index)
             {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
@@ -119,7 +119,7 @@ impl Hugr {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
-        let self_input_node_index = self.hierarchy.first(r.region.index).unwrap();
+        let self_input_node_index = self.hierarchy.first(r.parent.index).unwrap();
         let replacement_output_node = replacement_nodes[replacement_sz - 1];
         for &node in replacement_inner_nodes {
             // Add the nodes.
@@ -127,7 +127,7 @@ impl Hugr {
             let sig = op.signature();
             let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
             self.op_types[new_node_index] = op.clone();
-            // Make r.region the parent
+            // Make r.parent the parent
             self.hierarchy
                 .insert_after(new_node_index, self_input_node_index)
                 .ok();
