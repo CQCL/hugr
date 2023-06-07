@@ -23,7 +23,8 @@ pub trait Rewrite<E> {
     /// See also [self.verify]
     /// # Panics
     /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
-    /// implementations may begin with `assert!(h.validate())`, and *should* begin with `debug_assert!(h.validate())`
+    /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
+    /// being preferred.
     fn apply(self, h: &mut Hugr) -> Result<(), E>;
 }
 
