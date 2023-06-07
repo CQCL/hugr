@@ -768,6 +768,7 @@ mod test {
     use super::*;
     use crate::hugr::HugrMut;
     use crate::ops::{BasicBlockOp, ConstValue, LeafOp, ModuleOp, OpType};
+    use crate::resource::ResourceSet;
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
 

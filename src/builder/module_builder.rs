@@ -74,14 +74,18 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         let f_node = f_id.node();
         let signature = match self.hugr().get_optype(f_node) {
             OpType::Module(ModuleOp::Declare { signature }) => signature.clone(),
-            _ => return Err(BuildError::UnexpectedType {
-                node: f_node,
-                op_desc: "ModuleOp::Declare",
-            }),
+            _ => {
+                return Err(BuildError::UnexpectedType {
+                    node: f_node,
+                    op_desc: "ModuleOp::Declare",
+                })
+            }
         };
         self.base().replace_op(
             f_node,
-            OpType::Module(ModuleOp::Def { signature: signature.clone() })
+            OpType::Module(ModuleOp::Def {
+                signature: signature.clone(),
+            }),
         );
 
         let db = DFGBuilder::create_with_io(self.base(), f_node, signature)?;

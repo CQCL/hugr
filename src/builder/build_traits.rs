@@ -156,16 +156,15 @@ pub trait Dataflow: Container {
     /// the DFG node.
     fn dfg_builder(
         &mut self,
-        inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        output_types: TypeRow,
+        signature: Signature,
+        input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
-        let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
             OpType::Dataflow(DataflowOp::DFG {
-                signature: Signature::new_df(input_types.clone(), output_types.clone()),
+                signature: signature.clone(),
             }),
-            input_wires,
+            input_wires.into_iter().collect(),
         )?;
 
         DFGBuilder::create_with_io(self.base(), dfg_n, signature)

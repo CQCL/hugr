@@ -101,8 +101,10 @@ mod test {
                 vec![qb2],
             )?;
 
-            let mut inner_builder =
-                func_builder.dfg_builder(vec![(QB, qb0), (QB, qb1)], type_row![QB, QB])?;
+            let mut inner_builder = func_builder.dfg_builder(
+                Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
+                [qb0, qb1],
+            )?;
             let inner_graph = {
                 let [wire0, wire1] = inner_builder.input_wires_arr();
                 let wire2 = inner_builder.add_dataflow_op(

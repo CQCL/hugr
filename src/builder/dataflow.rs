@@ -25,7 +25,7 @@ impl<T: HugrMutRef> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        signature: Signature
+        signature: Signature,
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input.len();
         let num_out_wires = signature.output.len();
@@ -66,7 +66,9 @@ impl DFGBuilder<HugrMut> {
         let input = input.into();
         let output = output.into();
         let signature = Signature::new_df(input.clone(), output.clone());
-        let dfg_op = DataflowOp::DFG { signature: signature.clone() };
+        let dfg_op = DataflowOp::DFG {
+            signature: signature.clone(),
+        };
         let base = HugrMut::new(dfg_op);
         let root = base.hugr().root();
         DFGBuilder::create_with_io(base, root, signature)
@@ -135,7 +137,9 @@ impl FunctionBuilder<HugrMut> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let op = ModuleOp::Def { signature: signature.clone() };
+        let op = ModuleOp::Def {
+            signature: signature.clone(),
+        };
 
         let base = HugrMut::new(op);
         let root = base.hugr().root();
@@ -225,7 +229,8 @@ mod test {
                     vec![qb],
                 )?;
 
-                let inner_builder = func_builder.dfg_builder(vec![(NAT, int)], type_row![NAT])?;
+                let inner_builder = func_builder
+                    .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
                 let inner_id = n_identity(inner_builder)?;
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
@@ -318,7 +323,8 @@ mod test {
             let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested = f_build.dfg_builder(vec![], type_row![BIT])?;
+            let mut nested =
+                f_build.dfg_builder(Signature::new_df(type_row![], type_row![BIT]), [])?;
 
             let id = nested.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
 
