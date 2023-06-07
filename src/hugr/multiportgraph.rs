@@ -206,6 +206,7 @@ impl MultiPortGraph {
     /// ```
     /// # use hugr::hugr::multiportgraph::{MultiPortGraph, SubportIndex};
     /// # use portgraph::{NodeIndex, PortIndex, Direction};
+    /// # use itertools::Itertools;
     /// let mut g = MultiPortGraph::new();
     /// let a = g.add_node(0, 2);
     /// let b = g.add_node(2, 0);
@@ -215,10 +216,8 @@ impl MultiPortGraph {
     /// g.link_nodes(a, 1, b, 1).unwrap();
     ///
     /// let mut connections = g.get_connections(a, b);
-    /// let out0 = g.output(a, 0).unwrap();
-    /// let out1 = g.output(a, 1).unwrap();
-    /// let in0 = g.input(b, 0).unwrap();
-    /// let in1 = g.input(b, 1).unwrap();
+    /// let (out0, out1) = g.outputs(a).collect_tuple().unwrap();
+    /// let (in0, in1) = g.inputs(b).collect_tuple().unwrap();
     /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out0,0), SubportIndex::new_multi(in0,0)));
     /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out0,1), SubportIndex::new_multi(in1,0)));
     /// assert_eq!(connections.next().unwrap(), (SubportIndex::new_multi(out1,0), SubportIndex::new_multi(in1,1)));
@@ -1061,8 +1060,8 @@ pub mod test {
         let mut g = MultiPortGraph::new();
         let node0 = g.add_node(1, 2);
         let node1 = g.add_node(2, 1);
-        let node0_output0 = g.output(node0, 0).unwrap();
-        let node1_input0 = g.input(node1, 0).unwrap();
+        let (node0_output0, node0_output1) = g.outputs(node0).collect_tuple().unwrap();
+        let (node1_input0, node1_input1) = g.inputs(node1).collect_tuple().unwrap();
 
         assert!(g.input_links(node0).eq([]));
         assert!(g.output_links(node0).eq([]));
@@ -1072,18 +1071,49 @@ pub mod test {
         assert!(g.all_neighbours(node0).eq([]));
 
         g.link_nodes(node0, 0, node1, 0).unwrap();
+        g.link_nodes(node0, 0, node1, 1).unwrap();
+        g.link_nodes(node0, 1, node1, 1).unwrap();
 
-        assert!(g.input_links(node0).eq([]));
-        assert!(g.output_links(node0).eq([(
-            SubportIndex::new_unique(node0_output0),
-            SubportIndex::new_unique(node1_input0)
-        )]));
-        assert!(g.all_links(node0).eq([(
-            SubportIndex::new_unique(node0_output0),
-            SubportIndex::new_unique(node1_input0)
-        )]));
-        assert!(g.input_neighbours(node0).eq([]));
-        assert!(g.output_neighbours(node0).eq([node1]));
-        assert!(g.all_neighbours(node0).eq([node1]));
+        assert_eq!(
+            g.subport_outputs(node0).collect_vec(),
+            [
+                SubportIndex::new_multi(node0_output0, 0),
+                SubportIndex::new_multi(node0_output0, 1),
+                SubportIndex::new_unique(node0_output1),
+            ]
+        );
+        assert_eq!(
+            g.subport_inputs(node1).collect_vec(),
+            [
+                SubportIndex::new_unique(node1_input0),
+                SubportIndex::new_multi(node1_input1, 0),
+                SubportIndex::new_multi(node1_input1, 1),
+            ]
+        );
+
+        let links = [
+            (
+                SubportIndex::new_multi(node0_output0, 0),
+                SubportIndex::new_unique(node1_input0),
+            ),
+            (
+                SubportIndex::new_multi(node0_output0, 1),
+                SubportIndex::new_multi(node1_input1, 0),
+            ),
+            (
+                SubportIndex::new_unique(node0_output1),
+                SubportIndex::new_multi(node1_input1, 1),
+            ),
+        ];
+        assert_eq!(g.input_links(node0).collect_vec(), []);
+        assert_eq!(g.output_links(node0).collect_vec(), links);
+        assert_eq!(g.all_links(node0).collect_vec(), links);
+        assert_eq!(g.input_neighbours(node0).collect_vec(), []);
+        assert_eq!(
+            g.output_neighbours(node0).collect_vec(),
+            [node1, node1, node1]
+        );
+        assert_eq!(g.all_neighbours(node0).collect_vec(), [node1, node1, node1]);
+        assert_eq!(g.port_links(node0_output0).collect_vec(), links[0..2]);
     }
 }

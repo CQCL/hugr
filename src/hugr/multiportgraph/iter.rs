@@ -87,15 +87,17 @@ impl<'a> Iterator for NodeSubports<'a> {
     type Item = SubportIndex;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(offset) = self.current_subports.next() {
-            // We are in the middle of iterating over the subports of a port.
-            let current_port = self
-                .current_port
-                .expect("NodeSubports set an invalid current_port value.");
-            return Some(SubportIndex::new_multi(current_port, offset));
-        }
-        // Proceed to the next port.
-        if let Some(port) = self.ports.next() {
+        loop {
+            if let Some(offset) = self.current_subports.next() {
+                // We are in the middle of iterating over the subports of a port.
+                let current_port = self
+                    .current_port
+                    .expect("NodeSubports set an invalid current_port value.");
+                return Some(SubportIndex::new_multi(current_port, offset));
+            }
+
+            // Proceed to the next port.
+            let port = self.ports.next()?;
             self.current_port = Some(port);
             if self.multigraph.is_multiport(port) {
                 let dir = self.multigraph.graph.port_direction(port).unwrap();
@@ -113,7 +115,6 @@ impl<'a> Iterator for NodeSubports<'a> {
                 return Some(SubportIndex::new_unique(port));
             }
         }
-        None
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -163,7 +164,8 @@ impl<'a> Iterator for Neighbours<'a> {
                 self.multigraph.graph.port_link(subport_index)
             }
         })?;
-        self.multigraph.graph.port_node(link)
+        let link_subport = self.multigraph.get_subport_from_index(link).unwrap();
+        self.multigraph.graph.port_node(link_subport.port())
     }
 }
 
