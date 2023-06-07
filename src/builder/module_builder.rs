@@ -127,7 +127,7 @@ impl ModuleBuilder {
     /// [`ModuleOp::Const`] node.
     pub fn constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val, typ.clone()))?;
+        let const_n = self.add_child_op(ModuleOp::Const(val))?;
 
         Ok((const_n, typ).into())
     }

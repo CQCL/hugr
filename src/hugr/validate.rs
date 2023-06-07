@@ -376,9 +376,7 @@ impl<'a> ValidationContext<'a> {
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
             EdgeKind::Const(typ) => match from_optype {
-                // We don't need to check the second argument of ModuleOp::Const
-                // because it's what's providing the information for `port_kind`
-                OpType::Module(ModuleOp::Const(val, _)) => {
+                OpType::Module(ModuleOp::Const(val)) => {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 }
                 // If const edges aren't coming from const nodes, they're graph
@@ -775,12 +773,8 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let tag_classic_type = ClassicType::new_simple_predicate(predicate_size);
-        let const_op = ModuleOp::Const(
-            ConstValue::simple_predicate(0, predicate_size),
-            tag_classic_type.clone(),
-        );
-        let tag_type = SimpleType::Classic(tag_classic_type);
+        let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
+        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
             .add_op_with_parent(

@@ -40,7 +40,7 @@ pub enum ModuleOp {
         definition: SimpleType,
     },
     // A constant value definition.
-    Const(ConstValue, ClassicType),
+    Const(ConstValue),
 }
 
 impl ModuleOp {
@@ -52,7 +52,7 @@ impl ModuleOp {
             ModuleOp::Declare { .. } => "declare",
             ModuleOp::AliasDeclare { .. } => "alias_declare",
             ModuleOp::AliasDef { .. } => "alias_def",
-            ModuleOp::Const(val, _) => return val.name(),
+            ModuleOp::Const(val) => return val.name(),
         }
         .into()
     }
@@ -65,7 +65,7 @@ impl ModuleOp {
             ModuleOp::Declare { .. } => "External function declaration, linked at runtime",
             ModuleOp::AliasDeclare { .. } => "A type alias declaration",
             ModuleOp::AliasDef { .. } => "A type alias definition",
-            ModuleOp::Const(val, _) => val.description(),
+            ModuleOp::Const(val) => val.description(),
         }
     }
 
@@ -101,7 +101,7 @@ impl ModuleOp {
             ModuleOp::Def { signature } | ModuleOp::Declare { signature } => Some(EdgeKind::Const(
                 ClassicType::graph_from_sig(signature.clone()),
             )),
-            ModuleOp::Const(_, ty) => Some(EdgeKind::Const(ty.clone())),
+            ModuleOp::Const(tm) => Some(EdgeKind::Const(tm.const_type())),
         }
     }
 }
