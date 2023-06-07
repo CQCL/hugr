@@ -8,7 +8,7 @@ use portgraph::{NodeIndex, PortIndex};
 
 use super::{MultiPortGraph, SubportIndex};
 
-/// Iterator over the ports of a node.
+/// Iterator over the nodes of a graph.
 #[derive(Clone)]
 pub struct Nodes<'a> {
     // We use portgraph's iterator, but filter out the copy nodes.
@@ -201,8 +201,8 @@ impl<'a> Iterator for NodeLinks<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(links) = &mut self.current_links {
-                if let Some(elt) = links.next() {
-                    return Some(elt);
+                if let Some(link) = links.next() {
+                    return Some(link);
                 }
                 self.current_links = None;
             }
@@ -390,7 +390,9 @@ impl<'a> FusedIterator for PortLinks<'a> {}
 pub struct Ports<'a> {
     /// The multiport graph.
     multigraph: &'a MultiPortGraph,
-    /// The current port.
+    /// The wrapped ports iterator.
+    ///
+    /// We filter out the copy nodes from here.
     ports: portgraph::portgraph::Ports<'a>,
 }
 
