@@ -43,17 +43,6 @@ pub enum LeafOp {
     Measure,
     /// A rotation of a qubit about the Pauli Z axis by an input float angle.
     RzF64,
-    /// A copy operation for classical data.
-    Copy {
-        /// The number of copies to make.
-        ///
-        /// Note that a 0-ary copy acts as an explicit discard.
-        /// Like any stateful operation with no dataflow outputs, such
-        /// a copy should have a State output connecting it to the Output node.
-        n_copies: u32,
-        /// The type of the data to copy.
-        typ: ClassicType,
-    },
     /// A bitwise XOR operation.
     Xor,
     /// An operation that packs all its inputs into a tuple.
@@ -103,7 +92,6 @@ impl LeafOp {
             LeafOp::Reset => "Reset",
             LeafOp::Noop(_) => "Noop",
             LeafOp::Measure => "Measure",
-            LeafOp::Copy { .. } => "Copy",
             LeafOp::Xor => "Xor",
             LeafOp::MakeTuple(_) => "MakeTuple",
             LeafOp::UnpackTuple(_) => "UnpackTuple",
@@ -130,7 +118,6 @@ impl LeafOp {
             LeafOp::Reset => "Qubit reset",
             LeafOp::Noop(_) => "Noop gate",
             LeafOp::Measure => "Qubit measurement gate",
-            LeafOp::Copy { .. } => "Classical data copy",
             LeafOp::Xor => "Bitwise XOR",
             LeafOp::MakeTuple(_) => "MakeTuple operation",
             LeafOp::UnpackTuple(_) => "UnpackTuple operation",
@@ -160,10 +147,6 @@ impl LeafOp {
             | LeafOp::Z => Signature::new_linear(type_row![Q]),
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
-            LeafOp::Copy { n_copies, typ } => {
-                let typ: SimpleType = typ.clone().into();
-                Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
-            }
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(opaque) => opaque.signature(),
             LeafOp::MakeTuple(types) => {
