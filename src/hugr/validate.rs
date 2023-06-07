@@ -757,13 +757,13 @@ mod test {
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
     /// Returns the hugr and the node index of the definition.
-    fn make_simple_hugr(copies: usize) -> (HugrMut, Node) {
+    fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
         let def_op: OpType = ModuleOp::Def {
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
         .into();
 
-        let mut b = HugrMut::new_module();
+        let mut b = Hugr::default();
         let root = b.root();
 
         let def = b.add_op_with_parent(root, def_op).unwrap();
@@ -775,7 +775,7 @@ mod test {
     /// Adds an input{B}, copy{B -> B^copies}, and output{B^copies} operation to a dataflow container.
     ///
     /// Returns the node indices of each of the operations.
-    fn add_df_children(b: &mut HugrMut, parent: Node, copies: usize) -> (Node, Node, Node) {
+    fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
             .add_op_with_parent(
                 parent,
@@ -816,7 +816,7 @@ mod test {
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(
-        b: &mut HugrMut,
+        b: &mut Hugr,
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
@@ -865,23 +865,23 @@ mod test {
         }
         .into();
 
-        let mut b = HugrMut::new_module();
+        let mut b = Hugr::default();
         let root = b.root();
-        assert_eq!(b.hugr().validate(), Ok(()));
+        assert_eq!(b.validate(), Ok(()));
 
         // Add another hierarchy root
         let other = b.add_op(ModuleOp::Root);
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, declare_op);
-        assert_eq!(b.hugr().validate(), Ok(()));
+        assert_eq!(b.validate(), Ok(()));
 
         // Make the hugr root not a hierarchy root
         {
-            let mut hugr = b.hugr().clone();
+            let mut hugr = b.clone();
             hugr.root = other.index;
             assert_matches!(
                 hugr.validate(),
@@ -894,8 +894,8 @@ mod test {
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop(ClassicType::F64.into()).into();
 
-        let b = HugrMut::new(leaf_op);
-        assert_eq!(b.hugr().validate(), Ok(()));
+        let b = Hugr::new(leaf_op);
+        assert_eq!(b.validate(), Ok(()));
     }
 
     #[test]
@@ -905,23 +905,22 @@ mod test {
         }
         .into();
 
-        let mut b = HugrMut::new(dfg_op);
+        let mut b = Hugr::new(dfg_op);
         let root = b.root();
         add_df_children(&mut b, root, 1);
-        assert_eq!(b.hugr().validate(), Ok(()));
+        assert_eq!(b.validate(), Ok(()));
     }
 
     #[test]
     fn simple_hugr() {
         let b = make_simple_hugr(2).0;
-        assert_eq!(b.hugr().validate(), Ok(()));
+        assert_eq!(b.validate(), Ok(()));
     }
 
     #[test]
     fn invalid_ports() {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, output) = b
-            .hugr()
             .hierarchy
             .children(def.index)
             .map_into()
@@ -937,7 +936,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, copy)
         );
 
@@ -951,7 +950,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::IncompatiblePorts { from, to, .. }) => {assert_eq!(from, copy); assert_eq!(to, output)}
         );
     }
@@ -962,7 +961,6 @@ mod test {
         let (mut b, def) = make_simple_hugr(2);
         let root = b.root();
         let (_input, copy, _output) = b
-            .hugr()
             .hierarchy
             .children(def.index)
             .map_into()
@@ -975,7 +973,7 @@ mod test {
             .add_op_with_parent(root, ModuleOp::Def { signature: def_sig })
             .unwrap();
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
         );
 
@@ -983,7 +981,7 @@ mod test {
         add_df_children(&mut b, new_def, 2);
         b.set_parent(new_def, copy).unwrap();
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
         );
         b.set_parent(new_def, root).unwrap();
@@ -994,7 +992,7 @@ mod test {
             .add_op_with_parent(root, DataflowOp::Input { types: type_row![] })
             .unwrap();
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
     }
@@ -1004,7 +1002,6 @@ mod test {
     fn df_children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, output) = b
-            .hugr()
             .hierarchy
             .children(def.index)
             .map_into()
@@ -1020,7 +1017,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
         );
 
@@ -1032,7 +1029,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
@@ -1051,7 +1048,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, copy.index)}
         );
@@ -1061,7 +1058,6 @@ mod test {
     fn dags() {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, copy, _output) = b
-            .hugr()
             .hierarchy
             .children(def.index)
             .map_into()
@@ -1090,7 +1086,7 @@ mod test {
         b.add_ports(copy, Direction::Outgoing, 1);
         b.connect(copy, 2, new_copy, 0).unwrap();
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::NotADag { node, .. }) => assert_eq!(node, def)
         );
     }
@@ -1100,7 +1096,6 @@ mod test {
     fn cfg_children_restrictions() {
         let (mut b, def) = make_simple_hugr(1);
         let (_input, copy, _output) = b
-            .hugr()
             .hierarchy
             .children(def.index)
             .map_into()
@@ -1115,7 +1110,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::ContainerWithoutChildren { .. })
         );
         let cfg = copy;
@@ -1141,7 +1136,7 @@ mod test {
             )
             .unwrap();
         b.add_other_edge(block, exit).unwrap();
-        assert_eq!(b.hugr().validate(), Ok(()));
+        assert_eq!(b.validate(), Ok(()));
 
         // Test malformed errors
 
@@ -1155,7 +1150,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
                 => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
         );
@@ -1170,7 +1165,7 @@ mod test {
                 other_outputs: type_row![Q],
             },
         );
-        let mut block_children = b.hugr().hierarchy.children(block.index);
+        let mut block_children = b.hierarchy.children(block.index);
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
         b.replace_op(
@@ -1186,7 +1181,7 @@ mod test {
             },
         );
         assert_matches!(
-            b.hugr().validate(),
+            b.validate(),
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );

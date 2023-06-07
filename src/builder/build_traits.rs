@@ -37,9 +37,9 @@ use crate::hugr::HugrMut;
 pub trait Container {
     /// The container node.
     fn container_node(&self) -> Node;
-    /// The underlying [`HugrMut`] being used to build the HUGR.
-    fn base(&mut self) -> &mut HugrMut;
-    /// Immutable reference to HUGR being built.
+    /// The underlying [`Hugr`] being built...TODO: should we just require AsMut<Hugr>?
+    fn base(&mut self) -> &mut Hugr;
+    /// Immutable reference to HUGR being built...TODO: should we just require AsRef<Hugr>? Or combine with previous?
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
@@ -158,7 +158,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<DFGBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
@@ -185,7 +185,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<CFGBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -261,7 +261,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: TypeRow,
-    ) -> Result<TailLoopBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -299,7 +299,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<ConditionalBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -543,7 +543,8 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-    let op = data_builder.base().hugr().get_optype(op_node);
+    let base = data_builder.base();
+    let op = base.get_optype(op_node);
     let some_df_outputs = !op.signature().output.is_empty();
     if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
@@ -564,17 +565,16 @@ fn wire_up<T: Dataflow + ?Sized>(
     let base = data_builder.base();
     let src_offset = Port::new_outgoing(src_port);
 
-    let src_parent = base.hugr().get_parent(src);
-    let dst_parent = base.hugr().get_parent(dst);
+    let src_parent = base.get_parent(src);
+    let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
     if !local_source {
         if let Some(copy_port) = if_copy_add_port(base, src) {
             src_port = copy_port;
         } else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            let src_parent = base.hugr().get_parent(src).expect("Node has no parent");
+            let src_parent = base.get_parent(src).expect("Node has no parent");
 
             let final_child = base
-                .hugr()
                 .children(src_parent)
                 .next_back()
                 .expect("Parent must have at least one child.");
@@ -583,7 +583,7 @@ fn wire_up<T: Dataflow + ?Sized>(
             base.connect(src, src_port, copy_node, 0)?;
 
             // Copy node has to have state edge to an ancestor of dst
-            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.hugr().get_parent(p))
+            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.get_parent(p))
                 .tuple_windows()
                 .find_map(|(ancestor, ancestor_parent)| {
                     (ancestor_parent == src_parent).then_some(ancestor)
@@ -604,7 +604,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
 
-    if let Some((connected, connected_offset)) = base.hugr().linked_port(src, src_offset) {
+    if let Some((connected, connected_offset)) = base.linked_port(src, src_offset) {
         if let Some(copy_port) = if_copy_add_port(base, src) {
             src_port = copy_port;
             src = connected;
@@ -629,7 +629,6 @@ fn wire_up<T: Dataflow + ?Sized>(
         && matches!(
             data_builder
                 .base()
-                .hugr()
                 .get_optype(dst)
                 .port_kind(Port::new_incoming(dst_port))
                 .unwrap(),
@@ -641,11 +640,11 @@ fn wire_up<T: Dataflow + ?Sized>(
 /// Return None if Const kind
 /// Panics if port not valid for Op or port is not Const/Value
 fn check_classical_value(
-    base: &HugrMut,
+    base: &impl AsRef<Hugr>,
     src: Node,
     src_offset: Port,
 ) -> Result<Option<ClassicType>, BuildError> {
-    let wire_kind = base.hugr().get_optype(src).port_kind(src_offset).unwrap();
+    let wire_kind = base.as_ref().get_optype(src).port_kind(src_offset).unwrap();
     let typ = match wire_kind {
         EdgeKind::Const(_) => None,
         EdgeKind::Value(simple_type) => match simple_type {
@@ -661,12 +660,11 @@ fn check_classical_value(
 }
 
 // Return newly added port to copy node if src node is a copy
-fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
-    let src_op: Result<&LeafOp, ()> = base.hugr().get_optype(src).try_into();
+fn if_copy_add_port(base: &mut impl HugrMut, src: Node) -> Option<usize> {
+    let src_op: Result<&LeafOp, ()> = base.as_ref().get_optype(src).try_into();
     if let Ok(LeafOp::Copy { n_copies, typ }) = src_op {
         let copy_node = src;
         // If already connected to a copy node, add wire to the copy
-        let n_copies = *n_copies;
         base.replace_op(
             copy_node,
             LeafOp::Copy {

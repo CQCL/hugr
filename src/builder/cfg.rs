@@ -30,17 +30,17 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn base(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.as_ref().hugr()
+        self.base.as_ref()
     }
 }
 
-impl SubContainer for CFGBuilder<&mut HugrMut> {
+impl<H: HugrMutRef> SubContainer for CFGBuilder<H> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -48,7 +48,7 @@ impl SubContainer for CFGBuilder<&mut HugrMut> {
     }
 }
 
-impl CFGBuilder<HugrMut> {
+impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
@@ -58,13 +58,13 @@ impl CFGBuilder<HugrMut> {
             outputs: output.clone(),
         };
 
-        let base = HugrMut::new(cfg_op);
+        let base = Hugr::new(cfg_op);
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
 }
 
-impl HugrBuilder for CFGBuilder<HugrMut> {
+impl<H: HugrMut> HugrBuilder for CFGBuilder<H> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
         self.base.finish()
     }
@@ -104,7 +104,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let n_cases = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlockOp::Block {
             inputs: inputs.clone(),
@@ -136,7 +136,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         inputs: TypeRow,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -151,7 +151,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
             .take()
@@ -169,7 +169,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         &mut self,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
@@ -191,13 +191,12 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     ) -> Result<(), BuildError> {
         let from = predecessor.node();
         let to = successor.node();
-        let base = self.base();
-        let hugr = base.hugr();
+        let hugr = self.base();
         let tin = hugr.num_inputs(to);
         let tout = hugr.num_outputs(to);
 
-        base.set_num_ports(to, tin + 1, tout);
-        Ok(base.connect(from, branch, to, tin)?)
+        hugr.set_num_ports(to, tin + 1, tout);
+        Ok(hugr.connect(from, branch, to, tin)?)
     }
 }
 
@@ -229,7 +228,7 @@ impl<B: HugrMutRef> BlockBuilder<B> {
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 }
-impl BlockBuilder<&mut HugrMut> {
+impl<B: HugrMutRef> BlockBuilder<B> {
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
@@ -244,7 +243,7 @@ impl BlockBuilder<&mut HugrMut> {
     }
 }
 
-impl BlockBuilder<HugrMut> {
+impl BlockBuilder<Hugr> {
     /// Initialize a [`BasicBlockOp::Block`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
@@ -260,7 +259,7 @@ impl BlockBuilder<HugrMut> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        let base = HugrMut::new(op);
+        let base = Hugr::new(op);
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }

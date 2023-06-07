@@ -55,17 +55,17 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn base(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.as_ref().hugr()
+        self.base.as_ref()
     }
 }
 
-impl SubContainer for ConditionalBuilder<&mut HugrMut> {
+impl<H: HugrMutRef> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -96,7 +96,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut HugrMut>, BuildError> {
+    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut Hugr>, BuildError> {
         let conditional = self.conditional_node;
         let control_op: Result<ControlFlowOp, ()> = self
             .hugr()
@@ -133,13 +133,13 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     }
 }
 
-impl HugrBuilder for ConditionalBuilder<HugrMut> {
+impl<H: HugrMut> HugrBuilder for ConditionalBuilder<H> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
         self.base.finish()
     }
 }
 
-impl ConditionalBuilder<HugrMut> {
+impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
         predicate_inputs: impl IntoIterator<Item = TypeRow>,
@@ -158,7 +158,7 @@ impl ConditionalBuilder<HugrMut> {
             other_inputs,
             outputs,
         });
-        let base = HugrMut::new(op);
+        let base = Hugr::new(op);
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -170,7 +170,7 @@ impl ConditionalBuilder<HugrMut> {
     }
 }
 
-impl CaseBuilder<HugrMut> {
+impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
@@ -178,8 +178,8 @@ impl CaseBuilder<HugrMut> {
         let op = CaseOp {
             signature: Signature::new_df(input.clone(), output.clone()),
         };
-        let base = HugrMut::new(op);
-        let root = base.hugr().root();
+        let base = Hugr::new(op);
+        let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, input, output)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))

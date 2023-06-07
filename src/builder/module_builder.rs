@@ -29,30 +29,30 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn base(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 
     fn hugr(&self) -> &Hugr {
-        self.0.as_ref().hugr()
+        self.0.as_ref()
     }
 }
 
-impl ModuleBuilder<HugrMut> {
+impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
     pub fn new() -> Self {
-        Self(HugrMut::new_module())
+        Self(Default::default())
     }
 }
 
-impl Default for ModuleBuilder<HugrMut> {
+impl Default for ModuleBuilder<Hugr> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl HugrBuilder for ModuleBuilder<HugrMut> {
+impl<H: HugrMut> HugrBuilder for ModuleBuilder<H> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.0.finish()
     }
@@ -70,7 +70,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     pub fn define_function(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
         let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
             self.hugr().get_optype(f_node)
@@ -104,7 +104,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let fid = self.declare(name, signature)?;
         self.define_function(&fid)
     }
