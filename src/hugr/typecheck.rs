@@ -21,7 +21,7 @@ pub enum TypeError {
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
     IntTooLarge(u8, u128),
-    /// Width (n) of an `I<n>` type doesn't fit into a u32
+    /// Width (n) of an `I<n>` type doesn't fit into a u8
     IntWidthTooLarge(u8),
     /// The width of an integer type wasn't a power of 2
     IntWidthInvalid(u8),
