@@ -379,7 +379,6 @@ impl<'a> ValidationContext<'a> {
                 // We don't need to check the second argument of ModuleOp::Const
                 // because it's what's providing the information for `port_kind`
                 OpType::Module(ModuleOp::Const(val, _)) => {
-                    println!("Const typechecking: {:?} in {}", val, typ);
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 }
                 // If const edges aren't coming from const nodes, they're graph
