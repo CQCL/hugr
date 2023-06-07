@@ -95,12 +95,9 @@ fn check_valid_width(width: u8) -> Result<(), TypeError> {
     }
 }
 
-/// Typecheck a constant value - for ensuring that it's valid before creating
-/// a const node
+/// Typecheck a constant value
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeError> {
     match (typ, val) {
-        // N.B. If the width is larger than u6, our const value (backed by an i64)
-        // wont be able to accomodate the value anyway.
         (ClassicType::Int(exp_width), ConstValue::Int { value, width }) => {
             // Check that the types make sense
             check_valid_width(*exp_width)?;
