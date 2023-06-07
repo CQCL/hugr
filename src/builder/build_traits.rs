@@ -611,8 +611,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
         // Need to insert a copy - first check can be copied
         else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            // TODO API consistency in using PortOffset vs. usize
-            base.disconnect(src, src_port, Direction::Outgoing)?;
+            base.disconnect(src, Port::new_outgoing(src_port))?;
 
             let copy = data_builder.add_dataflow_op(
                 LeafOp::Copy { n_copies: 2, typ },

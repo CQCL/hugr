@@ -1,10 +1,11 @@
 //! HUGR invariant checks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use itertools::Itertools;
-use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
+use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree, TopoSort};
+use portgraph::PortIndex;
 use thiserror::Error;
 
 use crate::ops::tag::OpTag;
@@ -319,9 +320,7 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        // TODO: Use a `TopoSort<HashSet>` once that's supported
-        //   see https://github.com/CQCL/portgraph/issues/55
-        let topo = toposort_filtered(
+        let topo: TopoSort<HashSet<PortIndex>> = toposort_filtered(
             &self.hugr.graph,
             [first_child],
             Direction::Outgoing,
