@@ -917,6 +917,27 @@ impl MultiPortGraph {
     }
 }
 
+impl From<PortGraph> for MultiPortGraph {
+    fn from(graph: PortGraph) -> Self {
+        let node_count = graph.node_count();
+        let port_count = graph.port_count();
+        Self {
+            graph,
+            multiport: BitVec::with_capacity(port_count),
+            copy_node: BitVec::with_capacity(node_count),
+            copy_node_count: 0,
+            subport_count: 0,
+        }
+    }
+}
+
+impl From<MultiPortGraph> for PortGraph {
+    fn from(multi: MultiPortGraph) -> Self {
+        // Return the internal graph, exposing the copy nodes
+        multi.graph
+    }
+}
+
 impl SubportIndex {
     /// Creates a new multiport index for a port without a copy node.
     #[inline]
