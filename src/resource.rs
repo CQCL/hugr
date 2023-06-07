@@ -80,13 +80,13 @@ impl ResourceSet {
     }
 
     /// Adds a resource to the set.
-    pub fn insert(&mut self, resource: &Resource) {
-        self.0.insert(resource.name.clone());
+    pub fn insert(&mut self, resource: &ResourceId) {
+        self.0.insert(resource.clone());
     }
 
     /// Returns `true` if the set contains the given resource.
-    pub fn contains(&self, resource: &Resource) -> bool {
-        self.0.contains(&resource.name)
+    pub fn contains(&self, resource: &ResourceId) -> bool {
+        self.0.contains(resource)
     }
 
     /// Returns `true` if the set is a subset of `other`.
@@ -100,7 +100,7 @@ impl ResourceSet {
     }
 
     /// Create a resource set with a single element.
-    pub fn singleton(resource: &Resource) -> Self {
+    pub fn singleton(resource: &ResourceId) -> Self {
         let mut set = Self::new();
         set.insert(resource);
         set
