@@ -601,8 +601,10 @@ at runtime. In many cases this is desirable.
 
 #### Extension Implementation
 
-To strike a balance then, every resource provides a YAML declaration of its operations,
-where each specifies its type by one of two methods:
+To strike a balance then, every resource provides YAML that declares its opaque
+types and a number of named **OpDef**s (operation-definitions), which may be
+polymorphic in type. Each OpDef specifies one of two methods for how the type
+of individual operations is computed:
 
 1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
    that is built into tools that process the HUGR.
@@ -610,11 +612,10 @@ where each specifies its type by one of two methods:
 2. The extension self-registers binary code (e.g. a Rust trait) providing a function
    `compute_signature` that computes the type.
 
-Each *operation-definition* (aka **OpFactory** ?? Or just **OpDef**??) has a name, and
-may declare named type parameters---if so then the individual operation nodes in a HUGR
-will provide for each a static-constant "type argument": a value that in many cases
-will be a type. These type arguments are processed by the type scheme interpreter or
-the `compute_signature` implementation.
+Each OpDef may declare named type parameters---if so then the individual operation nodes
+in a HUGR will provide for each a static-constant "type argument": a value that in many
+cases will be a type. These type arguments are processed by the type scheme interpreter
+or the `compute_signature` implementation to compute the type of that operation node.
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
@@ -639,9 +640,9 @@ resources to provide semantics portable across tools.
    when a higher-performance (e.g. native HW) implementation is not available.
    Such a HUGR may itself require other resources.
 
-Whether a particular operation-definition provides binary code for `try_lower` is
-independent of whether it provides a binary `compute_signature`, but it will not
-generally be possible to provide a HUGR for a function whose type cannot be expressed
+Whether a particular OpDef provides binary code for `try_lower` is independent
+of whether it provides a binary `compute_signature`, but it will not generally
+be possible to provide a HUGR for a function whose type cannot be expressed
 in YAML.
 
 <!-- Should we preserve some of this language about downcasting?
