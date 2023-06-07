@@ -52,7 +52,12 @@ pub trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     ///
     /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
     /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs.
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError>;
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
+        let src_port: usize = self.add_ports(src, Direction::Outgoing, 1).collect_vec()[0];
+        let dst_port: usize = self.add_ports(dst, Direction::Incoming, 1).collect_vec()[0];
+        self.connect(src, src_port, dst, dst_port)?;
+        Ok((src_port, dst_port))
+    }
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize);
@@ -183,14 +188,6 @@ impl HugrMut for Hugr {
         )?;
         self.graph.unlink_port(port);
         Ok(())
-    }
-
-    // ALAN can this move into the trait?
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
-        let src_port: usize = self.add_ports(src, Direction::Outgoing, 1).collect_vec()[0];
-        let dst_port: usize = self.add_ports(dst, Direction::Incoming, 1).collect_vec()[0];
-        self.connect(src, src_port, dst, dst_port)?;
-        Ok((src_port, dst_port))
     }
 
     #[inline]
