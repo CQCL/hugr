@@ -7,7 +7,7 @@ pub mod serialize;
 pub mod validate;
 pub mod view;
 
-pub use self::hugrmut::HugrMut;
+pub(crate) use self::hugrmut::HugrMut;
 use self::multiportgraph::MultiPortGraph;
 pub use self::validate::ValidationError;
 

@@ -10,7 +10,7 @@ use crate::ops::OpType;
 use crate::{Hugr, Port};
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
-pub trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
+pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     /// Add a node to the graph.
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
 
