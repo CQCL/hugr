@@ -177,7 +177,9 @@ impl CaseBuilder<HugrMut> {
         let input = input.into();
         let output = output.into();
         let signature = Signature::new_df(input, output);
-        let op = CaseOp { signature: signature.clone() };
+        let op = CaseOp {
+            signature: signature.clone(),
+        };
         let base = HugrMut::new(op);
         let root = base.hugr().root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;

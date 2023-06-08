@@ -11,9 +11,9 @@ use thiserror::Error;
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, OpType};
+use crate::ops::{ControlFlowOp, DataflowOp, ModuleOp, OpType};
 use crate::resource::ResourceSet;
-use crate::types::{EdgeKind, SimpleType};
+use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::view::HugrView;
@@ -246,7 +246,7 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
-        self.check_resources_compatible(&port_index, &link)?;
+        self.check_resources_compatible(&port_index, &link_index)?;
 
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
@@ -832,12 +832,16 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
+    use crate::builder::{BuildError, ModuleBuilder};
+    use crate::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
     use crate::hugr::HugrMut;
     use crate::ops::{BasicBlockOp, ConstValue, LeafOp, ModuleOp, OpType};
     use crate::resource::ResourceSet;
     use crate::types::{ClassicType, LinearType, Signature};
+    use crate::Direction;
     use crate::{type_row, Node};
 
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     const B: SimpleType = SimpleType::Classic(ClassicType::bit());
     const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
@@ -1228,13 +1232,6 @@ mod test {
                 => assert_eq!(parent, cfg)
         );
     }
-
-    use crate::builder::{BuildError, ModuleBuilder};
-    use crate::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
-    use crate::resource::ResourceSet;
-    use crate::Direction;
-
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
     #[test]
     fn missing_lift_node() -> Result<(), BuildError> {
