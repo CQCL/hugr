@@ -237,7 +237,7 @@ impl HugrMut {
     pub fn finish(self) -> Result<Hugr, ValidationError> {
         let hugr = self.hugr;
 
-        // hugr.validate()?;
+        hugr.validate()?;
 
         Ok(hugr)
     }
