@@ -167,9 +167,7 @@ mod test {
                         branch_0.finish_with_outputs([continue_wire])?;
 
                         let mut branch_1 = conditional_b.case_builder(1)?;
-                        let [b1] = branch_1.input_wires_arr();
-
-                        branch_1.discard(b1)?;
+                        let [_b1] = branch_1.input_wires_arr();
 
                         let wire = branch_1.load_const(&s2)?;
                         let break_wire = branch_1.make_break(signature, [wire])?;

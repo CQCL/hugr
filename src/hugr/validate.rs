@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::ops::{ControlFlowOp, DataflowOp, ModuleOp, OpType};
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -446,22 +446,6 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        if !matches!(
-            from_optype,
-            OpType::Dataflow(DataflowOp::Leaf {
-                op: LeafOp::Copy { .. },
-            })
-        ) {
-            return Err(InterGraphEdgeError::NonCopySource {
-                from,
-                from_offset,
-                from_optype: from_optype.clone(),
-                to,
-                to_offset,
-            }
-            .into());
-        }
-
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
         // case), or the parent of `from_parent` (in the dominator case).
@@ -731,15 +715,6 @@ pub enum InterGraphEdgeError {
         to_offset: Port,
         ty: EdgeKind,
     },
-    /// Inter-Graph edges must start from a copy node.
-    #[error("Inter-graph edges must start from a copy node. Found operation {from_optype:?}. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
-    NonCopySource {
-        from: Node,
-        from_offset: Port,
-        from_optype: OpType,
-        to: Node,
-        to_offset: Port,
-    },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error("The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op:?}. In a dominator inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
     NonCFGAncestor {
@@ -792,7 +767,7 @@ mod test {
 
     use super::*;
     use crate::hugr::HugrMut;
-    use crate::ops::{BasicBlockOp, ConstValue, ModuleOp, OpType};
+    use crate::ops::{BasicBlockOp, ConstValue, LeafOp, ModuleOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
 
@@ -830,13 +805,7 @@ mod test {
             )
             .unwrap();
         let copy = b
-            .add_op_with_parent(
-                parent,
-                LeafOp::Copy {
-                    n_copies: copies as u32,
-                    typ: ClassicType::bit(),
-                },
-            )
+            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
         let output = b
             .add_op_with_parent(
@@ -849,7 +818,7 @@ mod test {
 
         b.connect(input, 0, copy, 0).unwrap();
         for i in 0..copies {
-            b.connect(copy, i, output, i).unwrap();
+            b.connect(copy, 0, output, i).unwrap();
         }
 
         (input, copy, output)
@@ -963,45 +932,6 @@ mod test {
     }
 
     #[test]
-    fn invalid_ports() {
-        let (mut b, def) = make_simple_hugr(2);
-        let (_input, copy, output) = b
-            .hugr()
-            .hierarchy
-            .children(def.index)
-            .map_into()
-            .collect_tuple()
-            .unwrap();
-
-        // Missing an output port
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 3,
-                typ: ClassicType::bit(),
-            },
-        );
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, copy)
-        );
-
-        // Make the 2nd copy output become an order edge, mismatching the output port
-        b.set_num_ports(copy, 1, 2);
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 1,
-                typ: ClassicType::bit(),
-            },
-        );
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::IncompatiblePorts { from, to, .. }) => {assert_eq!(from, copy); assert_eq!(to, output)}
-        );
-    }
-
-    #[test]
     /// General children restrictions.
     fn children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
@@ -1057,13 +987,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(
-            output,
-            LeafOp::Copy {
-                n_copies: 0,
-                typ: ClassicType::bit(),
-            },
-        );
+        b.replace_op(output, LeafOp::Noop(ClassicType::bit().into()));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
@@ -1116,24 +1040,10 @@ mod test {
         // Add a dangling discard operation without outgoing order edges. Note
         // that the dag check only allows for one source and sink (the input and
         // output resp.).
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 3,
-                typ: ClassicType::bit(),
-            },
-        );
         let new_copy = b
-            .add_op_after(
-                copy,
-                LeafOp::Copy {
-                    n_copies: 0,
-                    typ: ClassicType::bit(),
-                },
-            )
+            .add_op_after(copy, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
-        b.add_ports(copy, Direction::Outgoing, 1);
-        b.connect(copy, 2, new_copy, 0).unwrap();
+        b.connect(copy, 0, new_copy, 0).unwrap();
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::NotADag { node, .. }) => assert_eq!(node, def)

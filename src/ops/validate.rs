@@ -518,10 +518,7 @@ mod test {
             types: out_types.clone(),
         });
         let leaf_node = OpType::Dataflow(DataflowOp::Leaf {
-            op: LeafOp::Copy {
-                n_copies: 2,
-                typ: ClassicType::bit(),
-            },
+            op: LeafOp::Noop(ClassicType::bit().into()),
         });
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.

@@ -299,14 +299,8 @@ mod test {
                     },
                 )
                 .unwrap();
-            let copy = builder
-                .add_op_with_parent(
-                    f,
-                    LeafOp::Copy {
-                        n_copies: 2,
-                        typ: ClassicType::i64(),
-                    },
-                )
+            let noop = builder
+                .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
                 .unwrap();
             let f_out = builder
                 .add_op_with_parent(
@@ -317,9 +311,9 @@ mod test {
                 )
                 .unwrap();
 
-            assert!(builder.connect(f_in, 0, copy, 0).is_ok());
-            assert!(builder.connect(copy, 0, f_out, 0).is_ok());
-            assert!(builder.connect(copy, 1, f_out, 1).is_ok());
+            assert!(builder.connect(f_in, 0, noop, 0).is_ok());
+            assert!(builder.connect(noop, 0, f_out, 0).is_ok());
+            assert!(builder.connect(noop, 0, f_out, 1).is_ok());
         }
 
         // Finish the construction and create the HUGR
