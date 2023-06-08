@@ -6,7 +6,8 @@ use super::{
 
 use crate::{
     hugr::{view::HugrView, ValidationError},
-    types::SimpleType, ops,
+    ops,
+    types::SimpleType,
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};

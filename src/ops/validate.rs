@@ -6,7 +6,6 @@
 //! It also defines a `validate_children` method for more complex tests that
 //! require traversing the children.
 
-use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;

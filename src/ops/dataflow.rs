@@ -1,7 +1,6 @@
 //! Dataflow operations.
 
-use super::{impl_op_name, tag::OpTag, OpName, OpTrait};
-use smol_str::SmolStr;
+use super::{impl_op_name, tag::OpTag, OpTrait};
 
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 /// An input node.

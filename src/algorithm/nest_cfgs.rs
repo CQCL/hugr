@@ -46,7 +46,7 @@ use itertools::Itertools;
 use crate::hugr::view::{HugrView, Neighbours};
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::tag::OpTag;
-use crate::ops::{self, OpTrait};
+use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node

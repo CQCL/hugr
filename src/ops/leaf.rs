@@ -5,7 +5,9 @@ use smol_str::SmolStr;
 use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow, EdgeKind},
+    types::{
+        ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
+    },
 };
 
 /// Dataflow operations with no children.

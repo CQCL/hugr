@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
+use crate::types::{EdgeKind, Signature, SignatureDescription};
 use crate::{Direction, Port};
 
 pub use custom::{CustomOp, OpDef, OpaqueOp};
@@ -116,7 +116,7 @@ pub trait ValidateOp {
 
     fn validate_children<'a>(
         &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+        _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), validate::ChildrenValidationError> {
         Ok(())
     }
@@ -130,17 +130,3 @@ macro_rules! impl_validate_op {
 }
 
 use impl_validate_op;
-
-#[cfg(test)]
-mod test {
-    use crate::type_row;
-
-    use super::*;
-    #[test]
-    fn test_into() {
-        let op: OpType = BasicBlock::Exit {
-            cfg_outputs: type_row![],
-        }
-        .into();
-    }
-}

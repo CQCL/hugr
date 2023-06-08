@@ -2,7 +2,7 @@ use crate::hugr::view::HugrView;
 use crate::types::{Signature, TypeRow};
 
 use crate::ops::handle::CaseID;
-use crate::ops::{self, OpType};
+use crate::ops;
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;

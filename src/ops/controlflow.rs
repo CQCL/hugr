@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
+use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -98,7 +98,6 @@ impl Conditional {
         Some(inputs)
     }
 }
-
 
 /// A dataflow node which is defined by a child CFG.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

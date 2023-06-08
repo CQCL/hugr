@@ -5,7 +5,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{self, OpType};
+use crate::ops;
 
 use crate::types::{Signature, TypeRow};
 

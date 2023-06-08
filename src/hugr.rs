@@ -16,7 +16,7 @@ use portgraph::{Hierarchy, PortGraph, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{OpType, OpTrait, OpName};
+use crate::ops::{OpName, OpTrait, OpType};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
 
