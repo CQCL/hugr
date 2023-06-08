@@ -17,7 +17,7 @@ use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateO
 // use super::{
 //     controlflow::{CaseOp, ConditionalSignature, TailLoopSignature},
 //     tag::OpTag,
-//     BasicBlockOp, ControlFlowOp, DataflowOp, OpType,
+//     BasicBlock, ControlFlowOp, DataflowOp, OpType,
 // };
 
 /// A set of property flags required for an operation.

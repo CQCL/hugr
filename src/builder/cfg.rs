@@ -13,7 +13,7 @@ use crate::ops::{self, BasicBlock, OpType};
 use crate::Node;
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 
-/// Builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] child control
+/// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
 pub struct CFGBuilder<T> {
     pub(super) base: T,
@@ -92,7 +92,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
-    /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -125,7 +125,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for a non-entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -140,7 +140,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
-    /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -159,7 +159,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         self.block_builder(inputs, predicate_variants, other_outputs)
     }
 
-    /// Return a builder for the entry [`BasicBlockOp::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -201,7 +201,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     }
 }
 
-/// Builder for a [`BasicBlockOp::Block`] child graph.
+/// Builder for a [`BasicBlock::Block`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: HugrMutRef> BlockBuilder<B> {
@@ -245,7 +245,7 @@ impl BlockBuilder<&mut HugrMut> {
 }
 
 impl BlockBuilder<HugrMut> {
-    /// Initialize a [`BasicBlockOp::Block`] rooted HUGR builder
+    /// Initialize a [`BasicBlock::Block`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,

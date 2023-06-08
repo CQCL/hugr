@@ -20,7 +20,7 @@ use std::collections::HashSet;
 
 use thiserror::Error;
 
-/// Builder for a [`CaseOp`] child graph.
+/// Builder for a [`ops::Case`] child graph.
 pub type CaseBuilder<B> = DFGWrapper<B, BuildHandle<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -39,7 +39,7 @@ pub enum ConditionalBuildError {
     },
 }
 
-/// Builder for a [`ControlFlowOp::Conditional`] node's children.
+/// Builder for a [`crate::ops::Conditional`] node's children.
 pub struct ConditionalBuilder<T> {
     pub(super) base: T,
     pub(super) conditional_node: Node,
@@ -89,7 +89,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     ///
     /// # Panics
     ///
-    /// Panics if the parent node is not of type [`ControlFlowOp::Conditional`].
+    /// Panics if the parent node is not of type [`crate::ops::Conditional`].
     ///
     /// # Errors
     ///

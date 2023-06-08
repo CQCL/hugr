@@ -13,7 +13,7 @@ use super::{
     BuildError, Container, Dataflow, TailLoopID, Wire,
 };
 
-/// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
+/// Builder for a [`crate::ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
 impl<B: HugrMutRef> TailLoopBuilder<B> {
@@ -31,7 +31,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
-    /// Set the outputs of the [`ControlFlowOp::TailLoop`], with `out_variant` as the value of the
+    /// Set the outputs of the [`crate::ops::TailLoop`], with `out_variant` as the value of the
     /// termination predicate, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
@@ -41,15 +41,15 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
-    /// Get a reference to the [`crate::ops::controlflow::ops::TailLoop`]
-    /// that defines the signature of the [`ControlFlowOp::TailLoop`]
+    /// Get a reference to the [`crate::ops::TailLoop`]
+    /// that defines the signature of the [`crate::ops::TailLoop`]
     pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
         if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
             Ok(tail_loop)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
-                op_desc: "ControlFlowOp::TailLoop",
+                op_desc: "crate::ops::TailLoop",
             })
         }
     }
@@ -76,7 +76,7 @@ impl TailLoopBuilder<&mut HugrMut> {
 }
 
 impl TailLoopBuilder<HugrMut> {
-    /// Initialize new builder for a [`ControlFlowOp::TailLoop`] rooted HUGR
+    /// Initialize new builder for a [`crate::ops::TailLoop`] rooted HUGR
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,

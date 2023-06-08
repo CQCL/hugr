@@ -143,7 +143,7 @@ pub trait Dataflow: Container {
             .expect(&format!("Incorrect number of wires: {N}")[..])
     }
 
-    /// Return a builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node, i.e. a nested dataflow subgraph.
+    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
@@ -169,7 +169,7 @@ pub trait Dataflow: Container {
         DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), output_types)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] node,
+    /// Return a builder for a [`crate::ops::CFG`] node,
     /// i.e. a nested controlflow subgraph.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -234,7 +234,7 @@ pub trait Dataflow: Container {
         Ok((const_n.node(), typ).into())
     }
     /// Load a static constant and return the local dataflow wire for that constant.
-    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// Adds a [`ops::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
@@ -243,7 +243,7 @@ pub trait Dataflow: Container {
         self.load_const(&cid)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
+    /// Return a builder for a [`crate::ops::TailLoop`] node.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
@@ -251,7 +251,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when building
-    /// the [`ControlFlowOp::TailLoop`] node.
+    /// the [`ops::TailLoop`] node.
     fn tail_loop_builder(
         &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
@@ -274,7 +274,7 @@ pub trait Dataflow: Container {
         TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
+    /// Return a builder for a [`crate::ops::Conditional`] node.
     /// `predicate_inputs` and `predicate_wire` define the type of the predicate
     /// variants and the wire carrying the predicate respectively.
     ///
@@ -389,7 +389,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Continue" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
+    /// "Continue" variant of a [`ops::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -406,7 +406,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Break" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
+    /// "Break" variant of a [`ops::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -422,14 +422,14 @@ pub trait Dataflow: Container {
         self.make_predicate(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
-    /// Add a [`DataflowOp::Call`] node, calling `function`, with inputs
+    /// Add a [`ops::Call`] node, calling `function`, with inputs
     /// specified by `input_wires`. Returns a handle to the corresponding Call node.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the Call
-    /// node, or if `function` does not refer to a [`OpType::Declare`] or
-    /// [`OpType::Def`] node.
+    /// node, or if `function` does not refer to a [`ops::Declare`] or
+    /// [`ops::Def`] node.
     fn call<const DEFINED: bool>(
         &mut self,
         function: &FuncID<DEFINED>,
