@@ -560,12 +560,12 @@ impl<'a> ValidationContext<'a> {
     fn df_port_filter(&self, node: portgraph::NodeIndex, port: portgraph::PortIndex) -> bool {
         // Toposort operates on the internal portgraph. It may traverse copy nodes.
         let portgraph = self.hugr.graph.as_portgraph();
-
+        let is_copy = !self.hugr.graph.contains_node(node);
         let offset = self.hugr.graph.port_offset(port).unwrap();
 
         // Always follow (non-intergraph) ports from copy nodes. These nodes must be filtered out
         // when using the toposort iterator.
-        if self.hugr.graph.contains_node(node) {
+        if !is_copy {
             let node_optype = self.hugr.get_optype(node.into());
 
             let kind = node_optype.port_kind(offset).unwrap();
@@ -575,25 +575,43 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Ignore ports that are not connected (that property is checked elsewhere)
-        let Some(other_port) = portgraph.port_index(node, offset).and_then(|p| portgraph.port_link(p))  else {
-                return false;
-            };
-        let other = portgraph.port_node(other_port).unwrap();
+        let Some(other_port) = portgraph
+            .port_index(node, offset)
+            .and_then(|p| portgraph.port_link(p))
+        else {
+            return false;
+        };
+        let other_node = portgraph.port_node(other_port).unwrap();
 
         // Ignore inter-graph edges
-        let parent = if self.hugr.graph.contains_node(other) {
-            self.hugr.hierarchy.parent(node)
-        } else {
-            // This is a bit ugly. We are in a copy node, so we need the parent
-            // of the operation node to check for intergraph edges.
-            let op_node = portgraph.input_neighbours(node).next().unwrap();
-            self.hugr.hierarchy.parent(op_node)
-        };
-        if parent != self.hugr.hierarchy.parent(other) {
+        let parent = self.get_pg_node_parent(node);
+        let other_parent = self.get_pg_node_parent(other_node);
+
+        // Copy nodes do not have a parent.
+        if parent != other_parent {
             return false;
         }
 
         true
+    }
+
+    /// Get the parent for a node in the underlying flat portgraph.
+    ///
+    /// For copy nodes we must check the parent of the operation node.
+    fn get_pg_node_parent(&self, node: portgraph::NodeIndex) -> Option<portgraph::NodeIndex> {
+        match self.hugr.hierarchy.parent(node) {
+            Some(parent) => Some(parent),
+            None => {
+                // Copy node, root
+                let op_node = self
+                    .hugr
+                    .graph
+                    .as_portgraph()
+                    .input_neighbours(node)
+                    .next()?;
+                self.hugr.hierarchy.parent(op_node)
+            }
+        }
     }
 }
 
