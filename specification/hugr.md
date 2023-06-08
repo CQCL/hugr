@@ -1072,12 +1072,12 @@ There are the following primitive operations.
 This method is used for simple replacement of dataflow subgraphs consisting of
 leaf nodes.
 
-Given a set $S$ of nodes in a hugr $H$, let:
+Given a set $X$ of nodes in a hugr $G$, let:
 
-  - $\textrm{inp}_H(S)$ be the set of input ports of nodes in $S$ whose source
-    is in $H \setminus S$;
-  - $\textrm{out}_H(S)$ be the set of input ports of nodes in $H \setminus S$
-    whose source is in $S$.
+  - $\textrm{inp}_G(X)$ be the set of input ports of nodes in $X$ whose source
+    is in $G \setminus X$;
+  - $\textrm{out}_G(X)$ be the set of input ports of nodes in $G \setminus X$
+    whose source is in $X$.
 
 Notation: given an input port $p$, let $p^-$ be its unique predecessor port.
 
