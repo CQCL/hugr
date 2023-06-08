@@ -1,3 +1,5 @@
+//! Module-level operations
+
 use smol_str::SmolStr;
 
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType};
@@ -25,6 +27,7 @@ impl OpTrait for Module {
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Def {
+    /// Signature of the function
     pub signature: Signature,
 }
 
@@ -48,6 +51,7 @@ impl OpTrait for Def {
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Declare {
+    /// Signature of the function
     pub signature: Signature,
 }
 
@@ -72,7 +76,9 @@ impl OpTrait for Declare {
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AliasDef {
+    /// Alias name
     pub name: SmolStr,
+    /// Aliased type
     pub definition: SimpleType,
 }
 impl_op_name!(AliasDef);
@@ -89,7 +95,9 @@ impl OpTrait for AliasDef {
 /// A type alias declaration. Resolved at link time.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AliasDeclare {
+    /// Alias name
     pub name: SmolStr,
+    /// Flag to signify type is linear
     pub linear: bool,
 }
 

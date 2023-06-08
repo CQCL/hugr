@@ -1,8 +1,8 @@
 use crate::hugr::view::HugrView;
 use crate::types::{Signature, TypeRow};
 
-use crate::ops::handle::CaseID;
 use crate::ops;
+use crate::ops::handle::CaseID;
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;

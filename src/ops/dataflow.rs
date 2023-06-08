@@ -7,6 +7,7 @@ use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 /// The outputs of this node are the inputs to the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
+    /// Input value types
     pub types: TypeRow,
 }
 
@@ -54,6 +55,7 @@ impl DataflowOpTrait for Input {
 /// An output node. The inputs are the outputs of the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
+    /// Output value types
     pub types: TypeRow,
 }
 
@@ -104,6 +106,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
 /// connected to the def/declare block with a `ConstE<Graph>` edge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
+    /// Signature of function being called
     pub signature: Signature,
 }
 impl_op_name!(Call);
@@ -128,6 +131,7 @@ impl DataflowOpTrait for Call {
 /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
+    /// Signature of function being called
     pub signature: Signature,
 }
 impl_op_name!(CallIndirect);
@@ -154,6 +158,7 @@ impl DataflowOpTrait for CallIndirect {
 /// Load a static constant in to the local dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoadConstant {
+    /// Constant type
     pub datatype: ClassicType,
 }
 impl_op_name!(LoadConstant);
@@ -178,6 +183,7 @@ impl DataflowOpTrait for LoadConstant {
 /// A simply nested dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DFG {
+    /// Signature of DFG node
     pub signature: Signature,
 }
 

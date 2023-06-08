@@ -1,5 +1,5 @@
 //! The operation types for the HUGR.
-#![allow(missing_docs)]
+
 pub mod constant;
 pub mod controlflow;
 pub mod custom;
@@ -31,8 +31,8 @@ pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum OpType {
-    /// The root of a module, parent of all other `OpType`s.
     Module,
     Def,
     Declare,
@@ -74,27 +74,52 @@ macro_rules! impl_op_name {
 use impl_op_name;
 
 #[enum_dispatch]
+/// Trait for setting name of OpType variants.
+// Separate to OpTrait to allow simple definition via impl_op_name
 pub trait OpName {
+    /// The name of the operation.
     fn name(&self) -> SmolStr;
 }
 
 #[enum_dispatch]
+/// Trait implemented by all OpType variants.
 pub trait OpTrait {
+    /// A human-readable description of the operation.
     fn description(&self) -> &str;
+    /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
+    /// The signature of the operation.
+    ///
+    /// Only dataflow operations have a non-empty signature.
     fn signature(&self) -> Signature {
         Default::default()
     }
+    /// Optional description of the ports in the signature.
+    ///
+    /// Only dataflow operations have a non-empty signature.
     fn signature_desc(&self) -> SignatureDescription {
         Default::default()
     }
+
+    /// The edge kind for the inputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other input edges. Otherwise, all other input
+    /// edges will be of that kind.
     fn other_inputs(&self) -> Option<EdgeKind> {
         None
     }
+
+    /// The edge kind for the outputs of the operation not described by the
+    /// signature.
+    ///
+    /// If None, there will be no other output edges. Otherwise, all other
+    /// output edges will be of that kind.
     fn other_outputs(&self) -> Option<EdgeKind> {
         None
     }
 
+    /// Returns the edge kind for the given port.
     fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
         let port = port.into();
@@ -109,11 +134,16 @@ pub trait OpTrait {
 }
 
 #[enum_dispatch]
+/// Methods for Ops to validate themselves and children
 pub trait ValidateOp {
+    /// Returns a set of flags describing the validity predicates for this operation.
+    #[inline]
     fn validity_flags(&self) -> validate::OpValidityFlags {
         Default::default()
     }
 
+    /// Validate the ordered list of children.
+    #[inline]
     fn validate_children<'a>(
         &self,
         _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
