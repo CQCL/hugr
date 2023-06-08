@@ -4,6 +4,7 @@ mod hugrmut;
 
 pub mod multiportgraph;
 pub mod serialize;
+pub mod typecheck;
 pub mod validate;
 pub mod view;
 
