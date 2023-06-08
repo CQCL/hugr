@@ -86,8 +86,7 @@ impl Hugr {
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
         for node in &r.removal {
-            if self.hierarchy.is_root(node.index)
-                || self.hierarchy.parent(node.index).unwrap() != r.parent.index
+            if self.hierarchy.parent(node.index) != Some(r.parent.index)
                 || self.hierarchy.has_children(node.index)
             {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
