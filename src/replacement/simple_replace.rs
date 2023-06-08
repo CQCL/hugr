@@ -238,8 +238,8 @@ mod test {
             .node_ports(n_node_cx, Direction::Outgoing)
             .collect_tuple()
             .unwrap();
-        let n_port_2 = n.linked_port(n_node_cx, n_cx_out_0).unwrap().1;
-        let n_port_3 = n.linked_port(n_node_cx, n_cx_out_1).unwrap().1;
+        let n_port_2 = n.linked_ports(n_node_cx, n_cx_out_0).next().unwrap().1;
+        let n_port_3 = n.linked_ports(n_node_cx, n_cx_out_1).next().unwrap().1;
         // 4.3. Locate the ports we need to specify as "glue" in h
         let (h_port_0, h_port_1) = h
             .node_ports(h_node_cx, Direction::Incoming)
@@ -255,8 +255,8 @@ mod test {
             .exactly_one()
             .ok()
             .unwrap();
-        let (h_outp_node, h_port_2) = h.linked_port(h_node_h0, h_h0_out).unwrap();
-        let h_port_3 = h.linked_port(h_node_h1, h_h1_out).unwrap().1;
+        let (h_outp_node, h_port_2) = h.linked_ports(h_node_h0, h_h0_out).next().unwrap();
+        let h_port_3 = h.linked_ports(h_node_h1, h_h1_out).next().unwrap().1;
         // 4.4. Construct the maps
         let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
         let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
