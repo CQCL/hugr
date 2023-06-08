@@ -2,15 +2,18 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, HugrMut, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
+
 use crate::types::LinearType;
 
 pub mod handle;
 pub use handle::BuildHandle;
 
 mod build_traits;
-pub use build_traits::{Container, Dataflow};
+pub use build_traits::{
+    Container, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
+};
 
 mod dataflow;
 pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
@@ -67,14 +70,32 @@ pub enum BuildError {
     CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
 
+impl AsMut<HugrMut> for HugrMut {
+    fn as_mut(&mut self) -> &mut HugrMut {
+        self
+    }
+}
+impl AsRef<HugrMut> for HugrMut {
+    fn as_ref(&self) -> &HugrMut {
+        self
+    }
+}
+
+/// Trait allowing treating type as (im)mutable reference to [`HugrMut`]
+pub trait HugrMutRef: AsMut<HugrMut> + AsRef<HugrMut> {}
+impl HugrMutRef for HugrMut {}
+impl HugrMutRef for &mut HugrMut {}
+
 #[cfg(test)]
 mod test {
 
+    use crate::hugr::HugrMut;
     use crate::types::{ClassicType, LinearType, Signature, SimpleType};
-    use crate::{builder::ModuleBuilder, Hugr};
+    use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::{BuildError, Container, Dataflow, FuncID, FunctionBuilder};
+    use super::{BuildError, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
@@ -82,7 +103,7 @@ mod test {
     pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
     /// Wire up inputs of a Dataflow container to the outputs.
-    pub(super) fn n_identity<T: Dataflow>(
+    pub(super) fn n_identity<T: DataflowSubContainer>(
         dataflow_builder: T,
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
@@ -91,13 +112,12 @@ mod test {
 
     pub(super) fn build_main(
         signature: Signature,
-        f: impl FnOnce(FunctionBuilder<true>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        f: impl FnOnce(FunctionBuilder<&mut HugrMut>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let f_builder = module_builder.declare_and_def("main", signature)?;
 
         f(f_builder)?;
-
-        module_builder.finish()
+        Ok(module_builder.finish_hugr()?)
     }
 }
