@@ -801,6 +801,7 @@ mod test {
                 parent,
                 DataflowOp::Input {
                     types: type_row![B],
+                    resources: ResourceSet::new(),
                 },
             )
             .unwrap();
@@ -812,6 +813,7 @@ mod test {
                 parent,
                 DataflowOp::Output {
                     types: vec![B; copies].into(),
+                    resources: ResourceSet::new(),
                 },
             )
             .unwrap();
@@ -842,6 +844,7 @@ mod test {
                 parent,
                 DataflowOp::Input {
                     types: type_row![B],
+                    resources: ResourceSet::new(),
                 },
             )
             .unwrap();
@@ -859,6 +862,7 @@ mod test {
                 parent,
                 DataflowOp::Output {
                     types: vec![tag_type, B].into(),
+                    resources: ResourceSet::new(),
                 },
             )
             .unwrap();
@@ -966,7 +970,13 @@ mod test {
         // After moving the previous definition to a valid place,
         // add an input node to the module subgraph
         let new_input = b
-            .add_op_with_parent(root, DataflowOp::Input { types: type_row![] })
+            .add_op_with_parent(
+                root,
+                DataflowOp::Input {
+                    types: type_row![],
+                    resources: ResourceSet::new(),
+                },
+            )
             .unwrap();
         assert_matches!(
             b.hugr().validate(),
@@ -998,6 +1008,7 @@ mod test {
             output,
             DataflowOp::Output {
                 types: type_row![B],
+                resources: ResourceSet::new(),
             },
         );
         assert_matches!(
@@ -1009,6 +1020,7 @@ mod test {
             output,
             DataflowOp::Output {
                 types: type_row![B, B],
+                resources: ResourceSet::new(),
             },
         );
 
@@ -1017,6 +1029,7 @@ mod test {
             copy,
             DataflowOp::Output {
                 types: type_row![B, B],
+                resources: ResourceSet::new(),
             },
         );
         assert_matches!(
@@ -1132,12 +1145,14 @@ mod test {
             block_input,
             DataflowOp::Input {
                 types: type_row![Q],
+                resources: ResourceSet::new(),
             },
         );
         b.replace_op(
             block_output,
             DataflowOp::Output {
                 types: vec![SimpleType::new_simple_predicate(1), Q].into(),
+                resources: ResourceSet::new(),
             },
         );
         assert_matches!(

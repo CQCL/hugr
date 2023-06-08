@@ -3,6 +3,7 @@
 use smol_str::SmolStr;
 
 use super::{controlflow::ControlFlowOp, tag::OpTag, LeafOp};
+use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 
 /// A dataflow operation.
@@ -11,9 +12,15 @@ use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, Simpl
 pub enum DataflowOp {
     /// An input node.
     /// The outputs of this node are the inputs to the function.
-    Input { types: TypeRow },
+    Input {
+        types: TypeRow,
+        resources: ResourceSet,
+    },
     /// An output node. The inputs are the outputs of the function.
-    Output { types: TypeRow },
+    Output {
+        types: TypeRow,
+        resources: ResourceSet,
+    },
     /// Call a function directly.
     ///
     /// The first ports correspond to the signature of the function being
@@ -106,8 +113,16 @@ impl DataflowOp {
     /// The signature of the operation.
     pub fn signature(&self) -> Signature {
         match self {
-            DataflowOp::Input { types } => Signature::new_df(TypeRow::new(), types.clone()),
-            DataflowOp::Output { types } => Signature::new_df(types.clone(), TypeRow::new()),
+            DataflowOp::Input { types, resources } => {
+                let mut sig = Signature::new_df(TypeRow::new(), types.clone());
+                sig.output_resources = resources.clone();
+                sig
+            }
+            DataflowOp::Output { types, resources } => {
+                let mut sig = Signature::new_df(types.clone(), TypeRow::new());
+                sig.input_resources = resources.clone();
+                sig
+            }
             DataflowOp::Call { signature } => Signature {
                 const_input: vec![ClassicType::graph_from_sig(signature.clone()).into()].into(),
                 ..signature.clone()

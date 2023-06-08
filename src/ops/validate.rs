@@ -498,6 +498,7 @@ mod test {
 
     use crate::{
         ops::LeafOp,
+        resource::ResourceSet,
         type_row,
         types::{ClassicType, SimpleType},
     };
@@ -513,9 +514,11 @@ mod test {
 
         let input_node = OpType::Dataflow(DataflowOp::Input {
             types: in_types.clone(),
+            resources: ResourceSet::new(),
         });
         let output_node = OpType::Dataflow(DataflowOp::Output {
             types: out_types.clone(),
+            resources: ResourceSet::new(),
         });
         let leaf_node = OpType::Dataflow(DataflowOp::Leaf {
             op: LeafOp::Noop(ClassicType::bit().into()),

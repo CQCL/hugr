@@ -168,7 +168,7 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), output_types)
+        DFGBuilder::create_with_io(self.base(), dfg_n, signature)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] node,

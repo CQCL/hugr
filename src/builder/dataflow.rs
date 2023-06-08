@@ -25,18 +25,23 @@ impl<T: HugrMutRef> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        signature: Signature
     ) -> Result<Self, BuildError> {
-        let num_in_wires = inputs.len();
-        let num_out_wires = outputs.len();
+        let num_in_wires = signature.input.len();
+        let num_out_wires = signature.output.len();
         let i = base.as_mut().add_op_with_parent(
             parent,
-            OpType::Dataflow(DataflowOp::Input { types: inputs }),
+            OpType::Dataflow(DataflowOp::Input {
+                types: signature.input,
+                resources: signature.input_resources,
+            }),
         )?;
         let o = base.as_mut().add_op_with_parent(
             parent,
-            OpType::Dataflow(DataflowOp::Output { types: outputs }),
+            OpType::Dataflow(DataflowOp::Output {
+                types: signature.output,
+                resources: signature.output_resources,
+            }),
         )?;
 
         Ok(Self {
@@ -60,12 +65,11 @@ impl DFGBuilder<HugrMut> {
     ) -> Result<DFGBuilder<HugrMut>, BuildError> {
         let input = input.into();
         let output = output.into();
-        let dfg_op = DataflowOp::DFG {
-            signature: Signature::new_df(input.clone(), output.clone()),
-        };
+        let signature = Signature::new_df(input.clone(), output.clone());
+        let dfg_op = DataflowOp::DFG { signature: signature.clone() };
         let base = HugrMut::new(dfg_op);
         let root = base.hugr().root();
-        DFGBuilder::create_with_io(base, root, input, output)
+        DFGBuilder::create_with_io(base, root, signature)
     }
 }
 
@@ -131,14 +135,12 @@ impl FunctionBuilder<HugrMut> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let inputs = signature.input.clone();
-        let outputs = signature.output.clone();
-        let op = ModuleOp::Def { signature };
+        let op = ModuleOp::Def { signature: signature.clone() };
 
         let base = HugrMut::new(op);
         let root = base.hugr().root();
 
-        let db = DFGBuilder::create_with_io(base, root, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(base, root, signature)?;
         Ok(Self::from_dfg_builder(db))
     }
 }

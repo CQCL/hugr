@@ -3,7 +3,7 @@ use crate::ops::controlflow::TailLoopSignature;
 use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::TypeRow;
+use crate::types::{Signature,TypeRow};
 use crate::Node;
 
 use super::build_traits::SubContainer;
@@ -23,11 +23,11 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         loop_node: Node,
         tail_loop_sig: &TailLoopSignature,
     ) -> Result<Self, BuildError> {
+        let signature = Signature::new_df(tail_loop_sig.body_input_row(), tail_loop_sig.body_output_row());
         let dfg_build = DFGBuilder::create_with_io(
             base,
             loop_node,
-            tail_loop_sig.body_input_row(),
-            tail_loop_sig.body_output_row(),
+            signature,
         )?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))

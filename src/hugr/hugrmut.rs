@@ -263,6 +263,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{DataflowOp, LeafOp, ModuleOp},
+        resource::ResourceSet,
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -296,6 +297,7 @@ mod test {
                     f,
                     DataflowOp::Input {
                         types: type_row![NAT],
+                        resources: ResourceSet::new(),
                     },
                 )
                 .unwrap();
@@ -307,6 +309,7 @@ mod test {
                     f,
                     DataflowOp::Output {
                         types: type_row![NAT, NAT],
+                        resources: ResourceSet::new(),
                     },
                 )
                 .unwrap();

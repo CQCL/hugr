@@ -9,6 +9,7 @@ use crate::{hugr::view::HugrView, ops::ControlFlowOp, type_row, types::SimpleTyp
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlockOp, OpType};
+use crate::types::Signature;
 
 use crate::Node;
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
@@ -225,7 +226,8 @@ impl<B: HugrMutRef> BlockBuilder<B> {
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let db = DFGBuilder::create_with_io(base, block_n, inputs, node_outputs.into())?;
+        let signature = Signature::new_df(inputs, TypeRow::from(node_outputs));
+        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 }
