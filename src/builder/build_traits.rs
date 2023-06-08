@@ -14,7 +14,7 @@ use super::{
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
     ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType},
-    types::{ClassicType, EdgeKind},
+    types::EdgeKind,
 };
 
 use crate::types::{LinearType, Signature, SimpleType, TypeRow};
@@ -348,36 +348,6 @@ pub trait Dataflow: Container {
         } else {
             Err(BuildError::WireNotFound(wire))
         }
-    }
-
-    /// Add a discard (0-arity copy) for a `wire` with a known type `typ`.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard_type(
-        &mut self,
-        wire: Wire,
-        typ: ClassicType,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_op(LeafOp::Noop(typ.into()), [wire])
-    }
-
-    /// Discard a value on a `wire` using [`Dataflow::discard_type`], retrieving
-    /// the type of the Wire from it's source.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let typ = self.get_wire_type(wire)?;
-        let typ = match typ {
-            SimpleType::Classic(typ) => typ,
-            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
-        };
-        self.discard_type(wire, typ)
     }
 
     /// Add a [`LeafOp::MakeTuple`] node and wire in the `values` Wires,
