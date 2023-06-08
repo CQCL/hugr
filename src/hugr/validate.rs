@@ -419,24 +419,24 @@ impl<'a> ValidationContext<'a> {
 
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
-            EdgeKind::Const(typ) => match from_optype {
-                OpType::Const(ops::Const(val)) => {
+            EdgeKind::Const(typ) => {
+                if let OpType::Const(ops::Const(val)) = from_optype {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
+                } else {
+                    // If const edges aren't coming from const nodes, they're graph
+                    // edges coming from Declare or Def
+                    return if [OpTag::Def, OpTag::Function].contains(&from_optype.tag()) {
+                        Ok(())
+                    } else {
+                        Err(InterGraphEdgeError::InvalidConstSrc {
+                            from,
+                            from_offset,
+                            typ,
+                        }
+                        .into())
+                    };
                 }
-                // If const edges aren't coming from const nodes, they're graph
-                // edges coming from Declare or Def
-                OpType::Def(ops::Def { .. }) | OpType::Declare(ops::Declare { .. }) => {
-                    return Ok(())
-                }
-                _ => {
-                    return Err(InterGraphEdgeError::InvalidConstSrc {
-                        from,
-                        from_offset,
-                        typ,
-                    }
-                    .into())
-                }
-            },
+            }
             EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
                 return Err(InterGraphEdgeError::NonClassicalData {
@@ -480,7 +480,7 @@ impl<'a> ValidationContext<'a> {
             } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if !matches!(ancestor_parent_op, OpType::CFG(_)) {
+                if ancestor_parent_op.tag() == OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,

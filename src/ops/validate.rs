@@ -417,15 +417,15 @@ fn validate_io_nodes<'a>(
 
     // The first and last children have already been popped from the iterator.
     for (child, optype) in children {
-        match optype {
-            OpType::Input(_) => {
+        match optype.tag() {
+            OpTag::Input => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "first",
                 })
             }
-            OpType::Output(_) => {
+            OpTag::Output => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
