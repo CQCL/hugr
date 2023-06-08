@@ -9,7 +9,7 @@
 //!   structures.
 //!
 
-// pub mod algorithm;
+pub mod algorithm;
 pub mod builder;
 pub mod extensions;
 pub mod hugr;

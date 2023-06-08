@@ -3,7 +3,8 @@ use std::hash::Hash;
 use super::nest_cfgs::CfgView;
 use crate::hugr::view::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
-use crate::ops::{controlflow::BasicBlockOp, OpType};
+use crate::ops::tag::OpTag;
+use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
