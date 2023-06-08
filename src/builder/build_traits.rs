@@ -602,7 +602,7 @@ fn get_value_kind(base: &HugrMut, src: Node, src_offset: Port) -> ValueKind {
             SimpleType::Linear(typ) => ValueKind::Linear(typ),
         },
         _ => {
-            panic!("Wires can only be Value kind")
+            panic!("Wires can only be Const or Value kind")
         }
     }
 }
