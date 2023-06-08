@@ -65,7 +65,7 @@ impl DFGBuilder<HugrMut> {
     ) -> Result<DFGBuilder<HugrMut>, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = Signature::new_df(input.clone(), output.clone());
+        let signature = Signature::new_df(input, output);
         let dfg_op = DataflowOp::DFG {
             signature: signature.clone(),
         };

@@ -176,7 +176,7 @@ impl CaseBuilder<HugrMut> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = Signature::new_df(input.clone(), output.clone());
+        let signature = Signature::new_df(input, output);
         let op = CaseOp {
             signature: signature.clone(),
         };
