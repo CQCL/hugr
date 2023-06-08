@@ -81,10 +81,7 @@ impl<'a> ValidationContext<'a> {
                 // We include copy nodes in addition to basic blocks.
                 // These are later filtered when iterating.
                 !self.hugr.graph.contains_node(n)
-                    || matches!(
-                        self.hugr.get_optype(n.into()).tag(),
-                        OpTag::BasicBlock | OpTag::BasicBlockExit
-                    )
+                    || OpTag::BasicBlock.contains(self.hugr.get_optype(n.into()).tag())
             },
             |_, _| true,
         )
@@ -425,7 +422,7 @@ impl<'a> ValidationContext<'a> {
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
                     // edges coming from Declare or Def
-                    return if [OpTag::Def, OpTag::Function].contains(&from_optype.tag()) {
+                    return if OpTag::Function.contains(from_optype.tag()) {
                         Ok(())
                     } else {
                         Err(InterGraphEdgeError::InvalidConstSrc {
