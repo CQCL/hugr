@@ -63,10 +63,10 @@ pub trait HugrView {
     /// Iterator over both the input and output ports of node.
     fn all_node_ports(&self, node: Node) -> NodePorts;
 
-    /// Return node and port connected to provided port, if not connected return None.
+    /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: Port) -> PortLinks<'_>;
 
-    /// Return node and port connected to provided port, if not connected return None.
+    /// Returns whether a port is connected.
     fn is_linked(&self, node: Node, port: Port) -> bool {
         self.linked_ports(node, port).next().is_some()
     }
