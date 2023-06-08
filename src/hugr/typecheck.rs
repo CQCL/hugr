@@ -10,77 +10,49 @@ use crate::types::{ClassicType, Container};
 
 use crate::ops::module::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
-use std::fmt::{self, Display};
-
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
 pub enum ConstTypeError {
     /// This case hasn't been implemented. Possibly because we don't have value
     /// constructors to check against it
+    #[error("Const type checking unimplemented for {0}")]
     Unimplemented(ClassicType),
     /// The given type and term are incompatible
+    #[error("Invalid const value for type {0}")]
     Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
+    #[error("Const int {1} too large for type I{0}")]
     IntTooLarge(HugrIntWidthStore, HugrIntValueStore),
     /// Width (n) of an `I<n>` type doesn't fit into a HugrIntWidthStore
+    #[error("Int type too large: I{0}")]
     IntWidthTooLarge(HugrIntWidthStore),
     /// The width of an integer type wasn't a power of 2
+    #[error("The int type I{0} is invalid, because {0} is not a power of 2")]
     IntWidthInvalid(HugrIntWidthStore),
     /// Expected width (packed with const int) doesn't match type
+    #[error("Type mismatch for int: expected I{0}, but found I{1}")]
     IntWidthMismatch(HugrIntWidthStore, HugrIntWidthStore),
     /// Found a Var type constructor when we're checking a const val
+    #[error("Type of a const value can't be Var")]
     ConstCantBeVar,
     /// The length of the tuple value doesn't match the length of the tuple type
+    #[error("Tuple of wrong length")]
     TupleWrongLength,
     /// Const values aren't allowed to be linear
+    #[error("Linear types not allowed in const nodes")]
     LinearTypeDisallowed,
     /// Tag for a sum value exceeded the number of variants
+    #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
     /// For a value which embeds its type (e.g. sum or opaque) - a mismatch
     /// between the embedded type and the type we're checking against
+    #[error("Type mismatch for const - expected {0}, found {1}")]
     TypeMismatch(ClassicType, ClassicType),
     /// A mismatch between the embedded type and the type we're checking
     /// against, as above, but for rows instead of simple types
+    #[error("Type mismatch for const - expected {0}, found {1}")]
     TypeRowMismatch(TypeRow, TypeRow),
-}
-
-impl Display for ConstTypeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let str = match self {
-            ConstTypeError::Unimplemented(ty) => {
-                format!("Const type checking unimplemented for {}", ty)
-            }
-            ConstTypeError::Failed(typ) => format!("Invalid const value for type {}", typ),
-            ConstTypeError::IntTooLarge(width, val) => {
-                format!("Const int {} too large for type I{}", val, width)
-            }
-            ConstTypeError::IntWidthTooLarge(w) => format!("Int type too large: I{}", w),
-            ConstTypeError::IntWidthInvalid(w) => {
-                format!(
-                    "The int type I{} is invalid, because {} is not a power of 2",
-                    w, w
-                )
-            }
-            ConstTypeError::IntWidthMismatch(exp, act) => format!(
-                "Type mismatch for int: expected I{}, but found I{}",
-                exp, act
-            ),
-            ConstTypeError::ConstCantBeVar => "Type of a const value can't be Var".to_string(),
-            ConstTypeError::TupleWrongLength => "Tuple of wrong length".to_string(),
-            ConstTypeError::LinearTypeDisallowed => {
-                "Linear types not allowed in const nodes".to_string()
-            }
-            ConstTypeError::InvalidSumTag => "Tag of Sum value is invalid".to_string(),
-            ConstTypeError::TypeMismatch(exp, act) => {
-                format!("Type mismatch for const - expected {}, found {}", exp, act)
-            }
-            ConstTypeError::TypeRowMismatch(exp, act) => {
-                format!("Type mismatch for const - expected {}, found {}", exp, act)
-            }
-        };
-        f.write_str(&str)
-    }
 }
 
 /// Per the spec, valid widths for integers are 2^n for all n in [0,7]
