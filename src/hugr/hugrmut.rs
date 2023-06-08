@@ -255,73 +255,73 @@ impl HugrMut {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use crate::{
-//         hugr::HugrView,
-//         macros::type_row,
-//         ops::{DataflowOp, LeafOp},
-//         types::{ClassicType, Signature, SimpleType},
-//     };
+#[cfg(test)]
+mod test {
+    use crate::{
+        hugr::HugrView,
+        macros::type_row,
+        ops::{self, LeafOp},
+        types::{ClassicType, Signature, SimpleType},
+    };
 
-//     use super::*;
+    use super::*;
 
-//     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
-//     #[test]
-//     fn simple_function() {
-//         // Starts an empty builder
-//         let mut builder = HugrMut::new_module();
+    #[test]
+    fn simple_function() {
+        // Starts an empty builder
+        let mut builder = HugrMut::new_module();
 
-//         // Create the root module definition
-//         let module: Node = builder.hugr().root();
+        // Create the root module definition
+        let module: Node = builder.hugr().root();
 
-//         // Start a main function with two nat inputs.
-//         //
-//         // `add_op` is equivalent to `add_root_op` followed by `set_parent`
-//         let f: Node = builder
-//             .add_op_with_parent(
-//                 module,
-//                 crate::ops::Def {
-//                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
-//                 },
-//             )
-//             .expect("Failed to add function definition node");
+        // Start a main function with two nat inputs.
+        //
+        // `add_op` is equivalent to `add_root_op` followed by `set_parent`
+        let f: Node = builder
+            .add_op_with_parent(
+                module,
+                crate::ops::Def {
+                    signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                },
+            )
+            .expect("Failed to add function definition node");
 
-//         {
-//             let f_in = builder
-//                 .add_op_with_parent(
-//                     f,
-//                     DataflowOp::Input {
-//                         types: type_row![NAT],
-//                     },
-//                 )
-//                 .unwrap();
-//             let copy = builder
-//                 .add_op_with_parent(
-//                     f,
-//                     LeafOp::Copy {
-//                         n_copies: 2,
-//                         typ: ClassicType::i64(),
-//                     },
-//                 )
-//                 .unwrap();
-//             let f_out = builder
-//                 .add_op_with_parent(
-//                     f,
-//                     DataflowOp::Output {
-//                         types: type_row![NAT, NAT],
-//                     },
-//                 )
-//                 .unwrap();
+        {
+            let f_in = builder
+                .add_op_with_parent(
+                    f,
+                    ops::Input {
+                        types: type_row![NAT],
+                    },
+                )
+                .unwrap();
+            let copy = builder
+                .add_op_with_parent(
+                    f,
+                    LeafOp::Copy {
+                        n_copies: 2,
+                        typ: ClassicType::i64(),
+                    },
+                )
+                .unwrap();
+            let f_out = builder
+                .add_op_with_parent(
+                    f,
+                    ops::Output {
+                        types: type_row![NAT, NAT],
+                    },
+                )
+                .unwrap();
 
-//             assert!(builder.connect(f_in, 0, copy, 0).is_ok());
-//             assert!(builder.connect(copy, 0, f_out, 0).is_ok());
-//             assert!(builder.connect(copy, 1, f_out, 1).is_ok());
-//         }
+            assert!(builder.connect(f_in, 0, copy, 0).is_ok());
+            assert!(builder.connect(copy, 0, f_out, 0).is_ok());
+            assert!(builder.connect(copy, 1, f_out, 1).is_ok());
+        }
 
-//         // Finish the construction and create the HUGR
-//         let hugr: Result<Hugr, ValidationError> = builder.finish();
-//         assert_eq!(hugr.err(), None);
-//     }
-// }
+        // Finish the construction and create the HUGR
+        let hugr: Result<Hugr, ValidationError> = builder.finish();
+        assert_eq!(hugr.err(), None);
+    }
+}

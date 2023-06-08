@@ -5,10 +5,10 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, HugrMutRef, Wire,
 };
 
-use crate::{hugr::view::HugrView, ops::ControlFlowOp, type_row, types::SimpleType};
+use crate::{hugr::view::HugrView, type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
-use crate::ops::{BasicBlockOp, OpType};
+use crate::ops::{self, BasicBlock, OpType};
 
 use crate::Node;
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
@@ -53,7 +53,7 @@ impl CFGBuilder<HugrMut> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let cfg_op = ControlFlowOp::CFG {
+        let cfg_op = ops::CFG {
             inputs: input.clone(),
             outputs: output.clone(),
         };
@@ -78,7 +78,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         output: TypeRow,
     ) -> Result<Self, BuildError> {
         let n_out_wires = output.len();
-        let exit_block_type = OpType::BasicBlock(BasicBlockOp::Exit {
+        let exit_block_type = OpType::BasicBlock(BasicBlock::Exit {
             cfg_outputs: output,
         });
         let exit_node = base
@@ -106,7 +106,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut HugrMut>, BuildError> {
         let n_cases = predicate_variants.len();
-        let op = OpType::BasicBlock(BasicBlockOp::Block {
+        let op = OpType::BasicBlock(BasicBlock::Block {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
@@ -254,7 +254,7 @@ impl BlockBuilder<HugrMut> {
         let inputs = inputs.into();
         let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
         let other_outputs = other_outputs.into();
-        let op = BasicBlockOp::Block {
+        let op = BasicBlock::Block {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),

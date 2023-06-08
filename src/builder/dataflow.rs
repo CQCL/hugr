@@ -5,7 +5,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{DataflowOp, OpType};
+use crate::ops::{self, OpType};
 
 use crate::types::{Signature, TypeRow};
 
@@ -30,14 +30,12 @@ impl<T: HugrMutRef> DFGBuilder<T> {
     ) -> Result<Self, BuildError> {
         let num_in_wires = inputs.len();
         let num_out_wires = outputs.len();
-        let i = base.as_mut().add_op_with_parent(
-            parent,
-            OpType::Dataflow(DataflowOp::Input { types: inputs }),
-        )?;
-        let o = base.as_mut().add_op_with_parent(
-            parent,
-            OpType::Dataflow(DataflowOp::Output { types: outputs }),
-        )?;
+        let i = base
+            .as_mut()
+            .add_op_with_parent(parent, ops::Input { types: inputs })?;
+        let o = base
+            .as_mut()
+            .add_op_with_parent(parent, ops::Output { types: outputs })?;
 
         Ok(Self {
             base,
@@ -60,7 +58,7 @@ impl DFGBuilder<HugrMut> {
     ) -> Result<DFGBuilder<HugrMut>, BuildError> {
         let input = input.into();
         let output = output.into();
-        let dfg_op = DataflowOp::DFG {
+        let dfg_op = ops::DFG {
             signature: Signature::new_df(input.clone(), output.clone()),
         };
         let base = HugrMut::new(dfg_op);
@@ -133,7 +131,7 @@ impl FunctionBuilder<HugrMut> {
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
         let inputs = signature.input.clone();
         let outputs = signature.output.clone();
-        let op = OpType::Def { signature };
+        let op = ops::Def { signature };
 
         let base = HugrMut::new(op);
         let root = base.hugr().root();
@@ -194,6 +192,8 @@ mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::HugrView;
+    use crate::ops::tag::OpTag;
+    use crate::ops::OpTrait;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -218,10 +218,7 @@ mod test {
 
                 let [int, qb] = func_builder.input_wires_arr();
 
-                let q_out = func_builder.add_dataflow_op(
-                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
-                    vec![qb],
-                )?;
+                let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
 
                 let inner_builder = func_builder.dfg_builder(vec![(NAT, int)], type_row![NAT])?;
                 let inner_id = n_identity(inner_builder)?;
@@ -336,7 +333,7 @@ mod test {
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type().tag(), OpTag::DFG);
+        assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
 
         Ok(())
     }

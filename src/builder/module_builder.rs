@@ -6,11 +6,11 @@ use super::{
 
 use crate::{
     hugr::{view::HugrView, ValidationError},
-    types::SimpleType,
+    types::SimpleType, ops,
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-use crate::ops::{OpType};
+use crate::ops::OpType;
 
 use crate::types::Signature;
 
@@ -72,19 +72,18 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
-        let (inputs, outputs) = if let OpType::Declare { signature } =
-            self.hugr().get_optype(f_node)
-        {
-            (signature.input.clone(), signature.output.clone())
-        } else {
-            return Err(BuildError::UnexpectedType {
-                node: f_node,
-                op_desc: "OpType::Declare",
-            });
-        };
+        let (inputs, outputs) =
+            if let OpType::Declare(ops::Declare { signature }) = self.hugr().get_optype(f_node) {
+                (signature.input.clone(), signature.output.clone())
+            } else {
+                return Err(BuildError::UnexpectedType {
+                    node: f_node,
+                    op_desc: "OpType::Declare",
+                });
+            };
         self.base().replace_op(
             f_node,
-            OpType::Def {
+            ops::Def {
                 signature: Signature::new_df(inputs.clone(), outputs.clone()),
             },
         );
@@ -121,7 +120,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add name and param names to metadata
-        let declare_n = self.add_child_op(OpType::Declare { signature })?;
+        let declare_n = self.add_child_op(ops::Declare { signature })?;
 
         Ok(declare_n.into())
     }
@@ -138,7 +137,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     ) -> Result<AliasID<true>, BuildError> {
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
-        let node = self.add_child_op(OpType::AliasDef {
+        let node = self.add_child_op(ops::AliasDef {
             name: name.clone(),
             definition: typ,
         })?;
@@ -156,7 +155,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         linear: bool,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(OpType::AliasDeclare {
+        let node = self.add_child_op(ops::AliasDeclare {
             name: name.clone(),
             linear,
         })?;

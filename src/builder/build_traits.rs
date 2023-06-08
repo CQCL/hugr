@@ -1,8 +1,7 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
-use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
-use crate::ops::ConstValue;
+use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
 
@@ -13,7 +12,6 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, OpType},
     types::{ClassicType, EdgeKind},
 };
 
@@ -47,10 +45,10 @@ pub trait Container {
         Ok(self.base().add_op_with_parent(parent, op)?)
     }
 
-    /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`OpType::other_inputs`] or  [`OpType::other_outputs`]
+    /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
     ///
-    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
-    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
+    /// [`other_inputs`]: crate::ops::OpTrait::other_inputs
+    /// [`other_outputs`]: crate::ops::OpTrait::other_outputs
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
         Ok(Wire::new(src, Port::new_outgoing(src_port)))
@@ -64,7 +62,7 @@ pub trait Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(OpType::Const(val))?;
+        let const_n = self.add_child_op(ops::Const(val))?;
 
         Ok((const_n, typ).into())
     }
@@ -162,9 +160,9 @@ pub trait Dataflow: Container {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
-            OpType::Dataflow(DataflowOp::DFG {
+            ops::DFG {
                 signature: Signature::new_df(input_types.clone(), output_types.clone()),
-            }),
+            },
             input_wires,
         )?;
 
@@ -192,19 +190,17 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_op_with_wires(
             self,
-            OpType::Dataflow(DataflowOp::ControlFlow {
-                op: ControlFlowOp::CFG {
-                    inputs: inputs.clone(),
-                    outputs: output_types.clone(),
-                },
-            }),
+            ops::CFG {
+                inputs: inputs.clone(),
+                outputs: output_types.clone(),
+            },
             input_wires,
         )?;
         CFGBuilder::create(self.base(), cfg_node, inputs, output_types)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.
-    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// Adds a [`OpType::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
@@ -215,7 +211,7 @@ pub trait Dataflow: Container {
         self.base().add_ports(cn, Direction::Outgoing, 1);
 
         let load_n = self.add_dataflow_op(
-            DataflowOp::LoadConstant {
+            ops::LoadConstant {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
@@ -233,7 +229,7 @@ pub trait Dataflow: Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_dataflow_op(OpType::Const(val), [])?;
+        let const_n = self.add_dataflow_op(ops::Const(val), [])?;
 
         Ok((const_n.node(), typ).into())
     }
@@ -268,18 +264,14 @@ pub trait Dataflow: Container {
             inputs_outputs.into_iter().unzip();
         input_wires.extend(rest_input_wires.into_iter());
 
-        let tail_loop_signature = TailLoopSignature {
+        let tail_loop = ops::TailLoop {
             just_inputs: input_types.into(),
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        let (loop_node, _) = add_op_with_wires(
-            self,
-            ControlFlowOp::TailLoop(tail_loop_signature.clone()),
-            input_wires,
-        )?;
+        let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
-        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop_signature)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop)
     }
 
     /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
@@ -311,11 +303,11 @@ pub trait Dataflow: Container {
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
-            ControlFlowOp::Conditional(ConditionalSignature {
+            ops::Conditional {
                 predicate_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
-            }),
+            },
             input_wires,
         )?;
 
@@ -437,14 +429,10 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_continue(
         &mut self,
-        loop_signature: TailLoopSignature,
+        tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(
-            0,
-            [loop_signature.just_inputs, loop_signature.just_outputs],
-            values,
-        )
+        self.make_predicate(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -458,14 +446,10 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_break(
         &mut self,
-        loop_signature: TailLoopSignature,
+        loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(
-            1,
-            [loop_signature.just_inputs, loop_signature.just_outputs],
-            values,
-        )
+        self.make_predicate(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
     /// Add a [`DataflowOp::Call`] node, calling `function`, with inputs
@@ -484,7 +468,9 @@ pub trait Dataflow: Container {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
-            OpType::Def { signature } | OpType::Declare { signature } => signature.clone(),
+            OpType::Def(ops::Def { signature }) | OpType::Declare(ops::Declare { signature }) => {
+                signature.clone()
+            }
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
@@ -493,7 +479,7 @@ pub trait Dataflow: Container {
             }
         };
         let const_in_port = signature.output.len();
-        let op_id = self.add_dataflow_op(DataflowOp::Call { signature }, input_wires)?;
+        let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port: usize = self
             .base()
             .add_ports(function.node(), Direction::Outgoing, 1)
@@ -663,8 +649,8 @@ fn check_classical_value(
 
 // Return newly added port to copy node if src node is a copy
 fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
-    let src_op: Result<&LeafOp, ()> = base.hugr().get_optype(src).try_into();
-    if let Ok(LeafOp::Copy { n_copies, typ }) = src_op {
+    let src_op = base.hugr().get_optype(src);
+    if let OpType::LeafOp(LeafOp::Copy { n_copies, typ }) = src_op {
         let copy_node = src;
         // If already connected to a copy node, add wire to the copy
         let n_copies = *n_copies;

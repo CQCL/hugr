@@ -1,5 +1,5 @@
 //! The operation types for the HUGR.
-
+#![allow(missing_docs)]
 pub mod constant;
 pub mod controlflow;
 pub mod custom;
@@ -49,6 +49,7 @@ pub enum OpType {
     BasicBlock,
     TailLoop,
     CFG,
+    Conditional,
     Case,
 }
 

@@ -1,6 +1,5 @@
 use crate::hugr::HugrMut;
-use crate::ops::controlflow::TailLoopSignature;
-use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
+use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
 use crate::types::TypeRow;
@@ -21,13 +20,13 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
-        tail_loop_sig: &TailLoopSignature,
+        tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
             loop_node,
-            tail_loop_sig.body_input_row(),
-            tail_loop_sig.body_output_row(),
+            tail_loop.body_input_row(),
+            tail_loop.body_output_row(),
         )?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
@@ -42,14 +41,11 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
-    /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
+    /// Get a reference to the [`crate::ops::controlflow::ops::TailLoop`]
     /// that defines the signature of the [`ControlFlowOp::TailLoop`]
-    pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
-        if let OpType::Dataflow(DataflowOp::ControlFlow {
-            op: ControlFlowOp::TailLoop(tail_sig),
-        }) = self.hugr().get_optype(self.container_node())
-        {
-            Ok(tail_sig)
+    pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
+        if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
+            Ok(tail_loop)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
@@ -60,8 +56,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
 
     /// The output types of the child graph, including the predicate as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
-        self.loop_signature()
-            .map(TailLoopSignature::body_output_row)
+        self.loop_signature().map(ops::TailLoop::body_output_row)
     }
 }
 
@@ -87,15 +82,14 @@ impl TailLoopBuilder<HugrMut> {
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        let tail_loop_sig = TailLoopSignature {
+        let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let op = ControlFlowOp::TailLoop(tail_loop_sig.clone());
-        let base = HugrMut::new(op);
+        let base = HugrMut::new(tail_loop.clone());
         let root = base.hugr().root();
-        Self::create_with_io(base, root, &tail_loop_sig)
+        Self::create_with_io(base, root, &tail_loop)
     }
 }
 

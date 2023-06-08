@@ -1,9 +1,8 @@
 use crate::hugr::view::HugrView;
-use crate::ops::controlflow::ConditionalSignature;
 use crate::types::{Signature, TypeRow};
 
 use crate::ops::handle::CaseID;
-use crate::ops::{controlflow::ControlFlowOp, CaseOp, OpType};
+use crate::ops::{self, OpType};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
@@ -98,14 +97,13 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     /// `case` is not a valid index or if there is an error adding nodes.
     pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut HugrMut>, BuildError> {
         let conditional = self.conditional_node;
-        let control_op: Result<ControlFlowOp, ()> = self
-            .hugr()
-            .get_optype(self.conditional_node)
-            .clone()
-            .try_into();
+        let control_op = self.hugr().get_optype(self.conditional_node);
 
-        let Ok(ControlFlowOp::Conditional(cond_sig)) = control_op else {panic!("Parent node does not have Conditional optype.")};
-        let inputs = cond_sig
+        let cond: ops::Conditional = control_op
+            .clone()
+            .try_into()
+            .expect("Parent node does not have Conditional optype.");
+        let inputs = cond
             .case_input_row(case)
             .ok_or(ConditionalBuildError::NotCase { conditional, case })?;
 
@@ -113,16 +111,16 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
             return Err(ConditionalBuildError::CaseBuilt { conditional, case }.into());
         }
 
-        let outputs = cond_sig.outputs;
-        let bb_op = OpType::Case(CaseOp {
+        let outputs = cond.outputs;
+        let case_op = ops::Case {
             signature: Signature::new_df(inputs.clone(), outputs.clone()),
-        });
+        };
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                self.base().add_op_before(sibling_node, bb_op)?
+                self.base().add_op_before(sibling_node, case_op)?
             } else {
-                self.add_child_op(bb_op)?
+                self.add_child_op(case_op)?
             };
 
         self.case_nodes[case] = Some(case_node);
@@ -153,11 +151,11 @@ impl ConditionalBuilder<HugrMut> {
         let n_out_wires = outputs.len();
         let n_cases = predicate_inputs.len();
 
-        let op = ControlFlowOp::Conditional(ConditionalSignature {
+        let op = ops::Conditional {
             predicate_inputs,
             other_inputs,
             outputs,
-        });
+        };
         let base = HugrMut::new(op);
         let conditional_node = base.root();
 
@@ -175,7 +173,7 @@ impl CaseBuilder<HugrMut> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let op = CaseOp {
+        let op = ops::Case {
             signature: Signature::new_df(input.clone(), output.clone()),
         };
         let base = HugrMut::new(op);
