@@ -66,9 +66,7 @@ impl DFGBuilder<HugrMut> {
         let input = input.into();
         let output = output.into();
         let signature = Signature::new_df(input, output);
-        let dfg_op = DataflowOp::DFG {
-            signature: signature.clone(),
-        };
+        let dfg_op = DataflowOp::DFG { signature: signature.clone() };
         let base = HugrMut::new(dfg_op);
         let root = base.hugr().root();
         DFGBuilder::create_with_io(base, root, signature)
@@ -137,9 +135,7 @@ impl FunctionBuilder<HugrMut> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let op = ModuleOp::Def {
-            signature: signature.clone(),
-        };
+        let op = ModuleOp::Def { signature: signature.clone() };
 
         let base = HugrMut::new(op);
         let root = base.hugr().root();
