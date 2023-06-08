@@ -14,7 +14,6 @@ use self::multiportgraph::MultiPortGraph;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
-use itertools::Itertools;
 use portgraph::dot::{hier_graph_dot_string_with, DotEdgeStyle};
 use portgraph::{Hierarchy, NodeIndex, UnmanagedDenseMap};
 use thiserror::Error;
@@ -98,9 +97,7 @@ impl Hugr {
         let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
         let replacement_nodes = r
             .replacement
-            .hierarchy
-            .children(r.replacement.root().index)
-            .map_into::<Node>()
+            .children(r.replacement.root())
             .collect::<Vec<Node>>();
         // number of replacement nodes including Input and Output:
         let replacement_sz = replacement_nodes.len();
