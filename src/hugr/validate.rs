@@ -7,7 +7,7 @@ use itertools::Itertools;
 use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
 use thiserror::Error;
 
-use crate::hugr::typecheck::{typecheck_const, TypeError};
+use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
@@ -623,7 +623,7 @@ pub enum ValidationError {
     InterGraphEdgeError(#[from] InterGraphEdgeError),
     /// Type error for constant values
     #[error("Type error for constant value: {0}.")]
-    ConstTypeError(#[from] TypeError),
+    ConstConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.
