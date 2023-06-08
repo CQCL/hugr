@@ -8,10 +8,11 @@ use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTre
 use portgraph::PortIndex;
 use thiserror::Error;
 
+use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, OpType};
-use crate::types::{EdgeKind, SimpleType};
+use crate::ops::{ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType};
+use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::view::HugrView;
@@ -416,7 +417,22 @@ impl<'a> ValidationContext<'a> {
 
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
-            EdgeKind::Const(_) => return Ok(()),
+            EdgeKind::Const(typ) => match from_optype {
+                OpType::Module(ModuleOp::Const(val)) => {
+                    return typecheck_const(&typ, val).map_err(ValidationError::from);
+                }
+                // If const edges aren't coming from const nodes, they're graph
+                // edges coming from Declare or Def
+                OpType::Module(ModuleOp::Def { .. } | ModuleOp::Declare { .. }) => return Ok(()),
+                _ => {
+                    return Err(InterGraphEdgeError::InvalidConstSrc {
+                        from,
+                        from_offset,
+                        typ,
+                    }
+                    .into())
+                }
+            },
             EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
                 return Err(InterGraphEdgeError::NonClassicalData {
@@ -679,6 +695,9 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
+    /// Type error for constant values
+    #[error("Type error for constant value: {0}.")]
+    ConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -738,6 +757,14 @@ pub enum InterGraphEdgeError {
         to_offset: Port,
         from_parent: Node,
         ancestor: Node,
+    },
+    #[error(
+        "Const edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
+    )]
+    InvalidConstSrc {
+        from: Node,
+        from_offset: Port,
+        typ: ClassicType,
     },
 }
 
@@ -821,7 +848,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
-        let tag_type = SimpleType::new_simple_predicate(predicate_size);
+        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
             .add_op_with_parent(

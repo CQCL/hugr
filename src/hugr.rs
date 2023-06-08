@@ -4,6 +4,7 @@ mod hugrmut;
 
 pub mod multiportgraph;
 pub mod serialize;
+pub mod typecheck;
 pub mod validate;
 pub mod view;
 
@@ -265,43 +266,55 @@ impl Hugr {
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     pub fn dot_string(&self) -> String {
+        let portgraph = self.graph.as_portgraph();
         hier_graph_dot_string_with(
-            self.graph.as_portgraph(),
+            portgraph,
             &self.hierarchy,
             |n| {
-                format!(
-                    "({ni}) {name}",
-                    name = self.op_types[n].name(),
-                    ni = n.index()
-                )
+                if !self.graph.contains_node(n) {
+                    return "".into();
+                }
+                let name = self.op_types[n].name();
+                format!("({ni}) {name}", ni = n.index())
             },
-            |p| {
-                let src = self.graph.port_node(p).unwrap();
-                let Some(tgt_port) = self.graph.port_link(p) else {
+            |mut p| {
+                let mut src = portgraph.port_node(p).unwrap();
+                let src_is_copy = !self.graph.contains_node(src);
+                let Some(tgt_port) = portgraph.port_link(p) else {
                         return ("".into(), DotEdgeStyle::None);
                     };
-                let tgt = self.graph.port_node(tgt_port).unwrap();
-                let style = if self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
-                    DotEdgeStyle::Some("dashed".into())
-                } else if self
-                    .get_optype(src.into())
-                    .port_kind(self.graph.port_offset(p).unwrap())
-                    == Some(EdgeKind::StateOrder)
-                {
-                    DotEdgeStyle::Some("dotted".into())
-                } else {
-                    DotEdgeStyle::None
-                };
+                let tgt = portgraph.port_node(tgt_port).unwrap();
+                let tgt_is_copy = !self.graph.contains_node(tgt);
+                if src_is_copy {
+                    p = portgraph.input_links(src).next().unwrap().unwrap();
+                    src = portgraph.port_node(p).unwrap();
+                }
 
-                let optype = self.op_types.get(src);
+                let style =
+                    if !tgt_is_copy && self.hierarchy.parent(src) != self.hierarchy.parent(tgt) {
+                        DotEdgeStyle::Some("dashed".into())
+                    } else if !src_is_copy
+                        && self
+                            .get_optype(src.into())
+                            .port_kind(self.graph.port_offset(p).unwrap())
+                            == Some(EdgeKind::StateOrder)
+                    {
+                        DotEdgeStyle::Some("dotted".into())
+                    } else {
+                        DotEdgeStyle::None
+                    };
+
                 let mut label = String::new();
-                let offset = self.graph.port_offset(p).unwrap();
-                let type_string = match optype.port_kind(offset) {
-                    Some(EdgeKind::Const(ty)) => format!("{}", ty),
-                    Some(EdgeKind::Value(ty)) => format!("{}", ty),
-                    _ => String::new(),
-                };
-                encode_text_to_string(type_string, &mut label);
+                if !src_is_copy {
+                    let optype = self.op_types.get(src);
+                    let offset = portgraph.port_offset(p).unwrap();
+                    let type_string = match optype.port_kind(offset) {
+                        Some(EdgeKind::Const(ty)) => format!("{}", ty),
+                        Some(EdgeKind::Value(ty)) => format!("{}", ty),
+                        _ => String::new(),
+                    };
+                    encode_text_to_string(type_string, &mut label);
+                }
 
                 (label, style)
             },
