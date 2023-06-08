@@ -86,8 +86,8 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             check_valid_width(*width)?;
             // Check that the terms make sense against the types
             if exp_width == width {
-                let max_value = if *width == 128 {
-                    u128::MAX
+                let max_value = if *width == HUGR_MAX_INT_WIDTH {
+                    HugrIntValueStore::MAX
                 } else {
                     HugrIntValueStore::pow(2, *width as u32) - 1
                 };

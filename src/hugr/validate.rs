@@ -697,7 +697,7 @@ pub enum ValidationError {
     InterGraphEdgeError(#[from] InterGraphEdgeError),
     /// Type error for constant values
     #[error("Type error for constant value: {0}.")]
-    ConstConstTypeError(#[from] ConstTypeError),
+    ConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.

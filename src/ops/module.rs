@@ -108,7 +108,8 @@ impl ModuleOp {
 
 pub(crate) type HugrIntValueStore = u128;
 pub(crate) type HugrIntWidthStore = u8;
-pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore = 128;
+pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
+    HugrIntValueStore::BITS as HugrIntWidthStore;
 
 /// Value constants
 ///
