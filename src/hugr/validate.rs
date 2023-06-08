@@ -1,15 +1,18 @@
 //! HUGR invariant checks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use itertools::Itertools;
 use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
+use portgraph::PortIndex;
 use thiserror::Error;
 
+use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{LeafOp, OpTrait, OpType, ValidateOp};
+use crate::ops::{self, OpTrait, OpType, ValidateOp};
+use crate::types::ClassicType;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -60,27 +63,31 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Returns the dominator tree for a CFG region, identified by its container node.
-    /// May compute the dominator tree if it has not been computed yet.
+    /// Compute the dominator tree for a CFG region, identified by its container
+    /// node.
+    ///
+    /// The results of this computation should be cached in `self.dominators`.
+    /// We don't do it here to avoid mutable borrows.
     //
     // TODO: Use a `DominatorTree<HashMap>` once that's supported
     //   see https://github.com/CQCL/portgraph/issues/55
-    fn dominator_tree(&mut self, node: Node) -> &DominatorTree {
-        self.dominators.entry(node).or_insert_with(|| {
-            let entry = self.hugr.hierarchy.first(node.index).unwrap();
-            dominators_filtered(
-                &self.hugr.graph,
-                entry,
-                Direction::Outgoing,
-                |n| {
-                    matches!(
+    fn compute_dominator(&self, node: Node) -> DominatorTree {
+        let entry = self.hugr.hierarchy.first(node.index).unwrap();
+        dominators_filtered(
+            self.hugr.graph.as_portgraph(),
+            entry,
+            Direction::Outgoing,
+            |n| {
+                // We include copy nodes in addition to basic blocks.
+                // These are later filtered when iterating.
+                !self.hugr.graph.contains_node(n)
+                    || matches!(
                         self.hugr.get_optype(n.into()).tag(),
                         OpTag::BasicBlock | OpTag::BasicBlockExit
                     )
-                },
-                |_, _| true,
-            )
-        })
+            },
+            |_, _| true,
+        )
     }
 
     /// Check the constraints on a single node.
@@ -163,7 +170,7 @@ impl<'a> ValidationContext<'a> {
     }
 
     /// Check whether a port is valid.
-    /// - It must be connected
+    /// - Input ports and output linear ports must be connected
     /// - The linked port must have a compatible type.
     fn validate_port(
         &mut self,
@@ -173,42 +180,54 @@ impl<'a> ValidationContext<'a> {
         optype: &OpType,
     ) -> Result<(), ValidationError> {
         let port_kind = optype.port_kind(port).unwrap();
+        let dir = port.direction();
 
-        // Ports must always be connected
-        let Some(link) = self.hugr.graph.port_link(port_index) else {
+        // Input ports and output linear ports must always be connected
+        let mut links = self.hugr.graph.port_links(port_index).peekable();
+        if (dir == Direction::Incoming || port_kind.is_linear()) && links.peek().is_none() {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port,
                 port_kind,
             });
-        };
+        }
 
         // Avoid double checking connected port types.
-        if port.direction() == Direction::Incoming {
+        if dir == Direction::Incoming {
             return Ok(());
         }
 
-        let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
-        let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
-        let other_op = self.hugr.get_optype(other_node);
-        let Some(other_kind) = other_op.port_kind(other_offset) else {
-            // The number of ports in `other_node` does not match the operation definition.
-            // This should be caught by `validate_node`.
-            return Err(self.validate_node(other_node).unwrap_err());
-        };
-        // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
-        if other_kind != port_kind {
-            return Err(ValidationError::IncompatiblePorts {
-                from: node,
-                from_port: port,
-                from_kind: port_kind,
-                to: other_node,
-                to_port: other_offset,
-                to_kind: other_kind,
-            });
-        }
+        for (subport, link) in links {
+            if port_kind.is_linear() && subport.offset() != 0 {
+                return Err(ValidationError::TooManyConnections {
+                    node,
+                    port,
+                    port_kind,
+                });
+            }
 
-        self.validate_intergraph_edge(node, port, optype, other_node, other_offset)?;
+            let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
+            let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
+            let other_op = self.hugr.get_optype(other_node);
+            let Some(other_kind) = other_op.port_kind(other_offset) else {
+                // The number of ports in `other_node` does not match the operation definition.
+                // This should be caught by `validate_node`.
+                return Err(self.validate_node(other_node).unwrap_err());
+            };
+            // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
+            if other_kind != port_kind {
+                return Err(ValidationError::IncompatiblePorts {
+                    from: node,
+                    from_port: port,
+                    from_kind: port_kind,
+                    to: other_node,
+                    to_port: other_offset,
+                    to_kind: other_kind,
+                });
+            }
+
+            self.validate_intergraph_edge(node, port, optype, other_node, other_offset)?;
+        }
 
         Ok(())
     }
@@ -324,15 +343,17 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        // TODO: Use a `TopoSort<HashSet>` once that's supported
-        //   see https://github.com/CQCL/portgraph/issues/55
-        let topo = toposort_filtered(
-            &self.hugr.graph,
+        // TODO: Use a HUGR-specific toposort that ignores the copy nodes,
+        // so we can be more efficient and avoid the `contains_node` filter.
+        // https://github.com/CQCL-DEV/hugr/issues/125
+        let topo = toposort_filtered::<HashSet<PortIndex>>(
+            self.hugr.graph.as_portgraph(),
             [first_child],
             Direction::Outgoing,
             |_| true,
             |n, p| self.df_port_filter(n, p),
-        );
+        )
+        .filter(|&node| self.hugr.graph.contains_node(node));
 
         // Compute the number of nodes visited and keep the last one.
         let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| {
@@ -398,7 +419,24 @@ impl<'a> ValidationContext<'a> {
 
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
-            EdgeKind::Const(_) => return Ok(()),
+            EdgeKind::Const(typ) => match from_optype {
+                OpType::Const(ops::Const(val)) => {
+                    return typecheck_const(&typ, val).map_err(ValidationError::from);
+                }
+                // If const edges aren't coming from const nodes, they're graph
+                // edges coming from Declare or Def
+                OpType::Def(ops::Def { .. }) | OpType::Declare(ops::Declare { .. }) => {
+                    return Ok(())
+                }
+                _ => {
+                    return Err(InterGraphEdgeError::InvalidConstSrc {
+                        from,
+                        from_offset,
+                        typ,
+                    }
+                    .into())
+                }
+            },
             EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
                 return Err(InterGraphEdgeError::NonClassicalData {
@@ -410,17 +448,6 @@ impl<'a> ValidationContext<'a> {
                 }
                 .into())
             }
-        }
-
-        if !matches!(from_optype, OpType::LeafOp(LeafOp::Copy { .. }),) {
-            return Err(InterGraphEdgeError::NonCopySource {
-                from,
-                from_offset,
-                from_optype: from_optype.clone(),
-                to,
-                to_offset,
-            }
-            .into());
         }
 
         // To detect either external or dominator edges, we traverse the ancestors
@@ -467,10 +494,22 @@ impl<'a> ValidationContext<'a> {
                 // Check domination
                 //
                 // TODO: Add a more efficient lookup for dominator trees.
-                let dominator_tree = self.dominator_tree(ancestor_parent);
+                //
+                // TODO: Use a HUGR-specific dominator that ignores the copy nodes,
+                // so we can be more efficient and avoid the `contains_node` filter.
+                // https://github.com/CQCL-DEV/hugr/issues/125
+                let dominator_tree = match self.dominators.get(&ancestor_parent) {
+                    Some(tree) => tree,
+                    None => {
+                        let tree = self.compute_dominator(ancestor_parent);
+                        self.dominators.insert(ancestor_parent, tree);
+                        self.dominators.get(&ancestor_parent).unwrap()
+                    }
+                };
                 let mut dominators = iter::successors(Some(ancestor.index), |&n| {
                     dominator_tree.immediate_dominator(n)
                 })
+                .filter(|&node| self.hugr.graph.contains_node(node))
                 .map_into();
                 if !dominators.any(|n: Node| n == from_parent) {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
@@ -497,31 +536,65 @@ impl<'a> ValidationContext<'a> {
         .into())
     }
 
-    /// A filter function for internal dataflow edges.
+    /// A filter function for internal dataflow edges used in the toposort algorithm.
     ///
     /// Returns `true` for ports that connect to a sibling node with a value or
     /// state order edge.
     fn df_port_filter(&self, node: portgraph::NodeIndex, port: portgraph::PortIndex) -> bool {
+        // Toposort operates on the internal portgraph. It may traverse copy nodes.
+        let portgraph = self.hugr.graph.as_portgraph();
+        let is_copy = !self.hugr.graph.contains_node(node);
         let offset = self.hugr.graph.port_offset(port).unwrap();
-        let node_optype = self.hugr.get_optype(node.into());
 
-        let kind = node_optype.port_kind(offset).unwrap();
-        if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
-            return false;
+        // Always follow (non-intergraph) ports from copy nodes. These nodes must be filtered out
+        // when using the toposort iterator.
+        if !is_copy {
+            let node_optype = self.hugr.get_optype(node.into());
+
+            let kind = node_optype.port_kind(offset).unwrap();
+            if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
+                return false;
+            }
         }
 
         // Ignore ports that are not connected (that property is checked elsewhere)
-        let Some(other_port) = self.hugr.graph.port_index(node, offset).and_then(|p| self.hugr.graph.port_link(p))  else {
-                return false;
-            };
-        let other = self.hugr.graph.port_node(other_port).unwrap();
+        let Some(other_port) = portgraph
+            .port_index(node, offset)
+            .and_then(|p| portgraph.port_link(p))
+        else {
+            return false;
+        };
+        let other_node = portgraph.port_node(other_port).unwrap();
 
         // Ignore inter-graph edges
-        if self.hugr.hierarchy.parent(node) != self.hugr.hierarchy.parent(other) {
+        let parent = self.get_pg_node_parent(node);
+        let other_parent = self.get_pg_node_parent(other_node);
+
+        // Copy nodes do not have a parent.
+        if parent != other_parent {
             return false;
         }
 
         true
+    }
+
+    /// Get the parent for a node in the underlying flat portgraph.
+    ///
+    /// For copy nodes we must check the parent of the operation node.
+    fn get_pg_node_parent(&self, node: portgraph::NodeIndex) -> Option<portgraph::NodeIndex> {
+        match self.hugr.hierarchy.parent(node) {
+            Some(parent) => Some(parent),
+            None => {
+                // Copy node, root
+                let op_node = self
+                    .hugr
+                    .graph
+                    .as_portgraph()
+                    .input_neighbours(node)
+                    .next()?;
+                self.hugr.hierarchy.parent(op_node)
+            }
+        }
     }
 }
 
@@ -546,6 +619,13 @@ pub enum ValidationError {
     /// A dataflow port is not connected.
     #[error("The node {node:?} has an unconnected port {port:?} of type {port_kind:?}.")]
     UnconnectedPort {
+        node: Node,
+        port: Port,
+        port_kind: EdgeKind,
+    },
+    /// A linear port is connected to more than one thing.
+    #[error("The node {node:?} has a port {port:?} of type {port_kind:?} with more than one connection.")]
+    TooManyConnections {
         node: Node,
         port: Port,
         port_kind: EdgeKind,
@@ -616,6 +696,9 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
+    /// Type error for constant values
+    #[error("Type error for constant value: {0}.")]
+    ConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -630,15 +713,6 @@ pub enum InterGraphEdgeError {
         to: Node,
         to_offset: Port,
         ty: EdgeKind,
-    },
-    /// Inter-Graph edges must start from a copy node.
-    #[error("Inter-graph edges must start from a copy node. Found operation {from_optype:?}. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
-    NonCopySource {
-        from: Node,
-        from_offset: Port,
-        from_optype: OpType,
-        to: Node,
-        to_offset: Port,
     },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error("The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op:?}. In a dominator inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
@@ -676,6 +750,14 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
+    #[error(
+        "Const edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
+    )]
+    InvalidConstSrc {
+        from: Node,
+        from_offset: Port,
+        typ: ClassicType,
+    },
 }
 
 #[cfg(test)]
@@ -684,7 +766,7 @@ mod test {
 
     use super::*;
     use crate::hugr::HugrMut;
-    use crate::ops::{self, ConstValue, OpType};
+    use crate::ops::{self, ConstValue, LeafOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
 
@@ -722,13 +804,7 @@ mod test {
             )
             .unwrap();
         let copy = b
-            .add_op_with_parent(
-                parent,
-                LeafOp::Copy {
-                    n_copies: copies as u32,
-                    typ: ClassicType::bit(),
-                },
-            )
+            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
         let output = b
             .add_op_with_parent(
@@ -741,7 +817,7 @@ mod test {
 
         b.connect(input, 0, copy, 0).unwrap();
         for i in 0..copies {
-            b.connect(copy, i, output, i).unwrap();
+            b.connect(copy, 0, output, i).unwrap();
         }
 
         (input, copy, output)
@@ -758,7 +834,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ops::Const(ConstValue::simple_predicate(0, predicate_size));
-        let tag_type = SimpleType::new_simple_predicate(predicate_size);
+        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
             .add_op_with_parent(
@@ -855,52 +931,6 @@ mod test {
     }
 
     #[test]
-    fn invalid_ports() {
-        let (mut b, def) = make_simple_hugr(2);
-        let (_input, copy, output) = b
-            .hugr()
-            .hierarchy
-            .children(def.index)
-            .map_into()
-            .collect_tuple()
-            .unwrap();
-
-        // Missing an output port
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 3,
-                typ: ClassicType::bit(),
-            },
-        );
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, copy)
-        );
-
-        // Allocate that port, it remains unconnected
-        b.set_num_ports(copy, 1, 3);
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::UnconnectedPort { node, .. }) => assert_eq!(node, copy)
-        );
-
-        // Make the 2nd copy output become an order edge, mismatching the output port
-        b.set_num_ports(copy, 1, 2);
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 1,
-                typ: ClassicType::bit(),
-            },
-        );
-        assert_matches!(
-            b.hugr().validate(),
-            Err(ValidationError::IncompatiblePorts { from, to, .. }) => {assert_eq!(from, copy); assert_eq!(to, output)}
-        );
-    }
-
-    #[test]
     /// General children restrictions.
     fn children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
@@ -956,13 +986,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(
-            output,
-            LeafOp::Copy {
-                n_copies: 0,
-                typ: ClassicType::bit(),
-            },
-        );
+        b.replace_op(output, LeafOp::Noop(ClassicType::bit().into()));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
@@ -1015,24 +1039,10 @@ mod test {
         // Add a dangling discard operation without outgoing order edges. Note
         // that the dag check only allows for one source and sink (the input and
         // output resp.).
-        b.replace_op(
-            copy,
-            LeafOp::Copy {
-                n_copies: 3,
-                typ: ClassicType::bit(),
-            },
-        );
         let new_copy = b
-            .add_op_after(
-                copy,
-                LeafOp::Copy {
-                    n_copies: 0,
-                    typ: ClassicType::bit(),
-                },
-            )
+            .add_op_after(copy, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
-        b.add_ports(copy, Direction::Outgoing, 1);
-        b.connect(copy, 2, new_copy, 0).unwrap();
+        b.connect(copy, 0, new_copy, 0).unwrap();
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::NotADag { node, .. }) => assert_eq!(node, def)

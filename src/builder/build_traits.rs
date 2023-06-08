@@ -12,10 +12,10 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    types::{ClassicType, EdgeKind},
+    types::EdgeKind,
 };
 
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::types::{LinearType, Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
 
@@ -342,36 +342,6 @@ pub trait Dataflow: Container {
         }
     }
 
-    /// Add a discard (0-arity copy) for a `wire` with a known type `typ`.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard_type(
-        &mut self,
-        wire: Wire,
-        typ: ClassicType,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
-    }
-
-    /// Discard a value on a `wire` using [`Dataflow::discard_type`], retrieving
-    /// the type of the Wire from it's source.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let typ = self.get_wire_type(wire)?;
-        let typ = match typ {
-            SimpleType::Classic(typ) => typ,
-            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
-        };
-        self.discard_type(wire, typ)
-    }
-
     /// Add a [`LeafOp::MakeTuple`] node and wire in the `values` Wires,
     /// returning the Wire corresponding to the tuple.
     ///
@@ -542,8 +512,8 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 /// Add edge from src to dst and report back if they do share a parent
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    mut src: Node,
-    mut src_port: usize,
+    src: Node,
+    src_port: usize,
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
@@ -553,64 +523,38 @@ fn wire_up<T: Dataflow + ?Sized>(
     let src_parent = base.hugr().get_parent(src);
     let dst_parent = base.hugr().get_parent(dst);
     let local_source = src_parent == dst_parent;
-    if !local_source {
-        if let Some(copy_port) = if_copy_add_port(base, src) {
-            src_port = copy_port;
-        } else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            let src_parent = base.hugr().get_parent(src).expect("Node has no parent");
 
-            let final_child = base
-                .hugr()
-                .children(src_parent)
-                .next_back()
-                .expect("Parent must have at least one child.");
-            let copy_node = base.add_op_before(final_child, LeafOp::Copy { n_copies: 1, typ })?;
+    // Non-local value sources require a state edge to an ancestor of dst
+    if !local_source && get_value_kind(base, src, src_offset) == ValueKind::Classic {
+        let src_parent = src_parent.expect("Node has no parent");
+        let Some(src_sibling) =
+                iter::successors(dst_parent, |&p| base.hugr().get_parent(p))
+                    .tuple_windows()
+                    .find_map(|(ancestor, ancestor_parent)| {
+                        (ancestor_parent == src_parent).then_some(ancestor)
+                    })
+            else {
+                let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+                    from: src,
+                    from_offset: Port::new_outgoing(src_port),
+                    to: dst,
+                    to_offset: Port::new_incoming(dst_port),
+                }.into();
+                return Err(val_err.into());
+            };
 
-            base.connect(src, src_port, copy_node, 0)?;
+        // TODO: Avoid adding duplicate edges
+        // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
+        base.add_other_edge(src, src_sibling)?;
+    }
 
-            // Copy node has to have state edge to an ancestor of dst
-            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.hugr().get_parent(p))
-                .tuple_windows()
-                .find_map(|(ancestor, ancestor_parent)| {
-                    (ancestor_parent == src_parent).then_some(ancestor)
-                }) else {
-                    let val_err: ValidationError = InterGraphEdgeError::NoRelation {
-                        from: src,
-                        from_offset: Port::new_outgoing(src_port),
-                        to: dst,
-                        to_offset: Port::new_incoming(dst_port),
-                    }.into();
-                    return Err(val_err.into());
-                };
-
-            base.add_other_edge(copy_node, src_sibling)?;
-
-            src = copy_node;
-            src_port = 0;
+    // Don't copy linear edges.
+    if base.hugr().linked_ports(src, src_offset).next().is_some() {
+        if let ValueKind::Linear(typ) = get_value_kind(base, src, src_offset) {
+            return Err(BuildError::NoCopyLinear(typ));
         }
     }
 
-    if let Some((connected, connected_offset)) = base.hugr().linked_port(src, src_offset) {
-        if let Some(copy_port) = if_copy_add_port(base, src) {
-            src_port = copy_port;
-            src = connected;
-        }
-        // Need to insert a copy - first check can be copied
-        else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            // TODO API consistency in using PortOffset vs. usize
-            base.disconnect(src, src_port, Direction::Outgoing)?;
-
-            let copy = data_builder.add_dataflow_op(
-                LeafOp::Copy { n_copies: 2, typ },
-                [Wire::new(src, Port::new_outgoing(src_port))],
-            )?;
-
-            let base = data_builder.base();
-            base.connect(copy.node(), 0, connected, connected_offset.index())?;
-            src = copy.node();
-            src_port = 1;
-        }
-    }
     data_builder.base().connect(src, src_port, dst, dst_port)?;
     Ok(local_source
         && matches!(
@@ -624,46 +568,28 @@ fn wire_up<T: Dataflow + ?Sized>(
         ))
 }
 
+/// Return type for `get_value_kind`
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ValueKind {
+    Classic,
+    Linear(LinearType),
+    Const,
+}
+
 /// Check the kind of a port is a classical Value and return it
 /// Return None if Const kind
 /// Panics if port not valid for Op or port is not Const/Value
-fn check_classical_value(
-    base: &HugrMut,
-    src: Node,
-    src_offset: Port,
-) -> Result<Option<ClassicType>, BuildError> {
+fn get_value_kind(base: &HugrMut, src: Node, src_offset: Port) -> ValueKind {
     let wire_kind = base.hugr().get_optype(src).port_kind(src_offset).unwrap();
-    let typ = match wire_kind {
-        EdgeKind::Const(_) => None,
+    match wire_kind {
+        EdgeKind::Const(_) => ValueKind::Const,
         EdgeKind::Value(simple_type) => match simple_type {
-            SimpleType::Classic(typ) => Some(typ),
-            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
+            SimpleType::Classic(_) => ValueKind::Classic,
+            SimpleType::Linear(typ) => ValueKind::Linear(typ),
         },
         _ => {
-            panic!("Wires can only be Value kind")
+            panic!("Wires can only be Const or Value kind")
         }
-    };
-
-    Ok(typ)
-}
-
-// Return newly added port to copy node if src node is a copy
-fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
-    let src_op = base.hugr().get_optype(src);
-    if let OpType::LeafOp(LeafOp::Copy { n_copies, typ }) = src_op {
-        let copy_node = src;
-        // If already connected to a copy node, add wire to the copy
-        let n_copies = *n_copies;
-        base.replace_op(
-            copy_node,
-            LeafOp::Copy {
-                n_copies: n_copies + 1,
-                typ: typ.clone(),
-            },
-        );
-        base.add_ports(copy_node, Direction::Outgoing, 1).next()
-    } else {
-        None
     }
 }
 

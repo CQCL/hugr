@@ -1,9 +1,9 @@
 //! Extensible operations.
 
 use downcast_rs::{impl_downcast, Downcast};
-use once_cell::sync::OnceCell;
 use smol_str::SmolStr;
 use std::any::Any;
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -163,8 +163,8 @@ impl OpDef {
             misc: HashMap::new(),
             def: None,
             resource_reqs: ResourceSet::new(),
-            signature: OnceCell::with_value(signature),
-            port_names: OnceCell::with_value(port_names),
+            signature: OnceCell::from(signature),
+            port_names: OnceCell::from(port_names),
         }
     }
 

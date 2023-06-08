@@ -1,6 +1,7 @@
 #![allow(unused)]
 //! A Trait for "read-only" HUGRs.
 
+use std::iter::FusedIterator;
 use std::ops::Deref;
 
 use itertools::{Itertools, MapInto};
@@ -11,7 +12,7 @@ use crate::ops::OpType;
 use crate::Direction;
 
 /// An Iterator over the nodes in a Hugr(View)
-pub type Nodes<'a> = MapInto<portgraph::portgraph::Nodes<'a>, Node>;
+pub type Nodes<'a> = MapInto<crate::hugr::multiportgraph::Nodes<'a>, Node>;
 
 /// An Iterator over (some or all) ports of a node
 pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
@@ -20,14 +21,10 @@ pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
 pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 
 /// An Iterator over (some or all) the nodes neighbouring a node
-pub type Neighbours<'a> = MapInto<portgraph::portgraph::Neighbours<'a>, Node>;
+pub type Neighbours<'a> = MapInto<crate::hugr::multiportgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
-/// For end users we intend this to be superceded by region-specific APIs.
-///
-/// TODO: Wraps the underlying graph and hierarchy, producing a view where
-/// non-linear ports can be connected to multiple nodes via implicit copies
-/// (which correspond to copy nodes in the internal graph).
+/// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView {
     /// Return index of HUGR root node.
     fn root(&self) -> Node;
@@ -66,8 +63,13 @@ pub trait HugrView {
     /// Iterator over both the input and output ports of node.
     fn all_node_ports(&self, node: Node) -> NodePorts;
 
-    /// Return node and port connected to provided port, if not connected return None.
-    fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)>;
+    /// Iterator over the nodes and ports connected to a port.
+    fn linked_ports(&self, node: Node, port: Port) -> PortLinks<'_>;
+
+    /// Returns whether a port is connected.
+    fn is_linked(&self, node: Node, port: Port) -> bool {
+        self.linked_ports(node, port).next().is_some()
+    }
 
     /// Number of ports in node for a given direction.
     fn num_ports(&self, node: Node, dir: Direction) -> usize;
@@ -154,14 +156,11 @@ where
     }
 
     #[inline]
-    fn linked_port(&self, node: Node, port: Port) -> Option<(Node, Port)> {
-        let raw = self.hugr();
-        let port = raw.graph.port_index(node.index, port.offset)?;
-        let link = raw.graph.port_link(port)?;
-        Some((
-            raw.graph.port_node(link).map(Into::into)?,
-            raw.graph.port_offset(link).map(Into::into)?,
-        ))
+    fn linked_ports(&self, node: Node, port: Port) -> PortLinks<'_> {
+        let hugr = self.hugr();
+        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
+        let links = hugr.graph.port_links(port);
+        PortLinks { hugr, links }
     }
 
     #[inline]
@@ -227,3 +226,43 @@ where
         self.deref()
     }
 }
+
+/// Iterator over the links of a port
+#[derive(Clone)]
+pub struct PortLinks<'a> {
+    hugr: &'a Hugr,
+    links: crate::hugr::multiportgraph::PortLinks<'a>,
+}
+
+impl<'a> Iterator for PortLinks<'a> {
+    type Item = (Node, Port);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.links.next().map(|(_, link)| {
+            let port = link.port();
+            let node = self.hugr.graph.port_node(port).unwrap();
+            let offset = self.hugr.graph.port_offset(port).unwrap();
+            (node.into(), offset.into())
+        })
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.links.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for PortLinks<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.links.next_back().map(|(_, link)| {
+            let port = link.port();
+            let node = self.hugr.graph.port_node(port).unwrap();
+            let offset = self.hugr.graph.port_offset(port).unwrap();
+            (node.into(), offset.into())
+        })
+    }
+}
+
+impl<'a> FusedIterator for PortLinks<'a> {}

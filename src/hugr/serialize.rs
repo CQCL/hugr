@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::{hugr::Hugr, ops::OpType};
-use portgraph::{
-    hierarchy::AttachError, Direction, Hierarchy, LinkError, NodeIndex, PortGraph, PortIndex,
-    UnmanagedDenseMap,
-};
+use portgraph::hierarchy::AttachError;
+use portgraph::{Direction, Hierarchy, LinkError, NodeIndex, UnmanagedDenseMap};
 use serde::{Deserialize, Deserializer, Serialize};
+
+use super::multiportgraph::{MultiPortGraph, SubportIndex};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -32,7 +32,9 @@ enum Versioned {
 /// Version 0 of the HUGR serialization format.
 #[derive(Serialize, Deserialize)]
 struct SerHugrV0 {
+    /// For each node: (parent, num_inputs, num_outputs)
     nodes: Vec<(NodeIndex, usize, usize)>,
+    /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(NodeIndex, usize); 2]>,
     root: NodeIndex,
     op_types: HashMap<NodeIndex, OpType>,
@@ -41,9 +43,6 @@ struct SerHugrV0 {
 /// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum HUGRSerializationError {
-    /// Cannot serialize a non-compact graph.
-    #[error("Cannot serialize a non-compact graph (node indices must be contiguous).")]
-    NonCompactGraph,
     /// Unexpected hierarchy error.
     #[error("Failed to attach child to parent: {0:?}.")]
     AttachError(#[from] AttachError),
@@ -89,15 +88,17 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             op_types,
         }: &Hugr,
     ) -> Result<Self, Self::Error> {
+        // We compact the operation nodes during the serialization process,
+        // and ignore the copy nodes.
         let mut op_types_hsh = HashMap::new();
-        let nodes: Result<Vec<_>, HUGRSerializationError> = graph
+        let mut node_rekey = HashMap::new();
+        let mut nodes: Vec<_> = graph
             .nodes_iter()
             .enumerate()
             .map(|(i, n)| {
-                if i != n.index() {
-                    return Err(HUGRSerializationError::NonCompactGraph);
-                }
-
+                node_rekey.insert(n, NodeIndex::new(i));
+                // Note that we don't rekey the parent here, as we need to fully
+                // populate `node_rekey` first.
                 let parent = hierarchy.parent(n).unwrap_or_else(|| {
                     assert_eq!(*root, n);
                     n
@@ -111,27 +112,28 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                 }
                 Ok((parent, graph.num_inputs(n), graph.num_outputs(n)))
             })
-            .collect();
-        let nodes = nodes?;
+            .collect::<Result<_, Self::Error>>()?;
+        for (parent, _, _) in &mut nodes {
+            *parent = node_rekey[parent];
+        }
 
-        let find_offset = |p: PortIndex| {
+        let find_offset = |p: SubportIndex| {
             (
-                graph.port_node(p).unwrap(),
+                node_rekey[&graph.port_node(p).unwrap()],
                 graph.port_offset(p).unwrap().index(),
             )
         };
 
         let edges: Vec<_> = graph
             .ports_iter()
-            .filter_map(|p| {
-                if graph.port_direction(p) == Some(Direction::Outgoing) {
-                    let tgt = graph.port_link(p)?;
-                    let np = [p, tgt].map(find_offset);
-                    Some(np)
+            .filter_map(|port| {
+                if graph.port_direction(port) == Some(Direction::Outgoing) {
+                    Some(graph.port_links(port))
                 } else {
                     None
                 }
             })
+            .flat_map(|port_links| port_links.map(|(src, tgt)| [src, tgt].map(find_offset)))
             .collect();
 
         Ok(Self {
@@ -155,14 +157,14 @@ impl TryFrom<SerHugrV0> for Hugr {
     ) -> Result<Self, Self::Error> {
         let mut hierarchy = Hierarchy::new();
 
-        // if there are any unconnected ports the capacity will be an
-        // underestimate
-        let mut graph = PortGraph::with_capacity(nodes.len(), edges.len() * 2);
+        // if there are any unconnected ports or copy nodes the capacity will be
+        // an underestimate
+        let mut graph = MultiPortGraph::with_capacity(nodes.len(), edges.len() * 2);
         let mut op_types_sec = UnmanagedDenseMap::with_capacity(nodes.len());
         for (parent, incoming, outgoing) in nodes {
             let ni = graph.add_node(incoming, outgoing);
             if parent != ni {
-                hierarchy.push_child(ni, parent)?; // TODO remove unwrap
+                hierarchy.push_child(ni, parent)?;
             }
             if let Some(typ) = op_types.remove(&ni) {
                 op_types_sec[ni] = typ;
@@ -192,7 +194,8 @@ pub mod test {
         #[test]
         // miri fails due to proptest filesystem access
         #[cfg_attr(miri, ignore)]
-        fn prop_serialization(mut graph in gen_portgraph(100, 50, 1000)) {
+        fn prop_serialization(graph in gen_portgraph(100, 50, 1000)) {
+            let mut graph : MultiPortGraph = graph.into();
             let root = graph.add_node(0, 0);
             let mut hierarchy = Hierarchy::new();
             for n in graph.nodes_iter() {
@@ -201,9 +204,9 @@ pub mod test {
                 }
             }
 
-            let hgraph = Hugr { graph, hierarchy, root, ..Default::default()};
+            let hugr = Hugr { graph, hierarchy, root, ..Default::default()};
 
-            prop_assert_eq!(ser_roundtrip(&hgraph), hgraph);
+            prop_assert_eq!(ser_roundtrip(&hugr), hugr);
         }
     }
 
@@ -219,15 +222,17 @@ pub mod test {
 
     #[test]
     fn simpleser() {
-        let mut g = PortGraph::new();
+        let mut g = MultiPortGraph::new();
         let a = g.add_node(1, 1);
         let b = g.add_node(3, 2);
         let c = g.add_node(1, 1);
         let root = g.add_node(0, 0);
 
         g.link_nodes(a, 0, b, 0).unwrap();
+        g.link_nodes(a, 0, b, 0).unwrap();
         g.link_nodes(b, 0, b, 1).unwrap();
         g.link_nodes(b, 1, c, 0).unwrap();
+        g.link_nodes(b, 1, a, 0).unwrap();
         g.link_nodes(c, 0, a, 0).unwrap();
 
         let mut h = Hierarchy::new();

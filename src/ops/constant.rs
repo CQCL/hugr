@@ -36,12 +36,24 @@ impl OpTrait for Const {
     }
 }
 
+pub(crate) type HugrIntValueStore = u128;
+pub(crate) type HugrIntWidthStore = u8;
+pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
+    HugrIntValueStore::BITS as HugrIntWidthStore;
+
+/// Value constants
+///
+/// TODO: Add more constants
+/// TODO: bigger/smaller integers.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum ConstValue {
     /// An arbitrary length integer constant.
-    Int { value: i64, width: usize },
+    Int {
+        value: HugrIntValueStore,
+        width: HugrIntWidthStore,
+    },
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
@@ -112,7 +124,6 @@ impl ConstValue {
             }
         }
     }
-
     /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
@@ -176,7 +187,10 @@ impl ConstValue {
 
     /// New 64 bit integer constant
     pub fn i64(value: i64) -> Self {
-        Self::Int { value, width: 64 }
+        Self::Int {
+            value: value as u128,
+            width: 64,
+        }
     }
 }
 

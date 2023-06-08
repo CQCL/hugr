@@ -480,11 +480,7 @@ mod test {
             types: out_types.clone(),
         }
         .into();
-        let leaf_node = LeafOp::Copy {
-            n_copies: 2,
-            typ: ClassicType::bit(),
-        }
-        .into();
+        let leaf_node = LeafOp::Noop(ClassicType::bit().into()).into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
