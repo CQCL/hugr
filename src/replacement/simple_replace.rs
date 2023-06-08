@@ -170,7 +170,7 @@ mod test {
             OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
             vec![wire1],
         )?;
-        let wire2out = wire2.outputs().exactly_one().ok().unwrap();
+        let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
         dfg_builder.finish_hugr_with_outputs(wireoutvec)
     }
@@ -195,7 +195,7 @@ mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn test_simple_replacement() {
-        let mut h: Hugr = make_hugr().ok().unwrap();
+        let mut h: Hugr = make_hugr().unwrap();
         // crate::utils::test::viz_dotstr(&h.dot_string());
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
@@ -212,7 +212,7 @@ mod test {
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
         let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
-        let n: Hugr = make_dfg_hugr().ok().unwrap();
+        let n: Hugr = make_dfg_hugr().unwrap();
         // crate::utils::test::viz_dotstr(&n.dot_string());
         // 4. Construct the input and output matchings
         // 4.1. Locate the CX and its predecessor H's in n
@@ -302,7 +302,7 @@ mod test {
     /// ┤ H ├
     /// └───┘
     fn test_simple_replacement_with_empty_wires() {
-        let mut h: Hugr = make_hugr().ok().unwrap();
+        let mut h: Hugr = make_hugr().unwrap();
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
@@ -317,7 +317,7 @@ mod test {
             .unwrap();
         let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
-        let n: Hugr = make_dfg_hugr2().ok().unwrap();
+        let n: Hugr = make_dfg_hugr2().unwrap();
         // crate::utils::test::viz_dotstr(&n.dot_string());
         // 4. Construct the input and output matchings
         // 4.1. Locate the Output and its predecessor H in n
