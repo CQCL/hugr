@@ -116,7 +116,7 @@ impl Hugr {
             }
         }
         let self_input_node_index = self.hierarchy.first(r.parent.index).unwrap();
-        let replacement_output_node = replacement_nodes[replacement_sz - 1];
+        let replacement_output_node = *replacement_nodes.last().unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = r.replacement.get_optype(node);
