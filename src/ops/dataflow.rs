@@ -3,15 +3,6 @@
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
-/// An input node.
-/// The outputs of this node are the inputs to the function.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Input {
-    /// Input value types
-    pub types: TypeRow,
-}
-
-impl_op_name!(Input);
 
 pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
@@ -34,6 +25,26 @@ pub(super) trait DataflowOpTrait {
         Some(EdgeKind::StateOrder)
     }
 }
+
+/// An input node.
+/// The outputs of this node are the inputs to the function.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Input {
+    /// Input value types
+    pub types: TypeRow,
+}
+
+impl_op_name!(Input);
+
+/// An output node. The inputs are the outputs of the function.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Output {
+    /// Output value types
+    pub types: TypeRow,
+}
+
+impl_op_name!(Output);
+
 impl DataflowOpTrait for Input {
     fn description(&self) -> &str {
         "The input node for this dataflow subgraph"
@@ -51,16 +62,6 @@ impl DataflowOpTrait for Input {
         Signature::new_df(TypeRow::new(), self.types.clone())
     }
 }
-
-/// An output node. The inputs are the outputs of the function.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Output {
-    /// Output value types
-    pub types: TypeRow,
-}
-
-impl_op_name!(Output);
-
 impl DataflowOpTrait for Output {
     fn description(&self) -> &str {
         "The output node for this dataflow subgraph"
