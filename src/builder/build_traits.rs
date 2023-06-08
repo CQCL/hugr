@@ -604,7 +604,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
 
-    if let Some((connected, connected_offset)) = base.hugr().linked_port(src, src_offset) {
+    if let Some((connected, connected_offset)) = base.hugr().linked_ports(src, src_offset).next() {
         if let Some(copy_port) = if_copy_add_port(base, src) {
             src_port = copy_port;
             src = connected;
