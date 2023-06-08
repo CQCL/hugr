@@ -50,7 +50,7 @@ pub struct DfgID(Node);
 pub struct CfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a module [Root](crate::ops::module::OpType::Root) node.
+/// Handle to a module [Root](crate::ops::Root) node.
 pub struct ModuleRootID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]

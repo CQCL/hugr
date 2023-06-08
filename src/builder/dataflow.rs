@@ -5,7 +5,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{DataflowOp,  OpType};
+use crate::ops::{DataflowOp, OpType};
 
 use crate::types::{Signature, TypeRow};
 
@@ -336,7 +336,7 @@ mod test {
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type(), OpType::Dataflow(DataflowOp::DFG { .. }));
+        assert_matches!(hugr.root_type().tag(), OpTag::DFG);
 
         Ok(())
     }

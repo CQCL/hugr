@@ -5,7 +5,7 @@ use smol_str::SmolStr;
 use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow},
+    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow, EdgeKind},
 };
 
 /// Dataflow operations with no children.
@@ -182,6 +182,14 @@ impl OpTrait for LeafOp {
             // TODO: More port descriptions
             _ => Default::default(),
         }
+    }
+
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
     }
 }
 

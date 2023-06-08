@@ -9,23 +9,24 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-
 use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
 use crate::{Direction, Port};
 
 pub use custom::{CustomOp, OpDef, OpaqueOp};
 
+use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
 use self::tag::OpTag;
 use enum_dispatch::enum_dispatch;
 
 pub use constant::{Const, ConstValue};
+pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
 pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 
-#[enum_dispatch(OpTrait, OpName)]
+#[enum_dispatch(OpTrait, OpName, ValidateOp)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -45,6 +46,10 @@ pub enum OpType {
     LoadConstant,
     DFG,
     LeafOp,
+    BasicBlock,
+    TailLoop,
+    CFG,
+    Case,
 }
 
 impl Default for OpType {
@@ -102,6 +107,29 @@ pub trait OpTrait {
     }
 }
 
+#[enum_dispatch]
+pub trait ValidateOp {
+    fn validity_flags(&self) -> validate::OpValidityFlags {
+        Default::default()
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), validate::ChildrenValidationError> {
+        Ok(())
+    }
+}
+
+/// Macro used for default implementation of ValidateOp
+macro_rules! impl_validate_op {
+    ($i: ident) => {
+        impl $crate::ops::ValidateOp for $i {}
+    };
+}
+
+use impl_validate_op;
+
 #[cfg(test)]
 mod test {
     use crate::type_row;
@@ -109,7 +137,9 @@ mod test {
     use super::*;
     #[test]
     fn test_into() {
-        let op: OpType = Input { types: type_row![] }.into();
-        dbg!(op.signature());
+        let op: OpType = BasicBlock::Exit {
+            cfg_outputs: type_row![],
+        }
+        .into();
     }
 }

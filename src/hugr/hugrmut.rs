@@ -5,10 +5,8 @@ use std::ops::Range;
 use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 
-// use crate::hugr::{Direction, HugrError, Node, ValidationError};
-use crate::hugr::{Direction, HugrError, Node};
-pub struct ValidationError;
-use crate::ops::{OpType, OpTrait};
+use crate::hugr::{Direction, HugrError, Node, ValidationError};
+use crate::ops::{OpTrait, OpType};
 use crate::Hugr;
 
 /// A low-level builder for a HUGR.

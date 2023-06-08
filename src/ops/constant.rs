@@ -16,7 +16,7 @@ use super::{OpName, OpTrait};
 
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-pub struct Const(ConstValue);
+pub struct Const(pub ConstValue);
 impl OpName for Const {
     fn name(&self) -> SmolStr {
         self.0.name()
@@ -29,6 +29,10 @@ impl OpTrait for Const {
 
     fn tag(&self) -> OpTag {
         OpTag::Const
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Const(self.0.const_type()))
     }
 }
 

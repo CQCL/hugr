@@ -136,10 +136,7 @@ impl<'a, H: HugrView> SimpleCfgView<'a, H> {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
-        debug_assert!(matches!(
-            h.get_optype(exit),
-            OpType::BasicBlock(BasicBlockOp::Exit { .. })
-        ));
+        debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
 }

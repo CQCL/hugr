@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use crate::types::{Signature, SimpleType};
+use crate::types::{ClassicType, EdgeKind, Signature, SimpleType};
 
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
@@ -37,6 +37,12 @@ impl OpTrait for Def {
     fn tag(&self) -> OpTag {
         OpTag::Def
     }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Const(ClassicType::graph_from_sig(
+            self.signature.clone(),
+        )))
+    }
 }
 
 /// External function declaration, linked at runtime.
@@ -54,6 +60,12 @@ impl OpTrait for Declare {
 
     fn tag(&self) -> OpTag {
         OpTag::Function
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Const(ClassicType::graph_from_sig(
+            self.signature.clone(),
+        )))
     }
 }
 

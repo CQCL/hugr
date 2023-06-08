@@ -13,7 +13,7 @@ pub struct Input {
 
 impl_op_name!(Input);
 
-trait DataflowOpTrait {
+pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn tag(&self) -> OpTag;
     fn signature(&self) -> Signature;
@@ -88,6 +88,13 @@ impl<T: DataflowOpTrait> OpTrait for T {
     }
     fn signature(&self) -> Signature {
         DataflowOpTrait::signature(self)
+    }
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_inputs(self)
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_outputs(self)
     }
 }
 
