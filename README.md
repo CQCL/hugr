@@ -23,4 +23,4 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
 
   [build_status]: https://github.com/CQCL/portgraph/workflows/Continuous%20integration/badge.svg?branch=main
   [msrv]: https://img.shields.io/badge/rust-1.69.0%2B-blue.svg?maxAge=3600
-  [LICENSE]: LICENCE
+  [LICENSE]: LICENSE
