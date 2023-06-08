@@ -1,6 +1,7 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
+use crate::ops::tag::OpTag;
 use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -437,17 +438,13 @@ pub trait Dataflow: Container {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
-        let signature = match def_op {
-            OpType::Def(ops::Def { signature }) | OpType::Declare(ops::Declare { signature }) => {
-                signature.clone()
-            }
-            _ => {
-                return Err(BuildError::UnexpectedType {
-                    node: function.node(),
-                    op_desc: "Declare/Def",
-                })
-            }
-        };
+        if !OpTag::Function.contains(def_op.tag()) {
+            return Err(BuildError::UnexpectedType {
+                node: function.node(),
+                op_desc: "Declare/Def",
+            });
+        }
+        let signature = def_op.signature();
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port: usize = self
