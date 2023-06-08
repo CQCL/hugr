@@ -1,6 +1,10 @@
 //! Simple type checking - takes a hugr and some extra info and checks whether
 //! the types at the sources of each wire match those of the targets
 
+use lazy_static::lazy_static;
+
+use std::collections::HashSet;
+
 use crate::hugr::*;
 use crate::types::{SimpleType, TypeRow};
 
@@ -55,15 +59,18 @@ pub enum ConstTypeError {
     TypeRowMismatch(TypeRow, TypeRow),
 }
 
+lazy_static! {
+    static ref VALID_WIDTHS: HashSet<HugrIntWidthStore> =
+        HashSet::from_iter((0..8).map(|a| HugrIntWidthStore::pow(2, a)));
+}
+
 /// Per the spec, valid widths for integers are 2^n for all n in [0,7]
 fn check_valid_width(width: HugrIntWidthStore) -> Result<(), ConstTypeError> {
     if width > HUGR_MAX_INT_WIDTH {
         return Err(ConstTypeError::IntWidthTooLarge(width));
     }
 
-    let valid_widths: Vec<HugrIntWidthStore> =
-        (0..8).map(|a| HugrIntWidthStore::pow(2, a)).collect();
-    if valid_widths.contains(&width) {
+    if VALID_WIDTHS.contains(&width) {
         Ok(())
     } else {
         Err(ConstTypeError::IntWidthInvalid(width))
