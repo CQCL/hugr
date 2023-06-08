@@ -39,7 +39,7 @@ pub enum ConditionalBuildError {
     },
 }
 
-/// Builder for a [`crate::ops::Conditional`] node's children.
+/// Builder for a [`ops::Conditional`] node's children.
 pub struct ConditionalBuilder<T> {
     pub(super) base: T,
     pub(super) conditional_node: Node,
@@ -89,7 +89,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     ///
     /// # Panics
     ///
-    /// Panics if the parent node is not of type [`crate::ops::Conditional`].
+    /// Panics if the parent node is not of type [`ops::Conditional`].
     ///
     /// # Errors
     ///

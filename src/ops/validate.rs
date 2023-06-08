@@ -14,12 +14,6 @@ use crate::types::{SimpleType, TypeRow};
 
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
 
-// use super::{
-//     controlflow::{CaseOp, ConditionalSignature, TailLoopSignature},
-//     tag::OpTag,
-//     BasicBlock, ControlFlowOp, DataflowOp, OpType,
-// };
-
 /// A set of property flags required for an operation.
 #[non_exhaustive]
 pub struct OpValidityFlags {

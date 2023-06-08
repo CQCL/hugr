@@ -12,7 +12,7 @@ use crate::types::{Signature, TypeRow};
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
-/// Builder for a [`crate::ops::DFG`] node.
+/// Builder for a [`ops::DFG`] node.
 pub struct DFGBuilder<T> {
     pub(crate) base: T,
     pub(crate) dfg_node: Node,
@@ -120,7 +120,7 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-/// Builder for a [`crate::ops::Def`] node
+/// Builder for a [`ops::Def`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<HugrMut> {
