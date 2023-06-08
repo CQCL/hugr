@@ -8,6 +8,8 @@ use crate::types::{SimpleType, TypeRow};
 use crate::ops::ConstValue;
 use crate::types::{ClassicType, Container};
 
+use crate::ops::module::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
+
 use std::fmt::{self, Display};
 
 /// Errors that arise from typechecking constants
@@ -20,13 +22,13 @@ pub enum TypeError {
     Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
-    IntTooLarge(u8, u128),
-    /// Width (n) of an `I<n>` type doesn't fit into a u8
-    IntWidthTooLarge(u8),
+    IntTooLarge(HugrIntWidthStore, HugrIntValueStore),
+    /// Width (n) of an `I<n>` type doesn't fit into a HugrIntWidthStore
+    IntWidthTooLarge(HugrIntWidthStore),
     /// The width of an integer type wasn't a power of 2
-    IntWidthInvalid(u8),
+    IntWidthInvalid(HugrIntWidthStore),
     /// Expected width (packed with const int) doesn't match type
-    IntWidthMismatch(u8, u8),
+    IntWidthMismatch(HugrIntWidthStore, HugrIntWidthStore),
     /// Found a Var type constructor when we're checking a const val
     ConstCantBeVar,
     /// The length of the tuple value doesn't match the length of the tuple type
@@ -82,12 +84,13 @@ impl Display for TypeError {
 }
 
 /// Per the spec, valid widths for integers are 2^n for all n in [0,7]
-fn check_valid_width(width: u8) -> Result<(), TypeError> {
-    if width > 128 {
+fn check_valid_width(width: HugrIntWidthStore) -> Result<(), TypeError> {
+    if width > HUGR_MAX_INT_WIDTH {
         return Err(TypeError::IntWidthTooLarge(width));
     }
 
-    let valid_widths: Vec<u8> = (0..8).map(|a| u8::pow(2, a)).collect();
+    let valid_widths: Vec<HugrIntWidthStore> =
+        (0..8).map(|a| HugrIntWidthStore::pow(2, a)).collect();
     if valid_widths.contains(&width) {
         Ok(())
     } else {
@@ -104,7 +107,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), TypeEr
             check_valid_width(*width)?;
             // Check that the terms make sense against the types
             if exp_width == width {
-                let max_value = u128::pow(2, *width as u32);
+                let max_value = HugrIntValueStore::pow(2, *width as u32);
                 if value < &max_value {
                     Ok(())
                 } else {

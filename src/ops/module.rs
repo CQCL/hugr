@@ -106,6 +106,10 @@ impl ModuleOp {
     }
 }
 
+pub(crate) type HugrIntValueStore = u128;
+pub(crate) type HugrIntWidthStore = u8;
+pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore = 128;
+
 /// Value constants
 ///
 /// TODO: Add more constants
@@ -115,7 +119,10 @@ impl ModuleOp {
 #[allow(missing_docs)]
 pub enum ConstValue {
     /// An arbitrary length integer constant.
-    Int { value: u128, width: u8 },
+    Int {
+        value: HugrIntValueStore,
+        width: HugrIntWidthStore,
+    },
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
