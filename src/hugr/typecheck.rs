@@ -12,7 +12,7 @@ use crate::types::{SimpleType, TypeRow};
 use crate::ops::ConstValue;
 use crate::types::{ClassicType, Container};
 
-use crate::ops::module::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
+use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, Eq, PartialEq, Error)]

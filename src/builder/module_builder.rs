@@ -6,11 +6,12 @@ use super::{
 
 use crate::{
     hugr::{view::HugrView, ValidationError},
+    ops,
     types::SimpleType,
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-use crate::ops::{ModuleOp, OpType};
+use crate::ops::OpType;
 
 use crate::types::Signature;
 
@@ -61,8 +62,8 @@ impl HugrBuilder for ModuleBuilder<HugrMut> {
 impl<T: HugrMutRef> ModuleBuilder<T> {
     /// Generate a builder for defining a function body graph.
     ///
-    /// Replaces a [`ModuleOp::Declare`] node as specified by `f_id`
-    /// with a [`ModuleOp::Def`] node.
+    /// Replaces a [`OpType::Declare`] node as specified by `f_id`
+    /// with a [`OpType::Def`] node.
     ///
     /// # Errors
     ///
@@ -72,34 +73,33 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
-        let (inputs, outputs) = if let OpType::Module(ModuleOp::Declare { signature }) =
-            self.hugr().get_optype(f_node)
-        {
-            (signature.input.clone(), signature.output.clone())
-        } else {
-            return Err(BuildError::UnexpectedType {
-                node: f_node,
-                op_desc: "ModuleOp::Declare",
-            });
-        };
+        let (inputs, outputs) =
+            if let OpType::Declare(ops::Declare { signature }) = self.hugr().get_optype(f_node) {
+                (signature.input.clone(), signature.output.clone())
+            } else {
+                return Err(BuildError::UnexpectedType {
+                    node: f_node,
+                    op_desc: "OpType::Declare",
+                });
+            };
         self.base().replace_op(
             f_node,
-            OpType::Module(ModuleOp::Def {
+            ops::Def {
                 signature: Signature::new_df(inputs.clone(), outputs.clone()),
-            }),
+            },
         );
 
         let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Add a [`ModuleOp::Def`] node and returns a builder to define the function
+    /// Add a [`OpType::Def`] node and returns a builder to define the function
     /// body graph.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Def`] node.
+    /// [`OpType::Def`] node.
     pub fn declare_and_def(
         &mut self,
         name: impl Into<String>,
@@ -114,23 +114,23 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Declare`] node.
+    /// [`OpType::Declare`] node.
     pub fn declare(
         &mut self,
         _name: impl Into<String>,
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add name and param names to metadata
-        let declare_n = self.add_child_op(ModuleOp::Declare { signature })?;
+        let declare_n = self.add_child_op(ops::Declare { signature })?;
 
         Ok(declare_n.into())
     }
 
-    /// Add a [`ModuleOp::AliasDef`] node and return a handle to the Alias.
+    /// Add a [`OpType::AliasDef`] node and return a handle to the Alias.
     ///
     /// # Errors
     ///
-    /// Error in adding [`ModuleOp::AliasDef`] child node.
+    /// Error in adding [`OpType::AliasDef`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
@@ -138,7 +138,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     ) -> Result<AliasID<true>, BuildError> {
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
-        let node = self.add_child_op(ModuleOp::AliasDef {
+        let node = self.add_child_op(ops::AliasDef {
             name: name.clone(),
             definition: typ,
         })?;
@@ -146,17 +146,17 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         Ok(AliasID::new(node, name, linear))
     }
 
-    /// Add a [`ModuleOp::AliasDeclare`] node and return a handle to the Alias.
+    /// Add a [`OpType::AliasDeclare`] node and return a handle to the Alias.
     /// # Errors
     ///
-    /// Error in adding [`ModuleOp::AliasDeclare`] child node.
+    /// Error in adding [`OpType::AliasDeclare`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
         linear: bool,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(ModuleOp::AliasDeclare {
+        let node = self.add_child_op(ops::AliasDeclare {
             name: name.clone(),
             linear,
         })?;

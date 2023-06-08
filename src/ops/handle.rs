@@ -38,36 +38,36 @@ pub trait ContainerHandle: NodeHandle {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [DataflowOp](crate::ops::dataflow::DataflowOp).
+/// Handle to a [DataflowOp](crate::ops::dataflow).
 pub struct DataflowOpID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [DFG](crate::ops::dataflow::DataflowOp::DFG) node.
+/// Handle to a [DFG](crate::ops::DFG) node.
 pub struct DfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [CFG](crate::ops::controlflow::ControlFlowOp::CFG) node.
+/// Handle to a [CFG](crate::ops::CFG) node.
 pub struct CfgID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a module [Root](crate::ops::module::ModuleOp::Root) node.
+/// Handle to a module [Module](crate::ops::Module) node.
 pub struct ModuleRootID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [ModuleOp](crate::ops::module::ModuleOp) node.
+/// Handle to a [module op](crate::ops::module) node.
 pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [def](crate::ops::module::ModuleOp::Def)
-/// or [declare](crate::ops::module::ModuleOp::Declare) node.
+/// Handle to a [def](crate::ops::OpType::Def)
+/// or [declare](crate::ops::OpType::Declare) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDef](crate::ops::module::ModuleOp::AliasDef)
-/// or [AliasDeclare](crate::ops::module::ModuleOp::AliasDeclare) node.
+/// Handle to an [AliasDef](crate::ops::OpType::AliasDef)
+/// or [AliasDeclare](crate::ops::OpType::AliasDeclare) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
@@ -98,7 +98,7 @@ impl<const DEF: bool> AliasID<DEF> {
 }
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
-/// Handle to a [Const](crate::ops::module::ModuleOp::Const) node.
+/// Handle to a [Const](crate::ops::OpType::Const) node.
 pub struct ConstID(Node, ClassicType);
 
 impl ConstID {
@@ -109,19 +109,19 @@ impl ConstID {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [BasicBlock](crate::ops::controlflow::BasicBlockOp) node.
+/// Handle to a [BasicBlock](crate::ops::BasicBlock) node.
 pub struct BasicBlockID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [Case](crate::ops::controlflow::CaseOp) node.
+/// Handle to a [Case](crate::ops::Case) node.
 pub struct CaseID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [TailLoop](crate::ops::controlflow::ControlFlowOp::TailLoop) node.
+/// Handle to a [TailLoop](crate::ops::TailLoop) node.
 pub struct TailLoopID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [Conditional](crate::ops::controlflow::ControlFlowOp::Conditional) node.
+/// Handle to a [Conditional](crate::ops::Conditional) node.
 pub struct ConditionalID(Node);
 
 /// Implements the `NodeHandle` trait for a tuple struct that contains just a

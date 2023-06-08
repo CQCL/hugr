@@ -3,7 +3,8 @@ use std::hash::Hash;
 use super::nest_cfgs::CfgView;
 use crate::hugr::view::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
-use crate::ops::{controlflow::BasicBlockOp, OpType};
+use crate::ops::tag::OpTag;
+use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
@@ -34,10 +35,7 @@ impl<'a, H: HugrView> HalfNodeView<'a, H> {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
-        assert!(matches!(
-            h.get_optype(exit),
-            OpType::BasicBlock(BasicBlockOp::Exit { .. })
-        ));
+        assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
 

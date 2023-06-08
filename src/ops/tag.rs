@@ -126,7 +126,7 @@ impl OpTag {
     /// Returns whether the set is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        matches!(self, OpTag::None)
+        self == &OpTag::None
     }
 }
 
