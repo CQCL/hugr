@@ -470,11 +470,11 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let [inp, out] = data_builder.io();
+    let [inp, _] = data_builder.io();
 
     let op: OpType = op.into();
     let sig = op.signature();
-    let op_node = data_builder.hugr_mut().add_op_before(out, op)?;
+    let op_node = data_builder.add_child_op(op)?;
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

@@ -107,14 +107,29 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        self.any_block_builder(inputs, predicate_variants, other_outputs, false)
+    }
+
+    fn any_block_builder(
+        &mut self,
+        inputs: TypeRow,
+        predicate_variants: Vec<TypeRow>,
+        other_outputs: TypeRow,
+        entry: bool,
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let n_cases = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlock::Block {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
         });
-        let exit = self.exit_node;
-        let block_n = self.hugr_mut().add_op_before(exit, op)?;
+        let parent = self.container_node();
+        let block_n = if entry {
+            let exit = self.exit_node;
+            self.hugr_mut().add_op_before(exit, op)
+        } else {
+            self.hugr_mut().add_op_with_parent(parent, op)
+        }?;
 
         self.hugr_mut().set_num_ports(block_n, 0, n_cases);
 
@@ -158,7 +173,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.block_builder(inputs, predicate_variants, other_outputs)
+        self.any_block_builder(inputs, predicate_variants, other_outputs, true)
     }
 
     /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`

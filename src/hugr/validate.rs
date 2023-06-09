@@ -243,11 +243,11 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            let first_child = self
-                .hugr
-                .get_optype(self.hugr.hierarchy.first(node.index).unwrap().into());
+            let all_children = self.hugr.children(node);
+            let mut first_two_children = all_children.clone().take(2);
+            let first_child = self.hugr.get_optype(first_two_children.next().unwrap());
             if !flags.allowed_first_child.contains(first_child.tag()) {
-                return Err(ValidationError::InvalidBoundaryChild {
+                return Err(ValidationError::InvalidInitialChild {
                     parent: node,
                     parent_optype: optype.clone(),
                     optype: first_child.clone(),
@@ -256,25 +256,22 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            let last_child = self
-                .hugr
-                .get_optype(self.hugr.hierarchy.last(node.index).unwrap().into());
-            if !flags.allowed_last_child.contains(last_child.tag()) {
-                return Err(ValidationError::InvalidBoundaryChild {
-                    parent: node,
-                    parent_optype: optype.clone(),
-                    optype: last_child.clone(),
-                    expected: flags.allowed_last_child,
-                    position: "last",
-                });
+            if let Some(second_child) = first_two_children
+                .next()
+                .map(|child| self.hugr.get_optype(child))
+            {
+                if !flags.allowed_second_child.contains(second_child.tag()) {
+                    return Err(ValidationError::InvalidInitialChild {
+                        parent: node,
+                        parent_optype: optype.clone(),
+                        optype: second_child.clone(),
+                        expected: flags.allowed_second_child,
+                        position: "second",
+                    });
+                }
             }
-
             // Additional validations running over the full list of children optypes
-            let children_optypes = self
-                .hugr
-                .hierarchy
-                .children(node.index)
-                .map(|c| (c, self.hugr.get_optype(c.into())));
+            let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
             if let Err(source) = optype.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -352,8 +349,8 @@ impl<'a> ValidationContext<'a> {
         )
         .filter(|&node| self.hugr.graph.contains_node(node));
 
-        // Compute the number of nodes visited and keep the last one.
-        let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| {
+        // Compute the number of nodes visited.
+        let nodes_visited = topo.fold(0, |n, node| {
             // If there is a LoadConstant with a local constant, count that node too
             if OpTag::LoadConst == self.hugr.get_optype(node.into()).tag() {
                 let const_node = self
@@ -369,15 +366,13 @@ impl<'a> ValidationContext<'a> {
                     .expect("Const can't be root.");
 
                 if const_parent == parent {
-                    return (n + 2, Some(node));
+                    return n + 2;
                 }
             }
-            (n + 1, Some(node))
+            n + 1
         });
 
-        if nodes_visited != self.hugr.hierarchy.child_count(parent.index)
-            || last_node != self.hugr.hierarchy.last(parent.index)
-        {
+        if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
             return Err(ValidationError::NotADag {
                 node: parent,
                 optype: optype.clone(),
@@ -649,9 +644,9 @@ pub enum ValidationError {
         parent_optype: OpType,
         allowed_children: OpTag,
     },
-    /// Invalid first/last child.
+    /// Invalid first/second child.
     #[error("A {optype:?} operation cannot be the {position} child of a {parent_optype:?}. Expected {expected}. In parent node {parent:?}")]
-    InvalidBoundaryChild {
+    InvalidInitialChild {
         parent: Node,
         parent_optype: OpType,
         optype: OpType,
@@ -797,11 +792,11 @@ mod test {
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
-        let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
-            .unwrap();
         let output = b
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies].into()))
+            .unwrap();
+        let copy = b
+            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -828,17 +823,17 @@ mod test {
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
+        let output = b
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B].into()))
+            .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
             .add_op_with_parent(
                 parent,
                 ops::LoadConstant {
-                    datatype: tag_type.clone().try_into().unwrap(),
+                    datatype: tag_type.try_into().unwrap(),
                 },
             )
-            .unwrap();
-        let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![tag_type, B].into()))
             .unwrap();
 
         b.add_ports(tag_def, Direction::Outgoing, 1);
@@ -962,7 +957,7 @@ mod test {
     /// Validation errors in a dataflow subgraph.
     fn df_children_restrictions() {
         let (mut b, def) = make_simple_hugr(2);
-        let (_input, copy, output) = b
+        let (_input, output, copy) = b
             .hierarchy
             .children(def.index)
             .map_into()
@@ -973,7 +968,7 @@ mod test {
         b.replace_op(output, LeafOp::Noop(ClassicType::bit().into()));
         assert_matches!(
             b.validate(),
-            Err(ValidationError::InvalidBoundaryChild { parent, .. }) => assert_eq!(parent, def)
+            Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
         );
 
         // Revert it back to an output, but with the wrong number of ports
@@ -995,33 +990,10 @@ mod test {
     }
 
     #[test]
-    fn dags() {
-        let (mut b, def) = make_simple_hugr(2);
-        let (_input, copy, _output) = b
-            .hierarchy
-            .children(def.index)
-            .map_into()
-            .collect_tuple()
-            .unwrap();
-
-        // Add a dangling discard operation without outgoing order edges. Note
-        // that the dag check only allows for one source and sink (the input and
-        // output resp.).
-        let new_copy = b
-            .add_op_after(copy, LeafOp::Noop(ClassicType::bit().into()))
-            .unwrap();
-        b.connect(copy, 0, new_copy, 0).unwrap();
-        assert_matches!(
-            b.validate(),
-            Err(ValidationError::NotADag { node, .. }) => assert_eq!(node, def)
-        );
-    }
-
-    #[test]
     /// Validation errors in a dataflow subgraph.
     fn cfg_children_restrictions() {
         let (mut b, def) = make_simple_hugr(1);
-        let (_input, copy, _output) = b
+        let (_input, _output, copy) = b
             .hierarchy
             .children(def.index)
             .map_into()
@@ -1068,7 +1040,7 @@ mod test {
 
         // Add an internal exit node
         let exit2 = b
-            .add_op_before(
+            .add_op_after(
                 exit,
                 ops::BasicBlock::Exit {
                     cfg_outputs: type_row![B],
