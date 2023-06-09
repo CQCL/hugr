@@ -285,6 +285,7 @@ mod test {
             .add_op_with_parent(
                 module,
                 ops::Def {
+                    name: "main".into(),
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
