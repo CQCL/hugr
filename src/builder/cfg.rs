@@ -64,9 +64,10 @@ impl CFGBuilder<Hugr> {
     }
 }
 
-impl<H: HugrMut> HugrBuilder for CFGBuilder<H> {
+impl HugrBuilder for CFGBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.finish()
+        self.base.validate()?;
+        Ok(self.base)
     }
 }
 

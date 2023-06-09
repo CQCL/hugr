@@ -131,9 +131,10 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     }
 }
 
-impl<H: HugrMut> HugrBuilder for ConditionalBuilder<H> {
+impl HugrBuilder for ConditionalBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.finish()
+        self.base.validate()?;
+        Ok(self.base)
     }
 }
 

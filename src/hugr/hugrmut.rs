@@ -5,7 +5,7 @@ use std::ops::Range;
 use itertools::Itertools;
 use portgraph::SecondaryMap;
 
-use crate::hugr::{Direction, HugrError, Node, ValidationError};
+use crate::hugr::{Direction, HugrError, Node};
 use crate::ops::{OpTrait, OpType};
 use crate::{Hugr, Port};
 
@@ -117,9 +117,6 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
-
-    /// Build the HUGR, returning an error if the graph is not valid.
-    fn finish(self) -> Result<Hugr, ValidationError>;
 
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
@@ -243,13 +240,6 @@ impl HugrMut for Hugr {
         Ok(node)
     }
 
-    /// Build the HUGR, returning an error if the graph is not valid.
-    fn finish(self) -> Result<Hugr, ValidationError> {
-        self.validate()?;
-
-        Ok(self)
-    }
-
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
         let cur = self.op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
@@ -317,7 +307,6 @@ mod test {
         }
 
         // Finish the construction and create the HUGR
-        let hugr: Result<Hugr, ValidationError> = builder.finish();
-        assert_eq!(hugr.err(), None);
+        builder.validate().unwrap();
     }
 }

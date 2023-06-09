@@ -53,9 +53,10 @@ impl Default for ModuleBuilder<Hugr> {
     }
 }
 
-impl<H: HugrMut> HugrBuilder for ModuleBuilder<H> {
+impl HugrBuilder for ModuleBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.0.finish()
+        self.0.validate()?;
+        Ok(self.0)
     }
 }
 
