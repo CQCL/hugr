@@ -121,32 +121,39 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            // Check that we have enough ports. If the `non_df_ports` flag is set
-            // for the direction, we require exactly that number of ports after the
-            // dataflow ports. Otherwise, we allow any number of extra ports.
-            let check_extra_ports = |df_ports: usize, non_df_ports, actual| {
-                if let Some(non_df) = non_df_ports {
-                    df_ports + non_df == actual
-                } else {
-                    df_ports <= actual
+            // Check that we have the correct amount of ports and edges.
+            for dir in Direction::BOTH {
+                let num_ports = self.hugr.graph.num_ports(node.index, dir);
+                let has_other_ports = optype.other_port(dir).is_some();
+                let expected_ports = sig.port_count(dir) + has_other_ports as usize;
+                if num_ports != expected_ports {
+                    return Err(ValidationError::WrongNumberOfPorts {
+                        node,
+                        optype: optype.clone(),
+                        actual: num_ports,
+                        expected: expected_ports,
+                        dir,
+                    });
                 }
-            };
-            let df_const_input = sig.const_input.len();
-            if !check_extra_ports(
-                sig.input.len() + df_const_input,
-                flags.non_df_ports.0,
-                self.hugr.graph.num_inputs(node.index),
-            ) || !check_extra_ports(
-                sig.output.len(),
-                flags.non_df_ports.1,
-                self.hugr.graph.num_outputs(node.index),
-            ) {
-                return Err(ValidationError::WrongNumberOfPorts {
-                    node,
-                    optype: optype.clone(),
-                    actual_inputs: sig.input.len(),
-                    actual_outputs: sig.output.len(),
-                });
+
+                // Check the restrictions for the exact number of other edges.
+                if let Some(expected_other_edges) = flags.non_df_edge_count(dir) {
+                    let actual_count = if !has_other_ports {
+                        0
+                    } else {
+                        let port = Port::new(dir, sig.port_count(dir));
+                        self.hugr.linked_ports(node, port).count()
+                    };
+                    if actual_count != expected_other_edges {
+                        return Err(ValidationError::WrongNumberOfNonDFEdges {
+                            node,
+                            optype: optype.clone(),
+                            actual: actual_count,
+                            expected: expected_other_edges,
+                            dir,
+                        });
+                    }
+                }
             }
 
             // Check port connections
@@ -601,12 +608,22 @@ pub enum ValidationError {
     #[error("The root node of the Hugr {node:?} has edges when it should not.")]
     RootWithEdges { node: Node },
     /// The node ports do not match the operation signature.
-    #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
+    #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual:?} {dir:?} ports. Expected {expected:?}.")]
     WrongNumberOfPorts {
         node: Node,
         optype: OpType,
-        actual_inputs: usize,
-        actual_outputs: usize,
+        actual: usize,
+        expected: usize,
+        dir: Direction,
+    },
+    /// The non-dataflow multiport has the wrong number of connections.
+    #[error("The node {node:?} has an invalid number of non-dataflow edges. The operation {optype:?} cannot have {actual:?} {dir:?} non-dataflow edges. Expected {expected:?}.")]
+    WrongNumberOfNonDFEdges {
+        node: Node,
+        optype: OpType,
+        actual: usize,
+        expected: usize,
+        dir: Direction,
     },
     /// A dataflow port is not connected.
     #[error("The node {node:?} has an unconnected port {port:?} of type {port_kind:?}.")]
