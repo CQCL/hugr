@@ -54,7 +54,7 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
@@ -118,14 +118,14 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                self.base().add_op_before(sibling_node, case_op)?
+                self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
                 self.add_child_op(case_op)?
             };
 
         self.case_nodes[case] = Some(case_node);
 
-        let dfg_builder = DFGBuilder::create_with_io(self.base(), case_node, inputs, outputs)?;
+        let dfg_builder = DFGBuilder::create_with_io(self.hugr_mut(), case_node, inputs, outputs)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

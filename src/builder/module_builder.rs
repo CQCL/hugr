@@ -30,7 +30,7 @@ impl<T: HugrMutRef> Container for ModuleBuilder<T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 
@@ -88,7 +88,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
                 op_desc: "OpType::Declare",
             });
         };
-        self.base().replace_op(
+        self.hugr_mut().replace_op(
             f_node,
             ops::Def {
                 name,
@@ -96,7 +96,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
             },
         );
 
-        let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, inputs, outputs)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 

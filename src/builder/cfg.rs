@@ -30,7 +30,7 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
@@ -113,12 +113,12 @@ impl<B: HugrMutRef> CFGBuilder<B> {
             predicate_variants: predicate_variants.clone(),
         });
         let exit = self.exit_node;
-        let block_n = self.base().add_op_before(exit, op)?;
+        let block_n = self.hugr_mut().add_op_before(exit, op)?;
 
-        self.base().set_num_ports(block_n, 0, n_cases);
+        self.hugr_mut().set_num_ports(block_n, 0, n_cases);
 
         BlockBuilder::create(
-            self.base(),
+            self.hugr_mut(),
             block_n,
             predicate_variants,
             other_outputs,
@@ -192,7 +192,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
     ) -> Result<(), BuildError> {
         let from = predecessor.node();
         let to = successor.node();
-        let hugr = self.base();
+        let hugr = self.hugr_mut();
         let tin = hugr.num_inputs(to);
         let tout = hugr.num_outputs(to);
 

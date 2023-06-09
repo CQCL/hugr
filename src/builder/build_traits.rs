@@ -36,13 +36,13 @@ pub trait Container {
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`Hugr`] being built...TODO: should we just require `AsMut<Hugr>`?
-    fn base(&mut self) -> &mut Hugr;
+    fn hugr_mut(&mut self) -> &mut Hugr;
     /// Immutable reference to HUGR being built...TODO: should we just require `AsRef<Hugr>`? Or combine with previous?
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.base().add_op_with_parent(parent, op)?)
+        Ok(self.hugr_mut().add_op_with_parent(parent, op)?)
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
@@ -50,7 +50,7 @@ pub trait Container {
     /// [`other_inputs`]: crate::ops::OpTrait::other_inputs
     /// [`other_outputs`]: crate::ops::OpTrait::other_outputs
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
-        let (src_port, _) = self.base().add_other_edge(src, dst)?;
+        let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
         Ok(Wire::new(src, Port::new_outgoing(src_port)))
     }
 
@@ -166,7 +166,7 @@ pub trait Dataflow: Container {
             input_wires,
         )?;
 
-        DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), output_types)
+        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, input_types.into(), output_types)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
@@ -196,7 +196,7 @@ pub trait Dataflow: Container {
             },
             input_wires,
         )?;
-        CFGBuilder::create(self.base(), cfg_node, inputs, output_types)
+        CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.
@@ -208,7 +208,7 @@ pub trait Dataflow: Container {
         let cn = cid.node();
         let c_out = self.hugr().num_outputs(cn);
 
-        self.base().add_ports(cn, Direction::Outgoing, 1);
+        self.hugr_mut().add_ports(cn, Direction::Outgoing, 1);
 
         let load_n = self.add_dataflow_op(
             ops::LoadConstant {
@@ -271,7 +271,7 @@ pub trait Dataflow: Container {
         };
         let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
-        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop)
+        TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
@@ -312,7 +312,7 @@ pub trait Dataflow: Container {
         )?;
 
         Ok(ConditionalBuilder {
-            base: self.base(),
+            base: self.hugr_mut(),
             conditional_node: conditional_id.node(),
             n_out_wires,
             case_nodes: vec![None; n_cases],
@@ -450,11 +450,11 @@ pub trait Dataflow: Container {
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port: usize = self
-            .base()
+            .hugr_mut()
             .add_ports(function.node(), Direction::Outgoing, 1)
             .collect_vec()[0];
 
-        self.base()
+        self.hugr_mut()
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;
         Ok(op_id)
     }
@@ -475,7 +475,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 
     let op: OpType = op.into();
     let sig = op.signature();
-    let op_node = data_builder.base().add_op_before(out, op)?;
+    let op_node = data_builder.hugr_mut().add_op_before(out, op)?;
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 
@@ -498,7 +498,7 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-    let base = data_builder.base();
+    let base = data_builder.hugr_mut();
     let op = base.get_optype(op_node);
     let some_df_outputs = !op.signature().output.is_empty();
     if !any_local_df_inputs && some_df_outputs {
@@ -517,7 +517,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
-    let base = data_builder.base();
+    let base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.get_parent(src);
@@ -554,11 +554,13 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
 
-    data_builder.base().connect(src, src_port, dst, dst_port)?;
+    data_builder
+        .hugr_mut()
+        .connect(src, src_port, dst, dst_port)?;
     Ok(local_source
         && matches!(
             data_builder
-                .base()
+                .hugr_mut()
                 .get_optype(dst)
                 .port_kind(Port::new_incoming(dst_port))
                 .unwrap(),

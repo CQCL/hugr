@@ -82,7 +82,7 @@ impl<T: HugrMutRef> Container for DFGBuilder<T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
@@ -153,8 +153,8 @@ impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
     }
 
     #[inline]
-    fn base(&mut self) -> &mut Hugr {
-        self.0.base()
+    fn hugr_mut(&mut self) -> &mut Hugr {
+        self.0.hugr_mut()
     }
 
     #[inline]
