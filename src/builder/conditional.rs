@@ -125,7 +125,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         self.case_nodes[case] = Some(case_node);
 
-        let dfg_builder = DFGBuilder::create_with_io(self.hugr_mut(), case_node, inputs, outputs)?;
+        let dfg_builder = DFGBuilder::create_with_io(
+            self.hugr_mut(),
+            case_node,
+            Signature::new_df(inputs, outputs),
+        )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }
@@ -174,12 +178,13 @@ impl CaseBuilder<Hugr> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
+        let signature = Signature::new_df(input, output);
         let op = ops::Case {
-            signature: Signature::new_df(input.clone(), output.clone()),
+            signature: signature.clone(),
         };
         let base = Hugr::new(op);
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, input, output)?;
+        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

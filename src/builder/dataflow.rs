@@ -25,17 +25,24 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        signature: Signature,
     ) -> Result<Self, BuildError> {
-        let num_in_wires = inputs.len();
-        let num_out_wires = outputs.len();
-        let i = base
-            .as_mut()
-            .add_op_with_parent(parent, ops::Input { types: inputs })?;
-        let o = base
-            .as_mut()
-            .add_op_with_parent(parent, ops::Output { types: outputs })?;
+        let num_in_wires = signature.input.len();
+        let num_out_wires = signature.output.len();
+        let i = base.as_mut().add_op_with_parent(
+            parent,
+            ops::Input {
+                types: signature.input.clone(),
+                resources: signature.input_resources,
+            },
+        )?;
+        let o = base.as_mut().add_op_with_parent(
+            parent,
+            ops::Output {
+                types: signature.output.clone(),
+                resources: signature.output_resources,
+            },
+        )?;
 
         Ok(Self {
             base,
@@ -59,12 +66,13 @@ impl DFGBuilder<Hugr> {
     ) -> Result<DFGBuilder<Hugr>, BuildError> {
         let input = input.into();
         let output = output.into();
+        let signature = Signature::new_df(input, output);
         let dfg_op = ops::DFG {
-            signature: Signature::new_df(input.clone(), output.clone()),
+            signature: signature.clone(),
         };
         let base = Hugr::new(dfg_op);
         let root = base.root();
-        DFGBuilder::create_with_io(base, root, input, output)
+        DFGBuilder::create_with_io(base, root, signature)
     }
 }
 
@@ -131,17 +139,15 @@ impl FunctionBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let inputs = signature.input.clone();
-        let outputs = signature.output.clone();
         let op = ops::Def {
-            signature,
+            signature: signature.clone(),
             name: name.into(),
         };
 
         let base = Hugr::new(op);
         let root = base.root();
 
-        let db = DFGBuilder::create_with_io(base, root, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(base, root, signature)?;
         Ok(Self::from_dfg_builder(db))
     }
 }
@@ -224,7 +230,8 @@ mod test {
 
                 let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
 
-                let inner_builder = func_builder.dfg_builder(vec![(NAT, int)], type_row![NAT])?;
+                let inner_builder = func_builder
+                    .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
                 let inner_id = n_identity(inner_builder)?;
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
@@ -317,7 +324,8 @@ mod test {
             let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested = f_build.dfg_builder(vec![], type_row![BIT])?;
+            let mut nested =
+                f_build.dfg_builder(Signature::new_df(type_row![], type_row![BIT]), [])?;
 
             let id = nested.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
 

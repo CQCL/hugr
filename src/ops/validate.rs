@@ -451,6 +451,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 mod test {
     use crate::ops;
     use crate::{
+        ops::dataflow::IOTrait,
         ops::LeafOp,
         type_row,
         types::{ClassicType, SimpleType},
@@ -466,14 +467,8 @@ mod test {
         let in_types = type_row![B];
         let out_types = type_row![B, B];
 
-        let input_node: OpType = ops::Input {
-            types: in_types.clone(),
-        }
-        .into();
-        let output_node = ops::Output {
-            types: out_types.clone(),
-        }
-        .into();
+        let input_node: OpType = ops::Input::new(in_types.clone()).into();
+        let output_node = ops::Output::new(out_types.clone()).into();
         let leaf_node = LeafOp::Noop(ClassicType::bit().into()).into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
