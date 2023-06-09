@@ -200,26 +200,59 @@ impl<'a> ValidationContext<'a> {
     /// according to the information accumulated by `gather_resources`
     fn check_resources_compatible(
         &self,
-        port: &PortIndex,
-        link: &PortIndex,
+        from_node: &Node,
+        to_node: &Node,
+        port: (&Port, &PortIndex),
+        link: (&Port, &PortIndex),
     ) -> Result<(), ValidationError> {
-        let d1 = self.hugr.graph.port_direction(*port).unwrap();
-        let d2 = self.hugr.graph.port_direction(*link).unwrap();
+        let d1 = self.hugr.graph.port_direction(*port.1).unwrap();
+        let d2 = self.hugr.graph.port_direction(*link.1).unwrap();
         let (src, tgt) = match (d1, d2) {
-            (Direction::Outgoing, Direction::Incoming) => (port, link),
-            (Direction::Incoming, Direction::Outgoing) => (link, port),
-            _ => panic!("Fucked ports"), // TODO: return a ValidationError here
+            (Direction::Outgoing, Direction::Incoming) => ((from_node, port.1), (to_node, link.1)),
+            (Direction::Incoming, Direction::Outgoing) => ((to_node, link.1), (from_node, port.1)),
+            // In this case, which graph is "from" or "to" doesn't really matter
+            _ => {
+                return Err(InterGraphEdgeError::SamePortDirection {
+                    from: from_node.clone(),
+                    from_offset: port.0.clone(),
+                    to: to_node.clone(),
+                    to_offset: link.0.clone(),
+                    dir: d1.clone(),
+                }
+                .into())
+            }
         };
-        let rs_src = self.resources.get(src).unwrap();
-        let rs_tgt = self.resources.get(tgt).unwrap();
+        let rs_src = self.resources.get(src.1).unwrap();
+        let rs_tgt = self.resources.get(tgt.1).unwrap();
+
+        println!(
+            "SRC: {:?}\nTGT: {:?}",
+            self.hugr.get_optype(*src.0),
+            self.hugr.get_optype(*tgt.0)
+        );
+
         if rs_src == rs_tgt {
             Ok(())
         } else if rs_src.is_subset(rs_tgt) {
             // The extra resource requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
-            Err(ValidationError::TgtExceedsSrcResources)
+            Err(ValidationError::TgtExceedsSrcResources {
+                from: from_node.clone(),
+                from_offset: port.0.clone(),
+                from_resources: rs_src.clone(),
+                to: to_node.clone(),
+                to_offset: port.0.clone(),
+                to_resources: rs_tgt.clone(),
+            })
         } else {
-            Err(ValidationError::SrcExceedsTgtResources)
+            Err(ValidationError::SrcExceedsTgtResources {
+                from: from_node.clone(),
+                from_offset: port.0.clone(),
+                from_resources: rs_src.clone(),
+                to: to_node.clone(),
+                to_offset: port.0.clone(),
+                to_resources: rs_tgt.clone(),
+            })
         }
     }
 
@@ -246,7 +279,14 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
-        self.check_resources_compatible(&port_index, &link_index)?;
+        let link_node = self.hugr.graph.port_node(link_index).unwrap();
+        let link = self.hugr.graph.port_offset(link_index).unwrap();
+        self.check_resources_compatible(
+            &node,
+            &link_node.into(),
+            (&port, &port_index),
+            (&link.into(), &link_index),
+        )?;
 
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
@@ -761,11 +801,25 @@ pub enum ValidationError {
     #[error("Type error for constant value: {0}.")]
     ConstTypeError(#[from] ConstTypeError),
     /// Missing lift node
-    #[error("Tgt exceeds src")]
-    TgtExceedsSrcResources,
+    #[error("Resources at target node {to:?} ({to_offset:?}) ({to_resources}) exceed those at source {from:?} ({from_offset:?}) ({from_resources})")]
+    TgtExceedsSrcResources {
+        from: Node,
+        from_offset: Port,
+        from_resources: ResourceSet,
+        to: Node,
+        to_offset: Port,
+        to_resources: ResourceSet,
+    },
     /// Too many resource requirements coming from src
-    #[error("Src exceeds tgt")]
-    SrcExceedsTgtResources,
+    #[error("Resources at source node {from:?} ({from_offset:?}) ({from_resources}) exceed those at target {to:?} ({to_offset:?}) ({to_resources})")]
+    SrcExceedsTgtResources {
+        from: Node,
+        from_offset: Port,
+        from_resources: ResourceSet,
+        to: Node,
+        to_offset: Port,
+        to_resources: ResourceSet,
+    },
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -824,6 +878,14 @@ pub enum InterGraphEdgeError {
         from: Node,
         from_offset: Port,
         typ: ClassicType,
+    },
+    #[error("Two linked ports both have the same direction")]
+    SamePortDirection {
+        from: Node,
+        from_offset: Port,
+        to: Node,
+        to_offset: Port,
+        dir: Direction,
     },
 }
 
@@ -1254,7 +1316,7 @@ mod test {
         main.finish_with_outputs([f_output])?;
         let handle = module_builder.finish_hugr();
 
-        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources));
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
         Ok(())
     }
 
@@ -1323,7 +1385,7 @@ mod test {
 
         main.finish_with_outputs([output])?;
         let handle = module_builder.finish_hugr();
-        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources));
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
         Ok(())
     }
 }
