@@ -763,6 +763,7 @@ mod test {
 
     use super::*;
     use crate::hugr::HugrMut;
+    use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
@@ -794,23 +795,13 @@ mod test {
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut HugrMut, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(
-                parent,
-                ops::Input {
-                    types: type_row![B],
-                },
-            )
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let copy = b
             .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
         let output = b
-            .add_op_with_parent(
-                parent,
-                ops::Output {
-                    types: vec![B; copies].into(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Output::new(vec![B; copies].into()))
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -835,12 +826,7 @@ mod test {
         let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
-            .add_op_with_parent(
-                parent,
-                ops::Input {
-                    types: type_row![B],
-                },
-            )
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
@@ -852,12 +838,7 @@ mod test {
             )
             .unwrap();
         let output = b
-            .add_op_with_parent(
-                parent,
-                ops::Output {
-                    types: vec![tag_type, B].into(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type, B].into()))
             .unwrap();
 
         b.add_ports(tag_def, Direction::Outgoing, 1);
@@ -970,7 +951,7 @@ mod test {
         // After moving the previous definition to a valid place,
         // add an input node to the module subgraph
         let new_input = b
-            .add_op_with_parent(root, ops::Input { types: type_row![] })
+            .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
             b.hugr().validate(),
@@ -998,31 +979,16 @@ mod test {
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(
-            output,
-            ops::Output {
-                types: type_row![B],
-            },
-        );
+        b.replace_op(output, ops::Output::new(type_row![B]));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
-        b.replace_op(
-            output,
-            ops::Output {
-                types: type_row![B, B],
-            },
-        );
+        b.replace_op(output, ops::Output::new(type_row![B, B]));
 
         // After fixing the output back, replace the copy with an output op
-        b.replace_op(
-            copy,
-            ops::Output {
-                types: type_row![B, B],
-            },
-        );
+        b.replace_op(copy, ops::Output::new(type_row![B, B]));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -1132,17 +1098,10 @@ mod test {
         let mut block_children = b.hugr().hierarchy.children(block.index);
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
-        b.replace_op(
-            block_input,
-            ops::Input {
-                types: type_row![Q],
-            },
-        );
+        b.replace_op(block_input, ops::Input::new(type_row![Q]));
         b.replace_op(
             block_output,
-            ops::Output {
-                types: vec![SimpleType::new_simple_predicate(1), Q].into(),
-            },
+            ops::Output::new(vec![SimpleType::new_simple_predicate(1), Q].into()),
         );
         assert_matches!(
             b.hugr().validate(),

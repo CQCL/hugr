@@ -73,14 +73,10 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
-        let (inputs, outputs, name) = if let OpType::Declare(ops::Declare { signature, name }) =
+        let (signature, name) = if let OpType::Declare(ops::Declare { signature, name }) =
             self.hugr().get_optype(f_node)
         {
-            (
-                signature.input.clone(),
-                signature.output.clone(),
-                name.clone(),
-            )
+            (signature.clone(), name.clone())
         } else {
             return Err(BuildError::UnexpectedType {
                 node: f_node,
@@ -91,11 +87,11 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
             f_node,
             ops::Def {
                 name,
-                signature: Signature::new_df(inputs.clone(), outputs.clone()),
+                signature: signature.clone(),
             },
         );
 
-        let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(self.base(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 

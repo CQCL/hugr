@@ -262,7 +262,7 @@ mod test {
     use crate::{
         hugr::HugrView,
         macros::type_row,
-        ops::{self, LeafOp},
+        ops::{self, dataflow::IOTrait, LeafOp},
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -293,23 +293,13 @@ mod test {
 
         {
             let f_in = builder
-                .add_op_with_parent(
-                    f,
-                    ops::Input {
-                        types: type_row![NAT],
-                    },
-                )
+                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
                 .unwrap();
             let noop = builder
                 .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
                 .unwrap();
             let f_out = builder
-                .add_op_with_parent(
-                    f,
-                    ops::Output {
-                        types: type_row![NAT, NAT],
-                    },
-                )
+                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());
