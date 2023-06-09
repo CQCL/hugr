@@ -101,34 +101,45 @@ pub trait OpTrait {
         Default::default()
     }
 
-    /// The edge kind for the inputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow or constant inputs of the operation,
+    /// not described by the signature.
     ///
-    /// If None, there will be no other input edges. Otherwise, all other input
-    /// edges will be of that kind.
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_input(&self) -> Option<EdgeKind> {
         None
     }
 
-    /// The edge kind for the outputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow outputs of the operation, not
+    /// described by the signature.
     ///
-    /// If None, there will be no other output edges. Otherwise, all other
-    /// output edges will be of that kind.
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_output(&self) -> Option<EdgeKind> {
         None
+    }
+
+    /// The edge kind for the non-dataflow or constant-input ports of the
+    /// operation, not described by the signature.
+    ///
+    /// If not None, a single extra multiport of that kind will be present on
+    /// the given direction.
+    fn other_port(&self, dir: Direction) -> Option<EdgeKind> {
+        match dir {
+            Direction::Incoming => self.other_input(),
+            Direction::Outgoing => self.other_output(),
+        }
     }
 
     /// Returns the edge kind for the given port.
     fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
         let port = port.into();
-        if let Some(port_kind) = signature.get(port) {
-            Some(port_kind)
-        } else if port.direction() == Direction::Incoming {
-            self.other_inputs()
-        } else {
-            self.other_outputs()
+        let dir = port.direction();
+        match port.index().cmp(&signature.port_count(dir)) {
+            std::cmp::Ordering::Less => signature.get(port),
+            std::cmp::Ordering::Equal => self.other_port(dir),
+            std::cmp::Ordering::Greater => None,
         }
     }
 }

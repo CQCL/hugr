@@ -31,7 +31,7 @@ impl OpTrait for Const {
         OpTag::Const
     }
 
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Const(self.0.const_type()))
     }
 }
