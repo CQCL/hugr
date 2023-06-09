@@ -45,7 +45,8 @@ use itertools::Itertools;
 
 use crate::hugr::view::{HugrView, Neighbours};
 use crate::ops::handle::{CfgID, NodeHandle};
-use crate::ops::{controlflow::BasicBlockOp, OpType};
+use crate::ops::tag::OpTag;
+use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
@@ -136,10 +137,7 @@ impl<'a, H: HugrView> SimpleCfgView<'a, H> {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.last().unwrap();
-        debug_assert!(matches!(
-            h.get_optype(exit),
-            OpType::BasicBlock(BasicBlockOp::Exit { .. })
-        ));
+        debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
 }

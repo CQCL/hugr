@@ -1,8 +1,7 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Direction, Node, Port, ValidationError};
-use crate::ops::controlflow::{ConditionalSignature, TailLoopSignature};
-use crate::ops::ConstValue;
+use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
 
@@ -13,11 +12,10 @@ use super::{
 
 use crate::{
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    ops::{controlflow::ControlFlowOp, DataflowOp, LeafOp, ModuleOp, OpType},
-    types::{ClassicType, EdgeKind},
+    types::EdgeKind,
 };
 
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::types::{LinearType, Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
 
@@ -47,10 +45,10 @@ pub trait Container {
         Ok(self.base().add_op_with_parent(parent, op)?)
     }
 
-    /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`OpType::other_inputs`] or  [`OpType::other_outputs`]
+    /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
     ///
-    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
-    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs
+    /// [`other_inputs`]: crate::ops::OpTrait::other_inputs
+    /// [`other_outputs`]: crate::ops::OpTrait::other_outputs
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.base().add_other_edge(src, dst)?;
         Ok(Wire::new(src, Port::new_outgoing(src_port)))
@@ -61,10 +59,10 @@ pub trait Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
+    /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(ModuleOp::Const(val))?;
+        let const_n = self.add_child_op(ops::Const(val))?;
 
         Ok((const_n, typ).into())
     }
@@ -145,7 +143,7 @@ pub trait Dataflow: Container {
             .expect(&format!("Incorrect number of wires: {N}")[..])
     }
 
-    /// Return a builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node, i.e. a nested dataflow subgraph.
+    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
@@ -162,16 +160,16 @@ pub trait Dataflow: Container {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
         let (dfg_n, _) = add_op_with_wires(
             self,
-            OpType::Dataflow(DataflowOp::DFG {
+            ops::DFG {
                 signature: Signature::new_df(input_types.clone(), output_types.clone()),
-            }),
+            },
             input_wires,
         )?;
 
         DFGBuilder::create_with_io(self.base(), dfg_n, input_types.into(), output_types)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::CFG`] node,
+    /// Return a builder for a [`crate::ops::CFG`] node,
     /// i.e. a nested controlflow subgraph.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -192,19 +190,17 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_op_with_wires(
             self,
-            OpType::Dataflow(DataflowOp::ControlFlow {
-                op: ControlFlowOp::CFG {
-                    inputs: inputs.clone(),
-                    outputs: output_types.clone(),
-                },
-            }),
+            ops::CFG {
+                inputs: inputs.clone(),
+                outputs: output_types.clone(),
+            },
             input_wires,
         )?;
         CFGBuilder::create(self.base(), cfg_node, inputs, output_types)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.
-    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// Adds a [`OpType::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
@@ -215,7 +211,7 @@ pub trait Dataflow: Container {
         self.base().add_ports(cn, Direction::Outgoing, 1);
 
         let load_n = self.add_dataflow_op(
-            DataflowOp::LoadConstant {
+            ops::LoadConstant {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
@@ -230,15 +226,15 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ModuleOp::Const`] node.
+    /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_dataflow_op(ModuleOp::Const(val), [])?;
+        let const_n = self.add_dataflow_op(ops::Const(val), [])?;
 
         Ok((const_n.node(), typ).into())
     }
     /// Load a static constant and return the local dataflow wire for that constant.
-    /// Adds a [`DataflowOp::LoadConstant`] node.
+    /// Adds a [`ops::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
@@ -247,7 +243,7 @@ pub trait Dataflow: Container {
         self.load_const(&cid)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
+    /// Return a builder for a [`crate::ops::TailLoop`] node.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
@@ -255,7 +251,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when building
-    /// the [`ControlFlowOp::TailLoop`] node.
+    /// the [`ops::TailLoop`] node.
     fn tail_loop_builder(
         &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
@@ -268,21 +264,17 @@ pub trait Dataflow: Container {
             inputs_outputs.into_iter().unzip();
         input_wires.extend(rest_input_wires.into_iter());
 
-        let tail_loop_signature = TailLoopSignature {
+        let tail_loop = ops::TailLoop {
             just_inputs: input_types.into(),
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        let (loop_node, _) = add_op_with_wires(
-            self,
-            ControlFlowOp::TailLoop(tail_loop_signature.clone()),
-            input_wires,
-        )?;
+        let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
-        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop_signature)
+        TailLoopBuilder::create_with_io(self.base(), loop_node, &tail_loop)
     }
 
-    /// Return a builder for a [`crate::ops::controlflow::ControlFlowOp::Conditional`] node.
+    /// Return a builder for a [`crate::ops::Conditional`] node.
     /// `predicate_inputs` and `predicate_wire` define the type of the predicate
     /// variants and the wire carrying the predicate respectively.
     ///
@@ -311,11 +303,11 @@ pub trait Dataflow: Container {
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
-            ControlFlowOp::Conditional(ConditionalSignature {
+            ops::Conditional {
                 predicate_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
-            }),
+            },
             input_wires,
         )?;
 
@@ -348,36 +340,6 @@ pub trait Dataflow: Container {
         } else {
             Err(BuildError::WireNotFound(wire))
         }
-    }
-
-    /// Add a discard (0-arity copy) for a `wire` with a known type `typ`.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard_type(
-        &mut self,
-        wire: Wire,
-        typ: ClassicType,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_op(LeafOp::Copy { n_copies: 0, typ }, [wire])
-    }
-
-    /// Discard a value on a `wire` using [`Dataflow::discard_type`], retrieving
-    /// the type of the Wire from it's source.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// copy node.
-    fn discard(&mut self, wire: Wire) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let typ = self.get_wire_type(wire)?;
-        let typ = match typ {
-            SimpleType::Classic(typ) => typ,
-            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
-        };
-        self.discard_type(wire, typ)
     }
 
     /// Add a [`LeafOp::MakeTuple`] node and wire in the `values` Wires,
@@ -427,7 +389,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Continue" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
+    /// "Continue" variant of a [`ops::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -437,18 +399,14 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_continue(
         &mut self,
-        loop_signature: TailLoopSignature,
+        tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(
-            0,
-            [loop_signature.just_inputs, loop_signature.just_outputs],
-            values,
-        )
+        self.make_predicate(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Break" variant of a [`ControlFlowOp::TailLoop`] with `loop_signature`.
+    /// "Break" variant of a [`ops::TailLoop`] with `loop_signature`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -458,33 +416,30 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error in adding the nodes.
     fn make_break(
         &mut self,
-        loop_signature: TailLoopSignature,
+        loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(
-            1,
-            [loop_signature.just_inputs, loop_signature.just_outputs],
-            values,
-        )
+        self.make_predicate(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
-    /// Add a [`DataflowOp::Call`] node, calling `function`, with inputs
+    /// Add a [`ops::Call`] node, calling `function`, with inputs
     /// specified by `input_wires`. Returns a handle to the corresponding Call node.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the Call
-    /// node, or if `function` does not refer to a [`ModuleOp::Declare`] or
-    /// [`ModuleOp::Def`] node.
+    /// node, or if `function` does not refer to a [`ops::Declare`] or
+    /// [`ops::Def`] node.
     fn call<const DEFINED: bool>(
         &mut self,
         function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
-        let def_op: Result<&ModuleOp, ()> = hugr.get_optype(function.node()).try_into();
+        let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
-            Ok(ModuleOp::Def { signature } | ModuleOp::Declare { signature }) => signature.clone(),
+            OpType::Def(ops::Def { signature, .. })
+            | OpType::Declare(ops::Declare { signature, .. }) => signature.clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
@@ -493,7 +448,7 @@ pub trait Dataflow: Container {
             }
         };
         let const_in_port = signature.output.len();
-        let op_id = self.add_dataflow_op(DataflowOp::Call { signature }, input_wires)?;
+        let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port: usize = self
             .base()
             .add_ports(function.node(), Direction::Outgoing, 1)
@@ -556,8 +511,8 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 /// Add edge from src to dst and report back if they do share a parent
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    mut src: Node,
-    mut src_port: usize,
+    src: Node,
+    src_port: usize,
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
@@ -567,63 +522,38 @@ fn wire_up<T: Dataflow + ?Sized>(
     let src_parent = base.hugr().get_parent(src);
     let dst_parent = base.hugr().get_parent(dst);
     let local_source = src_parent == dst_parent;
-    if !local_source {
-        if let Some(copy_port) = if_copy_add_port(base, src) {
-            src_port = copy_port;
-        } else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            let src_parent = base.hugr().get_parent(src).expect("Node has no parent");
 
-            let final_child = base
-                .hugr()
-                .children(src_parent)
-                .next_back()
-                .expect("Parent must have at least one child.");
-            let copy_node = base.add_op_before(final_child, LeafOp::Copy { n_copies: 1, typ })?;
+    // Non-local value sources require a state edge to an ancestor of dst
+    if !local_source && get_value_kind(base, src, src_offset) == ValueKind::Classic {
+        let src_parent = src_parent.expect("Node has no parent");
+        let Some(src_sibling) =
+                iter::successors(dst_parent, |&p| base.hugr().get_parent(p))
+                    .tuple_windows()
+                    .find_map(|(ancestor, ancestor_parent)| {
+                        (ancestor_parent == src_parent).then_some(ancestor)
+                    })
+            else {
+                let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+                    from: src,
+                    from_offset: Port::new_outgoing(src_port),
+                    to: dst,
+                    to_offset: Port::new_incoming(dst_port),
+                }.into();
+                return Err(val_err.into());
+            };
 
-            base.connect(src, src_port, copy_node, 0)?;
+        // TODO: Avoid adding duplicate edges
+        // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
+        base.add_other_edge(src, src_sibling)?;
+    }
 
-            // Copy node has to have state edge to an ancestor of dst
-            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.hugr().get_parent(p))
-                .tuple_windows()
-                .find_map(|(ancestor, ancestor_parent)| {
-                    (ancestor_parent == src_parent).then_some(ancestor)
-                }) else {
-                    let val_err: ValidationError = InterGraphEdgeError::NoRelation {
-                        from: src,
-                        from_offset: Port::new_outgoing(src_port),
-                        to: dst,
-                        to_offset: Port::new_incoming(dst_port),
-                    }.into();
-                    return Err(val_err.into());
-                };
-
-            base.add_other_edge(copy_node, src_sibling)?;
-
-            src = copy_node;
-            src_port = 0;
+    // Don't copy linear edges.
+    if base.hugr().linked_ports(src, src_offset).next().is_some() {
+        if let ValueKind::Linear(typ) = get_value_kind(base, src, src_offset) {
+            return Err(BuildError::NoCopyLinear(typ));
         }
     }
 
-    if let Some((connected, connected_offset)) = base.hugr().linked_port(src, src_offset) {
-        if let Some(copy_port) = if_copy_add_port(base, src) {
-            src_port = copy_port;
-            src = connected;
-        }
-        // Need to insert a copy - first check can be copied
-        else if let Some(typ) = check_classical_value(base, src, src_offset)? {
-            base.disconnect(src, Port::new_outgoing(src_port))?;
-
-            let copy = data_builder.add_dataflow_op(
-                LeafOp::Copy { n_copies: 2, typ },
-                [Wire::new(src, Port::new_outgoing(src_port))],
-            )?;
-
-            let base = data_builder.base();
-            base.connect(copy.node(), 0, connected, connected_offset.index())?;
-            src = copy.node();
-            src_port = 1;
-        }
-    }
     data_builder.base().connect(src, src_port, dst, dst_port)?;
     Ok(local_source
         && matches!(
@@ -637,46 +567,28 @@ fn wire_up<T: Dataflow + ?Sized>(
         ))
 }
 
+/// Return type for `get_value_kind`
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ValueKind {
+    Classic,
+    Linear(LinearType),
+    Const,
+}
+
 /// Check the kind of a port is a classical Value and return it
 /// Return None if Const kind
 /// Panics if port not valid for Op or port is not Const/Value
-fn check_classical_value(
-    base: &HugrMut,
-    src: Node,
-    src_offset: Port,
-) -> Result<Option<ClassicType>, BuildError> {
+fn get_value_kind(base: &HugrMut, src: Node, src_offset: Port) -> ValueKind {
     let wire_kind = base.hugr().get_optype(src).port_kind(src_offset).unwrap();
-    let typ = match wire_kind {
-        EdgeKind::Const(_) => None,
+    match wire_kind {
+        EdgeKind::Const(_) => ValueKind::Const,
         EdgeKind::Value(simple_type) => match simple_type {
-            SimpleType::Classic(typ) => Some(typ),
-            SimpleType::Linear(typ) => return Err(BuildError::NoCopyLinear(typ)),
+            SimpleType::Classic(_) => ValueKind::Classic,
+            SimpleType::Linear(typ) => ValueKind::Linear(typ),
         },
         _ => {
-            panic!("Wires can only be Value kind")
+            panic!("Wires can only be Const or Value kind")
         }
-    };
-
-    Ok(typ)
-}
-
-// Return newly added port to copy node if src node is a copy
-fn if_copy_add_port(base: &mut HugrMut, src: Node) -> Option<usize> {
-    let src_op: Result<&LeafOp, ()> = base.hugr().get_optype(src).try_into();
-    if let Ok(LeafOp::Copy { n_copies, typ }) = src_op {
-        let copy_node = src;
-        // If already connected to a copy node, add wire to the copy
-        let n_copies = *n_copies;
-        base.replace_op(
-            copy_node,
-            LeafOp::Copy {
-                n_copies: n_copies + 1,
-                typ: typ.clone(),
-            },
-        );
-        base.add_ports(copy_node, Direction::Outgoing, 1).next()
-    } else {
-        None
     }
 }
 

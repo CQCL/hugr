@@ -103,7 +103,7 @@ pub enum ClassicType {
     /// A type variable identified by a name.
     Variable(SmolStr),
     /// An arbitrary size integer.
-    Int(usize),
+    Int(u8),
     /// A 64-bit floating point number.
     F64,
     /// An arbitrary length string.
@@ -126,7 +126,7 @@ impl ClassicType {
 
     /// Returns a new integer type with the given number of bits.
     #[inline]
-    pub const fn int<const N: usize>() -> Self {
+    pub const fn int<const N: u8>() -> Self {
         Self::Int(N)
     }
 
@@ -140,6 +140,19 @@ impl ClassicType {
     #[inline]
     pub const fn bit() -> Self {
         Self::int::<1>()
+    }
+
+    /// New Sum of Tuple types, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+        Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
+            variant_rows,
+        ))))
+    }
+
+    /// New simple predicate with empty Tuple variants
+    pub fn new_simple_predicate(size: usize) -> Self {
+        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
     }
 }
 
@@ -240,14 +253,12 @@ impl SimpleType {
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
-        Self::Classic(ClassicType::Container(Container::Sum(Box::new(
-            TypeRow::predicate_variants_row(variant_rows),
-        ))))
+        Self::Classic(ClassicType::new_predicate(variant_rows))
     }
 
     /// New simple predicate with empty Tuple variants
     pub fn new_simple_predicate(size: usize) -> Self {
-        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
+        Self::Classic(ClassicType::new_simple_predicate(size))
     }
 }
 

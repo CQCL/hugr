@@ -7,7 +7,7 @@ use itertools::Itertools;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node, ValidationError};
-use crate::ops::OpType;
+use crate::ops::{OpTrait, OpType};
 use crate::{Hugr, Port};
 
 /// A low-level builder for a HUGR.
@@ -262,7 +262,7 @@ mod test {
     use crate::{
         hugr::HugrView,
         macros::type_row,
-        ops::{DataflowOp, LeafOp, ModuleOp},
+        ops::{self, LeafOp},
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -284,7 +284,8 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ModuleOp::Def {
+                ops::Def {
+                    name: "main".into(),
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
@@ -294,32 +295,26 @@ mod test {
             let f_in = builder
                 .add_op_with_parent(
                     f,
-                    DataflowOp::Input {
+                    ops::Input {
                         types: type_row![NAT],
                     },
                 )
                 .unwrap();
-            let copy = builder
-                .add_op_with_parent(
-                    f,
-                    LeafOp::Copy {
-                        n_copies: 2,
-                        typ: ClassicType::i64(),
-                    },
-                )
+            let noop = builder
+                .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
                 .unwrap();
             let f_out = builder
                 .add_op_with_parent(
                     f,
-                    DataflowOp::Output {
+                    ops::Output {
                         types: type_row![NAT, NAT],
                     },
                 )
                 .unwrap();
 
-            assert!(builder.connect(f_in, 0, copy, 0).is_ok());
-            assert!(builder.connect(copy, 0, f_out, 0).is_ok());
-            assert!(builder.connect(copy, 1, f_out, 1).is_ok());
+            assert!(builder.connect(f_in, 0, noop, 0).is_ok());
+            assert!(builder.connect(noop, 0, f_out, 0).is_ok());
+            assert!(builder.connect(noop, 0, f_out, 1).is_ok());
         }
 
         // Finish the construction and create the HUGR
