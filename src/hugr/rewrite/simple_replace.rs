@@ -51,7 +51,7 @@ impl SimpleReplacement {
 impl Rewrite<SimpleReplacementError> for SimpleReplacement {
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &Hugr) -> Result<(), SimpleReplacementError> {
+    fn verify(&self, _h: &Hugr) -> Result<(), SimpleReplacementError> {
         unimplemented!()
     }
 
