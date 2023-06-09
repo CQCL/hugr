@@ -2,7 +2,6 @@
 
 use std::ops::Range;
 
-use itertools::Itertools;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node};
@@ -43,18 +42,19 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     /// The port is left in place.
     fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError>;
 
-    /// Adds a non-dataflow edge between two nodes, allocating new ports for the
-    /// connection. The kind is given by the operation's
-    /// [`OpType::other_inputs`] or [`OpType::other_outputs`].
+    /// Adds a non-dataflow edge between two nodes. The kind is given by the
+    /// operation's [`OpType::other_input`] or [`OpType::other_output`].
     ///
     /// Returns the offsets of the new input and output ports, or an error if
     /// the connection failed.
     ///
-    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
-    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs.
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
-        let src_port: usize = self.add_ports(src, Direction::Outgoing, 1).collect_vec()[0];
-        let dst_port: usize = self.add_ports(dst, Direction::Incoming, 1).collect_vec()[0];
+    /// [`OpType::other_input`]: crate::ops::OpType::other_input
+    /// [`OpType::other_output`]: crate::ops::OpType::other_output.
+    pub fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
+        debug_assert!(self.get_optype(src).other_output().is_some());
+        debug_assert!(self.get_optype(dst).other_input().is_some());
+        let src_port: usize = self.num_ports(src, Direction::Outgoing) - 1;
+        let dst_port: usize = self.num_ports(dst, Direction::Incoming) - 1;
         self.connect(src, src_port, dst, dst_port)?;
         Ok((src_port, dst_port))
     }
@@ -129,8 +129,8 @@ impl HugrMut for Hugr {
         let op: OpType = op.into();
         let sig = op.signature();
         let node = self.graph.add_node(
-            sig.input.len() + sig.const_input.iter().count(),
-            sig.output.len(),
+            sig.input_count() + op.other_input().is_some() as usize,
+            sig.output_count() + op.other_output().is_some() as usize,
         );
         self.op_types[node] = op;
         node.into()

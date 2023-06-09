@@ -136,10 +136,9 @@ pub trait OpTrait {
         let signature = self.signature();
         let port = port.into();
         let dir = port.direction();
-        match port.index().cmp(&signature.port_count(dir)) {
-            std::cmp::Ordering::Less => signature.get(port),
-            std::cmp::Ordering::Equal => self.other_port(dir),
-            std::cmp::Ordering::Greater => None,
+        match port.index() < signature.port_count(dir) {
+            true => signature.get(port),
+            false => self.other_port(dir),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
-use crate::hugr::{Direction, Node, Port, ValidationError};
+use crate::hugr::{Node, Port, ValidationError};
 use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -211,17 +211,14 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
-        let cn = cid.node();
-        let c_out = self.hugr().num_outputs(cn);
-
-        self.hugr_mut().add_ports(cn, Direction::Outgoing, 1);
+        let const_node = cid.node();
 
         let load_n = self.add_dataflow_op(
             ops::LoadConstant {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
-            vec![Wire::new(cn, Port::new_outgoing(c_out))],
+            vec![Wire::new(const_node, Port::new_outgoing(0))],
         )?;
 
         Ok(load_n.out_wire(0))
@@ -455,10 +452,7 @@ pub trait Dataflow: Container {
         };
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
-        let src_port: usize = self
-            .hugr_mut()
-            .add_ports(function.node(), Direction::Outgoing, 1)
-            .collect_vec()[0];
+        let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;

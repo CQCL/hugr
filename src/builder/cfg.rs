@@ -117,7 +117,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         other_outputs: TypeRow,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        let n_cases = predicate_variants.len();
         let op = OpType::BasicBlock(BasicBlock::Block {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
@@ -130,8 +129,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         } else {
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
-
-        self.hugr_mut().set_num_ports(block_n, 0, n_cases);
 
         BlockBuilder::create(
             self.hugr_mut(),
@@ -208,12 +205,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     ) -> Result<(), BuildError> {
         let from = predecessor.node();
         let to = successor.node();
-        let hugr = self.hugr_mut();
-        let tin = hugr.num_inputs(to);
-        let tout = hugr.num_outputs(to);
-
-        hugr.set_num_ports(to, tin + 1, tout);
-        Ok(hugr.connect(from, branch, to, tin)?)
+        Ok(self.hugr_mut().connect(from, branch, to, 0)?)
     }
 }
 

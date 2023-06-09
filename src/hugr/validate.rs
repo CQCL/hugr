@@ -125,45 +125,26 @@ impl<'a> ValidationContext<'a> {
             for dir in Direction::BOTH {
                 let num_ports = self.hugr.graph.num_ports(node.index, dir);
                 let has_other_ports = optype.other_port(dir).is_some();
-                let expected_ports = sig.port_count(dir) + has_other_ports as usize;
-                if num_ports != expected_ports {
+                let expected_other_ports = flags
+                    .non_df_port_count(dir)
+                    .unwrap_or(has_other_ports as usize);
+                if num_ports != (sig.port_count(dir) + expected_other_ports) {
                     return Err(ValidationError::WrongNumberOfPorts {
                         node,
                         optype: optype.clone(),
                         actual: num_ports,
-                        expected: expected_ports,
+                        expected: sig.port_count(dir) + expected_other_ports,
                         dir,
                     });
-                }
-
-                // Check the restrictions for the exact number of other edges.
-                if let Some(expected_other_edges) = flags.non_df_edge_count(dir) {
-                    let actual_count = if !has_other_ports {
-                        0
-                    } else {
-                        let port = Port::new(dir, sig.port_count(dir));
-                        self.hugr.linked_ports(node, port).count()
-                    };
-                    if actual_count != expected_other_edges {
-                        return Err(ValidationError::WrongNumberOfNonDFEdges {
-                            node,
-                            optype: optype.clone(),
-                            actual: actual_count,
-                            expected: expected_other_edges,
-                            dir,
-                        });
-                    }
                 }
             }
 
             // Check port connections
-            for (i, port_index) in self.hugr.graph.inputs(node.index).enumerate() {
-                let port = Port::new_incoming(i);
-                self.validate_port(node, port, port_index, optype)?;
-            }
-            for (i, port_index) in self.hugr.graph.outputs(node.index).enumerate() {
-                let port = Port::new_outgoing(i);
-                self.validate_port(node, port, port_index, optype)?;
+            for dir in Direction::BOTH {
+                for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
+                    let port = Port::new(dir, i);
+                    self.validate_port(node, port, port_index, optype)?;
+                }
             }
         }
 
@@ -595,15 +576,6 @@ pub enum ValidationError {
     /// The node ports do not match the operation signature.
     #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual:?} {dir:?} ports. Expected {expected:?}.")]
     WrongNumberOfPorts {
-        node: Node,
-        optype: OpType,
-        actual: usize,
-        expected: usize,
-        dir: Direction,
-    },
-    /// The non-dataflow multiport has the wrong number of connections.
-    #[error("The node {node:?} has an invalid number of non-dataflow edges. The operation {optype:?} cannot have {actual:?} {dir:?} non-dataflow edges. Expected {expected:?}.")]
-    WrongNumberOfNonDFEdges {
         node: Node,
         optype: OpType,
         actual: usize,

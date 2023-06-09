@@ -32,8 +32,11 @@ pub struct OpValidityFlags {
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of edges connected to the non-dataflow multiports.
-    pub non_df_edges: (Option<usize>, Option<usize>),
+    /// A strict requirement on the number of non-dataflow multiports.
+    ///
+    /// If not specified, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
+    pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
@@ -41,13 +44,14 @@ pub struct OpValidityFlags {
 }
 
 impl OpValidityFlags {
-    /// Get the number of non-dataflow edges required by this operation.
+    /// Get the number of non-dataflow multiports.
     ///
-    /// If none, the operation has no strict requirement on the number of edges.
-    pub fn non_df_edge_count(&self, dir: Direction) -> Option<usize> {
+    /// If None, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
+    pub fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
         match dir {
-            Direction::Incoming => self.non_df_edges.0,
-            Direction::Outgoing => self.non_df_edges.1,
+            Direction::Incoming => self.non_df_ports.0,
+            Direction::Outgoing => self.non_df_ports.1,
         }
     }
 }
@@ -61,7 +65,7 @@ impl Default for OpValidityFlags {
             allowed_second_child: OpTag::Any,
             requires_children: false,
             requires_dag: false,
-            non_df_edges: (None, None),
+            non_df_ports: (None, None),
             edge_check: None,
         }
     }
@@ -333,7 +337,7 @@ impl ValidateOp for BasicBlock {
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_edges: (None, Some(predicate_variants.len())),
+                non_df_ports: (None, Some(predicate_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -371,7 +375,6 @@ impl ValidateOp for super::Case {
             allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
-            non_df_edges: (Some(0), Some(0)),
             ..Default::default()
         }
     }
