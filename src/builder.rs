@@ -2,7 +2,7 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{Hugr, HugrError, HugrMut, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 
 use crate::types::LinearType;
@@ -69,11 +69,6 @@ pub enum BuildError {
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
-
-/// Trait allowing treating type as (im)mutable reference to [`Hugr`]
-pub trait HugrMutRef: AsMut<Hugr> + AsRef<Hugr> {}
-impl<H: HugrMut> HugrMutRef for H {}
-impl HugrMutRef for &mut Hugr {}
 
 #[cfg(test)]
 mod test {

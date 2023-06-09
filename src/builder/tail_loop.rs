@@ -6,7 +6,6 @@ use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
-use super::HugrMutRef;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
@@ -15,7 +14,7 @@ use super::{
 /// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<B: HugrMutRef> TailLoopBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
@@ -59,7 +58,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     }
 }
 
-impl<H: HugrMutRef> TailLoopBuilder<H> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
     /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,

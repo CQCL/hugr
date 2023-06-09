@@ -1,7 +1,7 @@
 use super::{
     build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container, HugrMutRef,
+    BuildError, Container,
 };
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{hugr::HugrMut, Hugr};
 /// Builder for a HUGR module.
 pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<T: HugrMutRef> Container for ModuleBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.as_ref().root()
@@ -60,7 +60,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: HugrMutRef> ModuleBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// Generate a builder for defining a function body graph.
     ///
     /// Replaces a [`OpType::Declare`] node as specified by `f_id`

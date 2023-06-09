@@ -1,6 +1,6 @@
 use super::build_traits::{HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
-use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
+use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
 use std::marker::PhantomData;
 
@@ -21,7 +21,7 @@ pub struct DFGBuilder<T> {
     pub(crate) io: [Node; 2],
 }
 
-impl<T: HugrMutRef> DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
@@ -75,7 +75,7 @@ impl HugrBuilder for DFGBuilder<Hugr> {
     }
 }
 
-impl<T: HugrMutRef> Container for DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for DFGBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
@@ -92,7 +92,7 @@ impl<T: HugrMutRef> Container for DFGBuilder<T> {
     }
 }
 
-impl<T: HugrMutRef> SubContainer for DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> SubContainer for DFGBuilder<T> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -100,7 +100,7 @@ impl<T: HugrMutRef> SubContainer for DFGBuilder<T> {
     }
 }
 
-impl<T: HugrMutRef> Dataflow for DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.io
@@ -146,7 +146,7 @@ impl FunctionBuilder<Hugr> {
     }
 }
 
-impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.container_node()
@@ -163,7 +163,7 @@ impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
     }
 }
 
-impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.0.io
@@ -175,7 +175,7 @@ impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
     }
 }
 
-impl<B: HugrMutRef, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
     type ContainerHandle = T;
 
     #[inline]

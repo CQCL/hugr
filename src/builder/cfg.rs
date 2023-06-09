@@ -2,7 +2,7 @@ use super::{
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, HugrMutRef, Wire,
+    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
 use crate::{hugr::view::HugrView, type_row, types::SimpleType};
@@ -23,7 +23,7 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: HugrMutRef> Container for CFGBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> Container for CFGBuilder<B> {
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
@@ -40,7 +40,7 @@ impl<B: HugrMutRef> Container for CFGBuilder<B> {
     }
 }
 
-impl<H: HugrMutRef> SubContainer for CFGBuilder<H> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -71,7 +71,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: HugrMutRef> CFGBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -204,7 +204,7 @@ impl<B: HugrMutRef> CFGBuilder<B> {
 /// Builder for a [`BasicBlock::Block`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<B: HugrMutRef> BlockBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
     /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -229,7 +229,7 @@ impl<B: HugrMutRef> BlockBuilder<B> {
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 }
-impl<B: HugrMutRef> BlockBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
@@ -310,7 +310,9 @@ mod test {
 
         Ok(())
     }
-    fn build_basic_cfg<T: HugrMutRef>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError> {
+    fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
+        cfg_builder: &mut CFGBuilder<T>,
+    ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
         let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {

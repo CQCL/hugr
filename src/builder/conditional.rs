@@ -6,12 +6,12 @@ use crate::ops::handle::CaseID;
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
+use super::HugrBuilder;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, ConditionalID,
 };
-use super::{HugrBuilder, HugrMutRef};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
@@ -47,7 +47,7 @@ pub struct ConditionalBuilder<T> {
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ConditionalBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node
@@ -64,7 +64,7 @@ impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
     }
 }
 
-impl<H: HugrMutRef> SubContainer for ConditionalBuilder<H> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -84,7 +84,7 @@ impl<H: HugrMutRef> SubContainer for ConditionalBuilder<H> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-impl<B: HugrMutRef> ConditionalBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics
