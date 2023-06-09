@@ -86,10 +86,17 @@ pub trait SubContainer: Container {
 }
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
-    /// Return indices of input and output nodes.
-    fn io(&self) -> [Node; 2];
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
+    /// Return indices of input and output nodes.
+    fn io(&self) -> [Node; 2] {
+        self.hugr()
+            .children(self.container_node())
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .expect("First two children should be IO")
+    }
     /// Handle to input node.
     fn input(&self) -> BuildHandle<DataflowOpID> {
         (self.io()[0], self.num_inputs()).into()
@@ -470,11 +477,11 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let [inp, out] = data_builder.io();
+    let [inp, _] = data_builder.io();
 
     let op: OpType = op.into();
     let sig = op.signature();
-    let op_node = data_builder.hugr_mut().add_op_before(out, op)?;
+    let op_node = data_builder.add_child_op(op)?;
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

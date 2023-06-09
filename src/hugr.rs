@@ -109,10 +109,8 @@ impl Hugr {
             .replacement
             .children(r.replacement.root())
             .collect::<Vec<Node>>();
-        // number of replacement nodes including Input and Output:
-        let replacement_sz = replacement_nodes.len();
         // slice of nodes omitting Input and Output:
-        let replacement_inner_nodes = &replacement_nodes[1..replacement_sz - 1];
+        let replacement_inner_nodes = &replacement_nodes[2..];
         for &node in replacement_inner_nodes {
             // Check there are no const inputs.
             if !r
@@ -125,8 +123,8 @@ impl Hugr {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
-        let self_input_node_index = self.hierarchy.first(r.parent.index).unwrap();
-        let replacement_output_node = *replacement_nodes.last().unwrap();
+        let self_output_node_index = self.children(r.parent).nth(1).unwrap().index;
+        let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = r.replacement.get_optype(node);
@@ -135,7 +133,7 @@ impl Hugr {
             self.op_types[new_node_index] = op.clone();
             // Make r.parent the parent
             self.hierarchy
-                .insert_after(new_node_index, self_input_node_index)
+                .insert_after(new_node_index, self_output_node_index)
                 .ok();
             index_map.insert(node.index, new_node_index);
         }
