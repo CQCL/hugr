@@ -103,7 +103,7 @@ impl Rewrite<SimpleReplacementError> for SimpleReplacement {
             // Make self.parent the parent
             h.hierarchy
                 .insert_after(new_node_index, self_input_node_index)
-                .ok();
+                .unwrap();
             index_map.insert(node.index, new_node_index);
         }
         // Add edges between all newly added nodes matching those in replacement.
@@ -137,7 +137,7 @@ impl Rewrite<SimpleReplacementError> for SimpleReplacement {
                                 *new_node_successor_index,
                                 tgt_offset,
                             )
-                            .ok();
+                            .unwrap();
                     }
                 }
             }
@@ -161,7 +161,7 @@ impl Rewrite<SimpleReplacementError> for SimpleReplacement {
                 h.graph.unlink_port(rem_inp_predecessor_port_index);
                 h.graph
                     .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
-                    .ok();
+                    .unwrap();
             }
         }
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
@@ -205,7 +205,7 @@ impl Rewrite<SimpleReplacementError> for SimpleReplacement {
                 h.graph.unlink_port(rem_out_port_index);
                 h.graph
                     .link_ports(new_out_port_index, rem_out_port_index)
-                    .ok();
+                    .unwrap();
             }
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
@@ -228,7 +228,7 @@ impl Rewrite<SimpleReplacementError> for SimpleReplacement {
                 h.graph.unlink_port(rem_out_port_index);
                 h.graph
                     .link_ports(rem_inp_predecessor_port_index, rem_out_port_index)
-                    .ok();
+                    .unwrap();
             }
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
@@ -439,7 +439,7 @@ mod test {
             nu_inp,
             nu_out,
         };
-        h.apply_rewrite(r).ok();
+        h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├──■──
@@ -532,7 +532,7 @@ mod test {
             nu_inp,
             nu_out,
         };
-        h.apply_rewrite(r).ok();
+        h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├
