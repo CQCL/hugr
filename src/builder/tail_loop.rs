@@ -20,11 +20,11 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
-        tail_loop_sig: &ops::TailLoop,
+        tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
         let signature = Signature::new_df(
-            tail_loop_sig.body_input_row(),
-            tail_loop_sig.body_output_row(),
+            tail_loop.body_input_row(),
+            tail_loop.body_output_row(),
         );
         let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature)?;
 
