@@ -775,6 +775,7 @@ mod test {
     /// Returns the hugr and the node index of the definition.
     fn make_simple_hugr(copies: usize) -> (HugrMut, Node) {
         let def_op: OpType = ops::Def {
+            name: "main".into(),
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
         .into();
@@ -871,6 +872,7 @@ mod test {
     #[test]
     fn invalid_root() {
         let declare_op: OpType = ops::Declare {
+            name: "main".into(),
             signature: Default::default(),
         }
         .into();
@@ -943,7 +945,13 @@ mod test {
         // Add a definition without children
         let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
         let new_def = b
-            .add_op_with_parent(root, ops::Def { signature: def_sig })
+            .add_op_with_parent(
+                root,
+                ops::Def {
+                    signature: def_sig,
+                    name: "main".into(),
+                },
+            )
             .unwrap();
         assert_matches!(
             b.hugr().validate(),

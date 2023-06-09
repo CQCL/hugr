@@ -73,18 +73,24 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
         let f_node = f_id.node();
-        let (inputs, outputs) =
-            if let OpType::Declare(ops::Declare { signature }) = self.hugr().get_optype(f_node) {
-                (signature.input.clone(), signature.output.clone())
-            } else {
-                return Err(BuildError::UnexpectedType {
-                    node: f_node,
-                    op_desc: "OpType::Declare",
-                });
-            };
+        let (inputs, outputs, name) = if let OpType::Declare(ops::Declare { signature, name }) =
+            self.hugr().get_optype(f_node)
+        {
+            (
+                signature.input.clone(),
+                signature.output.clone(),
+                name.clone(),
+            )
+        } else {
+            return Err(BuildError::UnexpectedType {
+                node: f_node,
+                op_desc: "OpType::Declare",
+            });
+        };
         self.base().replace_op(
             f_node,
             ops::Def {
+                name,
                 signature: Signature::new_df(inputs.clone(), outputs.clone()),
             },
         );
@@ -117,11 +123,14 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     /// [`OpType::Declare`] node.
     pub fn declare(
         &mut self,
-        _name: impl Into<String>,
+        name: impl Into<String>,
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
-        // TODO add name and param names to metadata
-        let declare_n = self.add_child_op(ops::Declare { signature })?;
+        // TODO add param names to metadata
+        let declare_n = self.add_child_op(ops::Declare {
+            signature,
+            name: name.into(),
+        })?;
 
         Ok(declare_n.into())
     }
