@@ -1,6 +1,6 @@
 use super::build_traits::{HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
-use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
+use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
 use std::marker::PhantomData;
 
@@ -21,7 +21,7 @@ pub struct DFGBuilder<T> {
     pub(crate) io: [Node; 2],
 }
 
-impl<T: HugrMutRef> DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
@@ -53,7 +53,8 @@ impl<T: HugrMutRef> DFGBuilder<T> {
         })
     }
 }
-impl DFGBuilder<HugrMut> {
+
+impl DFGBuilder<Hugr> {
     /// Begin building a new DFG rooted HUGR.
     ///
     /// # Errors
@@ -62,43 +63,44 @@ impl DFGBuilder<HugrMut> {
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-    ) -> Result<DFGBuilder<HugrMut>, BuildError> {
+    ) -> Result<DFGBuilder<Hugr>, BuildError> {
         let input = input.into();
         let output = output.into();
         let signature = Signature::new_df(input, output);
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = HugrMut::new(dfg_op);
-        let root = base.hugr().root();
+        let base = Hugr::new(dfg_op);
+        let root = base.root();
         DFGBuilder::create_with_io(base, root, signature)
     }
 }
 
-impl HugrBuilder for DFGBuilder<HugrMut> {
+impl HugrBuilder for DFGBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.base.finish()
+        self.base.validate()?;
+        Ok(self.base)
     }
 }
 
-impl<T: HugrMutRef> Container for DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for DFGBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.as_ref().hugr()
+        self.base.as_ref()
     }
 }
 
-impl SubContainer for DFGBuilder<&mut HugrMut> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> SubContainer for DFGBuilder<T> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -106,7 +108,7 @@ impl SubContainer for DFGBuilder<&mut HugrMut> {
     }
 }
 
-impl<T: HugrMutRef> Dataflow for DFGBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.io
@@ -131,7 +133,7 @@ impl<B, T> DFGWrapper<B, T> {
 /// Builder for a [`ops::Def`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
-impl FunctionBuilder<HugrMut> {
+impl FunctionBuilder<Hugr> {
     /// Initialize a builder for a Def rooted HUGR
     /// # Errors
     ///
@@ -142,23 +144,23 @@ impl FunctionBuilder<HugrMut> {
             name: name.into(),
         };
 
-        let base = HugrMut::new(op);
-        let root = base.hugr().root();
+        let base = Hugr::new(op);
+        let root = base.root();
 
         let db = DFGBuilder::create_with_io(base, root, signature)?;
         Ok(Self::from_dfg_builder(db))
     }
 }
 
-impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.container_node()
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
-        self.0.base()
+    fn hugr_mut(&mut self) -> &mut Hugr {
+        self.0.hugr_mut()
     }
 
     #[inline]
@@ -167,7 +169,7 @@ impl<B: HugrMutRef, T> Container for DFGWrapper<B, T> {
     }
 }
 
-impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn io(&self) -> [Node; 2] {
         self.0.io
@@ -179,7 +181,7 @@ impl<B: HugrMutRef, T> Dataflow for DFGWrapper<B, T> {
     }
 }
 
-impl<T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<&mut HugrMut, T> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
     type ContainerHandle = T;
 
     #[inline]
@@ -188,7 +190,7 @@ impl<T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<&mut HugrMut, T> {
     }
 }
 
-impl<T> HugrBuilder for DFGWrapper<HugrMut, T> {
+impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
         self.0.finish_hugr()
     }
@@ -200,7 +202,6 @@ mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::hugr::HugrView;
     use crate::ops::tag::OpTag;
     use crate::ops::OpTrait;
     use crate::{
@@ -246,7 +247,7 @@ mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(FunctionBuilder<&mut HugrMut>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        F: FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();

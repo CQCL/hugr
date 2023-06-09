@@ -6,12 +6,12 @@ use crate::ops::handle::CaseID;
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
+use super::HugrBuilder;
 use super::{
     build_traits::Container,
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, ConditionalID,
 };
-use super::{HugrBuilder, HugrMutRef};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
@@ -47,24 +47,24 @@ pub struct ConditionalBuilder<T> {
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<T: HugrMutRef> Container for ConditionalBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ConditionalBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.base.as_mut()
     }
 
     #[inline]
     fn hugr(&self) -> &Hugr {
-        self.base.as_ref().hugr()
+        self.base.as_ref()
     }
 }
 
-impl SubContainer for ConditionalBuilder<&mut HugrMut> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -84,7 +84,7 @@ impl SubContainer for ConditionalBuilder<&mut HugrMut> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-impl<B: HugrMutRef> ConditionalBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics
@@ -95,7 +95,7 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut HugrMut>, BuildError> {
+    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut Hugr>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node);
 
@@ -118,27 +118,31 @@ impl<B: HugrMutRef> ConditionalBuilder<B> {
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                self.base().add_op_before(sibling_node, case_op)?
+                self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
                 self.add_child_op(case_op)?
             };
 
         self.case_nodes[case] = Some(case_node);
 
-        let dfg_builder =
-            DFGBuilder::create_with_io(self.base(), case_node, Signature::new_df(inputs, outputs))?;
+        let dfg_builder = DFGBuilder::create_with_io(
+            self.hugr_mut(),
+            case_node,
+            Signature::new_df(inputs, outputs),
+        )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }
 }
 
-impl HugrBuilder for ConditionalBuilder<HugrMut> {
+impl HugrBuilder for ConditionalBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.finish()
+        self.base.validate()?;
+        Ok(self.base)
     }
 }
 
-impl ConditionalBuilder<HugrMut> {
+impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
         predicate_inputs: impl IntoIterator<Item = TypeRow>,
@@ -157,7 +161,7 @@ impl ConditionalBuilder<HugrMut> {
             other_inputs,
             outputs,
         };
-        let base = HugrMut::new(op);
+        let base = Hugr::new(op);
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -169,7 +173,7 @@ impl ConditionalBuilder<HugrMut> {
     }
 }
 
-impl CaseBuilder<HugrMut> {
+impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
@@ -178,8 +182,8 @@ impl CaseBuilder<HugrMut> {
         let op = ops::Case {
             signature: signature.clone(),
         };
-        let base = HugrMut::new(op);
-        let root = base.hugr().root();
+        let base = Hugr::new(op);
+        let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))

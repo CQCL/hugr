@@ -10,7 +10,7 @@ pub mod view;
 
 use std::collections::HashMap;
 
-pub use self::hugrmut::HugrMut;
+pub(crate) use self::hugrmut::HugrMut;
 use self::multiportgraph::MultiPortGraph;
 pub use self::validate::ValidationError;
 
@@ -47,6 +47,18 @@ pub struct Hugr {
 impl Default for Hugr {
     fn default() -> Self {
         Self::new(crate::ops::Module)
+    }
+}
+
+impl AsRef<Hugr> for Hugr {
+    fn as_ref(&self) -> &Hugr {
+        self
+    }
+}
+
+impl AsMut<Hugr> for Hugr {
+    fn as_mut(&mut self) -> &mut Hugr {
+        self
     }
 }
 
