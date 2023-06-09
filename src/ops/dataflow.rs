@@ -1,177 +1,213 @@
 //! Dataflow operations.
 
-use smol_str::SmolStr;
+use super::{impl_op_name, tag::OpTag, OpTrait};
 
-use super::{controlflow::ControlFlowOp, tag::OpTag, LeafOp};
 use crate::resource::ResourceSet;
-use crate::types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow};
+use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
-/// A dataflow operation.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[allow(missing_docs)]
-pub enum DataflowOp {
-    /// An input node.
-    /// The outputs of this node are the inputs to the function.
-    Input {
-        types: TypeRow,
-        resources: ResourceSet,
-    },
-    /// An output node. The inputs are the outputs of the function.
-    Output {
-        types: TypeRow,
-        resources: ResourceSet,
-    },
-    /// Call a function directly.
-    ///
-    /// The first ports correspond to the signature of the function being
-    /// called. Immediately following those ports, the first input port is
-    /// connected to the def/declare block with a `ConstE<Graph>` edge.
-    Call { signature: Signature },
-    /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
-    CallIndirect { signature: Signature },
-    /// Load a static constant in to the local dataflow graph.
-    LoadConstant { datatype: ClassicType },
-    /// Simple operation that has only value inputs+outputs and (potentially) StateOrder edges.
-    Leaf { op: LeafOp },
-    /// A simply nested dataflow graph.
-    DFG { signature: Signature },
-    /// Operation related to control flow.
-    ControlFlow { op: ControlFlowOp },
-}
-
-impl DataflowOp {
+pub(super) trait DataflowOpTrait {
+    fn description(&self) -> &str;
+    fn tag(&self) -> OpTag;
+    fn signature(&self) -> Signature;
     /// The edge kind for the inputs of the operation not described by the
     /// signature.
     ///
     /// If None, there will be no other input edges. Otherwise, all other input
     /// edges will be of that kind.
-    pub fn other_inputs(&self) -> Option<EdgeKind> {
-        if let DataflowOp::Input { .. } = self {
-            None
-        } else {
-            Some(EdgeKind::StateOrder)
-        }
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
     }
-
     /// The edge kind for the outputs of the operation not described by the
     /// signature.
     ///
     /// If None, there will be no other output edges. Otherwise, all other
     /// output edges will be of that kind.
-    pub fn other_outputs(&self) -> Option<EdgeKind> {
-        if let DataflowOp::Output { .. } = self {
-            None
-        } else {
-            Some(EdgeKind::StateOrder)
-        }
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+}
+
+/// An input node.
+/// The outputs of this node are the inputs to the function.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Input {
+    /// Input value types
+    pub types: TypeRow,
+    /// Resources attached to output wires
+    pub resources: ResourceSet,
+}
+
+impl_op_name!(Input);
+
+/// An output node. The inputs are the outputs of the function.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Output {
+    /// Output value types
+    pub types: TypeRow,
+    /// Resources expected from input wires
+    pub resources: ResourceSet,
+}
+
+impl_op_name!(Output);
+
+impl DataflowOpTrait for Input {
+    fn description(&self) -> &str {
+        "The input node for this dataflow subgraph"
     }
 
-    /// The name of the operation.
-    pub fn name(&self) -> SmolStr {
-        match self {
-            DataflowOp::Input { .. } => "input",
-            DataflowOp::Output { .. } => "output",
-            DataflowOp::Call { .. } => "call",
-            DataflowOp::CallIndirect { .. } => "call_indirect",
-            DataflowOp::LoadConstant { .. } => "load",
-            DataflowOp::Leaf { op } => return op.name(),
-            DataflowOp::DFG { .. } => "DFG",
-            DataflowOp::ControlFlow { op } => return op.name(),
-        }
-        .into()
+    fn tag(&self) -> super::tag::OpTag {
+        OpTag::Input
     }
 
-    /// A human-readable description of the operation.
-    pub fn description(&self) -> &str {
-        match self {
-            DataflowOp::Input { .. } => "The input node for this dataflow subgraph",
-            DataflowOp::Output { .. } => "The output node for this dataflow subgraph",
-            DataflowOp::Call { .. } => "Call a function directly",
-            DataflowOp::CallIndirect { .. } => "Call a function indirectly",
-            DataflowOp::LoadConstant { .. } => {
-                "Load a static constant in to the local dataflow graph"
-            }
-            DataflowOp::Leaf { op } => return op.description(),
-            DataflowOp::DFG { .. } => "A simply nested dataflow graph",
-            DataflowOp::ControlFlow { op } => return op.description(),
-        }
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        None
     }
 
-    /// Tag identifying the operation.
-    pub fn tag(&self) -> OpTag {
-        match self {
-            DataflowOp::Input { .. } => OpTag::Input,
-            DataflowOp::Output { .. } => OpTag::Output,
-            DataflowOp::Call { .. } | DataflowOp::CallIndirect { .. } => OpTag::FnCall,
-            DataflowOp::LoadConstant { .. } => OpTag::LoadConst,
-            DataflowOp::Leaf { .. } => OpTag::Leaf,
-            DataflowOp::DFG { .. } => OpTag::Dfg,
-            DataflowOp::ControlFlow { op } => op.tag(),
-        }
+    fn signature(&self) -> Signature {
+        let mut sig = Signature::new_df(TypeRow::new(), self.types.clone());
+        sig.output_resources = self.resources.clone();
+        sig
+    }
+}
+impl DataflowOpTrait for Output {
+    fn description(&self) -> &str {
+        "The output node for this dataflow subgraph"
     }
 
-    /// The signature of the operation.
-    pub fn signature(&self) -> Signature {
-        match self {
-            DataflowOp::Input { types, resources } => {
-                let mut sig = Signature::new_df(TypeRow::new(), types.clone());
-                sig.output_resources = resources.clone();
-                sig
-            }
-            DataflowOp::Output { types, resources } => {
-                let mut sig = Signature::new_df(types.clone(), TypeRow::new());
-                sig.input_resources = resources.clone();
-                sig
-            }
-            DataflowOp::Call { signature } => Signature {
-                const_input: vec![ClassicType::graph_from_sig(signature.clone()).into()].into(),
-                ..signature.clone()
-            },
-            DataflowOp::CallIndirect { signature } => {
-                let mut s = signature.clone();
-                s.input
-                    .to_mut()
-                    .insert(0, ClassicType::graph_from_sig(signature.clone()).into());
-                s
-            }
-            DataflowOp::LoadConstant { datatype } => Signature::new(
-                TypeRow::new(),
-                vec![SimpleType::Classic(datatype.clone())],
-                vec![SimpleType::Classic(datatype.clone())],
-            ),
-            DataflowOp::Leaf { op } => op.signature(),
-            DataflowOp::DFG { signature } => signature.clone(),
-            DataflowOp::ControlFlow { op } => op.signature(),
-        }
+    fn tag(&self) -> super::tag::OpTag {
+        OpTag::Output
     }
 
-    /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self) -> SignatureDescription {
-        match self {
-            DataflowOp::Leaf { op } => op.signature_desc(),
-            DataflowOp::ControlFlow { op } => op.signature_desc(),
-            // TODO: add port descriptions for other ops
-            _ => SignatureDescription::default(),
+    fn signature(&self) -> Signature {
+        let mut sig = Signature::new_df(self.types.clone(), TypeRow::new());
+        sig.input_resources = self.resources.clone();
+        sig
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        None
+    }
+}
+
+impl<T: DataflowOpTrait> OpTrait for T {
+    fn description(&self) -> &str {
+        DataflowOpTrait::description(self)
+    }
+
+    fn tag(&self) -> OpTag {
+        DataflowOpTrait::tag(self)
+    }
+    fn signature(&self) -> Signature {
+        DataflowOpTrait::signature(self)
+    }
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_inputs(self)
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_outputs(self)
+    }
+}
+
+/// Call a function directly.
+///
+/// The first ports correspond to the signature of the function being
+/// called. Immediately following those ports, the first input port is
+/// connected to the def/declare block with a `ConstE<Graph>` edge.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Call {
+    /// Signature of function being called
+    pub signature: Signature,
+}
+impl_op_name!(Call);
+
+impl DataflowOpTrait for Call {
+    fn description(&self) -> &str {
+        "Call a function directly"
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::FnCall
+    }
+
+    fn signature(&self) -> Signature {
+        Signature {
+            const_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
+            ..self.signature.clone()
         }
     }
 }
 
-impl Default for DataflowOp {
-    fn default() -> Self {
-        Self::Leaf {
-            op: LeafOp::default(),
-        }
+/// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CallIndirect {
+    /// Signature of function being called
+    pub signature: Signature,
+}
+impl_op_name!(CallIndirect);
+
+impl DataflowOpTrait for CallIndirect {
+    fn description(&self) -> &str {
+        "Call a function indirectly"
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::FnCall
+    }
+
+    fn signature(&self) -> Signature {
+        let mut s = self.signature.clone();
+        s.input.to_mut().insert(
+            0,
+            ClassicType::graph_from_sig(self.signature.clone()).into(),
+        );
+        s
     }
 }
 
-impl From<LeafOp> for DataflowOp {
-    fn from(op: LeafOp) -> Self {
-        Self::Leaf { op }
+/// Load a static constant in to the local dataflow graph.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LoadConstant {
+    /// Constant type
+    pub datatype: ClassicType,
+}
+impl_op_name!(LoadConstant);
+impl DataflowOpTrait for LoadConstant {
+    fn description(&self) -> &str {
+        "Load a static constant in to the local dataflow graph"
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::LoadConst
+    }
+
+    fn signature(&self) -> Signature {
+        Signature::new(
+            TypeRow::new(),
+            vec![SimpleType::Classic(self.datatype.clone())],
+            vec![SimpleType::Classic(self.datatype.clone())],
+        )
     }
 }
 
-impl From<ControlFlowOp> for DataflowOp {
-    fn from(op: ControlFlowOp) -> Self {
-        Self::ControlFlow { op }
+/// A simply nested dataflow graph.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DFG {
+    /// Signature of DFG node
+    pub signature: Signature,
+}
+
+impl_op_name!(DFG);
+impl DataflowOpTrait for DFG {
+    fn description(&self) -> &str {
+        "A simply nested dataflow graph"
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::Dfg
+    }
+
+    fn signature(&self) -> Signature {
+        self.signature.clone()
     }
 }

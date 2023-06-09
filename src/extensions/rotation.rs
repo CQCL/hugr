@@ -10,7 +10,7 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::module::CustomConst;
+use crate::ops::constant::CustomConst;
 use crate::ops::CustomOp;
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, CustomType, Signature, SimpleType, TypeRow};

@@ -12,11 +12,7 @@ use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
 
-use super::{
-    controlflow::{CaseOp, ConditionalSignature, TailLoopSignature},
-    tag::OpTag,
-    BasicBlockOp, ControlFlowOp, DataflowOp, ModuleOp, OpType,
-};
+use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -58,33 +54,173 @@ impl Default for OpValidityFlags {
     }
 }
 
-impl OpType {
-    /// Returns a set of flags describing the validity predicates for this operation.
-    #[inline]
-    pub fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            OpType::Module(op) => op.validity_flags(),
-            OpType::Dataflow(op) => op.validity_flags(),
-            OpType::BasicBlock(op) => op.validity_flags(),
-            OpType::Case(op) => op.validity_flags(),
-        }
-    }
-
-    /// Validate the ordered list of children.
-    #[inline]
-    pub fn validate_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        match self {
-            OpType::Module(op) => op.validate_children(children),
-            OpType::Dataflow(op) => op.validate_children(children),
-            OpType::BasicBlock(op) => op.validate_children(children),
-            OpType::Case(op) => op.validate_children(children),
+impl ValidateOp for super::Module {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::ModuleOp,
+            requires_children: false,
+            ..Default::default()
         }
     }
 }
 
+impl ValidateOp for super::Def {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::DataflowOp,
+            allowed_first_child: OpTag::Input,
+            allowed_last_child: OpTag::Output,
+            requires_children: true,
+            requires_dag: true,
+            ..Default::default()
+        }
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        validate_io_nodes(
+            &self.signature.input,
+            &self.signature.output,
+            "function definition",
+            children,
+        )
+    }
+}
+
+impl ValidateOp for super::DFG {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::DataflowOp,
+            allowed_first_child: OpTag::Input,
+            allowed_last_child: OpTag::Output,
+            requires_children: true,
+            requires_dag: true,
+            ..Default::default()
+        }
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        validate_io_nodes(
+            &self.signature.input,
+            &self.signature.output,
+            "nested graph",
+            children,
+        )
+    }
+}
+
+impl ValidateOp for super::Conditional {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::Case,
+            requires_children: true,
+            requires_dag: false,
+            ..Default::default()
+        }
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        let children = children.collect_vec();
+        // The first input to the ɣ-node is a predicate of Sum type,
+        // whose arity matches the number of children of the ɣ-node.
+        if self.predicate_inputs.len() != children.len() {
+            return Err(ChildrenValidationError::InvalidConditionalPredicate {
+                child: children[0].0, // Pass an arbitrary child
+                expected_count: children.len(),
+                actual_count: self.predicate_inputs.len(),
+                actual_predicate_rows: self.predicate_inputs.clone(),
+            });
+        }
+
+        // Each child must have its predicate variant's row and the rest of `inputs` as input,
+        // and matching output
+        for (i, (child, optype)) in children.into_iter().enumerate() {
+            let OpType::Case(case_op) = optype else {panic!("Child check should have already checked valid ops.")};
+            let sig = &case_op.signature;
+            let predicate_value = &self.predicate_inputs[i];
+            if sig.input[0..predicate_value.len()] != predicate_value[..]
+                || sig.input[predicate_value.len()..] != self.other_inputs[..]
+                || sig.output != self.outputs
+            {
+                return Err(ChildrenValidationError::ConditionalCaseSignature {
+                    child,
+                    optype: optype.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl ValidateOp for super::TailLoop {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::DataflowOp,
+            allowed_first_child: OpTag::Input,
+            allowed_last_child: OpTag::Output,
+            requires_children: true,
+            requires_dag: true,
+            ..Default::default()
+        }
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        let expected_output = SimpleType::new_sum(vec![
+            SimpleType::new_tuple(self.just_inputs.clone()),
+            SimpleType::new_tuple(self.just_outputs.clone()),
+        ]);
+        let mut expected_output = vec![expected_output];
+        expected_output.extend_from_slice(&self.rest);
+        let expected_output: TypeRow = expected_output.into();
+
+        let mut expected_input = self.just_inputs.clone();
+        expected_input.to_mut().extend_from_slice(&self.rest);
+
+        validate_io_nodes(
+            &expected_input,
+            &expected_output,
+            "tail-controlled loop graph",
+            children,
+        )
+    }
+}
+
+impl ValidateOp for super::CFG {
+    fn validity_flags(&self) -> OpValidityFlags {
+        OpValidityFlags {
+            allowed_children: OpTag::BasicBlock,
+            allowed_last_child: OpTag::BasicBlockExit,
+            requires_children: true,
+            requires_dag: false,
+            edge_check: Some(validate_cfg_edge),
+            ..Default::default()
+        }
+    }
+
+    fn validate_children<'a>(
+        &self,
+        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        for (child, optype) in children.dropping_back(1) {
+            if optype.tag() == OpTag::BasicBlockExit {
+                return Err(ChildrenValidationError::InternalExitChildren { child });
+            }
+        }
+        Ok(())
+    }
+}
 /// Errors that can occur while checking the children of a node.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
@@ -172,50 +308,11 @@ pub struct ChildrenEdgeData {
     pub target_port: PortOffset,
 }
 
-impl ModuleOp {
+impl ValidateOp for BasicBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            ModuleOp::Root { .. } => OpValidityFlags {
-                allowed_children: OpTag::ModuleOp,
-                requires_children: false,
-                ..Default::default()
-            },
-            ModuleOp::Def { .. } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
-                allowed_first_child: OpTag::Input,
-                allowed_last_child: OpTag::Output,
-                requires_children: true,
-                requires_dag: true,
-                ..Default::default()
-            },
-            // Default flags are valid for non-container operations
-            _ => Default::default(),
-        }
-    }
-
-    /// Validate the ordered list of children.
-    fn validate_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        match self {
-            ModuleOp::Def { signature } => validate_io_nodes(
-                &signature.input,
-                &signature.output,
-                "function definition",
-                children,
-            ),
-            _ => Ok(()),
-        }
-    }
-}
-
-impl BasicBlockOp {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            BasicBlockOp::Block {
+            BasicBlock::Block {
                 predicate_variants, ..
             } => OpValidityFlags {
                 allowed_children: OpTag::DataflowOp,
@@ -227,7 +324,7 @@ impl BasicBlockOp {
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
-            BasicBlockOp::Exit { .. } => Default::default(),
+            BasicBlock::Exit { .. } => Default::default(),
         }
     }
 
@@ -237,7 +334,7 @@ impl BasicBlockOp {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            BasicBlockOp::Block {
+            BasicBlock::Block {
                 inputs,
                 predicate_variants,
                 other_outputs: outputs,
@@ -247,12 +344,12 @@ impl BasicBlockOp {
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children
-            BasicBlockOp::Exit { .. } => Ok(()),
+            BasicBlock::Exit { .. } => Ok(()),
         }
     }
 }
 
-impl CaseOp {
+impl ValidateOp for super::Case {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
@@ -277,149 +374,6 @@ impl CaseOp {
             "Conditional",
             children,
         )
-    }
-}
-
-impl DataflowOp {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            DataflowOp::ControlFlow { op } => op.validity_flags(),
-            DataflowOp::DFG { .. } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
-                allowed_first_child: OpTag::Input,
-                allowed_last_child: OpTag::Output,
-                requires_children: true,
-                requires_dag: true,
-                ..Default::default()
-            },
-            // Default flags are valid for non-container operations
-            _ => Default::default(),
-        }
-    }
-
-    /// Validate the ordered list of children.
-    fn validate_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        match self {
-            DataflowOp::ControlFlow { op } => op.validate_children(children),
-            DataflowOp::DFG { signature } => validate_io_nodes(
-                &signature.input,
-                &signature.output,
-                "nested graph",
-                children,
-            ),
-            _ => Ok(()),
-        }
-    }
-}
-
-impl ControlFlowOp {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            ControlFlowOp::Conditional { .. } => OpValidityFlags {
-                allowed_children: OpTag::Case,
-                requires_children: true,
-                requires_dag: false,
-                ..Default::default()
-            },
-            ControlFlowOp::TailLoop { .. } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
-                allowed_first_child: OpTag::Input,
-                allowed_last_child: OpTag::Output,
-                requires_children: true,
-                requires_dag: true,
-                ..Default::default()
-            },
-            ControlFlowOp::CFG { .. } => OpValidityFlags {
-                allowed_children: OpTag::BasicBlock,
-                allowed_last_child: OpTag::BasicBlockExit,
-                requires_children: true,
-                requires_dag: false,
-                edge_check: Some(validate_cfg_edge),
-                ..Default::default()
-            },
-        }
-    }
-
-    /// Validate the ordered list of children.
-    fn validate_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        match self {
-            ControlFlowOp::Conditional(ConditionalSignature {
-                predicate_inputs,
-                other_inputs,
-                outputs,
-            }) => {
-                let children = children.collect_vec();
-                // The first input to the ɣ-node is a predicate of Sum type,
-                // whose arity matches the number of children of the ɣ-node.
-                if predicate_inputs.len() != children.len() {
-                    return Err(ChildrenValidationError::InvalidConditionalPredicate {
-                        child: children[0].0, // Pass an arbitrary child
-                        expected_count: children.len(),
-                        actual_count: predicate_inputs.len(),
-                        actual_predicate_rows: predicate_inputs.clone(),
-                    });
-                }
-
-                // Each child must have its predicate variant's row and the rest of `inputs` as input,
-                // and matching output
-                for (i, (child, optype)) in children.into_iter().enumerate() {
-                    let case_op: &CaseOp = optype
-                        .try_into()
-                        .expect("Child check should have already checked valid ops.");
-                    let sig = &case_op.signature;
-                    let predicate_value = &predicate_inputs[i];
-                    if sig.input[0..predicate_value.len()] != predicate_value[..]
-                        || sig.input[predicate_value.len()..] != other_inputs[..]
-                        || sig.output != *outputs
-                    {
-                        return Err(ChildrenValidationError::ConditionalCaseSignature {
-                            child,
-                            optype: optype.clone(),
-                        });
-                    }
-                }
-            }
-            ControlFlowOp::TailLoop(TailLoopSignature {
-                just_inputs,
-                just_outputs,
-                rest,
-            }) => {
-                let expected_output = SimpleType::new_sum(vec![
-                    SimpleType::new_tuple(just_inputs.clone()),
-                    SimpleType::new_tuple(just_outputs.clone()),
-                ]);
-                let mut expected_output = vec![expected_output];
-                expected_output.extend_from_slice(rest);
-                let expected_output: TypeRow = expected_output.into();
-
-                let mut expected_input = just_inputs.clone();
-                expected_input.to_mut().extend_from_slice(rest);
-
-                validate_io_nodes(
-                    &expected_input,
-                    &expected_output,
-                    "tail-controlled loop graph",
-                    children,
-                )?;
-            }
-            ControlFlowOp::CFG { .. } => {
-                // Only the last child can be an exit node
-                for (child, optype) in children.dropping_back(1) {
-                    if matches!(optype, OpType::BasicBlock(BasicBlockOp::Exit { .. })) {
-                        return Err(ChildrenValidationError::InternalExitChildren { child });
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
 
@@ -457,15 +411,15 @@ fn validate_io_nodes<'a>(
 
     // The first and last children have already been popped from the iterator.
     for (child, optype) in children {
-        match optype {
-            OpType::Dataflow(DataflowOp::Input { .. }) => {
+        match optype.tag() {
+            OpTag::Input => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
                     expected_position: "first",
                 })
             }
-            OpType::Dataflow(DataflowOp::Output { .. }) => {
+            OpTag::Output => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
@@ -480,9 +434,10 @@ fn validate_io_nodes<'a>(
 
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
-    let [source, target]: [&BasicBlockOp; 2] = [&edge.source_op, &edge.target_op].map(|op| {
-        op.try_into()
-            .expect("CFG sibling graphs can only contain basic block operations.")
+    let [source, target]: [&BasicBlock; 2] = [&edge.source_op, &edge.target_op].map(|op| {
+        let OpType::BasicBlock(block_op) = op else {panic!("CFG sibling graphs can only contain basic block operations.")};
+        block_op
+
     });
 
     if source.successor_input(edge.source_port.index()).as_ref() != Some(target.dataflow_input()) {
@@ -494,14 +449,14 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
-
+    use crate::ops;
     use crate::{
         ops::LeafOp,
         resource::ResourceSet,
         type_row,
         types::{ClassicType, SimpleType},
     };
+    use cool_asserts::assert_matches;
 
     use super::*;
 
@@ -512,17 +467,17 @@ mod test {
         let in_types = type_row![B];
         let out_types = type_row![B, B];
 
-        let input_node = OpType::Dataflow(DataflowOp::Input {
+        let input_node: OpType = ops::Input {
             types: in_types.clone(),
             resources: ResourceSet::new(),
-        });
-        let output_node = OpType::Dataflow(DataflowOp::Output {
+        }
+        .into();
+        let output_node = ops::Output {
             types: out_types.clone(),
             resources: ResourceSet::new(),
-        });
-        let leaf_node = OpType::Dataflow(DataflowOp::Leaf {
-            op: LeafOp::Noop(ClassicType::bit().into()),
-        });
+        }
+        .into();
+        let leaf_node = LeafOp::Noop(ClassicType::bit().into()).into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
@@ -564,3 +519,17 @@ mod test {
         children.iter().map(|(n, op)| (NodeIndex::new(*n), *op))
     }
 }
+
+use super::{
+    AliasDeclare, AliasDef, Call, CallIndirect, Const, Declare, Input, LeafOp, LoadConstant, Output,
+};
+impl_validate_op!(Declare);
+impl_validate_op!(AliasDeclare);
+impl_validate_op!(AliasDef);
+impl_validate_op!(Input);
+impl_validate_op!(Output);
+impl_validate_op!(Const);
+impl_validate_op!(Call);
+impl_validate_op!(CallIndirect);
+impl_validate_op!(LoadConstant);
+impl_validate_op!(LeafOp);

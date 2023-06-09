@@ -2,10 +2,12 @@
 
 use smol_str::SmolStr;
 
-use super::OpaqueOp;
+use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow},
+    types::{
+        ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
+    },
 };
 
 /// Dataflow operations with no children.
@@ -63,20 +65,9 @@ impl Default for LeafOp {
         Self::Noop(SimpleType::default())
     }
 }
-
-impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
-    }
-
-    /// Returns true if the operation has only classical inputs and outputs.
-    pub fn is_pure_classical(&self) -> bool {
-        self.signature().purely_classical()
-    }
-
+impl OpName for LeafOp {
     /// The name of the operation.
-    pub fn name(&self) -> SmolStr {
+    fn name(&self) -> SmolStr {
         match self {
             LeafOp::CustomOp(opaque) => return opaque.name(),
             LeafOp::H => "H",
@@ -100,9 +91,11 @@ impl LeafOp {
         }
         .into()
     }
+}
 
+impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
-    pub fn description(&self) -> &str {
+    fn description(&self) -> &str {
         match self {
             LeafOp::CustomOp(opaque) => opaque.description(),
             LeafOp::H => "Hadamard gate",
@@ -126,8 +119,12 @@ impl LeafOp {
         }
     }
 
+    fn tag(&self) -> OpTag {
+        OpTag::Leaf
+    }
+
     /// The signature of the operation.
-    pub fn signature(&self) -> Signature {
+    fn signature(&self) -> Signature {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
@@ -164,11 +161,31 @@ impl LeafOp {
     }
 
     /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self) -> SignatureDescription {
+    fn signature_desc(&self) -> SignatureDescription {
         match self {
             LeafOp::CustomOp(opaque) => opaque.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }
+    }
+
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+}
+
+impl LeafOp {
+    /// Returns the number of linear inputs (also outputs) of the operation.
+    pub fn linear_count(&self) -> usize {
+        self.signature().linear().count()
+    }
+
+    /// Returns true if the operation has only classical inputs and outputs.
+    pub fn is_pure_classical(&self) -> bool {
+        self.signature().purely_classical()
     }
 }

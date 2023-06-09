@@ -1,5 +1,6 @@
 //! The operation types for the HUGR.
 
+pub mod constant;
 pub mod controlflow;
 pub mod custom;
 pub mod dataflow;
@@ -8,85 +9,96 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 use crate::{Direction, Port};
 
-pub use controlflow::{BasicBlockOp, CaseOp, ControlFlowOp};
 pub use custom::{CustomOp, OpDef, OpaqueOp};
-pub use dataflow::DataflowOp;
-pub use leaf::LeafOp;
-pub use module::{ConstValue, ModuleOp};
 
+use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
 use self::tag::OpTag;
+use enum_dispatch::enum_dispatch;
 
+pub use constant::{Const, ConstValue};
+pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
+pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
+pub use leaf::LeafOp;
+pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
+
+#[enum_dispatch(OpTrait, OpName, ValidateOp)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum OpType {
-    /// A module region node - parent will be the Root (or the node itself is the Root).
-    Module(ModuleOp),
-    /// A basic block in a control flow graph - parent will be a CFG node.
-    BasicBlock(BasicBlockOp),
-    /// A branch in a dataflow graph - parent will be a Conditional node.
-    Case(CaseOp),
-    /// Nodes used inside dataflow containers
-    /// (DFG, Conditional, TailLoop, def, BasicBlock).
-    Dataflow(DataflowOp),
+    Module,
+    Def,
+    Declare,
+    AliasDeclare,
+    AliasDef,
+    Const,
+    Input,
+    Output,
+    Call,
+    CallIndirect,
+    LoadConstant,
+    DFG,
+    LeafOp,
+    BasicBlock,
+    TailLoop,
+    CFG,
+    Conditional,
+    Case,
 }
 
-impl OpType {
+impl Default for OpType {
+    fn default() -> Self {
+        Module.into()
+    }
+}
+
+/// Macro used by operations that want their
+/// name to be the same as their type name
+macro_rules! impl_op_name {
+    ($i: ident) => {
+        impl $crate::ops::OpName for $i {
+            fn name(&self) -> smol_str::SmolStr {
+                stringify!($i).into()
+            }
+        }
+    };
+}
+
+use impl_op_name;
+
+#[enum_dispatch]
+/// Trait for setting name of OpType variants.
+// Separate to OpTrait to allow simple definition via impl_op_name
+pub trait OpName {
     /// The name of the operation.
-    pub fn name(&self) -> SmolStr {
-        match self {
-            OpType::Module(op) => op.name(),
-            OpType::BasicBlock(op) => op.name(),
-            OpType::Case(op) => op.name(),
-            OpType::Dataflow(op) => op.name(),
-        }
-    }
+    fn name(&self) -> SmolStr;
+}
 
+#[enum_dispatch]
+/// Trait implemented by all OpType variants.
+pub trait OpTrait {
     /// A human-readable description of the operation.
-    pub fn description(&self) -> &str {
-        match self {
-            OpType::Module(op) => op.description(),
-            OpType::BasicBlock(op) => op.description(),
-            OpType::Case(op) => op.description(),
-            OpType::Dataflow(op) => op.description(),
-        }
-    }
-
+    fn description(&self) -> &str;
     /// Tag identifying the operation.
-    pub fn tag(&self) -> OpTag {
-        match self {
-            OpType::Module(op) => op.tag(),
-            OpType::BasicBlock(op) => op.tag(),
-            OpType::Case(op) => op.tag(),
-            OpType::Dataflow(op) => op.tag(),
-        }
-    }
-
+    fn tag(&self) -> OpTag;
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
-    pub fn signature(&self) -> Signature {
-        match self {
-            OpType::Dataflow(op) => op.signature(),
-            _ => Default::default(),
-        }
+    fn signature(&self) -> Signature {
+        Default::default()
     }
-
     /// Optional description of the ports in the signature.
     ///
     /// Only dataflow operations have a non-empty signature.
-    pub fn signature_desc(&self) -> SignatureDescription {
-        match self {
-            OpType::Dataflow(op) => op.signature_desc(),
-            _ => Default::default(),
-        }
+    fn signature_desc(&self) -> SignatureDescription {
+        Default::default()
     }
 
     /// The edge kind for the inputs of the operation not described by the
@@ -94,13 +106,8 @@ impl OpType {
     ///
     /// If None, there will be no other input edges. Otherwise, all other input
     /// edges will be of that kind.
-    pub fn other_inputs(&self) -> Option<EdgeKind> {
-        match self {
-            OpType::Module(op) => op.other_inputs(),
-            OpType::Dataflow(op) => op.other_inputs(),
-            OpType::BasicBlock(op) => op.other_edges(),
-            OpType::Case(op) => op.other_edges(),
-        }
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        None
     }
 
     /// The edge kind for the outputs of the operation not described by the
@@ -108,17 +115,12 @@ impl OpType {
     ///
     /// If None, there will be no other output edges. Otherwise, all other
     /// output edges will be of that kind.
-    pub fn other_outputs(&self) -> Option<EdgeKind> {
-        match self {
-            OpType::Module(op) => op.other_outputs(),
-            OpType::Dataflow(op) => op.other_outputs(),
-            OpType::BasicBlock(op) => op.other_edges(),
-            OpType::Case(op) => op.other_edges(),
-        }
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        None
     }
 
     /// Returns the edge kind for the given port.
-    pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
+    fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
         let port = port.into();
         if let Some(port_kind) = signature.get(port) {
@@ -131,72 +133,30 @@ impl OpType {
     }
 }
 
-impl Default for OpType {
-    fn default() -> Self {
-        Self::Dataflow(Default::default())
+#[enum_dispatch]
+/// Methods for Ops to validate themselves and children
+pub trait ValidateOp {
+    /// Returns a set of flags describing the validity predicates for this operation.
+    #[inline]
+    fn validity_flags(&self) -> validate::OpValidityFlags {
+        Default::default()
+    }
+
+    /// Validate the ordered list of children.
+    #[inline]
+    fn validate_children<'a>(
+        &self,
+        _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), validate::ChildrenValidationError> {
+        Ok(())
     }
 }
 
-impl From<ModuleOp> for OpType {
-    fn from(op: ModuleOp) -> Self {
-        Self::Module(op)
-    }
-}
-
-impl From<BasicBlockOp> for OpType {
-    fn from(op: BasicBlockOp) -> Self {
-        Self::BasicBlock(op)
-    }
-}
-
-impl<T> From<T> for OpType
-where
-    T: Into<DataflowOp>,
-{
-    fn from(op: T) -> Self {
-        Self::Dataflow(op.into())
-    }
-}
-
-impl From<CaseOp> for OpType {
-    fn from(op: CaseOp) -> Self {
-        OpType::Case(op)
-    }
-}
-
-/// Implementations of TryFrom for OpType and &'a OpType for each variant.
-macro_rules! impl_try_from_optype {
-    ($target:ident, $matcher:pat, $unpack:expr) => {
-        impl TryFrom<OpType> for $target {
-            type Error = ();
-
-            fn try_from(op: OpType) -> Result<Self, Self::Error> {
-                match op {
-                    $matcher => Ok($unpack),
-                    _ => Err(()),
-                }
-            }
-        }
-
-        impl<'a> TryFrom<&'a OpType> for &'a $target {
-            type Error = ();
-
-            fn try_from(op: &'a OpType) -> Result<Self, Self::Error> {
-                match op {
-                    $matcher => Ok($unpack),
-                    _ => Err(()),
-                }
-            }
-        }
+/// Macro used for default implementation of ValidateOp
+macro_rules! impl_validate_op {
+    ($i: ident) => {
+        impl $crate::ops::ValidateOp for $i {}
     };
 }
-impl_try_from_optype!(ModuleOp, OpType::Module(op), op);
-impl_try_from_optype!(BasicBlockOp, OpType::BasicBlock(op), op);
-impl_try_from_optype!(CaseOp, OpType::Case(op), op);
-impl_try_from_optype!(DataflowOp, OpType::Dataflow(op), op);
-impl_try_from_optype!(
-    ControlFlowOp,
-    OpType::Dataflow(DataflowOp::ControlFlow { op }),
-    op
-);
-impl_try_from_optype!(LeafOp, OpType::Dataflow(DataflowOp::Leaf { op }), op);
+
+use impl_validate_op;
