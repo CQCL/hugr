@@ -27,7 +27,8 @@ pub(super) trait DataflowOpTrait {
     }
 }
 
-pub(crate) trait IOTrait {
+/// Helpers to construct input and output nodes
+pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
     fn new(types: TypeRow) -> Self;
     /// Helper method to add resource requirements to an I/O node
