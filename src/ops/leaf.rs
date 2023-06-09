@@ -2,10 +2,12 @@
 
 use smol_str::SmolStr;
 
-use super::OpaqueOp;
+use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
     type_row,
-    types::{ClassicType, LinearType, Signature, SignatureDescription, SimpleType, TypeRow},
+    types::{
+        ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
+    },
 };
 
 /// Dataflow operations with no children.
@@ -43,17 +45,6 @@ pub enum LeafOp {
     Measure,
     /// A rotation of a qubit about the Pauli Z axis by an input float angle.
     RzF64,
-    /// A copy operation for classical data.
-    Copy {
-        /// The number of copies to make.
-        ///
-        /// Note that a 0-ary copy acts as an explicit discard.
-        /// Like any stateful operation with no dataflow outputs, such
-        /// a copy should have a State output connecting it to the Output node.
-        n_copies: u32,
-        /// The type of the data to copy.
-        typ: ClassicType,
-    },
     /// A bitwise XOR operation.
     Xor,
     /// An operation that packs all its inputs into a tuple.
@@ -74,20 +65,9 @@ impl Default for LeafOp {
         Self::Noop(SimpleType::default())
     }
 }
-
-impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
-    }
-
-    /// Returns true if the operation has only classical inputs and outputs.
-    pub fn is_pure_classical(&self) -> bool {
-        self.signature().purely_classical()
-    }
-
+impl OpName for LeafOp {
     /// The name of the operation.
-    pub fn name(&self) -> SmolStr {
+    fn name(&self) -> SmolStr {
         match self {
             LeafOp::CustomOp(opaque) => return opaque.name(),
             LeafOp::H => "H",
@@ -103,7 +83,6 @@ impl LeafOp {
             LeafOp::Reset => "Reset",
             LeafOp::Noop(_) => "Noop",
             LeafOp::Measure => "Measure",
-            LeafOp::Copy { .. } => "Copy",
             LeafOp::Xor => "Xor",
             LeafOp::MakeTuple(_) => "MakeTuple",
             LeafOp::UnpackTuple(_) => "UnpackTuple",
@@ -112,9 +91,11 @@ impl LeafOp {
         }
         .into()
     }
+}
 
+impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
-    pub fn description(&self) -> &str {
+    fn description(&self) -> &str {
         match self {
             LeafOp::CustomOp(opaque) => opaque.description(),
             LeafOp::H => "Hadamard gate",
@@ -130,7 +111,6 @@ impl LeafOp {
             LeafOp::Reset => "Qubit reset",
             LeafOp::Noop(_) => "Noop gate",
             LeafOp::Measure => "Qubit measurement gate",
-            LeafOp::Copy { .. } => "Classical data copy",
             LeafOp::Xor => "Bitwise XOR",
             LeafOp::MakeTuple(_) => "MakeTuple operation",
             LeafOp::UnpackTuple(_) => "UnpackTuple operation",
@@ -139,8 +119,12 @@ impl LeafOp {
         }
     }
 
+    fn tag(&self) -> OpTag {
+        OpTag::Leaf
+    }
+
     /// The signature of the operation.
-    pub fn signature(&self) -> Signature {
+    fn signature(&self) -> Signature {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
@@ -160,10 +144,6 @@ impl LeafOp {
             | LeafOp::Z => Signature::new_linear(type_row![Q]),
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
-            LeafOp::Copy { n_copies, typ } => {
-                let typ: SimpleType = typ.clone().into();
-                Signature::new_df(vec![typ.clone()], vec![typ; *n_copies as usize])
-            }
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(opaque) => opaque.signature(),
             LeafOp::MakeTuple(types) => {
@@ -181,11 +161,31 @@ impl LeafOp {
     }
 
     /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self) -> SignatureDescription {
+    fn signature_desc(&self) -> SignatureDescription {
         match self {
             LeafOp::CustomOp(opaque) => opaque.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }
+    }
+
+    fn other_inputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+
+    fn other_outputs(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+}
+
+impl LeafOp {
+    /// Returns the number of linear inputs (also outputs) of the operation.
+    pub fn linear_count(&self) -> usize {
+        self.signature().linear().count()
+    }
+
+    /// Returns true if the operation has only classical inputs and outputs.
+    pub fn is_pure_classical(&self) -> bool {
+        self.signature().purely_classical()
     }
 }

@@ -1,5 +1,4 @@
-use crate::ops::controlflow::TailLoopSignature;
-use crate::ops::{controlflow::ControlFlowOp, DataflowOp, OpType};
+use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
 use crate::types::TypeRow;
@@ -13,25 +12,25 @@ use super::{
     BuildError, Container, Dataflow, TailLoopID, Wire,
 };
 
-/// Builder for a [`crate::ops::controlflow::ControlFlowOp::TailLoop`] node.
+/// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
 impl<B: HugrMutRef> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
-        tail_loop_sig: &TailLoopSignature,
+        tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
         let dfg_build = DFGBuilder::create_with_io(
             base,
             loop_node,
-            tail_loop_sig.body_input_row(),
-            tail_loop_sig.body_output_row(),
+            tail_loop.body_input_row(),
+            tail_loop.body_output_row(),
         )?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
-    /// Set the outputs of the [`ControlFlowOp::TailLoop`], with `out_variant` as the value of the
+    /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
     /// termination predicate, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
@@ -41,26 +40,22 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
         Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
     }
 
-    /// Get a reference to the [`crate::ops::controlflow::TailLoopSignature`]
-    /// that defines the signature of the [`ControlFlowOp::TailLoop`]
-    pub fn loop_signature(&self) -> Result<&TailLoopSignature, BuildError> {
-        if let OpType::Dataflow(DataflowOp::ControlFlow {
-            op: ControlFlowOp::TailLoop(tail_sig),
-        }) = self.hugr().get_optype(self.container_node())
-        {
-            Ok(tail_sig)
+    /// Get a reference to the [`ops::TailLoop`]
+    /// that defines the signature of the [`ops::TailLoop`]
+    pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
+        if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
+            Ok(tail_loop)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
-                op_desc: "ControlFlowOp::TailLoop",
+                op_desc: "crate::ops::TailLoop",
             })
         }
     }
 
     /// The output types of the child graph, including the predicate as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
-        self.loop_signature()
-            .map(TailLoopSignature::body_output_row)
+        self.loop_signature().map(ops::TailLoop::body_output_row)
     }
 }
 
@@ -80,21 +75,20 @@ impl<H: HugrMutRef> TailLoopBuilder<H> {
 }
 
 impl TailLoopBuilder<Hugr> {
-    /// Initialize new builder for a [`ControlFlowOp::TailLoop`] rooted HUGR
+    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
-        let tail_loop_sig = TailLoopSignature {
+        let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let op = ControlFlowOp::TailLoop(tail_loop_sig.clone());
-        let base = Hugr::new(op);
+        let base = Hugr::new(tail_loop.clone());
         let root = base.root();
-        Self::create_with_io(base, root, &tail_loop_sig)
+        Self::create_with_io(base, root, &tail_loop)
     }
 }
 
@@ -166,9 +160,7 @@ mod test {
                         branch_0.finish_with_outputs([continue_wire])?;
 
                         let mut branch_1 = conditional_b.case_builder(1)?;
-                        let [b1] = branch_1.input_wires_arr();
-
-                        branch_1.discard(b1)?;
+                        let [_b1] = branch_1.input_wires_arr();
 
                         let wire = branch_1.load_const(&s2)?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
