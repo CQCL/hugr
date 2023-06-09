@@ -142,6 +142,11 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<SmolStr>,
         typ: SimpleType,
     ) -> Result<AliasID<true>, BuildError> {
+        // TODO: add AliasDef in other containers
+        // This is currently tricky as they are not connected to anything so do
+        // not appear in topological traversals.
+        // Could be fixed by removing single-entry requirement and sorting from
+        // every 0-input node.
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
         let node = self.add_child_op(ops::AliasDef {
