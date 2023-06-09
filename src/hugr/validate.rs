@@ -188,7 +188,11 @@ impl<'a> ValidationContext<'a> {
 
         // Input ports and output linear ports must always be connected
         let mut links = self.hugr.graph.port_links(port_index).peekable();
-        if (dir == Direction::Incoming || port_kind.is_linear()) && links.peek().is_none() {
+        let must_be_connected = match dir {
+            Direction::Incoming => port_kind.is_linear() || matches!(port_kind, EdgeKind::Const(_)),
+            Direction::Outgoing => port_kind.is_linear(),
+        };
+        if must_be_connected && links.peek().is_none() {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port,
@@ -565,35 +569,16 @@ impl<'a> ValidationContext<'a> {
         };
         let other_node = portgraph.port_node(other_port).unwrap();
 
-        // Ignore inter-graph edges
-        let parent = self.get_pg_node_parent(node);
-        let other_parent = self.get_pg_node_parent(other_node);
-
-        // Copy nodes do not have a parent.
+        // Dereference any copy nodes
+        let op_node = self.hugr.graph.pg_main_node(node);
+        let other_op_node = self.hugr.graph.pg_main_node(other_node);
+        let parent = self.hugr.hierarchy.parent(op_node);
+        let other_parent = self.hugr.hierarchy.parent(other_op_node);
         if parent != other_parent {
             return false;
         }
 
         true
-    }
-
-    /// Get the parent for a node in the underlying flat portgraph.
-    ///
-    /// For copy nodes we must check the parent of the operation node.
-    fn get_pg_node_parent(&self, node: portgraph::NodeIndex) -> Option<portgraph::NodeIndex> {
-        match self.hugr.hierarchy.parent(node) {
-            Some(parent) => Some(parent),
-            None => {
-                // Copy node, root
-                let op_node = self
-                    .hugr
-                    .graph
-                    .as_portgraph()
-                    .input_neighbours(node)
-                    .next()?;
-                self.hugr.hierarchy.parent(op_node)
-            }
-        }
     }
 }
 
@@ -853,7 +838,6 @@ mod test {
             )
             .unwrap();
 
-        b.add_ports(tag_def, Direction::Outgoing, 1);
         b.connect(tag_def, 0, tag, 0).unwrap();
         b.add_other_edge(input, tag).unwrap();
         b.connect(tag, 0, output, 0).unwrap();
@@ -882,6 +866,7 @@ mod test {
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, declare_op);
+        b.add_ports(other, Direction::Outgoing, 1);
         assert_eq!(b.validate(), Ok(()));
 
         // Make the hugr root not a hierarchy root
