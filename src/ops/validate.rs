@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
 
-use crate::ops::dataflow::IOTrait;
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
+use crate::ops::dataflow::IOTrait;
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]

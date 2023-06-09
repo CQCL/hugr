@@ -437,9 +437,8 @@ pub trait Dataflow: Container {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
-            OpType::Def(ops::Def { signature }) | OpType::Declare(ops::Declare { signature }) => {
-                signature.clone()
-            }
+            OpType::Def(ops::Def { signature, .. })
+            | OpType::Declare(ops::Declare { signature, .. }) => signature.clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),

@@ -27,6 +27,8 @@ impl OpTrait for Module {
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Def {
+    /// Name of function
+    pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
@@ -51,6 +53,8 @@ impl OpTrait for Def {
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Declare {
+    /// Name of function
+    pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }

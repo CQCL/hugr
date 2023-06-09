@@ -136,9 +136,10 @@ impl FunctionBuilder<HugrMut> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
+    pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
         let op = ops::Def {
             signature: signature.clone(),
+            name: name.into(),
         };
 
         let base = HugrMut::new(op);
