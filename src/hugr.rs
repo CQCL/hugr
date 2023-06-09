@@ -129,7 +129,11 @@ impl Hugr {
             // Add the nodes.
             let op: &OpType = r.replacement.get_optype(node);
             let sig = op.signature();
-            let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
+            // TODO: Use HugrMut::add_node instead of computing the port counts manually.
+            let new_node_index = self.graph.add_node(
+                sig.input_count() + op.other_input().is_some() as usize,
+                sig.output_count() + op.other_output().is_some() as usize,
+            );
             self.op_types[new_node_index] = op.clone();
             // Make r.parent the parent
             self.hierarchy
