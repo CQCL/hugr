@@ -361,8 +361,8 @@ children of a CFG-node.
     children of CFG-nodes.
 
   - `CFG` nodes: a dataflow node which is defined by a child control
-    sibling graph. All children except the last are `BasicBlock`-nodes,
-    the first of which is the entry block. The final child is an
+    sibling graph. All children except the second are `BasicBlock`-nodes,
+    the first is the entry block. The second child is an
     `ExitBlock` node, which has no children, this is the single exit
     point of the CFG and the inputs to this node match the outputs of
     the CFG-node. The inputs to the CFG-node are wired to the inputs of
@@ -399,9 +399,9 @@ has no parent).
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
+| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(second) is entry(exit)               |
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
+| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)         |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
 | "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
@@ -1174,7 +1174,7 @@ The new hugr is then derived by:
 
 3.  for each node n in top(G), adding a hierarchy edge from t(n) to n,
     placing n in the first position among children of t(n) if n is in
-    Init and in the last position if n is in Term;
+    Init and in the second position if n is in Term;
 
 4.  for each node n in bot(G), and for each child m of b(n), adding a
     hierarchy edge from n to m (replacing m’s existing parent edge)
