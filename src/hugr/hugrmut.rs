@@ -7,7 +7,7 @@ use itertools::Itertools;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node, ValidationError};
-use crate::ops::{OpTrait, OpType};
+use crate::ops::{dataflow::IOTrait, OpTrait, OpType};
 use crate::{Hugr, Port};
 
 /// A low-level builder for a HUGR.
@@ -293,25 +293,13 @@ mod test {
 
         {
             let f_in = builder
-                .add_op_with_parent(
-                    f,
-                    ops::Input {
-                        types: type_row![NAT],
-                        resources: ResourceSet::new(),
-                    },
-                )
+                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
                 .unwrap();
             let noop = builder
                 .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
                 .unwrap();
             let f_out = builder
-                .add_op_with_parent(
-                    f,
-                    ops::Output {
-                        types: type_row![NAT, NAT],
-                        resources: ResourceSet::new(),
-                    },
-                )
+                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());

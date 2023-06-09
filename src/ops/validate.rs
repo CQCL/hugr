@@ -12,6 +12,7 @@ use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
 
+use crate::ops::dataflow::IOTrait;
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
@@ -467,16 +468,8 @@ mod test {
         let in_types = type_row![B];
         let out_types = type_row![B, B];
 
-        let input_node: OpType = ops::Input {
-            types: in_types.clone(),
-            resources: ResourceSet::new(),
-        }
-        .into();
-        let output_node = ops::Output {
-            types: out_types.clone(),
-            resources: ResourceSet::new(),
-        }
-        .into();
+        let input_node: OpType = ops::Input::new(in_types.clone()).into();
+        let output_node = ops::Output::new(out_types.clone()).into();
         let leaf_node = LeafOp::Noop(ClassicType::bit().into()).into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.

@@ -27,6 +27,13 @@ pub(super) trait DataflowOpTrait {
     }
 }
 
+pub(crate) trait IOTrait {
+    /// Construct a new I/O node from a type row with no resource requirements
+    fn new(types: TypeRow) -> Self;
+    /// Helper method to add resource requirements to an I/O node
+    fn with_resources(self, rs: ResourceSet) -> Self;
+}
+
 /// An input node.
 /// The outputs of this node are the inputs to the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -39,6 +46,20 @@ pub struct Input {
 
 impl_op_name!(Input);
 
+impl IOTrait for Input {
+    fn new(types: TypeRow) -> Self {
+        Input {
+            types,
+            resources: ResourceSet::new(),
+        }
+    }
+
+    fn with_resources(mut self, resources: ResourceSet) -> Self {
+        self.resources = resources;
+        self
+    }
+}
+
 /// An output node. The inputs are the outputs of the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
@@ -49,6 +70,20 @@ pub struct Output {
 }
 
 impl_op_name!(Output);
+
+impl IOTrait for Output {
+    fn new(types: TypeRow) -> Self {
+        Output {
+            types,
+            resources: ResourceSet::new(),
+        }
+    }
+
+    fn with_resources(mut self, resources: ResourceSet) -> Self {
+        self.resources = resources;
+        self
+    }
+}
 
 impl DataflowOpTrait for Input {
     fn description(&self) -> &str {
