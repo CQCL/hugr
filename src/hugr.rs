@@ -50,6 +50,18 @@ impl Default for Hugr {
     }
 }
 
+impl AsRef<Hugr> for Hugr {
+    fn as_ref(&self) -> &Hugr {
+        self
+    }
+}
+
+impl AsMut<Hugr> for Hugr {
+    fn as_mut(&mut self) -> &mut Hugr {
+        self
+    }
+}
+
 /// A handle to a node in the HUGR.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
 pub struct Node {

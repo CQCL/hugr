@@ -127,18 +127,6 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
 }
 
-impl AsRef<Hugr> for Hugr {
-    fn as_ref(&self) -> &Hugr {
-        self
-    }
-}
-
-impl AsMut<Hugr> for Hugr {
-    fn as_mut(&mut self) -> &mut Hugr {
-        self
-    }
-}
-
 impl HugrMut for Hugr {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
