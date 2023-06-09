@@ -86,10 +86,17 @@ pub trait SubContainer: Container {
 }
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
-    /// Return indices of input and output nodes.
-    fn io(&self) -> [Node; 2];
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
+    /// Return indices of input and output nodes.
+    fn io(&self) -> [Node; 2] {
+        self.hugr()
+            .children(self.container_node())
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .expect("First two children should be IO")
+    }
     /// Handle to input node.
     fn input(&self) -> BuildHandle<DataflowOpID> {
         (self.io()[0], self.num_inputs()).into()
