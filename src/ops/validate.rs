@@ -13,7 +13,6 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
-use crate::ops::dataflow::IOTrait;
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -452,8 +451,8 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 mod test {
     use crate::ops;
     use crate::{
+        ops::dataflow::IOTrait,
         ops::LeafOp,
-        resource::ResourceSet,
         type_row,
         types::{ClassicType, SimpleType},
     };

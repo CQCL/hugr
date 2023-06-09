@@ -7,7 +7,7 @@ use itertools::Itertools;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node, ValidationError};
-use crate::ops::{dataflow::IOTrait, OpTrait, OpType};
+use crate::ops::{OpTrait, OpType};
 use crate::{Hugr, Port};
 
 /// A low-level builder for a HUGR.
@@ -262,8 +262,7 @@ mod test {
     use crate::{
         hugr::HugrView,
         macros::type_row,
-        ops::{self, LeafOp},
-        resource::ResourceSet,
+        ops::{self, dataflow::IOTrait, LeafOp},
         types::{ClassicType, Signature, SimpleType},
     };
 

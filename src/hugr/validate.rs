@@ -765,7 +765,6 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
-    use crate::resource::ResourceSet;
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::{type_row, Node};
 
