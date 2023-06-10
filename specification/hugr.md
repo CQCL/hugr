@@ -218,7 +218,7 @@ full programs, including dataflow operations (in
 #### Module
 
 If the HUGR contains a `Module` node then it is unique and sits at the top level
-of the of the hierarchy. In this case we call it a **module HUGR**. The weight
+of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
 metadata (e.g. source file). The children of a `Module` correspond
 to "module level" operation types. Neither `Module` nor these module-level
