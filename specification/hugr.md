@@ -308,7 +308,7 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type, whose
+The first input to the Conditional-node is of Predicate type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
 contents of the Predicate with all remaining inputs to Conditional
