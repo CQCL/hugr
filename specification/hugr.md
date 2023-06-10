@@ -274,7 +274,7 @@ operations valid at both Module level and within dataflow regions):
 
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Graph>` edge to specify the graph being called. The
-    signature of the `Value` edges matches the function being called.
+    signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
 
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
     `Value<Local,T>` output, used to load a static constant into the local
