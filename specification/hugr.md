@@ -123,10 +123,17 @@ In this case, output 0 of the H operation is connected to input 0 of the
 CNOT.
 
 ### Edges
+
+A `SimpleType` is the type of a value that can be sent down a wire. We
+distinguish between `ClassicType` and `LinearType`. For more details see the
+[Type System](#type-system) section.
+
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
 ```
+SimpleType ::= ClassicType | LinearType
+
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
@@ -151,7 +158,8 @@ them.
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; the port types of a node are described by its
+source node, to an incoming **Port** of the target node. Every port has an
+associated type; the sequences of incoming and outgoing port types of a node constitute its
 **Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
 of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
 must have exactly one. See [Linearity](#linearity).
