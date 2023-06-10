@@ -139,7 +139,7 @@ these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
 In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
 with a unique root node. The HUGR is characterized by the type of its root node.
-The root node has no edges (and this supercedes any other requirements on the
+The root node has no non-hierarchy edges (and this supercedes any other requirements on the
 edges of specific node types).
 
 A **sibling graph** is a subgraph of the HUGR containing all nodes with
