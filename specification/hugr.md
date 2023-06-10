@@ -425,13 +425,9 @@ cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
 `Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. The common parent may be a `Def`, `TailLoop`, `DFG`,
-`Case` or `BasicBlock` node.
-
-In a dataflow sibling graph, the edges (value and order considered
-together) must be acyclic. There is a unique Input node and Output node.
-All nodes must be reachable from the Input node, and must reach the
-Output node.
+must be acyclic. There is a unique Input node and Output node. All nodes must be
+reachable from the Input node, and must reach the Output node. The common parent
+may be a `Def`, `TailLoop`, `DFG`, `Case` or `BasicBlock` node.
 
 | **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
