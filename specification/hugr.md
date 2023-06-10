@@ -377,7 +377,7 @@ children of a CFG-node.
     the entry block.
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0, #t1,...#tn)`, where the node has `N` successors, and the
+`Predicate(#t1,...#tn)`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
