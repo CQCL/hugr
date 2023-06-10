@@ -276,7 +276,7 @@ operations valid at both Module level and within dataflow regions):
     `Static<Graph>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
 
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
