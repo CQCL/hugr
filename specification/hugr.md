@@ -211,7 +211,7 @@ always *local*, i.e. source and target have the same parent.
 
 ### Node Operations
 
-Here we describe we define some core operations required to represent
+Here we define some core types of operation required to represent
 full programs, including dataflow operations (in
 [functions](#functions)).
 
