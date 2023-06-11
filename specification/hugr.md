@@ -251,7 +251,7 @@ regions:
     `AliasDef`.
 
 
-A **loadable HUGR** is a module HUGR where all edges are connected and there are
+A **loadable HUGR** is a module HUGR where all ports are connected and there are
 no `Declare/AliasDeclare` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
