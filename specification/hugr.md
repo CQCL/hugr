@@ -165,9 +165,9 @@ of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
 must have exactly one. See [Linearity](#linearity).
 
 
-The **Signature** may also specify a row
+In addition to the incoming and outgoing `Value` edges, the signature may also specify a row
 of `ClassicType`s for incoming `Static` edges. These correspond to incoming
-ports that always follow `Value` ports. 
+ports that follow the incoming `Value` ports.
 
 
 Value edges are parameterized by the locality and type; there are three
