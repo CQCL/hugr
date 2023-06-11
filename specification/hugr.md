@@ -190,7 +190,7 @@ Note that the locality is not fixed or even specified by the signature.
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def` and `Const`) and targets (`Call` and `LoadConstant`) of
+sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
