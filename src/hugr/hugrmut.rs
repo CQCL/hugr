@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use portgraph::SecondaryMap;
 
-use crate::hugr::{Direction, HugrError, Node};
+use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
 use crate::{Hugr, Port};
 
