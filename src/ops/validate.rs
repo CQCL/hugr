@@ -84,7 +84,7 @@ impl ValidateOp for super::Module {
 impl ValidateOp for super::Def {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
             allowed_second_child: OpTag::Output,
             requires_children: true,
@@ -109,7 +109,7 @@ impl ValidateOp for super::Def {
 impl ValidateOp for super::DFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
             allowed_second_child: OpTag::Output,
             requires_children: true,
@@ -181,7 +181,7 @@ impl ValidateOp for super::Conditional {
 impl ValidateOp for super::TailLoop {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
             allowed_second_child: OpTag::Output,
             requires_children: true,
@@ -332,7 +332,7 @@ impl ValidateOp for BasicBlock {
             BasicBlock::Block {
                 predicate_variants, ..
             } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
+                allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
@@ -370,7 +370,7 @@ impl ValidateOp for super::Case {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
             allowed_second_child: OpTag::Output,
             requires_children: true,
