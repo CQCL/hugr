@@ -25,7 +25,7 @@ pub type Neighbours<'a> = MapInto<crate::hugr::multiportgraph::Neighbours<'a>, N
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView: AsRef<Hugr> {
+pub trait HugrView {
     /// Return index of HUGR root node.
     fn root(&self) -> Node;
 
