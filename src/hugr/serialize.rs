@@ -30,14 +30,13 @@ enum Versioned {
 }
 
 /// Version 0 of the HUGR serialization format.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct SerHugrV0 {
-    /// For each node: (parent, num_inputs, num_outputs)
-    nodes: Vec<(NodeIndex, usize, usize)>,
+    /// For each node: (parent, num_inputs, num_outputs, node_operation)
+    nodes: Vec<(NodeIndex, usize, usize, OpType)>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(NodeIndex, usize); 2]>,
     root: NodeIndex,
-    op_types: HashMap<NodeIndex, OpType>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -90,7 +89,6 @@ impl TryFrom<&Hugr> for SerHugrV0 {
     ) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        let mut op_types_hsh = HashMap::new();
         let mut node_rekey = HashMap::new();
         let mut nodes: Vec<_> = graph
             .nodes_iter()
@@ -104,16 +102,15 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                     n
                 });
                 let opt = &op_types[n];
-                // secondary map holds default values for empty positions
-                // whether or not the default value is present or not - the
-                // serialization roundtrip will be correct
-                if opt != &OpType::default() {
-                    op_types_hsh.insert(n, opt.clone());
-                }
-                Ok((parent, graph.num_inputs(n), graph.num_outputs(n)))
+                Ok((
+                    parent,
+                    graph.num_inputs(n),
+                    graph.num_outputs(n),
+                    opt.clone(),
+                ))
             })
             .collect::<Result<_, Self::Error>>()?;
-        for (parent, _, _) in &mut nodes {
+        for (parent, _, _, _) in &mut nodes {
             *parent = node_rekey[parent];
         }
 
@@ -140,35 +137,25 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             nodes,
             edges,
             root: *root,
-            op_types: op_types_hsh,
         })
     }
 }
 
 impl TryFrom<SerHugrV0> for Hugr {
     type Error = HUGRSerializationError;
-    fn try_from(
-        SerHugrV0 {
-            nodes,
-            edges,
-            root,
-            mut op_types,
-        }: SerHugrV0,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(SerHugrV0 { nodes, edges, root }: SerHugrV0) -> Result<Self, Self::Error> {
         let mut hierarchy = Hierarchy::new();
 
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut graph = MultiPortGraph::with_capacity(nodes.len(), edges.len() * 2);
         let mut op_types_sec = UnmanagedDenseMap::with_capacity(nodes.len());
-        for (parent, incoming, outgoing) in nodes {
+        for (parent, incoming, outgoing, typ) in nodes {
             let ni = graph.add_node(incoming, outgoing);
             if parent != ni {
                 hierarchy.push_child(ni, parent)?;
             }
-            if let Some(typ) = op_types.remove(&ni) {
-                op_types_sec[ni] = typ;
-            }
+            op_types_sec[ni] = typ;
         }
 
         for [(srcn, from_offset), (tgtn, to_offset)] in edges {
@@ -188,6 +175,12 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::{
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        ops::LeafOp,
+        types::{ClassicType, LinearType, Signature, SimpleType},
+    };
+    use itertools::Itertools;
     use portgraph::proptest::gen_portgraph;
     use proptest::prelude::*;
     proptest! {
@@ -251,5 +244,42 @@ pub mod test {
 
         let newhg = rmp_serde::from_slice(&v[..]).unwrap();
         assert_eq!(hg, newhg);
+    }
+
+    #[test]
+    fn weighted_hugr_ser() {
+        const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+        const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+
+        let hugr = {
+            let mut module_builder = ModuleBuilder::new();
+            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let f_id = module_builder
+                .declare("main", Signature::new_df(t_row.clone(), t_row))
+                .unwrap();
+
+            let mut f_build = module_builder.define_function(&f_id).unwrap();
+            let outputs = f_build
+                .input_wires()
+                .map(|in_wire| {
+                    f_build
+                        .add_dataflow_op(
+                            LeafOp::Noop(f_build.get_wire_type(in_wire).unwrap()),
+                            [in_wire],
+                        )
+                        .unwrap()
+                        .out_wire(0)
+                })
+                .collect_vec();
+
+            f_build.finish_with_outputs(outputs).unwrap();
+            module_builder.finish_hugr().unwrap()
+        };
+
+        let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
+
+        // HUGR internal structures are not preserved across serialization, so
+        // test equality on SerHugrV0 instead.
+        assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
     }
 }

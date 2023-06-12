@@ -92,12 +92,12 @@ Port = tuple[NodeID, int]  # (node, offset)
 NodeWeight = Any
 
 class Hugr(MPBaseModel):
-    # (parent, #incoming, #outgoing)
-    nodes: list[tuple[NodeID, int, int]]
+    # (parent, #incoming, #outgoing, NodeWeight)
+    nodes: list[tuple[NodeID, int, int, NodeWeight]]
     edges: list[tuple[Port, Port]]
     root: NodeID
-    op_types: dict[NodeID, NodeWeight]
 
+# TODO: specify scheme for NodeWeight
 
 with open("../hugr/foo.bin", "rb") as f:
     # print(Hugr.schema_json())
