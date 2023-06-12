@@ -101,102 +101,106 @@ pub trait HugrView: AsRef<Hugr> {
     fn all_neighbours(&self, node: Node) -> Neighbours<'_>;
 }
 
-impl HugrView for Hugr {
+impl<T> HugrView for T
+where
+    T: AsRef<Hugr>,
+{
     #[inline]
     fn root(&self) -> Node {
-        self.root.into()
+        self.as_ref().root.into()
     }
 
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hierarchy.parent(node.index).map(Into::into)
+        self.as_ref().hierarchy.parent(node.index).map(Into::into)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.op_types.get(node.index)
+        self.as_ref().op_types.get(node.index)
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.graph.node_count()
+        self.as_ref().graph.node_count()
     }
 
     #[inline]
     fn edge_count(&self) -> usize {
-        self.graph.link_count()
+        self.as_ref().graph.link_count()
     }
 
     #[inline]
     fn nodes(&self) -> Nodes<'_> {
-        self.graph.nodes_iter().map_into()
+        self.as_ref().graph.nodes_iter().map_into()
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> NodePorts {
-        self.graph.port_offsets(node.index, dir).map_into()
+        self.as_ref().graph.port_offsets(node.index, dir).map_into()
     }
 
     #[inline]
     fn node_outputs(&self, node: Node) -> NodePorts {
-        self.graph.output_offsets(node.index).map_into()
+        self.as_ref().graph.output_offsets(node.index).map_into()
     }
 
     #[inline]
     fn node_inputs(&self, node: Node) -> NodePorts {
-        self.graph.input_offsets(node.index).map_into()
+        self.as_ref().graph.input_offsets(node.index).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> NodePorts {
-        self.graph.all_port_offsets(node.index).map_into()
+        self.as_ref().graph.all_port_offsets(node.index).map_into()
     }
 
     #[inline]
     fn linked_ports(&self, node: Node, port: Port) -> PortLinks<'_> {
-        let port = self.graph.port_index(node.index, port.offset).unwrap();
-        let links = self.graph.port_links(port);
-        PortLinks { hugr: self, links }
+        let hugr = self.as_ref();
+        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
+        let links = hugr.graph.port_links(port);
+        PortLinks { hugr, links }
     }
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.index, dir)
+        self.as_ref().graph.num_ports(node.index, dir)
     }
 
     #[inline]
     fn num_inputs(&self, node: Node) -> usize {
-        self.graph.num_inputs(node.index)
+        self.as_ref().graph.num_inputs(node.index)
     }
 
     #[inline]
     fn num_outputs(&self, node: Node) -> usize {
-        self.graph.num_outputs(node.index)
+        self.as_ref().graph.num_outputs(node.index)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Children<'_> {
-        self.hierarchy.children(node.index).map_into()
+        self.as_ref().hierarchy.children(node.index).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_> {
-        self.graph.neighbours(node.index, dir).map_into()
+        self.as_ref().graph.neighbours(node.index, dir).map_into()
     }
 
     #[inline]
     fn input_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.graph.input_neighbours(node.index).map_into()
+        self.as_ref().graph.input_neighbours(node.index).map_into()
     }
 
     #[inline]
     fn output_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.graph.output_neighbours(node.index).map_into()
+        self.as_ref().graph.output_neighbours(node.index).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.graph.all_neighbours(node.index).map_into()
+        self.as_ref().graph.all_neighbours(node.index).map_into()
     }
 }
 
