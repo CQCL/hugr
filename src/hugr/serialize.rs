@@ -143,14 +143,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
 
 impl TryFrom<SerHugrV0> for Hugr {
     type Error = HUGRSerializationError;
-    fn try_from(
-        SerHugrV0 {
-            nodes,
-            edges,
-            root,
-            // mut op_types,
-        }: SerHugrV0,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(SerHugrV0 { nodes, edges, root }: SerHugrV0) -> Result<Self, Self::Error> {
         let mut hierarchy = Hierarchy::new();
 
         // if there are any unconnected ports or copy nodes the capacity will be
