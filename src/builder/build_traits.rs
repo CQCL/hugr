@@ -5,6 +5,7 @@ use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
 
+use super::FunctionBuilder;
 use super::{
     handle::{BuildHandle, Outputs},
     CircuitBuilder,
@@ -65,6 +66,27 @@ pub trait Container {
         let const_n = self.add_child_op(ops::Const(val))?;
 
         Ok((const_n, typ).into())
+    }
+
+    /// Add a [`ops::Def`] node and returns a builder to define the function
+    /// body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::Def`] node.
+    fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: Signature,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let f_node = self.add_child_op(ops::Def {
+            name: name.into(),
+            signature: signature.clone(),
+        })?;
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 }
 
@@ -224,25 +246,13 @@ pub trait Dataflow: Container {
         Ok(load_n.out_wire(0))
     }
 
-    /// Add a constant value to the Dataflow container and return a handle to it.
-    /// Adds a state edge from input to the constant node.
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`OpType::Const`] node.
-    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
-        let typ = val.const_type();
-        let const_n = self.add_dataflow_op(ops::Const(val), [])?;
-
-        Ok((const_n.node(), typ).into())
-    }
     /// Load a static constant and return the local dataflow wire for that constant.
     /// Adds a [`ops::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
     fn add_load_const(&mut self, val: ConstValue) -> Result<Wire, BuildError> {
-        let cid = Dataflow::add_constant(self, val)?;
+        let cid = self.add_constant(val)?;
         self.load_const(&cid)
     }
 

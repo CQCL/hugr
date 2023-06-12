@@ -288,10 +288,9 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main =
-                module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+            let mut func_builder = module_builder
+                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
             let _f_id = {
-                let mut func_builder = module_builder.define_function(&main)?;
                 let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {

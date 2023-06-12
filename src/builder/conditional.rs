@@ -221,12 +221,10 @@ mod test {
     fn basic_conditional_module() -> Result<(), BuildError> {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder
-                .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let tru_const = module_builder.add_constant(ConstValue::true_val())?;
+            let mut fbuild = module_builder
+                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let tru_const = fbuild.add_constant(ConstValue::true_val())?;
             let _fdef = {
-                let mut fbuild = module_builder.define_function(&main)?;
-
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {

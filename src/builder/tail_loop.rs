@@ -124,20 +124,15 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main = module_builder
-                .declare("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
-
-            let s2 = module_builder.add_constant(ConstValue::i64(2))?;
-            let tru_const = module_builder.add_constant(ConstValue::true_val())?;
-
+            let mut fbuild = module_builder
+                .define_function("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
             let _fdef = {
-                let mut fbuild = module_builder.define_function(&main)?;
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b =
                         fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_wire = loop_b.load_const(&tru_const)?;
+                    let const_wire = loop_b.add_load_const(ConstValue::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
                         let predicate_inputs = vec![type_row![]; 2];
@@ -157,7 +152,7 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.load_const(&s2)?;
+                        let wire = branch_1.add_load_const(ConstValue::i64(2))?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

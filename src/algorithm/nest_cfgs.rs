@@ -434,7 +434,7 @@ pub(crate) mod test {
         let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let mut func_builder = module_builder.define_function(&main)?;
+        let mut func_builder = module_builder.define_declaration(&main)?;
         let [int] = func_builder.input_wires_arr();
 
         let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
@@ -486,7 +486,7 @@ pub(crate) mod test {
         let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let mut func_builder = module_builder.define_function(&main)?;
+        let mut func_builder = module_builder.define_declaration(&main)?;
         let [int] = func_builder.input_wires_arr();
 
         let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
@@ -687,7 +687,7 @@ pub(crate) mod test {
         let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
         let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let mut func_builder = module_builder.define_function(&main)?;
+        let mut func_builder = module_builder.define_declaration(&main)?;
         let [int] = func_builder.input_wires_arr();
 
         let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;

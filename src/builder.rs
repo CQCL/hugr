@@ -76,7 +76,7 @@ mod test {
     use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::{BuildError, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
@@ -97,7 +97,7 @@ mod test {
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
-        let f_builder = module_builder.declare_and_def("main", signature)?;
+        let f_builder = module_builder.define_function("main", signature)?;
 
         f(f_builder)?;
         Ok(module_builder.finish_hugr()?)
