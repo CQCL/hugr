@@ -47,8 +47,8 @@ pub trait Container {
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
     ///
-    /// [`other_inputs`]: crate::ops::OpTrait::other_inputs
-    /// [`other_outputs`]: crate::ops::OpTrait::other_outputs
+    /// [`other_inputs`]: crate::ops::OpTrait::other_input
+    /// [`other_outputs`]: crate::ops::OpTrait::other_output
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
         Ok(Wire::new(src, src_port))
