@@ -30,7 +30,7 @@ enum Versioned {
 }
 
 /// Version 0 of the HUGR serialization format.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct SerHugrV0 {
     /// For each node: (parent, num_inputs, num_outputs)
     nodes: Vec<(NodeIndex, usize, usize)>,
@@ -188,6 +188,12 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::{
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        ops::LeafOp,
+        types::{ClassicType, LinearType, Signature, SimpleType},
+    };
+    use itertools::Itertools;
     use portgraph::proptest::gen_portgraph;
     use proptest::prelude::*;
     proptest! {
@@ -251,5 +257,42 @@ pub mod test {
 
         let newhg = rmp_serde::from_slice(&v[..]).unwrap();
         assert_eq!(hg, newhg);
+    }
+
+    #[test]
+    fn weighted_hugr_ser() {
+        const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+        const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+
+        let hugr = {
+            let mut module_builder = ModuleBuilder::new();
+            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let f_id = module_builder
+                .declare("main", Signature::new_df(t_row.clone(), t_row))
+                .unwrap();
+
+            let mut f_build = module_builder.define_function(&f_id).unwrap();
+            let outputs = f_build
+                .input_wires()
+                .map(|in_wire| {
+                    f_build
+                        .add_dataflow_op(
+                            LeafOp::Noop(f_build.get_wire_type(in_wire).unwrap()),
+                            [in_wire],
+                        )
+                        .unwrap()
+                        .out_wire(0)
+                })
+                .collect_vec();
+
+            f_build.finish_with_outputs(outputs).unwrap();
+            module_builder.finish_hugr().unwrap()
+        };
+
+        let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
+
+        // HUGR internal structures are not preserved across serialization, so
+        // test equality on SerHugrV0 instead.
+        assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
     }
 }
