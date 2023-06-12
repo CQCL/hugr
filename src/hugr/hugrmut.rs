@@ -5,7 +5,7 @@ use std::ops::Range;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node};
-use crate::ops::{OpTrait, OpType};
+use crate::ops::OpType;
 use crate::{Hugr, Port};
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
@@ -50,12 +50,16 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     ///
     /// [`OpType::other_input`]: crate::ops::OpType::other_input
     /// [`OpType::other_output`]: crate::ops::OpType::other_output.
-    pub fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
-        debug_assert!(self.get_optype(src).other_output().is_some());
-        debug_assert!(self.get_optype(dst).other_input().is_some());
-        let src_port: usize = self.num_ports(src, Direction::Outgoing) - 1;
-        let dst_port: usize = self.num_ports(dst, Direction::Incoming) - 1;
-        self.connect(src, src_port, dst, dst_port)?;
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+        let src_port: Port = self
+            .get_optype(src)
+            .other_port_index(Direction::Outgoing)
+            .expect("Source operation has no non-dataflow outgoing edges");
+        let dst_port: Port = self
+            .get_optype(dst)
+            .other_port_index(Direction::Incoming)
+            .expect("Destination operation has no non-dataflow incoming edges");
+        self.connect(src, src_port.index(), dst, dst_port.index())?;
         Ok((src_port, dst_port))
     }
 
@@ -127,11 +131,7 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
 impl HugrMut for Hugr {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
-        let sig = op.signature();
-        let node = self.graph.add_node(
-            sig.input_count() + op.other_input().is_some() as usize,
-            sig.output_count() + op.other_output().is_some() as usize,
-        );
+        let node = self.graph.add_node(op.input_count(), op.output_count());
         self.op_types[node] = op;
         node.into()
     }
