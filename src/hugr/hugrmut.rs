@@ -10,7 +10,7 @@ use crate::ops::{OpTrait, OpType};
 use crate::{Hugr, Port};
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
-pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
+pub(crate) trait HugrMut {
     /// Add a node to the graph.
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
 
@@ -124,30 +124,33 @@ pub(crate) trait HugrMut: AsRef<Hugr> + AsMut<Hugr> {
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
 }
 
-impl HugrMut for Hugr {
+impl<T> HugrMut for T
+where
+    T: AsRef<Hugr> + AsMut<Hugr>,
+{
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
         let sig = op.signature();
-        let node = self.graph.add_node(
+        let node = self.as_mut().graph.add_node(
             sig.input.len() + sig.const_input.iter().count(),
             sig.output.len(),
         );
-        self.op_types[node] = op;
+        self.as_mut().op_types[node] = op;
         node.into()
     }
 
     fn remove_op(&mut self, node: Node) -> Result<(), HugrError> {
-        if node.index == self.root {
+        if node.index == self.as_ref().root {
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
         }
-        self.remove_node(node)
+        self.as_mut().remove_node(node)
     }
 
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
-        self.hierarchy.remove(node.index);
-        self.graph.remove_node(node.index);
-        self.op_types.remove(node.index);
+        self.as_mut().hierarchy.remove(node.index);
+        self.as_mut().graph.remove_node(node.index);
+        self.as_mut().op_types.remove(node.index);
         Ok(())
     }
 
@@ -158,33 +161,35 @@ impl HugrMut for Hugr {
         dst: Node,
         dst_port: usize,
     ) -> Result<(), HugrError> {
-        self.graph
+        self.as_mut()
+            .graph
             .link_nodes(src.index, src_port, dst.index, dst_port)?;
         Ok(())
     }
 
     fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
         let offset = port.offset;
-        let port = self.graph.port_index(node.index, offset).ok_or(
+        let port = self.as_mut().graph.port_index(node.index, offset).ok_or(
             portgraph::LinkError::UnknownOffset {
                 node: node.index,
                 offset,
             },
         )?;
-        self.graph.unlink_port(port);
+        self.as_mut().graph.unlink_port(port);
         Ok(())
     }
 
     #[inline]
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
-        self.graph
+        self.as_mut()
+            .graph
             .set_num_ports(node.index, incoming, outgoing, |_, _| {})
     }
 
     #[inline]
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
-        let mut incoming = self.graph.num_inputs(node.index);
-        let mut outgoing = self.graph.num_outputs(node.index);
+        let mut incoming = self.as_mut().graph.num_inputs(node.index);
+        let mut outgoing = self.as_mut().graph.num_outputs(node.index);
         let increment = |num: &mut usize| {
             let new = num.saturating_add_signed(amount);
             let range = *num..new;
@@ -195,26 +200,33 @@ impl HugrMut for Hugr {
             Direction::Incoming => increment(&mut incoming),
             Direction::Outgoing => increment(&mut outgoing),
         };
-        self.graph
+        self.as_mut()
+            .graph
             .set_num_ports(node.index, incoming, outgoing, |_, _| {});
         range
     }
 
     fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
-        self.hierarchy.detach(node.index);
-        self.hierarchy.push_child(node.index, parent.index)?;
+        self.as_mut().hierarchy.detach(node.index);
+        self.as_mut()
+            .hierarchy
+            .push_child(node.index, parent.index)?;
         Ok(())
     }
 
     fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-        self.hierarchy.detach(node.index);
-        self.hierarchy.insert_after(node.index, after.index)?;
+        self.as_mut().hierarchy.detach(node.index);
+        self.as_mut()
+            .hierarchy
+            .insert_after(node.index, after.index)?;
         Ok(())
     }
 
     fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
-        self.hierarchy.detach(node.index);
-        self.hierarchy.insert_before(node.index, before.index)?;
+        self.as_mut().hierarchy.detach(node.index);
+        self.as_mut()
+            .hierarchy
+            .insert_before(node.index, before.index)?;
         Ok(())
     }
 
@@ -224,24 +236,30 @@ impl HugrMut for Hugr {
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.hierarchy.push_child(node.index, parent.index)?;
+        self.as_mut()
+            .hierarchy
+            .push_child(node.index, parent.index)?;
         Ok(node)
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.hierarchy.insert_before(node.index, sibling.index)?;
+        self.as_mut()
+            .hierarchy
+            .insert_before(node.index, sibling.index)?;
         Ok(node)
     }
 
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.hierarchy.insert_after(node.index, sibling.index)?;
+        self.as_mut()
+            .hierarchy
+            .insert_after(node.index, sibling.index)?;
         Ok(node)
     }
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
-        let cur = self.op_types.get_mut(node.index);
+        let cur = self.as_mut().op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
     }
 }
