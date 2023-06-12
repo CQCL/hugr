@@ -24,8 +24,10 @@ use crate::{resource::ResourceSet, type_row};
 #[non_exhaustive]
 pub enum SimpleType {
     /// A type containing classical data. Elements of this type can be copied.
+    #[serde(rename = "c")]
     Classic(ClassicType),
     /// A type containing linear data. Elements of this type must be used exactly once.
+    #[serde(rename = "l")]
     Linear(LinearType),
 }
 
@@ -312,6 +314,7 @@ impl_from_into_simple_type!(LinearType, SimpleType::Linear(typ), typ, SimpleType
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
+#[serde(transparent)]
 pub struct TypeRow {
     /// The datatypes in the row.
     types: Cow<'static, [SimpleType]>,
