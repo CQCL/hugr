@@ -60,6 +60,9 @@ pub enum OpTag {
     BasicBlock,
     /// A control flow exit node.
     BasicBlockExit,
+
+    /// Can be a child to any container node.
+    ChildAnywhere,
 }
 
 impl OpTag {
@@ -79,14 +82,14 @@ impl OpTag {
             OpTag::DataflowOp => &[OpTag::Any],
             OpTag::Input => &[OpTag::DataflowOp],
             OpTag::Output => &[OpTag::DataflowOp],
-            OpTag::Function => &[OpTag::ModuleOp, OpTag::DataflowOp],
+            OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ModuleOp],
-            OpTag::Def => &[OpTag::Function],
+            OpTag::Def => &[OpTag::Function, OpTag::ChildAnywhere],
             OpTag::BasicBlock => &[OpTag::Any],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
             OpTag::ModuleRoot => &[OpTag::Any],
-            OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowOp],
+            OpTag::Const => &[OpTag::ModuleOp, OpTag::ChildAnywhere],
             OpTag::Dfg => &[OpTag::DataflowOp],
             OpTag::Cfg => &[OpTag::DataflowOp],
             OpTag::ConstInput => &[OpTag::DataflowOp],
@@ -95,6 +98,7 @@ impl OpTag {
             OpTag::FnCall => &[OpTag::ConstInput],
             OpTag::LoadConst => &[OpTag::ConstInput],
             OpTag::Leaf => &[OpTag::DataflowOp],
+            OpTag::ChildAnywhere => &[OpTag::DataflowOp],
         }
     }
 
@@ -123,6 +127,7 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ConstInput => "Dataflow operations that take a Const input.",
+            OpTag::ChildAnywhere => "Can be a child to any container node.",
         }
     }
 
