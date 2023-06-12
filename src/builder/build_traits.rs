@@ -382,8 +382,19 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error adding the
     /// Tag node.
-    fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
-        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
+    fn make_tag(
+        &mut self,
+        tag: usize,
+        variants: impl Into<TypeRow>,
+        value: Wire,
+    ) -> Result<Wire, BuildError> {
+        let make_op = self.add_dataflow_op(
+            LeafOp::Tag {
+                tag,
+                variants: variants.into(),
+            },
+            vec![value],
+        )?;
         Ok(make_op.out_wire(0))
     }
 

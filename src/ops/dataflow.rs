@@ -30,7 +30,7 @@ pub(super) trait DataflowOpTrait {
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
-    fn new(types: TypeRow) -> Self;
+    fn new(types: impl Into<TypeRow>) -> Self;
     /// Helper method to add resource requirements to an I/O node
     fn with_resources(self, rs: ResourceSet) -> Self;
 }
@@ -48,9 +48,9 @@ pub struct Input {
 impl_op_name!(Input);
 
 impl IOTrait for Input {
-    fn new(types: TypeRow) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Input {
-            types,
+            types: types.into(),
             resources: ResourceSet::new(),
         }
     }
@@ -73,9 +73,9 @@ pub struct Output {
 impl_op_name!(Output);
 
 impl IOTrait for Output {
-    fn new(types: TypeRow) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Output {
-            types,
+            types: types.into(),
             resources: ResourceSet::new(),
         }
     }

@@ -177,7 +177,7 @@ pub mod test {
     use super::*;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::LeafOp,
+        ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{ClassicType, LinearType, Signature, SimpleType},
     };
     use itertools::Itertools;
@@ -191,13 +191,15 @@ pub mod test {
             let mut graph : MultiPortGraph = graph.into();
             let root = graph.add_node(0, 0);
             let mut hierarchy = Hierarchy::new();
+            let mut op_types = UnmanagedDenseMap::new();
             for n in graph.nodes_iter() {
                 if n != root {
                     hierarchy.push_child(n, root).unwrap();
                 }
+                op_types[n] = gen_optype(&graph, n);
             }
 
-            let hugr = Hugr { graph, hierarchy, root, ..Default::default()};
+            let hugr = Hugr { graph, hierarchy, root, op_types };
 
             prop_assert_eq!(ser_roundtrip(&hugr), hugr);
         }
@@ -208,14 +210,34 @@ pub mod test {
         let hg = Hugr::default();
         assert_eq!(ser_roundtrip(&hg), hg);
     }
+
     pub fn ser_roundtrip<T: Serialize + serde::de::DeserializeOwned>(g: &T) -> T {
         let v = rmp_serde::to_vec_named(g).unwrap();
         rmp_serde::from_slice(&v[..]).unwrap()
     }
 
+    /// Generate an optype for a node with a matching amount of inputs and outputs.
+    fn gen_optype(g: &MultiPortGraph, node: NodeIndex) -> OpType {
+        let inputs = g.num_inputs(node);
+        let outputs = g.num_outputs(node);
+        match (inputs == 0, outputs == 0) {
+            (false, false) => DFG {
+                signature: Signature::new_df(
+                    vec![ClassicType::bit().into(); inputs - 1],
+                    vec![ClassicType::bit().into(); outputs - 1],
+                ),
+            }
+            .into(),
+            (true, false) => Input::new(vec![ClassicType::bit().into(); outputs - 1]).into(),
+            (false, true) => Output::new(vec![ClassicType::bit().into(); inputs - 1]).into(),
+            (true, true) => Module.into(),
+        }
+    }
+
     #[test]
     fn simpleser() {
         let mut g = MultiPortGraph::new();
+
         let a = g.add_node(1, 1);
         let b = g.add_node(3, 2);
         let c = g.add_node(1, 1);
@@ -229,15 +251,18 @@ pub mod test {
         g.link_nodes(c, 0, a, 0).unwrap();
 
         let mut h = Hierarchy::new();
+        let mut op_types = UnmanagedDenseMap::new();
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
+            op_types[n] = gen_optype(&g, n);
         }
+
         let hg = Hugr {
             graph: g,
             hierarchy: h,
             root,
-            op_types: UnmanagedDenseMap::new(),
+            op_types,
         };
 
         let v = rmp_serde::to_vec_named(&hg).unwrap();
