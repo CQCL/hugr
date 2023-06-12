@@ -50,18 +50,7 @@ pub(crate) trait HugrMut {
     ///
     /// [`OpType::other_input`]: crate::ops::OpType::other_input
     /// [`OpType::other_output`]: crate::ops::OpType::other_output.
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
-        let src_port: Port = self
-            .get_optype(src)
-            .other_port_index(Direction::Outgoing)
-            .expect("Source operation has no non-dataflow outgoing edges");
-        let dst_port: Port = self
-            .get_optype(dst)
-            .other_port_index(Direction::Incoming)
-            .expect("Destination operation has no non-dataflow incoming edges");
-        self.connect(src, src_port.index(), dst, dst_port.index())?;
-        Ok((src_port, dst_port))
-    }
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError>;
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize);
@@ -180,6 +169,19 @@ where
         )?;
         self.as_mut().graph.unlink_port(port);
         Ok(())
+    }
+
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+        let src_port: Port = self
+            .get_optype(src)
+            .other_port_index(Direction::Outgoing)
+            .expect("Source operation has no non-dataflow outgoing edges");
+        let dst_port: Port = self
+            .get_optype(dst)
+            .other_port_index(Direction::Incoming)
+            .expect("Destination operation has no non-dataflow incoming edges");
+        self.connect(src, src_port.index(), dst, dst_port.index())?;
+        Ok((src_port, dst_port))
     }
 
     #[inline]
