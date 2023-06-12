@@ -1,13 +1,11 @@
-use crate::hugr::HugrMut;
 use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::TypeRow;
-use crate::Node;
+use crate::types::{Signature, TypeRow};
+use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
-use super::HugrMutRef;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
@@ -16,18 +14,14 @@ use super::{
 /// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<B: HugrMutRef> TailLoopBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
         tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
-        let dfg_build = DFGBuilder::create_with_io(
-            base,
-            loop_node,
-            tail_loop.body_input_row(),
-            tail_loop.body_output_row(),
-        )?;
+        let signature = Signature::new_df(tail_loop.body_input_row(), tail_loop.body_output_row());
+        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature)?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
@@ -60,7 +54,7 @@ impl<B: HugrMutRef> TailLoopBuilder<B> {
     }
 }
 
-impl TailLoopBuilder<&mut HugrMut> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
     /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,
@@ -75,7 +69,7 @@ impl TailLoopBuilder<&mut HugrMut> {
     }
 }
 
-impl TailLoopBuilder<HugrMut> {
+impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
     pub fn new(
         just_inputs: impl Into<TypeRow>,
@@ -87,8 +81,8 @@ impl TailLoopBuilder<HugrMut> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = HugrMut::new(tail_loop.clone());
-        let root = base.hugr().root();
+        let base = Hugr::new(tail_loop.clone());
+        let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }
 }

@@ -1,7 +1,7 @@
 use super::{
     build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container, HugrMutRef,
+    BuildError, Container,
 };
 
 use crate::{
@@ -23,43 +23,44 @@ use crate::{hugr::HugrMut, Hugr};
 /// Builder for a HUGR module.
 pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<T: HugrMutRef> Container for ModuleBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.as_ref().root()
     }
 
     #[inline]
-    fn base(&mut self) -> &mut HugrMut {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 
     fn hugr(&self) -> &Hugr {
-        self.0.as_ref().hugr()
+        self.0.as_ref()
     }
 }
 
-impl ModuleBuilder<HugrMut> {
+impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
     pub fn new() -> Self {
-        Self(HugrMut::new_module())
+        Self(Default::default())
     }
 }
 
-impl Default for ModuleBuilder<HugrMut> {
+impl Default for ModuleBuilder<Hugr> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl HugrBuilder for ModuleBuilder<HugrMut> {
+impl HugrBuilder for ModuleBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.0.finish()
+        self.0.validate()?;
+        Ok(self.0)
     }
 }
 
-impl<T: HugrMutRef> ModuleBuilder<T> {
+impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// Generate a builder for defining a function body graph.
     ///
     /// Replaces a [`OpType::Declare`] node as specified by `f_id`
@@ -71,25 +72,27 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     pub fn define_function(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let (inputs, outputs) =
-            if let OpType::Declare(ops::Declare { signature }) = self.hugr().get_optype(f_node) {
-                (signature.input.clone(), signature.output.clone())
-            } else {
-                return Err(BuildError::UnexpectedType {
-                    node: f_node,
-                    op_desc: "OpType::Declare",
-                });
-            };
-        self.base().replace_op(
+        let (signature, name) = if let OpType::Declare(ops::Declare { signature, name }) =
+            self.hugr().get_optype(f_node)
+        {
+            (signature.clone(), name.clone())
+        } else {
+            return Err(BuildError::UnexpectedType {
+                node: f_node,
+                op_desc: "OpType::Declare",
+            });
+        };
+        self.hugr_mut().replace_op(
             f_node,
             ops::Def {
-                signature: Signature::new_df(inputs.clone(), outputs.clone()),
+                name,
+                signature: signature.clone(),
             },
         );
 
-        let db = DFGBuilder::create_with_io(self.base(), f_node, inputs, outputs)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -104,7 +107,7 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut HugrMut>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let fid = self.declare(name, signature)?;
         self.define_function(&fid)
     }
@@ -117,11 +120,14 @@ impl<T: HugrMutRef> ModuleBuilder<T> {
     /// [`OpType::Declare`] node.
     pub fn declare(
         &mut self,
-        _name: impl Into<String>,
+        name: impl Into<String>,
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
-        // TODO add name and param names to metadata
-        let declare_n = self.add_child_op(ops::Declare { signature })?;
+        // TODO add param names to metadata
+        let declare_n = self.add_child_op(ops::Declare {
+            signature,
+            name: name.into(),
+        })?;
 
         Ok(declare_n.into())
     }

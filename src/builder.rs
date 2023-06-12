@@ -2,7 +2,7 @@
 //!
 use thiserror::Error;
 
-use crate::hugr::{HugrError, HugrMut, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 
 use crate::types::LinearType;
@@ -70,26 +70,8 @@ pub enum BuildError {
     CircuitError(#[from] circuit_builder::CircuitBuildError),
 }
 
-impl AsMut<HugrMut> for HugrMut {
-    fn as_mut(&mut self) -> &mut HugrMut {
-        self
-    }
-}
-impl AsRef<HugrMut> for HugrMut {
-    fn as_ref(&self) -> &HugrMut {
-        self
-    }
-}
-
-/// Trait allowing treating type as (im)mutable reference to [`HugrMut`]
-pub trait HugrMutRef: AsMut<HugrMut> + AsRef<HugrMut> {}
-impl HugrMutRef for HugrMut {}
-impl HugrMutRef for &mut HugrMut {}
-
 #[cfg(test)]
 mod test {
-
-    use crate::hugr::HugrMut;
     use crate::types::{ClassicType, LinearType, Signature, SimpleType};
     use crate::Hugr;
 
@@ -112,7 +94,7 @@ mod test {
 
     pub(super) fn build_main(
         signature: Signature,
-        f: impl FnOnce(FunctionBuilder<&mut HugrMut>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let f_builder = module_builder.declare_and_def("main", signature)?;

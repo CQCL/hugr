@@ -2,6 +2,7 @@
 
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
+use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
@@ -26,24 +27,64 @@ pub(super) trait DataflowOpTrait {
     }
 }
 
+/// Helpers to construct input and output nodes
+pub trait IOTrait {
+    /// Construct a new I/O node from a type row with no resource requirements
+    fn new(types: TypeRow) -> Self;
+    /// Helper method to add resource requirements to an I/O node
+    fn with_resources(self, rs: ResourceSet) -> Self;
+}
+
 /// An input node.
 /// The outputs of this node are the inputs to the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     /// Input value types
     pub types: TypeRow,
+    /// Resources attached to output wires
+    pub resources: ResourceSet,
 }
 
 impl_op_name!(Input);
+
+impl IOTrait for Input {
+    fn new(types: TypeRow) -> Self {
+        Input {
+            types,
+            resources: ResourceSet::new(),
+        }
+    }
+
+    fn with_resources(mut self, resources: ResourceSet) -> Self {
+        self.resources = resources;
+        self
+    }
+}
 
 /// An output node. The inputs are the outputs of the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
     /// Output value types
     pub types: TypeRow,
+    /// Resources expected from input wires
+    pub resources: ResourceSet,
 }
 
 impl_op_name!(Output);
+
+impl IOTrait for Output {
+    fn new(types: TypeRow) -> Self {
+        Output {
+            types,
+            resources: ResourceSet::new(),
+        }
+    }
+
+    fn with_resources(mut self, resources: ResourceSet) -> Self {
+        self.resources = resources;
+        self
+    }
+}
 
 impl DataflowOpTrait for Input {
     fn description(&self) -> &str {
@@ -59,7 +100,9 @@ impl DataflowOpTrait for Input {
     }
 
     fn signature(&self) -> Signature {
-        Signature::new_df(TypeRow::new(), self.types.clone())
+        let mut sig = Signature::new_df(TypeRow::new(), self.types.clone());
+        sig.output_resources = self.resources.clone();
+        sig
     }
 }
 impl DataflowOpTrait for Output {
@@ -72,7 +115,9 @@ impl DataflowOpTrait for Output {
     }
 
     fn signature(&self) -> Signature {
-        Signature::new_df(self.types.clone(), TypeRow::new())
+        let mut sig = Signature::new_df(self.types.clone(), TypeRow::new());
+        sig.input_resources = self.resources.clone();
+        sig
     }
 
     fn other_outputs(&self) -> Option<EdgeKind> {

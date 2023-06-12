@@ -58,6 +58,10 @@ pub struct Signature {
     pub output: TypeRow,
     /// Possible constE input (for call / load-constant).
     pub const_input: TypeRow,
+    /// The resource requirements of all the inputs
+    pub input_resources: ResourceSet,
+    /// The resource requirements of all the outputs
+    pub output_resources: ResourceSet,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -142,6 +146,8 @@ impl Signature {
             input: input.into(),
             output: output.into(),
             const_input: const_input.into(),
+            input_resources: ResourceSet::new(),
+            output_resources: ResourceSet::new(),
         }
     }
 

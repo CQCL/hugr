@@ -361,8 +361,8 @@ children of a CFG-node.
     children of CFG-nodes.
 
   - `CFG` nodes: a dataflow node which is defined by a child control
-    sibling graph. All children except the last are `BasicBlock`-nodes,
-    the first of which is the entry block. The final child is an
+    sibling graph. All children except the second are `BasicBlock`-nodes,
+    the first is the entry block. The second child is an
     `ExitBlock` node, which has no children, this is the single exit
     point of the CFG and the inputs to this node match the outputs of
     the CFG-node. The inputs to the CFG-node are wired to the inputs of
@@ -399,9 +399,9 @@ has no parent).
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
+| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(second) is entry(exit)               |
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
+| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)         |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
 | "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
@@ -592,27 +592,60 @@ compiling, and linking C++ code.
 
 We can do something similar in Rust, and we wouldn't even need to parse
 another format, sufficiently nice rust macros/proc\_macros should
-provide a human-friendly enough definition experience.
+provide a human-friendly-enough definition experience.  However, we also
+provide a declarative YAML format, below.
 
 Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
 at runtime. In many cases this is desirable.
 
-#### Extension implementation
+#### Extension Implementation
 
-To strike a balance then, we implement three kinds of operation/type
-definition in tooling that processes the HUGR
+To strike a balance then, every resource provides YAML that declares its opaque
+types and a number of named **OpDef**s (operation-definitions), which may be
+polymorphic in type. Each OpDef specifies one of two methods for how the type
+of individual operations is computed:
 
-1.  `native`: operations and types that are native to the tool, e.g. an
-    Enum of quantum gates in TKET2, or of higher order operations in
-    Tierkreis. Tools which do not share natives communicate over a
-    serialized interface (not necessarily binary, can just be the in
-    memory form of the serialized structure). At deserialization time
-    when a tool sees an operation it does not recognise, it can treat it
-    as opaque (likewise any wire types it does not recognise) and store
-    the [serialized definition data](#serialization): in this way
-    subsequent tooling which does recognise the operation will receive
-    it faithfully.
+1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
+   that is built into tools that process the HUGR.
+
+2. The extension self-registers binary code (e.g. a Rust trait) providing a function
+   `compute_signature` that computes the type.
+
+Each OpDef may declare named type parameters---if so then the individual operation nodes
+in a HUGR will provide for each a static-constant "type argument": a value that in many
+cases will be a type. These type arguments are processed by the type scheme interpreter
+or the `compute_signature` implementation to compute the type of that operation node.
+
+When serializing the node, we also serialize the type arguments; we can also serialize
+the resulting (computed) type with the operation, and this will be useful when the type
+is computed by binary code, to allow the operation to be treated opaquely by tools that
+do not have the binary code available. (The YAML definition can be sent with the HUGR).
+
+This mechanism allows new operations to be passed through tools that do not understand
+what the operations *do*---that is, new operations may be be defined independently of
+any tool, but without providing any way for the tooling to treat them as anything other
+than a black box. The *semantics* of any operation are necessarily specific to both
+operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
+resources to provide semantics portable across tools.
+
+1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
+   that takes the type arguments and a set of target resources and may fallibly return
+   a subgraph or function-body-HUGR using only those target resources.
+
+2. They may provide a HUGR, that declares functions implementing those operations. This
+   is a simple case of the above (where the binary code is a constant function) but
+   easy to pass between tools. However note this will only be possible for operations
+   with sufficiently simple type (schemes), and is considered a "fallback" for use
+   when a higher-performance (e.g. native HW) implementation is not available.
+   Such a HUGR may itself require other resources.
+
+Whether a particular OpDef provides binary code for `try_lower` is independent
+of whether it provides a binary `compute_signature`, but it will not generally
+be possible to provide a HUGR for a function whose type cannot be expressed
+in YAML.
+
+<!-- Should we preserve some of this language about downcasting?
 
 2.  `CustomOp`: new operations defined in code that implement an
     extensible interface (Rust Trait), compiler operations/extensions
@@ -621,14 +654,6 @@ definition in tooling that processes the HUGR
     downcasting fails). For example, an SU4 unitary struct defined in
     matrix form. This is implemented in the TKET2 prototype.
 
-3.  `Opdef`: a struct where the operation type is identified by the name
-    it holds as a string. It also implements the `CustomOp` interface.
-    The struct is backed by a declarative format (e.g. YAML) for
-    defining it.
-
-Note all of these share the same representation in serialized HUGR - it
-is up to the tooling as to how to load that in to memory.
-
 We expect most compiler passes and rewrites to deal with `native`
 operations, with the other classes mostly being used at the start or end
 of the compilation flow. The `CustomOp` trait allows the option for
@@ -636,18 +661,7 @@ programs that extend the core toolchain to use strict typing for their
 new operations. While the `Opdef` allows users to specify extensions
 with a pre-compiled binary, and provide useful information for the
 compiler/runtime to use.
-
-The exact interface that should be specified by `CustomOp` is unclear,
-but should include at minimum a way to query the signature of the
-operation and a fallible interface for returning an equivalent program
-made of operations from some provided set of `Resources`.
-
-These classes of extension also allow greater flexibility in future. For
-instance, "header" files for both `native` or `CustomOp` operation sets
-can be written in the `OpDef` format for non-Rust tooling to use (e.g.
-Python front end). Or like MLIR, we can in future write code generation
-tooling to generate specific `CustomOp` implementations from `Opdef`
-definitions.
+-->
 
 #### Declarative format
 
@@ -665,68 +679,90 @@ See [Type System](#type-system) for more on Resources.
 # may need some top level data, e.g. namespace?
 
 # Import other header files to use their custom types
+  # TODO: allow qualified, and maybe locally-scoped
 imports: [Quantum]
 
-# Declare custom types
-types:
-- name: QubitVector
-  # Opaque types can take type arguments, with specified names
-  args: [size]
-
-# Declare operations which aren't associated to a resource
-operations:
-- name: measure
-  description: "measure a qubit"
-  # We're going to implement this using ops defined in the "Quantum" resource
-  resource_reqs: [Quantum] 
-  inputs: [[null, Q]]
-  # the first element of each pair is an optional parameter name
-  outputs: [[null, Q], [measured, B]]
-
-# Declare some resource interfaces which provide the rest of the operations
 resources:
 - name: MyGates
+  # Declare custom types
+  types:
+  - name: QubitVector
+    # Opaque types can take type arguments, with specified names
+    args: [["size", u64]]
   operations:
+  - name: measure
+    description: "measure a qubit"
+    signature:
+      # The first element of each pair is an optional parameter name.
+      inputs: [[null, Q]]  # Q is defined in Quantum resource
+      outputs: [[null, Q], ["measured", B]]
   - name: ZZPhase
     description: "Apply a parametric ZZPhase gate"
-    resource_reqs: [] # The "MyGates" resource will automatically be added as a requirement
-    inputs: [[null, Q], [null, Q], [angle, Angle]]
-    outputs: [[null, Q], [null, Q]]
+    signature:
+      inputs: [[null, Q], [null, Q], ["angle", Angle]]
+      outputs: [[null, Q], [null, Q]]
     misc:
       # extra data that may be used by some compiler passes
+      # and is passed to try_lower and compute_signature
       equivalent: [0, 1]
       basis: [Z, Z]
   - name: SU2
     description: "One qubit unitary matrix"
-    resource_reqs: []
-    inputs: [[null, Q]]
-    outputs: [[null, Q]]
+    args: # per-node values passed to the type-scheme interpreter, but not used in signature
+      - matrix: Opaque(complex_matrix,2,2)
+    signature:
+      inputs: [[null, Q]]
+      outputs: [[null, Q]]
+  - name: MatMul
+    description: "Multiply matrices of statically-known size"
+    args:  # per-node values passed to type-scheme-interpreter and used in signature
+      - i: U64
+      - j: U64
+      - k: U64
+    signature:
+      inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
+      outputs: [[null, Array<i>(Array<k>(F64))]]
+      #alternative inputs: [["a", Opaque(complex_matrix,i,j)], ["b", Opaque(complex_matrix,j,k)]]
+      #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
+  - name: max_float
+    description: "Variable number of inputs"
     args:
-      - matrix: List(List(List(F64))))
-
-- name: MyResource
-  operations:
-  - name: MyCustom
-    description: "Custom op defined by a program"
-    resource_reqs: [MyGates] # Depend on operations defined in the other module
-    inputs: [[null, Q], [null, Q], [param, F64]]
-    outputs: [[null, Q], [null, Q]]
+      - n: U64
+    signature:
+      # Where an element of a signature has three subelements, the third is the number of repeats
+      inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
+      outputs: [[null, F64, 1]]
+  - name: ArrayConcat
+    description: "Concatenate two arrays. Resource provides a compute_signature implementation."
+    args:
+      - t: Type  # Classic or Quantum
+      - i: U64
+      - j: U64
+    # inputs could be: Array<i>(t), Array<j>(t)
+    # outputs would be, in principle: Array<i+j>(t)
+    # - but default type scheme interpreter does not support such addition
+    # Hence, no signature block => will look up a compute_signature in registry.
 ```
 
-Reading this format into Rust is made easy by `serde` and
+The declaration of the `args` uses a language that is a distinct, simplified
+form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
+the value of each member of `args` is given by the following production:
+```
+TypeParam ::= "Type" | "ClassicType" | "F64" | "U64" | "I64" | "Opaque"(name, ...) | "List"(TypeParam)
+```
+
+**Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
 Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
-Note the required `name`, `description`. `inputs` and `outputs` fields,
-the last two defining the signature of the operation, and optional
-parameter names as metadata. The optional `misc` field is used for
-arbitrary YAML, which is read in as-is (into the `serde_yaml Value`
-struct). The data held here can be used by compiler passes which expect
-to deal with this operation (e.g. a pass can use the `basis` information
-to perform commutation). The optional `args` field can be used to
-specify the types of parameters to the operation - for example the
-matrix needed to define an SU2 operation.
+Note the only required fields are `name` and `description`. `signature` is optional, but if present
+must have children `inputs` and `outputs`, each lists. The optional `misc` field is used for arbitrary
+YAML, which is read in as-is and passed to compiler passes and (if no `signature` is present) the
+`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+The optional `args` field can be used to specify the types of static+const arguments to each operation
+---for example the matrix needed to define an SU2 operation. If `args` are not specified
+then it is assumed empty.
 
 ### Extensible metadata
 
@@ -1138,7 +1174,7 @@ The new hugr is then derived by:
 
 3.  for each node n in top(G), adding a hierarchy edge from t(n) to n,
     placing n in the first position among children of t(n) if n is in
-    Init and in the last position if n is in Term;
+    Init and in the second position if n is in Term;
 
 4.  for each node n in bot(G), and for each child m of b(n), adding a
     hierarchy edge from n to m (replacing m’s existing parent edge)
