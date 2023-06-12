@@ -94,8 +94,6 @@ impl<'a> ValidationContext<'a> {
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
         let optype = self.hugr.get_optype(node);
-        let sig = optype.signature();
-        let flags = optype.validity_flags();
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -121,26 +119,20 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            // Check that we have the correct amount of ports and edges.
             for dir in Direction::BOTH {
+                // Check that we have the correct amount of ports and edges.
                 let num_ports = self.hugr.graph.num_ports(node.index, dir);
-                let has_other_ports = optype.other_port(dir).is_some();
-                let expected_other_ports = flags
-                    .non_df_port_count(dir)
-                    .unwrap_or(has_other_ports as usize);
-                if num_ports != (sig.port_count(dir) + expected_other_ports) {
+                if num_ports != optype.port_count(dir) {
                     return Err(ValidationError::WrongNumberOfPorts {
                         node,
                         optype: optype.clone(),
                         actual: num_ports,
-                        expected: sig.port_count(dir) + expected_other_ports,
+                        expected: optype.port_count(dir),
                         dir,
                     });
                 }
-            }
 
-            // Check port connections
-            for dir in Direction::BOTH {
+                // Check port connections
                 for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
                     let port = Port::new(dir, i);
                     self.validate_port(node, port, port_index, optype)?;

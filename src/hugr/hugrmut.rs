@@ -134,7 +134,10 @@ where
 {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
-        let node = self.as_mut().graph.add_node(op.input_count(), op.output_count());
+        let node = self
+            .as_mut()
+            .graph
+            .add_node(op.input_count(), op.output_count());
         self.as_mut().op_types[node] = op;
         node.into()
     }
