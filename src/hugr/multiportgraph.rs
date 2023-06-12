@@ -187,13 +187,11 @@ impl MultiPortGraph {
     /// Unlinks all connections to the `port`. Return `false` if the port was not linked.
     pub fn unlink_port(&mut self, port: PortIndex) -> bool {
         if self.is_multiport(port) {
-            self.multiport.set(port, false);
             let link = self
                 .graph
                 .port_link(port)
                 .expect("MultiPortGraph error: a port marked as multiport has no link.");
-            let copy_node = self.graph.port_node(link).unwrap();
-            self.remove_copy_node(copy_node, link);
+            self.remove_copy_node(port, link);
             true
         } else {
             self.graph.unlink_port(port).is_some()
@@ -669,8 +667,9 @@ impl MultiPortGraph {
     {
         let mut dropped_ports = Vec::new();
         let rekey_wrapper = |port, op| {
-            if let PortOperation::Removed { old_link } = op {
-                dropped_ports.push((port, old_link))
+            match op {
+                PortOperation::Removed { old_link } => dropped_ports.push((port, old_link)),
+                PortOperation::Moved { new_index } => self.multiport.swap(port, new_index),
             }
             rekey(port, op);
         };
@@ -678,10 +677,8 @@ impl MultiPortGraph {
             .set_num_ports(node, incoming, outgoing, rekey_wrapper);
         for (port, old_link) in dropped_ports {
             if self.is_multiport(port) {
-                self.multiport.set(port, false);
                 let link = old_link.expect("Multiport node has no link");
-                let copy_node = self.graph.port_node(link).unwrap();
-                self.remove_copy_node(copy_node, link)
+                self.remove_copy_node(port, link)
             }
         }
     }
@@ -726,16 +723,29 @@ impl MultiPortGraph {
         self.multiport.shrink_to_fit();
         self.copy_node.shrink_to_fit();
     }
+
+    /// Given a node in the underlying flat portgraph, returns the main node for it.
+    ///
+    /// If the node is not a copy node, returns the node itself.
+    pub fn pg_main_node(&self, node: NodeIndex) -> NodeIndex {
+        if !self.copy_node.get(node) {
+            return node;
+        }
+        self.port_node(self.copy_node_main_port(node).unwrap())
+            .unwrap()
+    }
 }
 
 /// Internal helper methods
 impl MultiPortGraph {
     /// Remove an internal copy node.
-    fn remove_copy_node(&mut self, copy_node: NodeIndex, from: PortIndex) {
-        let dir = self.port_direction(from).unwrap();
+    fn remove_copy_node(&mut self, main_node_port: PortIndex, copy_port: PortIndex) {
+        let copy_node = self.graph.port_node(copy_port).unwrap();
+        let dir = self.port_direction(copy_port).unwrap();
         debug_assert!(self.copy_node.get(copy_node));
         let mut subports = self.graph.ports(copy_node, dir.reverse());
-        self.multiport.set(from, false);
+        self.multiport.set(copy_port, false);
+        self.multiport.set(main_node_port, false);
         self.copy_node.set(copy_node, false);
         self.graph.remove_node(copy_node);
         self.copy_node_count -= 1;
@@ -822,8 +832,7 @@ impl MultiPortGraph {
                 outgoing - 1
             }
         };
-        self.graph
-            .set_num_ports(node, incoming, outgoing, |_, _| {});
+        self.set_num_ports(node, incoming, outgoing, |_, _| {});
         self.graph
             .port_index(node, PortOffset::new(direction, new_offset))
             .unwrap()

@@ -373,7 +373,7 @@ impl<'a> ValidationContext<'a> {
         });
 
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
-            return Err(ValidationError::NotADag {
+            return Err(ValidationError::NotABoundedDag {
                 node: parent,
                 optype: optype.clone(),
             });
@@ -684,7 +684,7 @@ pub enum ValidationError {
     ContainerWithoutChildren { node: Node, optype: OpType },
     /// The children of a node do not form a dag with single source and sink.
     #[error("The children of an operation {optype:?} must form a dag with single source and sink. Loops are not allowed, nor are dangling nodes not in the path between the input and output. In node {node:?}.")]
-    NotADag { node: Node, optype: OpType },
+    NotABoundedDag { node: Node, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
