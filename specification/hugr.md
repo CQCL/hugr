@@ -123,10 +123,17 @@ In this case, output 0 of the H operation is connected to input 0 of the
 CNOT.
 
 ### Edges
+
+A `SimpleType` is the type of a value that can be sent down a wire. We
+distinguish between `ClassicType` and `LinearType`. For more details see the
+[Type System](#type-system) section.
+
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
 ```
+SimpleType ::= ClassicType | LinearType
+
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
@@ -139,7 +146,7 @@ these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
 In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
 with a unique root node. The HUGR is characterized by the type of its root node.
-The root node has no edges (and this supercedes any other requirements on the
+The root node has no non-hierarchy edges (and this supercedes any other requirements on the
 edges of specific node types).
 
 A **sibling graph** is a subgraph of the HUGR containing all nodes with
@@ -151,15 +158,16 @@ them.
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; the port types of a node are described by its
+source node, to an incoming **Port** of the target node. Every port has an
+associated type; the sequences of incoming and outgoing port types of a node constitute its
 **Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
 of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
 must have exactly one. See [Linearity](#linearity).
 
 
-The **Signature** may also specify a row
+In addition to the incoming and outgoing `Value` edges, the signature may also specify a row
 of `ClassicType`s for incoming `Static` edges. These correspond to incoming
-ports that always follow `Value` ports. 
+ports that follow the incoming `Value` ports.
 
 
 Value edges are parameterized by the locality and type; there are three
@@ -182,7 +190,7 @@ Note that the locality is not fixed or even specified by the signature.
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def` and `Const`) and targets (`Call` and `LoadConstant`) of
+sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
@@ -203,14 +211,14 @@ always *local*, i.e. source and target have the same parent.
 
 ### Node Operations
 
-Here we describe we define some core operations required to represent
+Here we define some core types of operation required to represent
 full programs, including dataflow operations (in
 [functions](#functions)).
 
 #### Module
 
 If the HUGR contains a `Module` node then it is unique and sits at the top level
-of the of the hierarchy. In this case we call it a **module HUGR**. The weight
+of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
 metadata (e.g. source file). The children of a `Module` correspond
 to "module level" operation types. Neither `Module` nor these module-level
@@ -243,7 +251,7 @@ regions:
     `AliasDef`.
 
 
-A **loadable HUGR** is a module HUGR where all edges are connected and there are
+A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `Declare/AliasDeclare` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
@@ -266,9 +274,9 @@ operations valid at both Module level and within dataflow regions):
 
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Graph>` edge to specify the graph being called. The
-    signature of the `Value` edges matches the function being called.
+    signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
 
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
@@ -300,7 +308,7 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type, whose
+The first input to the Conditional-node is of Predicate type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
 contents of the Predicate with all remaining inputs to Conditional
@@ -369,7 +377,7 @@ children of a CFG-node.
     the entry block.
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0, #t1,...#tn)`, where the node has `N` successors, and the
+`Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -417,13 +425,9 @@ cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
 `Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. The common parent may be a `Def`, `TailLoop`, `DFG`,
-`Case` or `BasicBlock` node.
-
-In a dataflow sibling graph, the edges (value and order considered
-together) must be acyclic. There is a unique Input node and Output node.
-All nodes must be reachable from the Input node, and must reach the
-Output node.
+must be acyclic. There is a unique Input node and Output node. All nodes must be
+reachable from the Input node, and must reach the Output node. The common parent
+may be a `Def`, `TailLoop`, `DFG`, `Case` or `BasicBlock` node.
 
 | **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
