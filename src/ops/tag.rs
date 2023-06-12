@@ -45,6 +45,8 @@ pub enum OpTag {
     FnCall,
     /// A constant load operation.
     LoadConst,
+    /// Operations taking const inputs.
+    ConstInput,
     /// A tail-recursive loop.
     TailLoop,
     /// A conditional operation.
@@ -77,21 +79,21 @@ impl OpTag {
             OpTag::DataflowOp => &[OpTag::Any],
             OpTag::Input => &[OpTag::DataflowOp],
             OpTag::Output => &[OpTag::DataflowOp],
-            OpTag::Function => &[OpTag::ModuleOp],
+            OpTag::Function => &[OpTag::ModuleOp, OpTag::DataflowOp],
             OpTag::Alias => &[OpTag::ModuleOp],
             OpTag::Def => &[OpTag::Function],
             OpTag::BasicBlock => &[OpTag::Any],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
             OpTag::ModuleRoot => &[OpTag::Any],
-            // Technically, this should be ModuleOp, but we will allow it outside modules soon.
             OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowOp],
             OpTag::Dfg => &[OpTag::DataflowOp],
             OpTag::Cfg => &[OpTag::DataflowOp],
+            OpTag::ConstInput => &[OpTag::DataflowOp],
             OpTag::TailLoop => &[OpTag::DataflowOp],
             OpTag::Conditional => &[OpTag::DataflowOp],
-            OpTag::FnCall => &[OpTag::DataflowOp],
-            OpTag::LoadConst => &[OpTag::DataflowOp],
+            OpTag::FnCall => &[OpTag::ConstInput],
+            OpTag::LoadConst => &[OpTag::ConstInput],
             OpTag::Leaf => &[OpTag::DataflowOp],
         }
     }
@@ -120,6 +122,7 @@ impl OpTag {
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
+            OpTag::ConstInput => "Dataflow operations that take a Const input.",
         }
     }
 

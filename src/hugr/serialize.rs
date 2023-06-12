@@ -176,7 +176,7 @@ pub mod test {
 
     use super::*;
     use crate::{
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, Container},
         ops::LeafOp,
         types::{ClassicType, LinearType, Signature, SimpleType},
     };
@@ -254,11 +254,10 @@ pub mod test {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
             let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
-            let f_id = module_builder
-                .declare("main", Signature::new_df(t_row.clone(), t_row))
+            let mut f_build = module_builder
+                .define_function("main", Signature::new_df(t_row.clone(), t_row))
                 .unwrap();
 
-            let mut f_build = module_builder.define_function(&f_id).unwrap();
             let outputs = f_build
                 .input_wires()
                 .map(|in_wire| {

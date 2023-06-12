@@ -209,7 +209,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let _f_id = {
-                let mut func_builder = module_builder.declare_and_def(
+                let mut func_builder = module_builder.define_function(
                     "main",
                     Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
                 )?;
@@ -240,7 +240,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build = module_builder.declare_and_def(
+            let f_build = module_builder.define_function(
                 "main",
                 Signature::new_df(type_row![BIT], type_row![BIT, BIT]),
             )?;
@@ -291,7 +291,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let f_build = module_builder
-                .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
+                .define_function("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;

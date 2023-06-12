@@ -12,7 +12,7 @@ use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
-use crate::types::ClassicType;
+use crate::types::{ClassicType, Signature};
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -335,23 +335,27 @@ impl<'a> ValidationContext<'a> {
 
         // Compute the number of nodes visited.
         let nodes_visited = topo.fold(0, |n, node| {
-            // If there is a LoadConstant with a local constant, count that node too
-            if OpTag::LoadConst == self.hugr.get_optype(node.into()).tag() {
-                let const_node = self
-                    .hugr
-                    .graph
-                    .input_neighbours(node)
-                    .next()
-                    .expect("LoadConstant must be connected to a Const node.")
-                    .into();
-                let const_parent = self
-                    .hugr
-                    .get_parent(const_node)
-                    .expect("Const can't be root.");
+            let node: Node = node.into();
+            let optype = self.hugr.get_optype(node);
+            // Count any local Const/Def nodes (those connected to const inputs
+            // but not reachable from Input)
+            if OpTag::ConstInput.contains(optype.tag()) {
+                let sig: Signature = optype.signature();
+                let n_df_inputs = sig.input.len();
 
-                if const_parent == parent {
-                    return n + 2;
-                }
+                let n_const_pred = self
+                    .hugr
+                    .input_neighbours(node)
+                    .take(sig.input_count())
+                    .skip(n_df_inputs)
+                    .filter(|other_node| {
+                        self.hugr
+                            .get_parent(*other_node)
+                            .expect("Const can't be root.")
+                            == parent
+                    })
+                    .count();
+                return n + 1 + n_const_pred;
             }
             n + 1
         });

@@ -64,7 +64,7 @@ mod test {
 
     use crate::builder::{
         BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder,
+        ModuleBuilder, Container,
     };
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
@@ -89,7 +89,7 @@ mod test {
     fn make_hugr() -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let _f_id = {
-            let mut func_builder = module_builder.declare_and_def(
+            let mut func_builder = module_builder.define_function(
                 "main",
                 Signature::new_df(type_row![QB, QB, QB], type_row![QB, QB, QB]),
             )?;
