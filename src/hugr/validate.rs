@@ -759,7 +759,7 @@ mod test {
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![B; copies].into()))
+            .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
             .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
@@ -790,7 +790,7 @@ mod test {
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B].into()))
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B]))
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
@@ -1035,7 +1035,7 @@ mod test {
         b.replace_op(block_input, ops::Input::new(type_row![Q]));
         b.replace_op(
             block_output,
-            ops::Output::new(vec![SimpleType::new_simple_predicate(1), Q].into()),
+            ops::Output::new(vec![SimpleType::new_simple_predicate(1), Q]),
         );
         assert_matches!(
             b.validate(),
