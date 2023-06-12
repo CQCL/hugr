@@ -176,7 +176,7 @@ pub mod test {
 
     use super::*;
     use crate::{
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, Container},
+        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::LeafOp,
         types::{ClassicType, LinearType, Signature, SimpleType},
     };

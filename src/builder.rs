@@ -76,7 +76,7 @@ mod test {
     use crate::Hugr;
 
     use super::handle::BuildHandle;
-    use super::{BuildError, FuncID, FunctionBuilder, ModuleBuilder, Container};
+    use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());

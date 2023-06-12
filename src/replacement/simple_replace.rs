@@ -63,8 +63,8 @@ mod test {
     use portgraph::Direction;
 
     use crate::builder::{
-        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder, Container,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder,
     };
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
