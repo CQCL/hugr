@@ -94,8 +94,6 @@ impl<'a> ValidationContext<'a> {
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
         let optype = self.hugr.get_optype(node);
-        let sig = optype.signature();
-        let flags = optype.validity_flags();
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -121,42 +119,24 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            // Check that we have enough ports. If the `non_df_ports` flag is set
-            // for the direction, we require exactly that number of ports after the
-            // dataflow ports. Otherwise, we allow any number of extra ports.
-            let check_extra_ports = |df_ports: usize, non_df_ports, actual| {
-                if let Some(non_df) = non_df_ports {
-                    df_ports + non_df == actual
-                } else {
-                    df_ports <= actual
+            for dir in Direction::BOTH {
+                // Check that we have the correct amount of ports and edges.
+                let num_ports = self.hugr.graph.num_ports(node.index, dir);
+                if num_ports != optype.port_count(dir) {
+                    return Err(ValidationError::WrongNumberOfPorts {
+                        node,
+                        optype: optype.clone(),
+                        actual: num_ports,
+                        expected: optype.port_count(dir),
+                        dir,
+                    });
                 }
-            };
-            let df_const_input = sig.const_input.len();
-            if !check_extra_ports(
-                sig.input.len() + df_const_input,
-                flags.non_df_ports.0,
-                self.hugr.graph.num_inputs(node.index),
-            ) || !check_extra_ports(
-                sig.output.len(),
-                flags.non_df_ports.1,
-                self.hugr.graph.num_outputs(node.index),
-            ) {
-                return Err(ValidationError::WrongNumberOfPorts {
-                    node,
-                    optype: optype.clone(),
-                    actual_inputs: sig.input.len(),
-                    actual_outputs: sig.output.len(),
-                });
-            }
 
-            // Check port connections
-            for (i, port_index) in self.hugr.graph.inputs(node.index).enumerate() {
-                let port = Port::new_incoming(i);
-                self.validate_port(node, port, port_index, optype)?;
-            }
-            for (i, port_index) in self.hugr.graph.outputs(node.index).enumerate() {
-                let port = Port::new_outgoing(i);
-                self.validate_port(node, port, port_index, optype)?;
+                // Check port connections
+                for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
+                    let port = Port::new(dir, i);
+                    self.validate_port(node, port, port_index, optype)?;
+                }
             }
         }
 
@@ -181,7 +161,11 @@ impl<'a> ValidationContext<'a> {
 
         // Input ports and output linear ports must always be connected
         let mut links = self.hugr.graph.port_links(port_index).peekable();
-        if (dir == Direction::Incoming || port_kind.is_linear()) && links.peek().is_none() {
+        let must_be_connected = match dir {
+            Direction::Incoming => port_kind.is_linear() || matches!(port_kind, EdgeKind::Const(_)),
+            Direction::Outgoing => port_kind.is_linear(),
+        };
+        if must_be_connected && links.peek().is_none() {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port,
@@ -558,35 +542,16 @@ impl<'a> ValidationContext<'a> {
         };
         let other_node = portgraph.port_node(other_port).unwrap();
 
-        // Ignore inter-graph edges
-        let parent = self.get_pg_node_parent(node);
-        let other_parent = self.get_pg_node_parent(other_node);
-
-        // Copy nodes do not have a parent.
+        // Dereference any copy nodes
+        let op_node = self.hugr.graph.pg_main_node(node);
+        let other_op_node = self.hugr.graph.pg_main_node(other_node);
+        let parent = self.hugr.hierarchy.parent(op_node);
+        let other_parent = self.hugr.hierarchy.parent(other_op_node);
         if parent != other_parent {
             return false;
         }
 
         true
-    }
-
-    /// Get the parent for a node in the underlying flat portgraph.
-    ///
-    /// For copy nodes we must check the parent of the operation node.
-    fn get_pg_node_parent(&self, node: portgraph::NodeIndex) -> Option<portgraph::NodeIndex> {
-        match self.hugr.hierarchy.parent(node) {
-            Some(parent) => Some(parent),
-            None => {
-                // Copy node, root
-                let op_node = self
-                    .hugr
-                    .graph
-                    .as_portgraph()
-                    .input_neighbours(node)
-                    .next()?;
-                self.hugr.hierarchy.parent(op_node)
-            }
-        }
     }
 }
 
@@ -601,12 +566,13 @@ pub enum ValidationError {
     #[error("The root node of the Hugr {node:?} has edges when it should not.")]
     RootWithEdges { node: Node },
     /// The node ports do not match the operation signature.
-    #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual_inputs:?} inputs and {actual_outputs:?} outputs.")]
+    #[error("The node {node:?} has an invalid number of ports. The operation {optype:?} cannot have {actual:?} {dir:?} ports. Expected {expected:?}.")]
     WrongNumberOfPorts {
         node: Node,
         optype: OpType,
-        actual_inputs: usize,
-        actual_outputs: usize,
+        actual: usize,
+        expected: usize,
+        dir: Direction,
     },
     /// A dataflow port is not connected.
     #[error("The node {node:?} has an unconnected port {port:?} of type {port_kind:?}.")]
@@ -836,7 +802,6 @@ mod test {
             )
             .unwrap();
 
-        b.add_ports(tag_def, Direction::Outgoing, 1);
         b.connect(tag_def, 0, tag, 0).unwrap();
         b.add_other_edge(input, tag).unwrap();
         b.connect(tag, 0, output, 0).unwrap();
@@ -865,6 +830,7 @@ mod test {
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, declare_op);
+        b.add_ports(other, Direction::Outgoing, 1);
         assert_eq!(b.validate(), Ok(()));
 
         // Make the hugr root not a hierarchy root

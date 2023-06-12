@@ -11,6 +11,7 @@ use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
+use crate::Direction;
 
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
 
@@ -31,12 +32,28 @@ pub struct OpValidityFlags {
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of non-dataflow input and output wires.
+    /// A strict requirement on the number of non-dataflow multiports.
+    ///
+    /// If not specified, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
     pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
+}
+
+impl OpValidityFlags {
+    /// Get the number of non-dataflow multiports.
+    ///
+    /// If None, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
+    pub fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
+        match dir {
+            Direction::Incoming => self.non_df_ports.0,
+            Direction::Outgoing => self.non_df_ports.1,
+        }
+    }
 }
 
 impl Default for OpValidityFlags {
@@ -358,7 +375,6 @@ impl ValidateOp for super::Case {
             allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
-            non_df_ports: (Some(0), Some(0)),
             ..Default::default()
         }
     }

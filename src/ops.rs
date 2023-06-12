@@ -59,6 +59,65 @@ impl Default for OpType {
     }
 }
 
+impl OpType {
+    /// The edge kind for the non-dataflow or constant-input ports of the
+    /// operation, not described by the signature.
+    ///
+    /// If not None, a single extra multiport of that kind will be present on
+    /// the given direction.
+    pub fn other_port(&self, dir: Direction) -> Option<EdgeKind> {
+        match dir {
+            Direction::Incoming => self.other_input(),
+            Direction::Outgoing => self.other_output(),
+        }
+    }
+
+    /// Returns the edge kind for the given port.
+    pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
+        let signature = self.signature();
+        let port = port.into();
+        let dir = port.direction();
+        match port.index() < signature.port_count(dir) {
+            true => signature.get(port),
+            false => self.other_port(dir),
+        }
+    }
+
+    /// The non-dataflow port for the operation, not described by the signature.
+    /// See `[OpType::other_port]`.
+    ///
+    /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
+    pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
+        let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
+        if self.other_port(dir).is_some() && non_df_count == 1 {
+            Some(Port::new(dir, self.signature().port_count(dir)))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the number of ports for the given direction.
+    pub fn port_count(&self, dir: Direction) -> usize {
+        let signature = self.signature();
+        let has_other_ports = self.other_port(dir).is_some();
+        let non_df_count = self
+            .validity_flags()
+            .non_df_port_count(dir)
+            .unwrap_or(has_other_ports as usize);
+        signature.port_count(dir) + non_df_count
+    }
+
+    /// Returns the number of inputs ports for the operation.
+    pub fn input_count(&self) -> usize {
+        self.port_count(Direction::Incoming)
+    }
+
+    /// Returns the number of outputs ports for the operation.
+    pub fn output_count(&self) -> usize {
+        self.port_count(Direction::Outgoing)
+    }
+}
+
 /// Macro used by operations that want their
 /// name to be the same as their type name
 macro_rules! impl_op_name {
@@ -101,35 +160,22 @@ pub trait OpTrait {
         Default::default()
     }
 
-    /// The edge kind for the inputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow or constant inputs of the operation,
+    /// not described by the signature.
     ///
-    /// If None, there will be no other input edges. Otherwise, all other input
-    /// edges will be of that kind.
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_input(&self) -> Option<EdgeKind> {
         None
     }
 
-    /// The edge kind for the outputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow outputs of the operation, not
+    /// described by the signature.
     ///
-    /// If None, there will be no other output edges. Otherwise, all other
-    /// output edges will be of that kind.
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_output(&self) -> Option<EdgeKind> {
         None
-    }
-
-    /// Returns the edge kind for the given port.
-    fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.signature();
-        let port = port.into();
-        if let Some(port_kind) = signature.get(port) {
-            Some(port_kind)
-        } else if port.direction() == Direction::Incoming {
-            self.other_inputs()
-        } else {
-            self.other_outputs()
-        }
     }
 }
 

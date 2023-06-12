@@ -170,7 +170,6 @@ mod test {
     /// └───┘└───┘
     fn test_simple_replacement() {
         let mut h: Hugr = make_hugr().unwrap();
-        // crate::utils::test::viz_dotstr(&h.dot_string());
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
@@ -185,7 +184,6 @@ mod test {
         let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = make_dfg_hugr().unwrap();
-        // crate::utils::test::viz_dotstr(&n.dot_string());
         // 4. Construct the input and output matchings
         // 4.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
@@ -194,18 +192,11 @@ mod test {
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
-        let n_port_0 = n
-            .node_ports(n_node_h0, Direction::Incoming)
-            .exactly_one()
-            .ok()
-            .unwrap();
-        let n_port_1 = n
-            .node_ports(n_node_h1, Direction::Incoming)
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let n_port_0 = n.node_ports(n_node_h0, Direction::Incoming).next().unwrap();
+        let n_port_1 = n.node_ports(n_node_h1, Direction::Incoming).next().unwrap();
         let (n_cx_out_0, n_cx_out_1) = n
             .node_ports(n_node_cx, Direction::Outgoing)
+            .take(2)
             .collect_tuple()
             .unwrap();
         let n_port_2 = n.linked_ports(n_node_cx, n_cx_out_0).next().unwrap().1;
@@ -213,18 +204,11 @@ mod test {
         // 4.3. Locate the ports we need to specify as "glue" in h
         let (h_port_0, h_port_1) = h
             .node_ports(h_node_cx, Direction::Incoming)
+            .take(2)
             .collect_tuple()
             .unwrap();
-        let h_h0_out = h
-            .node_ports(h_node_h0, Direction::Outgoing)
-            .exactly_one()
-            .ok()
-            .unwrap();
-        let h_h1_out = h
-            .node_ports(h_node_h1, Direction::Outgoing)
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let h_h0_out = h.node_ports(h_node_h0, Direction::Outgoing).next().unwrap();
+        let h_h1_out = h.node_ports(h_node_h1, Direction::Outgoing).next().unwrap();
         let (h_outp_node, h_port_2) = h.linked_ports(h_node_h0, h_h0_out).next().unwrap();
         let h_port_3 = h.linked_ports(h_node_h1, h_h1_out).next().unwrap().1;
         // 4.4. Construct the maps
@@ -249,7 +233,6 @@ mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        // crate::utils::test::viz_dotstr(&h.dot_string());
         assert_eq!(h.validate(), Ok(()));
     }
 
@@ -286,7 +269,6 @@ mod test {
         let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = make_dfg_hugr2().unwrap();
-        // crate::utils::test::viz_dotstr(&n.dot_string());
         // 4. Construct the input and output matchings
         // 4.1. Locate the Output and its predecessor H in n
         let n_node_output = n
@@ -296,30 +278,16 @@ mod test {
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
-            .node_ports(n_node_output, Direction::Incoming)
+            .node_inputs(n_node_output)
+            .take(2)
             .collect_tuple()
             .unwrap();
-        let n_port_2 = n
-            .node_ports(n_node_h, Direction::Incoming)
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let n_port_2 = n.node_inputs(n_node_h).next().unwrap();
         // 4.3. Locate the ports we need to specify as "glue" in h
-        let (h_port_0, h_port_1) = h
-            .node_ports(h_node_cx, Direction::Incoming)
-            .collect_tuple()
-            .unwrap();
+        let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
-        let h_port_2 = h
-            .node_ports(h_node_h0, Direction::Incoming)
-            .exactly_one()
-            .ok()
-            .unwrap();
-        let h_port_3 = h
-            .node_ports(h_node_h1, Direction::Incoming)
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let h_port_2 = h.node_ports(h_node_h0, Direction::Incoming).next().unwrap();
+        let h_port_3 = h.node_ports(h_node_h1, Direction::Incoming).next().unwrap();
         // 4.4. Construct the maps
         let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
         let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
@@ -342,7 +310,6 @@ mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        // crate::utils::test::viz_dotstr(&h.dot_string());
         assert_eq!(h.validate(), Ok(()));
     }
 }

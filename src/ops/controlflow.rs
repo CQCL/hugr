@@ -164,11 +164,11 @@ impl OpTrait for BasicBlock {
         }
     }
 
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    fn other_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
 
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
 }

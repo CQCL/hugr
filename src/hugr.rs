@@ -123,19 +123,15 @@ impl Hugr {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
-        let self_output_node_index = self.children(r.parent).nth(1).unwrap().index;
+        let self_output_node_index = self.children(r.parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = r.replacement.get_optype(node);
-            let sig = op.signature();
-            let new_node_index = self.graph.add_node(sig.input.len(), sig.output.len());
-            self.op_types[new_node_index] = op.clone();
-            // Make r.parent the parent
-            self.hierarchy
-                .insert_after(new_node_index, self_output_node_index)
-                .ok();
-            index_map.insert(node.index, new_node_index);
+            let new_node_index = self
+                .add_op_after(self_output_node_index, op.clone())
+                .unwrap();
+            index_map.insert(node.index, new_node_index.index);
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.

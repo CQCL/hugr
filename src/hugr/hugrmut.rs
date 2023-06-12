@@ -2,11 +2,10 @@
 
 use std::ops::Range;
 
-use itertools::Itertools;
 use portgraph::SecondaryMap;
 
-use crate::hugr::{Direction, HugrError, Node};
-use crate::ops::{OpTrait, OpType};
+use crate::hugr::{Direction, HugrError, HugrView, Node};
+use crate::ops::OpType;
 use crate::{Hugr, Port};
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
@@ -43,21 +42,15 @@ pub(crate) trait HugrMut {
     /// The port is left in place.
     fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError>;
 
-    /// Adds a non-dataflow edge between two nodes, allocating new ports for the
-    /// connection. The kind is given by the operation's
-    /// [`OpType::other_inputs`] or [`OpType::other_outputs`].
+    /// Adds a non-dataflow edge between two nodes. The kind is given by the
+    /// operation's [`OpType::other_input`] or [`OpType::other_output`].
     ///
     /// Returns the offsets of the new input and output ports, or an error if
     /// the connection failed.
     ///
-    /// [`OpType::other_inputs`]: crate::ops::OpType::other_inputs
-    /// [`OpType::other_outputs`]: crate::ops::OpType::other_outputs.
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(usize, usize), HugrError> {
-        let src_port: usize = self.add_ports(src, Direction::Outgoing, 1).collect_vec()[0];
-        let dst_port: usize = self.add_ports(dst, Direction::Incoming, 1).collect_vec()[0];
-        self.connect(src, src_port, dst, dst_port)?;
-        Ok((src_port, dst_port))
-    }
+    /// [`OpType::other_input`]: crate::ops::OpType::other_input
+    /// [`OpType::other_output`]: crate::ops::OpType::other_output.
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError>;
 
     /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize);
@@ -130,11 +123,10 @@ where
 {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
-        let sig = op.signature();
-        let node = self.as_mut().graph.add_node(
-            sig.input.len() + sig.const_input.iter().count(),
-            sig.output.len(),
-        );
+        let node = self
+            .as_mut()
+            .graph
+            .add_node(op.input_count(), op.output_count());
         self.as_mut().op_types[node] = op;
         node.into()
     }
@@ -177,6 +169,19 @@ where
         )?;
         self.as_mut().graph.unlink_port(port);
         Ok(())
+    }
+
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+        let src_port: Port = self
+            .get_optype(src)
+            .other_port_index(Direction::Outgoing)
+            .expect("Source operation has no non-dataflow outgoing edges");
+        let dst_port: Port = self
+            .get_optype(dst)
+            .other_port_index(Direction::Incoming)
+            .expect("Destination operation has no non-dataflow incoming edges");
+        self.connect(src, src_port.index(), dst, dst_port.index())?;
+        Ok((src_port, dst_port))
     }
 
     #[inline]
