@@ -25,7 +25,7 @@ pub type Neighbours<'a> = MapInto<crate::hugr::multiportgraph::Neighbours<'a>, N
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView {
+pub trait HugrView: AsRef<Hugr> {
     /// Return index of HUGR root node.
     fn root(&self) -> Node;
 
@@ -101,129 +101,102 @@ pub trait HugrView {
     fn all_neighbours(&self, node: Node) -> Neighbours<'_>;
 }
 
-impl<T> HugrView for T
-where
-    T: DerefHugr,
-{
+impl HugrView for Hugr {
     #[inline]
     fn root(&self) -> Node {
-        self.hugr().root.into()
+        self.root.into()
     }
 
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hugr().hierarchy.parent(node.index).map(Into::into)
+        self.hierarchy.parent(node.index).map(Into::into)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.hugr().op_types.get(node.index)
+        self.op_types.get(node.index)
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.hugr().graph.node_count()
+        self.graph.node_count()
     }
 
     #[inline]
     fn edge_count(&self) -> usize {
-        self.hugr().graph.link_count()
+        self.graph.link_count()
     }
 
     #[inline]
     fn nodes(&self) -> Nodes<'_> {
-        self.hugr().graph.nodes_iter().map_into()
+        self.graph.nodes_iter().map_into()
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> NodePorts {
-        self.hugr().graph.port_offsets(node.index, dir).map_into()
+        self.graph.port_offsets(node.index, dir).map_into()
     }
 
     #[inline]
     fn node_outputs(&self, node: Node) -> NodePorts {
-        self.hugr().graph.output_offsets(node.index).map_into()
+        self.graph.output_offsets(node.index).map_into()
     }
 
     #[inline]
     fn node_inputs(&self, node: Node) -> NodePorts {
-        self.hugr().graph.input_offsets(node.index).map_into()
+        self.graph.input_offsets(node.index).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> NodePorts {
-        self.hugr().graph.all_port_offsets(node.index).map_into()
+        self.graph.all_port_offsets(node.index).map_into()
     }
 
     #[inline]
     fn linked_ports(&self, node: Node, port: Port) -> PortLinks<'_> {
-        let hugr = self.hugr();
-        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
-        let links = hugr.graph.port_links(port);
-        PortLinks { hugr, links }
+        let port = self.graph.port_index(node.index, port.offset).unwrap();
+        let links = self.graph.port_links(port);
+        PortLinks { hugr: self, links }
     }
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.hugr().graph.num_ports(node.index, dir)
+        self.graph.num_ports(node.index, dir)
     }
 
     #[inline]
     fn num_inputs(&self, node: Node) -> usize {
-        self.hugr().graph.num_inputs(node.index)
+        self.graph.num_inputs(node.index)
     }
 
     #[inline]
     fn num_outputs(&self, node: Node) -> usize {
-        self.hugr().graph.num_outputs(node.index)
+        self.graph.num_outputs(node.index)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Children<'_> {
-        self.hugr().hierarchy.children(node.index).map_into()
+        self.hierarchy.children(node.index).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Neighbours<'_> {
-        self.hugr().graph.neighbours(node.index, dir).map_into()
+        self.graph.neighbours(node.index, dir).map_into()
     }
 
     #[inline]
     fn input_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.hugr().graph.input_neighbours(node.index).map_into()
+        self.graph.input_neighbours(node.index).map_into()
     }
 
     #[inline]
     fn output_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.hugr().graph.output_neighbours(node.index).map_into()
+        self.graph.output_neighbours(node.index).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Neighbours<'_> {
-        self.hugr().graph.all_neighbours(node.index).map_into()
-    }
-}
-
-/// Trait for things that can be converted into a reference to a Hugr.
-///
-/// This is equivalent to `Deref<Target=Hugr>`, but we use a local definition to
-/// be able to write blanket implementations.
-pub(crate) trait DerefHugr {
-    fn hugr(&self) -> &Hugr;
-}
-
-impl DerefHugr for Hugr {
-    fn hugr(&self) -> &Hugr {
-        self
-    }
-}
-
-impl<T> DerefHugr for T
-where
-    T: Deref<Target = Hugr>,
-{
-    fn hugr(&self) -> &Hugr {
-        self.deref()
+        self.graph.all_neighbours(node.index).map_into()
     }
 }
 
