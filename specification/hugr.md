@@ -92,9 +92,16 @@ represent (typed) data or control dependencies.
 
 A HUGR is a directed graph. There are several different types of node, and
 several different types of edge, with different semantics, described below.
-Nodes usually have additional data associated with them. Some edges have a
-"port" at each end (source and target), containing some additional data; others
-are simply arrows.
+
+Nodes usually have additional data associated with them.
+
+Edge types are of three kinds:
+
+- _simple_ -- just an arrow, no data;
+- _dataflow_ -- these have a _port_ at each end (source and target), containing
+  some additional data (a type); and
+- _ordered_ -- the set of outgoing edges of an ordered type from a node have a
+  definite linear ordering.
 
 The nodes represent
 processes that produce values - either statically, i.e. at compile time,
@@ -145,9 +152,14 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 Locality ::= Local | Ext | Dom
 ```
 
-Ports always exist on `Value` and `Static` edges; never on `Hierarchy`, `Order `
-or `ControlFlow` edges. Every port has an associated `SimpleType`. The source
-and target ports of an edge have the same `SimpleType`.
+`Order` edges are simple (they are just arrows). `Value` and `Static` edges are
+dataflow (they have a source and target port, each of which has an associated
+`SimpleType`, these two types being equal). `Hierarchy` and `ControlFlow` edges
+are ordered (the children of a container node have a linear ordering, as do the
+successors of a `BasicBlock` node).
+
+Note that a port is associated with both a dataflow edge and a node (adjoining
+the edge). The incoming and outgoing ports of a node are (separately) ordered.
 
 A source port with a `ClassicType` may have any number of edges associated with
 it (including zero). A port with a `LinearType`, and a target port of any type,
