@@ -873,7 +873,7 @@ ClassicType ::= int<N>
               | Container(ClassicType)
 LinearType ::= Qubit
               | QPaque(Name, #)
-              | Container(SimpleType)
+              | Container(LinearType)
 ```
 
 SimpleTypes are the types of *values* which can be sent down wires,
