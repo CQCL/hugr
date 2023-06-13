@@ -151,7 +151,8 @@ and target ports of an edge have the same `SimpleType`.
 
 A source port with a `ClassicType` may have any number of edges associated with
 it (including zero). A port with a `LinearType`, and a target port of any type,
-must have exactly one edge associated with it.
+must have exactly one edge associated with it. This captures the property of
+linear types that the value is used exactly once.
 
 #### Hierarchy
 
