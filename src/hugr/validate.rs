@@ -987,7 +987,7 @@ mod test {
         let block = b
             .add_op_with_parent(
                 cfg,
-                ops::BasicBlock::Block {
+                ops::BasicBlock::DFB {
                     inputs: type_row![B],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![B],
@@ -1027,7 +1027,7 @@ mod test {
         // Change the types in the BasicBlock node to work on qubits instead of bits
         b.replace_op(
             block,
-            ops::BasicBlock::Block {
+            ops::BasicBlock::DFB {
                 inputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
                 other_outputs: type_row![Q],

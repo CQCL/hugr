@@ -94,7 +94,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
-    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -117,7 +117,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         other_outputs: TypeRow,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        let op = OpType::BasicBlock(BasicBlock::Block {
+        let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
@@ -139,7 +139,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -154,7 +154,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
-    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -173,7 +173,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.any_block_builder(inputs, predicate_variants, other_outputs, true)
     }
 
-    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -209,7 +209,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 }
 
-/// Builder for a [`BasicBlock::Block`] child graph.
+/// Builder for a [`BasicBlock::DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
@@ -254,7 +254,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 }
 
 impl BlockBuilder<Hugr> {
-    /// Initialize a [`BasicBlock::Block`] rooted HUGR builder
+    /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,
@@ -263,7 +263,7 @@ impl BlockBuilder<Hugr> {
         let inputs = inputs.into();
         let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
         let other_outputs = other_outputs.into();
-        let op = BasicBlock::Block {
+        let op = BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
