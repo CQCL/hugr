@@ -90,7 +90,13 @@ represent (typed) data or control dependencies.
 
 ## Functional description
 
-A HUGR is a directed graph with nodes and edges. The nodes represent
+A HUGR is a directed graph. There are several different types of node, and
+several different types of edge, with different semantics, described below.
+Nodes usually have additional data associated with them. Some edges have a
+"port" at each end (source and target), containing some additional data; others
+are simply arrows.
+
+The nodes represent
 processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
@@ -138,6 +144,15 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 
 Locality ::= Local | Ext | Dom
 ```
+
+Ports always exist on `Value` and `Static` edges; never on `Hierarchy`, `Order `
+or `ControlFlow` edges. Every port has an associated `SimpleType`. The source
+and target ports of an edge have the same `SimpleType`.
+
+A source port with a `ClassicType` may have any number of edges associated with
+it (including zero). A port with a `LinearType`, and a target port of any type,
+must have exactly one edge associated with it.
+
 #### Hierarchy
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
