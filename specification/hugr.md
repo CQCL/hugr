@@ -95,14 +95,6 @@ several different types of edge, with different semantics, described below.
 
 Nodes usually have additional data associated with them.
 
-Edge types are of three kinds:
-
-- _simple_ -- just an arrow, no data;
-- _dataflow_ -- these have a _port_ at each end (source and target), containing
-  some additional data (a type); and
-- _ordered_ -- the set of outgoing edges of an ordered type from a node have a
-  definite linear ordering.
-
 The nodes represent
 processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
@@ -151,6 +143,14 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 
 Locality ::= Local | Ext | Dom
 ```
+
+Edge types are divided into three categories:
+
+- _simple_ -- just an arrow, no data;
+- _dataflow_ -- these have a _port_ at each end (source and target), containing
+  some additional data (a type); and
+- _ordered_ -- the set of outgoing edges of an ordered type from a node have a
+  definite linear ordering.
 
 `Order` edges are simple (they are just arrows). `Value` and `Static` edges are
 dataflow (they have a source and target port, each of which has an associated
