@@ -392,21 +392,22 @@ are:
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
 arbitrarily-complex (even irreducible) control flow via an explicit CFG,
 expressed using `ControlFlow` edges between `BasicBlock`-nodes that are
-children of a CFG-node.
+children of a CFG-node. `BasicBlock`-nodes only exist as children of CFG-nodes.
 
-  - `BasicBlock` nodes are CFG basic blocks. Edges between them are
-    control-flow (as opposed to dataflow), and express traditional
-    control-flow concepts of branch/merge. Each `BasicBlock` node is
-    parent to a dataflow sibling graph. `BasicBlock`-nodes only exist as
-    children of CFG-nodes.
+There are two kinds of `BasicBlock`: `DFB` (dataflow block) and `Exit`.
 
-  - `CFG` nodes: a dataflow node which is defined by a child control
-    sibling graph. All children except the second are `BasicBlock`-nodes,
-    the first is the entry block. The second child is an
-    `ExitBlock` node, which has no children, this is the single exit
-    point of the CFG and the inputs to this node match the outputs of
-    the CFG-node. The inputs to the CFG-node are wired to the inputs of
-    the entry block.
+`DFB` nodes are CFG basic blocks. Edges between them are
+control-flow (as opposed to dataflow), and express traditional
+control-flow concepts of branch/merge. Each `DFB` node is
+parent to a dataflow sibling graph.
+
+A `CFG` node is a dataflow node which is defined by a child control
+sibling graph. All children except the second are `DFB`-nodes,
+the first is the entry block. The second child is an
+`Exit` node, which has no children, this is the single exit
+point of the CFG and the inputs to this node match the outputs of
+the CFG-node. The inputs to the CFG-node are wired to the inputs of
+the entry block.
 
 The first output of the DSG contained in a `BasicBlock` has type
 `Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
@@ -439,12 +440,12 @@ has no parent).
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(second) is entry(exit)               |
+| CFG container             | "                              | CFG                | **C**         | `BasicBlock`             | First(second) is entry(exit)             |
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)         |
+| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
-| "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
+| "                         | Static                         | `Def`              | **C**         |  "                       | "                                        |
+| "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
 | "                         | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
 
@@ -459,7 +460,7 @@ cycles. The common parent is a CFG-node.
 `Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
 must be acyclic. There is a unique Input node and Output node. All nodes must be
 reachable from the Input node, and must reach the Output node. The common parent
-may be a `Def`, `TailLoop`, `DFG`, `Case` or `BasicBlock` node.
+may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
