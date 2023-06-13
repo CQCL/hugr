@@ -90,7 +90,12 @@ represent (typed) data or control dependencies.
 
 ## Functional description
 
-A HUGR is a directed graph with nodes and edges. The nodes represent
+A HUGR is a directed graph. There are several different types of node, and
+several different types of edge, with different semantics, described below.
+
+Nodes usually have additional data associated with them.
+
+The nodes represent
 processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
@@ -138,7 +143,32 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 
 Locality ::= Local | Ext | Dom
 ```
-#### Hierarchy
+
+#### Ports and ordering of edges
+
+Edge kinds are divided into three categories:
+
+- `Order` -- simple edges with just an arrow, no data;
+- `Value`, `Static` -- dataflow edges with a _port_ at each end (source and
+  target), containing some additional data (a type); and
+- `Hierarchy`, `ControlFlow` -- the set of outgoing edges of one of these kinds
+  from a node has a definite linear ordering.
+
+`Order` edges are simple (they are just arrows). `Value` and `Static` edges are
+dataflow (they have a source and target port, each of which has an associated
+`SimpleType`, these two types being equal). `Hierarchy` and `ControlFlow` edges
+are ordered (the children of a container node have a linear ordering, as do the
+successors of a `BasicBlock` node).
+
+Note that a port is associated with both a dataflow edge and a node (adjoining
+the edge). The incoming and outgoing ports of a node are (separately) ordered.
+
+A source port with a `ClassicType` may have any number of edges associated with
+it (including zero). A port with a `LinearType`, and a target port of any type,
+must have exactly one edge associated with it. This captures the property of
+linear types that the value is used exactly once.
+
+#### Kinds of edge
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
 of *b*. Only certain nodes, known as *container* nodes, may act as parents -
@@ -149,43 +179,35 @@ with a unique root node. The HUGR is characterized by the type of its root node.
 The root node has no non-hierarchy edges (and this supercedes any other requirements on the
 edges of specific node types).
 
-A **sibling graph** is a subgraph of the HUGR containing all nodes with
+A _sibling graph_ is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
 them.
-
-#### Value
 
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node. Every port has an
+source node, to an incoming port of the target node. Every port has an
 associated type; the sequences of incoming and outgoing port types of a node constitute its
-**Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
+_signature_. Outgoing ports of kind `Value(ClassicType)` may have any number
 of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
 must have exactly one. See [Linearity](#linearity).
-
 
 In addition to the incoming and outgoing `Value` edges, the signature may also specify a row
 of `ClassicType`s for incoming `Static` edges. These correspond to incoming
 ports that follow the incoming `Value` ports.
 
-
 Value edges are parameterized by the locality and type; there are three
 possible localities:
 
   - Local: both source and target nodes must have the same parent
-
   - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
     parent<sup>i</sup>(dest) for i\>1; see
     [inter-graph-edges](#inter-graph-value-edges).
-
   - Dom: edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
     [inter-graph-edges](#inter-graph-value-edges)
 
 Note that the locality is not fixed or even specified by the signature.
-
-#### Static
 
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
@@ -195,15 +217,11 @@ these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
 
-#### Order
-
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
 local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
-
-#### Controlflow
 
 **ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
