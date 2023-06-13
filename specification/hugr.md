@@ -144,7 +144,9 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 Locality ::= Local | Ext | Dom
 ```
 
-Edge types are divided into three categories:
+#### Ports and ordering of edges
+
+Edge kinds are divided into three categories:
 
 - _simple_ -- just an arrow, no data;
 - _dataflow_ -- these have a _port_ at each end (source and target), containing
@@ -166,7 +168,9 @@ it (including zero). A port with a `LinearType`, and a target port of any type,
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once.
 
-#### Hierarchy
+#### Kinds of edge
+
+##### Hierarchy
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
 of *b*. Only certain nodes, known as *container* nodes, may act as parents -
@@ -181,7 +185,7 @@ A **sibling graph** is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
 them.
 
-#### Value
+##### Value
 
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
@@ -213,7 +217,7 @@ possible localities:
 
 Note that the locality is not fixed or even specified by the signature.
 
-#### Static
+##### Static
 
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
@@ -223,7 +227,7 @@ these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
 
-#### Order
+##### Order
 
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
@@ -231,7 +235,7 @@ local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
 
-#### Controlflow
+##### Controlflow
 
 **ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
