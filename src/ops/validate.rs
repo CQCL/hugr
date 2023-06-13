@@ -329,7 +329,7 @@ impl ValidateOp for BasicBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlock::Block {
+            BasicBlock::DFB {
                 predicate_variants, ..
             } => OpValidityFlags {
                 allowed_children: OpTag::DataflowChild,
@@ -351,7 +351,7 @@ impl ValidateOp for BasicBlock {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            BasicBlock::Block {
+            BasicBlock::DFB {
                 inputs,
                 predicate_variants,
                 other_outputs: outputs,
