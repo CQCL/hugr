@@ -4,12 +4,13 @@
 use std::collections::HashMap;
 use thiserror::Error;
 
+use crate::ops::OpTrait;
 use crate::{hugr::Hugr, ops::OpType};
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, Hierarchy, LinkError, NodeIndex, UnmanagedDenseMap};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::multiportgraph::{MultiPortGraph, SubportIndex};
+use super::multiportgraph::MultiPortGraph;
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -35,7 +36,7 @@ struct SerHugrV0 {
     /// For each node: (parent, num_inputs, num_outputs, node_operation)
     nodes: Vec<(NodeIndex, usize, usize, OpType)>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
-    edges: Vec<[(NodeIndex, usize); 2]>,
+    edges: Vec<[(NodeIndex, Option<u16>); 2]>,
     root: NodeIndex,
 }
 
@@ -48,6 +49,14 @@ pub enum HUGRSerializationError {
     /// Failed to add edge.
     #[error("Failed to build edge when deserializing: {0:?}.")]
     LinkError(#[from] LinkError),
+    /// Edges without port offsets cannot be present in operations without non-dataflow ports.
+    #[error("Cannot connect an edge without port offset to node {node:?} with operation type {op_type:?}.")]
+    MissingPortOffset {
+        /// The node that has the port without offset.
+        node: NodeIndex,
+        /// The operation type of the node.
+        op_type: OpType,
+    },
 }
 
 impl Serialize for Hugr {
@@ -114,23 +123,31 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             *parent = node_rekey[parent];
         }
 
-        let find_offset = |p: SubportIndex| {
-            (
-                node_rekey[&graph.port_node(p).unwrap()],
-                graph.port_offset(p).unwrap().index(),
-            )
+        let find_offset = |node: NodeIndex, offset: usize, dir: Direction| {
+            let sig = &op_types[node].signature();
+            let offset = match offset < sig.port_count(dir) {
+                true => Some(offset as u16),
+                false => None,
+            };
+            (node, offset)
         };
 
         let edges: Vec<_> = graph
-            .ports_iter()
-            .filter_map(|port| {
-                if graph.port_direction(port) == Some(Direction::Outgoing) {
-                    Some(graph.port_links(port))
-                } else {
-                    None
-                }
+            .nodes_iter()
+            .flat_map(|node| {
+                graph
+                    .outputs(node)
+                    .enumerate()
+                    .flat_map(move |(src_offset, port)| {
+                        let src = find_offset(node, src_offset, Direction::Outgoing);
+                        graph.port_links(port).map(move |(_, tgt)| {
+                            let tgt_node = graph.port_node(tgt).unwrap();
+                            let tgt_offset = graph.port_offset(tgt).unwrap().index();
+                            let tgt = find_offset(tgt_node, tgt_offset, Direction::Incoming);
+                            [src, tgt]
+                        })
+                    })
             })
-            .flat_map(|port_links| port_links.map(|(src, tgt)| [src, tgt].map(find_offset)))
             .collect();
 
         Ok(Self {
@@ -158,7 +175,24 @@ impl TryFrom<SerHugrV0> for Hugr {
             op_types_sec[ni] = typ;
         }
 
+        let unwrap_offset = |node, offset, dir| -> Result<usize, Self::Error> {
+            let offset = match offset {
+                Some(offset) => offset as usize,
+                None => op_types_sec[node]
+                    .other_port_index(dir)
+                    .ok_or(HUGRSerializationError::MissingPortOffset {
+                        node,
+                        op_type: op_types_sec[node].clone(),
+                    })?
+                    .index(),
+            };
+            Ok(offset)
+        };
         for [(srcn, from_offset), (tgtn, to_offset)] in edges {
+            let from_offset = unwrap_offset(srcn, from_offset, Direction::Outgoing)?;
+            let to_offset = unwrap_offset(tgtn, to_offset, Direction::Incoming)?;
+            assert!(from_offset < graph.num_outputs(srcn));
+            assert!(to_offset < graph.num_inputs(tgtn));
             graph.link_nodes(srcn, from_offset, tgtn, to_offset)?;
         }
 
