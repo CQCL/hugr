@@ -433,7 +433,7 @@ has no parent).
 | "                         | Static                         | `Def`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| "                         | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
+| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
