@@ -443,8 +443,8 @@ graph:
 cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
-`Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. There is a unique Input node and Output node. All nodes must be
+`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
+and must be acyclic. There is a unique Input node and Output node. All nodes must be
 reachable from the Input node, and must reach the Output node. The common parent
 may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
