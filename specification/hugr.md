@@ -1923,29 +1923,29 @@ differences include:
 The following table shows which edge kinds may adjoin each node type.
 
 Under each edge kind, the inbound constraints are followed by the outbound
-constraints. The symbol ✱ atands for "any number". For example, "1, ✱" means
-"one edge in, any number out".
+constraints. The symbol ✱ stands for "any number", while + stands for "at least
+one". For example, "1, ✱" means "one edge in, any number out".
 
-Except for `Module` it is assumed that these are non-root nodes. The `Module`
-row of the table applies to root nodes of any type.
+The "Root" row of the table applies to whichever node is the HUGR root,
+including `Module`.
 
 | Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
 | -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
-| `Module`       | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, ✱        | DSG      |
+| Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
+| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
 | `Declare`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
 | `AliasDef`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `AliasDeclare` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `LoadConst`    | 0, 1    | 1, 1    | 1, 0     | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
 | `Output`       | ✱, 0    | ✱, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0     | 0, 0          | 1, 0        |          |
 | `Call`         | ✱, ✱    | ✱, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
-| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | DSG      |
-| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | CSG      |
-| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, ✱        | DSG      |
-| `Exit`         | 0, 0    | 0, 0    | 0, 0     | ✱, 0          | 1, 0        |          |
-| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | DSG      | 
-| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | `Case`   |
-| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, ✱        | DSG      |
+| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
+| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | CSG      |
+| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, +        | DSG      |
+| `Exit`         | 0, 0    | 0, 0    | 0, 0     | +, 0          | 1, 0        |          |
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      | 
+| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
+| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
