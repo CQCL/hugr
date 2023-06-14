@@ -1819,9 +1819,11 @@ an edge weight.
   - **value edge:** An edge between data-dependency nodes. Has a fixed
     edge type.
 
-## Appendix: Rationale for Control Flow
+## Appendices
 
-### **Justification of the need for CFG-nodes**
+### Appendix 1: Rationale for Control Flow
+
+#### **Justification of the need for CFG-nodes**
 
   - Conditional + TailLoop are not able to express arbitrary control
     flow without introduction of extra variables (dynamic overhead, i.e.
@@ -1855,7 +1857,7 @@ an edge weight.
 `CFG` because we believe they are much easier to work with conceptually
 e.g. for authors of "rewrite rules" and other optimisations.
 
-### **Alternative representations considered but rejected**
+#### **Alternative representations considered but rejected**
 
   - A [Google paper](https://dl.acm.org/doi/pdf/10.1145/2693261) allows
     for the introduction of extra variables into the DSG that can be
@@ -1891,7 +1893,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     inter-graph edges for called functions. TODO are those objections
     sufficient to rule this out?
 
-#### Comparison with MLIR
+##### Comparison with MLIR
 
 There are a lot of broad similarities here, with MLIR’s regions
 providing hierarchy, and “graph” regions being like DSGs. Significant
@@ -1915,3 +1917,35 @@ differences include:
   - I note re. closures that MLIR expects the enclosing scope to make
     sure any referenced values are kept ‘live’ for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
+
+### Appendix 2: Node types and their edges
+
+The following table shows which edge kinds may adjoin each node type.
+
+Under each edge kind, the inbound constraints are followed by the outbound
+constraints. The symbol ✱ atands for "any number". For example, "1, ✱" means
+"one edge in, any number out".
+
+Except for `Module` it is assumed that these are non-root nodes. The `Module`
+row of the table applies to root nodes of any type.
+
+| Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
+| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
+| `Module`       | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
+| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, ✱        | DSG      |
+| `Declare`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `AliasDef`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `AliasDeclare` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `LoadConst`    | 0, 1    | 1, 1    | 1, 0     | 0, 0          | 1, 0        |          |
+| `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
+| `Output`       | ✱, 0    | ✱, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0     | 0, 0          | 1, 0        |          |
+| `Call`         | ✱, ✱    | ✱, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
+| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | DSG      |
+| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | CSG      |
+| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, ✱        | DSG      |
+| `Exit`         | 0, 0    | 0, 0    | 0, 0     | ✱, 0          | 1, 0        |          |
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | DSG      | 
+| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, ✱        | `Case`   |
+| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, ✱        | DSG      |
