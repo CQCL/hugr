@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [dependencies]
 thiserror = "1.0.28"
-portgraph = { version = "0.4.0", features = ["serde"] }
+portgraph = { version = "0.5.0", features = ["serde"] }
 pyo3 = { version = "0.19.0", optional = true, features = [
     "multiple-pymethods",
 ] }
@@ -48,7 +48,7 @@ pyo3 = ["dep:pyo3"]
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
 rstest = "0.17.0"
-portgraph = { version = "0.4.0", features = ["proptest"] }
+portgraph = { version = "0.5.0", features = ["proptest"] }
 proptest = "1.1.0"
 rmp-serde = "1.1.1"
 webbrowser = "0.8.10"

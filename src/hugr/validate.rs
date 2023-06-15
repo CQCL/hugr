@@ -5,7 +5,7 @@ use std::iter;
 
 use itertools::Itertools;
 use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
-use portgraph::PortIndex;
+use portgraph::{LinkView, PortIndex, PortView};
 use thiserror::Error;
 
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
