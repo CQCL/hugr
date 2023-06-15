@@ -7,10 +7,11 @@ use thiserror::Error;
 use crate::ops::OpTrait;
 use crate::{hugr::Hugr, ops::OpType};
 use portgraph::hierarchy::AttachError;
-use portgraph::{Direction, Hierarchy, LinkError, NodeIndex, UnmanagedDenseMap};
+use portgraph::multiportgraph::MultiPortGraph;
+use portgraph::{
+    Direction, Hierarchy, LinkError, LinkView, NodeIndex, PortView, UnmanagedDenseMap,
+};
 use serde::{Deserialize, Deserializer, Serialize};
-
-use super::multiportgraph::MultiPortGraph;
 
 /// A wrapper over the available HUGR serialization formats.
 ///

@@ -5,6 +5,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 use itertools::{Itertools, MapInto};
+use portgraph::{LinkView, PortView};
 
 use super::Hugr;
 use super::{Node, Port};
@@ -12,7 +13,7 @@ use crate::ops::OpType;
 use crate::Direction;
 
 /// An Iterator over the nodes in a Hugr(View)
-pub type Nodes<'a> = MapInto<crate::hugr::multiportgraph::Nodes<'a>, Node>;
+pub type Nodes<'a> = MapInto<portgraph::multiportgraph::Nodes<'a>, Node>;
 
 /// An Iterator over (some or all) ports of a node
 pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
@@ -21,7 +22,7 @@ pub type NodePorts = MapInto<portgraph::portgraph::NodePortOffsets, Port>;
 pub type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>;
 
 /// An Iterator over (some or all) the nodes neighbouring a node
-pub type Neighbours<'a> = MapInto<crate::hugr::multiportgraph::Neighbours<'a>, Node>;
+pub type Neighbours<'a> = MapInto<portgraph::multiportgraph::Neighbours<'a>, Node>;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -208,7 +209,7 @@ where
 #[derive(Clone)]
 pub struct PortLinks<'a> {
     hugr: &'a Hugr,
-    links: crate::hugr::multiportgraph::PortLinks<'a>,
+    links: portgraph::multiportgraph::PortLinks<'a>,
 }
 
 impl<'a> Iterator for PortLinks<'a> {
