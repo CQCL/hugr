@@ -1168,44 +1168,78 @@ The new hugr is then derived as follows:
 
 ###### `Replace`
 
-This takes as input:
+This is the general subgraph-replacement method.
 
-  - a set S of IDs of nodes in Γ, all of which are separated;
+A _partial hugr_ is is a graph $G$ having the same node and edge types as a hugr
+and satisfying all the same local constraints except that it may be missing edges.
 
-  - a partial hugr G;
+In particular:
 
-  - a map T from top(G) to IDs of container nodes in Γ\\S\*;
+  - it has no root node (the set of nodes without a parent is
+    denoted $\mathrm{top}(G)$ );
+  - it may have empty container nodes (the set of these is
+    denoted $\mathrm{bot}(G)$ ).
 
-  - a map B from bot(G) to IDs of container nodes in S\*, such that B(x)
-    is separated from B(y) unless x == y. Let X be the set of children
-    of values in B, and R be S\*\\X\*.
+A partial hugr describes a set of nodes and well-formed edges between
+them that potentially forms a subgraph of a hugr.
 
-  - a bijection μ<sub>inp</sub> between inp(G) and the set of input
-    ports of nodes in R whose source is not in R;
+Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
+descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
+including $S$ itself.
 
-  - a bijection μ<sub>out</sub> between out(G) and the set of output
-    ports of nodes in R whose target is not in R;
+Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
+$b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them).
 
-  - disjoint subsets Init and Term of top(G);
+We define two structures to specify edge insertion.
 
-The new hugr is then derived by:
+A `NewInpEdgeSpec` specifies an edge inserted from an existing node to a (given) new node.
+It contains the following fields:
 
-1.  adding the new nodes from G;
+  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
+  - `SrcNode`: the source node of the new edge.
+  - `SrcPort`: (for `Value` and `Static` edges only) the source port.
+  - `ToPos`: (for `Value` and `Static` edges only) the desired position among
+    the incoming ports to the new node.
 
-2.  connecting the ports according to the bijections μ<sub>inp</sub> and
-    μ<sub>out</sub>;
+A `NewOutEdgeSpec` specifies an edge inserted from a new node to an existing node.
+It contains the following fields:
 
-3.  for each node n in top(G), adding a hierarchy edge from t(n) to n,
-    placing n in the first position among children of t(n) if n is in
-    Init and in the second position if n is in Term;
+  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
+  - `TgtNode`: the target node of the new edge.
+  - `TgtPort`: (for `Value` and `Static` edges only) the target port (whose
+    existing incoming edge will be removed).
+  - `FromPos` (for `Value`, `Static` and `ControlFlow` edges only) the desired
+    position among the outgoing ports from the new node.
 
-4.  for each node n in bot(G), and for each child m of b(n), adding a
-    hierarchy edge from n to m (replacing m’s existing parent edge)
+The `Replace` method takes as input:
 
-5.  removing all nodes in R
+  - a set $S$ of mutually-separated nodes in $\Gamma$;
+  - a partial hugr $G$;
+  - a map $T : \mathrm{top}(G) \to \Gamma \setminus S^*$ whose image consists of container nodes;
+  - a map $B : \mathrm{bot}(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
+    is separated from $B(y)$ unless $x = y$. Let $X$ be the set of children
+    of nodes $B(y)$ for $y \in \mathrm{bot}(G)$, and $R = S^\* \setminus X^\*$.
+  - a list $\mu\_\textrm{inp}$ of pairs $(n, \sigma\_\mathrm{inp})$ where $n$ is a node in $G$ and $\sigma\_\mathrm{inp}$ is a `NewInpEdgeSpec`;
+  - a list $\mu\_\textrm{out}$ of pairs $(n, \sigma\_\mathrm{out})$ where $n$ is a node in $G$ and $\sigma\_\mathrm{out}$ is a `NewOutEdgeSpec`.
 
-6.  If any edges inserted in step 2 are inter-graph (i.e DFG.
-    non-sibling), inserting any `Order` edges required to validate them.
+The new hugr is then derived as follows:
+
+1.  Make a copy in $\Gamma$ of all the nodes in $G$, and all edges between them.
+2.  For each $(n, \sigma\_\mathrm{inp}) \in \mu\_\textrm{inp}$, insert a new edge going into the new
+    copy of $n$ according to the specification $\sigma\_\mathrm{inp}$. (Note: some
+    bookkeeping will be required to ensure the eventual input port orderings of newly added nodes
+    are correct.)
+3.  For each $(n, \sigma\_\mathrm{out}) \in \mu\_\textrm{out}$, insert a new edge going out of the new
+    copy of $n$ according to the specification $\sigma\_\mathrm{out}$. (Note: it should
+    be verified that the predecessor node of the existing target port is in $R$,
+    and so will be removed at step 6.)
+4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
+    of children of $t$ (adding a hierachy edge from $t$ to $n$).
+5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace $m$ with
+    the new copy of $n$ in the list of children of $b$ (replacing the existing hierarchy edge).
+6.  Remove all nodes in $R$ and edges adjoining them.
+7.  If any edges inserted in step 2 are inter-graph (i.e. DFG,
+    non-sibling), insert any `Order` edges required to validate them.
 
 ##### Outlining methods
 
