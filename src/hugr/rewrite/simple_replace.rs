@@ -2,9 +2,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use portgraph::NodeIndex;
+use portgraph::{LinkView, NodeIndex, PortView};
 
-use crate::hugr::{HugrView, HugrMut};
+use crate::hugr::{HugrMut, HugrView};
 use crate::{
     hugr::{Node, Rewrite},
     ops::{tag::OpTag, OpTrait, OpType},

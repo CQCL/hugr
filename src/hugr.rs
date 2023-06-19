@@ -16,11 +16,11 @@ pub use rewrite::{Replace, ReplaceError, Rewrite, SimpleReplacement, SimpleRepla
 
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, LinkView, NodeIndex, PortView, UnmanagedDenseMap};
+use portgraph::{Hierarchy, LinkView, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{OpName, OpTrait, OpType};
+use crate::ops::{OpName, OpType};
 use crate::types::EdgeKind;
 
 /// The Hugr data structure.
