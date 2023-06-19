@@ -1207,27 +1207,28 @@ mod test {
     }
 
     #[test]
-    /// A wire with resource requirement `[A]` is wired into a function of type
-    /// `Nat -> Nat`. In the validation resource typechecking, we don't do any
+    /// A wire with resource requirement `[A]` is wired into a an output with no
+    /// resource req. In the validation resource typechecking, we don't do any
     /// unification, so don't allow open resource variables on the function
     /// signature, so this fails.
     fn too_many_resources() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let mut main_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
-        main_sig.output_resources.insert(&"A".into());
+        let main_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
 
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+        inner_sig.output_resources.insert(&"A".into());
 
         let f_builder = main.dfg_builder(inner_sig, [main_input])?;
         let f_inputs = f_builder.input_wires();
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        module_builder.finish_hugr()?;
+        let handle = module_builder.finish_hugr();
+        assert_matches!(handle, Err(ValidationError::SrcExceedsTgtResources { .. }));
         Ok(())
     }
 
