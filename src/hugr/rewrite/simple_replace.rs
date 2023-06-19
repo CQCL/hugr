@@ -48,7 +48,8 @@ impl SimpleReplacement {
     }
 }
 
-impl Rewrite<SimpleReplacementError> for SimpleReplacement {
+impl Rewrite for SimpleReplacement {
+    type Error = SimpleReplacementError;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, _h: &Hugr) -> Result<(), SimpleReplacementError> {

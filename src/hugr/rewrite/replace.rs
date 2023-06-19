@@ -125,7 +125,8 @@ impl Replace {
     }
 }
 
-impl Rewrite<ReplaceError> for Replace {
+impl Rewrite for Replace {
+    type Error = ReplaceError;
     const UNCHANGED_ON_FAILURE: bool = false;
 
     /// Checks that the rewrite is valid.

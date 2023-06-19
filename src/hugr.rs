@@ -80,7 +80,7 @@ pub struct Wire(Node, usize);
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<E>) -> Result<(), E> {
+    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error=E>) -> Result<(), E> {
         rw.apply(self)
     }
 
