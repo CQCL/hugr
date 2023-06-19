@@ -202,10 +202,10 @@ possible localities:
   - Local: both source and target nodes must have the same parent
   - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
     parent<sup>i</sup>(dest) for i\>1; see
-    [inter-graph-edges](#inter-graph-value-edges).
+    [Inter-graph Edges](#inter-graph-edges).
   - Dom: edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
-    [inter-graph-edges](#inter-graph-value-edges)
+    [Inter-graph Edges](#inter-graph-edges)
 
 Note that the locality is not fixed or even specified by the signature.
 
@@ -448,12 +448,12 @@ and must be acyclic. There is a unique Input node and Output node. All nodes mus
 reachable from the Input node, and must reach the Output node. The common parent
 may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
-| **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Edge Kind**  | **Locality** |
+| -------------- | ------------ |
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
-| Order, Control | Source + target have same parent                                                                                                                                                                        |
-| Value          | For local edges, source + target have same parent, but there are [inter-graph edges](#inter-graph-value-edges) |
-| Static         | Parent of source is ancestor of target                                                                                                                                                                  |
+| Order, Control | Local (Source + target have same parent) |
+| Value          | Local, Ext or Dom - see [Inter-graph edges](#inter-graph-edges) |
+| Static         | Local, Ext or Dom - see [Inter-graph edges](#inter-graph-edges) |
 
 ### Exception Handling
 
@@ -489,27 +489,25 @@ may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
     resource, taking a graph argument; and `run_circuit` will return the
     same way.
 
-#### **Inter-Graph Value Edges**
+#### **Inter-Graph Edges**
 
-**For classical values only** we allow value edges
+**For classical values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is either Ext or Dom, as
 follows:
 
-Specifically, these rules allow for edges where in a given execution of
-the HUGR the source of the edge executes once, but the target may
-execute \>=0 times.
-
 1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
-    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1 *and* there must be
-    a order edge from parent(n<sub>1</sub>) to
-    parent<sup>i-1</sup>(n<sub>2</sub>). The order edge records the
+    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from parent(n<sub>1</sub>) to
+    parent<sup>i-1</sup>(n<sub>2</sub>).
+
+    The order edge records the
     ordering requirement that results, i.e. it must be possible to
     execute the entire n<sub>1</sub> node before executing
     parent<sup>i-1</sup>(n<sub>2</sub>). (Further recall that
     order+value edges together must be acyclic). We record the
     relationship between the inter-graph value edge and the
     corresponding order edge via metadata on each edge.
+
     For Static edges this order edge is not required since the source is
     guaranteed to causally precede the target.
 
@@ -520,6 +518,10 @@ execute \>=0 times.
     parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
     i\>1 allows the node to target an arbitrarily-deep descendant of the
     dominated block, similar to an Ext edge.)
+
+Specifically, these rules allow for edges where in a given execution of
+the HUGR the source of the edge executes once, but the target may
+execute \>=0 times.
 
 <img src="attachments/2647818241/2647818338.png" width="768px">
 
@@ -1765,7 +1767,7 @@ an edge weight.
   - **input signature**: The input signature of a node is the mapping
     from identifiers of input ports to their associated edge types.
 
-  - **inter-graph edge**: TODO
+  - **inter-graph edge**: A Value or Static edge with Locality Ext or Dom (i.e. not Local)
 
   - **CFG node**: A node representing a control-flow graph. Its children
     are all BasicBlock nodes, of which there is exactly one entry node
