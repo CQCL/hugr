@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::iter;
 
 use itertools::Itertools;
+use petgraph::algo::dominators::{self, Dominators};
 use petgraph::visit::{DfsPostOrder, Walker};
-use portgraph::algorithms::{dominators_filtered, DominatorTree};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
@@ -28,7 +28,7 @@ use super::view::HugrView;
 struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<Node, DominatorTree>,
+    dominators: HashMap<Node, Dominators<portgraph::NodeIndex>>,
     /// Resource requirements associated with each edge
     resources: HashMap<(Node, Direction), ResourceSet>,
 }
@@ -94,23 +94,14 @@ impl<'a> ValidationContext<'a> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    //
-    // TODO: Use a `DominatorTree<HashMap>` once that's supported
-    //   see https://github.com/CQCL/portgraph/issues/55
-    fn compute_dominator(&self, node: Node) -> DominatorTree {
-        let entry = self.hugr.hierarchy.first(node.index).unwrap();
-        dominators_filtered(
-            self.hugr.graph.as_portgraph(),
-            entry,
-            Direction::Outgoing,
-            |n| {
-                // We include copy nodes in addition to basic blocks.
-                // These are later filtered when iterating.
-                !self.hugr.graph.contains_node(n)
-                    || OpTag::BasicBlock.contains(self.hugr.get_optype(n.into()).tag())
-            },
-            |_, _| true,
-        )
+    fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
+        let region = portgraph::view::region::Region::new(
+            &self.hugr.graph,
+            &self.hugr.hierarchy,
+            parent.index,
+        );
+        let entry_node = self.hugr.hierarchy.first(parent.index).unwrap();
+        dominators::simple_fast(&region, entry_node)
     }
 
     /// Check the constraints on a single node.
@@ -520,12 +511,6 @@ impl<'a> ValidationContext<'a> {
                 }
 
                 // Check domination
-                //
-                // TODO: Add a more efficient lookup for dominator trees.
-                //
-                // TODO: Use a HUGR-specific dominator that ignores the copy nodes,
-                // so we can be more efficient and avoid the `contains_node` filter.
-                // https://github.com/CQCL-DEV/hugr/issues/125
                 let dominator_tree = match self.dominators.get(&ancestor_parent) {
                     Some(tree) => tree,
                     None => {
