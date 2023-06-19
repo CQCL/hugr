@@ -71,7 +71,7 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Use the signature supplied by a dataflow node to work out the resource
+    /// Use the signature supplied by a dataflow node to work out the
     /// resource requirements for all of its input and output edges, then put
     /// those requirements in the ValidationContext
     fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
