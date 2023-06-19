@@ -77,22 +77,16 @@ impl<'a> ValidationContext<'a> {
     fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
         let op = self.hugr.op_types.get(node.index);
         let sig = op.signature();
-        let input_ports = self.hugr.node_ports(*node, Direction::Incoming);
 
-        for port in input_ports.into_iter() {
-            assert!(self
-                .resources
-                .insert((*node, port), sig.input_resources.clone())
-                .is_none());
+        for dir in Direction::BOTH {
+            for port in self.hugr.node_ports(*node, dir) {
+                assert!(self
+                    .resources
+                    .insert((*node, port), sig.get_resources(&dir).clone())
+                    .is_none());
+            }
         }
 
-        let output_ports = self.hugr.node_ports(*node, Direction::Outgoing);
-        for port in output_ports.into_iter() {
-            assert!(self
-                .resources
-                .insert((*node, port), sig.output_resources.clone())
-                .is_none());
-        }
         Ok(())
     }
 
