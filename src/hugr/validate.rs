@@ -188,6 +188,7 @@ impl<'a> ValidationContext<'a> {
     ) -> Result<(), ValidationError> {
         let d1 = self.hugr.graph.port_direction(*port.1).unwrap();
         let d2 = self.hugr.graph.port_direction(*link.1).unwrap();
+        // Work out the order of the edges
         let (src, tgt) = match (d1, d2) {
             (Direction::Outgoing, Direction::Incoming) => ((from_node, port.1), (to_node, link.1)),
             (Direction::Incoming, Direction::Outgoing) => ((to_node, link.1), (from_node, port.1)),
@@ -205,12 +206,6 @@ impl<'a> ValidationContext<'a> {
         };
         let rs_src = self.resources.get(src.1).unwrap();
         let rs_tgt = self.resources.get(tgt.1).unwrap();
-
-        println!(
-            "SRC: {:?}\nTGT: {:?}",
-            self.hugr.get_optype(*src.0),
-            self.hugr.get_optype(*tgt.0)
-        );
 
         if rs_src == rs_tgt {
             Ok(())
@@ -1184,6 +1179,9 @@ mod test {
     }
 
     #[test]
+    /// A wire with no resource requirements is wired into a node which has
+    /// [A,B] resources required on its inputs and outputs. This could be fixed
+    /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let mut main = module_builder
@@ -1209,7 +1207,10 @@ mod test {
     }
 
     #[test]
-    // Should be fine?
+    /// A wire with resource requirement `[A]` is wired into a function of type
+    /// `Nat -> Nat`. In the validation resource typechecking, we don't do any
+    /// unification, so don't allow open resource variables on the function
+    /// signature, so this fails.
     fn too_many_resources() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
@@ -1221,11 +1222,6 @@ mod test {
 
         let inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
 
-        // Inner DFG has resource requirements that the wire wont satisfy
-        //let rs = ResourceSet::from_iter(["A".into(), "B".into()]);
-        //inner_sig.inputresources = rs.clone();
-        //inner_sig.output_resources = rs;
-
         let f_builder = main.dfg_builder(inner_sig, [main_input])?;
         let f_inputs = f_builder.input_wires();
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
@@ -1236,10 +1232,13 @@ mod test {
     }
 
     #[test]
+    /// A wire with resource requirements `[A]` and another with requirements
+    /// `[B]` are both wired into a node which requires its inputs to have
+    /// requirements `[A,B]`. A slightly more complex test of the error from
+    /// `missing_lift_node`.
     fn resource_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        //let all_rs = ResourceSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
 
         let mut main_sig = Signature::new_df(type_row![], type_row![NAT]);
