@@ -369,7 +369,7 @@ pub trait Dataflow: Container {
             .map(|&wire| self.get_wire_type(wire))
             .collect();
         let types = types?.into();
-        let make_op = self.add_dataflow_op(LeafOp::MakeTuple(types), values)?;
+        let make_op = self.add_dataflow_op(LeafOp::MakeTuple { tys: types }, values)?;
         Ok(make_op.out_wire(0))
     }
 

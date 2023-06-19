@@ -288,7 +288,9 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            LeafOp::Noop(f_build.get_wire_type(in_wire).unwrap()),
+                            LeafOp::Noop {
+                                ty: f_build.get_wire_type(in_wire).unwrap(),
+                            },
                             [in_wire],
                         )
                         .unwrap()
@@ -301,7 +303,6 @@ pub mod test {
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
-
         // HUGR internal structures are not preserved across serialization, so
         // test equality on SerHugrV0 instead.
         assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
