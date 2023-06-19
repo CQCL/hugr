@@ -254,16 +254,6 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
-        // Ignore subport indices assuming that we only care about dataflow nodes
-        for link_index in links.clone().map(|(_, b)| b.port()) {
-            let link_node = self.hugr.graph.port_node(link_index).unwrap();
-            let link_port = self.hugr.graph.port_offset(link_index).unwrap();
-            self.check_resources_compatible(
-                &(node, port),
-                &(link_node.into(), link_port.into()),
-            )?;
-        }
-
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
             return Ok(());
@@ -280,6 +270,12 @@ impl<'a> ValidationContext<'a> {
 
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
+
+            self.check_resources_compatible(
+                &(node, port),
+                &(other_node, other_offset)
+                )?;
+
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
                 // The number of ports in `other_node` does not match the operation definition.
