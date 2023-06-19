@@ -1096,24 +1096,6 @@ is itself in S.
 The meaning of “convex” is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
 
-A *partial hugr* is is a graph G satisfying all the constraints of a
-hugr except that:
-
-  - it may have unconnected input ports (the set of these is denoted
-    inp(G));
-
-  - it may have unconnected output ports (the set of these is denoted
-    out(G));
-
-  - it has no root node (the set of IDs of nodes without a parent is
-    denoted top(G));
-
-  - it may have empty container nodes (the set of IDs of these is
-    denoted bot(G)).
-
-A “partial hugr” describes a set of nodes and well-formed edges between
-them that potentially occupies a region of a hugr.
-
 Given a set S of nodes in a hugr, let S\* be the set of all nodes
 descended from nodes in S, including S itself.
 
