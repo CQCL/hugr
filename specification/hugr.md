@@ -1220,8 +1220,6 @@ The new hugr is then derived as follows:
 5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace $m$ with
     the new copy of $n$ in the list of children of $b$ (replacing the existing hierarchy edge).
 6.  Remove all nodes in $R$ and edges adjoining them.
-7.  If any edges inserted in step 2 are inter-graph (i.e. DFG,
-    non-sibling), insert any `Order` edges required to validate them.
 
 ##### Outlining methods
 
