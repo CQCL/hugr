@@ -1717,6 +1717,9 @@ an edge weight.
     and one exit node. Nodes are basic blocks, edges point to possible
     successors.
 
+  - **Dataflow edge** either a Value edge or a Static edge; has a type,
+    and runs between an output port and an input port.
+
   - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
     Dataflow container node, with all edges between them. Includes
     exactly one input node (unique node having no input edges) and one
