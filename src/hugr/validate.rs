@@ -1,11 +1,12 @@
 //! HUGR invariant checks.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::iter;
 
 use itertools::Itertools;
-use portgraph::algorithms::{dominators_filtered, toposort_filtered, DominatorTree};
-use portgraph::{LinkView, PortIndex, PortView};
+use petgraph::visit::{DfsPostOrder, Walker};
+use portgraph::algorithms::{dominators_filtered, DominatorTree};
+use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
@@ -393,50 +394,20 @@ impl<'a> ValidationContext<'a> {
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
     fn validate_children_dag(&self, parent: Node, optype: &OpType) -> Result<(), ValidationError> {
-        let Some(first_child) = self.hugr.hierarchy.first(parent.index) else {
+        if !self.hugr.hierarchy.has_children(parent.index) {
             // No children, nothing to do
             return Ok(());
         };
 
-        // TODO: Use a HUGR-specific toposort that ignores the copy nodes,
-        // so we can be more efficient and avoid the `contains_node` filter.
-        // https://github.com/CQCL-DEV/hugr/issues/125
-        let topo = toposort_filtered::<HashSet<PortIndex>>(
-            self.hugr.graph.as_portgraph(),
-            [first_child],
-            Direction::Outgoing,
-            |_| true,
-            |n, p| self.df_port_filter(n, p),
-        )
-        .filter(|&node| self.hugr.graph.contains_node(node));
+        let region = portgraph::view::region::Region::new(
+            &self.hugr.graph,
+            &self.hugr.hierarchy,
+            parent.index,
+        );
+        let entry_node = self.hugr.hierarchy.first(parent.index).unwrap();
 
-        // Compute the number of nodes visited.
-        let nodes_visited = topo.fold(0, |n, node| {
-            let node: Node = node.into();
-            let optype = self.hugr.get_optype(node);
-            // Count any local Const/Def nodes (those connected to const inputs
-            // but not reachable from Input)
-            if OpTag::ConstInput.contains(optype.tag()) {
-                let sig: Signature = optype.signature();
-                let n_df_inputs = sig.input.len();
-
-                let n_const_pred = self
-                    .hugr
-                    .input_neighbours(node)
-                    .take(sig.input_count())
-                    .skip(n_df_inputs)
-                    .filter(|other_node| {
-                        self.hugr
-                            .get_parent(*other_node)
-                            .expect("Const can't be root.")
-                            == parent
-                    })
-                    .count();
-                return n + 1 + n_const_pred;
-            }
-            n + 1
-        });
-
+        let postorder = DfsPostOrder::new(&region, entry_node);
+        let nodes_visited = postorder.iter(&region).count();
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
@@ -591,48 +562,6 @@ impl<'a> ValidationContext<'a> {
             to_offset,
         }
         .into())
-    }
-
-    /// A filter function for internal dataflow edges used in the toposort algorithm.
-    ///
-    /// Returns `true` for ports that connect to a sibling node with a value or
-    /// state order edge.
-    fn df_port_filter(&self, node: portgraph::NodeIndex, port: portgraph::PortIndex) -> bool {
-        // Toposort operates on the internal portgraph. It may traverse copy nodes.
-        let portgraph = self.hugr.graph.as_portgraph();
-        let is_copy = !self.hugr.graph.contains_node(node);
-        let offset = self.hugr.graph.port_offset(port).unwrap();
-
-        // Always follow (non-intergraph) ports from copy nodes. These nodes must be filtered out
-        // when using the toposort iterator.
-        if !is_copy {
-            let node_optype = self.hugr.get_optype(node.into());
-
-            let kind = node_optype.port_kind(offset).unwrap();
-            if !matches!(kind, EdgeKind::StateOrder | EdgeKind::Value(_)) {
-                return false;
-            }
-        }
-
-        // Ignore ports that are not connected (that property is checked elsewhere)
-        let Some(other_port) = portgraph
-            .port_index(node, offset)
-            .and_then(|p| portgraph.port_link(p))
-        else {
-            return false;
-        };
-        let other_node = portgraph.port_node(other_port).unwrap();
-
-        // Dereference any copy nodes
-        let op_node = self.hugr.graph.pg_main_node(node);
-        let other_op_node = self.hugr.graph.pg_main_node(other_node);
-        let parent = self.hugr.hierarchy.parent(op_node);
-        let other_parent = self.hugr.hierarchy.parent(other_op_node);
-        if parent != other_parent {
-            return false;
-        }
-
-        true
     }
 }
 
