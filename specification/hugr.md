@@ -1152,18 +1152,16 @@ The new hugr is then derived as follows:
 
 This is the general subgraph-replacement method.
 
-A _partial hugr_ is is a graph $G$ having the same node and edge types as a hugr
+A _partial hugr_ is a graph formed by a subset of nodes of a valid hugr together
+with a subset of their adjoining edges. It must not include a `Module` node.
+
+Informally, a partial hugr is is a graph $G$ having the same node and edge types as a hugr
 and satisfying all the same local constraints except that it may be missing edges.
 
-In particular:
+Given a partial hugr $G$, let
 
-  - it has no root node (the set of nodes without a parent is
-    denoted $\mathrm{top}(G)$ );
-  - it may have empty container nodes (the set of these is
-    denoted $\mathrm{bot}(G)$ ).
-
-A partial hugr describes a set of nodes and well-formed edges between
-them that potentially forms a subgraph of a hugr.
+  - $\mathrm{top}(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
+  - $\mathrm{bot}(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
 
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
