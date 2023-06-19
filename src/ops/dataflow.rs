@@ -9,20 +9,20 @@ pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn tag(&self) -> OpTag;
     fn signature(&self) -> Signature;
-    /// The edge kind for the inputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow or constant inputs of the operation,
+    /// not described by the signature.
     ///
-    /// If None, there will be no other input edges. Otherwise, all other input
-    /// edges will be of that kind.
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
     }
-    /// The edge kind for the outputs of the operation not described by the
-    /// signature.
+    /// The edge kind for the non-dataflow outputs of the operation, not
+    /// described by the signature.
     ///
-    /// If None, there will be no other output edges. Otherwise, all other
-    /// output edges will be of that kind.
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    /// If not None, a single extra output multiport of that kind will be
+    /// present.
+    fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
     }
 }
@@ -30,7 +30,7 @@ pub(super) trait DataflowOpTrait {
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
-    fn new(types: TypeRow) -> Self;
+    fn new(types: impl Into<TypeRow>) -> Self;
     /// Helper method to add resource requirements to an I/O node
     fn with_resources(self, rs: ResourceSet) -> Self;
 }
@@ -48,9 +48,9 @@ pub struct Input {
 impl_op_name!(Input);
 
 impl IOTrait for Input {
-    fn new(types: TypeRow) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Input {
-            types,
+            types: types.into(),
             resources: ResourceSet::new(),
         }
     }
@@ -73,9 +73,9 @@ pub struct Output {
 impl_op_name!(Output);
 
 impl IOTrait for Output {
-    fn new(types: TypeRow) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Output {
-            types,
+            types: types.into(),
             resources: ResourceSet::new(),
         }
     }
@@ -95,7 +95,7 @@ impl DataflowOpTrait for Input {
         OpTag::Input
     }
 
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    fn other_input(&self) -> Option<EdgeKind> {
         None
     }
 
@@ -120,7 +120,7 @@ impl DataflowOpTrait for Output {
         sig
     }
 
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    fn other_output(&self) -> Option<EdgeKind> {
         None
     }
 }
@@ -136,12 +136,12 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn signature(&self) -> Signature {
         DataflowOpTrait::signature(self)
     }
-    fn other_inputs(&self) -> Option<EdgeKind> {
-        DataflowOpTrait::other_inputs(self)
+    fn other_input(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_input(self)
     }
 
-    fn other_outputs(&self) -> Option<EdgeKind> {
-        DataflowOpTrait::other_outputs(self)
+    fn other_output(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::other_output(self)
     }
 }
 

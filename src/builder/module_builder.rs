@@ -61,15 +61,14 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Generate a builder for defining a function body graph.
-    ///
-    /// Replaces a [`OpType::Declare`] node as specified by `f_id`
-    /// with a [`OpType::Def`] node.
+    /// Replace a [`ops::Declare`] with [`ops::Def`] and return a builder for
+    /// the defining graph.
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error in adding the node.
-    pub fn define_function(
+    /// This function will return an error if there is an error in adding the
+    /// [`OpType::Def`] node.
+    pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
@@ -94,22 +93,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
-    }
-
-    /// Add a [`OpType::Def`] node and returns a builder to define the function
-    /// body graph.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`OpType::Def`] node.
-    pub fn declare_and_def(
-        &mut self,
-        name: impl Into<String>,
-        signature: Signature,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let fid = self.declare(name, signature)?;
-        self.define_function(&fid)
     }
 
     /// Declare a function with `signature` and return a handle to the declaration.
@@ -142,6 +125,11 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<SmolStr>,
         typ: SimpleType,
     ) -> Result<AliasID<true>, BuildError> {
+        // TODO: add AliasDef in other containers
+        // This is currently tricky as they are not connected to anything so do
+        // not appear in topological traversals.
+        // Could be fixed by removing single-entry requirement and sorting from
+        // every 0-input node.
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
         let node = self.add_child_op(ops::AliasDef {
@@ -192,7 +180,7 @@ mod test {
             let f_id = module_builder
                 .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
 
-            let mut f_build = module_builder.define_function(&f_id)?;
+            let mut f_build = module_builder.define_declaration(&f_id)?;
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
@@ -209,7 +197,7 @@ mod test {
 
             let qubit_state_type = module_builder.add_alias_declare("qubit_state", true)?;
 
-            let f_build = module_builder.declare_and_def(
+            let f_build = module_builder.define_function(
                 "main",
                 Signature::new_df(
                     vec![qubit_state_type.get_alias_type()],
@@ -217,6 +205,27 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
+            module_builder.finish_hugr()
+        };
+        assert_matches!(build_result, Ok(_));
+        Ok(())
+    }
+
+    #[test]
+    fn local_def() -> Result<(), BuildError> {
+        let build_result = {
+            let mut module_builder = ModuleBuilder::new();
+
+            let mut f_build = module_builder
+                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let local_build = f_build
+                .define_function("local", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let [wire] = local_build.input_wires_arr();
+            let f_id = local_build.finish_with_outputs([wire])?;
+
+            let call = f_build.call(f_id.handle(), f_build.input_wires())?;
+
+            f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));

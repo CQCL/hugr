@@ -18,10 +18,10 @@ pub struct CustomType {
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: SmolStr, params: TypeRow) -> Self {
+    pub fn new(id: SmolStr, params: impl Into<TypeRow>) -> Self {
         Self {
             id,
-            params: Box::new(params),
+            params: Box::new(params.into()),
         }
     }
 

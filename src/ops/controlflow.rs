@@ -128,7 +128,7 @@ impl DataflowOpTrait for CFG {
 #[allow(missing_docs)]
 pub enum BasicBlock {
     /// A CFG basic block node. The signature is that of the internal Dataflow graph.
-    Block {
+    DFB {
         inputs: TypeRow,
         other_outputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
@@ -142,8 +142,8 @@ impl OpName for BasicBlock {
     /// The name of the operation.
     fn name(&self) -> SmolStr {
         match self {
-            BasicBlock::Block { .. } => "BasicBlock".into(),
-            BasicBlock::Exit { .. } => "ExitBlock".into(),
+            BasicBlock::DFB { .. } => "DFB".into(),
+            BasicBlock::Exit { .. } => "Exit".into(),
         }
     }
 }
@@ -152,23 +152,23 @@ impl OpTrait for BasicBlock {
     /// The description of the operation.
     fn description(&self) -> &str {
         match self {
-            BasicBlock::Block { .. } => "A CFG basic block node",
+            BasicBlock::DFB { .. } => "A CFG basic block node",
             BasicBlock::Exit { .. } => "A CFG exit block node",
         }
     }
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
         match self {
-            BasicBlock::Block { .. } => OpTag::BasicBlock,
+            BasicBlock::DFB { .. } => OpTag::BasicBlock,
             BasicBlock::Exit { .. } => OpTag::BasicBlockExit,
         }
     }
 
-    fn other_inputs(&self) -> Option<EdgeKind> {
+    fn other_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
 
-    fn other_outputs(&self) -> Option<EdgeKind> {
+    fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
     }
 }
@@ -177,7 +177,7 @@ impl BasicBlock {
     /// The input signature of the contained dataflow graph.
     pub fn dataflow_input(&self) -> &TypeRow {
         match self {
-            BasicBlock::Block { inputs, .. } => inputs,
+            BasicBlock::DFB { inputs, .. } => inputs,
             BasicBlock::Exit { cfg_outputs } => cfg_outputs,
         }
     }
@@ -186,7 +186,7 @@ impl BasicBlock {
     /// valid index.
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
         match self {
-            BasicBlock::Block {
+            BasicBlock::DFB {
                 predicate_variants,
                 other_outputs: outputs,
                 ..

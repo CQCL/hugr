@@ -133,6 +133,27 @@ impl Signature {
             Direction::Outgoing => self.output.get_mut(port.index()),
         }
     }
+
+    /// Returns the number of dataflow and value ports in the signature.
+    #[inline]
+    pub fn port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.input.len() + self.const_input.len(),
+            Direction::Outgoing => self.output.len(),
+        }
+    }
+
+    /// Returns the number of input dataflow and value ports in the signature.
+    #[inline]
+    pub fn input_count(&self) -> usize {
+        self.port_count(Direction::Incoming)
+    }
+
+    /// Returns the number of output dataflow and value ports in the signature.
+    #[inline]
+    pub fn output_count(&self) -> usize {
+        self.port_count(Direction::Outgoing)
+    }
 }
 
 impl Signature {

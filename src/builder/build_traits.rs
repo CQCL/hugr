@@ -1,10 +1,11 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
-use crate::hugr::{Direction, Node, Port, ValidationError};
+use crate::hugr::{Node, Port, ValidationError};
 use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
 
+use super::FunctionBuilder;
 use super::{
     handle::{BuildHandle, Outputs},
     CircuitBuilder,
@@ -47,11 +48,11 @@ pub trait Container {
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
     ///
-    /// [`other_inputs`]: crate::ops::OpTrait::other_inputs
-    /// [`other_outputs`]: crate::ops::OpTrait::other_outputs
+    /// [`other_inputs`]: crate::ops::OpTrait::other_input
+    /// [`other_outputs`]: crate::ops::OpTrait::other_output
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
-        Ok(Wire::new(src, Port::new_outgoing(src_port)))
+        Ok(Wire::new(src, src_port))
     }
 
     /// Add a constant value to the container and return a handle to it.
@@ -65,6 +66,27 @@ pub trait Container {
         let const_n = self.add_child_op(ops::Const(val))?;
 
         Ok((const_n, typ).into())
+    }
+
+    /// Add a [`ops::Def`] node and returns a builder to define the function
+    /// body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::Def`] node.
+    fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: Signature,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let f_node = self.add_child_op(ops::Def {
+            name: name.into(),
+            signature: signature.clone(),
+        })?;
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 }
 
@@ -86,10 +108,17 @@ pub trait SubContainer: Container {
 }
 /// Trait for building dataflow regions of a HUGR.
 pub trait Dataflow: Container {
-    /// Return indices of input and output nodes.
-    fn io(&self) -> [Node; 2];
     /// Return the number of inputs to the dataflow sibling graph.
     fn num_inputs(&self) -> usize;
+    /// Return indices of input and output nodes.
+    fn io(&self) -> [Node; 2] {
+        self.hugr()
+            .children(self.container_node())
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .expect("First two children should be IO")
+    }
     /// Handle to input node.
     fn input(&self) -> BuildHandle<DataflowOpID> {
         (self.io()[0], self.num_inputs()).into()
@@ -204,41 +233,26 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
-        let cn = cid.node();
-        let c_out = self.hugr().num_outputs(cn);
-
-        self.hugr_mut().add_ports(cn, Direction::Outgoing, 1);
+        let const_node = cid.node();
 
         let load_n = self.add_dataflow_op(
             ops::LoadConstant {
                 datatype: cid.const_type(),
             },
             // Constant wire from the constant value node
-            vec![Wire::new(cn, Port::new_outgoing(c_out))],
+            vec![Wire::new(const_node, Port::new_outgoing(0))],
         )?;
 
         Ok(load_n.out_wire(0))
     }
 
-    /// Add a constant value to the Dataflow container and return a handle to it.
-    /// Adds a state edge from input to the constant node.
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`OpType::Const`] node.
-    fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
-        let typ = val.const_type();
-        let const_n = self.add_dataflow_op(ops::Const(val), [])?;
-
-        Ok((const_n.node(), typ).into())
-    }
     /// Load a static constant and return the local dataflow wire for that constant.
     /// Adds a [`ops::LoadConstant`] node.
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
     fn add_load_const(&mut self, val: ConstValue) -> Result<Wire, BuildError> {
-        let cid = Dataflow::add_constant(self, val)?;
+        let cid = self.add_constant(val)?;
         self.load_const(&cid)
     }
 
@@ -368,8 +382,19 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error adding the
     /// Tag node.
-    fn make_tag(&mut self, tag: usize, variants: TypeRow, value: Wire) -> Result<Wire, BuildError> {
-        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![value])?;
+    fn make_tag(
+        &mut self,
+        tag: usize,
+        variants: impl Into<TypeRow>,
+        value: Wire,
+    ) -> Result<Wire, BuildError> {
+        let make_op = self.add_dataflow_op(
+            LeafOp::Tag {
+                tag,
+                variants: variants.into(),
+            },
+            vec![value],
+        )?;
         Ok(make_op.out_wire(0))
     }
 
@@ -448,10 +473,7 @@ pub trait Dataflow: Container {
         };
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
-        let src_port: usize = self
-            .hugr_mut()
-            .add_ports(function.node(), Direction::Outgoing, 1)
-            .collect_vec()[0];
+        let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;
@@ -470,11 +492,11 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     op: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let [inp, out] = data_builder.io();
+    let [inp, _] = data_builder.io();
 
     let op: OpType = op.into();
     let sig = op.signature();
-    let op_node = data_builder.hugr_mut().add_op_before(out, op)?;
+    let op_node = data_builder.add_child_op(op)?;
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

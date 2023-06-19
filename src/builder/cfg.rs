@@ -94,7 +94,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
-    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -107,16 +107,28 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        let n_cases = predicate_variants.len();
-        let op = OpType::BasicBlock(BasicBlock::Block {
+        self.any_block_builder(inputs, predicate_variants, other_outputs, false)
+    }
+
+    fn any_block_builder(
+        &mut self,
+        inputs: TypeRow,
+        predicate_variants: Vec<TypeRow>,
+        other_outputs: TypeRow,
+        entry: bool,
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
         });
-        let exit = self.exit_node;
-        let block_n = self.hugr_mut().add_op_before(exit, op)?;
-
-        self.hugr_mut().set_num_ports(block_n, 0, n_cases);
+        let parent = self.container_node();
+        let block_n = if entry {
+            let exit = self.exit_node;
+            self.hugr_mut().add_op_before(exit, op)
+        } else {
+            self.hugr_mut().add_op_with_parent(parent, op)
+        }?;
 
         BlockBuilder::create(
             self.hugr_mut(),
@@ -127,7 +139,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for a non-entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -142,7 +154,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
-    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
     ///
@@ -158,10 +170,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.block_builder(inputs, predicate_variants, other_outputs)
+        self.any_block_builder(inputs, predicate_variants, other_outputs, true)
     }
 
-    /// Return a builder for the entry [`BasicBlock::Block`] child graph with `inputs`
+    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -193,16 +205,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     ) -> Result<(), BuildError> {
         let from = predecessor.node();
         let to = successor.node();
-        let hugr = self.hugr_mut();
-        let tin = hugr.num_inputs(to);
-        let tout = hugr.num_outputs(to);
-
-        hugr.set_num_ports(to, tin + 1, tout);
-        Ok(hugr.connect(from, branch, to, tin)?)
+        Ok(self.hugr_mut().connect(from, branch, to, 0)?)
     }
 }
 
-/// Builder for a [`BasicBlock::Block`] child graph.
+/// Builder for a [`BasicBlock::DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
@@ -247,7 +254,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 }
 
 impl BlockBuilder<Hugr> {
-    /// Initialize a [`BasicBlock::Block`] rooted HUGR builder
+    /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,
@@ -256,7 +263,7 @@ impl BlockBuilder<Hugr> {
         let inputs = inputs.into();
         let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
         let other_outputs = other_outputs.into();
-        let op = BasicBlock::Block {
+        let op = BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
@@ -281,10 +288,9 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let main =
-                module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+            let mut func_builder = module_builder
+                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
             let _f_id = {
-                let mut func_builder = module_builder.define_function(&main)?;
                 let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {

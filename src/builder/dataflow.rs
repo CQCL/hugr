@@ -18,7 +18,6 @@ pub struct DFGBuilder<T> {
     pub(crate) dfg_node: Node,
     pub(crate) num_in_wires: usize,
     pub(crate) num_out_wires: usize,
-    pub(crate) io: [Node; 2],
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
@@ -29,14 +28,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input.len();
         let num_out_wires = signature.output.len();
-        let i = base.as_mut().add_op_with_parent(
+        base.as_mut().add_op_with_parent(
             parent,
             ops::Input {
                 types: signature.input.clone(),
                 resources: signature.input_resources,
             },
         )?;
-        let o = base.as_mut().add_op_with_parent(
+        base.as_mut().add_op_with_parent(
             parent,
             ops::Output {
                 types: signature.output.clone(),
@@ -47,7 +46,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         Ok(Self {
             base,
             dfg_node: parent,
-            io: [i, o],
             num_in_wires,
             num_out_wires,
         })
@@ -110,11 +108,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> SubContainer for DFGBuilder<T> {
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
     #[inline]
-    fn io(&self) -> [Node; 2] {
-        self.io
-    }
-
-    #[inline]
     fn num_inputs(&self) -> usize {
         self.num_in_wires
     }
@@ -171,11 +164,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
-    fn io(&self) -> [Node; 2] {
-        self.0.io
-    }
-
-    #[inline]
     fn num_inputs(&self) -> usize {
         self.0.num_inputs()
     }
@@ -221,7 +209,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let _f_id = {
-                let mut func_builder = module_builder.declare_and_def(
+                let mut func_builder = module_builder.define_function(
                     "main",
                     Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
                 )?;
@@ -252,7 +240,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build = module_builder.declare_and_def(
+            let f_build = module_builder.define_function(
                 "main",
                 Signature::new_df(type_row![BIT], type_row![BIT, BIT]),
             )?;
@@ -303,7 +291,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let f_build = module_builder
-                .declare_and_def("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
+                .define_function("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
