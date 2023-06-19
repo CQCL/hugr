@@ -1265,7 +1265,7 @@ mod test {
 
         let mut inner_mult_sig = Signature::new_df(type_row![NAT, NAT], type_row![NAT]);
         inner_mult_sig.input_resources = all_rs.clone();
-        inner_mult_sig.output_resources = all_rs.clone();
+        inner_mult_sig.output_resources = all_rs;
 
         let [left_wire] = main
             .dfg_builder(inner_left_sig, [])?
