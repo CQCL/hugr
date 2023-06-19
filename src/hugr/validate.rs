@@ -196,10 +196,8 @@ impl<'a> ValidationContext<'a> {
         port: (&Port, &PortIndex),
         link: (&Port, &PortIndex),
     ) -> Result<(), ValidationError> {
-        let d1 = self.hugr.graph.port_direction(*port.1).unwrap();
-        let d2 = self.hugr.graph.port_direction(*link.1).unwrap();
         // Work out the order of the edges
-        let (src, tgt) = match (d1, d2) {
+        let (src, tgt) = match (port.0.direction(), port.1.direction()) {
             (Direction::Outgoing, Direction::Incoming) => ((from_node, port.1), (to_node, link.1)),
             (Direction::Incoming, Direction::Outgoing) => ((to_node, link.1), (from_node, port.1)),
             // In this case, which graph is "from" or "to" doesn't really matter
