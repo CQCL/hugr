@@ -77,7 +77,7 @@ impl<'a> ValidationContext<'a> {
     fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
         let op = self.hugr.op_types.get(node.index);
         let sig = op.signature();
-        let input_ports = self.hugr.node_ports(node.clone(), Direction::Incoming);
+        let input_ports = self.hugr.node_ports(*node, Direction::Incoming);
 
         for p in input_ports.into_iter() {
             let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
@@ -87,7 +87,7 @@ impl<'a> ValidationContext<'a> {
                 .is_none());
         }
 
-        let output_ports = self.hugr.node_ports(node.clone(), Direction::Outgoing);
+        let output_ports = self.hugr.node_ports(*node, Direction::Outgoing);
         for p in output_ports.into_iter() {
             let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
             assert!(self
@@ -205,11 +205,11 @@ impl<'a> ValidationContext<'a> {
             // In this case, which graph is "from" or "to" doesn't really matter
             _ => {
                 return Err(InterGraphEdgeError::SamePortDirection {
-                    from: from_node.clone(),
-                    from_offset: port.0.clone(),
-                    to: to_node.clone(),
-                    to_offset: link.0.clone(),
-                    dir: d1.clone(),
+                    from: *from_node,
+                    from_offset: *port.0,
+                    to: *to_node,
+                    to_offset: *link.0,
+                    dir: d1,
                 }
                 .into())
             }
@@ -223,20 +223,20 @@ impl<'a> ValidationContext<'a> {
             // The extra resource requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
             Err(ValidationError::TgtExceedsSrcResources {
-                from: from_node.clone(),
-                from_offset: port.0.clone(),
+                from: *from_node,
+                from_offset: *port.0,
                 from_resources: rs_src.clone(),
-                to: to_node.clone(),
-                to_offset: port.0.clone(),
+                to: *to_node,
+                to_offset: *port.0,
                 to_resources: rs_tgt.clone(),
             })
         } else {
             Err(ValidationError::SrcExceedsTgtResources {
-                from: from_node.clone(),
-                from_offset: port.0.clone(),
+                from: *from_node,
+                from_offset: *port.0,
                 from_resources: rs_src.clone(),
-                to: to_node.clone(),
-                to_offset: port.0.clone(),
+                to: *to_node,
+                to_offset: *port.0,
                 to_resources: rs_tgt.clone(),
             })
         }
@@ -270,7 +270,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Ignore subport indices assuming that we only care about dataflow nodes
-        for (port_index, link_index) in links.clone().into_iter().map(|(a, b)| (a.port(), b.port()))
+        for (port_index, link_index) in links.clone().map(|(a, b)| (a.port(), b.port()))
         {
             let link_node = self.hugr.graph.port_node(link_index).unwrap();
             let link = self.hugr.graph.port_offset(link_index).unwrap();
