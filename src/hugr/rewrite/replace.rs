@@ -117,11 +117,11 @@ impl Replace {
     }
 
     pub fn verify_convexity(&self) -> Result<(), ReplaceError> {
-        todo!()
+        unimplemented!()
     }
 
     pub fn verify_boundaries(&self) -> Result<(), ReplaceError> {
-        todo!()
+        unimplemented!()
     }
 }
 
