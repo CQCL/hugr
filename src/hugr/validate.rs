@@ -29,7 +29,7 @@ struct ValidationContext<'a> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
     /// Resource requirements associated with each edge
-    resources: HashMap<(Node,Port), ResourceSet>,
+    resources: HashMap<(Node, Port), ResourceSet>,
 }
 
 impl Hugr {
@@ -264,10 +264,7 @@ impl<'a> ValidationContext<'a> {
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
-            self.check_resources_compatible(
-                &(node, port),
-                &(other_node, other_offset)
-                )?;
+            self.check_resources_compatible(&(node, port), &(other_node, other_offset))?;
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
