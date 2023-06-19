@@ -40,7 +40,7 @@ pub struct Transactional<R> {
 // Note we might like to constrain R to Rewrite<unchanged_on_failure=false> but this
 // is not yet supported, https://github.com/rust-lang/rust/issues/92827
 impl<R: Rewrite> Rewrite for Transactional<R> {
-    type Error = R :: Error;
+    type Error = R::Error;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &Hugr) -> Result<(), Self::Error> {
