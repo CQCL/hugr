@@ -38,7 +38,7 @@ enum Versioned {
 /// Version 0 of the HUGR serialization format.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct SerHugrV0 {
-    /// For each node: (parent, num_inputs, num_outputs, node_operation)
+    /// For each node: (parent, node_operation)
     nodes: Vec<(Node, OpType)>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
@@ -64,6 +64,9 @@ pub enum HUGRSerializationError {
     /// Error building HUGR.
     #[error("HugrError: {0:?}")]
     HugrError(#[from] HugrError),
+    /// First node in node list must be the HUGR root.
+    #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
+    FirstNodeNotRoot(Node),
 }
 
 impl Serialize for Hugr {
@@ -99,17 +102,22 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::new();
+        let mut index_counter = 1..;
         let mut nodes: Vec<(Node, OpType)> = hugr
             .nodes()
-            .enumerate()
-            .map(|(i, n)| {
-                node_rekey.insert(n, NodeIndex::new(i).into());
+            .map(|n| {
                 // Note that we don't rekey the parent here, as we need to fully
                 // populate `node_rekey` first.
-                let parent = hugr.get_parent(n).unwrap_or_else(|| {
-                    assert_eq!(hugr.root(), n);
-                    n
-                });
+                let (parent, new_node) = if n == hugr.root() {
+                    (n, NodeIndex::new(0).into())
+                } else {
+                    (
+                        hugr.get_parent(n).expect("Unexpected root."),
+                        NodeIndex::new(index_counter.next().unwrap()).into(),
+                    )
+                };
+
+                node_rekey.insert(n, new_node);
                 let opt = hugr.get_optype(n);
                 Ok((parent, opt.clone()))
             })
@@ -158,7 +166,11 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(nodes.next().unwrap().1, nodes.len(), edges.len() * 2);
+        let (root_parent, root_type) = nodes.next().unwrap();
+        if root_parent.index.index() != 0 {
+            return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
+        }
+        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
 
         for (parent, typ) in nodes {
             hugr.add_op_with_parent(parent, typ)?;
