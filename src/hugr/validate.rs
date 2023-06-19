@@ -192,8 +192,8 @@ impl<'a> ValidationContext<'a> {
         src: &(Node, Port),
         tgt: &(Node, Port),
     ) -> Result<(), ValidationError> {
-        let rs_src = self.resources.get(&src).unwrap();
-        let rs_tgt = self.resources.get(&tgt).unwrap();
+        let rs_src = self.resources.get(src).unwrap();
+        let rs_tgt = self.resources.get(tgt).unwrap();
 
         if rs_src == rs_tgt {
             Ok(())
