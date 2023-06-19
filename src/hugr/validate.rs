@@ -270,7 +270,8 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Ignore subport indices assuming that we only care about dataflow nodes
-        for (port_index, link_index) in links.clone().into_iter().map(|(a,b)| (a.port(), b.port())) {
+        for (port_index, link_index) in links.clone().into_iter().map(|(a, b)| (a.port(), b.port()))
+        {
             let link_node = self.hugr.graph.port_node(link_index).unwrap();
             let link = self.hugr.graph.port_offset(link_index).unwrap();
             self.check_resources_compatible(
