@@ -5,14 +5,14 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID, HugrMutRef};
 use std::marker::PhantomData;
 
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{DataflowOp, ModuleOp, OpType};
+use crate::ops;
 
 use crate::types::{Signature, TypeRow};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
-/// Builder for a [`crate::ops::dataflow::DataflowOp::DFG`] node.
+/// Builder for a [`ops::DFG`] node.
 pub struct DFGBuilder<T> {
     pub(crate) base: T,
     pub(crate) dfg_node: Node,
@@ -31,17 +31,17 @@ impl<T: HugrMutRef> DFGBuilder<T> {
         let num_out_wires = signature.output.len();
         let i = base.as_mut().add_op_with_parent(
             parent,
-            OpType::Dataflow(DataflowOp::Input {
-                types: signature.input,
+            ops::Input {
+                types: signature.input.clone(),
                 resources: signature.input_resources,
-            }),
+            },
         )?;
         let o = base.as_mut().add_op_with_parent(
             parent,
-            OpType::Dataflow(DataflowOp::Output {
-                types: signature.output,
+            ops::Output {
+                types: signature.output.clone(),
                 resources: signature.output_resources,
-            }),
+            },
         )?;
 
         Ok(Self {
@@ -66,7 +66,7 @@ impl DFGBuilder<HugrMut> {
         let input = input.into();
         let output = output.into();
         let signature = Signature::new_df(input, output);
-        let dfg_op = DataflowOp::DFG {
+        let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
         let base = HugrMut::new(dfg_op);
@@ -128,7 +128,7 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-/// Builder for a [`crate::ops::module::ModuleOp::Def`] node
+/// Builder for a [`ops::Def`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<HugrMut> {
@@ -136,9 +136,10 @@ impl FunctionBuilder<HugrMut> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(_name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let op = ModuleOp::Def {
+    pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
+        let op = ops::Def {
             signature: signature.clone(),
+            name: name.into(),
         };
 
         let base = HugrMut::new(op);
@@ -200,6 +201,8 @@ mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::HugrView;
+    use crate::ops::tag::OpTag;
+    use crate::ops::OpTrait;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -224,10 +227,7 @@ mod test {
 
                 let [int, qb] = func_builder.input_wires_arr();
 
-                let q_out = func_builder.add_dataflow_op(
-                    OpType::Dataflow(DataflowOp::Leaf { op: LeafOp::H }),
-                    vec![qb],
-                )?;
+                let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
 
                 let inner_builder = func_builder
                     .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
@@ -344,7 +344,7 @@ mod test {
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type(), OpType::Dataflow(DataflowOp::DFG { .. }));
+        assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
 
         Ok(())
     }

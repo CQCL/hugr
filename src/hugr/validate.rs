@@ -11,9 +11,10 @@ use thiserror::Error;
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{ControlFlowOp, DataflowOp, ModuleOp, OpType};
+use crate::ops::{self, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
-use crate::types::{ClassicType, EdgeKind, SimpleType};
+use crate::types::ClassicType;
+use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::view::HugrView;
@@ -111,7 +112,7 @@ impl<'a> ValidationContext<'a> {
                 // We include copy nodes in addition to basic blocks.
                 // These are later filtered when iterating.
                 !self.hugr.graph.contains_node(n)
-                    || matches!(self.hugr.get_optype(n.into()), OpType::BasicBlock(_))
+                    || OpTag::BasicBlock.contains(self.hugr.get_optype(n.into()).tag())
             },
             |_, _| true,
         )
@@ -279,14 +280,17 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
-        let link_node = self.hugr.graph.port_node(link_index).unwrap();
-        let link = self.hugr.graph.port_offset(link_index).unwrap();
-        self.check_resources_compatible(
-            &node,
-            &link_node.into(),
-            (&port, &port_index),
-            (&link.into(), &link_index),
-        )?;
+        // Ignore subport indices assuming that we only care about dataflow nodes
+        for (port_index, link_index) in links.clone().into_iter().map(|(a,b)| (a.port(), b.port())) {
+            let link_node = self.hugr.graph.port_node(link_index).unwrap();
+            let link = self.hugr.graph.port_offset(link_index).unwrap();
+            self.check_resources_compatible(
+                &node,
+                &link_node.into(),
+                (&port, &port_index),
+                (&link.into(), &link_index),
+            )?;
+        }
 
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
@@ -454,15 +458,13 @@ impl<'a> ValidationContext<'a> {
         // Compute the number of nodes visited and keep the last one.
         let (nodes_visited, last_node) = topo.fold((0, None), |(n, _), node| {
             // If there is a LoadConstant with a local constant, count that node too
-            if let OpType::Dataflow(DataflowOp::LoadConstant { .. }) =
-                self.hugr.get_optype(node.into())
-            {
+            if OpTag::LoadConst == self.hugr.get_optype(node.into()).tag() {
                 let const_node = self
                     .hugr
                     .graph
                     .input_neighbours(node)
                     .next()
-                    .expect("LoadConstant must be connected to a Cont node.")
+                    .expect("LoadConstant must be connected to a Const node.")
                     .into();
                 let const_parent = self
                     .hugr
@@ -517,22 +519,24 @@ impl<'a> ValidationContext<'a> {
 
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
-            EdgeKind::Const(typ) => match from_optype {
-                OpType::Module(ModuleOp::Const(val)) => {
+            EdgeKind::Const(typ) => {
+                if let OpType::Const(ops::Const(val)) = from_optype {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
+                } else {
+                    // If const edges aren't coming from const nodes, they're graph
+                    // edges coming from Declare or Def
+                    return if OpTag::Function.contains(from_optype.tag()) {
+                        Ok(())
+                    } else {
+                        Err(InterGraphEdgeError::InvalidConstSrc {
+                            from,
+                            from_offset,
+                            typ,
+                        }
+                        .into())
+                    };
                 }
-                // If const edges aren't coming from const nodes, they're graph
-                // edges coming from Declare or Def
-                OpType::Module(ModuleOp::Def { .. } | ModuleOp::Declare { .. }) => return Ok(()),
-                _ => {
-                    return Err(InterGraphEdgeError::InvalidConstSrc {
-                        from,
-                        from_offset,
-                        typ,
-                    }
-                    .into())
-                }
-            },
+            }
             EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
                 return Err(InterGraphEdgeError::NonClassicalData {
@@ -576,12 +580,7 @@ impl<'a> ValidationContext<'a> {
             } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if !matches!(
-                    ancestor_parent_op,
-                    OpType::Dataflow(DataflowOp::ControlFlow {
-                        op: ControlFlowOp::CFG { .. }
-                    })
-                ) {
+                if ancestor_parent_op.tag() == OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,
@@ -897,8 +896,8 @@ mod test {
     use crate::builder::{BuildError, ModuleBuilder};
     use crate::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
     use crate::hugr::HugrMut;
-    use crate::ops::{BasicBlockOp, ConstValue, LeafOp, ModuleOp, OpType};
-    use crate::resource::ResourceSet;
+    use crate::ops::dataflow::IOTrait;
+    use crate::ops::{self, ConstValue, LeafOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -911,7 +910,8 @@ mod test {
     ///
     /// Returns the hugr and the node index of the definition.
     fn make_simple_hugr(copies: usize) -> (HugrMut, Node) {
-        let def_op: OpType = ModuleOp::Def {
+        let def_op: OpType = ops::Def {
+            name: "main".into(),
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
         .into();
@@ -930,25 +930,13 @@ mod test {
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut HugrMut, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(
-                parent,
-                DataflowOp::Input {
-                    types: type_row![B],
-                    resources: ResourceSet::new(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let copy = b
             .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
             .unwrap();
         let output = b
-            .add_op_with_parent(
-                parent,
-                DataflowOp::Output {
-                    types: vec![B; copies].into(),
-                    resources: ResourceSet::new(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Output::new(vec![B; copies].into()))
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -969,35 +957,23 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ModuleOp::Const(ConstValue::simple_predicate(0, predicate_size));
+        let const_op = ops::Const(ConstValue::simple_predicate(0, predicate_size));
         let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
-            .add_op_with_parent(
-                parent,
-                DataflowOp::Input {
-                    types: type_row![B],
-                    resources: ResourceSet::new(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
             .add_op_with_parent(
                 parent,
-                DataflowOp::LoadConstant {
+                ops::LoadConstant {
                     datatype: tag_type.clone().try_into().unwrap(),
                 },
             )
             .unwrap();
         let output = b
-            .add_op_with_parent(
-                parent,
-                DataflowOp::Output {
-                    types: vec![tag_type, B].into(),
-                    resources: ResourceSet::new(),
-                },
-            )
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type, B].into()))
             .unwrap();
 
         b.add_ports(tag_def, Direction::Outgoing, 1);
@@ -1011,7 +987,8 @@ mod test {
 
     #[test]
     fn invalid_root() {
-        let declare_op: OpType = ModuleOp::Declare {
+        let declare_op: OpType = ops::Declare {
+            name: "main".into(),
             signature: Default::default(),
         }
         .into();
@@ -1021,7 +998,7 @@ mod test {
         assert_eq!(b.hugr().validate(), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(ModuleOp::Root);
+        let other = b.add_op(ops::Module);
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -1051,7 +1028,7 @@ mod test {
 
     #[test]
     fn dfg_root() {
-        let dfg_op: OpType = DataflowOp::DFG {
+        let dfg_op: OpType = ops::DFG {
             signature: Signature::new_linear(type_row![B]),
         }
         .into();
@@ -1084,7 +1061,13 @@ mod test {
         // Add a definition without children
         let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
         let new_def = b
-            .add_op_with_parent(root, ModuleOp::Def { signature: def_sig })
+            .add_op_with_parent(
+                root,
+                ops::Def {
+                    signature: def_sig,
+                    name: "main".into(),
+                },
+            )
             .unwrap();
         assert_matches!(
             b.hugr().validate(),
@@ -1103,13 +1086,7 @@ mod test {
         // After moving the previous definition to a valid place,
         // add an input node to the module subgraph
         let new_input = b
-            .add_op_with_parent(
-                root,
-                DataflowOp::Input {
-                    types: type_row![],
-                    resources: ResourceSet::new(),
-                },
-            )
+            .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
             b.hugr().validate(),
@@ -1137,34 +1114,16 @@ mod test {
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(
-            output,
-            DataflowOp::Output {
-                types: type_row![B],
-                resources: ResourceSet::new(),
-            },
-        );
+        b.replace_op(output, ops::Output::new(type_row![B]));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
-        b.replace_op(
-            output,
-            DataflowOp::Output {
-                types: type_row![B, B],
-                resources: ResourceSet::new(),
-            },
-        );
+        b.replace_op(output, ops::Output::new(type_row![B, B]));
 
         // After fixing the output back, replace the copy with an output op
-        b.replace_op(
-            copy,
-            DataflowOp::Output {
-                types: type_row![B, B],
-                resources: ResourceSet::new(),
-            },
-        );
+        b.replace_op(copy, ops::Output::new(type_row![B, B]));
         assert_matches!(
             b.hugr().validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -1210,7 +1169,7 @@ mod test {
 
         b.replace_op(
             copy,
-            ControlFlowOp::CFG {
+            ops::CFG {
                 inputs: type_row![B],
                 outputs: type_row![B],
             },
@@ -1225,7 +1184,7 @@ mod test {
         let block = b
             .add_op_with_parent(
                 cfg,
-                BasicBlockOp::Block {
+                ops::BasicBlock::Block {
                     inputs: type_row![B],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![B],
@@ -1236,7 +1195,7 @@ mod test {
         let exit = b
             .add_op_with_parent(
                 cfg,
-                BasicBlockOp::Exit {
+                ops::BasicBlock::Exit {
                     cfg_outputs: type_row![B],
                 },
             )
@@ -1250,7 +1209,7 @@ mod test {
         let exit2 = b
             .add_op_before(
                 exit,
-                BasicBlockOp::Exit {
+                ops::BasicBlock::Exit {
                     cfg_outputs: type_row![B],
                 },
             )
@@ -1265,7 +1224,7 @@ mod test {
         // Change the types in the BasicBlock node to work on qubits instead of bits
         b.replace_op(
             block,
-            BasicBlockOp::Block {
+            ops::BasicBlock::Block {
                 inputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
                 other_outputs: type_row![Q],
@@ -1274,19 +1233,10 @@ mod test {
         let mut block_children = b.hugr().hierarchy.children(block.index);
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
-        b.replace_op(
-            block_input,
-            DataflowOp::Input {
-                types: type_row![Q],
-                resources: ResourceSet::new(),
-            },
-        );
+        b.replace_op(block_input, ops::Input::new(type_row![Q]));
         b.replace_op(
             block_output,
-            DataflowOp::Output {
-                types: vec![SimpleType::new_simple_predicate(1), Q].into(),
-                resources: ResourceSet::new(),
-            },
+            ops::Output::new(vec![SimpleType::new_simple_predicate(1), Q].into()),
         );
         assert_matches!(
             b.hugr().validate(),

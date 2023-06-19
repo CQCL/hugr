@@ -7,7 +7,7 @@ use itertools::Itertools;
 use portgraph::SecondaryMap;
 
 use crate::hugr::{Direction, HugrError, Node, ValidationError};
-use crate::ops::OpType;
+use crate::ops::{OpTrait, OpType};
 use crate::{Hugr, Port};
 
 /// A low-level builder for a HUGR.
@@ -262,8 +262,7 @@ mod test {
     use crate::{
         hugr::HugrView,
         macros::type_row,
-        ops::{DataflowOp, LeafOp, ModuleOp},
-        resource::ResourceSet,
+        ops::{self, dataflow::IOTrait, LeafOp},
         types::{ClassicType, Signature, SimpleType},
     };
 
@@ -285,7 +284,8 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ModuleOp::Def {
+                ops::Def {
+                    name: "main".into(),
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
@@ -293,25 +293,13 @@ mod test {
 
         {
             let f_in = builder
-                .add_op_with_parent(
-                    f,
-                    DataflowOp::Input {
-                        types: type_row![NAT],
-                        resources: ResourceSet::new(),
-                    },
-                )
+                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
                 .unwrap();
             let noop = builder
                 .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
                 .unwrap();
             let f_out = builder
-                .add_op_with_parent(
-                    f,
-                    DataflowOp::Output {
-                        types: type_row![NAT, NAT],
-                        resources: ResourceSet::new(),
-                    },
-                )
+                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());

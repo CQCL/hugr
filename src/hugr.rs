@@ -21,7 +21,7 @@ use thiserror::Error;
 
 pub use self::view::HugrView;
 use crate::ops::tag::OpTag;
-use crate::ops::{ModuleOp, OpType};
+use crate::ops::{OpName, OpTrait, OpType};
 use crate::replacement::{SimpleReplacement, SimpleReplacementError};
 use crate::rewrite::{Rewrite, RewriteError};
 use crate::types::EdgeKind;
@@ -38,9 +38,6 @@ pub struct Hugr {
     hierarchy: Hierarchy,
 
     /// The single root node in the hierarchy.
-    /// It must correspond to a [`ModuleOp::Root`] node.
-    ///
-    /// [`ModuleOp::Root`]: crate::ops::ModuleOp::Root.
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
@@ -49,7 +46,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(ModuleOp::Root)
+        Self::new(crate::ops::Module)
     }
 }
 
