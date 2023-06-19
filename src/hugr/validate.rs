@@ -197,7 +197,7 @@ impl<'a> ValidationContext<'a> {
             (Direction::Outgoing, Direction::Incoming) => (port, link),
             (Direction::Incoming, Direction::Outgoing) => (link, port),
             // In this case, which graph is "from" or "to" doesn't really matter
-            _ => panic!("Two linked ports have the same direction")
+            _ => unreachable!(),
         };
         let rs_src = self.resources.get(&src).unwrap();
         let rs_tgt = self.resources.get(&tgt).unwrap();
