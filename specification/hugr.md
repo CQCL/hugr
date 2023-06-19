@@ -1177,8 +1177,9 @@ It contains the following fields:
 
   - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
   - `SrcNode`: the source node of the new edge.
-  - `SrcPort`: (for `Value` and `Static` edges only) the source port.
-  - `ToPos`: (for `Value` and `Static` edges only) the desired position among
+  - `SrcPos`: for `Value` and `Static` edges, the position of the source port;
+    for `ControlFlow` edges, the position among the outgoing edges.
+  - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
     the incoming ports to the new node.
 
 A `NewOutEdgeSpec` specifies an edge inserted from a new node to an existing node.
@@ -1186,10 +1187,11 @@ It contains the following fields:
 
   - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
   - `TgtNode`: the target node of the new edge.
-  - `TgtPort`: (for `Value` and `Static` edges only) the target port (whose
+  - `TgtPos`: (for `Value` and `Static` edges only) the target port (whose
     existing incoming edge will be removed).
-  - `FromPos` (for `Value`, `Static` and `ControlFlow` edges only) the desired
-    position among the outgoing ports from the new node.
+  - `SrcPos`: for `Value` and `Static` edges, the desired
+    position among the outgoing ports from the new node; for `ControlFlow`
+    edges, the desired position among the outgoing edges.
 
 The `Replace` method takes as input:
 
