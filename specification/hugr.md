@@ -202,10 +202,10 @@ possible localities:
   - Local: both source and target nodes must have the same parent
   - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
     parent<sup>i</sup>(dest) for i\>1; see
-    [Inter-graph Edges](#inter-graph-edges).
+    [Non-local Edges](#non-local-edges).
   - Dom: edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
-    [Inter-graph Edges](#inter-graph-edges)
+    [Non-local Edges](#non-local-edges)
 
 Note that the locality is not fixed or even specified by the signature.
 
@@ -452,8 +452,8 @@ may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | -------------- | ------------ |
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
-| Value          | Local, Ext or Dom - see [Inter-graph edges](#inter-graph-edges) |
-| Static         | Local, Ext or Dom - see [Inter-graph edges](#inter-graph-edges) |
+| Value          | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
+| Static         | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
 
 ### Exception Handling
 
@@ -489,7 +489,7 @@ may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
     resource, taking a graph argument; and `run_circuit` will return the
     same way.
 
-#### **Inter-Graph Edges**
+#### **Non-local Edges**
 
 **For classical values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
@@ -505,7 +505,7 @@ follows:
     execute the entire n<sub>1</sub> node before executing
     parent<sup>i-1</sup>(n<sub>2</sub>). (Further recall that
     order+value edges together must be acyclic). We record the
-    relationship between the inter-graph value edge and the
+    relationship between the Value edge and the
     corresponding order edge via metadata on each edge.
 
     For Static edges this order edge is not required since the source is
@@ -530,7 +530,7 @@ bypassing the input/output nodes, and we expect this form to make
 rewrites easier to spot. The constraints on input/output node signatures
 remain as before.
 
-HUGRs without inter-graph edges may still be useful for e.g. register
+HUGRs with only local dataflow edges may still be useful for e.g. register
 allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
 outside, we add an outgoing port to the Input node of each subgraph, a
@@ -540,8 +540,8 @@ edge between graphs into a combination of intra-graph edges and extra
 input/output ports+nodes in such a way, but this is akin to
 decompression.
 
-Conversion from intra-graph edges to a smallest number of total edges
-(using inter-graph edges to reduce their number) is much more complex,
+Conversion from only local edges to a smallest total number of edges
+(using non-local edges to reduce their number) is much more complex,
 akin to compression, as it requires elision of useless split-merge
 diamonds and other patterns and will likely require computation of
 (post/)dominator trees. (However this will be somewhat similar to the
@@ -550,7 +550,7 @@ Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
 **Example CFG (TODO update with** `Sum` **types)** the following CFG is
-equivalent to the previous example. Besides the use of inter-block
+equivalent to the previous example. Besides the use of Ext
 edges to reduce passing of P and X, I have also used the normalization
 of moving operations out of the exit-block into the surrounding graph;
 this results in the qubit being passed right through so can also be
@@ -1206,7 +1206,7 @@ The new hugr is then derived by:
 
 5.  removing all nodes in R
 
-6.  If any edges inserted in step 2 are inter-graph (i.e DFG.
+6.  If any edges inserted in step 2 are non-local (i.e DFG.
     non-sibling), inserting any `Order` edges required to validate them.
 
 ##### Outlining methods
@@ -1767,7 +1767,7 @@ an edge weight.
   - **input signature**: The input signature of a node is the mapping
     from identifiers of input ports to their associated edge types.
 
-  - **inter-graph edge**: A Value or Static edge with Locality Ext or Dom (i.e. not Local)
+  - **Inter-graph Edge**: Deprecated, see *non-local edge*
 
   - **CFG node**: A node representing a control-flow graph. Its children
     are all BasicBlock nodes, of which there is exactly one entry node
@@ -1781,6 +1781,9 @@ an edge weight.
 
   - **node index**: An identifier for a node that is unique within the
     HUGR.
+
+  - **non-local edge**: A Value or Static edge with Locality Ext or Dom
+    (i.e. not Local)
 
   - **operation**: TODO
 
@@ -1892,7 +1895,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     the return address is the extra boolean variable, likely to be very
     cheap). However, I think this means pattern-matching will want to
     span across function-call boundaries; and it rules out using
-    inter-graph edges for called functions. TODO are those objections
+    non-local edges for called functions. TODO are those objections
     sufficient to rule this out?
 
 ##### Comparison with MLIR
