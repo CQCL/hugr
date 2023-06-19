@@ -28,6 +28,7 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
+    /// Resource requirements associated with each edge
     resources: HashMap<PortIndex, ResourceSet>,
 }
 
@@ -70,6 +71,9 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
+    /// Use the signature supplied by a dataflow node to work out the resource
+    /// resource requirements for all of its input and output edges, then put
+    /// those requirements in the ValidationContext
     fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
         let op = self.hugr.op_types.get(node.index);
         let sig = op.signature();
@@ -178,7 +182,13 @@ impl<'a> ValidationContext<'a> {
     }
 
     /// Check that two `PortIndex` have compatible resource requirements,
-    /// according to the information accumulated by `gather_resources`
+    /// according to the information accumulated by `gather_resources`.
+    ///
+    /// This resource checking assumes that free resource variables
+    ///   (e.g. implicit lifting of `A -> B` to `[R]A -> [R]B`)
+    /// and adding of lift nodes
+    ///   (i.e. those which transform an edge from `A` to `[R]A`)
+    /// has already been done.
     fn check_resources_compatible(
         &self,
         from_node: &Node,
