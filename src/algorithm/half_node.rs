@@ -34,7 +34,7 @@ impl<'a, H: HugrView> HalfNodeView<'a, H> {
     pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
         let mut children = h.children(cfg.node());
         let entry = children.next().unwrap(); // Panic if malformed
-        let exit = children.last().unwrap();
+        let exit = children.next().unwrap();
         assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }

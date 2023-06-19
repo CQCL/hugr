@@ -145,7 +145,7 @@ macro_rules! impl_nodehandle {
     };
 }
 
-impl_nodehandle!(DataflowOpID, OpTag::DataflowOp);
+impl_nodehandle!(DataflowOpID, OpTag::DataflowChild);
 impl_nodehandle!(ConditionalID, OpTag::Conditional);
 impl_nodehandle!(CaseID, OpTag::Case);
 impl_nodehandle!(DfgID, OpTag::Dfg);

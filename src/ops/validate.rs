@@ -11,6 +11,7 @@ use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
 use crate::types::{SimpleType, TypeRow};
+use crate::Direction;
 
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
 
@@ -23,20 +24,36 @@ pub struct OpValidityFlags {
     ///
     /// This is checked in addition to the child allowing the parent optype.
     pub allowed_first_child: OpTag,
-    /// Additional restrictions on the last child operation
+    /// Additional restrictions on the second child operation
     ///
     /// This is checked in addition to the child allowing the parent optype.
-    pub allowed_last_child: OpTag,
+    pub allowed_second_child: OpTag,
     /// Whether the operation must have children.
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of non-dataflow input and output wires.
+    /// A strict requirement on the number of non-dataflow multiports.
+    ///
+    /// If not specified, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
     pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
+}
+
+impl OpValidityFlags {
+    /// Get the number of non-dataflow multiports.
+    ///
+    /// If None, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
+    pub fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
+        match dir {
+            Direction::Incoming => self.non_df_ports.0,
+            Direction::Outgoing => self.non_df_ports.1,
+        }
+    }
 }
 
 impl Default for OpValidityFlags {
@@ -45,7 +62,7 @@ impl Default for OpValidityFlags {
         Self {
             allowed_children: OpTag::None,
             allowed_first_child: OpTag::Any,
-            allowed_last_child: OpTag::Any,
+            allowed_second_child: OpTag::Any,
             requires_children: false,
             requires_dag: false,
             non_df_ports: (None, None),
@@ -67,9 +84,9 @@ impl ValidateOp for super::Module {
 impl ValidateOp for super::Def {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
-            allowed_last_child: OpTag::Output,
+            allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
             ..Default::default()
@@ -92,9 +109,9 @@ impl ValidateOp for super::Def {
 impl ValidateOp for super::DFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
-            allowed_last_child: OpTag::Output,
+            allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
             ..Default::default()
@@ -164,9 +181,9 @@ impl ValidateOp for super::Conditional {
 impl ValidateOp for super::TailLoop {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
-            allowed_last_child: OpTag::Output,
+            allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
             ..Default::default()
@@ -201,7 +218,7 @@ impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_children: OpTag::BasicBlock,
-            allowed_last_child: OpTag::BasicBlockExit,
+            allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,
             edge_check: Some(validate_cfg_edge),
@@ -211,9 +228,9 @@ impl ValidateOp for super::CFG {
 
     fn validate_children<'a>(
         &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+        children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        for (child, optype) in children.dropping_back(1) {
+        for (child, optype) in children.dropping(2) {
             if optype.tag() == OpTag::BasicBlockExit {
                 return Err(ChildrenValidationError::InternalExitChildren { child });
             }
@@ -225,10 +242,10 @@ impl ValidateOp for super::CFG {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum ChildrenValidationError {
-    /// An CFG graph has an exit operation as a non-last child.
-    #[error("Exit basic blocks are only allowed as the last child in a CFG graph")]
+    /// An CFG graph has an exit operation as a non-second child.
+    #[error("Exit basic blocks are only allowed as the second child in a CFG graph")]
     InternalExitChildren { child: NodeIndex },
-    /// An operation only allowed as the first/last child was found as an intermediate child.
+    /// An operation only allowed as the first/second child was found as an intermediate child.
     #[error("A {optype:?} operation is only allowed as a {expected_position} child")]
     InternalIOChildren {
         child: NodeIndex,
@@ -312,12 +329,12 @@ impl ValidateOp for BasicBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlock::Block {
+            BasicBlock::DFB {
                 predicate_variants, ..
             } => OpValidityFlags {
-                allowed_children: OpTag::DataflowOp,
+                allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
-                allowed_last_child: OpTag::Output,
+                allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
                 non_df_ports: (None, Some(predicate_variants.len())),
@@ -334,7 +351,7 @@ impl ValidateOp for BasicBlock {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         match self {
-            BasicBlock::Block {
+            BasicBlock::DFB {
                 inputs,
                 predicate_variants,
                 other_outputs: outputs,
@@ -353,12 +370,11 @@ impl ValidateOp for super::Case {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::DataflowOp,
+            allowed_children: OpTag::DataflowChild,
             allowed_first_child: OpTag::Input,
-            allowed_last_child: OpTag::Output,
+            allowed_second_child: OpTag::Output,
             requires_children: true,
             requires_dag: true,
-            non_df_ports: (Some(0), Some(0)),
             ..Default::default()
         }
     }
@@ -378,17 +394,17 @@ impl ValidateOp for super::Case {
 }
 
 /// Checks a that the list of children nodes does not contain Input and Output
-/// nodes outside of the first and last elements respectively, and that those
+/// nodes outside of the first and second elements respectively, and that those
 /// have the correct signature.
 fn validate_io_nodes<'a>(
     expected_input: &TypeRow,
     expected_output: &TypeRow,
     container_desc: &'static str,
-    mut children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
 ) -> Result<(), ChildrenValidationError> {
     // Check that the signature matches with the Input and Output rows.
     let (first, first_optype) = children.next().unwrap();
-    let (last, last_optype) = children.next_back().unwrap();
+    let (second, second_optype) = children.next().unwrap();
 
     if &first_optype.signature().output != expected_input {
         return Err(ChildrenValidationError::IOSignatureMismatch {
@@ -399,17 +415,17 @@ fn validate_io_nodes<'a>(
             container_desc,
         });
     }
-    if &last_optype.signature().input != expected_output {
+    if &second_optype.signature().input != expected_output {
         return Err(ChildrenValidationError::IOSignatureMismatch {
-            child: last,
-            actual: last_optype.signature().input,
+            child: second,
+            actual: second_optype.signature().input,
             expected: expected_output.clone(),
             node_desc: "Output",
             container_desc,
         });
     }
 
-    // The first and last children have already been popped from the iterator.
+    // The first and second children have already been popped from the iterator.
     for (child, optype) in children {
         match optype.tag() {
             OpTag::Input => {
@@ -423,7 +439,7 @@ fn validate_io_nodes<'a>(
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
                     optype: optype.clone(),
-                    expected_position: "last",
+                    expected_position: "second",
                 })
             }
             _ => {}
@@ -474,9 +490,9 @@ mod test {
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
             (0, &input_node),
-            (1, &leaf_node),
+            (1, &output_node),
             (2, &leaf_node),
-            (3, &output_node),
+            (3, &leaf_node),
         ];
         assert_eq!(
             validate_io_nodes(&in_types, &out_types, "test", make_iter(&children)),
@@ -488,20 +504,20 @@ mod test {
         );
         assert_matches!(
             validate_io_nodes(&in_types, &in_types, "test", make_iter(&children)),
-            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 3
+            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 1
         );
 
         // Internal I/O nodes
         let children = vec![
             (0, &input_node),
-            (1, &leaf_node),
-            (42, &output_node),
+            (1, &output_node),
+            (42, &leaf_node),
             (2, &leaf_node),
             (3, &output_node),
         ];
         assert_matches!(
             validate_io_nodes(&in_types, &out_types, "test", make_iter(&children)),
-            Err(ChildrenValidationError::InternalIOChildren { child, .. }) if child.index() == 42
+            Err(ChildrenValidationError::InternalIOChildren { child, .. }) if child.index() == 3
         );
     }
 

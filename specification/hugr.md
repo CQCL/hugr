@@ -90,7 +90,12 @@ represent (typed) data or control dependencies.
 
 ## Functional description
 
-A HUGR is a directed graph with nodes and edges. The nodes represent
+A HUGR is a directed graph. There are several different types of node, and
+several different types of edge, with different semantics, described below.
+
+Nodes usually have additional data associated with them.
+
+The nodes represent
 processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
@@ -123,15 +128,47 @@ In this case, output 0 of the H operation is connected to input 0 of the
 CNOT.
 
 ### Edges
+
+A `SimpleType` is the type of a value that can be sent down a wire. We
+distinguish between `ClassicType` and `LinearType`. For more details see the
+[Type System](#type-system) section.
+
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
 of edge for different relationships, and some edges have types:
 
 ```
+SimpleType ::= ClassicType | LinearType
+
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
 ```
-#### Hierarchy
+
+#### Ports and ordering of edges
+
+Edge kinds are divided into three categories:
+
+- `Order` -- simple edges with just an arrow, no data;
+- `Value`, `Static` -- dataflow edges with a _port_ at each end (source and
+  target), containing some additional data (a type); and
+- `Hierarchy`, `ControlFlow` -- the set of outgoing edges of one of these kinds
+  from a node has a definite linear ordering.
+
+`Order` edges are simple (they are just arrows). `Value` and `Static` edges are
+dataflow (they have a source and target port, each of which has an associated
+`SimpleType`, these two types being equal). `Hierarchy` and `ControlFlow` edges
+are ordered (the children of a container node have a linear ordering, as do the
+successors of a `BasicBlock` node).
+
+Note that a port is associated with both a dataflow edge and a node (adjoining
+the edge). The incoming and outgoing ports of a node are (separately) ordered.
+
+A source port with a `ClassicType` may have any number of edges associated with
+it (including zero). A port with a `LinearType`, and a target port of any type,
+must have exactly one edge associated with it. This captures the property of
+linear types that the value is used exactly once.
+
+#### Kinds of edge
 
 A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
 of *b*. Only certain nodes, known as *container* nodes, may act as parents -
@@ -139,55 +176,46 @@ these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
 In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
 with a unique root node. The HUGR is characterized by the type of its root node.
-The root node has no edges (and this supercedes any other requirements on the
+The root node has no non-hierarchy edges (and this supercedes any other requirements on the
 edges of specific node types).
 
-A **sibling graph** is a subgraph of the HUGR containing all nodes with
+A _sibling graph_ is a subgraph of the HUGR containing all nodes with
 a particular parent, plus the Order, Value and ControlFlow edges between
 them.
-
-#### Value
 
 A **Value** edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
 the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming **Port** of the target node; the port types of a node are described by its
-**Signature**. Outgoing ports of kind `Value(ClassicType)` may have any number
+source node, to an incoming port of the target node. Every port has an
+associated type; the sequences of incoming and outgoing port types of a node constitute its
+_signature_. Outgoing ports of kind `Value(ClassicType)` may have any number
 of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
 must have exactly one. See [Linearity](#linearity).
 
-
-The **Signature** may also specify a row
+In addition to the incoming and outgoing `Value` edges, the signature may also specify a row
 of `ClassicType`s for incoming `Static` edges. These correspond to incoming
-ports that always follow `Value` ports. 
-
+ports that follow the incoming `Value` ports.
 
 Value edges are parameterized by the locality and type; there are three
 possible localities:
 
   - Local: both source and target nodes must have the same parent
-
   - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
     parent<sup>i</sup>(dest) for i\>1; see
     [inter-graph-edges](#inter-graph-value-edges).
-
   - Dom: edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
     [inter-graph-edges](#inter-graph-value-edges)
 
 Note that the locality is not fixed or even specified by the signature.
 
-#### Static
-
 A **Static** edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def` and `Const`) and targets (`Call` and `LoadConstant`) of
+sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 Static edges may have any of the valid `Value` localities.
-
-#### Order
 
 **Order** edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
@@ -195,22 +223,20 @@ local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one Order edge between any two nodes.
 
-#### Controlflow
-
 **ControlFlow** edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
 always *local*, i.e. source and target have the same parent.
 
 ### Node Operations
 
-Here we describe we define some core operations required to represent
+Here we define some core types of operation required to represent
 full programs, including dataflow operations (in
 [functions](#functions)).
 
 #### Module
 
 If the HUGR contains a `Module` node then it is unique and sits at the top level
-of the of the hierarchy. In this case we call it a **module HUGR**. The weight
+of the hierarchy. In this case we call it a **module HUGR**. The weight
 attached to this node contains module level data. There may also be additional
 metadata (e.g. source file). The children of a `Module` correspond
 to "module level" operation types. Neither `Module` nor these module-level
@@ -243,7 +269,7 @@ regions:
     `AliasDef`.
 
 
-A **loadable HUGR** is a module HUGR where all edges are connected and there are
+A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `Declare/AliasDeclare` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
@@ -266,9 +292,9 @@ operations valid at both Module level and within dataflow regions):
 
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Graph>` edge to specify the graph being called. The
-    signature of the `Value` edges matches the function being called.
+    signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
 
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is non-linear, and a
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
@@ -300,7 +326,7 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type, whose
+The first input to the Conditional-node is of Predicate type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
 contents of the Predicate with all remaining inputs to Conditional
@@ -352,24 +378,25 @@ are:
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
 arbitrarily-complex (even irreducible) control flow via an explicit CFG,
 expressed using `ControlFlow` edges between `BasicBlock`-nodes that are
-children of a CFG-node.
+children of a CFG-node. `BasicBlock`-nodes only exist as children of CFG-nodes.
 
-  - `BasicBlock` nodes are CFG basic blocks. Edges between them are
-    control-flow (as opposed to dataflow), and express traditional
-    control-flow concepts of branch/merge. Each `BasicBlock` node is
-    parent to a dataflow sibling graph. `BasicBlock`-nodes only exist as
-    children of CFG-nodes.
+There are two kinds of `BasicBlock`: `DFB` (dataflow block) and `Exit`.
 
-  - `CFG` nodes: a dataflow node which is defined by a child control
-    sibling graph. All children except the last are `BasicBlock`-nodes,
-    the first of which is the entry block. The final child is an
-    `ExitBlock` node, which has no children, this is the single exit
-    point of the CFG and the inputs to this node match the outputs of
-    the CFG-node. The inputs to the CFG-node are wired to the inputs of
-    the entry block.
+`DFB` nodes are CFG basic blocks. Edges between them are
+control-flow (as opposed to dataflow), and express traditional
+control-flow concepts of branch/merge. Each `DFB` node is
+parent to a dataflow sibling graph.
+
+A `CFG` node is a dataflow node which is defined by a child control
+sibling graph. All children except the second are `DFB`-nodes,
+the first is the entry block. The second child is an
+`Exit` node, which has no children, this is the single exit
+point of the CFG and the inputs to this node match the outputs of
+the CFG-node. The inputs to the CFG-node are wired to the inputs of
+the entry block.
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0, #t1,...#tn)`, where the node has `N` successors, and the
+`Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -399,14 +426,14 @@ has no parent).
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | **C**         | `BasicBlock`/`ExitBlock` | First(last) is entry(exit)               |
+| CFG container             | "                              | CFG                | **C**         | `BasicBlock`             | First(second) is entry(exit)             |
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(last) is `Input`(`Output`)         |
+| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Static                          | `Def`              | **C**         |  "                       | "                                        |
-| "                         | ControlFlow                    | `BasicBlock`       | CFG           |  "                       | "                                        |
+| "                         | Static                         | `Def`              | **C**         |  "                       | "                                        |
+| "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| "                         | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
+| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -416,14 +443,10 @@ graph:
 cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
-`Conditional`, `TailLoop` and `DFG` nodes; edges are value and order and
-must be acyclic. The common parent may be a `Def`, `TailLoop`, `DFG`,
-`Case` or `BasicBlock` node.
-
-In a dataflow sibling graph, the edges (value and order considered
-together) must be acyclic. There is a unique Input node and Output node.
-All nodes must be reachable from the Input node, and must reach the
-Output node.
+`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
+and must be acyclic. There is a unique Input node and Output node. All nodes must be
+reachable from the Input node, and must reach the Output node. The common parent
+may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Hierarchical Constraints**                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -853,7 +876,7 @@ ClassicType ::= int<N>
               | Container(ClassicType)
 LinearType ::= Qubit
               | QPaque(Name, #)
-              | Container(SimpleType)
+              | Container(LinearType)
 ```
 
 SimpleTypes are the types of *values* which can be sent down wires,
@@ -1174,7 +1197,7 @@ The new hugr is then derived by:
 
 3.  for each node n in top(G), adding a hierarchy edge from t(n) to n,
     placing n in the first position among children of t(n) if n is in
-    Init and in the last position if n is in Term;
+    Init and in the second position if n is in Term;
 
 4.  for each node n in bot(G), and for each child m of b(n), adding a
     hierarchy edge from n to m (replacing m’s existing parent edge)
@@ -1796,9 +1819,11 @@ an edge weight.
   - **value edge:** An edge between data-dependency nodes. Has a fixed
     edge type.
 
-## Appendix: Rationale for Control Flow
+## Appendices
 
-### **Justification of the need for CFG-nodes**
+### Appendix 1: Rationale for Control Flow
+
+#### **Justification of the need for CFG-nodes**
 
   - Conditional + TailLoop are not able to express arbitrary control
     flow without introduction of extra variables (dynamic overhead, i.e.
@@ -1832,7 +1857,7 @@ an edge weight.
 `CFG` because we believe they are much easier to work with conceptually
 e.g. for authors of "rewrite rules" and other optimisations.
 
-### **Alternative representations considered but rejected**
+#### **Alternative representations considered but rejected**
 
   - A [Google paper](https://dl.acm.org/doi/pdf/10.1145/2693261) allows
     for the introduction of extra variables into the DSG that can be
@@ -1868,7 +1893,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     inter-graph edges for called functions. TODO are those objections
     sufficient to rule this out?
 
-#### Comparison with MLIR
+##### Comparison with MLIR
 
 There are a lot of broad similarities here, with MLIR’s regions
 providing hierarchy, and “graph” regions being like DSGs. Significant
@@ -1892,3 +1917,35 @@ differences include:
   - I note re. closures that MLIR expects the enclosing scope to make
     sure any referenced values are kept ‘live’ for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
+
+### Appendix 2: Node types and their edges
+
+The following table shows which edge kinds may adjoin each node type.
+
+Under each edge kind, the inbound constraints are followed by the outbound
+constraints. The symbol ✱ stands for "any number", while + stands for "at least
+one". For example, "1, ✱" means "one edge in, any number out".
+
+The "Root" row of the table applies to whichever node is the HUGR root,
+including `Module`.
+
+| Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
+| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
+| Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
+| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
+| `Declare`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `AliasDef`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `AliasDeclare` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
+| `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
+| `Output`       | ✱, 0    | ✱, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0     | 0, 0          | 1, 0        |          |
+| `Call`         | ✱, ✱    | ✱, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
+| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
+| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | CSG      |
+| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, +        | DSG      |
+| `Exit`         | 0, 0    | 0, 0    | 0, 0     | +, 0          | 1, 0        |          |
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      | 
+| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
+| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |

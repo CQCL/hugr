@@ -31,8 +31,8 @@ pub enum OpTag {
     /// A constant declaration.
     Const,
 
-    /// Any dataflow operation.
-    DataflowOp,
+    /// Node in a Dataflow Sibling Graph.
+    DataflowChild,
     /// A nested data-flow operation.
     Dfg,
     /// A nested control-flow operation.
@@ -45,6 +45,8 @@ pub enum OpTag {
     FnCall,
     /// A constant load operation.
     LoadConst,
+    /// Operations taking const inputs.
+    ConstInput,
     /// A tail-recursive loop.
     TailLoop,
     /// A conditional operation.
@@ -74,25 +76,25 @@ impl OpTag {
             OpTag::Any => &[],
             OpTag::None => &[OpTag::Any],
             OpTag::ModuleOp => &[OpTag::Any],
-            OpTag::DataflowOp => &[OpTag::Any],
-            OpTag::Input => &[OpTag::DataflowOp],
-            OpTag::Output => &[OpTag::DataflowOp],
+            OpTag::DataflowChild => &[OpTag::Any],
+            OpTag::Input => &[OpTag::DataflowChild],
+            OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ModuleOp],
-            OpTag::Def => &[OpTag::Function],
+            OpTag::Def => &[OpTag::Function, OpTag::DataflowChild],
             OpTag::BasicBlock => &[OpTag::Any],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
             OpTag::ModuleRoot => &[OpTag::Any],
-            // Technically, this should be ModuleOp, but we will allow it outside modules soon.
-            OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowOp],
-            OpTag::Dfg => &[OpTag::DataflowOp],
-            OpTag::Cfg => &[OpTag::DataflowOp],
-            OpTag::TailLoop => &[OpTag::DataflowOp],
-            OpTag::Conditional => &[OpTag::DataflowOp],
-            OpTag::FnCall => &[OpTag::DataflowOp],
-            OpTag::LoadConst => &[OpTag::DataflowOp],
-            OpTag::Leaf => &[OpTag::DataflowOp],
+            OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowChild],
+            OpTag::Dfg => &[OpTag::DataflowChild],
+            OpTag::Cfg => &[OpTag::DataflowChild],
+            OpTag::ConstInput => &[OpTag::DataflowChild],
+            OpTag::TailLoop => &[OpTag::DataflowChild],
+            OpTag::Conditional => &[OpTag::DataflowChild],
+            OpTag::FnCall => &[OpTag::ConstInput],
+            OpTag::LoadConst => &[OpTag::ConstInput],
+            OpTag::Leaf => &[OpTag::DataflowChild],
         }
     }
 
@@ -102,7 +104,7 @@ impl OpTag {
             OpTag::Any => "Any",
             OpTag::None => "None",
             OpTag::ModuleOp => "Module operations",
-            OpTag::DataflowOp => "Dataflow operations",
+            OpTag::DataflowChild => "Node in a Dataflow Sibling Graph",
             OpTag::Input => "Input node",
             OpTag::Output => "Output node",
             OpTag::Def => "Function definition",
@@ -120,6 +122,7 @@ impl OpTag {
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
+            OpTag::ConstInput => "Dataflow operations that take a Const input.",
         }
     }
 
@@ -159,17 +162,17 @@ mod test {
         assert!(OpTag::Any.contains(OpTag::Any));
         assert!(OpTag::None.contains(OpTag::None));
         assert!(OpTag::ModuleOp.contains(OpTag::ModuleOp));
-        assert!(OpTag::DataflowOp.contains(OpTag::DataflowOp));
+        assert!(OpTag::DataflowChild.contains(OpTag::DataflowChild));
         assert!(OpTag::BasicBlock.contains(OpTag::BasicBlock));
 
         assert!(OpTag::Any.contains(OpTag::None));
         assert!(OpTag::Any.contains(OpTag::ModuleOp));
-        assert!(OpTag::Any.contains(OpTag::DataflowOp));
+        assert!(OpTag::Any.contains(OpTag::DataflowChild));
         assert!(OpTag::Any.contains(OpTag::BasicBlock));
 
         assert!(!OpTag::None.contains(OpTag::Any));
         assert!(!OpTag::None.contains(OpTag::ModuleOp));
-        assert!(!OpTag::None.contains(OpTag::DataflowOp));
+        assert!(!OpTag::None.contains(OpTag::DataflowChild));
         assert!(!OpTag::None.contains(OpTag::BasicBlock));
     }
 }
