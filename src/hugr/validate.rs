@@ -189,16 +189,9 @@ impl<'a> ValidationContext<'a> {
     /// has already been done.
     fn check_resources_compatible(
         &self,
-        port: &(Node, Port),
-        link: &(Node, Port),
+        src: &(Node, Port),
+        tgt: &(Node, Port),
     ) -> Result<(), ValidationError> {
-        // Work out the order of the edges
-        let (src, tgt) = match (port.1.direction(), link.1.direction()) {
-            (Direction::Outgoing, Direction::Incoming) => (port, link),
-            (Direction::Incoming, Direction::Outgoing) => (link, port),
-            // In this case, which graph is "from" or "to" doesn't really matter
-            _ => unreachable!(),
-        };
         let rs_src = self.resources.get(&src).unwrap();
         let rs_tgt = self.resources.get(&tgt).unwrap();
 
