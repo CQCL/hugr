@@ -160,8 +160,8 @@ dataflow (they have a source and target port, each of which has an associated
 are ordered (the children of a container node have a linear ordering, as do the
 successors of a `BasicBlock` node).
 
-Note that a port is associated with both a dataflow edge and a node (adjoining
-the edge). The incoming and outgoing ports of a node are (separately) ordered.
+Note that a port is associated with a node and zero or more dataflow edges (adjoining
+the node). The incoming and outgoing ports of a node are (separately) ordered.
 
 A source port with a `ClassicType` may have any number of edges associated with
 it (including zero). A port with a `LinearType`, and a target port of any type,
