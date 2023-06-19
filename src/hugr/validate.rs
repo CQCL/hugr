@@ -197,16 +197,7 @@ impl<'a> ValidationContext<'a> {
             (Direction::Outgoing, Direction::Incoming) => (port, link),
             (Direction::Incoming, Direction::Outgoing) => (link, port),
             // In this case, which graph is "from" or "to" doesn't really matter
-            _ => {
-                return Err(InterGraphEdgeError::SamePortDirection {
-                    from: *from_node,
-                    from_offset: *port.0,
-                    to: *to_node,
-                    to_offset: *link.0,
-                    dir: d1,
-                }
-                .into())
-            }
+            _ => panic!("Two linked ports have the same direction")
         };
         let rs_src = self.resources.get(&src).unwrap();
         let rs_tgt = self.resources.get(&tgt).unwrap();
@@ -839,14 +830,6 @@ pub enum InterGraphEdgeError {
         from: Node,
         from_offset: Port,
         typ: ClassicType,
-    },
-    #[error("Two linked ports both have the same direction")]
-    SamePortDirection {
-        from: Node,
-        from_offset: Port,
-        to: Node,
-        to_offset: Port,
-        dir: Direction,
     },
 }
 
