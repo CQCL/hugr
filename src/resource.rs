@@ -114,9 +114,7 @@ impl ResourceSet {
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        ResourceSet(HashSet::from_iter(
-            other.0.difference(&self.0).cloned(),
-        ))
+        ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
     }
 }
 
