@@ -1170,28 +1170,18 @@ including $S$ itself.
 Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
 $b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them).
 
-We define two structures to specify edge insertion.
+We a structure to specify edge insertion.
 
-A `NewInpEdgeSpec` specifies an edge inserted from an existing node to a (given) new node.
+A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
 
-  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
   - `SrcNode`: the source node of the new edge.
+  - `TgtNode`: the target node of the new edge.
+  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
   - `SrcPos`: for `Value` and `Static` edges, the position of the source port;
     for `ControlFlow` edges, the position among the outgoing edges.
   - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
     the incoming ports to the new node.
-
-A `NewOutEdgeSpec` specifies an edge inserted from a new node to an existing node.
-It contains the following fields:
-
-  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
-  - `TgtNode`: the target node of the new edge.
-  - `TgtPos`: (for `Value` and `Static` edges only) the target port (whose
-    existing incoming edge will be removed).
-  - `SrcPos`: for `Value` and `Static` edges, the desired
-    position among the outgoing ports from the new node; for `ControlFlow`
-    edges, the desired position among the outgoing edges.
 
 The `Replace` method takes as input:
 
@@ -1201,18 +1191,20 @@ The `Replace` method takes as input:
   - a map $B : \mathrm{bot}(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
     is separated from $B(y)$ unless $x = y$. Let $X$ be the set of children
     of nodes $B(y)$ for $y \in \mathrm{bot}(G)$, and $R = S^\* \setminus X^\*$.
-  - a list $\mu\_\textrm{inp}$ of pairs $(n, \sigma\_\mathrm{inp})$ where $n$ is a node in $G$ and $\sigma\_\mathrm{inp}$ is a `NewInpEdgeSpec`;
-  - a list $\mu\_\textrm{out}$ of pairs $(n, \sigma\_\mathrm{out})$ where $n$ is a node in $G$ and $\sigma\_\mathrm{out}$ is a `NewOutEdgeSpec`.
+  - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
+    $G$ and `SrcNode` in $\Gamma \setminus S^*$;
+  - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
+    $G$ and `TgtNode` in $\Gamma \setminus S^*$.
 
 The new hugr is then derived as follows:
 
 1.  Make a copy in $\Gamma$ of all the nodes in $G$, and all edges between them.
-2.  For each $(n, \sigma\_\mathrm{inp}) \in \mu\_\textrm{inp}$, insert a new edge going into the new
-    copy of $n$ according to the specification $\sigma\_\mathrm{inp}$. (Note: some
+2.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
+    copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$. (Note: some
     bookkeeping will be required to ensure the eventual input port orderings of newly added nodes
     are correct.)
-3.  For each $(n, \sigma\_\mathrm{out}) \in \mu\_\textrm{out}$, insert a new edge going out of the new
-    copy of $n$ according to the specification $\sigma\_\mathrm{out}$. (Note: it should
+3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
+    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$. (Note: it should
     be verified that the predecessor node of the existing target port is in $R$,
     and so will be removed at step 6.)
 4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
