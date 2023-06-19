@@ -29,7 +29,7 @@ struct ValidationContext<'a> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
     /// Resource requirements associated with each edge
-    resources: HashMap<PortIndex, ResourceSet>,
+    resources: HashMap<(Node,Port), ResourceSet>,
 }
 
 impl Hugr {
@@ -79,20 +79,18 @@ impl<'a> ValidationContext<'a> {
         let sig = op.signature();
         let input_ports = self.hugr.node_ports(*node, Direction::Incoming);
 
-        for p in input_ports.into_iter() {
-            let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
+        for port in input_ports.into_iter() {
             assert!(self
                 .resources
-                .insert(port_ix, sig.input_resources.clone())
+                .insert((*node, port), sig.input_resources.clone())
                 .is_none());
         }
 
         let output_ports = self.hugr.node_ports(*node, Direction::Outgoing);
-        for p in output_ports.into_iter() {
-            let port_ix = self.hugr.graph.port_index(node.index, p.offset).unwrap();
+        for port in output_ports.into_iter() {
             assert!(self
                 .resources
-                .insert(port_ix, sig.output_resources.clone())
+                .insert((*node, port), sig.output_resources.clone())
                 .is_none());
         }
         Ok(())
@@ -191,15 +189,13 @@ impl<'a> ValidationContext<'a> {
     /// has already been done.
     fn check_resources_compatible(
         &self,
-        from_node: &Node,
-        to_node: &Node,
-        port: (&Port, &PortIndex),
-        link: (&Port, &PortIndex),
+        port: &(Node, Port),
+        link: &(Node, Port),
     ) -> Result<(), ValidationError> {
         // Work out the order of the edges
-        let (src, tgt) = match (port.0.direction(), port.1.direction()) {
-            (Direction::Outgoing, Direction::Incoming) => ((from_node, port.1), (to_node, link.1)),
-            (Direction::Incoming, Direction::Outgoing) => ((to_node, link.1), (from_node, port.1)),
+        let (src, tgt) = match (port.1.direction(), link.1.direction()) {
+            (Direction::Outgoing, Direction::Incoming) => (port, link),
+            (Direction::Incoming, Direction::Outgoing) => (link, port),
             // In this case, which graph is "from" or "to" doesn't really matter
             _ => {
                 return Err(InterGraphEdgeError::SamePortDirection {
@@ -212,8 +208,8 @@ impl<'a> ValidationContext<'a> {
                 .into())
             }
         };
-        let rs_src = self.resources.get(src.1).unwrap();
-        let rs_tgt = self.resources.get(tgt.1).unwrap();
+        let rs_src = self.resources.get(&src).unwrap();
+        let rs_tgt = self.resources.get(&tgt).unwrap();
 
         if rs_src == rs_tgt {
             Ok(())
@@ -221,20 +217,20 @@ impl<'a> ValidationContext<'a> {
             // The extra resource requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
             Err(ValidationError::TgtExceedsSrcResources {
-                from: *from_node,
-                from_offset: *port.0,
+                from: src.0,
+                from_offset: src.1,
                 from_resources: rs_src.clone(),
-                to: *to_node,
-                to_offset: *port.0,
+                to: tgt.0,
+                to_offset: tgt.1,
                 to_resources: rs_tgt.clone(),
             })
         } else {
             Err(ValidationError::SrcExceedsTgtResources {
-                from: *from_node,
-                from_offset: *port.0,
+                from: src.0,
+                from_offset: src.1,
                 from_resources: rs_src.clone(),
-                to: *to_node,
-                to_offset: *port.0,
+                to: tgt.0,
+                to_offset: tgt.1,
                 to_resources: rs_tgt.clone(),
             })
         }
@@ -268,14 +264,12 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Ignore subport indices assuming that we only care about dataflow nodes
-        for (port_index, link_index) in links.clone().map(|(a, b)| (a.port(), b.port())) {
+        for link_index in links.clone().map(|(_, b)| b.port()) {
             let link_node = self.hugr.graph.port_node(link_index).unwrap();
-            let link = self.hugr.graph.port_offset(link_index).unwrap();
+            let link_port = self.hugr.graph.port_offset(link_index).unwrap();
             self.check_resources_compatible(
-                &node,
-                &link_node.into(),
-                (&port, &port_index),
-                (&link.into(), &link_index),
+                &(node, port),
+                &(link_node.into(), link_port.into()),
             )?;
         }
 
