@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
-//! Rewrite operations on Hugr graphs.
+//! Replace operations on Hugr graphs. This is a nonfunctional
+//! dummy implementation just to demonstrate design principles.
 
 use std::collections::HashMap;
 
@@ -7,6 +8,7 @@ use portgraph::substitute::OpenGraph;
 use portgraph::{NodeIndex, PortIndex};
 use thiserror::Error;
 
+use super::Rewrite;
 use crate::Hugr;
 
 /// A subset of the nodes in a graph, and the ports that it is connected to.
@@ -77,7 +79,7 @@ pub type ParentsMap = HashMap<NodeIndex, NodeIndex>;
 /// Includes the new weights for the nodes in the replacement graph.
 #[derive(Debug, Clone)]
 #[allow(unused)]
-pub struct Rewrite {
+pub struct Replace {
     /// The subgraph to be replaced.
     subgraph: BoundedSubgraph,
     /// The replacement graph.
@@ -86,7 +88,7 @@ pub struct Rewrite {
     parents: ParentsMap,
 }
 
-impl Rewrite {
+impl Replace {
     /// Creates a new rewrite operation.
     pub fn new(
         subgraph: BoundedSubgraph,
@@ -114,30 +116,42 @@ impl Rewrite {
         )
     }
 
+    pub fn verify_convexity(&self) -> Result<(), ReplaceError> {
+        unimplemented!()
+    }
+
+    pub fn verify_boundaries(&self) -> Result<(), ReplaceError> {
+        unimplemented!()
+    }
+}
+
+impl Rewrite for Replace {
+    type Error = ReplaceError;
+    const UNCHANGED_ON_FAILURE: bool = false;
+
     /// Checks that the rewrite is valid.
     ///
     /// This includes having a convex subgraph (TODO: include definition), and
     /// having matching numbers of ports on the boundaries.
-    pub fn verify(&self) -> Result<(), RewriteError> {
+    /// TODO not clear this implementation really provides much guarantee about [self.apply]
+    /// but this class is not really working anyway.
+    fn verify(&self, _h: &Hugr) -> Result<(), ReplaceError> {
         self.verify_convexity()?;
         self.verify_boundaries()?;
         Ok(())
     }
 
-    pub fn verify_convexity(&self) -> Result<(), RewriteError> {
-        todo!()
-    }
-
-    pub fn verify_boundaries(&self) -> Result<(), RewriteError> {
-        todo!()
+    /// Performs a Replace operation on the graph.
+    fn apply(self, _h: &mut Hugr) -> Result<(), ReplaceError> {
+        unimplemented!()
     }
 }
 
 /// Error generated when a rewrite fails.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum RewriteError {
-    /// The rewrite failed because the boundary defined by the
-    /// [`Rewrite`] could not be matched to the dangling ports of the
+pub enum ReplaceError {
+    /// The replacement failed because the boundary defined by the
+    /// [`Replace`] could not be matched to the dangling ports of the
     /// [`OpenHugr`].
     #[error("The boundary defined by the rewrite could not be matched to the dangling ports of the OpenHugr")]
     BoundarySize(#[source] portgraph::substitute::RewriteError),
@@ -152,7 +166,7 @@ pub enum RewriteError {
     NotConvex(),
 }
 
-impl From<portgraph::substitute::RewriteError> for RewriteError {
+impl From<portgraph::substitute::RewriteError> for ReplaceError {
     fn from(e: portgraph::substitute::RewriteError) -> Self {
         match e {
             portgraph::substitute::RewriteError::BoundarySize => Self::BoundarySize(e),
