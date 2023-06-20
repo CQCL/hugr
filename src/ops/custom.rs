@@ -16,7 +16,7 @@ use super::{OpName, OpTrait};
 
 /// An instantiation of an [`OpDef`] with values for the type arguments
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct OpaqueOp {
+pub struct ResourceOp {
     #[serde(
         serialize_with = "serialize_custom_op",
         deserialize_with = "deserialize_custom_op"
@@ -34,13 +34,13 @@ fn deserialize_custom_op<'de, D: Deserializer<'de>>(_des: D) -> Result<Rc<OpDef>
     todo!()
 }
 
-impl OpName for OpaqueOp {
+impl OpName for ResourceOp {
     fn name(&self) -> SmolStr {
         self.def.name.clone()
     }
 }
 
-impl OpTrait for OpaqueOp {
+impl OpTrait for ResourceOp {
     fn description(&self) -> &str {
         self.def.description.as_str()
     }
@@ -63,13 +63,13 @@ impl OpTrait for OpaqueOp {
     }
 }
 
-impl PartialEq for OpaqueOp {
+impl PartialEq for ResourceOp {
     fn eq(&self, other: &Self) -> bool {
         Rc::<OpDef>::ptr_eq(&self.def, &other.def)
     }
 }
 
-impl Eq for OpaqueOp {}
+impl Eq for ResourceOp {}
 
 /// Custom definition for an operation.
 ///
