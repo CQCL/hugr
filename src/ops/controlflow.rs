@@ -124,6 +124,7 @@ impl DataflowOpTrait for CFG {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "block")]
 /// Basic block ops - nodes valid in control flow graphs.
 #[allow(missing_docs)]
 pub enum BasicBlock {

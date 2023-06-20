@@ -58,7 +58,20 @@ impl AsMut<Hugr> for Hugr {
 }
 
 /// A handle to a node in the HUGR.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(transparent)]
 pub struct Node {
     index: portgraph::NodeIndex,
 }
