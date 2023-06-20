@@ -127,14 +127,40 @@ as *control* and the second as *target*.
 In this case, output 0 of the H operation is connected to input 0 of the
 CNOT.
 
-### Edges
-
-A `SimpleType` is the type of a value that can be sent down a wire. We
-distinguish between `ClassicType` and `LinearType`. For more details see the
-[Type System](#type-system) section.
+### Edges and ports
 
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
-of edge for different relationships, and some edges have types:
+of edge for different relationships.
+
+- `Order` edges are plain directed edges, and express a required ordering of
+  operations.
+- `Value` edges carry typed data. They have a _port_ at each end, associated
+  with the source and target nodes.
+- `Static` edges are similar to `Value` edges but carry static data (knowable at
+  compilation time).
+- `ControlFlow` edges represent possible flows of control from one part of the
+  program to another.
+- `Hierarchy` edges express the relationship between container nodes and their
+  children.
+
+`Value` and `Static` edges are sometimes referred to as _dataflow_ edges, or
+"wires". A `SimpleType` is the type of a value that can be sent down a wire. A
+`SimpleType` is either a `ClassicType` (ordinary classical data) or a
+`LinearType` (including quantum data, which cannot be copied). For more details
+see the [Type System](#type-system) section.
+
+A `Value` edge can carry any `SimpleType`; a `Static` edge can only carry a
+`ClassicType`. As well as the type, dataflow edges are also parametrized by a
+`Locality`. There are three possible localities:
+
+  - `Local`: Source and target nodes must have the same parent.
+  - `Ext`: Edges "in" from an ancestor, i.e. where parent(src) ==
+    parent<sup>i</sup>(dest) for i\>1; see
+    [Non-local Edges](#non-local-edges).
+  - `Dom`: Edges from a dominating basic block in a control-flow graph
+    that is the parent of the source; see
+    [Non-local Edges](#non-local-edges)
+
 
 ```
 SimpleType ::= ClassicType | LinearType
@@ -144,33 +170,29 @@ EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicT
 Locality ::= Local | Ext | Dom
 ```
 
-#### Ports and ordering of edges
+Note that a port is associated with a node and zero or more dataflow edges (adjoining
+the node). Incoming ports are associated with exactly one edge. All edges associated
+with a port have the same type; thus a port has a well-defined type, matching that
+of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
 
-Edge kinds are divided into three categories:
+The sequences of incoming and outgoing port types of a node constitute its
+_signature_. This signature may include the types of both `Value` and `Static`
+edges, with `Static` edges following `Value` edges in the ordering.
 
-- `Order` -- simple edges with just an arrow, no data;
-- `Value`, `Static` -- dataflow edges with a _port_ at each end (source and
-  target), containing some additional data (a type); and
-- `Hierarchy`, `ControlFlow` -- the set of outgoing edges of one of these kinds
-  from a node has a definite linear ordering.
+Note that the locality is not fixed or even specified by the signature.
 
-`Order` edges are simple (they are just arrows). `Value` and `Static` edges are
-dataflow (they have a source and target port, each of which has an associated
-`SimpleType`, these two types being equal). `Hierarchy` and `ControlFlow` edges
+A source port with a `ClassicType` may have any number of edges associated with
+it (including zero, which means "discard"). A port with a `LinearType`, and a target port of any type,
+must have exactly one edge associated with it. This captures the property of
+linear types that the value is used exactly once. See [Linearity](#linearity).
+
+The `Hierarchy` and `ControlFlow` edges from a node
 are ordered (the children of a container node have a linear ordering, as do the
 successors of a `BasicBlock` node).
 
-Note that a port is associated with a node and zero or more dataflow edges (adjoining
-the node). The incoming and outgoing ports of a node are (separately) ordered.
+#### `Hierarchy` edges
 
-A source port with a `ClassicType` may have any number of edges associated with
-it (including zero). A port with a `LinearType`, and a target port of any type,
-must have exactly one edge associated with it. This captures the property of
-linear types that the value is used exactly once.
-
-#### Kinds of edge
-
-A **Hierarchy** edge from node *a* to *b* encodes that *a* is the direct parent
+A `Hierarchy` edge from node *a* to *b* encodes that *a* is the direct parent
 of *b*. Only certain nodes, known as *container* nodes, may act as parents -
 these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
@@ -180,52 +202,38 @@ The root node has no non-hierarchy edges (and this supercedes any other requirem
 edges of specific node types).
 
 A _sibling graph_ is a subgraph of the HUGR containing all nodes with
-a particular parent, plus the Order, Value and ControlFlow edges between
+a particular parent, plus any `Order`, `Value` and `ControlFlow` edges between
 them.
 
-A **Value** edge represents dataflow that happens at runtime - i.e. the
+#### `Value` edges
+
+A `Value` edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
-the edge’s target. Value edges are from an outgoing **Port** of the
-source node, to an incoming port of the target node. Every port has an
-associated type; the sequences of incoming and outgoing port types of a node constitute its
-_signature_. Outgoing ports of kind `Value(ClassicType)` may have any number
-of edges leaving them (0 means *discard*), while those of `Value(LinearType)`
-must have exactly one. See [Linearity](#linearity).
+the edge’s target. Value edges are from an outgoing port of the
+source node, to an incoming port of the target node.
 
-In addition to the incoming and outgoing `Value` edges, the signature may also specify a row
-of `ClassicType`s for incoming `Static` edges. These correspond to incoming
-ports that follow the incoming `Value` ports.
+#### `Static` edges
 
-Value edges are parameterized by the locality and type; there are three
-possible localities:
-
-  - Local: both source and target nodes must have the same parent
-  - Ext: edges “in” from an ancestor, i.e. where parent(src) ==
-    parent<sup>i</sup>(dest) for i\>1; see
-    [Non-local Edges](#non-local-edges).
-  - Dom: edges from a dominating basic block in a control-flow graph
-    that is the parent of the source; see
-    [Non-local Edges](#non-local-edges)
-
-Note that the locality is not fixed or even specified by the signature.
-
-A **Static** edge represents dataflow that is statically knowable - i.e.
+A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
 sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
-Static edges may have any of the valid `Value` localities.
 
-**Order** edges represent constraints on ordering that may be specified
+#### `Order` edges
+
+`Order` edges represent constraints on ordering that may be specified
 explicitly (e.g. for operations that are stateful). These can be seen as
 local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
-most one Order edge between any two nodes.
+most one `Order` edge between any two nodes.
 
-**ControlFlow** edges represent all possible flows of control
+#### `ControlFlow` edges
+
+`ControlFlow` edges represent all possible flows of control
 from one region (basic block) of the program to another. These are
-always *local*, i.e. source and target have the same parent.
+always local, i.e. source and target have the same parent.
 
 ### Node Operations
 
