@@ -2,7 +2,7 @@
 //!
 //! Values for TypeParams declared in [`OpDef`]s.
 //!
-//! [`OpDef`]: crate::ops::custom::OpDef
+//! [`OpDef`]: crate::resource::OpDef
 
 use crate::types::{simple::HInt, ClassicType, SimpleType};
 
