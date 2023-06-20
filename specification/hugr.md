@@ -1203,13 +1203,13 @@ The new hugr is then derived as follows:
 
 1.  Make a copy in $\Gamma$ of all the nodes in $G$, and all edges between them.
 2.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
-    copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$. (Note: some
-    bookkeeping will be required to ensure the eventual input port orderings of newly added nodes
-    are correct.)
+    copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
+    Where these edges are from ports that currently have edges to nodes in $R$,
+    the existing edges are replaced.
 3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
-    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$. (Note: it should
-    be verified that the predecessor node of the existing target port is in $R$,
-    and so will be removed at step 6.)
+    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
+    The predecessor node of the existing target port must be in $R$; the
+    edge from it is removed.
 4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
     of children of $t$ (adding a hierachy edge from $t$ to $n$).
 5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace $m$ with
