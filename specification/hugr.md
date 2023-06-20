@@ -1183,6 +1183,9 @@ It contains the following fields:
   - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
     the incoming ports to the new node.
 
+Note that in a `NewEdgeSpec` one of `SrcNode` and `TgtNode` is an existing node
+in the hugr and the other is a new node.
+
 The `Replace` method takes as input:
 
   - a set $S$ of mutually-separated nodes in $\Gamma$;
