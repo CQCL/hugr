@@ -1,26 +1,45 @@
-//! Type Arguments
+//! Type Parameters
 //!
-//! Values for TypeParams declared in [`OpDef`]s.
+//! Parameters for [`OpDef`]s provided by extensions
 //!
 //! [`OpDef`]: crate::resource::OpDef
 
-use crate::types::{simple::HInt, ClassicType, SimpleType};
+use super::{simple::HInt, ClassicType, SimpleType, TypeRow};
+
+/// A Type Parameter declared by an OpDef. Specifies
+/// the values that must be provided by each operation node.
+pub enum TypeParam {
+    /// Node must provide a [TypeArgValue::Type] - classic or linear
+    Type,
+    /// Node must provide a [TypeArgValue::ClassicType]
+    ClassicType,
+    /// Node must provide a [TypeArgValue::F64] floating-point value
+    F64,
+    /// Node must provide a [TypeArgValue::Int] integer
+    Int,
+    /// Node must provide some Opaque data in an [TypeArgValue::Opaque].
+    /// TODO is the typerow here correct?
+    Opaque(String, Box<TypeRow>),
+    /// Node must provide a [TypeArgValue::List] (of whatever length)
+    List(Box<TypeParam>)
+}
 
 /// An argument value for a type parameter
 pub enum TypeArgValue {
-    /// Where the OpDef declares that an argument is a `Type`
+    /// Where the OpDef declares that an argument is a [TypeParam::Type]
     Type(SimpleType),
-    /// Where the OpDef declares that an argument is a `ClassicType`,
+    /// Where the OpDef declares that an argument is a [TypeParam::ClassicType],
     /// it'll get one of these (rather than embedding inside a Type)
     ClassicType(ClassicType),
-    /// Where the OpDef declares that an argument is an `F64`
+    /// Where the OpDef declares that an argument is a [TypeParam::F64]
     F64(f64),
-    /// Where the OpDef declares an argument that's an `Int`
+    /// Where the OpDef declares an argument that's a [TypeParam::Int]
     /// - using the same representation as [`ClassicType`].
     Int(HInt),
-    /// Serialized representation of an opaque value...?
+    /// Where the OpDef declares a [TypeParam::Opaque], this must be the
+    /// serialized representation of such a value....??
     Opaque(Vec<u8>),
-    /// Where an argument has type `List<T>` - all elements will implicitly
-    /// be of the same variety of TypeArgValue, representing a T.
+    /// Where an argument has type [TypeParam::List]`<T>` - all elements will implicitly
+    /// be of the same variety of TypeArgValue, representing a `T`.
     List(Vec<TypeArgValue>),
 }
