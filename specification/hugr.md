@@ -767,13 +767,24 @@ resources:
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
     # Hence, no signature block => will look up a compute_signature in registry.
+  - name: GraphOp
+    description: "Involves running an argument Graph. E.g. run it some variable number of times."
+    args:
+      - r: ResourceSet
+    signature:
+      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]
+      outputs: [[null, Int]]
+      resources: r # Indicates that running this operation also invokes resources r
 ```
 
 The declaration of the `args` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `args` is given by the following production:
 ```
-TypeParam ::= "Type" | "ClassicType" | "F64" | "Int" | "Opaque"(name, ...) | "List"(TypeParam)
+TypeParam ::= "Type" | "ClassicType"
+            | "F64" | "Int"
+            | "Opaque"(name, ...) | "List"(TypeParam)
+            | "ResourceSet"
 ```
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
@@ -782,9 +793,11 @@ Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
 Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists. The optional `misc` field is used for arbitrary
-YAML, which is read in as-is and passed to compiler passes and (if no `signature` is present) the
-`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+must have children `inputs` and `outputs`, each lists, and may have `resources`.
+
+The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
+ passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+
 The optional `args` field can be used to specify the types of static+const arguments to each operation
 ---for example the matrix needed to define an SU2 operation. If `args` are not specified
 then it is assumed empty.

@@ -4,6 +4,8 @@
 //!
 //! [`OpDef`]: crate::resource::OpDef
 
+use crate::resource::ResourceSet;
+
 use super::{simple::HInt, ClassicType, SimpleType, TypeRow};
 
 /// A Type Parameter declared by an OpDef. Specifies
@@ -21,7 +23,14 @@ pub enum TypeParam {
     /// TODO is the typerow here correct?
     Opaque(String, Box<TypeRow>),
     /// Node must provide a [TypeArgValue::List] (of whatever length)
-    List(Box<TypeParam>)
+    List(Box<TypeParam>),
+    /// Node must provide a [TypeArgValue::ResourceSet]. For example,
+    /// a definition of an operation that takes a Graph argument,
+    /// could be polymorphic over the ResourceSet of that graph,
+    /// in order to encode that ResourceSet in its [`output_resources`]
+    ///
+    /// [`output_resources`]: crate::types::Signature::output_resources
+    ResourceSet,
 }
 
 /// An argument value for a type parameter
@@ -42,4 +51,6 @@ pub enum TypeArgValue {
     /// Where an argument has type [TypeParam::List]`<T>` - all elements will implicitly
     /// be of the same variety of TypeArgValue, representing a `T`.
     List(Vec<TypeArgValue>),
+    /// Where the OpDef is polymorphic over a [TypeParam::ResourceSet]
+    ResourceSet(ResourceSet),
 }
