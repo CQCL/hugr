@@ -1160,8 +1160,8 @@ and satisfying all the same local constraints except that it may be missing edge
 
 Given a partial hugr $G$, let
 
-  - $\mathrm{top}(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
-  - $\mathrm{bot}(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
+  - $\top(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
+  - $\bot(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
 
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
@@ -1187,10 +1187,10 @@ The `Replace` method takes as input:
 
   - a set $S$ of mutually-separated nodes in $\Gamma$;
   - a partial hugr $G$;
-  - a map $T : \mathrm{top}(G) \to \Gamma \setminus S^*$ whose image consists of container nodes;
-  - a map $B : \mathrm{bot}(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
+  - a map $T : \top(G) \to \Gamma \setminus S^*$ whose image consists of container nodes;
+  - a map $B : \bot(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
     is separated from $B(y)$ unless $x = y$. Let $X$ be the set of children
-    of nodes $B(y)$ for $y \in \mathrm{bot}(G)$, and $R = S^\* \setminus X^\*$.
+    of nodes $B(y)$ for $y \in \bot(G)$, and $R = S^\* \setminus X^\*$.
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus S^*$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
