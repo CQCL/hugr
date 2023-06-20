@@ -6,6 +6,7 @@
 //! [`OpDef`]: crate::ops::custom::OpDef
 
 use std::collections::HashSet;
+use std::fmt::{self, Display};
 
 use smol_str::SmolStr;
 
@@ -79,13 +80,13 @@ impl ResourceSet {
     }
 
     /// Adds a resource to the set.
-    pub fn insert(&mut self, resource: &Resource) {
-        self.0.insert(resource.name.clone());
+    pub fn insert(&mut self, resource: &ResourceId) {
+        self.0.insert(resource.clone());
     }
 
     /// Returns `true` if the set contains the given resource.
-    pub fn contains(&self, resource: &Resource) -> bool {
-        self.0.contains(&resource.name)
+    pub fn contains(&self, resource: &ResourceId) -> bool {
+        self.0.contains(resource)
     }
 
     /// Returns `true` if the set is a subset of `other`.
@@ -99,7 +100,7 @@ impl ResourceSet {
     }
 
     /// Create a resource set with a single element.
-    pub fn singleton(resource: &Resource) -> Self {
+    pub fn singleton(resource: &ResourceId) -> Self {
         let mut set = Self::new();
         set.insert(resource);
         set
@@ -109,6 +110,17 @@ impl ResourceSet {
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
         self
+    }
+
+    /// The things in other which are in not in self
+    pub fn missing_from(&self, other: &Self) -> Self {
+        ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+    }
+}
+
+impl Display for ResourceSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
