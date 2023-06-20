@@ -29,7 +29,7 @@ struct ValidationContext<'a> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
     /// Resource requirements associated with each edge
-    resources: HashMap<(Node, Port), ResourceSet>,
+    resources: HashMap<(Node, Direction), ResourceSet>,
 }
 
 impl Hugr {
@@ -79,12 +79,10 @@ impl<'a> ValidationContext<'a> {
         let sig = op.signature();
 
         for dir in Direction::BOTH {
-            for port in self.hugr.node_ports(*node, dir) {
-                assert!(self
-                    .resources
-                    .insert((*node, port), sig.get_resources(&dir).clone())
-                    .is_none());
-            }
+            assert!(self
+                .resources
+                .insert((*node, dir), sig.get_resources(&dir).clone())
+                .is_none());
         }
 
         Ok(())
@@ -186,8 +184,8 @@ impl<'a> ValidationContext<'a> {
         src: &(Node, Port),
         tgt: &(Node, Port),
     ) -> Result<(), ValidationError> {
-        let rs_src = self.resources.get(src).unwrap();
-        let rs_tgt = self.resources.get(tgt).unwrap();
+        let rs_src = self.resources.get(&(src.0, Direction::Outgoing)).unwrap();
+        let rs_tgt = self.resources.get(&(tgt.0, Direction::Incoming)).unwrap();
 
         if rs_src == rs_tgt {
             Ok(())
