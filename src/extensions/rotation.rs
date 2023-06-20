@@ -6,14 +6,14 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use cgmath::num_traits::ToPrimitive;
 use num_rational::Rational64;
 use smol_str::SmolStr;
+use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::ops::CustomOp;
-use crate::resource::ResourceSet;
-use crate::types::{ClassicType, CustomType, Signature, SimpleType, TypeRow};
+use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError};
+use crate::types::{type_arg::TypeArgValue, ClassicType, CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -27,7 +27,13 @@ pub fn resource() -> Resource {
     resource.add_type(Type::Angle.into());
     resource.add_type(Type::Quaternion.into());
 
-    resource.add_opaque_op(AngleAdd.into());
+    resource.add_op(OpDef::new_with_custom_sig(
+        "AngleAdd".into(),
+        "".into(),
+        vec![],
+        HashMap::default(),
+        AngleAdd,
+    ));
     resource
 }
 
@@ -90,20 +96,17 @@ impl CustomConst for Constant {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AngleAdd;
 
-#[typetag::serde]
-impl CustomOp for AngleAdd {
-    fn name(&self) -> SmolStr {
-        "AngleAdd".into()
-    }
-
-    fn signature(&self) -> Signature {
-        // TODO: Is there a way to make this static? The Opaque simple type requires initializing a Box...
-        Signature::new_linear(vec![SimpleType::Classic(Type::Angle.classic_type())])
-    }
-
-    fn resources(&self) -> &ResourceSet {
-        // TODO: Don't return a reference? We need to initialize the resource set.
-        todo!()
+/// When we have a YAML type-scheme interpreter, we'll be able to use that;
+/// there is no need for a binary compute_signature for a case this simple.
+impl CustomSignatureFunc for AngleAdd {
+    fn compute_signature(
+        &self,
+        _name: &SmolStr,
+        _arg_values: &Vec<TypeArgValue>,
+        _misc: &HashMap<String, serde_yaml::Value>,
+    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
+        let t: TypeRow = vec![SimpleType::Classic(Type::Angle.classic_type())].into();
+        Ok((t.clone(), t, ResourceSet::default()))
     }
 }
 

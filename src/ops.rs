@@ -2,7 +2,7 @@
 
 pub mod constant;
 pub mod controlflow;
-pub mod custom;
+mod custom;
 pub mod dataflow;
 pub mod handle;
 pub mod leaf;
@@ -11,8 +11,6 @@ pub mod tag;
 pub mod validate;
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 use crate::{Direction, Port};
-
-pub use custom::{CustomOp, OpaqueOp};
 
 use portgraph::NodeIndex;
 use smol_str::SmolStr;

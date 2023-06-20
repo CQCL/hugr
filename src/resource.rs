@@ -3,129 +3,264 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display};
+use std::fmt::{Debug, Display, Formatter};
 
 use smol_str::SmolStr;
+use thiserror::Error;
 
-use crate::ops::OpaqueOp;
-use crate::types::{custom::CustomType, Signature, SignatureDescription, SimpleType};
+use crate::types::type_arg::check_arg;
+use crate::types::TypeRow;
+use crate::types::{
+    custom::CustomType,
+    type_arg::{TypeArgValue, TypeParam},
+    Signature, SignatureDescription,
+};
+use crate::Hugr;
+
+/// Trait for resources to provide custom binary code for computing signature.
+pub trait CustomSignatureFunc {
+    /// Compute signature of node given the operation name,
+    /// values for the type parameters,
+    /// and 'misc' data from the resource definition YAML
+    fn compute_signature(
+        &self,
+        name: &SmolStr,
+        arg_values: &Vec<TypeArgValue>,
+        misc: &HashMap<String, serde_yaml::Value>,
+    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
+
+    /// Describe the signature of a node, given the operation name,
+    /// values for the type parameters,
+    /// and 'misc' data from the resource definition YAML.
+    fn describe_signature(
+        &self,
+        _name: &SmolStr,
+        _arg_values: &Vec<TypeArgValue>,
+        _misc: &HashMap<String, serde_yaml::Value>,
+    ) -> SignatureDescription {
+        SignatureDescription::default()
+    }
+}
+
+/// An error that can occur in computing the signature of a node.
+/// TODO: there's no real way to plumb this out of OpType::signature()...
+/// TODO: decide on failure modes
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum SignatureError {
+    /// When the type arguments of the node did not match the params declared by the OpDef
+    #[error("Type arguments of node did not match params declared by OpDef: {0}")]
+    TypeArgMismatch(String),
+}
+
+/// Trait for resources to provide custom binary code for lowering a node to a Hugr.
+pub trait CustomLowerFunc {
+    /// Return a Hugr that implements the node using only the specified available resources;
+    /// may fail.
+    /// TODO: some error type to indicate Resources required?
+    fn try_lower(
+        &self,
+        name: &SmolStr,
+        arg_values: &Vec<TypeArgValue>,
+        misc: &HashMap<String, serde_yaml::Value>,
+        available_resources: &ResourceSet,
+    ) -> Option<Hugr>;
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+enum SignatureFunc {
+    // Note: I'd prefer to make the YAML version just implement the same CustomSignatureFunc trait,
+    // and then just have a Box<dyn CustomSignatureFunc> instead of this enum, but that seems less likely
+    // to serialize well.
+    /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
+    #[serde(rename = "signature")]
+    FromYAML { inputs: String, outputs: String },
+    #[serde(skip)]
+    CustomFunc(Box<dyn CustomSignatureFunc>),
+}
+
+impl Debug for SignatureFunc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FromYAML { inputs, outputs } => f
+                .debug_struct("signature")
+                .field("inputs", inputs)
+                .field("outputs", outputs)
+                .finish(),
+            Self::CustomFunc(_) => f.write_str("<custom sig>"),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+enum LowerFunc {
+    #[serde(skip)]
+    None,
+    #[serde(rename = "hugr")]
+    FixedHugr(ResourceSet, Hugr),
+    #[serde(skip)]
+    CustomFunc(Box<dyn CustomLowerFunc>),
+}
+
+impl Debug for LowerFunc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, "None"),
+            Self::FixedHugr(_, _) => write!(f, "FixedHugr"),
+            Self::CustomFunc(_) => write!(f, "<custom lower>"),
+        }
+    }
+}
 
 /// Serializable definition for dynamically loaded operations.
 ///
-/// TODO: Define a way to construct new CustomOps from a serialized definition.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// TODO: Define a way to construct new OpDef's from a serialized definition.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// Unique identifier of the operation.
-    ///
-    /// This is used to compare two custom ops for equality.
+    /// Unique identifier of the operation. Used to look up OpDefs in the registry
+    /// when deserializing nodes (which store only the name).
     pub name: SmolStr,
     /// Human readable description of the operation.
     pub description: String,
-    inputs: Vec<(Option<SmolStr>, SimpleType)>,
-    outputs: Vec<(Option<SmolStr>, SimpleType)>,
+    /// Declared type parameters, values must be provided for each operation node
+    pub args: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
-    /// (YAML?)-encoded definition of the operation.
-    ///
-    /// TODO: Define the format of this field.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub def: Option<String>,
-    /// Resources required to execute this operation.
-    pub resource_reqs: ResourceSet,
 
-    /// Signature of the operation.
-    ///
-    /// Computed from the serialized `inputs` and `outputs`.
-    #[serde(skip)]
-    signature: OnceCell<Signature>,
-    /// Optional port descriptions.
-    ///
-    /// Computed from the serialized `inputs` and `outputs`.
-    #[serde(skip)]
-    port_names: OnceCell<SignatureDescription>,
+    // TODO YAML directive: only serialize "FromYAML" version, skip CustomFunc
+    #[serde(flatten)]
+    signature_func: SignatureFunc,
+    #[serde(flatten)]
+    lower_func: LowerFunc,
 }
 
 impl OpDef {
-    /// Initialize a new operation definition with a fixed signature.
-    pub fn new(name: SmolStr, signature: Signature) -> Self {
-        Self::new_with_description(
-            name,
-            String::new(),
-            signature,
-            SignatureDescription::default(),
-        )
-    }
-
-    /// Initialize a new operation definition with a fixed signature.
-    pub fn new_with_description(
+    /// Create an OpDef with a signature (inputs+outputs) read from the YAML
+    pub fn new_with_yaml_types(
         name: SmolStr,
         description: String,
-        signature: Signature,
-        port_names: SignatureDescription,
+        args: Vec<TypeParam>,
+        misc: HashMap<String, serde_yaml::Value>,
+        inputs: String, // TODO this is likely the wrong type
+        outputs: String, // TODO similarly
+        // resources: Option<String> -- if mentioned in YAML?
     ) -> Self {
-        let inputs: Vec<_> = port_names
-            .input_zip(&signature)
-            .chain(port_names.const_input_zip(&signature))
-            .map(|(n, t)| (Some(n.clone()), t.clone()))
-            .collect();
-
-        let outputs = port_names
-            .output_zip(&signature)
-            .map(|(n, t)| (Some(n.clone()), t.clone()));
         Self {
             name,
             description,
-            inputs,
-            outputs: outputs.collect(),
-            misc: HashMap::new(),
-            def: None,
-            resource_reqs: ResourceSet::new(),
-            signature: OnceCell::from(signature),
-            port_names: OnceCell::from(port_names),
+            args,
+            misc,
+            signature_func: SignatureFunc::FromYAML { inputs, outputs },
+            lower_func: LowerFunc::None,
         }
     }
 
+    /// Create an OpDef with custom binary code to compute the signature
+    pub fn new_with_custom_sig(
+        name: SmolStr,
+        description: String,
+        args: Vec<TypeParam>,
+        misc: HashMap<String, serde_yaml::Value>,
+        sig_func: impl CustomSignatureFunc + 'static,
+    ) -> Self {
+        Self {
+            name,
+            description,
+            args,
+            misc,
+            signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
+            lower_func: LowerFunc::None,
+        }
+    }
+
+    /// Modifies the OpDef with the ability to lower every operation to a
+    /// fixed Hugr. Only applicable if the OpDef cannot currently lower itself.
+    pub fn lowering_to_hugr(
+        mut self,
+        h: Hugr,
+        required_resources: ResourceSet, // TODO can we figure these out from 'h' ?
+    ) -> Result<Self, Self> {
+        if let LowerFunc::None = self.lower_func {
+            self.lower_func = LowerFunc::FixedHugr(required_resources, h);
+            Ok(self)
+        } else {
+            Err(self)
+        }
+    }
+
+    /// Add custom binary code that may try to lower the operation.
+    /// Only applicable if the OpDef currently has no way to lower itself.
+    pub fn with_custom_lower_func<F: CustomLowerFunc + 'static>(
+        mut self,
+        func: F,
+    ) -> Result<Self, Self> {
+        if let LowerFunc::None = self.lower_func {
+            self.lower_func = LowerFunc::CustomFunc(Box::new(func));
+            Ok(self)
+        } else {
+            Err(self)
+        }
+    }
     /// The signature of the operation.
-    pub fn signature(&self) -> Signature {
-        self.signature
-            .get_or_init(|| {
-                let inputs = self
-                    .inputs
-                    .iter()
-                    .map(|(_, t)| t.clone())
-                    .collect::<Vec<_>>();
-                let outputs = self
-                    .outputs
-                    .iter()
-                    .map(|(_, t)| t.clone())
-                    .collect::<Vec<_>>();
-                Signature::new_df(inputs, outputs)
-            })
-            .clone()
+    pub fn signature(
+        &self,
+        args: &Vec<TypeArgValue>,
+        resources_in: &ResourceSet,
+    ) -> Result<Signature, SignatureError> {
+        if args.len() != self.args.len() {
+            return Err(SignatureError::TypeArgMismatch(
+                "Node provided wrong number of args".to_string(),
+            ));
+        }
+        for (a, p) in args.iter().zip(self.args.iter()) {
+            check_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        let (ins, outs, res) = match &self.signature_func {
+            SignatureFunc::FromYAML { .. } => {
+                // Sig should be computed solely from inputs + outputs + args.
+                // Resources used should be at least the resource containing this OpDef.
+                // (TODO Consider - should we identify that _in_ the OpDef?)
+                todo!()
+            }
+            SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
+        };
+        let mut sig = Signature::new_df(ins, outs);
+        sig.input_resources = resources_in.clone();
+        sig.output_resources = res.union(resources_in); // Pass input requirements through
+        Ok(sig)
     }
 
     /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self) -> Option<SignatureDescription> {
-        Some(
-            self.port_names
-                .get_or_init(|| {
-                    let inputs = self
-                        .inputs
-                        .iter()
-                        .map(|(n, _)| n.clone().unwrap_or_default())
-                        .collect::<Vec<_>>();
-                    let outputs = self
-                        .outputs
-                        .iter()
-                        .map(|(n, _)| n.clone().unwrap_or_default())
-                        .collect::<Vec<_>>();
-                    SignatureDescription::new_df(inputs, outputs)
-                })
-                .clone(),
-        )
+    pub fn signature_desc(&self, args: &Vec<TypeArgValue>) -> SignatureDescription {
+        match &self.signature_func {
+            SignatureFunc::FromYAML { .. } => {
+                todo!()
+            }
+            SignatureFunc::CustomFunc(bf) => bf.describe_signature(&self.name, args, &self.misc),
+        }
+    }
+
+    /// Fallibly returns a Hugr that may replace an instance of this OpDef
+    /// given a set of available resources that may be used in the Hugr.
+    pub fn try_lower(
+        &self,
+        args: &Vec<TypeArgValue>,
+        available_resources: &ResourceSet,
+    ) -> Option<Hugr> {
+        match &self.lower_func {
+            LowerFunc::None => None,
+            LowerFunc::FixedHugr(req_res, h) => {
+                if available_resources.is_superset(req_res) {
+                    Some(h.clone())
+                } else {
+                    None
+                }
+            }
+            LowerFunc::CustomFunc(f) => {
+                f.try_lower(&self.name, args, &self.misc, available_resources)
+            }
+        }
     }
 }
 
@@ -135,18 +270,18 @@ impl OpDef {
 pub type ResourceId = SmolStr;
 
 /// A resource is a set of capabilities required to execute a graph.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Resource {
     /// Unique identifier for the resource.
     pub name: ResourceId,
-    /// Set of resource dependencies required by this resource.
-    pub resource_reqs: ResourceSet,
+    // Set of resource dependencies required by this resource.
+    // TODO I haven't seen where these are required yet. If they are,
+    // we'll probably need some way to
+    // pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
     pub types: Vec<CustomType>,
     /// Operation declarations with serializable definitions.
     pub operations: Vec<OpDef>,
-    /// Opaque operation declarations that do not expose their definitions.
-    pub opaque_operations: Vec<OpaqueOp>,
 }
 
 impl Resource {
@@ -171,11 +306,6 @@ impl Resource {
     /// Add an operation definition to the resource.
     pub fn add_op(&mut self, op: OpDef) {
         self.operations.push(op);
-    }
-
-    /// Add an opaque operation declaration to the resource.
-    pub fn add_opaque_op(&mut self, op: OpaqueOp) {
-        self.opaque_operations.push(op);
     }
 }
 
@@ -235,7 +365,7 @@ impl ResourceSet {
 }
 
 impl Display for ResourceSet {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.0.iter()).finish()
     }
 }

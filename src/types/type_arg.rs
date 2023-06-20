@@ -10,6 +10,7 @@ use super::{simple::HInt, ClassicType, SimpleType, TypeRow};
 
 /// A Type Parameter declared by an OpDef. Specifies
 /// the values that must be provided by each operation node.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TypeParam {
     /// Node must provide a [TypeArgValue::Type] - classic or linear
     Type,
@@ -34,6 +35,7 @@ pub enum TypeParam {
 }
 
 /// An argument value for a type parameter
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum TypeArgValue {
     /// Where the OpDef declares that an argument is a [TypeParam::Type]
     Type(SimpleType),
@@ -53,4 +55,25 @@ pub enum TypeArgValue {
     List(Vec<TypeArgValue>),
     /// Where the OpDef is polymorphic over a [TypeParam::ResourceSet]
     ResourceSet(ResourceSet),
+}
+
+/// Checks a [TypeArgValue] is as expected for a [TypeParam]
+pub fn check_arg(arg: &TypeArgValue, param: &TypeParam) -> Result<(), String> {
+    match (arg, param) {
+        (TypeArgValue::Type(_), TypeParam::Type) => (),
+        (TypeArgValue::ClassicType(_), TypeParam::ClassicType) => (),
+        (TypeArgValue::F64(_), TypeParam::F64) => (),
+        (TypeArgValue::Int(_), TypeParam::Type) => (),
+        (TypeArgValue::Opaque(_), TypeParam::Opaque(_, _)) => todo!(), // Do we need more checks?
+        (TypeArgValue::List(items), TypeParam::List(ty)) => {
+            for item in items {
+                check_arg(item, &*ty)?;
+            }
+        }
+        (TypeArgValue::ResourceSet(_), TypeParam::ResourceSet) => (),
+        _ => {
+            return Err(format!("Mismatched {:?} vs {:?}", arg, param));
+        }
+    };
+    Ok(())
 }
