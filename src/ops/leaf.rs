@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Dataflow operations with no children.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that

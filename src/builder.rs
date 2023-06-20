@@ -33,7 +33,7 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit_builder;
 pub use circuit_builder::{AppendWire, CircuitBuilder};
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 /// Error while building the HUGR.
 pub enum BuildError {
     /// The constructed HUGR is invalid.
