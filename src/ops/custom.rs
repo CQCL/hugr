@@ -1,7 +1,6 @@
 //! Extensible operations.
 
 use downcast_rs::{impl_downcast, Downcast};
-use serde::{Deserializer, Serializer};
 use smol_str::SmolStr;
 use std::any::Any;
 use std::rc::Rc;
@@ -15,32 +14,48 @@ use super::tag::OpTag;
 use super::{OpName, OpTrait};
 
 /// An instantiation of an [`OpDef`] with values for the type arguments
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResourceOp {
-    #[serde(
-        serialize_with = "serialize_custom_op",
-        deserialize_with = "deserialize_custom_op"
-    )]
+#[derive(Clone, Debug)]
+pub struct ExternalOp {
     def: Rc<OpDef>,
     args: Vec<TypeArgValue>,
 }
 
-fn serialize_custom_op<S: Serializer>(rc: &Rc<OpDef>, ser: S) -> Result<S::Ok, S::Error> {
-    ser.serialize_str(rc.name.as_str())
+impl Into<OpaqueOp> for &ExternalOp {
+    fn into(self) -> OpaqueOp {
+        // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek?
+        let sig = self
+            .def
+            .signature(&self.args, &ResourceSet::default())
+            .unwrap();
+        OpaqueOp {
+            name: self.def.name.clone(),
+            args: self.args.clone(),
+            signature: sig,
+        }
+    }
 }
 
-fn deserialize_custom_op<'de, D: Deserializer<'de>>(_des: D) -> Result<Rc<OpDef>, D::Error> {
-    // We need some kind of global extension registry that we can read here to lookup the name?
-    todo!()
+/// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct OpaqueOp {
+    name: SmolStr, // This should be fully-qualified, somehow
+    args: Vec<TypeArgValue>,
+    signature: Signature,
 }
 
-impl OpName for ResourceOp {
+impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
         self.def.name.clone()
     }
 }
 
-impl OpTrait for ResourceOp {
+impl OpName for OpaqueOp {
+    fn name(&self) -> SmolStr {
+        return self.name.clone();
+    }
+}
+
+impl OpTrait for ExternalOp {
     fn description(&self) -> &str {
         self.def.description.as_str()
     }
@@ -63,13 +78,31 @@ impl OpTrait for ResourceOp {
     }
 }
 
-impl PartialEq for ResourceOp {
+impl OpTrait for OpaqueOp {
+    fn description(&self) -> &str {
+        "<opaque op from unknown Resource>"
+    }
+
+    fn signature_desc(&self) -> SignatureDescription {
+        SignatureDescription::default()
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::DataflowChild
+    }
+
+    fn signature(&self) -> Signature {
+        self.signature.clone()
+    }
+}
+
+impl PartialEq for ExternalOp {
     fn eq(&self, other: &Self) -> bool {
         Rc::<OpDef>::ptr_eq(&self.def, &other.def)
     }
 }
 
-impl Eq for ResourceOp {}
+impl Eq for ExternalOp {}
 
 /// Custom definition for an operation.
 ///

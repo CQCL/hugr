@@ -144,7 +144,7 @@ impl OpDef {
         misc: HashMap<String, serde_yaml::Value>,
         inputs: String, // TODO this is likely the wrong type
         outputs: String, // TODO similarly
-        // resources: Option<String> -- if mentioned in YAML?
+                        // resources: Option<String> -- if mentioned in YAML?
     ) -> Self {
         Self {
             name,
