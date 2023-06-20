@@ -2,6 +2,7 @@
 
 pub mod custom;
 pub mod simple;
+pub mod type_arg;
 
 use std::fmt::{self, Display, Write};
 use std::ops::Index;

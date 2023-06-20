@@ -713,7 +713,7 @@ resources:
   types:
   - name: QubitVector
     # Opaque types can take type arguments, with specified names
-    args: [["size", u64]]
+    args: [["size", Int]]
   operations:
   - name: measure
     description: "measure a qubit"
@@ -741,9 +741,9 @@ resources:
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     args:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: U64
-      - j: U64
-      - k: U64
+      - i: Int
+      - j: Int
+      - k: Int
     signature:
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
@@ -752,7 +752,7 @@ resources:
   - name: max_float
     description: "Variable number of inputs"
     args:
-      - n: U64
+      - n: Int
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
@@ -761,8 +761,8 @@ resources:
     description: "Concatenate two arrays. Resource provides a compute_signature implementation."
     args:
       - t: Type  # Classic or Quantum
-      - i: U64
-      - j: U64
+      - i: Int
+      - j: Int
     # inputs could be: Array<i>(t), Array<j>(t)
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
@@ -773,7 +773,7 @@ The declaration of the `args` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `args` is given by the following production:
 ```
-TypeParam ::= "Type" | "ClassicType" | "F64" | "U64" | "I64" | "Opaque"(name, ...) | "List"(TypeParam)
+TypeParam ::= "Type" | "ClassicType" | "F64" | "Int" | "Opaque"(name, ...) | "List"(TypeParam)
 ```
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and

@@ -94,6 +94,10 @@ impl From<Container<LinearType>> for SimpleType {
     }
 }
 
+/// The type of an Int in the Hugr. Keeping previous definition
+/// for now, but this looks likely to change.
+pub type HInt = u8;
+
 /// A type that represents concrete classical data.
 ///
 /// Uses `Box`es on most variants to reduce the memory footprint.
@@ -105,7 +109,7 @@ pub enum ClassicType {
     /// A type variable identified by a name.
     Variable(SmolStr),
     /// An arbitrary size integer.
-    Int(u8),
+    Int(HInt),
     /// A 64-bit floating point number.
     F64,
     /// An arbitrary length string.
