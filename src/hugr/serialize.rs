@@ -35,11 +35,18 @@ enum Versioned {
     Unsupported,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+struct NodeSer {
+    parent: Node,
+    #[serde(flatten)]
+    op: OpType,
+}
+
 /// Version 0 of the HUGR serialization format.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct SerHugrV0 {
     /// For each node: (parent, node_operation)
-    nodes: Vec<(Node, OpType)>,
+    nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
 }
@@ -103,7 +110,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::new();
         let mut index_counter = 1..;
-        let mut nodes: Vec<(Node, OpType)> = hugr
+        let mut nodes: Vec<NodeSer> = hugr
             .nodes()
             .map(|n| {
                 // Note that we don't rekey the parent here, as we need to fully
@@ -119,10 +126,13 @@ impl TryFrom<&Hugr> for SerHugrV0 {
 
                 node_rekey.insert(n, new_node);
                 let opt = hugr.get_optype(n);
-                Ok((parent, opt.clone()))
+                Ok(NodeSer {
+                    parent,
+                    op: opt.clone(),
+                })
             })
             .collect::<Result<_, Self::Error>>()?;
-        for (parent, _) in &mut nodes {
+        for NodeSer { parent, .. } in &mut nodes {
             *parent = node_rekey[parent];
         }
 
@@ -166,14 +176,17 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let (root_parent, root_type) = nodes.next().unwrap();
+        let NodeSer {
+            parent: root_parent,
+            op: root_type,
+        } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
         }
         let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
 
-        for (parent, typ) in nodes {
-            hugr.add_op_with_parent(parent, typ)?;
+        for node_ser in nodes {
+            hugr.add_op_with_parent(node_ser.parent, node_ser.op)?;
         }
 
         let unwrap_offset = |node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
