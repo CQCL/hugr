@@ -154,6 +154,15 @@ impl Signature {
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
+
+    /// Returns a reference to the resourceset for the ports of the
+    /// signature in a given direction
+    pub fn get_resources(&self, dir: &Direction) -> &ResourceSet {
+        match dir {
+            Direction::Incoming => &self.input_resources,
+            Direction::Outgoing => &self.output_resources,
+        }
+    }
 }
 
 impl Signature {
