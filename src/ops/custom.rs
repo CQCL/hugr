@@ -20,7 +20,7 @@ pub struct OpaqueOp {
     id: SmolStr,
 
     /// The custom operation.
-    op: Box<dyn CustomOp>,
+    custom: Box<dyn CustomOp>,
 }
 
 impl OpaqueOp {
@@ -42,7 +42,7 @@ impl Deref for OpaqueOp {
     type Target = dyn CustomOp;
 
     fn deref(&self) -> &Self::Target {
-        self.op.as_ref()
+        self.custom.as_ref()
     }
 }
 
@@ -50,7 +50,7 @@ impl<T: CustomOp> From<T> for OpaqueOp {
     fn from(op: T) -> Self {
         Self {
             id: op.name(),
-            op: Box::new(op),
+            custom: Box::new(op),
         }
     }
 }
