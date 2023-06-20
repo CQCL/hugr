@@ -174,8 +174,6 @@ impl TryFrom<SerHugrV0> for Hugr {
     fn try_from(SerHugrV0 { nodes, edges }: SerHugrV0) -> Result<Self, Self::Error> {
         // Root must be first node
         let mut nodes = nodes.into_iter();
-        // if there are any unconnected ports or copy nodes the capacity will be
-        // an underestimate
         let NodeSer {
             parent: root_parent,
             op: root_type,
@@ -183,6 +181,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         if root_parent.index.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
         }
+        // if there are any unconnected ports or copy nodes the capacity will be
+        // an underestimate
         let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
 
         for node_ser in nodes {
