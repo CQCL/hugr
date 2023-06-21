@@ -12,6 +12,7 @@ use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
+use crate::resource::ResourceSet;
 use crate::types::{ClassicType, Signature};
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
@@ -27,6 +28,8 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, DominatorTree>,
+    /// Resource requirements associated with each edge
+    resources: HashMap<(Node, Direction), ResourceSet>,
 }
 
 impl Hugr {
@@ -43,6 +46,7 @@ impl<'a> ValidationContext<'a> {
         Self {
             hugr,
             dominators: HashMap::new(),
+            resources: HashMap::new(),
         }
     }
 
@@ -55,9 +59,30 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
+        for node in self.hugr.graph.nodes_iter().map_into() {
+            self.gather_resources(&node)?;
+        }
+
         // Node-specific checks
         for node in self.hugr.graph.nodes_iter().map_into() {
             self.validate_node(node)?;
+        }
+
+        Ok(())
+    }
+
+    /// Use the signature supplied by a dataflow node to work out the
+    /// resource requirements for all of its input and output edges, then put
+    /// those requirements in the ValidationContext
+    fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
+        let op = self.hugr.op_types.get(node.index);
+        let sig = op.signature();
+
+        for dir in Direction::BOTH {
+            assert!(self
+                .resources
+                .insert((*node, dir), sig.get_resources(&dir).clone())
+                .is_none());
         }
 
         Ok(())
@@ -146,6 +171,47 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
+    /// Check that two `PortIndex` have compatible resource requirements,
+    /// according to the information accumulated by `gather_resources`.
+    ///
+    /// This resource checking assumes that free resource variables
+    ///   (e.g. implicit lifting of `A -> B` to `[R]A -> [R]B`)
+    /// and adding of lift nodes
+    ///   (i.e. those which transform an edge from `A` to `[R]A`)
+    /// has already been done.
+    fn check_resources_compatible(
+        &self,
+        src: &(Node, Port),
+        tgt: &(Node, Port),
+    ) -> Result<(), ValidationError> {
+        let rs_src = self.resources.get(&(src.0, Direction::Outgoing)).unwrap();
+        let rs_tgt = self.resources.get(&(tgt.0, Direction::Incoming)).unwrap();
+
+        if rs_src == rs_tgt {
+            Ok(())
+        } else if rs_src.is_subset(rs_tgt) {
+            // The extra resource requirements reside in the target node.
+            // If so, we can fix this mismatch with a lift node
+            Err(ValidationError::TgtExceedsSrcResources {
+                from: src.0,
+                from_offset: src.1,
+                from_resources: rs_src.clone(),
+                to: tgt.0,
+                to_offset: tgt.1,
+                to_resources: rs_tgt.clone(),
+            })
+        } else {
+            Err(ValidationError::SrcExceedsTgtResources {
+                from: src.0,
+                from_offset: src.1,
+                from_resources: rs_src.clone(),
+                to: tgt.0,
+                to_offset: tgt.1,
+                to_resources: rs_tgt.clone(),
+            })
+        }
+    }
+
     /// Check whether a port is valid.
     /// - Input ports and output linear ports must be connected
     /// - The linked port must have a compatible type.
@@ -189,6 +255,9 @@ impl<'a> ValidationContext<'a> {
 
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
+
+            self.check_resources_compatible(&(node, port), &(other_node, other_offset))?;
+
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
                 // The number of ports in `other_node` does not match the operation definition.
@@ -661,6 +730,26 @@ pub enum ValidationError {
     /// Type error for constant values
     #[error("Type error for constant value: {0}.")]
     ConstTypeError(#[from] ConstTypeError),
+    /// Missing lift node
+    #[error("Resources at target node {to:?} ({to_offset:?}) ({to_resources}) exceed those at source {from:?} ({from_offset:?}) ({from_resources})")]
+    TgtExceedsSrcResources {
+        from: Node,
+        from_offset: Port,
+        from_resources: ResourceSet,
+        to: Node,
+        to_offset: Port,
+        to_resources: ResourceSet,
+    },
+    /// Too many resource requirements coming from src
+    #[error("Resources at source node {from:?} ({from_offset:?}) ({from_resources}) exceed those at target {to:?} ({to_offset:?}) ({to_resources})")]
+    SrcExceedsTgtResources {
+        from: Node,
+        from_offset: Port,
+        from_resources: ResourceSet,
+        to: Node,
+        to_offset: Port,
+        to_resources: ResourceSet,
+    },
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -727,12 +816,16 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
+    use crate::builder::{BuildError, ModuleBuilder};
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder};
     use crate::hugr::HugrMut;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
+    use crate::Direction;
     use crate::{type_row, Node};
 
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     const B: SimpleType = SimpleType::Classic(ClassicType::bit());
     const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
 
@@ -766,7 +859,12 @@ mod test {
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
+            .add_op_with_parent(
+                parent,
+                LeafOp::Noop {
+                    ty: ClassicType::bit().into(),
+                },
+            )
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -850,7 +948,10 @@ mod test {
 
     #[test]
     fn leaf_root() {
-        let leaf_op: OpType = LeafOp::Noop(ClassicType::F64.into()).into();
+        let leaf_op: OpType = LeafOp::Noop {
+            ty: ClassicType::F64.into(),
+        }
+        .into();
 
         let b = Hugr::new(leaf_op);
         assert_eq!(b.validate(), Ok(()));
@@ -935,7 +1036,12 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(output, LeafOp::Noop(ClassicType::bit().into()));
+        b.replace_op(
+            output,
+            LeafOp::Noop {
+                ty: ClassicType::bit().into(),
+            },
+        );
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
@@ -1046,5 +1152,104 @@ mod test {
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
+    }
+
+    #[test]
+    /// A wire with no resource requirements is wired into a node which has
+    /// [A,B] resources required on its inputs and outputs. This could be fixed
+    /// by adding a lift node, but for validation this is an error.
+    fn missing_lift_node() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+        let mut main = module_builder
+            .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+        let [main_input] = main.input_wires_arr();
+
+        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+
+        // Inner DFG has resource requirements that the wire wont satisfy
+        let rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+        inner_sig.input_resources = rs.clone();
+        inner_sig.output_resources = rs;
+
+        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        let handle = module_builder.finish_hugr();
+
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        Ok(())
+    }
+
+    #[test]
+    /// A wire with resource requirement `[A]` is wired into a an output with no
+    /// resource req. In the validation resource typechecking, we don't do any
+    /// unification, so don't allow open resource variables on the function
+    /// signature, so this fails.
+    fn too_many_resources() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let main_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+
+        let mut main = module_builder.define_function("main", main_sig)?;
+        let [main_input] = main.input_wires_arr();
+
+        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+        inner_sig.output_resources.insert(&"A".into());
+
+        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        let handle = module_builder.finish_hugr();
+        assert_matches!(handle, Err(ValidationError::SrcExceedsTgtResources { .. }));
+        Ok(())
+    }
+
+    #[test]
+    /// A wire with resource requirements `[A]` and another with requirements
+    /// `[B]` are both wired into a node which requires its inputs to have
+    /// requirements `[A,B]`. A slightly more complex test of the error from
+    /// `missing_lift_node`.
+    fn resource_mismatch() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+
+        let mut main_sig = Signature::new_df(type_row![], type_row![NAT]);
+        main_sig.output_resources = all_rs.clone();
+
+        let mut main = module_builder.define_function("main", main_sig)?;
+
+        let mut inner_left_sig = Signature::new_df(type_row![], type_row![NAT]);
+        inner_left_sig.output_resources.insert(&"A".into());
+
+        let mut inner_right_sig = Signature::new_df(type_row![], type_row![NAT]);
+        inner_right_sig.output_resources.insert(&"B".into());
+
+        let mut inner_mult_sig = Signature::new_df(type_row![NAT, NAT], type_row![NAT]);
+        inner_mult_sig.input_resources = all_rs.clone();
+        inner_mult_sig.output_resources = all_rs;
+
+        let [left_wire] = main
+            .dfg_builder(inner_left_sig, [])?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let [right_wire] = main
+            .dfg_builder(inner_right_sig, [])?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let builder = main.dfg_builder(inner_mult_sig, [left_wire, right_wire])?;
+        let [_left, _right] = builder.input_wires_arr();
+        let [output] = builder.finish_with_outputs([])?.outputs_arr();
+
+        main.finish_with_outputs([output])?;
+        let handle = module_builder.finish_hugr();
+        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        Ok(())
     }
 }

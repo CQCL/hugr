@@ -311,7 +311,12 @@ mod test {
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = builder
-                .add_op_with_parent(f, LeafOp::Noop(ClassicType::i64().into()))
+                .add_op_with_parent(
+                    f,
+                    LeafOp::Noop {
+                        ty: ClassicType::i64().into(),
+                    },
+                )
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());
