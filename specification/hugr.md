@@ -133,7 +133,7 @@ The edges of a HUGR encode relationships between nodes; there are several *kinds
 of edge for different relationships.
 
 - `Order` edges are plain directed edges, and express requirements on the ordering.
-- `Value` edges carry typed data. They have a _port_ at each end, associated
+- `Value` edges carry typed data at runtime. They have a _port_ at each end, associated
   with the source and target nodes.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
   compilation time).
