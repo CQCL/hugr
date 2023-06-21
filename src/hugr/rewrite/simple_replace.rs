@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use portgraph::{LinkView, NodeIndex, PortView};
 
 use crate::hugr::{HugrMut, HugrView};
@@ -103,7 +104,7 @@ impl Rewrite for SimpleReplacement {
         // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
             let new_node_index = index_map.get(&node.index).unwrap();
-            for node_successor in self.replacement.output_neighbours(node) {
+            for node_successor in self.replacement.output_neighbours(node).unique() {
                 if self.replacement.get_optype(node_successor).tag() != OpTag::Output {
                     let new_node_successor_index = index_map.get(&node_successor.index).unwrap();
                     for connection in self
@@ -503,5 +504,49 @@ mod test {
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
         assert_eq!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    fn test_replace_cx_cross() {
+        let q_row: Vec<SimpleType> = vec![LinearType::Qubit.into(), LinearType::Qubit.into()];
+        let mut builder = DFGBuilder::new(q_row.clone(), q_row).unwrap();
+        let mut circ = builder.as_circuit(builder.input_wires().collect());
+        circ.append(LeafOp::CX, [0, 1]).unwrap();
+        circ.append(LeafOp::CX, [1, 0]).unwrap();
+        let wires = circ.finish();
+        let [input, output] = builder.io();
+        let mut h = builder.finish_hugr_with_outputs(wires).unwrap();
+        let replacement = h.clone();
+        let orig = h.clone();
+
+        let parent = h.root();
+        let removal = h
+            .nodes()
+            .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
+            .collect();
+        let inputs = h
+            .node_outputs(input)
+            .filter(|&p| h.get_optype(input).signature().get(p).is_some())
+            .map(|p| {
+                let link = h.linked_ports(input, p).next().unwrap();
+                (link, link)
+            })
+            .collect();
+        let outputs = h
+            .node_inputs(output)
+            .filter(|&p| h.get_optype(output).signature().get(p).is_some())
+            .map(|p| ((output, p), p))
+            .collect();
+        h.apply_rewrite(SimpleReplacement::new(
+            parent,
+            removal,
+            replacement,
+            inputs,
+            outputs,
+        ))
+        .unwrap();
+
+        // They should be the same, up to node indices
+        assert_eq!(h.edge_count(), orig.edge_count());
     }
 }
