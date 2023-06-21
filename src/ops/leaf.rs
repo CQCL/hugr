@@ -27,7 +27,10 @@ pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
     #[serde(serialize_with = "serialize_custom_as_unknown", skip_deserializing)]
-    CustomOp(ExternalOp),
+    CustomOp {
+        /// Instantiation of the target OpDef
+        ext: ExternalOp,
+    },
     /// A user-defined operation, from an unknown resource
     UnknownOp {
         /// Identifier of the desired (but unavailable) OpDef
@@ -96,7 +99,7 @@ impl OpName for LeafOp {
     /// The name of the operation.
     fn name(&self) -> SmolStr {
         match self {
-            LeafOp::CustomOp(op) => return op.name(),
+            LeafOp::CustomOp { ext } => return ext.name(),
             LeafOp::UnknownOp { opaque } => return opaque.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
@@ -125,7 +128,7 @@ impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
-            LeafOp::CustomOp(op) => op.description(),
+            LeafOp::CustomOp { ext } => ext.description(),
             LeafOp::UnknownOp { opaque } => opaque.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
@@ -174,7 +177,7 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp(op) => op.signature(),
+            LeafOp::CustomOp { ext } => ext.signature(),
             LeafOp::UnknownOp { opaque } => opaque.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
@@ -193,7 +196,7 @@ impl OpTrait for LeafOp {
     /// Optional description of the ports in the signature.
     fn signature_desc(&self) -> SignatureDescription {
         match self {
-            LeafOp::CustomOp(op) => op.signature_desc(),
+            LeafOp::CustomOp { ext } => ext.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }
