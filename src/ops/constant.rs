@@ -188,7 +188,7 @@ impl ConstValue {
     /// New 64 bit integer constant
     pub fn i64(value: i64) -> Self {
         Self::Int {
-            value: value as u128,
+            value: value as HugrIntValueStore,
             width: 64,
         }
     }
