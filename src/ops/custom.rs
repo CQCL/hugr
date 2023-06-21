@@ -1,12 +1,8 @@
 //! Extensible operations.
 
-use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
-use std::any::Any;
 use std::rc::Rc;
 
-use crate::hugr::Hugr;
-use crate::macros::impl_box_clone;
 use crate::resource::{OpDef, ResourceSet};
 use crate::types::{type_arg::TypeArgValue, Signature, SignatureDescription};
 
@@ -102,40 +98,3 @@ impl PartialEq for ExternalOp {
         Rc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
     }
 }
-
-/// Custom definition for an operation.
-///
-/// When implementing this trait, include the `#[typetag::serde]` attribute to
-/// enable serialization.
-#[typetag::serde]
-pub trait CustomOp: Send + Sync + std::fmt::Debug + CustomOpBoxClone + Any + Downcast {
-    /// Try to convert the custom op to a graph definition.
-    ///
-    /// TODO: Create a separate HUGR, or create a children subgraph in the HUGR?
-    fn try_into_hugr(&self, resources: &ResourceSet) -> Option<Hugr> {
-        let _ = resources;
-        None
-    }
-
-    /// List the resources required to execute this operation.
-    fn resources(&self) -> &ResourceSet;
-
-    /// The name of the operation.
-    fn name(&self) -> SmolStr;
-
-    /// Optional description of the operation.
-    fn description(&self) -> &str {
-        ""
-    }
-
-    /// The signature of the operation.
-    fn signature(&self) -> Signature;
-
-    /// Optional descriptions of the ports in the signature.
-    fn signature_desc(&self) -> SignatureDescription {
-        Default::default()
-    }
-}
-
-impl_downcast!(CustomOp);
-impl_box_clone!(CustomOp, CustomOpBoxClone);
