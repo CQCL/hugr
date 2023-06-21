@@ -1220,8 +1220,9 @@ The new hugr is then derived as follows:
     is removed.
 4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
     of children of $t$ (adding a hierachy edge from $t$ to $n$).
-5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace $m$ with
-    the new copy of $n$ in the list of children of $b$ (replacing the existing hierarchy edge).
+5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
+    hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
+    $n$ to $m$ (preserving the order).
 6.  Remove all nodes in $R$ and edges adjoining them.
 
 ##### Outlining methods
