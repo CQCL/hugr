@@ -1204,7 +1204,8 @@ The `Replace` method takes as input:
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus S^*$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus S^*$.
+    $G$ and `TgtNode` in $\Gamma \setminus S^*$ (and `TgtNode` has an existing
+    incoming edge from a node in $R$).
 
 The new hugr is then derived as follows:
 
@@ -1215,8 +1216,8 @@ The new hugr is then derived as follows:
     the existing edges are replaced.
 3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-    The predecessor node of the existing target port must be in $R$; the
-    edge from it is removed.
+    The target port must have an existing edge whose source is in $R$; this edge
+    is removed.
 4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
     of children of $t$ (adding a hierachy edge from $t$ to $n$).
 5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace $m$ with
