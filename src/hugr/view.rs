@@ -8,6 +8,8 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, WithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{multiportgraph, LinkView, PortView};
 
+type MapWithCtx<I, Ctx, O> = MapCtx<WithCtx<I, Ctx>, fn(<I as Iterator>::Item, &Ctx) -> O>;
+
 use super::Hugr;
 use super::{Node, Port};
 use crate::ops::OpType;
@@ -151,10 +153,8 @@ where
     type Neighbours<'a> = MapInto<multiportgraph::Neighbours<'a>, Node> where Self: 'a;
 
     /// Iterator over the children of a node
-    type PortLinks<'a> = MapCtx<
-        WithCtx<multiportgraph::PortLinks<'a>, &'a Hugr>,
-        fn((multiportgraph::SubportIndex, multiportgraph::SubportIndex), &&'a Hugr) -> (Node, Port),
-    > where
+    type PortLinks<'a> = MapWithCtx<multiportgraph::PortLinks<'a>, &'a Hugr, (Node, Port)>
+    where
         Self: 'a;
 
     #[inline]
