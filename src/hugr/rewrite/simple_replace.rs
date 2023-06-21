@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkView, NodeIndex, PortView};
+use portgraph::{LinkMut, LinkView, NodeIndex, PortMut, PortView};
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::{
