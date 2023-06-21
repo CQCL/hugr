@@ -22,7 +22,8 @@ pub struct ExternalOp {
 
 impl Into<OpaqueOp> for &ExternalOp {
     fn into(self) -> OpaqueOp {
-        // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek?
+        // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek!
+        // Also, we don't necessarily need to store the signature for all extensions/stages...?
         let sig = self
             .def
             .signature(&self.args, &ResourceSet::default())
@@ -30,7 +31,7 @@ impl Into<OpaqueOp> for &ExternalOp {
         OpaqueOp {
             name: self.def.name.clone(),
             args: self.args.clone(),
-            signature: sig,
+            signature: Some(sig),
         }
     }
 }
@@ -40,7 +41,7 @@ impl Into<OpaqueOp> for &ExternalOp {
 pub struct OpaqueOp {
     name: SmolStr, // This should be fully-qualified, somehow
     args: Vec<TypeArgValue>,
-    signature: Signature,
+    signature: Option<Signature>,
 }
 
 impl OpName for ExternalOp {
@@ -92,7 +93,7 @@ impl OpTrait for OpaqueOp {
     }
 
     fn signature(&self) -> Signature {
-        self.signature.clone()
+        self.signature.clone().unwrap()
     }
 }
 
