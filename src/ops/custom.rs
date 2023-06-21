@@ -13,26 +13,44 @@ use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
 
 /// An instantiation of an [`OpDef`] with values for the type arguments
-#[derive(Clone, Debug)]
-pub struct ExternalOp {
-    def: Rc<OpDef>,
-    args: Vec<TypeArgValue>,
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(into = "OpaqueOp", from = "OpaqueOp")]
+pub enum ExternalOp {
+    Resource {
+        def: Rc<OpDef>,
+        args: Vec<TypeArgValue>,
+    },
+    Opaque(OpaqueOp),
 }
 
-impl Into<OpaqueOp> for &ExternalOp {
+impl Into<OpaqueOp> for ExternalOp {
     fn into(self) -> OpaqueOp {
-        // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek!
-        // Also, we don't necessarily need to store the signature for all extensions/stages...?
-        let sig = self
-            .def
-            .signature(&self.args, &ResourceSet::default())
-            .unwrap();
-        OpaqueOp {
-            resource: self.def.resource.clone(),
-            op_name: self.def.name.clone(),
-            args: self.args.clone(),
-            signature: Some(sig),
+        match self {
+            Self::Opaque(op) => op,
+            Self::Resource { def, args } => {
+                // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek!
+                // Also, we don't necessarily need to store the signature for all extensions/stages...?
+                let sig = def.signature(&args, &ResourceSet::default()).unwrap();
+                OpaqueOp {
+                    resource: def.resource.clone(),
+                    op_name: def.name.clone(),
+                    args,
+                    signature: Some(sig),
+                }
+            }
         }
+    }
+}
+
+impl From<OpaqueOp> for ExternalOp {
+    fn from(op: OpaqueOp) -> Self {
+        Self::Opaque(op)
+    }
+}
+
+impl Into<LeafOp> for ExternalOp {
+    fn into(self) -> LeafOp {
+        LeafOp::CustomOp(self)
     }
 }
 
@@ -48,60 +66,54 @@ pub struct OpaqueOp {
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
         // TODO should we fully qualify?
-        self.def.name.clone()
-    }
-}
-
-impl OpName for OpaqueOp {
-    fn name(&self) -> SmolStr {
-        return self.op_name.clone();
+        match self {
+            Self::Opaque(op) => op.op_name.clone(),
+            Self::Resource { def, .. } => def.name.clone(),
+        }
     }
 }
 
 impl OpTrait for ExternalOp {
     fn description(&self) -> &str {
-        self.def.description.as_str()
+        match self {
+            Self::Opaque(_) => "<opaque op from unknown Resource>",
+            Self::Resource { def, .. } => def.description.as_str(),
+        }
     }
 
     fn signature_desc(&self) -> SignatureDescription {
-        self.def.signature_desc(&self.args)
+        match self {
+            Self::Opaque(_) => SignatureDescription::default(),
+            Self::Resource { def, args } => def.signature_desc(&args),
+        }
     }
 
     fn tag(&self) -> OpTag {
         OpTag::DataflowChild
     }
 
+    /// Note that there is no way to indicate failure here! We could fail in [resolve_external_ops]?
     fn signature(&self) -> Signature {
-        // TODO the Resources in inputs and outputs appear in Signature here, so we need to get them from somewhere?
-        // Do we store the input ResourceSet as another field in the CustomOp? If so, we should do the same for *all* ops?
-        // Also there is no way to indicate failure here...
-        self.def
-            .signature(&self.args, &ResourceSet::default())
-            .unwrap()
-    }
-}
-
-impl OpTrait for OpaqueOp {
-    fn description(&self) -> &str {
-        "<opaque op from unknown Resource>"
-    }
-
-    fn signature_desc(&self) -> SignatureDescription {
-        SignatureDescription::default()
-    }
-
-    fn tag(&self) -> OpTag {
-        OpTag::DataflowChild
-    }
-
-    fn signature(&self) -> Signature {
-        self.signature.clone().unwrap()
+        match self {
+            Self::Opaque(op) => op.signature.clone().unwrap(),
+            Self::Resource { def, args } => {
+                // TODO the Resources in inputs and outputs appear in Signature here, so we need to get them from somewhere?
+                // Do we store the input ResourceSet as another field in the CustomOp? If so, we should do the same for *all* ops?
+                def.signature(&args, &ResourceSet::default()).unwrap()
+            }
+        }
     }
 }
 
 impl PartialEq for ExternalOp {
     fn eq(&self, other: &Self) -> bool {
-        Rc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
+        match (self, other) {
+            (Self::Opaque(op1), Self::Opaque(op2)) => op1 == op2,
+            (Self::Resource { def: d1, args: a1 }, Self::Resource { def: d2, args: a2 }) => {
+                Rc::<OpDef>::ptr_eq(&d1, &d2) && a1 == a2
+            }
+            (_, _) => false,
+        }
     }
 }
 
@@ -110,7 +122,7 @@ impl PartialEq for ExternalOp {
 pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -> () {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::UnknownOp(opaque)) = h.get_optype(n) {
+        if let OpType::LeafOp(LeafOp::CustomOp(ExternalOp::Opaque(opaque))) = h.get_optype(n) {
             if let Some(r) = rsrcs.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
                 let Some(def) = r.operations().get(&opaque.op_name) else {
@@ -120,11 +132,11 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -
                 if let Some(sig) = &opaque.signature {
                     let computed_sig = def.signature(&opaque.args, &sig.input_resources).unwrap();
                     if sig != &computed_sig {
-                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.name(), computed_sig, sig);
+                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.op_name, computed_sig, sig);
                     };
                     replacements.push((
                         n,
-                        ExternalOp {
+                        ExternalOp::Resource {
                             def: def.clone(),
                             args: opaque.args.clone(),
                         },

@@ -1,9 +1,8 @@
 //! Definition of the leaf operations.
 
-use serde::{Serialize, Serializer};
 use smol_str::SmolStr;
 
-use super::custom::{ExternalOp, OpaqueOp};
+use super::custom::ExternalOp;
 use super::{tag::OpTag, OpName, OpTrait};
 use crate::{
     type_row,
@@ -12,25 +11,14 @@ use crate::{
     },
 };
 
-// TODO we need a function that takes a Hugr and a Map<String, Resource>
-// and replaces UnknownOp's with CustomOps's when it finds the former's name
-// in the map.
-fn serialize_custom_as_unknown<S: Serializer>(op: &ExternalOp, ser: S) -> Result<S::Ok, S::Error> {
-    let o_op: OpaqueOp = op.into();
-    o_op.serialize(ser)
-}
-
 /// Dataflow operations with no children.
-#[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "lop")]
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
-    #[serde(serialize_with = "serialize_custom_as_unknown", skip_deserializing)]
     CustomOp(ExternalOp),
-    /// A user-defined operation, from an unknown resource
-    UnknownOp(OpaqueOp),
     /// A Hadamard gate.
     H,
     /// A T gate.
@@ -95,7 +83,6 @@ impl OpName for LeafOp {
     fn name(&self) -> SmolStr {
         match self {
             LeafOp::CustomOp(ext) => return ext.name(),
-            LeafOp::UnknownOp(opaque) => return opaque.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -124,7 +111,6 @@ impl OpTrait for LeafOp {
     fn description(&self) -> &str {
         match self {
             LeafOp::CustomOp(ext) => ext.description(),
-            LeafOp::UnknownOp(opaque) => opaque.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
             LeafOp::S => "S gate",
@@ -173,7 +159,6 @@ impl OpTrait for LeafOp {
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(ext) => ext.signature(),
-            LeafOp::UnknownOp(opaque) => opaque.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
