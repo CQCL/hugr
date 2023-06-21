@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 use std::rc::Rc;
 
-use crate::resource::{OpDef, ResourceSet};
+use crate::resource::{OpDef, ResourceId, ResourceSet};
 use crate::types::{type_arg::TypeArgValue, Signature, SignatureDescription};
 
 use super::tag::OpTag;
@@ -25,7 +25,8 @@ impl Into<OpaqueOp> for &ExternalOp {
             .signature(&self.args, &ResourceSet::default())
             .unwrap();
         OpaqueOp {
-            name: self.def.name.clone(),
+            resource: self.def.resource.clone(),
+            op_name: self.def.name.clone(),
             args: self.args.clone(),
             signature: Some(sig),
         }
@@ -35,20 +36,22 @@ impl Into<OpaqueOp> for &ExternalOp {
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {
-    name: SmolStr, // This should be fully-qualified, somehow
+    resource: ResourceId,
+    op_name: SmolStr,
     args: Vec<TypeArgValue>,
     signature: Option<Signature>,
 }
 
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
+        // TODO should we fully qualify?
         self.def.name.clone()
     }
 }
 
 impl OpName for OpaqueOp {
     fn name(&self) -> SmolStr {
-        return self.name.clone();
+        return self.op_name.clone();
     }
 }
 

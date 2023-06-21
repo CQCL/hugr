@@ -3,6 +3,7 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 
@@ -117,6 +118,8 @@ impl Debug for LowerFunc {
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
+    /// The unique Resource owning this OpDef (of which this OpDef is a member)
+    pub resource: ResourceId,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
     pub name: SmolStr,
@@ -147,6 +150,7 @@ impl OpDef {
                         // resources: Option<String> -- if mentioned in YAML?
     ) -> Self {
         Self {
+            resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
             args,
@@ -165,6 +169,7 @@ impl OpDef {
         sig_func: impl CustomSignatureFunc + 'static,
     ) -> Self {
         Self {
+            resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
             args,
@@ -273,7 +278,7 @@ pub type ResourceId = SmolStr;
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Resource {
     /// Unique identifier for the resource.
-    pub name: ResourceId,
+    name: ResourceId,
     // Set of resource dependencies required by this resource.
     // TODO I haven't seen where these are required yet. If they are,
     // we'll probably need some way to
@@ -281,7 +286,7 @@ pub struct Resource {
     /// Types defined by this resource.
     pub types: Vec<CustomType>,
     /// Operation declarations with serializable definitions.
-    pub operations: Vec<OpDef>,
+    operations: HashMap<SmolStr, OpDef>,
 }
 
 impl Resource {
@@ -291,6 +296,11 @@ impl Resource {
             name,
             ..Default::default()
         }
+    }
+
+    /// Allows read-only access to the operations in this Resource
+    pub fn operations(&self) -> &HashMap<SmolStr, OpDef> {
+        &self.operations
     }
 
     /// Returns the name of the resource.
@@ -304,8 +314,17 @@ impl Resource {
     }
 
     /// Add an operation definition to the resource.
-    pub fn add_op(&mut self, op: OpDef) {
-        self.operations.push(op);
+    pub fn add_op(&mut self, mut op: OpDef) {
+        //if op.resource != self.name {
+        //   return Err("OpDef doesn't match")
+        //}
+        match self.operations.entry(op.name.clone()) {
+            Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
+            Entry::Vacant(ve) => {
+                op.resource = self.name.clone();
+                ve.insert(op);
+            }
+        }
     }
 }
 
