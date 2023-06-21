@@ -36,6 +36,7 @@ impl Into<OpaqueOp> for &ExternalOp {
     }
 }
 
+
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {
@@ -110,7 +111,7 @@ impl PartialEq for ExternalOp {
 pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -> () {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::UnknownOp { opaque }) = h.get_optype(n) {
+        if let OpType::LeafOp(LeafOp::UnknownOp(opaque)) = h.get_optype(n) {
             if let Some(r) = rsrcs.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
                 let Some(def) = r.operations().get(&opaque.op_name) else {
@@ -140,6 +141,6 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        h.replace_op(n, LeafOp::CustomOp { ext: op });
+        h.replace_op(n, LeafOp::CustomOp(op));
     }
 }

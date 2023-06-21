@@ -16,7 +16,8 @@ use crate::{
 // and replaces UnknownOp's with CustomOps's when it finds the former's name
 // in the map.
 fn serialize_custom_as_unknown<S: Serializer>(op: &ExternalOp, ser: S) -> Result<S::Ok, S::Error> {
-    LeafOp::UnknownOp { opaque: op.into() }.serialize(ser)
+    let o_op: OpaqueOp = op.into();
+    o_op.serialize(ser)
 }
 
 /// Dataflow operations with no children.
@@ -27,15 +28,9 @@ pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
     #[serde(serialize_with = "serialize_custom_as_unknown", skip_deserializing)]
-    CustomOp {
-        /// Instantiation of the target OpDef
-        ext: ExternalOp,
-    },
+    CustomOp(ExternalOp),
     /// A user-defined operation, from an unknown resource
-    UnknownOp {
-        /// Identifier of the desired (but unavailable) OpDef
-        opaque: OpaqueOp,
-    },
+    UnknownOp(OpaqueOp),
     /// A Hadamard gate.
     H,
     /// A T gate.
@@ -99,8 +94,8 @@ impl OpName for LeafOp {
     /// The name of the operation.
     fn name(&self) -> SmolStr {
         match self {
-            LeafOp::CustomOp { ext } => return ext.name(),
-            LeafOp::UnknownOp { opaque } => return opaque.name(),
+            LeafOp::CustomOp(ext) => return ext.name(),
+            LeafOp::UnknownOp(opaque) => return opaque.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -128,8 +123,8 @@ impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
-            LeafOp::CustomOp { ext } => ext.description(),
-            LeafOp::UnknownOp { opaque } => opaque.description(),
+            LeafOp::CustomOp(ext) => ext.description(),
+            LeafOp::UnknownOp(opaque) => opaque.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
             LeafOp::S => "S gate",
@@ -177,8 +172,8 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp { ext } => ext.signature(),
-            LeafOp::UnknownOp { opaque } => opaque.signature(),
+            LeafOp::CustomOp(ext) => ext.signature(),
+            LeafOp::UnknownOp(opaque) => opaque.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
@@ -196,7 +191,7 @@ impl OpTrait for LeafOp {
     /// Optional description of the ports in the signature.
     fn signature_desc(&self) -> SignatureDescription {
         match self {
-            LeafOp::CustomOp { ext } => ext.signature_desc(),
+            LeafOp::CustomOp(ext) => ext.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }
