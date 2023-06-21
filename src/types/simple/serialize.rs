@@ -15,6 +15,7 @@ use super::SimpleType;
 
 use super::super::Signature;
 
+use crate::ops::constant::HugrIntWidthStore;
 use crate::resource::ResourceSet;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -22,7 +23,7 @@ use crate::resource::ResourceSet;
 pub(crate) enum SerSimpleType {
     Q,
     I {
-        width: u8,
+        width: HugrIntWidthStore,
     },
     F,
     S,
