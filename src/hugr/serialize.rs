@@ -4,15 +4,13 @@
 use std::collections::HashMap;
 use thiserror::Error;
 
+use crate::hugr::{Hugr, HugrMut};
 use crate::ops::OpTrait;
+use crate::ops::OpType;
 use crate::Node;
-use crate::{
-    hugr::{Hugr, HugrMut},
-    ops::OpType,
-};
 use portgraph::hierarchy::AttachError;
-
 use portgraph::{Direction, LinkError, NodeIndex};
+
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::{HugrError, HugrView};
@@ -227,7 +225,7 @@ pub mod test {
     };
     use itertools::Itertools;
     use portgraph::{
-        multiportgraph::MultiPortGraph, Hierarchy, LinkView, PortView, UnmanagedDenseMap,
+        multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
     #[test]

@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use portgraph::{LinkView, PortView, SecondaryMap};
+use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
