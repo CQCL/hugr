@@ -3,9 +3,11 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use serde::{Deserializer, Serializer};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
+use std::rc::Rc;
 
 use smol_str::SmolStr;
 use thiserror::Error;
@@ -286,7 +288,22 @@ pub struct Resource {
     /// Types defined by this resource.
     pub types: Vec<CustomType>,
     /// Operation declarations with serializable definitions.
-    operations: HashMap<SmolStr, OpDef>,
+    #[serde(serialize_with = "elide_rcs", deserialize_with = "reinstate_rcs")]
+    operations: HashMap<SmolStr, Rc<OpDef>>,
+}
+
+fn elide_rcs<S: Serializer>(
+    _ops: &HashMap<SmolStr, Rc<OpDef>>,
+    _serializer: S,
+) -> Result<S::Ok, S::Error> {
+    // serde doesn't like Rc - write it out as if it were a Hashmap<SmolStr, OpDef>
+    todo!()
+}
+
+fn reinstate_rcs<'de, D: Deserializer<'de>>(
+    _deserializer: D,
+) -> Result<HashMap<SmolStr, Rc<OpDef>>, D::Error> {
+    todo!()
 }
 
 impl Resource {
@@ -299,7 +316,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the operations in this Resource
-    pub fn operations(&self) -> &HashMap<SmolStr, OpDef> {
+    pub fn operations(&self) -> &HashMap<SmolStr, Rc<OpDef>> {
         &self.operations
     }
 
@@ -322,7 +339,7 @@ impl Resource {
             Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
             Entry::Vacant(ve) => {
                 op.resource = self.name.clone();
-                ve.insert(op);
+                ve.insert(Rc::new(op));
             }
         }
     }
