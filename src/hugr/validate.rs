@@ -14,7 +14,7 @@ use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
-use crate::types::{ClassicType, Signature};
+use crate::types::ClassicType;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -95,7 +95,7 @@ impl<'a> ValidationContext<'a> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
-        let region = portgraph::view::region::Region::new(
+        let region = portgraph::view::FlatRegion::new_flat_region(
             &self.hugr.graph,
             &self.hugr.hierarchy,
             parent.index,
@@ -390,7 +390,7 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region = portgraph::view::region::Region::new(
+        let region = portgraph::view::FlatRegion::new_flat_region(
             &self.hugr.graph,
             &self.hugr.hierarchy,
             parent.index,
@@ -398,7 +398,10 @@ impl<'a> ValidationContext<'a> {
         let entry_node = self.hugr.hierarchy.first(parent.index).unwrap();
 
         let postorder = DfsPostOrder::new(&region, entry_node);
-        let nodes_visited = postorder.iter(&region).count();
+        let nodes_visited = postorder
+            .iter(&region)
+            .filter(|n| *n != parent.index)
+            .count();
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
