@@ -127,7 +127,7 @@ as *control* and the second as *target*.
 In this case, output 0 of the H operation is connected to input 0 of the
 CNOT.
 
-### Edges and ports
+### Edges, ports and signatures
 
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
 of edge for different relationships.
