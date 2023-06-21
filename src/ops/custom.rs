@@ -99,11 +99,9 @@ impl OpTrait for OpaqueOp {
 
 impl PartialEq for ExternalOp {
     fn eq(&self, other: &Self) -> bool {
-        Rc::<OpDef>::ptr_eq(&self.def, &other.def)
+        Rc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
     }
 }
-
-impl Eq for ExternalOp {}
 
 /// Custom definition for an operation.
 ///
