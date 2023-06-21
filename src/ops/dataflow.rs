@@ -2,7 +2,7 @@
 
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
-use crate::resource::ResourceSet;
+use crate::resource::{ResourceId, ResourceSet};
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
@@ -241,6 +241,38 @@ impl DataflowOpTrait for DFG {
 
     fn tag(&self) -> OpTag {
         OpTag::Dfg
+    }
+
+    fn signature(&self) -> Signature {
+        self.signature.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// A lift node
+pub struct Lift {
+    /// The signature of the lift node
+    pub signature: Signature,
+}
+
+impl Lift {
+    /// Create a new lift node which adds a single resource to a given type
+    /// the other resources on the input/output edges are left unspecified
+    pub fn new(delta: &ResourceId, ty: SimpleType) -> Self {
+        let mut sig = Signature::new_df(TypeRow::from(vec![ty.clone()]), TypeRow::from(vec![ty]));
+        sig.output_resources = ResourceSet::singleton(delta);
+        Lift { signature: sig }
+    }
+}
+
+impl_op_name!(Lift);
+impl DataflowOpTrait for Lift {
+    fn description(&self) -> &str {
+        "Add an extra resource requirement to an edge"
+    }
+
+    fn tag(&self) -> OpTag {
+        OpTag::Lift
     }
 
     fn signature(&self) -> Signature {

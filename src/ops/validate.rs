@@ -532,7 +532,8 @@ mod test {
 }
 
 use super::{
-    AliasDeclare, AliasDef, Call, CallIndirect, Const, Declare, Input, LeafOp, LoadConstant, Output,
+    AliasDeclare, AliasDef, Call, CallIndirect, Const, Declare, Input, LeafOp, Lift, LoadConstant,
+    Output,
 };
 impl_validate_op!(Declare);
 impl_validate_op!(AliasDeclare);
@@ -544,3 +545,4 @@ impl_validate_op!(Call);
 impl_validate_op!(CallIndirect);
 impl_validate_op!(LoadConstant);
 impl_validate_op!(LeafOp);
+impl_validate_op!(Lift);
