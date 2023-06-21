@@ -1179,8 +1179,6 @@ including $S$ itself.
 Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
 $b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them).
 
-We a structure to specify edge insertion.
-
 A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
 
