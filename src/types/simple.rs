@@ -21,15 +21,16 @@ use crate::{resource::ResourceSet, type_row};
 //
 // TODO: Compare performance vs flattening this into a single enum
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
 #[non_exhaustive]
 pub enum SimpleType {
     /// A type containing classical data. Elements of this type can be copied.
-    #[serde(rename = "c")]
     Classic(ClassicType),
     /// A type containing linear data. Elements of this type must be used exactly once.
-    #[serde(rename = "l")]
     Linear(LinearType),
 }
+
+mod serialize;
 
 impl Display for SimpleType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -45,13 +46,16 @@ pub trait PrimType {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType and LinearType
     // currently used to constrain Container<T>
+
+    /// Is this type linear
+    const LINEAR: bool;
 }
 
 /// A type that represents a container of other types.
 ///
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Container<T: PrimType> {
     /// Variable sized list of T.
     List(Box<T>),
@@ -104,6 +108,7 @@ pub type HInt = u8;
 ///
 /// TODO: Derive pyclass.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "SimpleType", into = "SimpleType")]
 #[non_exhaustive]
 pub enum ClassicType {
     /// A type variable identified by a name.
@@ -189,12 +194,14 @@ impl Display for ClassicType {
     }
 }
 
-impl PrimType for ClassicType {}
+impl PrimType for ClassicType {
+    const LINEAR: bool = false;
+}
 
 /// A type that represents concrete linear data.
 ///
 // TODO: Derive pyclass.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LinearType {
     /// A qubit.
@@ -216,7 +223,9 @@ impl Display for LinearType {
     }
 }
 
-impl PrimType for LinearType {}
+impl PrimType for LinearType {
+    const LINEAR: bool = true;
+}
 
 impl SimpleType {
     /// Returns whether the type contains only linear data.
@@ -284,23 +293,23 @@ macro_rules! impl_from_into_simple_type {
         }
 
         impl TryFrom<SimpleType> for $target {
-            type Error = ();
+            type Error = &'static str;
 
             fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
                 match op {
                     $matcher => Ok($unpack),
-                    _ => Err(()),
+                    _ => Err("Invalid type conversion"),
                 }
             }
         }
 
         impl<'a> TryFrom<&'a SimpleType> for &'a $target {
-            type Error = ();
+            type Error = &'static str;
 
             fn try_from(op: &'a SimpleType) -> Result<Self, Self::Error> {
                 match op {
                     $matcher => Ok($unpack),
-                    _ => Err(()),
+                    _ => Err("Invalid type conversion"),
                 }
             }
         }

@@ -859,7 +859,12 @@ mod test {
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop(ClassicType::bit().into()))
+            .add_op_with_parent(
+                parent,
+                LeafOp::Noop {
+                    ty: ClassicType::bit().into(),
+                },
+            )
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -943,7 +948,10 @@ mod test {
 
     #[test]
     fn leaf_root() {
-        let leaf_op: OpType = LeafOp::Noop(ClassicType::F64.into()).into();
+        let leaf_op: OpType = LeafOp::Noop {
+            ty: ClassicType::F64.into(),
+        }
+        .into();
 
         let b = Hugr::new(leaf_op);
         assert_eq!(b.validate(), Ok(()));
@@ -1028,7 +1036,12 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(output, LeafOp::Noop(ClassicType::bit().into()));
+        b.replace_op(
+            output,
+            LeafOp::Noop {
+                ty: ClassicType::bit().into(),
+            },
+        );
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)

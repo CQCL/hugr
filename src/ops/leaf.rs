@@ -16,19 +16,23 @@ use crate::{
 // and replaces UnknownOp's with CustomOps's when it finds the former's name
 // in the map.
 fn serialize_custom_as_unknown<S: Serializer>(op: &ExternalOp, ser: S) -> Result<S::Ok, S::Error> {
-    LeafOp::UnknownOp(op.into()).serialize(ser)
+    LeafOp::UnknownOp { opaque: op.into() }.serialize(ser)
 }
 
 /// Dataflow operations with no children.
 #[derive(Clone, Debug, PartialEq, Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[serde(tag = "lop")]
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
     #[serde(serialize_with = "serialize_custom_as_unknown", skip_deserializing)]
     CustomOp(ExternalOp),
     /// A user-defined operation, from an unknown resource
-    UnknownOp(OpaqueOp),
+    UnknownOp {
+        /// Identifier of the desired (but unavailable) OpDef
+        opaque: OpaqueOp,
+    },
     /// A Hadamard gate.
     H,
     /// A T gate.
@@ -52,7 +56,10 @@ pub enum LeafOp {
     /// A qubit reset operation.
     Reset,
     /// A no-op operation.
-    Noop(SimpleType),
+    Noop {
+        /// The type of edges connecting the Noop.
+        ty: SimpleType,
+    },
     /// A qubit measurement operation.
     Measure,
     /// A rotation of a qubit about the Pauli Z axis by an input float angle.
@@ -60,9 +67,15 @@ pub enum LeafOp {
     /// A bitwise XOR operation.
     Xor,
     /// An operation that packs all its inputs into a tuple.
-    MakeTuple(TypeRow),
+    MakeTuple {
+        ///Tuple element types.
+        tys: TypeRow,
+    },
     /// An operation that unpacks a tuple into its components.
-    UnpackTuple(TypeRow),
+    UnpackTuple {
+        ///Tuple element types.
+        tys: TypeRow,
+    },
     /// An operation that creates a tagged sum value from one of its variants.
     Tag {
         /// The variant to create.
@@ -74,7 +87,9 @@ pub enum LeafOp {
 
 impl Default for LeafOp {
     fn default() -> Self {
-        Self::Noop(SimpleType::default())
+        Self::Noop {
+            ty: SimpleType::default(),
+        }
     }
 }
 impl OpName for LeafOp {
@@ -82,7 +97,7 @@ impl OpName for LeafOp {
     fn name(&self) -> SmolStr {
         match self {
             LeafOp::CustomOp(op) => return op.name(),
-            LeafOp::UnknownOp(op) => return op.name(),
+            LeafOp::UnknownOp { opaque } => return opaque.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -94,11 +109,11 @@ impl OpName for LeafOp {
             LeafOp::CX => "CX",
             LeafOp::ZZMax => "ZZMax",
             LeafOp::Reset => "Reset",
-            LeafOp::Noop(_) => "Noop",
+            LeafOp::Noop { ty: _ } => "Noop",
             LeafOp::Measure => "Measure",
             LeafOp::Xor => "Xor",
-            LeafOp::MakeTuple(_) => "MakeTuple",
-            LeafOp::UnpackTuple(_) => "UnpackTuple",
+            LeafOp::MakeTuple { tys: _ } => "MakeTuple",
+            LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::RzF64 => "RzF64",
         }
@@ -111,7 +126,7 @@ impl OpTrait for LeafOp {
     fn description(&self) -> &str {
         match self {
             LeafOp::CustomOp(op) => op.description(),
-            LeafOp::UnknownOp(op) => op.description(),
+            LeafOp::UnknownOp { opaque } => opaque.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
             LeafOp::S => "S gate",
@@ -123,11 +138,11 @@ impl OpTrait for LeafOp {
             LeafOp::CX => "Controlled X gate",
             LeafOp::ZZMax => "Maximally entangling ZZPhase gate",
             LeafOp::Reset => "Qubit reset",
-            LeafOp::Noop(_) => "Noop gate",
+            LeafOp::Noop { ty: _ } => "Noop gate",
             LeafOp::Measure => "Qubit measurement gate",
             LeafOp::Xor => "Bitwise XOR",
-            LeafOp::MakeTuple(_) => "MakeTuple operation",
-            LeafOp::UnpackTuple(_) => "UnpackTuple operation",
+            LeafOp::MakeTuple { tys: _ } => "MakeTuple operation",
+            LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::RzF64 => "Rz rotation.",
         }
@@ -146,7 +161,7 @@ impl OpTrait for LeafOp {
         const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
         match self {
-            LeafOp::Noop(typ) => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
+            LeafOp::Noop { ty: typ } => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
             LeafOp::H
             | LeafOp::Reset
             | LeafOp::T
@@ -160,11 +175,11 @@ impl OpTrait for LeafOp {
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(op) => op.signature(),
-            LeafOp::UnknownOp(op) => op.signature(),
-            LeafOp::MakeTuple(types) => {
+            LeafOp::UnknownOp { opaque } => opaque.signature(),
+            LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
-            LeafOp::UnpackTuple(types) => {
+            LeafOp::UnpackTuple { tys: types } => {
                 Signature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
             }
             LeafOp::Tag { tag, variants } => Signature::new_df(

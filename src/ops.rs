@@ -30,6 +30,7 @@ pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 // TODO: Link the NodeHandles to the OpType.
 #[non_exhaustive]
 #[allow(missing_docs)]
+#[serde(tag = "op")]
 pub enum OpType {
     Module,
     Def,

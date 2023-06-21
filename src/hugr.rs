@@ -16,7 +16,7 @@ pub use rewrite::{Replace, ReplaceError, Rewrite, SimpleReplacement, SimpleRepla
 
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, LinkView, PortView, UnmanagedDenseMap};
+use portgraph::{Hierarchy, LinkView, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
@@ -58,7 +58,20 @@ impl AsMut<Hugr> for Hugr {
 }
 
 /// A handle to a node in the HUGR.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(transparent)]
 pub struct Node {
     index: portgraph::NodeIndex,
 }
@@ -108,10 +121,10 @@ impl Hugr {
                         PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
                     }
                     EdgeKind::StateOrder => match self.graph.port_links(port).count() > 0 {
-                        true => PortStyle::Text("".to_string()),
+                        true => PortStyle::text("", false),
                         false => PortStyle::Hidden,
                     },
-                    _ => PortStyle::Text("".to_string()),
+                    _ => PortStyle::text("", true),
                 }
             })
             .with_edge_style(|src, tgt| {

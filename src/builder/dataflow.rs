@@ -309,13 +309,13 @@ mod test {
                 FunctionBuilder::new("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
+            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested =
                 f_build.dfg_builder(Signature::new_df(type_row![], type_row![BIT]), [])?;
 
-            let id = nested.add_dataflow_op(LeafOp::Noop(BIT), [i1])?;
+            let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 

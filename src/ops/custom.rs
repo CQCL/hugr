@@ -110,28 +110,30 @@ impl PartialEq for ExternalOp {
 pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -> () {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::UnknownOp(op)) = h.get_optype(n) {
-            if let Some(r) = rsrcs.get(&op.resource) {
+        if let OpType::LeafOp(LeafOp::UnknownOp { opaque }) = h.get_optype(n) {
+            if let Some(r) = rsrcs.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
-                let Some(def) = r.operations().get(&op.op_name) else {panic!("Conflicting declaration of Resource {}, did not find OpDef for {}", r.name(), op.op_name);};
+                let Some(def) = r.operations().get(&opaque.op_name) else {
+                    panic!("Conflicting declaration of Resource {}, did not find OpDef for {}", r.name(), opaque.op_name);
+                };
                 // Check Signature is correct if stored
-                if let Some(sig) = &op.signature {
-                    let computed_sig = def.signature(&op.args, &sig.input_resources).unwrap();
+                if let Some(sig) = &opaque.signature {
+                    let computed_sig = def.signature(&opaque.args, &sig.input_resources).unwrap();
                     if sig != &computed_sig {
-                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", op.name(), computed_sig, sig);
+                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.name(), computed_sig, sig);
                     };
                     replacements.push((
                         n,
                         ExternalOp {
                             def: def.clone(),
-                            args: op.args.clone(),
+                            args: opaque.args.clone(),
                         },
                     ));
                 }
-            } else if op.signature.is_none() {
+            } else if opaque.signature.is_none() {
                 panic!(
                     "Loaded node with operation {} of unknown resource {} and no stored Signature",
-                    op.op_name, op.resource
+                    opaque.op_name, opaque.resource
                 );
             }
         }
