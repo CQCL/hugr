@@ -18,6 +18,7 @@ use crate::types::ClassicType;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
+use super::region::FlatRegionView;
 use super::view::HugrView;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -28,7 +29,7 @@ use super::view::HugrView;
 struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
-    dominators: HashMap<Node, Dominators<portgraph::NodeIndex>>,
+    dominators: HashMap<Node, Dominators<Node>>,
     /// Resource requirements associated with each edge
     resources: HashMap<(Node, Direction), ResourceSet>,
 }
@@ -94,13 +95,9 @@ impl<'a> ValidationContext<'a> {
     ///
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
-    fn compute_dominator(&self, parent: Node) -> Dominators<portgraph::NodeIndex> {
-        let region = portgraph::view::FlatRegion::new_flat_region(
-            &self.hugr.graph,
-            &self.hugr.hierarchy,
-            parent.index,
-        );
-        let entry_node = self.hugr.hierarchy.first(parent.index).unwrap();
+    fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
+        let region = FlatRegionView::new(self.hugr, parent);
+        let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region, entry_node)
     }
 
@@ -390,18 +387,11 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region = portgraph::view::FlatRegion::new_flat_region(
-            &self.hugr.graph,
-            &self.hugr.hierarchy,
-            parent.index,
-        );
-        let entry_node = self.hugr.hierarchy.first(parent.index).unwrap();
+        let region = FlatRegionView::new(self.hugr, parent);
+        let entry_node = self.hugr.children(parent).next().unwrap();
 
         let postorder = DfsPostOrder::new(&region, entry_node);
-        let nodes_visited = postorder
-            .iter(&region)
-            .filter(|n| *n != parent.index)
-            .count();
+        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
@@ -522,12 +512,10 @@ impl<'a> ValidationContext<'a> {
                         self.dominators.get(&ancestor_parent).unwrap()
                     }
                 };
-                let mut dominators = iter::successors(Some(ancestor.index), |&n| {
-                    dominator_tree.immediate_dominator(n)
-                })
-                .filter(|&node| self.hugr.graph.contains_node(node))
-                .map_into();
-                if !dominators.any(|n: Node| n == from_parent) {
+                if !dominator_tree
+                    .dominators(ancestor)
+                    .map_or(false, |mut ds| ds.any(|n| n == from_parent))
+                {
                     return Err(InterGraphEdgeError::NonDominatedAncestor {
                         from,
                         from_offset,
