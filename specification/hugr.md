@@ -1163,9 +1163,6 @@ This is the general subgraph-replacement method.
 A _partial hugr_ is a graph formed by a subset of nodes of a valid hugr together
 with a subset of their adjoining edges. It must not include a `Module` node.
 
-Informally, a partial hugr is is a graph $G$ having the same node and edge types
-as a hugr but that may be missing some edges or nodes.
-
 Given a partial hugr $G$, let
 
   - $\top(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
