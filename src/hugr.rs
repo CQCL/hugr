@@ -2,6 +2,7 @@
 
 mod hugrmut;
 
+pub mod region;
 pub mod rewrite;
 pub mod serialize;
 pub mod typecheck;
