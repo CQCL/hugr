@@ -36,7 +36,6 @@ impl Into<OpaqueOp> for &ExternalOp {
     }
 }
 
-
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {

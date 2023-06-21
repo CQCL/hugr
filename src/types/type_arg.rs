@@ -4,9 +4,9 @@
 //!
 //! [`OpDef`]: crate::resource::OpDef
 
-use crate::resource::ResourceSet;
+use crate::{ops::constant::HugrIntValueStore, resource::ResourceSet};
 
-use super::{simple::HInt, ClassicType, SimpleType, TypeRow};
+use super::{ClassicType, SimpleType, TypeRow};
 
 /// A Type Parameter declared by an OpDef. Specifies
 /// the values that must be provided by each operation node.
@@ -46,7 +46,7 @@ pub enum TypeArgValue {
     F64(f64),
     /// Where the OpDef declares an argument that's a [TypeParam::Int]
     /// - using the same representation as [`ClassicType`].
-    Int(HInt),
+    Int(HugrIntValueStore),
     /// Where the OpDef declares a [TypeParam::Opaque], this must be the
     /// serialized representation of such a value....??
     Opaque(Vec<u8>),

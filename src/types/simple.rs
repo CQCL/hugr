@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
-use crate::utils::display_list;
+use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
 use crate::{resource::ResourceSet, type_row};
 
 /// A type that represents concrete data.
@@ -98,10 +98,6 @@ impl From<Container<LinearType>> for SimpleType {
     }
 }
 
-/// The type of an Int in the Hugr. Keeping previous definition
-/// for now, but this looks likely to change.
-pub type HInt = u8;
-
 /// A type that represents concrete classical data.
 ///
 /// Uses `Box`es on most variants to reduce the memory footprint.
@@ -114,7 +110,7 @@ pub enum ClassicType {
     /// A type variable identified by a name.
     Variable(SmolStr),
     /// An arbitrary size integer.
-    Int(HInt),
+    Int(HugrIntWidthStore),
     /// A 64-bit floating point number.
     F64,
     /// An arbitrary length string.
@@ -137,7 +133,7 @@ impl ClassicType {
 
     /// Returns a new integer type with the given number of bits.
     #[inline]
-    pub const fn int<const N: u8>() -> Self {
+    pub const fn int<const N: HugrIntWidthStore>() -> Self {
         Self::Int(N)
     }
 
