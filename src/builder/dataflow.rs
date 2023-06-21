@@ -198,6 +198,7 @@ mod test {
             BuildError,
         },
         ops::LeafOp,
+        resource::ResourceSet,
         type_row,
         types::{LinearType, Signature},
     };

@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
+    resource::{ResourceId, ResourceSet},
     type_row,
     types::{
         ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
@@ -71,6 +72,13 @@ pub enum LeafOp {
         /// The variants of the sum type.
         variants: TypeRow,
     },
+    /// A lift node, which adds resources to an edge
+    Lift {
+        /// The type of the edge
+        ty: SimpleType,
+        /// The resources which we're adding
+        new_resource: ResourceId,
+    },
 }
 
 impl Default for LeafOp {
@@ -103,6 +111,7 @@ impl OpName for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::RzF64 => "RzF64",
+            LeafOp::Lift { .. } => "Lift",
         }
         .into()
     }
@@ -131,6 +140,7 @@ impl OpTrait for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::RzF64 => "Rz rotation.",
+            LeafOp::Lift { .. } => "Add resource requirements to an edge",
         }
     }
 
@@ -172,6 +182,14 @@ impl OpTrait for LeafOp {
                 vec![SimpleType::new_sum(variants.clone())],
             ),
             LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
+            LeafOp::Lift { ty, new_resource } => {
+                let mut sig = Signature::new_df(
+                    TypeRow::from(vec![ty.clone()]),
+                    TypeRow::from(vec![ty.clone()]),
+                );
+                sig.output_resources = ResourceSet::singleton(new_resource);
+                sig
+            }
         }
     }
 
