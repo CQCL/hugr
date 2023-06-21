@@ -142,11 +142,11 @@ of edge for different relationships.
 - `Hierarchy` edges express the relationship between container nodes and their
   children.
 
-`Value` and `Static` edges are sometimes referred to as _dataflow_ edges, or
-"wires". A `SimpleType` is the type of a value that can be sent down a wire. A
-`SimpleType` is either a `ClassicType` (ordinary classical data) or a
-`LinearType` (including quantum data, which cannot be copied). For more details
-see the [Type System](#type-system) section.
+`Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
+A `Value` edge can carry data of any `SimpleType`: either a `ClassicType`
+(ordinary classical data) or a `LinearType` (data which cannot be copied,
+including quantum data). A `Static` edge can only carry a `ClassicType`. For
+more details see the [Type System](#type-system) section.
 
 A `Value` edge can carry any `SimpleType`; a `Static` edge can only carry a
 `ClassicType`. As well as the type, dataflow edges are also parametrized by a
