@@ -148,8 +148,7 @@ A `Value` edge can carry data of any `SimpleType`: either a `ClassicType`
 including quantum data). A `Static` edge can only carry a `ClassicType`. For
 more details see the [Type System](#type-system) section.
 
-A `Value` edge can carry any `SimpleType`; a `Static` edge can only carry a
-`ClassicType`. As well as the type, dataflow edges are also parametrized by a
+As well as the type, dataflow edges are also parametrized by a
 `Locality`. There are three possible localities:
 
   - `Local`: Source and target nodes must have the same parent.
