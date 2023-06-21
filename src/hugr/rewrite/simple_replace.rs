@@ -555,7 +555,7 @@ mod test {
         let two_bit: Vec<SimpleType> = vec![ClassicType::bit().into(), ClassicType::bit().into()];
 
         let mut builder = DFGBuilder::new(one_bit.clone(), one_bit.clone()).unwrap();
-        let inw = builder.input_wires().into_iter().exactly_one().unwrap();
+        let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
             .add_dataflow_op(LeafOp::Xor, [inw, inw])
             .unwrap()

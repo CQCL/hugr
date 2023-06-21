@@ -244,8 +244,10 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         }
 
-        for (subport, link) in links {
-            if port_kind.is_linear() && subport.offset() != 0 {
+        let mut link_cnt = 0;
+        for (_, link) in links {
+            link_cnt += 1;
+            if port_kind.is_linear() && link_cnt > 1 {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
