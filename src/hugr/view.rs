@@ -8,6 +8,8 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx
 use itertools::{Itertools, MapInto};
 use portgraph::{multiportgraph, LinkView, PortView};
 
+type MapWithCtx<I, Ctx, O> = MapCtx<WithCtx<I, Ctx>, fn(<I as Iterator>::Item, &Ctx) -> O>;
+
 use super::Hugr;
 use super::{Node, Port};
 use crate::ops::OpType;
