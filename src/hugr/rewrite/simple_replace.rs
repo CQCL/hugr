@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, NodeIndex, PortMut, PortView};
+use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortMut, PortView};
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::{
@@ -146,13 +146,13 @@ impl Rewrite for SimpleReplacement {
                     .graph
                     .port_index(rem_inp_node.index, rem_inp_port.offset)
                     .unwrap();
-                let rem_inp_predecessor_port_index =
-                    h.graph.port_link(rem_inp_port_index).unwrap().port();
+                let rem_inp_predecessor_subport = h.graph.port_link(rem_inp_port_index).unwrap();
+                let rem_inp_predecessor_port_index = rem_inp_predecessor_subport.port();
                 let new_inp_port_index = h
                     .graph
                     .port_index(*new_inp_node_index, rep_inp_port.offset)
                     .unwrap();
-                h.graph.unlink_port(rem_inp_predecessor_port_index);
+                h.graph.unlink_subport(rem_inp_predecessor_subport);
                 h.graph
                     .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
                     .unwrap();
@@ -263,7 +263,7 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::tag::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{LinearType, Signature, SimpleType};
+    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
@@ -548,5 +548,55 @@ mod test {
 
         // They should be the same, up to node indices
         assert_eq!(h.edge_count(), orig.edge_count());
+    }
+
+    #[test]
+    fn test_replace_after_copy() {
+        let one_bit: Vec<SimpleType> = vec![ClassicType::bit().into()];
+        let two_bit: Vec<SimpleType> = vec![ClassicType::bit().into(), ClassicType::bit().into()];
+
+        let mut builder = DFGBuilder::new(one_bit.clone(), one_bit.clone()).unwrap();
+        let inw = builder.input_wires().exactly_one().unwrap();
+        let outw = builder
+            .add_dataflow_op(LeafOp::Xor, [inw, inw])
+            .unwrap()
+            .outputs();
+        let [input, _] = builder.io();
+        let mut h = builder.finish_hugr_with_outputs(outw).unwrap();
+
+        let mut builder = DFGBuilder::new(two_bit, one_bit).unwrap();
+        let inw = builder.input_wires();
+        let outw = builder.add_dataflow_op(LeafOp::Xor, inw).unwrap().outputs();
+        let [repl_input, repl_output] = builder.io();
+        let repl = builder.finish_hugr_with_outputs(outw).unwrap();
+
+        let orig = h.clone();
+
+        let parent = h.root();
+        let removal = h
+            .nodes()
+            .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
+            .collect();
+
+        let first_out_p = h.node_outputs(input).next().unwrap();
+        let embedded_inputs = h.linked_ports(input, first_out_p);
+        let repl_inputs = repl
+            .node_outputs(repl_input)
+            .map(|p| repl.linked_ports(repl_input, p).next().unwrap());
+        let inputs = embedded_inputs.zip(repl_inputs).collect();
+
+        let outputs = repl
+            .node_inputs(repl_output)
+            .filter(|&p| repl.get_optype(repl_output).signature().get(p).is_some())
+            .map(|p| ((repl_output, p), p))
+            .collect();
+
+        h.apply_rewrite(SimpleReplacement::new(
+            parent, removal, repl, inputs, outputs,
+        ))
+        .unwrap();
+
+        // Nothing changed
+        assert_eq!(h.node_count(), orig.node_count());
     }
 }
