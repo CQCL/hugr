@@ -47,8 +47,6 @@ impl EdgeKind {
 
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (constant).
-///
-/// TODO: Consider using Cow here instead of in the TypeRow.
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
@@ -116,7 +114,8 @@ impl Signature {
         }
     }
 
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
+    /// of bounds or if it is not a value.
     #[inline]
     pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
         match port.direction() {
@@ -125,7 +124,8 @@ impl Signature {
         }
     }
 
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
+    /// of bounds or if it is not a value.
     #[inline]
     pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
         match port.direction() {
@@ -134,7 +134,7 @@ impl Signature {
         }
     }
 
-    /// Returns the number of dataflow and value ports in the signature.
+    /// Returns the number of value and const ports in the signature.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
@@ -143,25 +143,70 @@ impl Signature {
         }
     }
 
-    /// Returns the number of input dataflow and value ports in the signature.
+    /// Returns the number of input value and const ports in the signature.
     #[inline]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
-    /// Returns the number of output dataflow and value ports in the signature.
+    /// Returns the number of output value and const ports in the signature.
     #[inline]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
-    /// Returns a reference to the resourceset for the ports of the
+    /// Returns the number of value ports in the signature.
+    #[inline]
+    pub fn df_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.input.len(),
+            Direction::Outgoing => self.output.len(),
+        }
+    }
+
+    /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
     pub fn get_resources(&self, dir: &Direction) -> &ResourceSet {
         match dir {
             Direction::Incoming => &self.input_resources,
             Direction::Outgoing => &self.output_resources,
         }
+    }
+
+    /// Returns the value `Port`s in the signature for a given direction.
+    #[inline]
+    pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port> {
+        (0..self.df_port_count(dir)).map(move |i| Port::new(dir, i))
+    }
+
+    /// Returns the incoming value `Port`s in the signature.
+    #[inline]
+    pub fn input_ports_df(&self) -> impl Iterator<Item = Port> {
+        self.ports_df(Direction::Incoming)
+    }
+
+    /// Returns the outgoing value `Port`s in the signature.
+    #[inline]
+    pub fn output_ports_df(&self) -> impl Iterator<Item = Port> {
+        self.ports_df(Direction::Outgoing)
+    }
+
+    /// Returns the `Port`s in the signature for a given direction.
+    #[inline]
+    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
+        (0..self.port_count(dir)).map(move |i| Port::new(dir, i))
+    }
+
+    /// Returns the incoming `Port`s in the signature.
+    #[inline]
+    pub fn input_ports(&self) -> impl Iterator<Item = Port> {
+        self.ports(Direction::Incoming)
+    }
+
+    /// Returns the outgoing `Port`s in the signature.
+    #[inline]
+    pub fn output_ports(&self) -> impl Iterator<Item = Port> {
+        self.ports(Direction::Outgoing)
     }
 }
 
