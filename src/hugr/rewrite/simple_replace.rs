@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, NodeIndex, PortMut, PortView};
+use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortMut, PortView};
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::{
@@ -146,12 +146,13 @@ impl Rewrite for SimpleReplacement {
                     .graph
                     .port_index(rem_inp_node.index, rem_inp_port.offset)
                     .unwrap();
-                let rem_inp_predecessor_port_index =
-                    h.graph.port_link(rem_inp_port_index).unwrap().port();
+                let rem_inp_predecessor_subport = h.graph.port_link(rem_inp_port_index).unwrap();
+                let rem_inp_predecessor_port_index = rem_inp_predecessor_subport.port();
                 let new_inp_port_index = h
                     .graph
                     .port_index(*new_inp_node_index, rep_inp_port.offset)
                     .unwrap();
+                h.graph.unlink_subport(rem_inp_predecessor_subport);
                 h.graph
                     .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
                     .unwrap();
