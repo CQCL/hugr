@@ -41,6 +41,7 @@ html-escape = "0.2.13"
 bitvec = { version = "1.0.1", features = ["serde"] }
 enum_dispatch = "0.3.11"
 lazy_static = "1.4.0"
+context-iterators = "0.2.0"
 
 [features]
 pyo3 = ["dep:pyo3"]
@@ -50,7 +51,7 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 rstest = "0.17.0"
 rmp-serde = "1.1.1"
 webbrowser = "0.8.10"
-url-escape = "0.1.1"
+urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 
 [[bench]]
