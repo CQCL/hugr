@@ -2,11 +2,9 @@
 
 pub mod petgraph;
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, WithCtx};
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{
-    multiportgraph::SubportIndex, Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap,
-};
+use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap};
 
 use crate::{ops::OpType, Direction, Hugr, Node, Port};
 
@@ -69,9 +67,10 @@ impl<'g> HugrView for FlatRegionView<'g> {
     where
         Self: 'a;
 
-    type PortLinks<'a> = MapCtx<
-        WithCtx<<FlatRegionGraph<'g> as LinkView>::PortLinks<'a>, &'a Self>,
-        fn((SubportIndex, SubportIndex), &&'a Self) -> (Node, Port),
+    type PortLinks<'a> = MapWithCtx<
+        <FlatRegionGraph<'g> as LinkView>::PortLinks<'a>,
+        &'a Self,
+        (Node, Port),
     > where
         Self: 'a;
 
@@ -210,9 +209,10 @@ impl<'g> HugrView for RegionView<'g> {
     where
         Self: 'a;
 
-    type PortLinks<'a> = MapCtx<
-        WithCtx<<RegionGraph<'g> as LinkView>::PortLinks<'a>, &'a Self>,
-        fn((SubportIndex, SubportIndex), &&'a Self) -> (Node, Port),
+    type PortLinks<'a> = MapWithCtx<
+        <RegionGraph<'g> as LinkView>::PortLinks<'a>,
+        &'a Self,
+        (Node, Port),
     > where
         Self: 'a;
 

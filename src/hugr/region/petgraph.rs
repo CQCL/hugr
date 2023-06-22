@@ -6,11 +6,9 @@ use crate::ops::OpType;
 use crate::types::EdgeKind;
 use crate::{Node, Port};
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, WithCtx};
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use petgraph::visit::NodeRef;
 use portgraph::NodeIndex;
-
-type MapWithCtx<I, Ctx, O> = MapCtx<WithCtx<I, Ctx>, fn(<I as Iterator>::Item, &Ctx) -> O>;
 
 macro_rules! impl_region_petgraph_traits {
     ($hugr:ident) => {
