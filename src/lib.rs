@@ -20,6 +20,6 @@ pub mod types;
 mod utils;
 
 pub use crate::hugr::{
-    Direction, Hugr, Node, Port, Replace, ReplaceError, SimpleReplacement, Wire,
+    Direction, Hugr, HugrView, Node, Port, Replace, ReplaceError, SimpleReplacement, Wire,
 };
 pub use crate::resource::Resource;

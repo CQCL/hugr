@@ -1,5 +1,5 @@
-hugr
-====
+quantinuum-hugr
+===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
 [![msrv][]](https://github.com/CQCL/hugr)
