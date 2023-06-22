@@ -39,10 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install latest nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install nightly-2023-06-01
+        uses: dtolnay/rust-toolchain
         with:
-          components: miri
+          toolchain: nightly-2023-06-01
+          components: miri, rust-src
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v0-rust-nightly
