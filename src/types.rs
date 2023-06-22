@@ -27,8 +27,8 @@ pub enum EdgeKind {
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
     Value(SimpleType),
-    /// A reference to a constant value definition, used in the module region.
-    Const(ClassicType),
+    /// A reference to a static value definition, used in the module region.
+    Static(ClassicType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
     /// An edge specifying a resource set.
@@ -108,7 +108,7 @@ impl Signature {
                 .clone()
                 .try_into()
                 .ok()
-                .map(EdgeKind::Const)
+                .map(EdgeKind::Static)
         } else {
             self.get_df(port).cloned().map(EdgeKind::Value)
         }

@@ -228,7 +228,9 @@ impl<'a> ValidationContext<'a> {
         // Input ports and output linear ports must always be connected
         let mut links = self.hugr.graph.port_links(port_index).peekable();
         let must_be_connected = match dir {
-            Direction::Incoming => port_kind.is_linear() || matches!(port_kind, EdgeKind::Const(_)),
+            Direction::Incoming => {
+                port_kind.is_linear() || matches!(port_kind, EdgeKind::Static(_))
+            }
             Direction::Outgoing => port_kind.is_linear(),
         };
         if must_be_connected && links.peek().is_none() {
@@ -470,7 +472,7 @@ impl<'a> ValidationContext<'a> {
 
         match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
-            EdgeKind::Const(typ) => {
+            EdgeKind::Static(typ) => {
                 if let OpType::Const(ops::Const(val)) = from_optype {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 } else {
