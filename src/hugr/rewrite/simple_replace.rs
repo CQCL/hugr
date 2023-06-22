@@ -86,7 +86,7 @@ impl Rewrite for SimpleReplacement {
                 .replacement
                 .get_optype(node)
                 .signature()
-                .const_input
+                .static_input
                 .is_empty()
             {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
