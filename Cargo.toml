@@ -51,7 +51,7 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 rstest = "0.17.0"
 rmp-serde = "1.1.1"
 webbrowser = "0.8.10"
-url-escape = "0.1.1"
+urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 
 [[bench]]

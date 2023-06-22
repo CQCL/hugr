@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 
-/// Write a comma seperated list of of some types.
+/// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
 /// and not adding surrounding square brackets.
 pub fn display_list<T>(ts: &[T], f: &mut fmt::Formatter) -> fmt::Result
@@ -28,7 +28,7 @@ pub(crate) mod test {
     #[cfg(not(ci_run))]
     pub(crate) fn viz_dotstr(dotstr: &str) {
         let mut base: String = "https://dreampuf.github.io/GraphvizOnline/#".into();
-        url_escape::encode_query_to_string(dotstr, &mut base);
+        base.push_str(&urlencoding::encode(dotstr));
         webbrowser::open(&base).unwrap();
     }
 }
