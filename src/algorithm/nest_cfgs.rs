@@ -43,7 +43,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::view::{HugrView, Neighbours};
+use crate::hugr::view::HugrView;
 use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::tag::OpTag;
 use crate::ops::OpTrait;
@@ -150,7 +150,7 @@ impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
         self.exit
     }
 
-    type Iterator<'c> = Neighbours<'c>
+    type Iterator<'c> = H::Neighbours<'c>
     where
         Self: 'c;
 
