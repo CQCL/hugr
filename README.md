@@ -17,6 +17,17 @@ The HUGR specification (still in draft) is [here](specification/hugr.md).
 
 -   `pyo3`: Enable Python bindings via pyo3.
 
+## Usage
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+quantinuum-hugr = "0.1"
+```
+
+The library crate is called `hugr`.
+
 ## License
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
