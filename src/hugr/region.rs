@@ -2,6 +2,8 @@
 
 pub mod petgraph;
 
+use std::iter;
+
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap};
@@ -51,7 +53,7 @@ impl<'g> FlatRegionView<'g> {
 }
 
 impl<'g> HugrView for FlatRegionView<'g> {
-    type Nodes<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
+    type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
     where
         Self: 'a;
 
@@ -102,7 +104,8 @@ impl<'g> HugrView for FlatRegionView<'g> {
 
     fn nodes(&self) -> Self::Nodes<'_> {
         // Faster implementation than filtering all the nodes in the internal graph.
-        self.hierarchy.children(self.root.index).map_into()
+        let children = self.hierarchy.children(self.root.index).map_into();
+        iter::once(self.root).chain(children)
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
