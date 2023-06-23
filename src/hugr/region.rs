@@ -290,3 +290,79 @@ impl<'g> HugrView for RegionView<'g> {
         self.graph.all_neighbours(node.index).map_into()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        ops::{handle::NodeHandle, LeafOp},
+        type_row,
+        types::{ClassicType, LinearType, Signature, SimpleType},
+    };
+
+    use super::*;
+
+    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+
+    /// Make a module hugr with a fn definition containing an inner dfg node.
+    ///
+    /// Returns the hugr, the fn node id, and the nested dgf node id.
+    fn make_module_hgr() -> Result<(Hugr, Node, Node), Box<dyn std::error::Error>> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let (f_id, inner_id) = {
+            let mut func_builder = module_builder.define_function(
+                "main",
+                Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
+            )?;
+
+            let [int, qb] = func_builder.input_wires_arr();
+
+            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+
+            let inner_id = {
+                let inner_builder = func_builder
+                    .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
+                let w = inner_builder.input_wires();
+                inner_builder.finish_with_outputs(w)
+            }?;
+
+            let f_id =
+                func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
+            (f_id, inner_id)
+        };
+        let hugr = module_builder.finish_hugr()?;
+        Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
+    }
+
+    #[test]
+    fn flat_region() -> Result<(), Box<dyn std::error::Error>> {
+        let (hugr, def, inner) = make_module_hgr()?;
+
+        let region = FlatRegionView::new(&hugr, def);
+
+        assert_eq!(region.node_count(), 5);
+        assert!(region
+            .nodes()
+            .all(|n| n == def || hugr.get_parent(n) == Some(def)));
+        assert_eq!(region.children(inner).count(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn full_region() -> Result<(), Box<dyn std::error::Error>> {
+        let (hugr, def, inner) = make_module_hgr()?;
+
+        let region = RegionView::new(&hugr, def);
+
+        assert_eq!(region.node_count(), 7);
+        assert!(region.nodes().all(|n| n == def
+            || hugr.get_parent(n) == Some(def)
+            || hugr.get_parent(n) == Some(inner)));
+        assert_eq!(region.children(inner).count(), 2);
+
+        Ok(())
+    }
+}
