@@ -20,3 +20,5 @@ proptest-regressions/
 .devenv*
 devenv.local.nix
 
+# managed by devenv
+.pre-commit-config.yaml

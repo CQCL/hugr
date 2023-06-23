@@ -22,7 +22,8 @@
   # languages.rust.enable = true;
 
   # https://devenv.sh/pre-commit-hooks/
-  # pre-commit.hooks.shellcheck.enable = true;
+  pre-commit.hooks.clippy.enable = true;
+  pre-commit.hooks.rustfmt.enable = true;
 
   # https://devenv.sh/processes/
   # processes.ping.exec = "ping example.com";
