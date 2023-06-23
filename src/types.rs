@@ -27,7 +27,7 @@ pub enum EdgeKind {
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
     Value(SimpleType),
-    /// A reference to a static value definition, used in the module region.
+    /// A reference to a static value definition.
     Static(ClassicType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
