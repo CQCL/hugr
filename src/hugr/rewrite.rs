@@ -1,5 +1,6 @@
 //! Rewrite operations on the HUGR - replacement, outlining, etc.
 
+pub mod outline_cfg;
 pub mod replace;
 pub mod simple_replace;
 use std::mem;
