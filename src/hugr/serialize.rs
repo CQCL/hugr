@@ -9,7 +9,7 @@ use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
-use portgraph::{Direction, LinkError, NodeIndex};
+use portgraph::{Direction, LinkError, NodeIndex, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -65,6 +65,12 @@ pub enum HUGRSerializationError {
         node: Node,
         /// The operation type of the node.
         op_type: OpType,
+    },
+    /// Edges with wrong node indices
+    #[error("The edge endpoint {node:?} is not a node in the graph.")]
+    UnknownEdgeNode {
+        /// The node that has the port without offset.
+        node: Node,
     },
     /// Error building HUGR.
     #[error("HugrError: {0:?}")]
@@ -140,7 +146,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                 true => Some(offset as u16),
                 false => None,
             };
-            (node, offset)
+            (node_rekey[&node], offset)
         };
 
         let edges: Vec<_> = hugr
@@ -187,7 +193,10 @@ impl TryFrom<SerHugrV0> for Hugr {
             hugr.add_op_with_parent(node_ser.parent, node_ser.op)?;
         }
 
-        let unwrap_offset = |node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
+        let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
+            if !hugr.graph.contains_node(node.index) {
+                return Err(HUGRSerializationError::UnknownEdgeNode { node });
+            }
             let offset = match offset {
                 Some(offset) => offset as usize,
                 None => {
@@ -219,7 +228,10 @@ pub mod test {
 
     use super::*;
     use crate::{
-        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        builder::{
+            Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+            ModuleBuilder,
+        },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{ClassicType, LinearType, Signature, SimpleType},
     };
@@ -329,5 +341,24 @@ pub mod test {
         // HUGR internal structures are not preserved across serialization, so
         // test equality on SerHugrV0 instead.
         assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
+    }
+
+    #[test]
+    fn dgf_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
+        let mut dfg = DFGBuilder::new(tp.clone(), tp)?;
+        let mut params: [_; 2] = dfg.input_wires_arr();
+        for p in params.iter_mut() {
+            *p = dfg
+                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .unwrap()
+                .out_wire(0);
+        }
+        let h = dfg.finish_hugr_with_outputs(params)?;
+
+        let ser = serde_json::to_string(&h)?;
+        let _: Hugr = serde_json::from_str(&ser)?;
+
+        Ok(())
     }
 }
