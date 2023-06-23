@@ -14,8 +14,7 @@ use super::HugrView;
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
-/// Single region view of a HUGR. Ignores any nodes that are not direct children
-/// of the root.
+/// Single region view of a HUGR. Includes only the root node and its direct children.
 ///
 /// For a view that includes all the descendants of the root, see [`RegionView`].
 #[derive(Clone, Debug)]
@@ -34,8 +33,8 @@ pub struct FlatRegionView<'g> {
 }
 
 impl<'g> FlatRegionView<'g> {
-    /// Create a new region view of a HUGR containing only the direct children
-    /// of the root.
+    /// Create a new region view of a HUGR containing only a root and its direct
+    /// children.
     pub fn new(hugr: &'g Hugr, root: Node) -> Self {
         let Hugr {
             graph,
@@ -155,8 +154,8 @@ impl<'g> HugrView for FlatRegionView<'g> {
 
 type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
 
-/// Single region view of a HUGR. Ignores any nodes that are not descendants of
-/// the root.
+/// Single region view of a HUGR. Includes only the root node and its
+/// descendants.
 ///
 /// For a view that includes only the direct children of the root, see
 /// [`FlatRegionView`]. Prefer using [`FlatRegionView`] over this type when
@@ -177,8 +176,8 @@ pub struct RegionView<'g> {
 }
 
 impl<'g> RegionView<'g> {
-    /// Create a new region view of a HUGR containing only the direct children
-    /// of the root.
+    /// Create a new region view of a HUGR containing only a root node and its
+    /// descendants.
     pub fn new(hugr: &'g Hugr, root: Node) -> Self {
         let Hugr {
             graph,
