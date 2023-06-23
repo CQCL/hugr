@@ -1230,11 +1230,21 @@ nodes as children.
 
 ###### `OutlineCFG`
 
-Replace a CFG-convex subgraph (of sibling BasicBlock nodes) having a
-single entry node with a single BasicBlock node having a CFG node child
-which has as its children the original BasicBlock nodes and an exit node
-that has inputs coming from all edges of the original CFG that don’t
-terminate in it.
+Replace a set of CFG sibling nodes with a single BasicBlock node having a
+CFG node child which has as its children the set of BasicBlock nodes
+originally specified. The set of basic blocks must satisfy constraints:
+* All (controlflow) edges whose target is in the set but whose source is outside,
+  must have the same target
+* There must be at most one edge leaving the set; specifically,
+   * *either* the set does not contain an Exit block, and there is exactly one edge leaving the set;
+   * *or* the set contains the Exit block, and there are not edges out of the set.
+
+Situations in which multiple nodes have edges leaving the set, can be converted to
+this form by a combination of InsertIdentity operations and one Replace.
+
+** Implementation Note ** The required form of set can be easily identified by two
+nodes: the unique entry node, and an exit node (which may be the Exit block of the
+CFG, or the source of the unique exit edge).
 
 ##### Inlining methods
 
