@@ -225,12 +225,16 @@ impl<'a> ValidationContext<'a> {
         let port_kind = optype.port_kind(port).unwrap();
         let dir = port.direction();
 
-        // Input ports and output linear ports must always be connected
         let mut links = self.hugr.graph.port_links(port_index).peekable();
         let must_be_connected = match dir {
+            // Incoming ports must be connected, except for state order ports, branch case nodes,
+            // and CFG nodes.
             Direction::Incoming => {
-                port_kind.is_linear() || matches!(port_kind, EdgeKind::Static(_))
+                port_kind != EdgeKind::StateOrder
+                    && port_kind != EdgeKind::ControlFlow
+                    && optype.tag() != OpTag::Case
             }
+            // Linear dataflow values must be connected.
             Direction::Outgoing => port_kind.is_linear(),
         };
         if must_be_connected && links.peek().is_none() {
