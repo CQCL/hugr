@@ -148,7 +148,7 @@ impl OpDef {
     ) -> Self {
         let inputs: Vec<_> = port_names
             .input_zip(&signature)
-            .chain(port_names.const_input_zip(&signature))
+            .chain(port_names.static_input_zip(&signature))
             .map(|(n, t)| (Some(n.clone()), t.clone()))
             .collect();
 
