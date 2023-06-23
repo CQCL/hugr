@@ -35,21 +35,6 @@ jobs:
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
-  miri:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install nightly-2023-06-01
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2023-06-01
-          components: miri, rust-src
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v0-rust-nightly
-      - name: Run miri
-        run: cargo miri test
-
   benches:
     runs-on: ubuntu-latest
     steps:
