@@ -344,7 +344,7 @@ pub mod test {
     }
 
     #[test]
-    fn dgf_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+    fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
         let mut dfg = DFGBuilder::new(tp.clone(), tp)?;
         let mut params: [_; 2] = dfg.input_wires_arr();
