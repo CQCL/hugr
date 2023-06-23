@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [dependencies]
 thiserror = "1.0.28"
-portgraph = { version = "0.6.0", features = ["serde"] }
+portgraph = { version = "0.6.0", features = ["serde", "petgraph"] }
 pyo3 = { version = "0.19.0", optional = true, features = [
     "multiple-pymethods",
 ] }
@@ -41,6 +41,7 @@ html-escape = "0.2.13"
 bitvec = { version = "1.0.1", features = ["serde"] }
 enum_dispatch = "0.3.11"
 lazy_static = "1.4.0"
+petgraph = { version="0.6.3", default-features = false}
 context-iterators = "0.2.0"
 
 [features]
