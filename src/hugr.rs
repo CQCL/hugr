@@ -115,7 +115,7 @@ impl Hugr {
                 let optype = self.op_types.get(node);
                 let offset = self.graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Const(ty) => {
+                    EdgeKind::Static(ty) => {
                         PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
                     }
                     EdgeKind::Value(ty) => {

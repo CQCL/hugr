@@ -168,7 +168,7 @@ impl DataflowOpTrait for Call {
 
     fn signature(&self) -> Signature {
         Signature {
-            const_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
+            static_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
             ..self.signature.clone()
         }
     }

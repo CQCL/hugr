@@ -27,8 +27,8 @@ pub enum EdgeKind {
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
     Value(SimpleType),
-    /// A reference to a constant value definition, used in the module region.
-    Const(ClassicType),
+    /// A reference to a static value definition.
+    Static(ClassicType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
     /// An edge specifying a resource set.
@@ -46,9 +46,7 @@ impl EdgeKind {
 }
 
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
-/// and also the target (value) of a call (constant).
-///
-/// TODO: Consider using Cow here instead of in the TypeRow.
+/// and also the target (value) of a call (static).
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
@@ -56,8 +54,8 @@ pub struct Signature {
     pub input: TypeRow,
     /// Value outputs of the function.
     pub output: TypeRow,
-    /// Possible constE input (for call / load-constant).
-    pub const_input: TypeRow,
+    /// Possible static input (for call / load-constant).
+    pub static_input: TypeRow,
     /// The resource requirements of all the inputs
     pub input_resources: ResourceSet,
     /// The resource requirements of all the outputs
@@ -69,7 +67,7 @@ impl Signature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty() && self.input.is_empty() && self.output.is_empty()
+        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear.
@@ -105,18 +103,19 @@ impl Signature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            self.const_input
+            self.static_input
                 .get(port.index() - self.input.len())?
                 .clone()
                 .try_into()
                 .ok()
-                .map(EdgeKind::Const)
+                .map(EdgeKind::Static)
         } else {
             self.get_df(port).cloned().map(EdgeKind::Value)
         }
     }
 
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
+    /// of bounds or if it is not a value.
     #[inline]
     pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
         match port.direction() {
@@ -125,7 +124,8 @@ impl Signature {
         }
     }
 
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
+    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
+    /// of bounds or if it is not a value.
     #[inline]
     pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
         match port.direction() {
@@ -134,34 +134,79 @@ impl Signature {
         }
     }
 
-    /// Returns the number of dataflow and value ports in the signature.
+    /// Returns the number of value and static ports in the signature.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
-            Direction::Incoming => self.input.len() + self.const_input.len(),
+            Direction::Incoming => self.input.len() + self.static_input.len(),
             Direction::Outgoing => self.output.len(),
         }
     }
 
-    /// Returns the number of input dataflow and value ports in the signature.
+    /// Returns the number of input value and static ports in the signature.
     #[inline]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
-    /// Returns the number of output dataflow and value ports in the signature.
+    /// Returns the number of output value and static ports in the signature.
     #[inline]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
-    /// Returns a reference to the resourceset for the ports of the
+    /// Returns the number of value ports in the signature.
+    #[inline]
+    pub fn df_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.input.len(),
+            Direction::Outgoing => self.output.len(),
+        }
+    }
+
+    /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
     pub fn get_resources(&self, dir: &Direction) -> &ResourceSet {
         match dir {
             Direction::Incoming => &self.input_resources,
             Direction::Outgoing => &self.output_resources,
         }
+    }
+
+    /// Returns the value `Port`s in the signature for a given direction.
+    #[inline]
+    pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port> {
+        (0..self.df_port_count(dir)).map(move |i| Port::new(dir, i))
+    }
+
+    /// Returns the incoming value `Port`s in the signature.
+    #[inline]
+    pub fn input_ports_df(&self) -> impl Iterator<Item = Port> {
+        self.ports_df(Direction::Incoming)
+    }
+
+    /// Returns the outgoing value `Port`s in the signature.
+    #[inline]
+    pub fn output_ports_df(&self) -> impl Iterator<Item = Port> {
+        self.ports_df(Direction::Outgoing)
+    }
+
+    /// Returns the `Port`s in the signature for a given direction.
+    #[inline]
+    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
+        (0..self.port_count(dir)).map(move |i| Port::new(dir, i))
+    }
+
+    /// Returns the incoming `Port`s in the signature.
+    #[inline]
+    pub fn input_ports(&self) -> impl Iterator<Item = Port> {
+        self.ports(Direction::Incoming)
+    }
+
+    /// Returns the outgoing `Port`s in the signature.
+    #[inline]
+    pub fn output_ports(&self) -> impl Iterator<Item = Port> {
+        self.ports(Direction::Outgoing)
     }
 }
 
@@ -170,12 +215,12 @@ impl Signature {
     pub fn new(
         input: impl Into<TypeRow>,
         output: impl Into<TypeRow>,
-        const_input: impl Into<TypeRow>,
+        static_input: impl Into<TypeRow>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
-            const_input: const_input.into(),
+            static_input: static_input.into(),
             input_resources: ResourceSet::new(),
             output_resources: ResourceSet::new(),
         }
@@ -195,12 +240,12 @@ impl Signature {
 
 impl Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let has_inputs = !(self.const_input.is_empty() && self.input.is_empty());
+        let has_inputs = !(self.static_input.is_empty() && self.input.is_empty());
         if has_inputs {
             self.input.fmt(f)?;
-            if !self.const_input.is_empty() {
+            if !self.static_input.is_empty() {
                 f.write_char('<')?;
-                display_list(&self.const_input, f)?;
+                display_list(&self.static_input, f)?;
                 f.write_char('>')?;
             }
             f.write_str(" -> ")?;
@@ -219,8 +264,8 @@ pub struct SignatureDescription {
     pub input: Vec<SmolStr>,
     /// Output of the function.
     pub output: Vec<SmolStr>,
-    /// Constant data references used by the function.
-    pub const_input: Vec<SmolStr>,
+    /// Static data references used by the function.
+    pub static_input: Vec<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -228,7 +273,7 @@ impl SignatureDescription {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.const_input.is_empty() && self.input.is_empty() && self.output.is_empty()
+        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 }
 
@@ -237,12 +282,12 @@ impl SignatureDescription {
     pub fn new(
         input: impl Into<Vec<SmolStr>>,
         output: impl Into<Vec<SmolStr>>,
-        const_input: impl Into<Vec<SmolStr>>,
+        static_input: impl Into<Vec<SmolStr>>,
     ) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
-            const_input: const_input.into(),
+            static_input: static_input.into(),
         }
     }
 
@@ -293,12 +338,12 @@ impl SignatureDescription {
         Self::row_zip(&signature.output, &self.output)
     }
 
-    /// Iterate over the constant input wires of the signature and their names.
-    pub fn const_input_zip<'a>(
+    /// Iterate over the static input wires of the signature and their names.
+    pub fn static_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.const_input, &self.const_input)
+        Self::row_zip(&signature.static_input, &self.static_input)
     }
 }
 

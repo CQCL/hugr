@@ -603,7 +603,7 @@ enum ValueKind {
 fn get_value_kind(base: &Hugr, src: Node, src_offset: Port) -> ValueKind {
     let wire_kind = base.get_optype(src).port_kind(src_offset).unwrap();
     match wire_kind {
-        EdgeKind::Const(_) => ValueKind::Const,
+        EdgeKind::Static(_) => ValueKind::Const,
         EdgeKind::Value(simple_type) => match simple_type {
             SimpleType::Classic(_) => ValueKind::Classic,
             SimpleType::Linear(typ) => ValueKind::Linear(typ),
