@@ -33,7 +33,7 @@ enum Versioned {
     Unsupported,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
     #[serde(flatten)]
@@ -106,6 +106,28 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
+fn set_index(
+    n: Node,
+    hugr: &Hugr,
+    rekey: &mut HashMap<Node, Node>,
+    free_indices: &mut impl Iterator<Item = Node>,
+) {
+    if rekey.contains_key(&n) {
+        return;
+    }
+    if let Some(parent) = hugr.get_parent(n) {
+        set_index(parent, hugr, rekey, free_indices);
+        for child in hugr.children(parent) {
+            if rekey.contains_key(&child) {
+                break;
+            }
+            rekey.insert(child, free_indices.next().unwrap());
+        }
+    } else {
+        rekey.insert(n, free_indices.next().unwrap());
+    }
+}
+
 impl TryFrom<&Hugr> for SerHugrV0 {
     type Error = HUGRSerializationError;
 
@@ -113,32 +135,24 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::new();
-        let mut index_counter = 1..;
-        let mut nodes: Vec<NodeSer> = hugr
-            .nodes()
-            .map(|n| {
-                // Note that we don't rekey the parent here, as we need to fully
-                // populate `node_rekey` first.
-                let (parent, new_node) = if n == hugr.root() {
-                    (n, NodeIndex::new(0).into())
-                } else {
-                    (
-                        hugr.get_parent(n).expect("Unexpected root."),
-                        NodeIndex::new(index_counter.next().unwrap()).into(),
-                    )
-                };
+        let mut index_counter = (0..).map(|i| NodeIndex::new(i).into());
+        let mut nodes = vec![None; hugr.node_count()];
+        for n in hugr.nodes() {
+            set_index(n, hugr, &mut node_rekey, &mut index_counter);
 
-                node_rekey.insert(n, new_node);
-                let opt = hugr.get_optype(n);
-                Ok(NodeSer {
-                    parent,
-                    op: opt.clone(),
-                })
-            })
-            .collect::<Result<_, Self::Error>>()?;
-        for NodeSer { parent, .. } in &mut nodes {
-            *parent = node_rekey[parent];
+            let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
+            let opt = hugr.get_optype(n);
+            nodes[node_rekey[&n].index.index()] = Some(NodeSer {
+                parent,
+                op: opt.clone(),
+            });
         }
+        dbg!(&node_rekey);
+        let nodes = nodes
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .expect("Could not reach one of the nodes");
+        assert_eq!(nodes[0].parent, NodeIndex::new(0).into());
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let sig = hugr.get_optype(node).signature();
@@ -233,7 +247,8 @@ pub mod test {
             ModuleBuilder,
         },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{ClassicType, LinearType, Signature, SimpleType}, Port,
+        types::{ClassicType, LinearType, Signature, SimpleType},
+        Port,
     };
     use itertools::Itertools;
     use portgraph::{
