@@ -233,7 +233,7 @@ pub mod test {
             ModuleBuilder,
         },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{ClassicType, LinearType, Signature, SimpleType},
+        types::{ClassicType, LinearType, Signature, SimpleType}, Port,
     };
     use itertools::Itertools;
     use portgraph::{
@@ -360,5 +360,30 @@ pub mod test {
         let _: Hugr = serde_json::from_str(&ser)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn hierarchy_order() {
+        let qb: SimpleType = LinearType::Qubit.into();
+        let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
+        let [old_in, out] = dfg.io();
+        let w = dfg.input_wires();
+        let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
+
+        // Now add a new input
+        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.connect(new_in, 0, out, 0).unwrap();
+        hugr.move_before_sibling(new_in, old_in).unwrap();
+        hugr.remove_node(old_in).unwrap();
+
+        // This is a valid Hugr
+        hugr.validate().unwrap();
+
+        let ser = serde_json::to_vec(&hugr).unwrap();
+        let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
+
+        // This isn't
+        new_hugr.validate().unwrap();
     }
 }
