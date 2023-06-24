@@ -147,12 +147,10 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                 op: opt.clone(),
             });
         }
-        dbg!(&node_rekey);
         let nodes = nodes
             .into_iter()
             .collect::<Option<Vec<_>>>()
             .expect("Could not reach one of the nodes");
-        assert_eq!(nodes[0].parent, NodeIndex::new(0).into());
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let sig = hugr.get_optype(node).signature();
