@@ -139,15 +139,15 @@ impl Rewrite for OutlineCfg {
         )
         .unwrap();
         let wires_in = inputs.into_iter().cloned().zip(b.input_wires());
-        let sub_cfg = b.cfg_builder(wires_in, outputs.clone()).unwrap();
-        let sub_cfg_node = sub_cfg.container_node();
-        let sub_cfg_outputs = sub_cfg.finish_sub_container().unwrap().outputs();
-        b.finish_with_outputs(sub_cfg_outputs).unwrap();
+        let cfg = b.cfg_builder(wires_in, outputs.clone()).unwrap();
+        let cfg_index = cfg.container_node().index;
+        let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+        b.finish_with_outputs(cfg_outputs).unwrap();
 
         // 4. Children of new CFG - entry node must be first
         h.hierarchy.detach(self.entry_node.index);
         h.hierarchy
-            .push_child(self.entry_node.index, sub_cfg_node.index)
+            .push_child(self.entry_node.index, cfg_index)
             .unwrap();
         // Make an exit node, next
         let inner_exit = h
