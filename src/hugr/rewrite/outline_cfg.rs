@@ -115,7 +115,7 @@ impl Rewrite for OutlineCfg {
             Signature::new_df(inputs.clone(), outputs.clone()),
         )
         .unwrap();
-        let wires_in = inputs.into_iter().cloned().zip(b.input_wires());
+        let wires_in = inputs.iter().cloned().zip(b.input_wires());
         let cfg = b.cfg_builder(wires_in, outputs.clone()).unwrap();
         let cfg_node = cfg.container_node();
         let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
@@ -132,7 +132,7 @@ impl Rewrite for OutlineCfg {
             .add_op_with_parent(
                 cfg_node,
                 OpType::BasicBlock(BasicBlock::Exit {
-                    cfg_outputs: outputs.clone(),
+                    cfg_outputs: outputs,
                 }),
             )
             .unwrap();
