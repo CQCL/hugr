@@ -88,21 +88,16 @@ impl Rewrite for OutlineCfg {
             )
             .signature()
             .output;
-        let outputs = {
-            let OpType::BasicBlock(exit_type) = h.get_optype(self.exit_node) else {panic!()};
-            match exit_type {
-                BasicBlock::Exit { cfg_outputs } => cfg_outputs,
-                BasicBlock::DFB { .. } => {
-                    let Some(s) = cfg_succ else {panic!();};
-                    assert!(h
-                        .output_neighbours(self.exit_node)
-                        .collect::<HashSet<_>>()
-                        .contains(&s));
-                    let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
-                    match s_type {
-                        BasicBlock::Exit { cfg_outputs } => cfg_outputs,
-                        BasicBlock::DFB { inputs, .. } => inputs,
-                    }
+        let outputs = match cfg_succ {
+            None => {
+                let OpType::BasicBlock(BasicBlock::Exit {cfg_outputs}) = h.get_optype(self.exit_node) else {panic!()};
+                cfg_outputs
+            },
+            Some(s) => {
+                let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
+                match s_type {
+                    BasicBlock::Exit { cfg_outputs } => cfg_outputs,
+                    BasicBlock::DFB { inputs, .. } => inputs,
                 }
             }
         }
