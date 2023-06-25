@@ -88,6 +88,7 @@ impl Rewrite for OutlineCfg {
         h.hierarchy
             .push_child(new_block.index, parent.index)
             .unwrap();
+
         // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
             .linked_ports(
@@ -101,6 +102,7 @@ impl Rewrite for OutlineCfg {
                 h.connect(pred, br.index(), new_block, 0).unwrap();
             }
         }
+
         // 4. new_block contains input node, sub-cfg, exit node all connected
         let mut b = DFGBuilder::create_with_io(
             &mut *h,
