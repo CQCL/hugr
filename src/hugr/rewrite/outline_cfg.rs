@@ -80,7 +80,7 @@ impl Rewrite for OutlineCfg {
     }
     fn apply(self, h: &mut Hugr) -> Result<(), OutlineCfgError> {
         let (all_blocks, exit_succ) = self.compute_all_blocks(h)?;
-        // Gather data.
+        // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
         let inputs = h
             .get_optype(
@@ -93,7 +93,7 @@ impl Rewrite for OutlineCfg {
                 let OpType::BasicBlock(BasicBlock::Exit {cfg_outputs}) = h.get_optype(self.exit_node) else {panic!()};
                 cfg_outputs
             },
-            Some(s) => {
+            Some(_) => {
                 let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
                 match s_type {
                     BasicBlock::Exit { cfg_outputs } => cfg_outputs,
@@ -113,7 +113,7 @@ impl Rewrite for OutlineCfg {
         h.hierarchy
             .push_child(new_block.index, parent.index)
             .unwrap();
-        // Change any edges into entry_block from outside, to target new_block
+        // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
             .linked_ports(
                 self.entry_node,
@@ -126,7 +126,7 @@ impl Rewrite for OutlineCfg {
                 h.connect(pred, br.index(), new_block, 0).unwrap();
             }
         }
-        // 3. new_block contains input node, sub-cfg, exit node all connected
+        // 4. new_block contains input node, sub-cfg, exit node all connected
         let mut b = DFGBuilder::create_with_io(
             &mut *h,
             new_block,
@@ -135,64 +135,69 @@ impl Rewrite for OutlineCfg {
         .unwrap();
         let wires_in = inputs.into_iter().cloned().zip(b.input_wires());
         let cfg = b.cfg_builder(wires_in, outputs.clone()).unwrap();
-        let cfg_index = cfg.container_node().index;
+        let cfg_node = cfg.container_node();
         let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
         b.finish_with_outputs(cfg_outputs).unwrap();
 
-        // 4. Children of new CFG - entry node must be first
+        // 5. Children of new CFG, and exit edges
+        // Entry node must be first
         h.hierarchy.detach(self.entry_node.index);
         h.hierarchy
-            .push_child(self.entry_node.index, cfg_index)
+            .push_child(self.entry_node.index, cfg_node.index)
             .unwrap();
-        // Make an exit node, next
-        let inner_exit = h
-            .add_op_after(
-                self.entry_node,
-                OpType::BasicBlock(BasicBlock::Exit {
-                    cfg_outputs: outputs,
-                }),
-            )
-            .unwrap();
-        // Then reparent remainder
+        // Then find or make exit node. We'll need a new exit node *somewhere*
+        let new_exit = h.add_op(OpType::BasicBlock(BasicBlock::Exit {
+            cfg_outputs: outputs.clone(),
+        }));
+        let mut all_blocks = all_blocks.into_iter().collect::<Vec<_>>();
+        let cfg_succ = match exit_succ {
+            Some(s) => {
+                h.hierarchy
+                    .push_child(new_exit.index, cfg_node.index)
+                    .unwrap();
+                // Retarget edge from exit_node (that used to target exit_succ) to inner_exit
+                let exit_port = h
+                    .node_outputs(self.exit_node)
+                    .filter(|p| {
+                        let (t, p2) = h
+                            .linked_ports(self.exit_node, *p)
+                            .exactly_one()
+                            .ok()
+                            .unwrap();
+                        assert!(p2.index() == 0);
+                        t == s
+                    })
+                    .exactly_one()
+                    .unwrap();
+                h.disconnect(self.exit_node, exit_port).unwrap();
+                h.connect(self.exit_node, exit_port.index(), new_exit, 0)
+                    .unwrap();
+                s
+            }
+            None => {
+                // Moving exit node - make sure it's first (i.e. next after entry node)
+                let (ex_i, _) = all_blocks
+                    .iter()
+                    .enumerate()
+                    .find_or_first(|(_, n)| **n == self.exit_node)
+                    .unwrap();
+                all_blocks.swap(ex_i, 0);
+                // Outer CFG is about to lose its exit node, so the new one will be successor of new_block
+                h.hierarchy
+                    .insert_after(new_exit.index, h.children(parent).next().unwrap().index)
+                    .unwrap();
+                new_exit
+            }
+        };
+        h.connect(new_block, 0, cfg_succ, 0).unwrap();
+        // Reparent remaining nodes
         for n in all_blocks {
-            // Do not move the entry node, as we have already;
-            // Also don't move the exit_node if it's the exit-block of the outer CFG
-            if n == self.entry_node || (n == self.exit_node && exit_succ.is_none()) {
-                continue;
-            };
-            h.hierarchy.detach(n.index);
-            h.hierarchy.insert_after(n.index, inner_exit.index).unwrap();
-        }
-        // Connect new_block to (old) successor of exit block
-        if let Some(s) = exit_succ {
-            let exit_port = h
-                .node_outputs(self.exit_node)
-                .filter(|p| {
-                    let (t, p2) = h
-                        .linked_ports(self.exit_node, *p)
-                        .exactly_one()
-                        .ok()
-                        .unwrap();
-                    assert!(p2.index() == 0);
-                    t == s
-                })
-                .exactly_one()
-                .unwrap();
-            h.disconnect(self.exit_node, exit_port).unwrap();
-            h.connect(self.exit_node, exit_port.index(), inner_exit, 0)
-                .unwrap();
-        } else {
-            // We left the exit block outside. So, it's *predecessors* need to be retargetted to the inner_exit.
-            let in_p = h.node_inputs(self.exit_node).exactly_one().unwrap();
-            assert!(in_p.index() == 0);
-            let preds = h.linked_ports(self.exit_node, in_p).collect::<Vec<_>>();
-            for (src_n, src_p) in preds {
-                h.disconnect(src_n, src_p).unwrap();
-                h.connect(src_n, src_p.index(), inner_exit, 0).unwrap();
+            // Do not move the entry node, as we have already
+            if n != self.entry_node {
+                h.hierarchy.detach(n.index);
+                h.hierarchy.push_child(n.index, cfg_node.index).unwrap();
             }
         }
-        h.connect(new_block, 0, exit_succ.unwrap_or(self.exit_node), 0)
-            .unwrap();
         Ok(())
     }
 }
