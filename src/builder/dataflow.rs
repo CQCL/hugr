@@ -21,7 +21,7 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
-    pub(super) fn create_with_io(
+    pub(crate) fn create_with_io(
         mut base: T,
         parent: Node,
         signature: Signature,
