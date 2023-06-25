@@ -88,7 +88,7 @@ impl Rewrite for OutlineCfg {
             )
             .signature()
             .output;
-        let cfg_outputs = {
+        let outputs = {
             let OpType::BasicBlock(exit_type) = h.get_optype(self.exit_node) else {panic!()};
             match exit_type {
                 BasicBlock::Exit { cfg_outputs } => cfg_outputs,
@@ -112,7 +112,7 @@ impl Rewrite for OutlineCfg {
         // 2. New CFG node will be contained in new single-successor BB
         let new_block = h.add_op(BasicBlock::DFB {
             inputs: inputs.clone(),
-            other_outputs: cfg_outputs.clone(),
+            other_outputs: outputs.clone(),
             predicate_variants: vec![type_row![]],
         });
         h.hierarchy
@@ -135,11 +135,11 @@ impl Rewrite for OutlineCfg {
         let mut b = DFGBuilder::create_with_io(
             &mut *h,
             new_block,
-            Signature::new_df(inputs.clone(), cfg_outputs.clone()),
+            Signature::new_df(inputs.clone(), outputs.clone()),
         )
         .unwrap();
         let wires_in = inputs.into_iter().cloned().zip(b.input_wires());
-        let sub_cfg = b.cfg_builder(wires_in, cfg_outputs.clone()).unwrap();
+        let sub_cfg = b.cfg_builder(wires_in, outputs.clone()).unwrap();
         let sub_cfg_node = sub_cfg.container_node();
         let sub_cfg_outputs = sub_cfg.finish_sub_container().unwrap().outputs();
         b.finish_with_outputs(sub_cfg_outputs).unwrap();
@@ -153,7 +153,7 @@ impl Rewrite for OutlineCfg {
         let inner_exit = h
             .add_op_after(
                 self.entry_node,
-                OpType::BasicBlock(BasicBlock::Exit { cfg_outputs }),
+                OpType::BasicBlock(BasicBlock::Exit { cfg_outputs: outputs }),
             )
             .unwrap();
         // Then reparent remainder
