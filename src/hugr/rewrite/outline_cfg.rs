@@ -28,11 +28,9 @@ impl OutlineCfg {
             (Some(p1), Some(p2)) if p1 == p2 => p1,
             (p1, p2) => return Err(OutlineCfgError::EntryExitNotSiblings(p1, p2)),
         };
-        match h.get_optype(cfg_n) {
-            OpType::CFG(_) => (),
-            o => {
-                return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
-            }
+        let o = h.get_optype(cfg_n);
+        if !matches!(o, OpType::CFG(_)) {
+            return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
         let mut all_blocks = HashSet::new();
         let mut queue = VecDeque::new();
