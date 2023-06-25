@@ -153,7 +153,9 @@ impl Rewrite for OutlineCfg {
         let inner_exit = h
             .add_op_after(
                 self.entry_node,
-                OpType::BasicBlock(BasicBlock::Exit { cfg_outputs: outputs }),
+                OpType::BasicBlock(BasicBlock::Exit {
+                    cfg_outputs: outputs,
+                }),
             )
             .unwrap();
         // Then reparent remainder
@@ -181,19 +183,21 @@ impl Rewrite for OutlineCfg {
                 })
                 .exactly_one()
                 .unwrap();
-            h.disconnect(self.exit_node, exit_port).unwrap(); // TODO need to connect this port to the inner exit block
-            h.connect(self.exit_node, exit_port.index(), inner_exit, 0).unwrap();
+            h.disconnect(self.exit_node, exit_port).unwrap();
+            h.connect(self.exit_node, exit_port.index(), inner_exit, 0)
+                .unwrap();
         } else {
             // We left the exit block outside. So, it's *predecessors* need to be retargetted to the inner_exit.
             let in_p = h.node_inputs(self.exit_node).exactly_one().unwrap();
             assert!(in_p.index() == 0);
             let preds = h.linked_ports(self.exit_node, in_p).collect::<Vec<_>>();
-            for (src_n,src_p) in  preds {
+            for (src_n, src_p) in preds {
                 h.disconnect(src_n, src_p).unwrap();
                 h.connect(src_n, src_p.index(), inner_exit, 0).unwrap();
             }
         }
-        h.connect(new_block, 0, cfg_succ.unwrap_or(self.exit_node), 0).unwrap();
+        h.connect(new_block, 0, cfg_succ.unwrap_or(self.exit_node), 0)
+            .unwrap();
         Ok(())
     }
 }
