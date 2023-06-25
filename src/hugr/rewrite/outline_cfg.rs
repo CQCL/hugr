@@ -79,7 +79,7 @@ impl Rewrite for OutlineCfg {
         Ok(())
     }
     fn apply(self, h: &mut Hugr) -> Result<(), OutlineCfgError> {
-        let (all_blocks, cfg_succ) = self.compute_all_blocks(h)?;
+        let (all_blocks, exit_succ) = self.compute_all_blocks(h)?;
         // Gather data.
         // These panic()s only happen if the Hugr would not have passed validate()
         let inputs = h
@@ -88,7 +88,7 @@ impl Rewrite for OutlineCfg {
             )
             .signature()
             .output;
-        let outputs = match cfg_succ {
+        let outputs = match exit_succ {
             None => {
                 let OpType::BasicBlock(BasicBlock::Exit {cfg_outputs}) = h.get_optype(self.exit_node) else {panic!()};
                 cfg_outputs
@@ -157,14 +157,14 @@ impl Rewrite for OutlineCfg {
         for n in all_blocks {
             // Do not move the entry node, as we have already;
             // Also don't move the exit_node if it's the exit-block of the outer CFG
-            if n == self.entry_node || (n == self.exit_node && cfg_succ.is_none()) {
+            if n == self.entry_node || (n == self.exit_node && exit_succ.is_none()) {
                 continue;
             };
             h.hierarchy.detach(n.index);
             h.hierarchy.insert_after(n.index, inner_exit.index).unwrap();
         }
         // Connect new_block to (old) successor of exit block
-        if let Some(s) = cfg_succ {
+        if let Some(s) = exit_succ {
             let exit_port = h
                 .node_outputs(self.exit_node)
                 .filter(|p| {
@@ -191,7 +191,7 @@ impl Rewrite for OutlineCfg {
                 h.connect(src_n, src_p.index(), inner_exit, 0).unwrap();
             }
         }
-        h.connect(new_block, 0, cfg_succ.unwrap_or(self.exit_node), 0)
+        h.connect(new_block, 0, exit_succ.unwrap_or(self.exit_node), 0)
             .unwrap();
         Ok(())
     }
