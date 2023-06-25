@@ -183,7 +183,6 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             h.disconnect(self.exit_node, exit_port).unwrap(); // TODO need to connect this port to the inner exit block
             h.connect(self.exit_node, exit_port.index(), inner_exit, 0).unwrap();
-            h.connect(new_block, 0, s, 0).unwrap();
         } else {
             // We left the exit block outside. So, it's *predecessors* need to be retargetted to the inner_exit.
             let in_p = h.node_inputs(self.exit_node).exactly_one().unwrap();
@@ -193,8 +192,8 @@ impl Rewrite for OutlineCfg {
                 h.disconnect(src_n, src_p).unwrap();
                 h.connect(src_n, src_p.index(), inner_exit, 0).unwrap();
             }
-            h.connect(new_block, 0, self.exit_node, 0).unwrap();
         }
+        h.connect(new_block, 0, cfg_succ.unwrap_or(self.exit_node), 0).unwrap();
         Ok(())
     }
 }
