@@ -1235,12 +1235,12 @@ CFG node child which has as its children the set of BasicBlock nodes
 originally specified. The set of basic blocks must satisfy constraints:
 * All (controlflow) edges whose target is in the set but whose source is outside,
   must have the same target
-* There must be at most one edge leaving the set; specifically,
-   * *either* the set does not contain an Exit block, and there is exactly one edge leaving the set;
-   * *or* the set contains the Exit block, and there are not edges out of the set.
+* There must be exactly one edge from a node in the set to a node outside it.
 
 Situations in which multiple nodes have edges leaving the set, can be converted to
-this form by a combination of InsertIdentity operations and one Replace.
+this form by a combination of InsertIdentity operations and one Replace. Similarly,
+rather than movng the Exit block into the nested CFG, an identity node with a single
+successor can be added just before, with that edge used as the exitting edge.
 
 ** Implementation Note ** The required form of set can be easily identified by two
 nodes: the unique entry node, and an exit node (which may be the Exit block of the

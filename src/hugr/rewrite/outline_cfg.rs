@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::builder::{Container, DFGBuilder, Dataflow, DataflowSubContainer, SubContainer};
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
-use crate::ops::{BasicBlock, OpTrait, OpType};
+use crate::ops::{BasicBlock, OpType};
 use crate::types::Signature;
 use crate::{type_row, Hugr, Node};
 
@@ -17,17 +17,13 @@ pub struct OutlineCfg {
     /// All edges "in" to this block will be redirected to the new block
     /// (excluding backedges from internal BBs)
     entry_node: Node,
-    /// Either the exit node of the parent CFG; or, another node, with
-    /// exactly one successor that is not reachable from the entry_node
-    /// (without going through the exit_node).
+    /// Unique node in the parent CFG that has a successor (indeed, exactly one)
+    /// that is not reachable from the entry_node (without going through this exit_node).
     exit_node: Node,
 }
 
 impl OutlineCfg {
-    fn compute_all_blocks(
-        &self,
-        h: &Hugr,
-    ) -> Result<(HashSet<Node>, Option<Node>), OutlineCfgError> {
+    fn compute_all_blocks(&self, h: &Hugr) -> Result<(HashSet<Node>, Node), OutlineCfgError> {
         let cfg_n = match (h.get_parent(self.entry_node), h.get_parent(self.exit_node)) {
             (Some(p1), Some(p2)) if p1 == p2 => p1,
             (p1, p2) => return Err(OutlineCfgError::EntryExitNotSiblings(p1, p2)),
@@ -50,12 +46,6 @@ impl OutlineCfg {
         if !all_blocks.contains(&self.exit_node) {
             return Err(OutlineCfgError::ExitNodeUnreachable);
         }
-        if matches!(
-            h.get_optype(self.exit_node),
-            OpType::BasicBlock(BasicBlock::Exit { .. })
-        ) {
-            return Ok((all_blocks, None));
-        };
         let mut succ = None;
         for exit_succ in h.output_neighbours(self.exit_node) {
             if all_blocks.contains(&exit_succ) {
@@ -66,8 +56,10 @@ impl OutlineCfg {
             }
             succ = Some(exit_succ);
         }
-        assert!(succ.is_some());
-        Ok((all_blocks, succ))
+        match succ {
+            None => Err(OutlineCfgError::NoExitSuccessors),
+            Some(s) => Ok((all_blocks, s)),
+        }
     }
 }
 
@@ -82,23 +74,13 @@ impl Rewrite for OutlineCfg {
         let (all_blocks, exit_succ) = self.compute_all_blocks(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let inputs = h
-            .get_optype(
-                h.children(self.entry_node).next().unwrap(), // input node is first child
-            )
-            .signature()
-            .output;
-        let outputs = match exit_succ {
-            None => {
-                let OpType::BasicBlock(BasicBlock::Exit {cfg_outputs}) = h.get_optype(self.exit_node) else {panic!()};
-                cfg_outputs
-            },
-            Some(_) => {
-                let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
-                match s_type {
-                    BasicBlock::Exit { cfg_outputs } => cfg_outputs,
-                    BasicBlock::DFB { inputs, .. } => inputs,
-                }
+        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(self.entry_node) else {panic!("Entry node is not a basic block")};
+        let inputs = inputs.clone();
+        let outputs = {
+            let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
+            match s_type {
+                BasicBlock::Exit { cfg_outputs } => cfg_outputs,
+                BasicBlock::DFB { inputs, .. } => inputs,
             }
         }
         .clone();
@@ -139,58 +121,22 @@ impl Rewrite for OutlineCfg {
         let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
         b.finish_with_outputs(cfg_outputs).unwrap();
 
-        // 5. Children of new CFG, and exit edges
+        // 5. Children of new CFG.
         // Entry node must be first
         h.hierarchy.detach(self.entry_node.index);
         h.hierarchy
             .push_child(self.entry_node.index, cfg_node.index)
             .unwrap();
-        // Then find or make exit node. We'll need a new exit node *somewhere*
-        let new_exit = h.add_op(OpType::BasicBlock(BasicBlock::Exit {
-            cfg_outputs: outputs.clone(),
-        }));
-        let mut all_blocks = all_blocks.into_iter().collect::<Vec<_>>();
-        let cfg_succ = match exit_succ {
-            Some(s) => {
-                h.hierarchy
-                    .push_child(new_exit.index, cfg_node.index)
-                    .unwrap();
-                // Retarget edge from exit_node (that used to target exit_succ) to inner_exit
-                let exit_port = h
-                    .node_outputs(self.exit_node)
-                    .filter(|p| {
-                        let (t, p2) = h
-                            .linked_ports(self.exit_node, *p)
-                            .exactly_one()
-                            .ok()
-                            .unwrap();
-                        assert!(p2.index() == 0);
-                        t == s
-                    })
-                    .exactly_one()
-                    .unwrap();
-                h.disconnect(self.exit_node, exit_port).unwrap();
-                h.connect(self.exit_node, exit_port.index(), new_exit, 0)
-                    .unwrap();
-                s
-            }
-            None => {
-                // Moving exit node - make sure it's first (i.e. next after entry node)
-                let (ex_i, _) = all_blocks
-                    .iter()
-                    .enumerate()
-                    .find_or_first(|(_, n)| **n == self.exit_node)
-                    .unwrap();
-                all_blocks.swap(ex_i, 0);
-                // Outer CFG is about to lose its exit node, so the new one will be successor of new_block
-                h.hierarchy
-                    .insert_after(new_exit.index, h.children(parent).next().unwrap().index)
-                    .unwrap();
-                new_exit
-            }
-        };
-        h.connect(new_block, 0, cfg_succ, 0).unwrap();
-        // Reparent remaining nodes
+        // Then exit node
+        let inner_exit = h
+            .add_op_with_parent(
+                cfg_node,
+                OpType::BasicBlock(BasicBlock::Exit {
+                    cfg_outputs: outputs.clone(),
+                }),
+            )
+            .unwrap();
+        // And remaining nodes
         for n in all_blocks {
             // Do not move the entry node, as we have already
             if n != self.entry_node {
@@ -198,6 +144,28 @@ impl Rewrite for OutlineCfg {
                 h.hierarchy.push_child(n.index, cfg_node.index).unwrap();
             }
         }
+
+        // 6. Exit edges.
+        // Retarget edge from exit_node (that used to target exit_succ) to inner_exit
+        let exit_port = h
+            .node_outputs(self.exit_node)
+            .filter(|p| {
+                let (t, p2) = h
+                    .linked_ports(self.exit_node, *p)
+                    .exactly_one()
+                    .ok()
+                    .unwrap();
+                assert!(p2.index() == 0);
+                t == exit_succ
+            })
+            .exactly_one()
+            .unwrap();
+        h.disconnect(self.exit_node, exit_port).unwrap();
+        h.connect(self.exit_node, exit_port.index(), inner_exit, 0)
+            .unwrap();
+        // And connect new_block to exit_succ instead
+        h.connect(new_block, 0, exit_succ, 0).unwrap();
+
         Ok(())
     }
 }
@@ -206,6 +174,8 @@ impl Rewrite for OutlineCfg {
 pub enum OutlineCfgError {
     #[error("The exit node could not be reached from the entry node")]
     ExitNodeUnreachable,
+    #[error("Exit node does not exit - all its successors can be reached from the entry")]
+    NoExitSuccessors,
     #[error("Entry node {0:?} and exit node {1:?} are not siblings")]
     EntryExitNotSiblings(Option<Node>, Option<Node>),
     #[error("The parent node {0:?} of entry and exit was not a CFG but an {1:?}")]
