@@ -44,19 +44,14 @@ impl OutlineCfg {
         if !all_blocks.contains(&self.exit_node) {
             return Err(OutlineCfgError::ExitNodeUnreachable);
         }
-        let mut succ = None;
-        for exit_succ in h.output_neighbours(self.exit_node) {
-            if all_blocks.contains(&exit_succ) {
-                continue;
-            }
-            if let Some(s) = succ {
-                return Err(OutlineCfgError::MultipleExitSuccessors(s, exit_succ));
-            }
-            succ = Some(exit_succ);
-        }
-        match succ {
-            None => Err(OutlineCfgError::NoExitSuccessors),
-            Some(s) => Ok((all_blocks, s)),
+        let exit_succs = h
+            .output_neighbours(self.exit_node)
+            .filter(|n| !all_blocks.contains(n))
+            .collect::<Vec<_>>();
+        match exit_succs.into_iter().at_most_one() {
+            Err(e) => Err(OutlineCfgError::MultipleExitSuccessors(Box::new(e))),
+            Ok(None) => Err(OutlineCfgError::NoExitSuccessors),
+            Ok(Some(exit_succ)) => Ok((all_blocks, exit_succ)),
         }
     }
 }
@@ -178,6 +173,6 @@ pub enum OutlineCfgError {
     EntryExitNotSiblings(Option<Node>, Option<Node>),
     #[error("The parent node {0:?} of entry and exit was not a CFG but an {1:?}")]
     ParentNotCfg(Node, OpType),
-    #[error("Exit node had multiple successors outside CFG - at least {0:?} and {1:?}")]
-    MultipleExitSuccessors(Node, Node),
+    #[error("Exit node had multiple successors outside CFG: {0}")]
+    MultipleExitSuccessors(#[source] Box<dyn std::error::Error>),
 }
