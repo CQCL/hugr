@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
 use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError};
-use crate::types::{type_arg::TypeArgValue, ClassicType, CustomType, SimpleType, TypeRow};
+use crate::types::{op_param::OpArg, ClassicType, CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -102,7 +102,7 @@ impl CustomSignatureFunc for AngleAdd {
     fn compute_signature(
         &self,
         _name: &SmolStr,
-        _arg_values: &[TypeArgValue],
+        _arg_values: &[OpArg],
         _misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
         let t: TypeRow = vec![SimpleType::Classic(Type::Angle.classic_type())].into();

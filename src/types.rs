@@ -1,8 +1,8 @@
 //! General wire types used in the compiler
 
 pub mod custom;
+pub mod op_param;
 pub mod simple;
-pub mod type_arg;
 
 use std::fmt::{self, Display, Write};
 use std::ops::Index;
