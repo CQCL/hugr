@@ -29,7 +29,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     fn compute_signature(
         &self,
         name: &SmolStr,
-        arg_values: &Vec<TypeArgValue>,
+        arg_values: &[TypeArgValue],
         misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
 
@@ -39,7 +39,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     fn describe_signature(
         &self,
         _name: &SmolStr,
-        _arg_values: &Vec<TypeArgValue>,
+        _arg_values: &[TypeArgValue],
         _misc: &HashMap<String, serde_yaml::Value>,
     ) -> SignatureDescription {
         SignatureDescription::default()
@@ -64,7 +64,7 @@ pub trait CustomLowerFunc: Send + Sync {
     fn try_lower(
         &self,
         name: &SmolStr,
-        arg_values: &Vec<TypeArgValue>,
+        arg_values: &[TypeArgValue],
         misc: &HashMap<String, serde_yaml::Value>,
         available_resources: &ResourceSet,
     ) -> Option<Hugr>;
@@ -239,7 +239,7 @@ impl OpDef {
     }
 
     /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self, args: &Vec<TypeArgValue>) -> SignatureDescription {
+    pub fn signature_desc(&self, args: &[TypeArgValue]) -> SignatureDescription {
         match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
                 todo!()
@@ -252,7 +252,7 @@ impl OpDef {
     /// given a set of available resources that may be used in the Hugr.
     pub fn try_lower(
         &self,
-        args: &Vec<TypeArgValue>,
+        args: &[TypeArgValue],
         available_resources: &ResourceSet,
     ) -> Option<Hugr> {
         match &self.lower_func {

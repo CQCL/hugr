@@ -23,11 +23,11 @@ pub enum ExternalOp {
     Opaque(OpaqueOp),
 }
 
-impl Into<OpaqueOp> for ExternalOp {
-    fn into(self) -> OpaqueOp {
-        match self {
-            Self::Opaque(op) => op,
-            Self::Resource { def, args } => {
+impl From<ExternalOp> for OpaqueOp {
+    fn from(value: ExternalOp) -> Self {
+        match value {
+            ExternalOp::Opaque(op) => op,
+            ExternalOp::Resource { def, args } => {
                 // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek!
                 // Also, we don't necessarily need to store the signature for all extensions/stages...?
                 let sig = def.signature(&args, &ResourceSet::default()).unwrap();
@@ -48,9 +48,9 @@ impl From<OpaqueOp> for ExternalOp {
     }
 }
 
-impl Into<LeafOp> for ExternalOp {
-    fn into(self) -> LeafOp {
-        LeafOp::CustomOp(self)
+impl From<ExternalOp> for LeafOp {
+    fn from(value: ExternalOp) -> Self {
+        LeafOp::CustomOp(value)
     }
 }
 
@@ -84,7 +84,7 @@ impl OpTrait for ExternalOp {
     fn signature_desc(&self) -> SignatureDescription {
         match self {
             Self::Opaque(_) => SignatureDescription::default(),
-            Self::Resource { def, args } => def.signature_desc(&args),
+            Self::Resource { def, args } => def.signature_desc(args),
         }
     }
 
@@ -99,7 +99,7 @@ impl OpTrait for ExternalOp {
             Self::Resource { def, args } => {
                 // TODO the Resources in inputs and outputs appear in Signature here, so we need to get them from somewhere?
                 // Do we store the input ResourceSet as another field in the CustomOp? If so, we should do the same for *all* ops?
-                def.signature(&args, &ResourceSet::default()).unwrap()
+                def.signature(args, &ResourceSet::default()).unwrap()
             }
         }
     }
@@ -110,7 +110,7 @@ impl PartialEq for ExternalOp {
         match (self, other) {
             (Self::Opaque(op1), Self::Opaque(op2)) => op1 == op2,
             (Self::Resource { def: d1, args: a1 }, Self::Resource { def: d2, args: a2 }) => {
-                Arc::<OpDef>::ptr_eq(&d1, &d2) && a1 == a2
+                Arc::<OpDef>::ptr_eq(d1, d2) && a1 == a2
             }
             (_, _) => false,
         }
@@ -119,7 +119,7 @@ impl PartialEq for ExternalOp {
 
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
 #[allow(dead_code)]
-pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) -> () {
+pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(ExternalOp::Opaque(opaque))) = h.get_optype(n) {

@@ -67,7 +67,7 @@ pub fn check_arg(arg: &TypeArgValue, param: &TypeParam) -> Result<(), String> {
         (TypeArgValue::Opaque(_), TypeParam::Opaque(_, _)) => todo!(), // Do we need more checks?
         (TypeArgValue::List(items), TypeParam::List(ty)) => {
             for item in items {
-                check_arg(item, &*ty)?;
+                check_arg(item, ty.as_ref())?;
             }
         }
         (TypeArgValue::ResourceSet(_), TypeParam::ResourceSet) => (),
