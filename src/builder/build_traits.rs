@@ -1,5 +1,5 @@
 use crate::hugr::validate::InterGraphEdgeError;
-use crate::hugr::view::HugrView;
+use crate::hugr::view::{AsPortgraph, HugrView};
 use crate::hugr::{Node, Port, ValidationError};
 use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
@@ -90,9 +90,12 @@ pub trait Container {
     }
 
     /// Insert a finished HUGR as a child of the container.
-    fn add_child_hugr(&mut self, child: &impl AsRef<Hugr>) -> Result<Node, BuildError> {
+    fn add_child_hugr(
+        &mut self,
+        child: &(impl AsPortgraph + HugrView),
+    ) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_hugr(parent, child.as_ref())?)
+        Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
 }
 

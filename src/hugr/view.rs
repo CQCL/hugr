@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{multiportgraph, LinkView, PortView};
+use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::Hugr;
 use super::{Node, Port};
@@ -229,4 +229,30 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.as_ref().graph.all_neighbours(node.index).map_into()
     }
+}
+
+/// Internal trait for accessing the underlying portgraph of a hugr view.
+pub trait AsPortgraph: sealed::Sealed {
+    /// The underlying portgraph view type.
+    type Portgraph: LinkView;
+
+    /// Returns a reference to the underlying portgraph.
+    fn as_portgraph(&self) -> &Self::Portgraph;
+}
+
+impl<T> AsPortgraph for T
+where
+    T: AsRef<Hugr>,
+{
+    type Portgraph = MultiPortGraph;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.as_ref().graph
+    }
+}
+
+pub(crate) mod sealed {
+    pub trait Sealed {}
+
+    impl<T> Sealed for T where T: AsRef<super::Hugr> {}
 }

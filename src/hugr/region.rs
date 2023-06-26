@@ -10,7 +10,7 @@ use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap
 
 use crate::{ops::OpType, Direction, Hugr, Node, Port};
 
-use super::HugrView;
+use super::{view::AsPortgraph, HugrView};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
@@ -355,5 +355,25 @@ mod test {
         assert_eq!(region.children(inner).count(), 2);
 
         Ok(())
+    }
+}
+
+impl<'g> crate::hugr::view::sealed::Sealed for FlatRegionView<'g> {}
+
+impl<'g> AsPortgraph for FlatRegionView<'g> {
+    type Portgraph = FlatRegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+}
+
+impl<'g> crate::hugr::view::sealed::Sealed for RegionView<'g> {}
+
+impl<'g> AsPortgraph for RegionView<'g> {
+    type Portgraph = RegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
     }
 }

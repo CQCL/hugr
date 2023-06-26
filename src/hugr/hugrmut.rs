@@ -8,6 +8,8 @@ use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
 use crate::{Hugr, Port};
 
+use super::view::AsPortgraph;
+
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
     /// Add a node to the graph.
@@ -119,10 +121,11 @@ pub(crate) trait HugrMut {
     /// Insert another hugr into this one, under a given root node.
     ///
     /// Returns the root node of the inserted hugr.
-    //
-    // TODO: Expose the `LinkView` of a `HugrView` internally, so we can use
-    // this with `RegionView` too (requiring only `&impl HugrView`).
-    fn insert_hugr(&mut self, root: Node, other: &Self) -> Result<Node, HugrError>;
+    fn insert_hugr(
+        &mut self,
+        root: Node,
+        other: &(impl AsPortgraph + HugrView),
+    ) -> Result<Node, HugrError>;
 }
 
 impl<T> HugrMut for T
@@ -276,9 +279,12 @@ where
         std::mem::replace(cur, op.into())
     }
 
-    fn insert_hugr(&mut self, root: Node, other: &Self) -> Result<Node, HugrError> {
-        let other = other.as_ref();
-        let node_map = self.as_mut().graph.insert_graph(&other.graph)?;
+    fn insert_hugr(
+        &mut self,
+        root: Node,
+        other: &(impl AsPortgraph + HugrView),
+    ) -> Result<Node, HugrError> {
+        let node_map = self.as_mut().graph.insert_graph(other.as_portgraph())?;
         let other_root = node_map[&other.root().index];
         self.as_mut().hierarchy.push_child(other_root, root.index)?;
         for (&node, &new_node) in node_map.iter() {
