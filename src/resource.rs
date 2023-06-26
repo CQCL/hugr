@@ -15,8 +15,8 @@ use thiserror::Error;
 use crate::types::op_param::check_arg;
 use crate::types::TypeRow;
 use crate::types::{
-    custom::CustomType,
     op_param::{OpArg, OpParam},
+    type_param::TypeParam,
     Signature, SignatureDescription,
 };
 use crate::Hugr;
@@ -267,6 +267,20 @@ impl OpDef {
     }
 }
 
+/// A declaration of an opaque type.
+/// Note this does not provide any way to create instances
+/// - typically these are operations also provided by the Resource.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct TypeDef {
+    /// The unique name of the type
+    pub name: SmolStr,
+    /// Declaration of type parameters. The TypeDef must be instantiated
+    /// with the same number of [`TypeArg`]'s to make an actual type.
+    ///
+    /// [`TypeArg`]: crate::types::type_param::TypeArg
+    pub args: Vec<TypeParam>,
+}
+
 /// A unique identifier for a resource.
 ///
 /// The actual [`Resource`] is stored externally.
@@ -276,13 +290,14 @@ pub type ResourceId = SmolStr;
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Resource {
     /// Unique identifier for the resource.
-    name: ResourceId,
-    // Set of resource dependencies required by this resource.
-    // TODO I haven't seen where these are required yet. If they are,
-    // we'll probably need some way to
-    // pub resource_reqs: ResourceSet,
+    pub name: ResourceId,
+    /// Other resources defining types used by this resource.
+    /// That is, an upper-bound on the types that can be returned by
+    /// computing the signature of any operation in this resource,
+    /// for any possible [OpArg].
+    pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
-    pub types: Vec<CustomType>,
+    types: HashMap<SmolStr, TypeDef>,
     /// Operation declarations with serializable definitions.
     #[serde(serialize_with = "elide_arcs", deserialize_with = "reinstate_arcs")]
     operations: HashMap<SmolStr, Arc<OpDef>>,
@@ -323,8 +338,13 @@ impl Resource {
     }
 
     /// Add an exported type to the resource.
-    pub fn add_type(&mut self, ty: CustomType) {
-        self.types.push(ty);
+    pub fn add_type(&mut self, ty: TypeDef) {
+        match self.types.entry(ty.name.clone()) {
+            Entry::Occupied(_) => panic!("Resource already has a type called {}", &ty.name),
+            Entry::Vacant(ve) => {
+                ve.insert(ty);
+            }
+        }
     }
 
     /// Add an operation definition to the resource.

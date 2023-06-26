@@ -1,8 +1,10 @@
 //! Opaque types, used to represent a user-defined [`SimpleType`].
+//!
+//! [`SimpleType`]: super::SimpleType
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use super::{ClassicType, SimpleType, TypeRow};
+use super::{ClassicType, TypeRow};
 
 /// An opaque type element. Contains an unique identifier and a reference to its definition.
 //
@@ -55,8 +57,8 @@ impl Display for CustomType {
 
 impl Eq for CustomType {}
 
-impl From<CustomType> for SimpleType {
+impl From<CustomType> for ClassicType {
     fn from(ty: CustomType) -> Self {
-        SimpleType::Classic(ty.classic_type())
+        ty.classic_type()
     }
 }

@@ -26,9 +26,10 @@ pub enum OpParam {
     /// Node must provide a value of the specified [OpArg::ClassicType]
     Value(ClassicType),
     /// Node must provide a [OpArg::List] (of whatever length)
-    /// TODO it'd be better to use [Container], and to exclude containerized
-    /// classictypes from [Value].
-    /// [Container]: hugr::types::simple::Container
+    /// TODO it'd be better to use [`Container`], and to exclude containerized
+    /// classictypes from [OpParam::Value].
+    ///
+    /// [`Container`]: crate::types::simple::Container
     List(Box<OpParam>),
 }
 
@@ -42,7 +43,7 @@ pub enum OpArg {
     ClassicType(ClassicType),
     /// Where the OpDef is polymorphic over a [OpParam::ResourceSet]
     ResourceSet(ResourceSet),
-    /// Where the OpDef is polymorphic over a [OpParam::Value](`t`); the value's
+    /// Where the OpDef is polymorphic over a [OpParam::Value] (`t`); the value's
     /// [ConstValue::const_type] will be equal to the ClassicType `t`.
     Value(ConstValue),
     /// Where an argument has type [OpParam::List]`<T>` - all elements will implicitly

@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError};
+use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError, TypeDef};
 use crate::types::{op_param::OpArg, ClassicType, CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
@@ -24,8 +24,8 @@ pub const fn resource_id() -> SmolStr {
 pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
-    resource.add_type(Type::Angle.into());
-    resource.add_type(Type::Quaternion.into());
+    resource.add_type(Type::Angle.type_def());
+    resource.add_type(Type::Quaternion.type_def());
 
     resource.add_op(OpDef::new_with_custom_sig(
         "AngleAdd".into(),
@@ -56,8 +56,11 @@ impl Type {
         CustomType::new(self.name(), TypeRow::new())
     }
 
-    pub fn classic_type(self) -> ClassicType {
-        self.custom_type().classic_type()
+    pub fn type_def(self) -> TypeDef {
+        TypeDef {
+            name: self.name(),
+            args: vec![],
+        }
     }
 }
 
@@ -85,11 +88,12 @@ impl CustomConst for Constant {
     }
 
     fn const_type(&self) -> ClassicType {
-        match self {
+        let t: Type = match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
-        }
-        .classic_type()
+        };
+        let t2: CustomType = t.into();
+        t2.into()
     }
 }
 
@@ -105,7 +109,10 @@ impl CustomSignatureFunc for AngleAdd {
         _arg_values: &[OpArg],
         _misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
-        let t: TypeRow = vec![SimpleType::Classic(Type::Angle.classic_type())].into();
+        let t: TypeRow = vec![SimpleType::Classic(
+            Into::<CustomType>::into(Type::Angle).into(),
+        )]
+        .into();
         Ok((t.clone(), t, ResourceSet::default()))
     }
 }

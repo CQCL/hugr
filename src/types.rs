@@ -3,6 +3,7 @@
 pub mod custom;
 pub mod op_param;
 pub mod simple;
+pub mod type_param;
 
 use std::fmt::{self, Display, Write};
 use std::ops::Index;
