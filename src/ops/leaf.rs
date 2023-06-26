@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Dataflow operations with no children.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "lop")]
 pub enum LeafOp {

@@ -114,6 +114,8 @@ impl PartialEq for ExternalOp {
     }
 }
 
+impl Eq for ExternalOp {}
+
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
 #[allow(dead_code)]
 pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {

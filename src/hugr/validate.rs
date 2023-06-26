@@ -637,7 +637,7 @@ impl<'a> ValidationContext<'a> {
 }
 
 /// Errors that can occur while validating a Hugr.
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
@@ -761,7 +761,7 @@ pub enum ValidationError {
 }
 
 /// Errors related to the inter-graph edge validations.
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum InterGraphEdgeError {
     /// Inter-Graph edges can only carry classical data.
