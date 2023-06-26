@@ -88,6 +88,12 @@ pub trait Container {
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
+
+    /// Insert a finished HUGR as a child of the container.
+    fn add_child_hugr(&mut self, child: &impl AsRef<Hugr>) -> Result<Node, BuildError> {
+        let parent = self.container_node();
+        Ok(self.hugr_mut().insert_hugr(parent, child.as_ref())?)
+    }
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
