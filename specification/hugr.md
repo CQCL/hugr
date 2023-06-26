@@ -367,6 +367,7 @@ system](#type-system)), where `#ti` is the *i*th Row defining it.
 ```mermaid
 flowchart
     subgraph Conditional
+        direction LR
         subgraph Case0["Case 0"]
             C0I["case 0 inputs + other inputs"] --> op0["operations"]
             op0 --> C0O["outputs"]
@@ -375,6 +376,7 @@ flowchart
             C1I["case 1 inputs + other inputs"] --> op1["operations"]
             op1 --> C1O["outputs"]
         end
+        Case0 ~~~ Case1
     end
     Pred["case 0 inputs | case 1 inputs"] --> Conditional
     OI["other inputs"] --> Conditional
