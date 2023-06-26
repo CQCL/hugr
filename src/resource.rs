@@ -12,11 +12,10 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::types::op_param::check_arg;
+use crate::types::type_param::check_arg;
 use crate::types::TypeRow;
 use crate::types::{
-    op_param::{OpArg, OpParam},
-    type_param::TypeParam,
+    type_param::{TypeArg, TypeParam},
     Signature, SignatureDescription,
 };
 use crate::Hugr;
@@ -29,7 +28,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     fn compute_signature(
         &self,
         name: &SmolStr,
-        arg_values: &[OpArg],
+        arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
 
@@ -39,7 +38,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     fn describe_signature(
         &self,
         _name: &SmolStr,
-        _arg_values: &[OpArg],
+        _arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
     ) -> SignatureDescription {
         SignatureDescription::default()
@@ -64,7 +63,7 @@ pub trait CustomLowerFunc: Send + Sync {
     fn try_lower(
         &self,
         name: &SmolStr,
-        arg_values: &[OpArg],
+        arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         available_resources: &ResourceSet,
     ) -> Option<Hugr>;
@@ -128,7 +127,7 @@ pub struct OpDef {
     /// Human readable description of the operation.
     pub description: String,
     /// Declared type parameters, values must be provided for each operation node
-    pub args: Vec<OpParam>,
+    pub args: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
@@ -145,7 +144,7 @@ impl OpDef {
     pub fn new_with_yaml_types(
         name: SmolStr,
         description: String,
-        args: Vec<OpParam>,
+        args: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         inputs: String, // TODO this is likely the wrong type
         outputs: String, // TODO similarly
@@ -166,7 +165,7 @@ impl OpDef {
     pub fn new_with_custom_sig(
         name: SmolStr,
         description: String,
-        args: Vec<OpParam>,
+        args: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         sig_func: impl CustomSignatureFunc + 'static,
     ) -> Self {
@@ -212,7 +211,7 @@ impl OpDef {
     /// The signature of the operation.
     pub fn signature(
         &self,
-        args: &Vec<OpArg>,
+        args: &Vec<TypeArg>,
         resources_in: &ResourceSet,
     ) -> Result<Signature, SignatureError> {
         if args.len() != self.args.len() {
@@ -239,7 +238,7 @@ impl OpDef {
     }
 
     /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self, args: &[OpArg]) -> SignatureDescription {
+    pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
         match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
                 todo!()
@@ -250,7 +249,7 @@ impl OpDef {
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available resources that may be used in the Hugr.
-    pub fn try_lower(&self, args: &[OpArg], available_resources: &ResourceSet) -> Option<Hugr> {
+    pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
         match &self.lower_func {
             LowerFunc::None => None,
             LowerFunc::FixedHugr(req_res, h) => {
@@ -294,7 +293,7 @@ pub struct Resource {
     /// Other resources defining types used by this resource.
     /// That is, an upper-bound on the types that can be returned by
     /// computing the signature of any operation in this resource,
-    /// for any possible [OpArg].
+    /// for any possible [TypeArg].
     pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
     types: HashMap<SmolStr, TypeDef>,

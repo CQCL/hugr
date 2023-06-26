@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::resource::{OpDef, ResourceId, ResourceSet};
-use crate::types::{op_param::OpArg, Signature, SignatureDescription};
+use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
 use crate::{Hugr, Resource};
 
 use super::tag::OpTag;
@@ -16,7 +16,7 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
-    Resource { def: Arc<OpDef>, args: Vec<OpArg> },
+    Resource { def: Arc<OpDef>, args: Vec<TypeArg> },
     Opaque(OpaqueOp),
 }
 
@@ -56,7 +56,7 @@ impl From<ExternalOp> for LeafOp {
 pub struct OpaqueOp {
     resource: ResourceId,
     op_name: SmolStr,
-    args: Vec<OpArg>,
+    args: Vec<TypeArg>,
     signature: Option<Signature>,
 }
 
