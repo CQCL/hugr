@@ -2,6 +2,7 @@
 
 mod hugrmut;
 
+pub mod region;
 pub mod rewrite;
 pub mod serialize;
 pub mod typecheck;
@@ -114,7 +115,7 @@ impl Hugr {
                 let optype = self.op_types.get(node);
                 let offset = self.graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Const(ty) => {
+                    EdgeKind::Static(ty) => {
                         PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
                     }
                     EdgeKind::Value(ty) => {
@@ -239,4 +240,17 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+}
+
+#[cfg(test)]
+mod test {
+    use super::Hugr;
+
+    #[test]
+    fn impls_send_and_sync() {
+        // Send and Sync are automatically impl'd by the compiler, if possible.
+        // This test will fail to compile if that wasn't possible.
+        trait Test: Send + Sync {}
+        impl Test for Hugr {}
+    }
 }

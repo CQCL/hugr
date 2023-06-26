@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::resource::{OpDef, ResourceId, ResourceSet};
@@ -17,7 +17,7 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     Resource {
-        def: Rc<OpDef>,
+        def: Arc<OpDef>,
         args: Vec<TypeArgValue>,
     },
     Opaque(OpaqueOp),
@@ -110,7 +110,7 @@ impl PartialEq for ExternalOp {
         match (self, other) {
             (Self::Opaque(op1), Self::Opaque(op2)) => op1 == op2,
             (Self::Resource { def: d1, args: a1 }, Self::Resource { def: d2, args: a2 }) => {
-                Rc::<OpDef>::ptr_eq(&d1, &d2) && a1 == a2
+                Arc::<OpDef>::ptr_eq(&d1, &d2) && a1 == a2
             }
             (_, _) => false,
         }

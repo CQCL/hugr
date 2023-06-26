@@ -7,7 +7,7 @@ use serde::{Deserializer, Serializer};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use smol_str::SmolStr;
 use thiserror::Error;
@@ -22,7 +22,7 @@ use crate::types::{
 use crate::Hugr;
 
 /// Trait for resources to provide custom binary code for computing signature.
-pub trait CustomSignatureFunc {
+pub trait CustomSignatureFunc: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the resource definition YAML
@@ -57,7 +57,7 @@ pub enum SignatureError {
 }
 
 /// Trait for resources to provide custom binary code for lowering a node to a Hugr.
-pub trait CustomLowerFunc {
+pub trait CustomLowerFunc: Send + Sync {
     /// Return a Hugr that implements the node using only the specified available resources;
     /// may fail.
     /// TODO: some error type to indicate Resources required?
@@ -288,21 +288,22 @@ pub struct Resource {
     /// Types defined by this resource.
     pub types: Vec<CustomType>,
     /// Operation declarations with serializable definitions.
-    #[serde(serialize_with = "elide_rcs", deserialize_with = "reinstate_rcs")]
-    operations: HashMap<SmolStr, Rc<OpDef>>,
+    #[serde(serialize_with = "elide_arcs", deserialize_with = "reinstate_arcs")]
+    operations: HashMap<SmolStr, Arc<OpDef>>,
 }
 
-fn elide_rcs<S: Serializer>(
-    _ops: &HashMap<SmolStr, Rc<OpDef>>,
+fn elide_arcs<S: Serializer>(
+    _ops: &HashMap<SmolStr, Arc<OpDef>>,
     _serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    // serde doesn't like Rc - write it out as if it were a Hashmap<SmolStr, OpDef>
+    // serde doesn't like Arc - write it out as if it were a HashMap<SmolStr, OpDef>
     todo!()
 }
 
-fn reinstate_rcs<'de, D: Deserializer<'de>>(
+fn reinstate_arcs<'de, D: Deserializer<'de>>(
     _deserializer: D,
-) -> Result<HashMap<SmolStr, Rc<OpDef>>, D::Error> {
+) -> Result<HashMap<SmolStr, Arc<OpDef>>, D::Error> {
+    // Read in HashMap<SmolStr, OpDef> and then put each value inside an Arc::new
     todo!()
 }
 
@@ -316,7 +317,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the operations in this Resource
-    pub fn operations(&self) -> &HashMap<SmolStr, Rc<OpDef>> {
+    pub fn operations(&self) -> &HashMap<SmolStr, Arc<OpDef>> {
         &self.operations
     }
 
@@ -339,7 +340,7 @@ impl Resource {
             Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
             Entry::Vacant(ve) => {
                 op.resource = self.name.clone();
-                ve.insert(Rc::new(op));
+                ve.insert(Arc::new(op));
             }
         }
     }

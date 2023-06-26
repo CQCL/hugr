@@ -44,7 +44,7 @@ impl OpTrait for Def {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(ClassicType::graph_from_sig(
+        Some(EdgeKind::Static(ClassicType::graph_from_sig(
             self.signature.clone(),
         )))
     }
@@ -71,7 +71,7 @@ impl OpTrait for Declare {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(ClassicType::graph_from_sig(
+        Some(EdgeKind::Static(ClassicType::graph_from_sig(
             self.signature.clone(),
         )))
     }

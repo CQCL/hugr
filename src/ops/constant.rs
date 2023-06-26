@@ -32,7 +32,7 @@ impl OpTrait for Const {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.0.const_type()))
+        Some(EdgeKind::Static(self.0.const_type()))
     }
 }
 

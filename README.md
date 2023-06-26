@@ -1,5 +1,5 @@
-hugr
-====
+quantinuum-hugr
+===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
 [![msrv][]](https://github.com/CQCL/hugr)
@@ -16,6 +16,17 @@ The HUGR specification (still in draft) is [here](specification/hugr.md).
 ## Features
 
 -   `pyo3`: Enable Python bindings via pyo3.
+
+## Usage
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+quantinuum-hugr = "0.1"
+```
+
+The library crate is called `hugr`.
 
 ## License
 
