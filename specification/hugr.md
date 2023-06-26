@@ -17,12 +17,7 @@ TKET, or the higher-order executable dataflow graphs in Tierkreis.
 The goal of the HUGR representation is to provide a unified structure
 that can be shared between the tools, allowing for more complex
 operations such as TKET optimizations across control-flow blocks, and
-nested quantum and classical programs in a single graph. 
-<!--
-For more see
-the initial proposal: [The Grand Graph
-Unification](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2506260512/The+Grand+Graph+Unification).
--->
+nested quantum and classical programs in a single graph.
 The HUGR should provide a generic graph representation of a program,
 where each node contains a specific kind of operation and wires
 represent (typed) data or control dependencies.
@@ -308,13 +303,6 @@ operations valid at both Module level and within dataflow regions):
     `Input` node when traversing.
 
   - `identity<T>`: pass-through, no operation is performed.
-<!-- this isn't referred to anywhere else
-  - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
-    input, and a single `Value<*,Sum((),...,())>` output with N elements
-    each of type unit `()`. The value is (1) a list of pairs of type
-    `(T,Sum((),...,())` used as a lookup table on the input value, the
-    first element being key and the second as the return value; and (2)
-    an optional default value of the same `Sum` type. -->
 
   - `DFG`: a simply nested dataflow graph, the signature of this
     operation is the signature of the child graph. These nodes are
@@ -675,24 +663,6 @@ Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for a function whose type cannot be expressed
 in YAML.
-
-<!-- Should we preserve some of this language about downcasting?
-
-2.  `CustomOp`: new operations defined in code that implement an
-    extensible interface (Rust Trait), compiler operations/extensions
-    that deal with these specific ops can downcast to safely retrieve
-    them at runtime from the generic object (and handle the cases where
-    downcasting fails). For example, an SU4 unitary struct defined in
-    matrix form. This is implemented in the TKET2 prototype.
-
-We expect most compiler passes and rewrites to deal with `native`
-operations, with the other classes mostly being used at the start or end
-of the compilation flow. The `CustomOp` trait allows the option for
-programs that extend the core toolchain to use strict typing for their
-new operations. While the `Opdef` allows users to specify extensions
-with a pre-compiled binary, and provide useful information for the
-compiler/runtime to use.
--->
 
 #### Declarative format
 
@@ -1898,14 +1868,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     like WASM. However although this would allow removing the CFG, the
     DSG nodes get more complicated, and start to behave in very
     non-DSG-like ways.
-<!--
-      - In the limit, we have TailLoop node for loops, plus a node that
-        contains an arbitrary *acyclic* CFG\! That was [considered
-        here](#) but still requires extra variables and runs into
-        similar problems with liveness as the Google paper. Also [The
-        fully-expressive alternative to
-        θ-nodes](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2623406136).
--->
+
   - We could use function calls to avoid code duplication (essentially
     the return address is the extra boolean variable, likely to be very
     cheap). However, I think this means pattern-matching will want to
