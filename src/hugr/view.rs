@@ -232,7 +232,7 @@ where
 }
 
 /// Internal trait for accessing the underlying portgraph of a hugr view.
-pub trait AsPortgraph: sealed::Sealed {
+pub trait AsPortgraph: HugrView + sealed::Sealed {
     /// The underlying portgraph view type.
     type Portgraph: LinkView;
 

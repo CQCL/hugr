@@ -124,7 +124,7 @@ pub(crate) trait HugrMut {
     fn insert_hugr(
         &mut self,
         root: Node,
-        other: &(impl AsPortgraph + HugrView),
+        other: &impl AsPortgraph,
     ) -> Result<Node, HugrError>;
 }
 
@@ -282,7 +282,7 @@ where
     fn insert_hugr(
         &mut self,
         root: Node,
-        other: &(impl AsPortgraph + HugrView),
+        other: &impl AsPortgraph,
     ) -> Result<Node, HugrError> {
         let node_map = self.as_mut().graph.insert_graph(other.as_portgraph())?;
         let other_root = node_map[&other.root().index];
