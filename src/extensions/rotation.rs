@@ -53,7 +53,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), TypeRow::new())
+        CustomType::new(self.name(), [])
     }
 
     pub fn type_def(self) -> TypeDef {

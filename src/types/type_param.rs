@@ -28,7 +28,7 @@ pub enum TypeParam {
 }
 
 /// A statically-known argument value to an operation.
-#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TypeArg {
     /// Where the TypeDef declares that an argument is a [TypeParam::Type]
     Type(SimpleType),

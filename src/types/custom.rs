@@ -4,26 +4,32 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use super::{ClassicType, TypeRow};
+use super::{type_param::TypeArg, ClassicType};
 
 /// An opaque type element. Contains an unique identifier and a reference to its definition.
 //
 // TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
 // but it adds atomic ops and a serialization-deserialization roundtrip
 // would still generate copies.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
     /// Unique identifier of the opaque type.
-    id: SmolStr,
-    params: Box<TypeRow>,
+    /// Same as the corresponding [`TypeDef`]
+    ///
+    /// [`TypeDef`]: crate::resource::TypeDef
+    pub id: SmolStr,
+    /// Arguments that fit the [`TypeParam`]s declared by the typedef
+    ///
+    /// [`TypeParam`]: super::type_param::TypeParam
+    pub params: Vec<TypeArg>,
 }
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: SmolStr, params: impl Into<TypeRow>) -> Self {
+    pub fn new(id: SmolStr, params: impl Into<Vec<TypeArg>>) -> Self {
         Self {
             id,
-            params: Box::new(params.into()),
+            params: params.into(),
         }
     }
 
@@ -32,30 +38,17 @@ impl CustomType {
         &self.id
     }
 
-    /// Returns the parameters of the opaque type.
-    pub fn params(&self) -> &TypeRow {
-        &self.params
-    }
-
     /// Returns a [`ClassicType`] containing this opaque type.
     pub const fn classic_type(self) -> ClassicType {
         ClassicType::Opaque(self)
     }
 }
 
-impl PartialEq for CustomType {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.id, self.params.as_ref())
+        write!(f, "{}({:?})", self.id, self.params)
     }
 }
-
-impl Eq for CustomType {}
 
 impl From<CustomType> for ClassicType {
     fn from(ty: CustomType) -> Self {
