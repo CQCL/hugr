@@ -241,3 +241,16 @@ pub enum HugrError {
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
 }
+
+#[cfg(test)]
+mod test {
+    use super::Hugr;
+
+    #[test]
+    fn impls_send_and_sync() {
+        // Send and Sync are automatically impl'd by the compiler, if possible.
+        // This test will fail to compile if that wasn't possible.
+        trait Test: Send + Sync {}
+        impl Test for Hugr {}
+    }
+}
