@@ -349,26 +349,6 @@ with those values unpacked. The graph may additionally take in a row
 `#x` (appended to `#i`) and return the same row (appended to `#o`). The
 contained graph may thus be evaluated more than once.
 
-**Alternate TailLoop**
-
-It is unclear whether this exact formulation of TailLoop is the most
-natural or useful. It may be that compilation typically uses multiple.
-Another is:
-
-A node with type `I -> O` with three children of types `A: I -> p + F`
-(the output is the row formed by extending the row `F` with the boolean
-output `p`), `B: F-> O` and `C: F -> I`. This node offers similar
-benefits to the option above, exchanging the machinery of variants for
-having a node with 3 children rather than 1. The semantics of the node
-are:
-
-1.  Execute A, outputting the boolean `p` and some outputs `F`
-
-2.  If `p`, execute B with inputs `F` and return the output `O`
-
-3.  Else execute `C` with inputs `F` and then restart loop with inputs
-    `I`
-
 ##### Control Flow Graphs
 
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
