@@ -115,6 +115,14 @@ pub(crate) trait HugrMut {
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
+
+    /// Insert another hugr into this one, under a given root node.
+    ///
+    /// Returns the root node of the inserted hugr.
+    //
+    // TODO: Expose the `LinkView` of a `HugrView` internally, so we can use
+    // this with `RegionView` too (requiring only `&impl HugrView`).
+    fn insert_hugr(&mut self, root: Node, other: &Self) -> Result<Node, HugrError>;
 }
 
 impl<T> HugrMut for T
@@ -266,6 +274,26 @@ where
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
         let cur = self.as_mut().op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
+    }
+
+    fn insert_hugr(&mut self, root: Node, other: &Self) -> Result<Node, HugrError> {
+        let other = other.as_ref();
+        let node_map = self.as_mut().graph.insert_graph(&other.graph)?;
+        let other_root = node_map[&other.root().index];
+        self.as_mut().hierarchy.push_child(other_root, root.index)?;
+        for (&node, &new_node) in node_map.iter() {
+            other
+                .children(node.into())
+                .try_for_each(|child| -> Result<(), HugrError> {
+                    self.as_mut()
+                        .hierarchy
+                        .push_child(node_map[&child.index], new_node)?;
+                    Ok(())
+                })?;
+            let optype = other.get_optype(node.into());
+            self.as_mut().op_types.set(new_node, optype.clone());
+        }
+        Ok(other_root.into())
     }
 }
 
