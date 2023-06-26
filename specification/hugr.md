@@ -783,15 +783,7 @@ resources:
       resources: r # Indicates that running this operation also invokes resources r
 ```
 
-The declaration of the `args` uses a language that is a distinct, simplified
-form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
-the value of each member of `args` is given by the following production:
-```
-TypeParam ::= "Type" | "ClassicType"
-            | "F64" | "Int"
-            | "Opaque"(name, ...) | "List"(TypeParam)
-            | "ResourceSet"
-```
+Each member of `args` can be `Type` (requiring a type, which may be a LinearType), `ClassicType` (where the argument must be a ClassicType), `ResourceSet`, or a ClassicType such as `Int` (meaning the argument must be a constant value of that type).
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the

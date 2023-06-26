@@ -4,9 +4,9 @@
 //!
 //! [`OpDef`]: crate::resource::OpDef
 
-use crate::{ops::constant::HugrIntValueStore, resource::ResourceSet};
+use crate::{ops::ConstValue, resource::ResourceSet};
 
-use super::{ClassicType, SimpleType, TypeRow};
+use super::{ClassicType, SimpleType};
 
 /// A Type Parameter declared by an OpDef. Specifies
 /// the values that must be provided by each operation node.
@@ -16,15 +16,6 @@ pub enum TypeParam {
     Type,
     /// Node must provide a [TypeArgValue::ClassicType]
     ClassicType,
-    /// Node must provide a [TypeArgValue::F64] floating-point value
-    F64,
-    /// Node must provide a [TypeArgValue::Int] integer
-    Int,
-    /// Node must provide some Opaque data in an [TypeArgValue::Opaque].
-    /// TODO is the typerow here correct?
-    Opaque(String, Box<TypeRow>),
-    /// Node must provide a [TypeArgValue::List] (of whatever length)
-    List(Box<TypeParam>),
     /// Node must provide a [TypeArgValue::ResourceSet]. For example,
     /// a definition of an operation that takes a Graph argument,
     /// could be polymorphic over the ResourceSet of that graph,
@@ -32,6 +23,10 @@ pub enum TypeParam {
     ///
     /// [`output_resources`]: crate::types::Signature::output_resources
     ResourceSet,
+    /// Node must provide a value of the specified [TypeArgValue::ClassicType]
+    Value(ClassicType),
+    /// Node must provide a [TypeArgValue::List] (of whatever length)
+    List(Box<TypeParam>),
 }
 
 /// An argument value for a type parameter
@@ -42,19 +37,14 @@ pub enum TypeArgValue {
     /// Where the OpDef declares that an argument is a [TypeParam::ClassicType],
     /// it'll get one of these (rather than embedding inside a Type)
     ClassicType(ClassicType),
-    /// Where the OpDef declares that an argument is a [TypeParam::F64]
-    F64(f64),
-    /// Where the OpDef declares an argument that's a [TypeParam::Int]
-    /// - using the same representation as [`ClassicType`].
-    Int(HugrIntValueStore),
-    /// Where the OpDef declares a [TypeParam::Opaque], this must be the
-    /// serialized representation of such a value....??
-    Opaque(Vec<u8>),
+    /// Where the OpDef is polymorphic over a [TypeParam::ResourceSet]
+    ResourceSet(ResourceSet),
+    /// Where the OpDef is polymorphic over a [TypeParam::Value](`t`); the value's
+    /// [ConstValue::const_type] will be equal to the ClassicType `t`.
+    Value(ConstValue),
     /// Where an argument has type [TypeParam::List]`<T>` - all elements will implicitly
     /// be of the same variety of TypeArgValue, representing a `T`.
     List(Vec<TypeArgValue>),
-    /// Where the OpDef is polymorphic over a [TypeParam::ResourceSet]
-    ResourceSet(ResourceSet),
 }
 
 /// Checks a [TypeArgValue] is as expected for a [TypeParam]
@@ -62,15 +52,13 @@ pub fn check_arg(arg: &TypeArgValue, param: &TypeParam) -> Result<(), String> {
     match (arg, param) {
         (TypeArgValue::Type(_), TypeParam::Type) => (),
         (TypeArgValue::ClassicType(_), TypeParam::ClassicType) => (),
-        (TypeArgValue::F64(_), TypeParam::F64) => (),
-        (TypeArgValue::Int(_), TypeParam::Type) => (),
-        (TypeArgValue::Opaque(_), TypeParam::Opaque(_, _)) => todo!(), // Do we need more checks?
+        (TypeArgValue::ResourceSet(_), TypeParam::ResourceSet) => (),
+        (TypeArgValue::Value(cst), TypeParam::Value(ty)) if cst.const_type() == *ty => (),
         (TypeArgValue::List(items), TypeParam::List(ty)) => {
             for item in items {
                 check_arg(item, ty.as_ref())?;
             }
         }
-        (TypeArgValue::ResourceSet(_), TypeParam::ResourceSet) => (),
         _ => {
             return Err(format!("Mismatched {:?} vs {:?}", arg, param));
         }
