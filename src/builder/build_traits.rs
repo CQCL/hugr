@@ -90,10 +90,7 @@ pub trait Container {
     }
 
     /// Insert a finished HUGR as a child of the container.
-    fn add_child_hugr(
-        &mut self,
-        child: &impl AsPortgraph,
-    ) -> Result<Node, BuildError> {
+    fn add_child_hugr(&mut self, child: &impl AsPortgraph) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
@@ -166,20 +163,14 @@ pub trait Dataflow: Container {
         hugr: &impl AsPortgraph,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_child_hugr(hugr)?;
-        let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
+        let node = self.add_child_hugr(hugr)?;
 
-        let [inp, _] = data_builder.io();
+        let [inp, _] = self.io();
+        let inputs = input_wires.into_iter().collect();
+        wire_up_inputs(inputs, node, self, inp)?;
 
-        let op: OpType = op.into();
-        let sig = op.signature();
-        let op_node = data_builder.add_child_op(op)?;
-
-        wire_up_inputs(inputs, op_node, data_builder, inp)?;
-
-        Ok((op_node, sig.output.len()))
-
-        Ok(outs.into())
+        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
+        Ok((node, num_outputs).into())
     }
 
     /// Wire up the `output_wires` to the input ports of the Output node.

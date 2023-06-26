@@ -341,7 +341,7 @@ mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
         let [i1] = dfg_builder.input_wires_arr();
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
@@ -349,16 +349,15 @@ mod test {
         let mut module_builder = ModuleBuilder::new();
 
         {
-            let f_build = module_builder
-            .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = module_builder
+                .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
-            let id = f_build.insert_hugr(dfg_hugr)?;
+            let id = f_build.add_hugr_with_wires(&dfg_hugr, [i1])?;
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 
-
-        assert_eq!(module_builder.finish_hugr()?.node_count(), 3);
+        assert_eq!(module_builder.finish_hugr()?.node_count(), 7);
 
         Ok(())
     }

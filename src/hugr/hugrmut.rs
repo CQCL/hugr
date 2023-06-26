@@ -121,11 +121,7 @@ pub(crate) trait HugrMut {
     /// Insert another hugr into this one, under a given root node.
     ///
     /// Returns the root node of the inserted hugr.
-    fn insert_hugr(
-        &mut self,
-        root: Node,
-        other: &impl AsPortgraph,
-    ) -> Result<Node, HugrError>;
+    fn insert_hugr(&mut self, root: Node, other: &impl AsPortgraph) -> Result<Node, HugrError>;
 }
 
 impl<T> HugrMut for T
@@ -279,13 +275,11 @@ where
         std::mem::replace(cur, op.into())
     }
 
-    fn insert_hugr(
-        &mut self,
-        root: Node,
-        other: &impl AsPortgraph,
-    ) -> Result<Node, HugrError> {
+    fn insert_hugr(&mut self, root: Node, other: &impl AsPortgraph) -> Result<Node, HugrError> {
         let node_map = self.as_mut().graph.insert_graph(other.as_portgraph())?;
         let other_root = node_map[&other.root().index];
+
+        // Update hierarchy and optypes
         self.as_mut().hierarchy.push_child(other_root, root.index)?;
         for (&node, &new_node) in node_map.iter() {
             other
@@ -299,6 +293,15 @@ where
             let optype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, optype.clone());
         }
+
+        // The root node didn't have any ports.
+        let root_optype = self.get_optype(other_root.into());
+        self.set_num_ports(
+            other_root.into(),
+            root_optype.input_count(),
+            root_optype.output_count(),
+        );
+
         Ok(other_root.into())
     }
 }
