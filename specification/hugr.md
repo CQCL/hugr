@@ -304,9 +304,11 @@ operations valid at both Module level and within dataflow regions):
 
   - `identity<T>`: pass-through, no operation is performed.
 
-  - `DFG`: a simply nested dataflow graph, the signature of this
-    operation is the signature of the child graph. These nodes are
-    parents in the hierarchy.
+  - `DFG`: A nested dataflow graph.
+    These nodes are parents in the hierarchy.
+    The signature of the operation comprises the output signature of the child
+    Input node (as input) and the input signature of the child Output node (as
+    output). 
 
 <img src="attachments/2647818241/2647818467.png" width="1024px">
 
