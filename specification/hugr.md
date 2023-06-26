@@ -310,7 +310,36 @@ operations valid at both Module level and within dataflow regions):
     Input node (as input) and the input signature of the child Output node (as
     output). 
 
-<img src="attachments/2647818241/2647818467.png" width="1024px">
+The example below shows two DFGs, one nested within the other. Each has an Input
+and an Output node, whose outputs and inputs respectively match the inputs and
+outputs of the containing DFG.
+
+```mermaid
+stateDiagram-v2
+    [*] --> DFG0
+    [*] --> DFG0
+
+    state DFG0 {
+        Input0 --> op0
+        op0 --> DFG1
+        op0 --> op1
+        Input0 --> op1
+        op1 --> DFG1
+
+        state DFG1 {
+            Input1 --> op2
+            Input1 --> op3
+            op2 --> Output1
+            op3--> Output1
+        }
+
+        DFG1 --> Output0
+        DFG1 --> Output0
+    }
+
+    DFG0 --> [*]
+    DFG0 --> [*]
+```
 
 #### Control Flow
 
@@ -335,9 +364,22 @@ A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
 system](#type-system)), where `#ti` is the *i*th Row defining it.
 
-**TODO: update below diagram now that Conditional is “match”**
-
-<img src="attachments/2647818241/2647818344.png" width="1024px">
+```mermaid
+flowchart
+    subgraph Conditional
+        subgraph Case0["Case 0"]
+            C0I["case 0 inputs + other inputs"] --> op0["operations"]
+            op0 --> C0O["outputs"]
+        end
+        subgraph Case1["Case 1"]
+            C1I["case 1 inputs + other inputs"] --> op1["operations"]
+            op1 --> C1O["outputs"]
+        end
+    end
+    Pred["case 0 inputs | case 1 inputs"] --> Conditional
+    OI["other inputs"] --> Conditional
+    Conditional --> outputs
+```
 
 ##### `TailLoop` nodes
 
