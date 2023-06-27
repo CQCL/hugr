@@ -31,6 +31,7 @@ impl From<ExternalOp> for OpaqueOp {
                 OpaqueOp {
                     resource: def.resource.clone(),
                     op_name: def.name.clone(),
+                    description: def.description.clone(),
                     args,
                     signature: Some(sig),
                 }
@@ -56,24 +57,47 @@ impl From<ExternalOp> for LeafOp {
 pub struct OpaqueOp {
     resource: ResourceId,
     op_name: SmolStr,
+    description: String, // cache in advance as description() returns &str
     args: Vec<TypeArg>,
     signature: Option<Signature>,
+}
+
+fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
+    format!("{}/{}", res_id, op_name).into()
+}
+
+impl OpaqueOp {
+    fn new(
+        resource: ResourceId,
+        op_name: SmolStr,
+        args: Vec<TypeArg>,
+        signature: Option<Signature>,
+    ) -> Self {
+        let description = qualify_name(&resource, &op_name).into();
+        Self {
+            resource,
+            op_name,
+            description,
+            args,
+            signature,
+        }
+    }
 }
 
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
         let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.resource, op.op_name.clone()),
-            Self::Resource { def, .. } => (&def.resource, def.name.clone()),
+            Self::Opaque(op) => (&op.resource, &op.op_name),
+            Self::Resource { def, .. } => (&def.resource, &def.name),
         };
-        format!("{}/{}", res_id, op_name).into()
+        qualify_name(res_id, op_name)
     }
 }
 
 impl OpTrait for ExternalOp {
     fn description(&self) -> &str {
         match self {
-            Self::Opaque(_) => "<opaque op from unknown Resource>",
+            Self::Opaque(op) => op.description.as_str(),
             Self::Resource { def, .. } => def.description.as_str(),
         }
     }
