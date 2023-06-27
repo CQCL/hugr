@@ -62,11 +62,11 @@ pub struct OpaqueOp {
 
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
-        // TODO should we fully qualify?
-        match self {
-            Self::Opaque(op) => op.op_name.clone(),
-            Self::Resource { def, .. } => def.name.clone(),
-        }
+        let (res_id, op_name) = match self {
+            Self::Opaque(op) => (&op.resource, op.op_name.clone()),
+            Self::Resource { def, .. } => (&def.resource, def.name.clone()),
+        };
+        format!("{}/{}", res_id, op_name).into()
     }
 }
 
@@ -89,7 +89,7 @@ impl OpTrait for ExternalOp {
         OpTag::DataflowChild
     }
 
-    /// Note that there is no way to indicate failure here! We could fail in [resolve_external_ops]?
+    /// Note that there is no way to indicate failure here! We could fail in [resolve_extension_ops]?
     fn signature(&self) -> Signature {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
@@ -151,6 +151,6 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        h.replace_op(n, LeafOp::CustomOp(op));
+        h.replace_op(n, Into::<LeafOp>::into(op));
     }
 }

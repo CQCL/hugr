@@ -225,12 +225,11 @@ impl OpDef {
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
                 // Sig should be computed solely from inputs + outputs + args.
-                // Resources used should be at least the resource containing this OpDef.
-                // (TODO Consider - should we identify that _in_ the OpDef?)
                 todo!()
             }
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
+        assert!(res.contains(&self.resource));
         let mut sig = Signature::new_df(ins, outs);
         sig.input_resources = resources_in.clone();
         sig.output_resources = res.union(resources_in); // Pass input requirements through
@@ -347,10 +346,14 @@ impl Resource {
     }
 
     /// Add an operation definition to the resource.
-    pub fn add_op(&mut self, mut op: OpDef) {
-        //if op.resource != self.name {
-        //   return Err("OpDef doesn't match")
-        //}
+    pub fn add_op(&mut self, mut op: OpDef) -> Result<(), String> {
+        // if op.resource != self.name {
+        if op.resource != ResourceId::default() {
+            return Err(format!(
+                "OpDef {} owned by another resource {}",
+                op.name, op.resource
+            ));
+        }
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
             Entry::Vacant(ve) => {
@@ -358,6 +361,7 @@ impl Resource {
                 ve.insert(Arc::new(op));
             }
         }
+        Ok(())
     }
 }
 

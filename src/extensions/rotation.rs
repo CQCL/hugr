@@ -27,13 +27,15 @@ pub fn resource() -> Resource {
     resource.add_type(Type::Angle.type_def());
     resource.add_type(Type::Quaternion.type_def());
 
-    resource.add_op(OpDef::new_with_custom_sig(
-        "AngleAdd".into(),
-        "".into(),
-        vec![],
-        HashMap::default(),
-        AngleAdd,
-    ));
+    resource
+        .add_op(OpDef::new_with_custom_sig(
+            "AngleAdd".into(),
+            "".into(),
+            vec![],
+            HashMap::default(),
+            AngleAdd,
+        ))
+        .unwrap();
     resource
 }
 
