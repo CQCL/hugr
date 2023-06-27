@@ -106,12 +106,21 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
+/// Sets the next free index to node `n` and its ancestors if necessary.
+///
+/// This will set the index of any ancestor and any older sibling of `n`
+/// recursively before setting the index of `n`. This guarantees that the
+/// indices are effectively set in a BFS order.
+///
+/// It is guaranteed that the indices of all siblings of `n` will be set.
 fn set_index(
     n: Node,
     hugr: &Hugr,
     rekey: &mut HashMap<Node, Node>,
     free_indices: &mut impl Iterator<Item = Node>,
 ) {
+    // TODO: computing the BFS ordering explicitly is probably both more
+    // efficient and more readable.
     if rekey.contains_key(&n) {
         return;
     }
@@ -134,10 +143,13 @@ impl TryFrom<&Hugr> for SerHugrV0 {
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
+        // TODO: separate this logic from the serialisation code
         let mut node_rekey: HashMap<Node, Node> = HashMap::new();
         let mut index_counter = (0..).map(|i| NodeIndex::new(i).into());
         let mut nodes = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
+            // Give `n` an index from `index_counter`, but make sure that
+            // all parents and elder siblings are given indices first
             set_index(n, hugr, &mut node_rekey, &mut index_counter);
 
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
