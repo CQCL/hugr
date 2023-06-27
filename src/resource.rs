@@ -207,6 +207,7 @@ impl OpDef {
             Err(self)
         }
     }
+
     /// The signature of the operation.
     pub fn signature(
         &self,
@@ -242,6 +243,13 @@ impl OpDef {
                 todo!()
             }
             SignatureFunc::CustomFunc(bf) => bf.describe_signature(&self.name, args, &self.misc),
+        }
+    }
+
+    pub(crate) fn should_serialize_signature(&self) -> bool {
+        match self.signature_func {
+            SignatureFunc::CustomFunc(_) => true,
+            SignatureFunc::FromYAML { .. } => false,
         }
     }
 

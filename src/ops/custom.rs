@@ -26,14 +26,18 @@ impl From<ExternalOp> for OpaqueOp {
             ExternalOp::Opaque(op) => op,
             ExternalOp::Resource { def, args } => {
                 // There's no way to report a panic here, but serde requires Into not TryInto. Eeeek!
-                // Also, we don't necessarily need to store the signature for all extensions/stages...?
-                let sig = def.signature(&args, &ResourceSet::default()).unwrap();
+                let signature = if def.should_serialize_signature() {
+                    // TODO More issues with the input resource set here!
+                    Some(def.signature(&args, &ResourceSet::default()).unwrap())
+                } else {
+                    None
+                };
                 OpaqueOp {
                     resource: def.resource.clone(),
                     op_name: def.name.clone(),
                     description: def.description.clone(),
                     args,
-                    signature: Some(sig),
+                    signature,
                 }
             }
         }
