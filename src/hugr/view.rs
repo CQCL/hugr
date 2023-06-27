@@ -232,27 +232,29 @@ where
 }
 
 /// Internal trait for accessing the underlying portgraph of a hugr view.
-pub trait AsPortgraph: HugrView + sealed::Sealed {
-    /// The underlying portgraph view type.
-    type Portgraph: LinkView;
+pub trait AsPortgraph: HugrView + sealed::AsPortgraph {}
 
-    /// Returns a reference to the underlying portgraph.
-    fn as_portgraph(&self) -> &Self::Portgraph;
-}
-
-impl<T> AsPortgraph for T
-where
-    T: AsRef<Hugr>,
-{
-    type Portgraph = MultiPortGraph;
-
-    fn as_portgraph(&self) -> &Self::Portgraph {
-        &self.as_ref().graph
-    }
-}
+impl<T> AsPortgraph for T where T: AsRef<Hugr> {}
 
 pub(crate) mod sealed {
-    pub trait Sealed {}
+    use super::*;
 
-    impl<T> Sealed for T where T: AsRef<super::Hugr> {}
+    pub trait AsPortgraph {
+        /// The underlying portgraph view type.
+        type Portgraph: LinkView;
+
+        /// Returns a reference to the underlying portgraph.
+        fn as_portgraph(&self) -> &Self::Portgraph;
+    }
+
+    impl<T> AsPortgraph for T
+    where
+        T: AsRef<super::Hugr>,
+    {
+        type Portgraph = MultiPortGraph;
+
+        fn as_portgraph(&self) -> &Self::Portgraph {
+            &self.as_ref().graph
+        }
+    }
 }
