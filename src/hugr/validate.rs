@@ -731,7 +731,7 @@ mod test {
     use super::*;
     use crate::builder::{BuildError, ModuleBuilder};
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use crate::hugr::HugrMut;
+    use crate::hugr::{HugrError, HugrMut};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
     use crate::types::{ClassicType, LinearType, Signature};
@@ -1065,6 +1065,59 @@ mod test {
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
+    }
+
+    #[test]
+    fn test_ext_edge() -> Result<(), HugrError> {
+        let mut h = Hugr::new(ops::DFG {
+            signature: Signature::new_df(type_row![B, B], type_row![B]),
+        });
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
+        // Nested DFG B -> B
+        let sub_dfg = h.add_op_with_parent(
+            h.root(),
+            ops::DFG {
+                signature: Signature::new_linear(type_row![B]),
+            },
+        )?;
+        // this Xor has its 2nd input unconnected
+        let sub_op = {
+            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![B]))?;
+            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![B]))?;
+            let sub_op = h.add_op_with_parent(sub_dfg, LeafOp::Xor)?;
+            h.connect(sub_input, 0, sub_op, 0)?;
+            h.connect(sub_op, 0, sub_output, 0)?;
+            sub_op
+        };
+
+        h.connect(input, 0, sub_dfg, 0)?;
+        h.connect(sub_dfg, 0, output, 0)?;
+
+        assert_matches!(h.validate(), Err(ValidationError::UnconnectedPort { .. }));
+
+        h.connect(input, 1, sub_op, 1)?;
+        assert_matches!(
+            h.validate(),
+            Err(ValidationError::InterGraphEdgeError(
+                InterGraphEdgeError::MissingOrderEdge { .. }
+            ))
+        );
+        //Order edge. There must be an easier way to do this?
+        h.connect(
+            input,
+            h.get_optype(input)
+                .other_port_index(Direction::Outgoing)
+                .unwrap()
+                .index(),
+            sub_dfg,
+            h.get_optype(sub_dfg)
+                .other_port_index(Direction::Incoming)
+                .unwrap()
+                .index(),
+        )?;
+        h.validate().unwrap();
+        Ok(())
     }
 
     #[test]
