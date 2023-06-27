@@ -778,12 +778,12 @@ resources:
     args:
       - r: ResourceSet
     signature:
-      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]
+      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]]
       outputs: [[null, Int]]
       resources: r # Indicates that running this operation also invokes resources r
     lowering:
       file: "graph_op_hugr.bin"
-      resources: ["arithmetic", "r"] # r is the ResourceSet in "args"
+      resources: ["arithmetic", r] # r is the ResourceSet in "args"
 ```
 
 The declaration of the `args` uses a language that is a distinct, simplified
