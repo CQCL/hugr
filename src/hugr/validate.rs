@@ -1103,19 +1103,8 @@ mod test {
                 InterGraphEdgeError::MissingOrderEdge { .. }
             ))
         );
-        //Order edge. There must be an easier way to do this?
-        h.connect(
-            input,
-            h.get_optype(input)
-                .other_port_index(Direction::Outgoing)
-                .unwrap()
-                .index(),
-            sub_dfg,
-            h.get_optype(sub_dfg)
-                .other_port_index(Direction::Incoming)
-                .unwrap()
-                .index(),
-        )?;
+        //Order edge. This will need metadata indicating its purpose.
+        h.add_other_edge(input, sub_dfg)?;
         h.validate().unwrap();
         Ok(())
     }
