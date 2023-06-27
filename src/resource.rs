@@ -132,7 +132,6 @@ pub struct OpDef {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
 
-    // TODO YAML directive: only serialize "FromYAML" version, skip CustomFunc
     #[serde(flatten)]
     signature_func: SignatureFunc,
     #[serde(flatten)]
