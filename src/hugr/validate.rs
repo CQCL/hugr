@@ -392,6 +392,15 @@ impl<'a> ValidationContext<'a> {
 
         let postorder = DfsPostOrder::new(&region, entry_node);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let _module_op_count = self
+            .hugr
+            .children(parent)
+            .filter(|n| OpTag::ModuleOp.contains(self.hugr.get_optype(*n).tag()))
+            .count();
+        // XXX TODO FIXME we should take _module_op_count off the child_count below,
+        // because e.g. Const nodes should not be reached by the DfsPostOrder in a forwards
+        // traversal. (Currently this would break tests because the traversal goes both forwards
+        // AND backwards).
         if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
@@ -1116,6 +1125,70 @@ mod test {
                 .unwrap()
                 .index(),
         )?;
+        h.validate().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn test_local_const() -> Result<(), HugrError> {
+        let mut h = Hugr::new(ops::DFG {
+            signature: Signature::new_df(type_row![B], type_row![B]),
+        });
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
+        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
+        h.connect(input, 0, xor, 0)?;
+        h.connect(xor, 0, output, 0)?;
+        assert_eq!(
+            h.validate(),
+            Err(ValidationError::UnconnectedPort {
+                node: xor,
+                port: Port::new_incoming(1),
+                port_kind: EdgeKind::Value(B)
+            })
+        );
+        // Second input of Xor from a constant
+        let cst =
+            h.add_op_with_parent(h.root(), ops::Const(ConstValue::Int { width: 1, value: 1 }))?;
+        let lcst = h.add_op_with_parent(
+            h.root(),
+            ops::LoadConstant {
+                datatype: ClassicType::Int(1),
+            },
+        )?;
+        h.connect(cst, 0, lcst, 0)?;
+        h.connect(lcst, 0, xor, 1)?;
+        // XXX TODO FIXME This should fail, but succeeds:
+        h.validate().unwrap();
+        // Now include the LoadConstant node in the causal cone
+        h.connect(
+            input,
+            h.get_optype(input)
+                .other_port_index(Direction::Outgoing)
+                .unwrap()
+                .index(),
+            lcst,
+            h.get_optype(lcst)
+                .other_port_index(Direction::Incoming)
+                .unwrap()
+                .index(),
+        )?;
+        h.validate().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn test_cyclic() -> Result<(), HugrError> {
+        let mut h = Hugr::new(ops::DFG {
+            signature: Signature::new_df(type_row![Q], type_row![Q]),
+        });
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![Q]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![Q]))?;
+        let cx = h.add_op_with_parent(h.root(), LeafOp::CX)?;
+        h.connect(input, 0, cx, 0)?;
+        h.connect(cx, 0, output, 0)?;
+        h.connect(cx, 1, cx, 1)?;
+        // TODO FIXME We should get an error here, but this passes ATM :-(
         h.validate().unwrap();
         Ok(())
     }
