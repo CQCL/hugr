@@ -1,11 +1,9 @@
 //! Rewrite operations on the HUGR - replacement, outlining, etc.
 
-pub mod replace;
 pub mod simple_replace;
 use std::mem;
 
 use crate::Hugr;
-pub use replace::{OpenHugr, Replace, ReplaceError};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
 /// An operation that can be applied to mutate a Hugr
