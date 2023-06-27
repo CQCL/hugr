@@ -110,7 +110,7 @@ impl<'de> Deserialize<'de> for Hugr {
 ///
 /// This will set the index of any ancestor and any older sibling of `n`
 /// recursively before setting the index of `n`. This guarantees that the
-/// indices are effectively set in a BFS order.
+/// indices are set in some topological order.
 ///
 /// It is guaranteed that the indices of all siblings of `n` will be set.
 fn set_index(
