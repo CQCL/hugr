@@ -1161,18 +1161,7 @@ mod test {
         // XXX TODO FIXME This should fail, but succeeds:
         h.validate().unwrap();
         // Now include the LoadConstant node in the causal cone
-        h.connect(
-            input,
-            h.get_optype(input)
-                .other_port_index(Direction::Outgoing)
-                .unwrap()
-                .index(),
-            lcst,
-            h.get_optype(lcst)
-                .other_port_index(Direction::Incoming)
-                .unwrap()
-                .index(),
-        )?;
+        h.add_other_edge(input, lcst)?;
         h.validate().unwrap();
         Ok(())
     }
