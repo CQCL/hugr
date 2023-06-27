@@ -57,6 +57,7 @@ impl From<ExternalOp> for LeafOp {
 pub struct OpaqueOp {
     resource: ResourceId,
     op_name: SmolStr,
+    #[serde(skip)]
     description: String, // cache in advance as description() returns &str
     args: Vec<TypeArg>,
     signature: Option<Signature>,
@@ -67,7 +68,7 @@ fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
 }
 
 impl OpaqueOp {
-    fn new(
+    pub fn new(
         resource: ResourceId,
         op_name: SmolStr,
         args: Vec<TypeArg>,
