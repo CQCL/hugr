@@ -781,9 +781,17 @@ resources:
       inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]
       outputs: [[null, Int]]
       resources: r # Indicates that running this operation also invokes resources r
+    lowering:
+      file: "graph_op_hugr.bin"
+      resources: ["arithmetic", "r"] # r is the ResourceSet in "args"
 ```
 
-Each member of `args` can be `Type` (requiring a type, which may be a LinearType), `ClassicType` (where the argument must be a ClassicType), `ResourceSet`, or a ClassicType such as `Int` (meaning the argument must be a constant value of that type).
+The declaration of the `args` uses a language that is a distinct, simplified
+form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
+the value of each member of `args` is given by the following production:
+```
+TypeParam ::= "Type" | "ClassicType" | Int | "List"(TypeParam)
+```
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
