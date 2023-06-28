@@ -15,7 +15,7 @@ use crate::Direction;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView {
+pub trait HugrView: sealed::HugrInternals {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -231,15 +231,14 @@ where
     }
 }
 
-/// Internal trait for accessing the underlying portgraph of a hugr view.
-pub trait AsPortgraph: HugrView + sealed::AsPortgraph {}
-
-impl<T> AsPortgraph for T where T: AsRef<Hugr> {}
-
 pub(crate) mod sealed {
     use super::*;
 
-    pub trait AsPortgraph {
+    /// Trait for accessing the internals of a Hugr(View).
+    ///
+    /// Specifically, this trait provides access to the underlying portgraph
+    /// view.
+    pub trait HugrInternals {
         /// The underlying portgraph view type.
         type Portgraph: LinkView;
 
@@ -247,7 +246,7 @@ pub(crate) mod sealed {
         fn as_portgraph(&self) -> &Self::Portgraph;
     }
 
-    impl<T> AsPortgraph for T
+    impl<T> HugrInternals for T
     where
         T: AsRef<super::Hugr>,
     {

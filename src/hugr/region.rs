@@ -358,9 +358,7 @@ mod test {
     }
 }
 
-impl<'g> super::view::AsPortgraph for FlatRegionView<'g> {}
-
-impl<'g> super::view::sealed::AsPortgraph for FlatRegionView<'g> {
+impl<'g> super::view::sealed::HugrInternals for FlatRegionView<'g> {
     type Portgraph = FlatRegionGraph<'g>;
 
     fn as_portgraph(&self) -> &Self::Portgraph {
@@ -368,9 +366,7 @@ impl<'g> super::view::sealed::AsPortgraph for FlatRegionView<'g> {
     }
 }
 
-impl<'g> super::view::AsPortgraph for RegionView<'g> {}
-
-impl<'g> super::view::sealed::AsPortgraph for RegionView<'g> {
+impl<'g> super::view::sealed::HugrInternals for RegionView<'g> {
     type Portgraph = RegionGraph<'g>;
 
     fn as_portgraph(&self) -> &Self::Portgraph {
