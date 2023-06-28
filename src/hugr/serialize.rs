@@ -1,7 +1,7 @@
 //! Serialization definition for [`Hugr`]
 //! [`Hugr`]: crate::hugr::Hugr
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 
 use crate::hugr::{Hugr, HugrMut};
@@ -106,52 +106,25 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
-/// Sets the next free index to node `n` and its ancestors if necessary.
-///
-/// This will set the index of any ancestor and any older sibling of `n`
-/// recursively before setting the index of `n`. This guarantees that the
-/// indices are set in some topological order.
-///
-/// It is guaranteed that the indices of all siblings of `n` will be set.
-fn set_index(
-    n: Node,
-    hugr: &Hugr,
-    rekey: &mut HashMap<Node, Node>,
-    free_indices: &mut impl Iterator<Item = Node>,
-) {
-    // TODO: computing the BFS ordering explicitly is probably both more
-    // efficient and more readable.
-    if rekey.contains_key(&n) {
-        return;
-    }
-    if let Some(parent) = hugr.get_parent(n) {
-        set_index(parent, hugr, rekey, free_indices);
-        for child in hugr.children(parent) {
-            if rekey.contains_key(&child) {
-                break;
-            }
-            rekey.insert(child, free_indices.next().unwrap());
-        }
-    } else {
-        rekey.insert(n, free_indices.next().unwrap());
-    }
-}
-
 impl TryFrom<&Hugr> for SerHugrV0 {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        // TODO: separate this logic from the serialisation code
-        let mut node_rekey: HashMap<Node, Node> = HashMap::new();
+        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
+        // Generate a BFS-ordered list of nodes based on the hierarchy
+        let mut ordered = VecDeque::from([hugr.root()]);
         let mut index_counter = (0..).map(|i| NodeIndex::new(i).into());
+        while let Some(node) = ordered.pop_front() {
+            node_rekey.insert(node, index_counter.next().unwrap());
+            for child in hugr.children(node) {
+                ordered.push_back(child);
+            }
+        }
+
         let mut nodes = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
-            // Give `n` an index from `index_counter`, but make sure that
-            // all parents and elder siblings are given indices first
-            set_index(n, hugr, &mut node_rekey, &mut index_counter);
-
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_optype(n);
             nodes[node_rekey[&n].index.index()] = Some(NodeSer {
@@ -382,7 +355,16 @@ pub mod test {
         let h = dfg.finish_hugr_with_outputs(params)?;
 
         let ser = serde_json::to_string(&h)?;
-        let _: Hugr = serde_json::from_str(&ser)?;
+        let h_deser: Hugr = serde_json::from_str(&ser)?;
+
+        // Check the canonicalization works
+        let mut h_canon = h;
+        h_canon.canonicalize_nodes(|_, _| {});
+
+        for node in h_deser.nodes() {
+            assert_eq!(h_deser.get_optype(node), h_canon.get_optype(node));
+            assert_eq!(h_deser.get_parent(node), h_canon.get_parent(node));
+        }
 
         Ok(())
     }
@@ -401,14 +383,19 @@ pub mod test {
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-
-        // This is a valid Hugr
         hugr.validate().unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
-
-        // This isn't
         new_hugr.validate().unwrap();
+
+        // Check the canonicalization works
+        let mut h_canon = hugr.clone();
+        h_canon.canonicalize_nodes(|_, _| {});
+
+        for node in new_hugr.nodes() {
+            assert_eq!(new_hugr.get_optype(node), h_canon.get_optype(node));
+            assert_eq!(new_hugr.get_parent(node), h_canon.get_parent(node));
+        }
     }
 }
