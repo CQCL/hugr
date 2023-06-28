@@ -94,13 +94,12 @@ mod test {
     use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
-    use crate::hugr::region::FlatRegionView;
     use crate::ops::handle::NodeHandle;
     use itertools::Itertools;
     use std::collections::HashSet;
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, main, tail) = build_conditional_in_loop_cfg(false)?;
+        let (h, main, tail) = build_conditional_in_loop_cfg(false)?;
         //               /-> left --\
         //  entry -> main            > merge -> tail -> exit
         //            |  \-> right -/             |
@@ -112,8 +111,7 @@ mod test {
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
-        let region = FlatRegionView::new(&h, cfg_id.node());
-        let v = HalfNodeView::new(&region);
+        let v = HalfNodeView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
 
