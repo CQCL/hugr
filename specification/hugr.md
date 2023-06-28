@@ -1458,7 +1458,7 @@ struct HUGR {
 }
 
 struct Node{
-  // parent node
+  // parent node index
   parent: Int,
   // name of operation
   op: String
@@ -1466,7 +1466,7 @@ struct Node{
   ...
 }
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
+struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 ```
 
 Node indices, used within the
