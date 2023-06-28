@@ -353,7 +353,7 @@ mod test {
                 .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
-            let id = f_build.add_hugr_with_wires(&dfg_hugr, [i1])?;
+            let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 

@@ -1,8 +1,9 @@
 //! Base HUGR builder providing low-level building blocks.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
-use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
+use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
@@ -119,7 +120,12 @@ pub(crate) trait HugrMut {
     /// Insert another hugr into this one, under a given root node.
     ///
     /// Returns the root node of the inserted hugr.
-    fn insert_hugr(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
+    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError>;
+
+    /// Insert another hugr into this one, under a given root node.
+    ///
+    /// Returns the root node of the inserted hugr.
+    fn insert_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
 }
 
 impl<T> HugrMut for T
@@ -273,35 +279,64 @@ where
         std::mem::replace(cur, op.into())
     }
 
-    fn insert_hugr(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
-        let node_map = self.as_mut().graph.insert_graph(other.as_portgraph())?;
-        let other_root = node_map[&other.root().index];
-
-        // Update hierarchy and optypes
-        self.as_mut().hierarchy.push_child(other_root, root.index)?;
+    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
+        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
+        // Update the optypes, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            other
-                .children(node.into())
-                .try_for_each(|child| -> Result<(), HugrError> {
-                    self.as_mut()
-                        .hierarchy
-                        .push_child(node_map[&child.index], new_node)?;
-                    Ok(())
-                })?;
+            let optype = other.op_types.take(node);
+            self.as_mut().op_types.set(new_node, optype);
+        }
+        Ok(other_root)
+    }
+
+    fn insert_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
+        // Update the optypes, copying them from the other graph.
+        for (&node, &new_node) in node_map.iter() {
             let optype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, optype.clone());
         }
-
-        // The root node didn't have any ports.
-        let root_optype = self.get_optype(other_root.into());
-        self.set_num_ports(
-            other_root.into(),
-            root_optype.input_count(),
-            root_optype.output_count(),
-        );
-
-        Ok(other_root.into())
+        Ok(other_root)
     }
+}
+
+/// Internal implementation of `insert_hugr` and `insert_view` methods for
+/// AsMut<Hugr>.
+///
+/// Returns the root node of the inserted hierarchy and a mapping from the nodes
+/// in the inserted graph to their new indices in `hugr`.
+///
+/// This function does not update the optypes of the inserted nodes, so the
+/// caller must do that.
+fn insert_hugr_internal(
+    hugr: &mut Hugr,
+    root: Node,
+    other: &impl HugrView,
+) -> Result<(Node, HashMap<NodeIndex, NodeIndex>), HugrError> {
+    let node_map = hugr.graph.insert_graph(other.as_portgraph())?;
+    let other_root = node_map[&other.root().index];
+
+    // Update hierarchy and optypes
+    hugr.hierarchy.push_child(other_root, root.index)?;
+    for (&node, &new_node) in node_map.iter() {
+        other
+            .children(node.into())
+            .try_for_each(|child| -> Result<(), HugrError> {
+                hugr.hierarchy
+                    .push_child(node_map[&child.index], new_node)?;
+                Ok(())
+            })?;
+    }
+
+    // The root node didn't have any ports.
+    let root_optype = other.get_optype(other.root());
+    hugr.set_num_ports(
+        other_root.into(),
+        root_optype.input_count(),
+        root_optype.output_count(),
+    );
+
+    Ok((other_root.into(), node_map))
 }
 
 #[cfg(test)]
