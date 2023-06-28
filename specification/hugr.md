@@ -1448,7 +1448,8 @@ The unique root node of the HUGR reports itself as the parent.
 
 The other required field in a node is `op` which identifies an operation by
 name, and is used as a discriminating tag in validating the remaining fields.
-The other fields are defining data for the particular operation.
+The other fields are defining data for the particular operation, including
+`args` which specifies the arguments to the `TypeParam`s of the operation.
 Metadata could also be included as a map keyed by node index.
 
 ```rust
