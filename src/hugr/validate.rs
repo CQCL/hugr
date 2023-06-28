@@ -1156,6 +1156,22 @@ mod test {
     }
 
     #[test]
+    fn test_cyclic() -> Result<(), HugrError> {
+        let mut h = Hugr::new(ops::DFG {
+            signature: Signature::new_df(type_row![Q], type_row![Q]),
+        });
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![Q]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![Q]))?;
+        let cx = h.add_op_with_parent(h.root(), LeafOp::CX)?;
+        h.connect(input, 0, cx, 0)?;
+        h.connect(cx, 0, output, 0)?;
+        h.connect(cx, 1, cx, 1)?;
+        // TODO FIXME We should get an error here, but this passes ATM :-(
+        h.validate().unwrap();
+        Ok(())
+    }
+
+    #[test]
     /// A wire with no resource requirements is wired into a node which has
     /// [A,B] resources required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
