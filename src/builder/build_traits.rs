@@ -89,16 +89,16 @@ pub trait Container {
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Insert a finished HUGR as a child of the container.
+    /// Insert a HUGR as a child of the container.
     fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
 
-    /// Insert a finished HUGR as a child of the container.
+    /// Insert a copy of a HUGR as a child of the container.
     fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_view(parent, child)?)
+        Ok(self.hugr_mut().insert_from_view(parent, child)?)
     }
 }
 
@@ -159,12 +159,13 @@ pub trait Dataflow: Container {
         Ok(outs.into())
     }
 
-    /// Add a hugr-defined op to the sibling graph, wiring up the `input_wires` to the
-    /// incoming ports of the resulting root node.
+    /// Insert a hugr-defined op to the sibling graph, wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node.
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error when adding the node.
+    /// This function will return an error if there is an error when adding the
+    /// node.
     fn add_hugr_with_wires(
         &mut self,
         hugr: Hugr,
@@ -180,12 +181,13 @@ pub trait Dataflow: Container {
         Ok((node, num_outputs).into())
     }
 
-    /// Add a hugr-defined op to the sibling graph, wiring up the `input_wires` to the
-    /// incoming ports of the resulting root node.
+    /// Copy a hugr-defined op into the sibling graph, wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node.
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error when adding the node.
+    /// This function will return an error if there is an error when adding the
+    /// node.
     fn add_hugr_view_with_wires(
         &mut self,
         hugr: &impl HugrView,

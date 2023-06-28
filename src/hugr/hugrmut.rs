@@ -122,10 +122,10 @@ pub(crate) trait HugrMut {
     /// Returns the root node of the inserted hugr.
     fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError>;
 
-    /// Insert another hugr into this one, under a given root node.
+    /// Copy another hugr into this one, under a given root node.
     ///
     /// Returns the root node of the inserted hugr.
-    fn insert_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
+    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
 }
 
 impl<T> HugrMut for T
@@ -289,7 +289,7 @@ where
         Ok(other_root)
     }
 
-    fn insert_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
