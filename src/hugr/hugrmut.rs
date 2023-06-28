@@ -126,6 +126,15 @@ pub(crate) trait HugrMut {
     ///
     /// Returns the root node of the inserted hugr.
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
+
+    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
+    /// traversal of the hierarchy.
+    ///
+    /// The rekey function is called for each moved node with the old and new indices.
+    ///
+    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
+    /// preserve the indices.
+    fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node));
 }
 
 impl<T> HugrMut for T
@@ -297,6 +306,46 @@ where
             self.as_mut().op_types.set(new_node, optype.clone());
         }
         Ok(other_root)
+    }
+
+    fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        // Generate the ordered list of nodes
+        let mut ordered = Vec::with_capacity(self.node_count());
+        ordered.push(self.root());
+        let mut i = 0;
+        while let Some(node) = ordered.get(i).copied() {
+            for child in self.children(node) {
+                ordered.push(child);
+            }
+            i += 1;
+        }
+
+        // Permute the nodes in the graph to match the order.
+        //
+        // Invariant: All the elements before `position` are in the correct place.
+        for position in 0..ordered.len() {
+            // Find the element's location. If it originally came from a previous position
+            // then it has been swapped somewhere else, so we follow the permutation chain.
+            let mut source: Node = ordered[position];
+            while position > source.index.index() {
+                source = ordered[source.index.index()];
+            }
+
+            let target: Node = NodeIndex::new(position).into();
+            if target != source {
+                let hugr = self.as_mut();
+                hugr.graph.swap_nodes(target.index, source.index);
+                hugr.op_types.swap(target.index, source.index);
+                hugr.hierarchy.swap_nodes(target.index, source.index);
+                rekey(source, target);
+            }
+        }
+        self.as_mut().root = NodeIndex::new(0);
+
+        // Finish by compacting the copy nodes.
+        // The operation nodes will be left in place.
+        // This step is not strictly necessary.
+        self.as_mut().graph.compact_nodes(|_, _| {});
     }
 }
 
