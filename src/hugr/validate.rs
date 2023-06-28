@@ -392,16 +392,13 @@ impl<'a> ValidationContext<'a> {
 
         let postorder = DfsPostOrder::new(&region, entry_node);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
-        let _module_op_count = self
+        // ModuleOp's (local Consts and Defs) should not be reachable from the Input node, so discount them
+        let non_module_op_count = self
             .hugr
             .children(parent)
-            .filter(|n| OpTag::ModuleOp.contains(self.hugr.get_optype(*n).tag()))
+            .filter(|n| !OpTag::ModuleOp.contains(self.hugr.get_optype(*n).tag()))
             .count();
-        // XXX TODO FIXME we should take _module_op_count off the child_count below,
-        // because e.g. Const nodes should not be reached by the DfsPostOrder in a forwards
-        // traversal. (Currently this would break tests because the traversal goes both forwards
-        // AND backwards).
-        if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
+        if nodes_visited != non_module_op_count {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
                 optype: optype.clone(),
@@ -1147,8 +1144,8 @@ mod test {
         )?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;
-        // XXX TODO FIXME This should fail, but succeeds:
-        h.validate().unwrap();
+        // We are missing the edge from Input to LoadConstant, hence:
+        assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
         // Now include the LoadConstant node in the causal cone
         h.add_other_edge(input, lcst)?;
         h.validate().unwrap();
