@@ -1441,27 +1441,36 @@ conversion to/from the binary serialised form.
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
 [Serialization implementation](serialization.md)).
-Note in particular that node and port weights are stored as separate
-maps to the graph structure itself, and that hierarchical relationships
-have a special encoding outside `edges`, as an optional parent field
-(the first) in a node definition. `Operation` refers to serialized
-payloads corresponding to arbitrary `Operations`. Metadata could also be
-included as a similar map.
+Note in particular that hierarchical relationships
+have a special encoding outside `edges`, as a field `parent`
+in a node definition. 
+The unique root node of the HUGR reports itself as the parent.
+
+The other required field in a node is `op` which identifies an operation by
+name, and is used as a discriminating tag in validating the remaining fields.
+The other fields are defining data for the particular operation, including
+`args` which specifies the arguments to the `TypeParam`s of the operation.
+Metadata could also be included as a map keyed by node index.
 
 ```rust
 struct HUGR {
-  nodes: [Node]
-  edges: [Edge]
-  node_weights: map<Int, Operation>
+  nodes: [Node],
+  edges: [Edge],
 }
 
-// (parent, #incoming, #outgoing)
-struct Node = (Optional<Int>, Int, Int)
+struct Node{
+  // parent node index
+  parent: Int,
+  // name of operation
+  op: String
+  //other op-specific fields
+  ...
+}
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
+struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 ```
 
-Node indices, used as keys in the weight maps and within the
+Node indices, used within the
 definitions of nodes and edges, directly correspond to indices of the
 node list. An edge is defined by the source and target nodes, and
 optionally the offset of the output/input ports within those nodes, if the edge
