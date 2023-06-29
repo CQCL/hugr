@@ -55,7 +55,14 @@ pub(crate) use impl_box_clone;
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! type_row {
-    ($($t:ident),*) => {
+    () => {
+        {
+            use $crate::types;
+            let row: types::TypeRow = Vec::new().into();
+            row
+        }
+    };
+    ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$($t),*];
@@ -63,7 +70,7 @@ macro_rules! type_row {
             row
         }
     };
-    ($t:ident; $n:expr) => {
+    ($t:expr; $n:expr) => {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$t; $n];
