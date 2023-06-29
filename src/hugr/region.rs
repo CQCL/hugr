@@ -133,14 +133,10 @@ impl<'g> HugrView for FlatRegionView<'g> {
     }
 
     fn children(&self, node: Node) -> Self::Children<'_> {
-        let mut iter = self.hierarchy.children(node.index).map_into();
-        if node != self.root {
-            // Eagerly empty the iterator.
-            // Ideally we would construct an empty iterator directly, but
-            // `Children` is not `Default`.
-            while iter.next().is_some() {}
+        match node == self.root {
+            true => self.hierarchy.children(node.index).map_into(),
+            false => portgraph::hierarchy::Children::default().map_into(),
         }
-        iter
     }
 
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
@@ -271,14 +267,10 @@ impl<'g> HugrView for RegionView<'g> {
     }
 
     fn children(&self, node: Node) -> Self::Children<'_> {
-        let mut iter = self.hierarchy.children(node.index).map_into();
-        if !self.graph.contains_node(node.index) {
-            // Eagerly empty the iterator.
-            // Ideally we would construct an empty iterator directly, but
-            // `Children` is not `Default`.
-            while iter.next().is_some() {}
+        match self.graph.contains_node(node.index) {
+            true => self.hierarchy.children(node.index).map_into(),
+            false => portgraph::hierarchy::Children::default().map_into(),
         }
-        iter
     }
 
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
