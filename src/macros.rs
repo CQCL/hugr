@@ -57,9 +57,7 @@ pub(crate) use impl_box_clone;
 macro_rules! type_row {
     () => {
         {
-            use $crate::types;
-            let row: types::TypeRow = Vec::new().into();
-            row
+            $crate::types::TypeRow::new()
         }
     };
     ($($t:expr),+ $(,)?) => {
