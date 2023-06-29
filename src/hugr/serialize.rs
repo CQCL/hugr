@@ -33,7 +33,7 @@ enum Versioned {
     Unsupported,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
     #[serde(flatten)]
@@ -106,39 +106,63 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
+/// Sets the next free index to node `n` and its ancestors if necessary.
+///
+/// This will set the index of any ancestor and any older sibling of `n`
+/// recursively before setting the index of `n`. This guarantees that the
+/// indices are set in some topological order.
+///
+/// It is guaranteed that the indices of all siblings of `n` will be set.
+fn set_index(
+    n: Node,
+    hugr: &Hugr,
+    rekey: &mut HashMap<Node, Node>,
+    free_indices: &mut impl Iterator<Item = Node>,
+) {
+    // TODO: computing the BFS ordering explicitly is probably both more
+    // efficient and more readable.
+    if rekey.contains_key(&n) {
+        return;
+    }
+    if let Some(parent) = hugr.get_parent(n) {
+        set_index(parent, hugr, rekey, free_indices);
+        for child in hugr.children(parent) {
+            if rekey.contains_key(&child) {
+                break;
+            }
+            rekey.insert(child, free_indices.next().unwrap());
+        }
+    } else {
+        rekey.insert(n, free_indices.next().unwrap());
+    }
+}
+
 impl TryFrom<&Hugr> for SerHugrV0 {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
+        // TODO: separate this logic from the serialisation code
         let mut node_rekey: HashMap<Node, Node> = HashMap::new();
-        let mut index_counter = 1..;
-        let mut nodes: Vec<NodeSer> = hugr
-            .nodes()
-            .map(|n| {
-                // Note that we don't rekey the parent here, as we need to fully
-                // populate `node_rekey` first.
-                let (parent, new_node) = if n == hugr.root() {
-                    (n, NodeIndex::new(0).into())
-                } else {
-                    (
-                        hugr.get_parent(n).expect("Unexpected root."),
-                        NodeIndex::new(index_counter.next().unwrap()).into(),
-                    )
-                };
+        let mut index_counter = (0..).map(|i| NodeIndex::new(i).into());
+        let mut nodes = vec![None; hugr.node_count()];
+        for n in hugr.nodes() {
+            // Give `n` an index from `index_counter`, but make sure that
+            // all parents and elder siblings are given indices first
+            set_index(n, hugr, &mut node_rekey, &mut index_counter);
 
-                node_rekey.insert(n, new_node);
-                let opt = hugr.get_optype(n);
-                Ok(NodeSer {
-                    parent,
-                    op: opt.clone(),
-                })
-            })
-            .collect::<Result<_, Self::Error>>()?;
-        for NodeSer { parent, .. } in &mut nodes {
-            *parent = node_rekey[parent];
+            let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
+            let opt = hugr.get_optype(n);
+            nodes[node_rekey[&n].index.index()] = Some(NodeSer {
+                parent,
+                op: opt.clone(),
+            });
         }
+        let nodes = nodes
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let sig = hugr.get_optype(node).signature();
@@ -234,6 +258,7 @@ pub mod test {
         },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{ClassicType, LinearType, Signature, SimpleType},
+        Port,
     };
     use itertools::Itertools;
     use portgraph::{
@@ -360,5 +385,30 @@ pub mod test {
         let _: Hugr = serde_json::from_str(&ser)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn hierarchy_order() {
+        let qb: SimpleType = LinearType::Qubit.into();
+        let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
+        let [old_in, out] = dfg.io();
+        let w = dfg.input_wires();
+        let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
+
+        // Now add a new input
+        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.connect(new_in, 0, out, 0).unwrap();
+        hugr.move_before_sibling(new_in, old_in).unwrap();
+        hugr.remove_node(old_in).unwrap();
+
+        // This is a valid Hugr
+        hugr.validate().unwrap();
+
+        let ser = serde_json::to_vec(&hugr).unwrap();
+        let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
+
+        // This isn't
+        new_hugr.validate().unwrap();
     }
 }
