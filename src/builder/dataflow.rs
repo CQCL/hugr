@@ -13,6 +13,7 @@ use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`ops::DFG`] node.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DFGBuilder<T> {
     pub(crate) base: T,
     pub(crate) dfg_node: Node,
@@ -115,6 +116,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
 
 /// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
 // Stores option of DFGBuilder so it can be taken out without moving.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DFGWrapper<B, T>(DFGBuilder<B>, PhantomData<T>);
 
 impl<B, T> DFGWrapper<B, T> {

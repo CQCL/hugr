@@ -21,6 +21,7 @@ use smol_str::SmolStr;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a HUGR module.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
