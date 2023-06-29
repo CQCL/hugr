@@ -88,6 +88,18 @@ pub trait Container {
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
+
+    /// Insert a HUGR as a child of the container.
+    fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
+        let parent = self.container_node();
+        Ok(self.hugr_mut().insert_hugr(parent, child)?)
+    }
+
+    /// Insert a copy of a HUGR as a child of the container.
+    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
+        let parent = self.container_node();
+        Ok(self.hugr_mut().insert_from_view(parent, child)?)
+    }
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
@@ -145,6 +157,50 @@ pub trait Dataflow: Container {
         let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
+    }
+
+    /// Insert a hugr-defined op to the sibling graph, wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// node.
+    fn add_hugr_with_wires(
+        &mut self,
+        hugr: Hugr,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
+        let node = self.add_hugr(hugr)?;
+
+        let [inp, _] = self.io();
+        let inputs = input_wires.into_iter().collect();
+        wire_up_inputs(inputs, node, self, inp)?;
+
+        Ok((node, num_outputs).into())
+    }
+
+    /// Copy a hugr-defined op into the sibling graph, wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// node.
+    fn add_hugr_view_with_wires(
+        &mut self,
+        hugr: &impl HugrView,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
+        let node = self.add_hugr_view(hugr)?;
+
+        let [inp, _] = self.io();
+        let inputs = input_wires.into_iter().collect();
+        wire_up_inputs(inputs, node, self, inp)?;
+
+        Ok((node, num_outputs).into())
     }
 
     /// Wire up the `output_wires` to the input ports of the Output node.
