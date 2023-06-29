@@ -10,6 +10,7 @@ use crate::Wire;
 /// Builder to build regions of dataflow graphs that look like Circuits,
 /// where some inputs of operations directly correspond to some outputs.
 /// Allows appending operations by indexing a vector of input wires.
+#[derive(Debug, PartialEq)]
 pub struct CircuitBuilder<'a, T: ?Sized> {
     wires: Vec<Wire>,
     builder: &'a mut T,
@@ -17,6 +18,7 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
 
 /// Enum for specifying a [`CircuitBuilder`] input wire using either an index to
 /// the builder vector of wires, or an arbitrary other wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AppendWire {
     /// Arbitrary input wire.
     W(Wire),
