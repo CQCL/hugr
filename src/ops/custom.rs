@@ -24,6 +24,15 @@ pub struct OpaqueOp {
 }
 
 impl OpaqueOp {
+    /// Initialize a new named OpaqueOp
+    pub fn new(id: impl Into<SmolStr>, custom: impl CustomOp) -> Self {
+        Self {
+            id: id.into(),
+
+            custom: Box::new(custom),
+        }
+    }
+
     /// The name of the operation, cached for fast equality checks.
     pub fn name(&self) -> SmolStr {
         self.id.clone()

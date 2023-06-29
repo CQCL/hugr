@@ -54,6 +54,8 @@ pub enum ConstValue {
         value: HugrIntValueStore,
         width: HugrIntWidthStore,
     },
+    /// Double precision float
+    F64(f64),
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
@@ -90,6 +92,8 @@ impl PartialEq for ConstValue {
             ) => tag == t1 && variants == type1 && val == v1,
 
             (Self::Tuple(v1), Self::Tuple(v2)) => v1.eq(v2),
+            (Self::F64(f1), Self::F64(f2)) => f1 == f2,
+
             _ => false,
         }
     }
@@ -122,12 +126,14 @@ impl ConstValue {
                     .collect();
                 ClassicType::Container(Container::Tuple(Box::new(row.into())))
             }
+            Self::F64(_) => ClassicType::F64,
         }
     }
     /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
             Self::Int { value, width } => format!("const:int<{width}>:{value}"),
+            Self::F64(f) => format!("const:float:{f}"),
             Self::Opaque(_, v) => format!("const:{}", v.name()),
             Self::Sum { tag, val, .. } => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
