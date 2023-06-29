@@ -357,3 +357,19 @@ mod test {
         Ok(())
     }
 }
+
+impl<'g> super::view::sealed::HugrInternals for FlatRegionView<'g> {
+    type Portgraph = FlatRegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+}
+
+impl<'g> super::view::sealed::HugrInternals for RegionView<'g> {
+    type Portgraph = RegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+}

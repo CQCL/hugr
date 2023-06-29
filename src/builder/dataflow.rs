@@ -339,4 +339,28 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn insert_hugr() -> Result<(), BuildError> {
+        // Create a simple DFG
+        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let [i1] = dfg_builder.input_wires_arr();
+        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
+
+        // Create a module, and insert the DFG into it
+        let mut module_builder = ModuleBuilder::new();
+
+        {
+            let mut f_build = module_builder
+                .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+
+            let [i1] = f_build.input_wires_arr();
+            let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+            f_build.finish_with_outputs([id.out_wire(0)])?;
+        }
+
+        assert_eq!(module_builder.finish_hugr()?.node_count(), 7);
+
+        Ok(())
+    }
 }
