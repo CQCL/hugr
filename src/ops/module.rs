@@ -52,16 +52,16 @@ impl OpTrait for FuncDef {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FuncDeclare {
+pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
 
-impl_op_name!(FuncDeclare);
+impl_op_name!(FuncDecl);
 
-impl OpTrait for FuncDeclare {
+impl OpTrait for FuncDecl {
     fn description(&self) -> &str {
         "External function declaration, linked at runtime"
     }

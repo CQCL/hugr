@@ -59,7 +59,7 @@ pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [def](crate::ops::OpType::FuncDef)
-/// or [declare](crate::ops::OpType::FuncDeclare) node.
+/// or [declare](crate::ops::OpType::FuncDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.

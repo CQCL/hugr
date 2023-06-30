@@ -436,7 +436,7 @@ impl<'a> ValidationContext<'a> {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
-                    // edges coming from FuncDeclare or FuncDef
+                    // edges coming from FuncDecl or FuncDef
                     return if OpTag::Function.contains(from_optype.tag()) {
                         Ok(())
                     } else {
@@ -827,7 +827,7 @@ mod test {
 
     #[test]
     fn invalid_root() {
-        let declare_op: OpType = ops::FuncDeclare {
+        let declare_op: OpType = ops::FuncDecl {
             name: "main".into(),
             signature: Default::default(),
         }

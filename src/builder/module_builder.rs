@@ -62,7 +62,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Replace a [`ops::FuncDeclare`] with [`ops::FuncDef`] and return a builder for
+    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDef`] and return a builder for
     /// the defining graph.
     ///
     /// # Errors
@@ -74,14 +74,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let (signature, name) = if let OpType::FuncDeclare(ops::FuncDeclare { signature, name }) =
+        let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
             self.hugr().get_optype(f_node)
         {
             (signature.clone(), name.clone())
         } else {
             return Err(BuildError::UnexpectedType {
                 node: f_node,
-                op_desc: "OpType::FuncDeclare",
+                op_desc: "OpType::FuncDecl",
             });
         };
         self.hugr_mut().replace_op(
@@ -101,14 +101,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDeclare`] node.
+    /// [`OpType::FuncDecl`] node.
     pub fn declare(
         &mut self,
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(ops::FuncDeclare {
+        let declare_n = self.add_child_op(ops::FuncDecl {
             signature,
             name: name.into(),
         })?;

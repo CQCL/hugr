@@ -508,7 +508,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the Call
-    /// node, or if `function` does not refer to a [`ops::FuncDeclare`] or
+    /// node, or if `function` does not refer to a [`ops::FuncDecl`] or
     /// [`ops::FuncDef`] node.
     fn call<const DEFINED: bool>(
         &mut self,
@@ -519,11 +519,11 @@ pub trait Dataflow: Container {
         let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
             OpType::FuncDef(ops::FuncDef { signature, .. })
-            | OpType::FuncDeclare(ops::FuncDeclare { signature, .. }) => signature.clone(),
+            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
-                    op_desc: "FuncDeclare/FuncDef",
+                    op_desc: "FuncDecl/FuncDef",
                 })
             }
         };
