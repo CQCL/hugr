@@ -21,16 +21,21 @@ pub struct CustomType {
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
-    pub params: Vec<TypeArg>,
+    params: Vec<TypeArg>,
 }
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: SmolStr, params: impl Into<Vec<TypeArg>>) -> Self {
+    pub fn new(id: impl Into<SmolStr>, params: impl Into<Vec<TypeArg>>) -> Self {
         Self {
-            id,
+            id: id.into(),
             params: params.into(),
         }
+    }
+
+    /// Creates a new opaque type with no parameters
+    pub const fn new_simple(id: SmolStr) -> Self {
+        Self { id, params: vec![] }
     }
 
     /// Returns the unique identifier of the opaque type.
