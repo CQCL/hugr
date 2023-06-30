@@ -74,16 +74,17 @@ fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
 impl OpaqueOp {
     pub fn new(
         resource: ResourceId,
-        op_name: SmolStr,
-        args: Vec<TypeArg>,
+        op_name: impl Into<SmolStr>,
+        args: impl Into<Vec<TypeArg>>,
         signature: Option<Signature>,
     ) -> Self {
+        let op_name: SmolStr = op_name.into();
         let description = qualify_name(&resource, &op_name).into();
         Self {
             resource,
             op_name,
             description,
-            args,
+            args: args.into(),
             signature,
         }
     }
