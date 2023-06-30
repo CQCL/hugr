@@ -442,7 +442,7 @@ impl<'a> ValidationContext<'a> {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
-                    // edges coming from Declare or Def
+                    // edges coming from FuncDecl or FuncDefn
                     return if OpTag::Function.contains(from_optype.tag()) {
                         Ok(())
                     } else {
@@ -752,7 +752,7 @@ mod test {
     ///
     /// Returns the hugr and the node index of the definition.
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-        let def_op: OpType = ops::Def {
+        let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
@@ -833,7 +833,7 @@ mod test {
 
     #[test]
     fn invalid_root() {
-        let declare_op: OpType = ops::Declare {
+        let declare_op: OpType = ops::FuncDecl {
             name: "main".into(),
             signature: Default::default(),
         }
@@ -912,7 +912,7 @@ mod test {
         let new_def = b
             .add_op_with_parent(
                 root,
-                ops::Def {
+                ops::FuncDefn {
                     signature: def_sig,
                     name: "main".into(),
                 },

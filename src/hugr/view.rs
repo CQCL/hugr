@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{multiportgraph, LinkView, PortView};
+use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::Hugr;
 use super::{Node, Port};
@@ -15,7 +15,7 @@ use crate::Direction;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView {
+pub trait HugrView: sealed::HugrInternals {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -228,5 +228,32 @@ where
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.as_ref().graph.all_neighbours(node.index).map_into()
+    }
+}
+
+pub(crate) mod sealed {
+    use super::*;
+
+    /// Trait for accessing the internals of a Hugr(View).
+    ///
+    /// Specifically, this trait provides access to the underlying portgraph
+    /// view.
+    pub trait HugrInternals {
+        /// The underlying portgraph view type.
+        type Portgraph: LinkView;
+
+        /// Returns a reference to the underlying portgraph.
+        fn as_portgraph(&self) -> &Self::Portgraph;
+    }
+
+    impl<T> HugrInternals for T
+    where
+        T: AsRef<super::Hugr>,
+    {
+        type Portgraph = MultiPortGraph;
+
+        fn as_portgraph(&self) -> &Self::Portgraph {
+            &self.as_ref().graph
+        }
     }
 }

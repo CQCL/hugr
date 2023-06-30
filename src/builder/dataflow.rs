@@ -13,6 +13,7 @@ use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`ops::DFG`] node.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DFGBuilder<T> {
     pub(crate) base: T,
     pub(crate) dfg_node: Node,
@@ -115,6 +116,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
 
 /// Wrapper around [`DFGBuilder`] used to build other dataflow regions.
 // Stores option of DFGBuilder so it can be taken out without moving.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DFGWrapper<B, T>(DFGBuilder<B>, PhantomData<T>);
 
 impl<B, T> DFGWrapper<B, T> {
@@ -123,16 +125,16 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-/// Builder for a [`ops::Def`] node
+/// Builder for a [`ops::FuncDefn`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a Def rooted HUGR
+    /// Initialize a builder for a FuncDefn rooted HUGR
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let op = ops::Def {
+        let op = ops::FuncDefn {
             signature: signature.clone(),
             name: name.into(),
         };
@@ -334,6 +336,30 @@ mod test {
 
         assert_eq!(hugr.node_count(), 3);
         assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
+
+        Ok(())
+    }
+
+    #[test]
+    fn insert_hugr() -> Result<(), BuildError> {
+        // Create a simple DFG
+        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let [i1] = dfg_builder.input_wires_arr();
+        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
+
+        // Create a module, and insert the DFG into it
+        let mut module_builder = ModuleBuilder::new();
+
+        {
+            let mut f_build = module_builder
+                .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+
+            let [i1] = f_build.input_wires_arr();
+            let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+            f_build.finish_with_outputs([id.out_wire(0)])?;
+        }
+
+        assert_eq!(module_builder.finish_hugr()?.node_count(), 7);
 
         Ok(())
     }

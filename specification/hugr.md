@@ -210,7 +210,7 @@ source node, to an incoming port of the target node.
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
+sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 
@@ -245,36 +245,36 @@ operations have value ports, but some have Static or other
 edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
-  - `Declare`: an external function declaration. The name of the function 
+  - `FuncDecl`: an external function declaration. The name of the function 
     and function attributes (relevant for compilation)
     define the node weight. The node has an outgoing `Static<Graph>`
     edge for each use of the function. The function name is used at link time to
     look up definitions in linked
     modules (other hugr instances specified to the linker).
   
-  - `AliasDeclare`: an external type alias declaration. At link time this can be
-    replaced with the definition. An alias declared with `AliasDeclare` is equivalent to a
+  - `AliasDecl`: an external type alias declaration. At link time this can be
+    replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
     named opaque type.
 
 The following operations are valid at the module level, but *also* in dataflow
 regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
-    weight. Like `Declare` and `Def` this has one `Static<T>` out-edge per use.
+    weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
 
-  - `Def` : a function definition. Like `Declare` but with a function body.
+  - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
     The function body is defined by the sibling graph formed by its children.
-    At link time `Declare` nodes are replaced by `Def`.
+    At link time `FuncDecl` nodes are replaced by `FuncDefn`.
 
-  - `AliasDef`: type alias definition. At link time `AliasDeclare` can be replaced with
-    `AliasDef`.
+  - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
+    `AliasDefn`.
 
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
-no `Declare/AliasDeclare` nodes.
+no `FuncDecl/AliasDecl` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
-root Module node has a `Def` child with function name
+root Module node has a `FuncDefn` child with function name
 “main”, that is the designated entry point. Modules that act as libraries need
 not be executable.
 
@@ -450,10 +450,10 @@ has no parent).
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Static                         | `Def`              | **C**         |  "                       | "                                        |
+| "                         | Static                         | `FuncDefn`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
+| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `FuncDefn` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -466,7 +466,7 @@ cycles. The common parent is a CFG-node.
 `Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
 and must be acyclic. There is a unique Input node and Output node. All nodes must be
 reachable from the Input node, and must reach the Output node. The common parent
-may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
+may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Locality** |
 | -------------- | ------------ |
@@ -1441,27 +1441,36 @@ conversion to/from the binary serialised form.
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
 [Serialization implementation](serialization.md)).
-Note in particular that node and port weights are stored as separate
-maps to the graph structure itself, and that hierarchical relationships
-have a special encoding outside `edges`, as an optional parent field
-(the first) in a node definition. `Operation` refers to serialized
-payloads corresponding to arbitrary `Operations`. Metadata could also be
-included as a similar map.
+Note in particular that hierarchical relationships
+have a special encoding outside `edges`, as a field `parent`
+in a node definition. 
+The unique root node of the HUGR reports itself as the parent.
+
+The other required field in a node is `op` which identifies an operation by
+name, and is used as a discriminating tag in validating the remaining fields.
+The other fields are defining data for the particular operation, including
+`args` which specifies the arguments to the `TypeParam`s of the operation.
+Metadata could also be included as a map keyed by node index.
 
 ```rust
 struct HUGR {
-  nodes: [Node]
-  edges: [Edge]
-  node_weights: map<Int, Operation>
+  nodes: [Node],
+  edges: [Edge],
 }
 
-// (parent, #incoming, #outgoing)
-struct Node = (Optional<Int>, Int, Int)
+struct Node{
+  // parent node index
+  parent: Int,
+  // name of operation
+  op: String
+  //other op-specific fields
+  ...
+}
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
+struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 ```
 
-Node indices, used as keys in the weight maps and within the
+Node indices, used within the
 definitions of nodes and edges, directly correspond to indices of the
 node list. An edge is defined by the source and target nodes, and
 optionally the offset of the output/input ports within those nodes, if the edge
@@ -1739,11 +1748,11 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **Declare node**: child of a module, indicates that an external
+  - **FuncDecl node**: child of a module, indicates that an external
     function exists but without giving a definition. May be the source
     of Static-edges to Call nodes and others.
 
-  - **Def node**: child of a module node, defines a function (by being
+  - **FuncDefn node**: child of a module node, defines a function (by being
     parent to the function’s body). May be the source of Static-edges to
     Call nodes and others.
 
@@ -1941,10 +1950,10 @@ including `Module`.
 | Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
 | -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
 | Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
-| `Declare`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `AliasDef`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `AliasDeclare` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `FuncDefn`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `AliasDefn`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `AliasDecl` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
 | `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |

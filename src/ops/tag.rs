@@ -22,14 +22,14 @@ pub enum OpTag {
     ModuleOp,
     /// Root module operation.
     ModuleRoot,
-    /// A function definition.
-    Def,
     /// A function definition or declaration.
     Function,
     /// A type alias.
     Alias,
     /// A constant declaration.
     Const,
+    /// A function definition.
+    FuncDefn,
 
     /// Node in a Dataflow Sibling Graph.
     DataflowChild,
@@ -81,7 +81,7 @@ impl OpTag {
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ModuleOp],
-            OpTag::Def => &[OpTag::Function, OpTag::DataflowChild],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::DataflowChild],
             OpTag::BasicBlock => &[OpTag::Any],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
@@ -107,7 +107,7 @@ impl OpTag {
             OpTag::DataflowChild => "Node in a Dataflow Sibling Graph",
             OpTag::Input => "Input node",
             OpTag::Output => "Output node",
-            OpTag::Def => "Function definition",
+            OpTag::FuncDefn => "Function definition",
             OpTag::BasicBlock => "Basic block",
             OpTag::BasicBlockExit => "Exit basic block node",
             OpTag::Case => "Case",

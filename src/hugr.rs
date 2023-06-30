@@ -13,7 +13,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
-pub use rewrite::{Replace, ReplaceError, Rewrite, SimpleReplacement, SimpleReplacementError};
+pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
