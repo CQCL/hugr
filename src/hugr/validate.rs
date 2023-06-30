@@ -392,13 +392,13 @@ impl<'a> ValidationContext<'a> {
 
         let postorder = DfsPostOrder::new(&region, entry_node);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
-        // ModuleOp's (local Consts and Defs) should not be reachable from the Input node, so discount them
-        let non_module_op_count = self
+        // Local ScopedDefn's should not be reachable from the Input node, so discount them
+        let non_defn_count = self
             .hugr
             .children(parent)
-            .filter(|n| !OpTag::ModuleOp.contains(self.hugr.get_optype(*n).tag()))
+            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).tag()))
             .count();
-        if nodes_visited != non_module_op_count {
+        if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
                 optype: optype.clone(),
