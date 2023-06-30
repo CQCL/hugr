@@ -44,7 +44,6 @@ use std::hash::Hash;
 use itertools::Itertools;
 
 use crate::hugr::view::HugrView;
-use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::tag::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
@@ -133,8 +132,8 @@ pub struct SimpleCfgView<'a, H> {
 }
 impl<'a, H: HugrView> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub fn new(h: &'a H, cfg: CfgID) -> Self {
-        let mut children = h.children(cfg.node());
+    pub fn new(h: &'a H) -> Self {
+        let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -402,6 +401,7 @@ pub(crate) mod test {
         BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder,
         ModuleBuilder, SubContainer,
     };
+    use crate::hugr::region::FlatRegionView;
     use crate::ops::{
         handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
         ConstValue,
@@ -456,8 +456,9 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes =
-            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(
+            &FlatRegionView::new(&h, cfg_id.node()),
+        ));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -507,8 +508,9 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (merge, tail) = (merge.node(), tail.node());
-        let edge_classes =
-            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(
+            &FlatRegionView::new(&h, cfg_id.node()),
+        ));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -534,7 +536,8 @@ pub(crate) mod test {
         //  entry -> head -> split            > merge -> tail -> exit
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
-        let v = SimpleCfgView::new(&h, cfg_id);
+        let view = FlatRegionView::new(&h, cfg_id.node());
+        let v = SimpleCfgView::new(&view);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // split is unique successor of head
@@ -577,7 +580,8 @@ pub(crate) mod test {
         //             \---<---<---<---<---<--<---/
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
-        let v = SimpleCfgView::new(&h, cfg_id);
+        let view = FlatRegionView::new(&h, cfg_id.node());
+        let v = SimpleCfgView::new(&view);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
