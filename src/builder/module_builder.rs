@@ -141,17 +141,17 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(AliasID::new(node, name, linear))
     }
 
-    /// Add a [`OpType::AliasDeclare`] node and return a handle to the Alias.
+    /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDeclare`] child node.
+    /// Error in adding [`OpType::AliasDecl`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
         linear: bool,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(ops::AliasDeclare {
+        let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
             linear,
         })?;

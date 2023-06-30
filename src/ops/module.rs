@@ -98,16 +98,16 @@ impl OpTrait for AliasDefn {
 
 /// A type alias declaration. Resolved at link time.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AliasDeclare {
+pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is linear
     pub linear: bool,
 }
 
-impl_op_name!(AliasDeclare);
+impl_op_name!(AliasDecl);
 
-impl OpTrait for AliasDeclare {
+impl OpTrait for AliasDecl {
     fn description(&self) -> &str {
         "A type alias declaration"
     }
