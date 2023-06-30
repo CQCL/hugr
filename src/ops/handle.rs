@@ -66,7 +66,7 @@ pub struct ModuleID(Node);
 pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDef](crate::ops::OpType::AliasDef)
+/// Handle to an [AliasDefn](crate::ops::OpType::AliasDefn)
 /// or [AliasDeclare](crate::ops::OpType::AliasDeclare) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is

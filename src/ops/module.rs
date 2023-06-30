@@ -79,14 +79,14 @@ impl OpTrait for FuncDecl {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AliasDef {
+pub struct AliasDefn {
     /// Alias name
     pub name: SmolStr,
     /// Aliased type
     pub definition: SimpleType,
 }
-impl_op_name!(AliasDef);
-impl OpTrait for AliasDef {
+impl_op_name!(AliasDefn);
+impl OpTrait for AliasDefn {
     fn description(&self) -> &str {
         "A type alias definition"
     }

@@ -67,7 +67,7 @@ pub enum Container<T: PrimType> {
     Sum(Box<TypeRow>),
     /// Known size array of T.
     Array(Box<T>, usize),
-    /// Alias defined in AliasDef or AliasDeclare nodes.
+    /// Alias defined in AliasDefn or AliasDeclare nodes.
     Alias(SmolStr),
 }
 

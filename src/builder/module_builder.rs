@@ -116,24 +116,24 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(declare_n.into())
     }
 
-    /// Add a [`OpType::AliasDef`] node and return a handle to the Alias.
+    /// Add a [`OpType::AliasDefn`] node and return a handle to the Alias.
     ///
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDef`] child node.
+    /// Error in adding [`OpType::AliasDefn`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
         typ: SimpleType,
     ) -> Result<AliasID<true>, BuildError> {
-        // TODO: add AliasDef in other containers
+        // TODO: add AliasDefn in other containers
         // This is currently tricky as they are not connected to anything so do
         // not appear in topological traversals.
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
-        let node = self.add_child_op(ops::AliasDef {
+        let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
