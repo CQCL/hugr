@@ -62,13 +62,13 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDef`] and return a builder for
+    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDef`] node.
+    /// [`OpType::FuncDefn`] node.
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
@@ -86,7 +86,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            ops::FuncDef {
+            ops::FuncDefn {
                 name,
                 signature: signature.clone(),
             },

@@ -125,16 +125,16 @@ impl<B, T> DFGWrapper<B, T> {
     }
 }
 
-/// Builder for a [`ops::FuncDef`] node
+/// Builder for a [`ops::FuncDefn`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a FuncDef rooted HUGR
+    /// Initialize a builder for a FuncDefn rooted HUGR
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        let op = ops::FuncDef {
+        let op = ops::FuncDefn {
             signature: signature.clone(),
             name: name.into(),
         };

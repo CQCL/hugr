@@ -366,7 +366,7 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ops::FuncDef {
+                ops::FuncDefn {
                     name: "main".into(),
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },

@@ -81,7 +81,7 @@ impl ValidateOp for super::Module {
     }
 }
 
-impl ValidateOp for super::FuncDef {
+impl ValidateOp for super::FuncDefn {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_children: OpTag::DataflowChild,
