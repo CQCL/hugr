@@ -81,7 +81,7 @@ impl ValidateOp for super::Module {
     }
 }
 
-impl ValidateOp for super::Def {
+impl ValidateOp for super::FuncDef {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_children: OpTag::DataflowChild,
@@ -532,9 +532,10 @@ mod test {
 }
 
 use super::{
-    AliasDeclare, AliasDef, Call, CallIndirect, Const, Declare, Input, LeafOp, LoadConstant, Output,
+    AliasDeclare, AliasDef, Call, CallIndirect, Const, FuncDeclare, Input, LeafOp, LoadConstant,
+    Output,
 };
-impl_validate_op!(Declare);
+impl_validate_op!(FuncDeclare);
 impl_validate_op!(AliasDeclare);
 impl_validate_op!(AliasDef);
 impl_validate_op!(Input);

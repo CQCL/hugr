@@ -68,19 +68,19 @@ pub trait Container {
         Ok((const_n, typ).into())
     }
 
-    /// Add a [`ops::Def`] node and returns a builder to define the function
+    /// Add a [`ops::FuncDef`] node and returns a builder to define the function
     /// body graph.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`ops::Def`] node.
+    /// [`ops::FuncDef`] node.
     fn define_function(
         &mut self,
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let f_node = self.add_child_op(ops::Def {
+        let f_node = self.add_child_op(ops::FuncDef {
             name: name.into(),
             signature: signature.clone(),
         })?;
@@ -508,8 +508,8 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the Call
-    /// node, or if `function` does not refer to a [`ops::Declare`] or
-    /// [`ops::Def`] node.
+    /// node, or if `function` does not refer to a [`ops::FuncDeclare`] or
+    /// [`ops::FuncDef`] node.
     fn call<const DEFINED: bool>(
         &mut self,
         function: &FuncID<DEFINED>,
@@ -518,12 +518,12 @@ pub trait Dataflow: Container {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
         let signature = match def_op {
-            OpType::Def(ops::Def { signature, .. })
-            | OpType::Declare(ops::Declare { signature, .. }) => signature.clone(),
+            OpType::FuncDef(ops::FuncDef { signature, .. })
+            | OpType::FuncDeclare(ops::FuncDeclare { signature, .. }) => signature.clone(),
             _ => {
                 return Err(BuildError::UnexpectedType {
                     node: function.node(),
-                    op_desc: "Declare/Def",
+                    op_desc: "FuncDeclare/FuncDef",
                 })
             }
         };

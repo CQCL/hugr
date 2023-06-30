@@ -26,21 +26,21 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Def {
+pub struct FuncDef {
     /// Name of function
     pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
 
-impl_op_name!(Def);
-impl OpTrait for Def {
+impl_op_name!(FuncDef);
+impl OpTrait for FuncDef {
     fn description(&self) -> &str {
         "A function definition"
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Def
+        OpTag::FuncDef
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -52,16 +52,16 @@ impl OpTrait for Def {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Declare {
+pub struct FuncDeclare {
     /// Name of function
     pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
 
-impl_op_name!(Declare);
+impl_op_name!(FuncDeclare);
 
-impl OpTrait for Declare {
+impl OpTrait for FuncDeclare {
     fn description(&self) -> &str {
         "External function declaration, linked at runtime"
     }
