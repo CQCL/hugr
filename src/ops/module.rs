@@ -26,21 +26,21 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Def {
+pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
 
-impl_op_name!(Def);
-impl OpTrait for Def {
+impl_op_name!(FuncDefn);
+impl OpTrait for FuncDefn {
     fn description(&self) -> &str {
         "A function definition"
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Def
+        OpTag::FuncDefn
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -52,16 +52,16 @@ impl OpTrait for Def {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Declare {
+pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
     pub signature: Signature,
 }
 
-impl_op_name!(Declare);
+impl_op_name!(FuncDecl);
 
-impl OpTrait for Declare {
+impl OpTrait for FuncDecl {
     fn description(&self) -> &str {
         "External function declaration, linked at runtime"
     }
@@ -79,14 +79,14 @@ impl OpTrait for Declare {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AliasDef {
+pub struct AliasDefn {
     /// Alias name
     pub name: SmolStr,
     /// Aliased type
     pub definition: SimpleType,
 }
-impl_op_name!(AliasDef);
-impl OpTrait for AliasDef {
+impl_op_name!(AliasDefn);
+impl OpTrait for AliasDefn {
     fn description(&self) -> &str {
         "A type alias definition"
     }
@@ -98,16 +98,16 @@ impl OpTrait for AliasDef {
 
 /// A type alias declaration. Resolved at link time.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AliasDeclare {
+pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is linear
     pub linear: bool,
 }
 
-impl_op_name!(AliasDeclare);
+impl_op_name!(AliasDecl);
 
-impl OpTrait for AliasDeclare {
+impl OpTrait for AliasDecl {
     fn description(&self) -> &str {
         "A type alias declaration"
     }

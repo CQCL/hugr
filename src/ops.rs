@@ -24,7 +24,7 @@ pub use constant::{Const, ConstValue};
 pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
-pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
+pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 
 #[enum_dispatch(OpTrait, OpName, ValidateOp)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -35,10 +35,10 @@ pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 #[serde(tag = "op")]
 pub enum OpType {
     Module,
-    Def,
-    Declare,
-    AliasDeclare,
-    AliasDef,
+    FuncDefn,
+    FuncDecl,
+    AliasDecl,
+    AliasDefn,
     Const,
     Input,
     Output,

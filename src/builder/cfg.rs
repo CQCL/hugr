@@ -16,6 +16,7 @@ use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
+#[derive(Debug, PartialEq)]
 pub struct CFGBuilder<T> {
     pub(super) base: T,
     pub(super) cfg_node: Node,

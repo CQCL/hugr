@@ -17,12 +17,7 @@ TKET, or the higher-order executable dataflow graphs in Tierkreis.
 The goal of the HUGR representation is to provide a unified structure
 that can be shared between the tools, allowing for more complex
 operations such as TKET optimizations across control-flow blocks, and
-nested quantum and classical programs in a single graph. 
-<!--
-For more see
-the initial proposal: [The Grand Graph
-Unification](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2506260512/The+Grand+Graph+Unification).
--->
+nested quantum and classical programs in a single graph.
 The HUGR should provide a generic graph representation of a program,
 where each node contains a specific kind of operation and wires
 represent (typed) data or control dependencies.
@@ -215,7 +210,7 @@ source node, to an incoming port of the target node.
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 do not include a resource specification. Only a few nodes may be
-sources (`Def`, `Declare` and `Const`) and targets (`Call` and `LoadConstant`) of
+sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see
 [operations](#node-operations).
 
@@ -250,36 +245,36 @@ operations have value ports, but some have Static or other
 edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
-  - `Declare`: an external function declaration. The name of the function 
+  - `FuncDecl`: an external function declaration. The name of the function 
     and function attributes (relevant for compilation)
     define the node weight. The node has an outgoing `Static<Graph>`
     edge for each use of the function. The function name is used at link time to
     look up definitions in linked
     modules (other hugr instances specified to the linker).
   
-  - `AliasDeclare`: an external type alias declaration. At link time this can be
-    replaced with the definition. An alias declared with `AliasDeclare` is equivalent to a
+  - `AliasDecl`: an external type alias declaration. At link time this can be
+    replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
     named opaque type.
 
 The following operations are valid at the module level, but *also* in dataflow
 regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
-    weight. Like `Declare` and `Def` this has one `Static<T>` out-edge per use.
+    weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
 
-  - `Def` : a function definition. Like `Declare` but with a function body.
+  - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
     The function body is defined by the sibling graph formed by its children.
-    At link time `Declare` nodes are replaced by `Def`.
+    At link time `FuncDecl` nodes are replaced by `FuncDefn`.
 
-  - `AliasDef`: type alias definition. At link time `AliasDeclare` can be replaced with
-    `AliasDef`.
+  - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
+    `AliasDefn`.
 
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
-no `Declare/AliasDeclare` nodes.
+no `FuncDecl/AliasDecl` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
-root Module node has a `Def` child with function name
+root Module node has a `FuncDefn` child with function name
 “main”, that is the designated entry point. Modules that act as libraries need
 not be executable.
 
@@ -308,19 +303,43 @@ operations valid at both Module level and within dataflow regions):
     `Input` node when traversing.
 
   - `identity<T>`: pass-through, no operation is performed.
-<!-- this isn't referred to anywhere else
-  - `lookup<T,N>`, where T in {i64, u64} and N\>0. Has a `Value<*,T>`
-    input, and a single `Value<*,Sum((),...,())>` output with N elements
-    each of type unit `()`. The value is (1) a list of pairs of type
-    `(T,Sum((),...,())` used as a lookup table on the input value, the
-    first element being key and the second as the return value; and (2)
-    an optional default value of the same `Sum` type. -->
 
-  - `DFG`: a simply nested dataflow graph, the signature of this
-    operation is the signature of the child graph. These nodes are
-    parents in the hierarchy.
+  - `DFG`: A nested dataflow graph.
+    These nodes are parents in the hierarchy.
+    The signature of the operation comprises the output signature of the child
+    Input node (as input) and the input signature of the child Output node (as
+    output). 
 
-<img src="attachments/2647818241/2647818467.png" width="1024px">
+The example below shows two DFGs, one nested within the other. Each has an Input
+and an Output node, whose outputs and inputs respectively match the inputs and
+outputs of the containing DFG.
+
+```mermaid
+stateDiagram-v2
+    [*] --> DFG0
+    [*] --> DFG0
+
+    state DFG0 {
+        Input0 --> op0
+        op0 --> DFG1
+        op0 --> op1
+        Input0 --> op1
+        op1 --> DFG1
+
+        state DFG1 {
+            Input1 --> op2
+            Input1 --> op3
+            op2 --> Output1
+            op3--> Output1
+        }
+
+        DFG1 --> Output0
+        DFG1 --> Output0
+    }
+
+    DFG0 --> [*]
+    DFG0 --> [*]
+```
 
 #### Control Flow
 
@@ -345,9 +364,24 @@ A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
 system](#type-system)), where `#ti` is the *i*th Row defining it.
 
-**TODO: update below diagram now that Conditional is “match”**
-
-<img src="attachments/2647818241/2647818344.png" width="1024px">
+```mermaid
+flowchart
+    subgraph Conditional
+        direction LR
+        subgraph Case0["Case 0"]
+            C0I["case 0 inputs + other inputs"] --> op0["operations"]
+            op0 --> C0O["outputs"]
+        end
+        subgraph Case1["Case 1"]
+            C1I["case 1 inputs + other inputs"] --> op1["operations"]
+            op1 --> C1O["outputs"]
+        end
+        Case0 ~~~ Case1
+    end
+    Pred["case 0 inputs | case 1 inputs"] --> Conditional
+    OI["other inputs"] --> Conditional
+    Conditional --> outputs
+```
 
 ##### `TailLoop` nodes
 
@@ -358,26 +392,6 @@ and “fed” in at at the top; the second variant means to exit the loop
 with those values unpacked. The graph may additionally take in a row
 `#x` (appended to `#i`) and return the same row (appended to `#o`). The
 contained graph may thus be evaluated more than once.
-
-**Alternate TailLoop**
-
-It is unclear whether this exact formulation of TailLoop is the most
-natural or useful. It may be that compilation typically uses multiple.
-Another is:
-
-A node with type `I -> O` with three children of types `A: I -> p + F`
-(the output is the row formed by extending the row `F` with the boolean
-output `p`), `B: F-> O` and `C: F -> I`. This node offers similar
-benefits to the option above, exchanging the machinery of variants for
-having a node with 3 children rather than 1. The semantics of the node
-are:
-
-1.  Execute A, outputting the boolean `p` and some outputs `F`
-
-2.  If `p`, execute B with inputs `F` and return the output `O`
-
-3.  Else execute `C` with inputs `F` and then restart loop with inputs
-    `I`
 
 ##### Control Flow Graphs
 
@@ -436,10 +450,10 @@ has no parent).
 | Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Static                         | `Def`              | **C**         |  "                       | "                                        |
+| "                         | Static                         | `FuncDefn`              | **C**         |  "                       | "                                        |
 | "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
 | "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `Def` for executable HUGR. |
+| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `FuncDefn` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
@@ -452,7 +466,7 @@ cycles. The common parent is a CFG-node.
 `Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
 and must be acyclic. There is a unique Input node and Output node. All nodes must be
 reachable from the Input node, and must reach the Output node. The common parent
-may be a `Def`, `TailLoop`, `DFG`, `Case` or `DFB` node.
+may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Locality** |
 | -------------- | ------------ |
@@ -675,24 +689,6 @@ Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for a function whose type cannot be expressed
 in YAML.
-
-<!-- Should we preserve some of this language about downcasting?
-
-2.  `CustomOp`: new operations defined in code that implement an
-    extensible interface (Rust Trait), compiler operations/extensions
-    that deal with these specific ops can downcast to safely retrieve
-    them at runtime from the generic object (and handle the cases where
-    downcasting fails). For example, an SU4 unitary struct defined in
-    matrix form. This is implemented in the TKET2 prototype.
-
-We expect most compiler passes and rewrites to deal with `native`
-operations, with the other classes mostly being used at the start or end
-of the compilation flow. The `CustomOp` trait allows the option for
-programs that extend the core toolchain to use strict typing for their
-new operations. While the `Opdef` allows users to specify extensions
-with a pre-compiled binary, and provide useful information for the
-compiler/runtime to use.
--->
 
 #### Declarative format
 
@@ -1455,27 +1451,36 @@ conversion to/from the binary serialised form.
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
 [Serialization implementation](serialization.md)).
-Note in particular that node and port weights are stored as separate
-maps to the graph structure itself, and that hierarchical relationships
-have a special encoding outside `edges`, as an optional parent field
-(the first) in a node definition. `Operation` refers to serialized
-payloads corresponding to arbitrary `Operations`. Metadata could also be
-included as a similar map.
+Note in particular that hierarchical relationships
+have a special encoding outside `edges`, as a field `parent`
+in a node definition. 
+The unique root node of the HUGR reports itself as the parent.
+
+The other required field in a node is `op` which identifies an operation by
+name, and is used as a discriminating tag in validating the remaining fields.
+The other fields are defining data for the particular operation, including
+`args` which specifies the arguments to the `TypeParam`s of the operation.
+Metadata could also be included as a map keyed by node index.
 
 ```rust
 struct HUGR {
-  nodes: [Node]
-  edges: [Edge]
-  node_weights: map<Int, Operation>
+  nodes: [Node],
+  edges: [Edge],
 }
 
-// (parent, #incoming, #outgoing)
-struct Node = (Optional<Int>, Int, Int)
+struct Node{
+  // parent node index
+  parent: Int,
+  // name of operation
+  op: String
+  //other op-specific fields
+  ...
+}
 // ((source, offset), (target, offset)
-struct Edge = ((Node, Optional<Int>), (Node, Optional<Int>))
+struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 ```
 
-Node indices, used as keys in the weight maps and within the
+Node indices, used within the
 definitions of nodes and edges, directly correspond to indices of the
 node list. An edge is defined by the source and target nodes, and
 optionally the offset of the output/input ports within those nodes, if the edge
@@ -1753,11 +1758,11 @@ an edge weight.
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
 
-  - **Declare node**: child of a module, indicates that an external
+  - **FuncDecl node**: child of a module, indicates that an external
     function exists but without giving a definition. May be the source
     of Static-edges to Call nodes and others.
 
-  - **Def node**: child of a module node, defines a function (by being
+  - **FuncDefn node**: child of a module node, defines a function (by being
     parent to the function’s body). May be the source of Static-edges to
     Call nodes and others.
 
@@ -1908,14 +1913,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
     like WASM. However although this would allow removing the CFG, the
     DSG nodes get more complicated, and start to behave in very
     non-DSG-like ways.
-<!--
-      - In the limit, we have TailLoop node for loops, plus a node that
-        contains an arbitrary *acyclic* CFG\! That was [considered
-        here](#) but still requires extra variables and runs into
-        similar problems with liveness as the Google paper. Also [The
-        fully-expressive alternative to
-        θ-nodes](https://cqc.atlassian.net/wiki/spaces/TKET/pages/2623406136).
--->
+
   - We could use function calls to avoid code duplication (essentially
     the return address is the extra boolean variable, likely to be very
     cheap). However, I think this means pattern-matching will want to
@@ -1962,10 +1960,10 @@ including `Module`.
 | Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
 | -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
 | Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `Def`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
-| `Declare`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `AliasDef`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `AliasDeclare` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `FuncDefn`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `AliasDefn`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `AliasDecl` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
 | `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |

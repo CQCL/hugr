@@ -13,7 +13,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
-pub use rewrite::{Replace, ReplaceError, Rewrite, SimpleReplacement, SimpleReplacementError};
+pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
@@ -240,4 +240,17 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+}
+
+#[cfg(test)]
+mod test {
+    use super::Hugr;
+
+    #[test]
+    fn impls_send_and_sync() {
+        // Send and Sync are automatically impl'd by the compiler, if possible.
+        // This test will fail to compile if that wasn't possible.
+        trait Test: Send + Sync {}
+        impl Test for Hugr {}
+    }
 }

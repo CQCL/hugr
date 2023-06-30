@@ -58,16 +58,16 @@ pub struct ModuleRootID(Node);
 pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [def](crate::ops::OpType::Def)
-/// or [declare](crate::ops::OpType::Declare) node.
+/// Handle to a [def](crate::ops::OpType::FuncDefn)
+/// or [declare](crate::ops::OpType::FuncDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDef](crate::ops::OpType::AliasDef)
-/// or [AliasDeclare](crate::ops::OpType::AliasDeclare) node.
+/// Handle to an [AliasDefn](crate::ops::OpType::AliasDefn)
+/// or [AliasDecl](crate::ops::OpType::AliasDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
