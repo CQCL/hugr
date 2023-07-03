@@ -3,14 +3,11 @@ use std::collections::{HashSet, VecDeque};
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::builder::{
-    BlockBuilder, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowSubContainer, SubContainer,
-};
+use crate::builder::{CFGBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlock, ConstValue, OpType};
-use crate::types::Signature;
 use crate::{type_row, Hugr, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -94,6 +91,7 @@ impl Rewrite for OutlineCfg {
         let wires_in = inputs.iter().cloned().zip(new_block.input_wires());
         let cfg = new_block.cfg_builder(wires_in, outputs.clone()).unwrap();
         let cfg_node = cfg.container_node();
+        let inner_exit = cfg.exit_block().node();
         let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
         let predicate = new_block
             .add_constant(ConstValue::simple_predicate(0, 1))
@@ -123,16 +121,7 @@ impl Rewrite for OutlineCfg {
         // Entry node must be first
         h.hierarchy.detach(self.entry_node.index);
         h.hierarchy
-            .push_child(self.entry_node.index, cfg_node.index)
-            .unwrap();
-        // Then exit node
-        let inner_exit = h
-            .add_op_with_parent(
-                cfg_node,
-                OpType::BasicBlock(BasicBlock::Exit {
-                    cfg_outputs: outputs,
-                }),
-            )
+            .insert_before(self.entry_node.index, inner_exit.index)
             .unwrap();
         // And remaining nodes
         for n in all_blocks {
