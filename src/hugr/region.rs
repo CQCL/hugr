@@ -10,7 +10,7 @@ use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap
 
 use crate::{ops::OpType, Direction, Hugr, Node, Port};
 
-use super::HugrView;
+use super::{HugrView, OpMetadata};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
@@ -30,6 +30,9 @@ pub struct FlatRegionView<'g> {
 
     /// Operation types for each node.
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+
+    /// Operation types for each node.
+    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpMetadata>,
 }
 
 impl<'g> FlatRegionView<'g> {
@@ -40,6 +43,7 @@ impl<'g> FlatRegionView<'g> {
             graph,
             hierarchy,
             op_types,
+            metadata,
             ..
         } = hugr;
         Self {
@@ -47,6 +51,7 @@ impl<'g> FlatRegionView<'g> {
             graph: FlatRegionGraph::new_flat_region(graph, hierarchy, root.index),
             hierarchy,
             op_types,
+            metadata,
         }
     }
 }
@@ -91,6 +96,11 @@ impl<'g> HugrView for FlatRegionView<'g> {
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         self.op_types.get(node.index)
+    }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &OpMetadata {
+        self.metadata.get(node.index)
     }
 
     #[inline]
@@ -181,6 +191,9 @@ pub struct RegionView<'g> {
 
     /// Operation types for each node.
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+
+    /// Operation types for each node.
+    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpMetadata>,
 }
 
 impl<'g> RegionView<'g> {
@@ -191,6 +204,7 @@ impl<'g> RegionView<'g> {
             graph,
             hierarchy,
             op_types,
+            metadata,
             ..
         } = hugr;
         Self {
@@ -198,6 +212,7 @@ impl<'g> RegionView<'g> {
             graph: RegionGraph::new_region(graph, hierarchy, root.index),
             hierarchy,
             op_types,
+            metadata,
         }
     }
 }
@@ -242,6 +257,11 @@ impl<'g> HugrView for RegionView<'g> {
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         self.op_types.get(node.index)
+    }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &OpMetadata {
+        self.metadata.get(node.index)
     }
 
     #[inline]

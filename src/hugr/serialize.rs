@@ -290,6 +290,7 @@ pub mod test {
             hierarchy: h,
             root,
             op_types,
+            metadata: Default::default(),
         };
 
         let v = rmp_serde::to_vec_named(&hg).unwrap();
@@ -376,7 +377,7 @@ pub mod test {
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
-        hugr.remove_node(old_in).unwrap();
+        hugr.remove_op(old_in).unwrap();
         hugr.validate().unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();

@@ -41,6 +41,9 @@ pub struct Hugr {
 
     /// Operation types for each node.
     op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+
+    /// Operation metadata
+    metadata: UnmanagedDenseMap<portgraph::NodeIndex, OpMetadata>,
 }
 
 impl Default for Hugr {
@@ -149,6 +152,9 @@ impl Hugr {
     }
 }
 
+/// Arbitrary metadata for an operation.
+pub type OpMetadata = serde_json::Value;
+
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
     /// Create a new Hugr, with a single root node.
@@ -169,6 +175,7 @@ impl Hugr {
             hierarchy,
             root,
             op_types,
+            metadata: UnmanagedDenseMap::with_capacity(nodes),
         }
     }
 
