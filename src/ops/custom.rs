@@ -129,7 +129,7 @@ pub struct OpaqueOp {
 }
 
 fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
-    format!("{}/{}", res_id, op_name).into()
+    format!("{}.{}", res_id, op_name).into()
 }
 
 impl OpaqueOp {
