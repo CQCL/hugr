@@ -1238,9 +1238,7 @@ this form by a combination of InsertIdentity operations and one Replace. Similar
 rather than movng the Exit block into the nested CFG, an identity node with a single
 successor can be added just before, with that edge used as the exitting edge.
 
-** Implementation Note ** The required form of set can be easily identified by two
-nodes: the unique entry node, and an exit node (which may be the Exit block of the
-CFG, or the source of the unique exit edge).
+** Note ** this does not allow moving the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
 
 ##### Inlining methods
 
