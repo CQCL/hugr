@@ -368,6 +368,7 @@ mod test {
         let lift_a = add_ab.add_dataflow_op(
             LeafOp::Lift {
                 ty: BIT,
+                input_resources: ResourceSet::new(),
                 new_resource: "A".into(),
             },
             [w],
@@ -377,6 +378,7 @@ mod test {
         let lift_b = add_ab.add_dataflow_op(
             LeafOp::Lift {
                 ty: BIT,
+                input_resources: ResourceSet::from_iter(["A".into()]),
                 new_resource: "B".into(),
             },
             [w],
@@ -391,6 +393,7 @@ mod test {
         let lift_c = add_c.add_dataflow_op(
             LeafOp::Lift {
                 ty: BIT,
+                input_resources: okay_resources,
                 new_resource: "C".into(),
             },
             [w],

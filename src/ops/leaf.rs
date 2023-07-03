@@ -76,6 +76,8 @@ pub enum LeafOp {
     Lift {
         /// The type of the edge
         ty: SimpleType,
+        /// The resources which are present in both the inputs and outputs
+        input_resources: ResourceSet,
         /// The resources which we're adding
         new_resource: ResourceId,
     },
@@ -182,12 +184,13 @@ impl OpTrait for LeafOp {
                 vec![SimpleType::new_sum(variants.clone())],
             ),
             LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
-            LeafOp::Lift { ty, new_resource } => {
+            LeafOp::Lift { ty, input_resources, new_resource } => {
                 let mut sig = Signature::new_df(
                     TypeRow::from(vec![ty.clone()]),
                     TypeRow::from(vec![ty.clone()]),
                 );
-                sig.output_resources = ResourceSet::singleton(new_resource);
+                sig.output_resources = ResourceSet::singleton(new_resource).union(input_resources);
+                sig.input_resources = input_resources.clone();
                 sig
             }
         }
