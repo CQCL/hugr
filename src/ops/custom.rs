@@ -122,8 +122,7 @@ impl Eq for ResourceOp {}
 pub struct OpaqueOp {
     resource: ResourceId,
     op_name: SmolStr,
-    #[serde(skip)]
-    description: String, // cache in advance as description() returns &str
+    description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: Option<Signature>,
 }
