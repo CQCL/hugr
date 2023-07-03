@@ -398,6 +398,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use crate::hugr::region::FlatRegionView;
     use crate::ops::{
         handle::{BasicBlockID, ConstID, NodeHandle},
         ConstValue,
@@ -443,7 +444,10 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
+        // There's no need to use a FlatRegionView here but we do so just to check
+        // that we *can* (as we'll need to for "real" module Hugr's).
+        let v = FlatRegionView::new(&h, h.root());
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
