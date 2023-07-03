@@ -72,7 +72,7 @@ pub enum LeafOp {
         /// The variants of the sum type.
         variants: TypeRow,
     },
-    /// A lift node, which adds resources to an edge
+    /// A lift node, which adds a resource to an edge
     Lift {
         /// The type of the edge
         ty: SimpleType,
@@ -142,7 +142,7 @@ impl OpTrait for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::RzF64 => "Rz rotation.",
-            LeafOp::Lift { .. } => "Add resource requirements to an edge",
+            LeafOp::Lift { .. } => "Add a resource requirement to an edge",
         }
     }
 

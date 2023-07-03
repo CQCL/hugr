@@ -360,7 +360,8 @@ mod test {
 
         let mut add_ab_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
         add_ab_sig.output_resources = ab_resources.clone();
-        // A box which adds resources A and B, via a child Lift node
+
+        // A box which adds resources A and B, via child Lift nodes
         let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
         let [w] = add_ab.input_wires_arr();
 
