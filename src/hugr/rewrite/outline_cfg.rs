@@ -170,3 +170,85 @@ pub enum OutlineCfgError {
     #[error("Exit node had multiple successors outside CFG: {0}")]
     MultipleExitSuccessors(#[source] Box<dyn std::error::Error>),
 }
+
+#[cfg(test)]
+mod test {
+    use crate::algorithm::nest_cfgs::test::build_conditional_in_loop_cfg;
+    use crate::ops::handle::NodeHandle;
+    use crate::{HugrView, Node};
+    use cool_asserts::assert_matches;
+    use itertools::Itertools;
+
+    use super::{OutlineCfg, OutlineCfgError};
+
+    fn depth(h: &impl HugrView, n: Node) -> u32 {
+        match h.get_parent(n) {
+            Some(p) => 1 + depth(h, p),
+            None => 0,
+        }
+    }
+
+    // TODO test cond_then_loop_separate (head, tail) keeps the backedge in the sub-cfg
+    // (== merge -> sub -> exit, hmm, maybe not that hard)
+
+    #[test]
+    fn test_outline_cfg_errors() {
+        let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
+        let head = head.node();
+        let tail = tail.node();
+        //               /-> left --\
+        //  entry -> head            > merge -> tail -> exit
+        //            |  \-> right -/             |
+        //             \---<---<---<---<---<--<---/
+        // merge is unique predecessor of tail
+        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        h.validate().unwrap();
+        let backup = h.clone();
+        let r = h.apply_rewrite(OutlineCfg {
+            entry_node: merge,
+            exit_node: tail,
+        });
+        assert_matches!(r, Err(OutlineCfgError::MultipleExitSuccessors(_)));
+        assert_eq!(h, backup);
+        let r = h.apply_rewrite(OutlineCfg {
+            entry_node: head,
+            exit_node: h.children(h.root()).next().unwrap(),
+        });
+        assert_matches!(r, Err(OutlineCfgError::ExitNodeUnreachable));
+        assert_eq!(h, backup);
+        // Here all the edges from the exit node target a node (tail) in the region
+        let r = h.apply_rewrite(OutlineCfg {
+            entry_node: tail,
+            exit_node: merge,
+        });
+        // All the edges from the exit node target a node (tail) in the region
+        assert_matches!(r, Err(OutlineCfgError::NoExitSuccessors));
+        assert_eq!(h, backup);
+    }
+
+    #[test]
+    fn test_outline_cfg() {
+        let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
+        let head = head.node();
+        let tail = tail.node();
+        //               /-> left --\
+        //  entry -> head            > merge -> tail -> exit
+        //            |  \-> right -/             |
+        //             \---<---<---<---<---<--<---/
+        // merge is unique predecessor of tail
+        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        for n in [head, tail, merge] {
+            assert_eq!(depth(&h, n), 1);
+        }
+        h.validate().unwrap();
+        h.apply_rewrite(OutlineCfg {
+            entry_node: head,
+            exit_node: merge,
+        })
+        .unwrap();
+        h.validate().unwrap();
+        assert_eq!(depth(&h, head), 3);
+        assert_eq!(depth(&h, merge), 3);
+        assert_eq!(depth(&h, tail), 1);
+    }
+}
