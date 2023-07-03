@@ -19,7 +19,7 @@ pub(crate) trait HugrMut {
     /// # Panics
     ///
     /// Panics if the node is the root node.
-    fn remove_op(&mut self, node: Node) -> Result<(), HugrError>;
+    fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
 
     /// Connect two nodes at the given ports.
     ///
@@ -148,7 +148,7 @@ where
         node.into()
     }
 
-    fn remove_op(&mut self, node: Node) -> Result<(), HugrError> {
+    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
         if node.index == self.as_ref().root {
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
