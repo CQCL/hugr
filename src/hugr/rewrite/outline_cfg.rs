@@ -49,7 +49,7 @@ impl OutlineCfg {
                     }
                 }
             }
-            let external = h.output_neighbours(n).filter(|s| !self.0.contains(&s));
+            let external = h.output_neighbours(n).filter(|s| !self.0.contains(s));
             match external.at_most_one() {
                 Ok(None) => (), // No external successors
                 Ok(Some(o)) => match exit_succ {
@@ -104,7 +104,7 @@ impl Rewrite for OutlineCfg {
 
         // 3. new_block contains input node, sub-cfg, exit node all connected
         let wires_in = inputs.iter().cloned().zip(new_block.input_wires());
-        let cfg = new_block.cfg_builder(wires_in, outputs.clone()).unwrap();
+        let cfg = new_block.cfg_builder(wires_in, outputs).unwrap();
         let cfg_node = cfg.container_node();
         let inner_exit = cfg.exit_block().node();
         let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
