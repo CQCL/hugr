@@ -297,20 +297,24 @@ where
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
-        // Update the optypes, taking them from the other graph.
+        // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
+            let meta = other.metadata.take(node);
+            self.as_mut().set_metadata(node.into(), meta);
         }
         Ok(other_root)
     }
 
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
-        // Update the optypes, copying them from the other graph.
+        // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, optype.clone());
+            let meta = other.get_metadata(node.into());
+            self.as_mut().set_metadata(node.into(), meta.clone());
         }
         Ok(other_root)
     }
