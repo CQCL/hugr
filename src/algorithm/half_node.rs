@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use super::nest_cfgs::CfgView;
 use crate::hugr::view::HugrView;
-use crate::ops::handle::{CfgID, NodeHandle};
 use crate::ops::tag::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
@@ -31,8 +30,8 @@ struct HalfNodeView<'a, H> {
 
 impl<'a, H: HugrView> HalfNodeView<'a, H> {
     #[allow(unused)]
-    pub(crate) fn new(h: &'a H, cfg: CfgID) -> Self {
-        let mut children = h.children(cfg.node());
+    pub(crate) fn new(h: &'a H) -> Self {
+        let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
         assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -100,7 +99,7 @@ mod test {
     use std::collections::HashSet;
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, main, tail) = build_conditional_in_loop_cfg(false)?;
+        let (h, main, tail) = build_conditional_in_loop_cfg(false)?;
         //               /-> left --\
         //  entry -> main            > merge -> tail -> exit
         //            |  \-> right -/             |
@@ -112,7 +111,7 @@ mod test {
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
-        let v = HalfNodeView::new(&h, cfg_id);
+        let v = HalfNodeView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
 

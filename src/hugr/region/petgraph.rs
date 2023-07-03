@@ -79,7 +79,7 @@ macro_rules! impl_region_petgraph_traits {
             type Neighbors = <$hugr<'a> as HugrView>::Neighbours<'g>;
 
             fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
-                self.all_neighbours(n)
+                self.output_neighbours(n)
             }
         }
 
