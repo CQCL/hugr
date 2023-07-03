@@ -513,23 +513,14 @@ pub(crate) mod test {
         //  entry -> head -> split            > merge -> tail -> exit
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
+        // split is unique successor of head
+        let split = h.output_neighbours(head).exactly_one().unwrap();
+        // merge is unique predecessor of tail
+        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+
         let v = SimpleCfgView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
-        // split is unique successor of head
-        let split = *edge_classes
-            .keys()
-            .filter(|(s, _)| *s == head)
-            .map(|(_, t)| t)
-            .exactly_one()
-            .unwrap();
-        // merge is unique predecessor of tail
-        let merge = *edge_classes
-            .keys()
-            .filter(|(_, t)| *t == tail)
-            .map(|(s, _)| s)
-            .exactly_one()
-            .unwrap();
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
