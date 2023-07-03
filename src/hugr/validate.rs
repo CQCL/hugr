@@ -392,7 +392,13 @@ impl<'a> ValidationContext<'a> {
 
         let postorder = DfsPostOrder::new(&region, entry_node);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
-        if nodes_visited != self.hugr.hierarchy.child_count(parent.index) {
+        // Local ScopedDefn's should not be reachable from the Input node, so discount them
+        let non_defn_count = self
+            .hugr
+            .children(parent)
+            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).tag()))
+            .count();
+        if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
                 optype: optype.clone(),
@@ -436,7 +442,7 @@ impl<'a> ValidationContext<'a> {
                     return typecheck_const(&typ, val).map_err(ValidationError::from);
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
-                    // edges coming from Declare or Def
+                    // edges coming from FuncDecl or FuncDefn
                     return if OpTag::Function.contains(from_optype.tag()) {
                         Ok(())
                     } else {
@@ -746,7 +752,7 @@ mod test {
     ///
     /// Returns the hugr and the node index of the definition.
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-        let def_op: OpType = ops::Def {
+        let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
             signature: Signature::new_df(type_row![B], vec![B; copies]),
         }
@@ -827,7 +833,7 @@ mod test {
 
     #[test]
     fn invalid_root() {
-        let declare_op: OpType = ops::Declare {
+        let declare_op: OpType = ops::FuncDecl {
             name: "main".into(),
             signature: Default::default(),
         }
@@ -906,7 +912,7 @@ mod test {
         let new_def = b
             .add_op_with_parent(
                 root,
-                ops::Def {
+                ops::FuncDefn {
                     signature: def_sig,
                     name: "main".into(),
                 },
@@ -1105,6 +1111,43 @@ mod test {
         );
         //Order edge. This will need metadata indicating its purpose.
         h.add_other_edge(input, sub_dfg)?;
+        h.validate().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    fn test_local_const() -> Result<(), HugrError> {
+        let mut h = Hugr::new(ops::DFG {
+            signature: Signature::new_df(type_row![B], type_row![B]),
+        });
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
+        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
+        h.connect(input, 0, xor, 0)?;
+        h.connect(xor, 0, output, 0)?;
+        assert_eq!(
+            h.validate(),
+            Err(ValidationError::UnconnectedPort {
+                node: xor,
+                port: Port::new_incoming(1),
+                port_kind: EdgeKind::Value(B)
+            })
+        );
+        // Second input of Xor from a constant
+        let cst =
+            h.add_op_with_parent(h.root(), ops::Const(ConstValue::Int { width: 1, value: 1 }))?;
+        let lcst = h.add_op_with_parent(
+            h.root(),
+            ops::LoadConstant {
+                datatype: ClassicType::Int(1),
+            },
+        )?;
+        h.connect(cst, 0, lcst, 0)?;
+        h.connect(lcst, 0, xor, 1)?;
+        // We are missing the edge from Input to LoadConstant, hence:
+        assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
+        // Now include the LoadConstant node in the causal cone
+        h.add_other_edge(input, lcst)?;
         h.validate().unwrap();
         Ok(())
     }
