@@ -9,6 +9,9 @@ pub mod typecheck;
 pub mod validate;
 pub mod view;
 
+use std::collections::VecDeque;
+use std::iter;
+
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
@@ -167,6 +170,21 @@ impl Hugr {
             root,
             op_types,
         }
+    }
+
+    /// Produce a canonical ordering of the nodes.
+    ///
+    /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
+    fn canonical_order(&self) -> impl Iterator<Item = Node> + '_ {
+        // Generate a BFS-ordered list of nodes based on the hierarchy
+        let mut queue = VecDeque::from([self.root.into()]);
+        iter::from_fn(move || {
+            let node = queue.pop_front()?;
+            for child in self.children(node) {
+                queue.push_back(child);
+            }
+            Some(node)
+        })
     }
 }
 

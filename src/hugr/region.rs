@@ -75,10 +75,12 @@ impl<'g> HugrView for FlatRegionView<'g> {
     > where
         Self: 'a;
 
+    #[inline]
     fn root(&self) -> Node {
         self.root
     }
 
+    #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
         self.hierarchy
             .parent(node.index)
@@ -86,14 +88,17 @@ impl<'g> HugrView for FlatRegionView<'g> {
             .filter(|&n| n == self.root)
     }
 
+    #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         self.op_types.get(node.index)
     }
 
+    #[inline]
     fn node_count(&self) -> usize {
         self.hierarchy.child_count(self.root.index) + 1
     }
 
+    #[inline]
     fn edge_count(&self) -> usize {
         // Faster implementation than filtering all the nodes in the internal graph.
         self.nodes()
@@ -101,16 +106,19 @@ impl<'g> HugrView for FlatRegionView<'g> {
             .sum()
     }
 
+    #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
         // Faster implementation than filtering all the nodes in the internal graph.
         let children = self.hierarchy.children(self.root.index).map_into();
         iter::once(self.root).chain(children)
     }
 
+    #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
         self.graph.port_offsets(node.index, dir).map_into()
     }
 
+    #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
         self.graph.all_port_offsets(node.index).map_into()
     }
@@ -128,10 +136,12 @@ impl<'g> HugrView for FlatRegionView<'g> {
             })
     }
 
+    #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.graph.num_ports(node.index, dir)
     }
 
+    #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
         match node == self.root {
             true => self.hierarchy.children(node.index).map_into(),
@@ -139,10 +149,12 @@ impl<'g> HugrView for FlatRegionView<'g> {
         }
     }
 
+    #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
         self.graph.neighbours(node.index, dir).map_into()
     }
 
+    #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
@@ -214,10 +226,12 @@ impl<'g> HugrView for RegionView<'g> {
     > where
         Self: 'a;
 
+    #[inline]
     fn root(&self) -> Node {
         self.root
     }
 
+    #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
         self.hierarchy
             .parent(node.index)
@@ -225,26 +239,32 @@ impl<'g> HugrView for RegionView<'g> {
             .map(Into::into)
     }
 
+    #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
         self.op_types.get(node.index)
     }
 
+    #[inline]
     fn node_count(&self) -> usize {
         self.graph.node_count()
     }
 
+    #[inline]
     fn edge_count(&self) -> usize {
         self.graph.link_count()
     }
 
+    #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
         self.graph.nodes_iter().map_into()
     }
 
+    #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
         self.graph.port_offsets(node.index, dir).map_into()
     }
 
+    #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
         self.graph.all_port_offsets(node.index).map_into()
     }
@@ -262,10 +282,12 @@ impl<'g> HugrView for RegionView<'g> {
             })
     }
 
+    #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.graph.num_ports(node.index, dir)
     }
 
+    #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
         match self.graph.contains_node(node.index) {
             true => self.hierarchy.children(node.index).map_into(),
@@ -273,10 +295,12 @@ impl<'g> HugrView for RegionView<'g> {
         }
     }
 
+    #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
         self.graph.neighbours(node.index, dir).map_into()
     }
 
+    #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }

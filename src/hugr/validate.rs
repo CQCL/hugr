@@ -1047,7 +1047,7 @@ mod test {
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
                 => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
         );
-        b.remove_op(exit2).unwrap();
+        b.remove_node(exit2).unwrap();
 
         // Change the types in the BasicBlock node to work on qubits instead of bits
         b.replace_op(
