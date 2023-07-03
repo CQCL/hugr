@@ -344,22 +344,22 @@ mod test {
     fn lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let okay_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
-        let cool_new_resources = ResourceSet::singleton(&"C".into());
-        let all_resources = okay_resources.clone().union(&cool_new_resources);
+        let ab_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
+        let c_resources = ResourceSet::singleton(&"C".into());
+        let abc_resources = ab_resources.clone().union(&c_resources);
 
         let mut parent_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        parent_sig.output_resources = all_resources.clone();
+        parent_sig.output_resources = abc_resources.clone();
         let mut parent = module_builder.define_function("parent", parent_sig)?;
 
-        let mut coolify_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        coolify_sig.input_resources = okay_resources.clone();
-        coolify_sig.output_resources = all_resources;
+        let mut add_c_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
+        add_c_sig.input_resources = ab_resources.clone();
+        add_c_sig.output_resources = abc_resources;
 
         let [w] = parent.input_wires_arr();
 
         let mut add_ab_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        add_ab_sig.output_resources = okay_resources.clone();
+        add_ab_sig.output_resources = ab_resources.clone();
         // A box which adds resources A and B, via a child Lift node
         let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
         let [w] = add_ab.input_wires_arr();
@@ -387,20 +387,21 @@ mod test {
         let add_ab = add_ab.finish_with_outputs([w])?;
         let [w] = add_ab.outputs_arr();
 
-        let mut add_c = parent.dfg_builder(coolify_sig, [w])?;
+        // Add another node (a sibling to add_ab) which adds resource C
+        // via a child lift node
+        let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             LeafOp::Lift {
                 ty: BIT,
-                input_resources: okay_resources,
+                input_resources: ab_resources,
                 new_resource: "C".into(),
             },
             [w],
         )?;
-        let ws: Vec<Wire> = lift_c.outputs().collect();
-        assert_eq!(ws.len(), 1);
+        let wires: Vec<Wire> = lift_c.outputs().collect();
 
-        let add_c = add_c.finish_with_outputs(ws)?;
+        let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
         parent.finish_with_outputs([w])?;
         module_builder.finish_hugr()?;
