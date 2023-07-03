@@ -1,4 +1,5 @@
-use std::collections::{HashSet, VecDeque};
+//! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -12,46 +13,60 @@ use crate::{type_row, Hugr, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
-pub struct OutlineCfg {
-    /// Will become the entry block in the new sub-cfg.
-    /// All edges "in" to this block will be redirected to the new block
-    /// (excluding backedges from internal BBs)
-    entry_node: Node,
-    /// Unique node in the parent CFG that has a successor (indeed, exactly one)
-    /// that is not reachable from the entry_node (without going through this exit_node).
-    exit_node: Node,
-}
+pub struct OutlineCfg(HashSet<Node>);
 
 impl OutlineCfg {
-    fn compute_all_blocks(&self, h: &Hugr) -> Result<(HashSet<Node>, Node), OutlineCfgError> {
-        let cfg_n = match (h.get_parent(self.entry_node), h.get_parent(self.exit_node)) {
-            (Some(p1), Some(p2)) if p1 == p2 => p1,
-            (p1, p2) => return Err(OutlineCfgError::EntryExitNotSiblings(p1, p2)),
+    /// Create a new OutlineCfg rewrite that will move the provided blocks.
+    pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
+        Self(HashSet::from_iter(blocks))
+    }
+
+    fn compute_entry_exit_outside(&self, h: &Hugr) -> Result<(Node, Node, Node), OutlineCfgError> {
+        let cfg_n = match self
+            .0
+            .iter()
+            .map(|n| h.get_parent(*n))
+            .unique()
+            .exactly_one()
+        {
+            Ok(Some(n)) => n,
+            _ => return Err(OutlineCfgError::NotSiblings),
         };
         let o = h.get_optype(cfg_n);
         if !matches!(o, OpType::CFG(_)) {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
-        let mut all_blocks = HashSet::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(self.entry_node);
-        while let Some(n) = queue.pop_front() {
-            // This puts the exit_node into 'all_blocks' but not its successors
-            if all_blocks.insert(n) && n != self.exit_node {
-                queue.extend(h.output_neighbours(n));
+        let mut entry = None;
+        let mut exit_succ = None;
+        for &n in self.0.iter() {
+            if h.input_neighbours(n).any(|pred| !self.0.contains(&pred)) {
+                match entry {
+                    None => {
+                        entry = Some(n);
+                    }
+                    Some(prev) => {
+                        return Err(OutlineCfgError::MultipleEntryNodes(prev, n));
+                    }
+                }
             }
+            let external = h.output_neighbours(n).filter(|s| !self.0.contains(&s));
+            match external.at_most_one() {
+                Ok(None) => (), // No external successors
+                Ok(Some(o)) => match exit_succ {
+                    None => {
+                        exit_succ = Some((n, o));
+                    }
+                    Some((prev, _)) => {
+                        return Err(OutlineCfgError::MultipleExitNodes(prev, n));
+                    }
+                },
+                Err(ext) => return Err(OutlineCfgError::MultipleExitEdges(n, ext.collect())),
+            };
         }
-        if !all_blocks.contains(&self.exit_node) {
-            return Err(OutlineCfgError::ExitNodeUnreachable);
-        }
-        let exit_succs = h
-            .output_neighbours(self.exit_node)
-            .filter(|n| !all_blocks.contains(n))
-            .collect::<Vec<_>>();
-        match exit_succs.into_iter().at_most_one() {
-            Err(e) => Err(OutlineCfgError::MultipleExitSuccessors(Box::new(e))),
-            Ok(None) => Err(OutlineCfgError::NoExitSuccessors),
-            Ok(Some(exit_succ)) => Ok((all_blocks, exit_succ)),
+        match (entry, exit_succ) {
+            (Some(e), Some((x, o))) => Ok((e, x, o)),
+            (None, _) => Err(OutlineCfgError::NoEntryNode),
+            (_, None) => Err(OutlineCfgError::NoExitNode),
         }
     }
 }
@@ -60,17 +75,17 @@ impl Rewrite for OutlineCfg {
     type Error = OutlineCfgError;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &Hugr) -> Result<(), OutlineCfgError> {
-        self.compute_all_blocks(h)?;
+        self.compute_entry_exit_outside(h)?;
         Ok(())
     }
     fn apply(self, h: &mut Hugr) -> Result<(), OutlineCfgError> {
-        let (all_blocks, exit_succ) = self.compute_all_blocks(h)?;
+        let (entry, exit, outside) = self.compute_entry_exit_outside(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(self.entry_node) else {panic!("Entry node is not a basic block")};
+        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry) else {panic!("Entry node is not a basic block")};
         let inputs = inputs.clone();
         let outputs = {
-            let OpType::BasicBlock(s_type) = h.get_optype(self.exit_node) else {panic!()};
+            let OpType::BasicBlock(s_type) = h.get_optype(exit) else {panic!()};
             match s_type {
                 BasicBlock::Exit { cfg_outputs } => cfg_outputs,
                 BasicBlock::DFB { inputs, .. } => inputs,
@@ -78,7 +93,7 @@ impl Rewrite for OutlineCfg {
         }
         .clone();
         let mut existing_cfg = {
-            let parent = h.get_parent(self.entry_node).unwrap();
+            let parent = h.get_parent(entry).unwrap();
             CFGBuilder::from_existing(h, parent).unwrap()
         };
 
@@ -105,13 +120,10 @@ impl Rewrite for OutlineCfg {
         let h = existing_cfg.hugr_mut();
 
         let preds: Vec<_> = h
-            .linked_ports(
-                self.entry_node,
-                h.node_inputs(self.entry_node).exactly_one().unwrap(),
-            )
+            .linked_ports(entry, h.node_inputs(entry).exactly_one().unwrap())
             .collect();
         for (pred, br) in preds {
-            if !all_blocks.contains(&pred) {
+            if !self.0.contains(&pred) {
                 h.disconnect(pred, br).unwrap();
                 h.connect(pred, br.index(), new_block.node(), 0).unwrap();
             }
@@ -119,60 +131,69 @@ impl Rewrite for OutlineCfg {
 
         // 5. Children of new CFG.
         // Entry node must be first
-        h.hierarchy.detach(self.entry_node.index);
+        h.hierarchy.detach(entry.index);
         h.hierarchy
-            .insert_before(self.entry_node.index, inner_exit.index)
+            .insert_before(entry.index, inner_exit.index)
             .unwrap();
         // And remaining nodes
-        for n in all_blocks {
+        for n in self.0 {
             // Do not move the entry node, as we have already
-            if n != self.entry_node {
+            if n != entry {
                 h.hierarchy.detach(n.index);
                 h.hierarchy.push_child(n.index, cfg_node.index).unwrap();
             }
         }
 
         // 6. Exit edges.
-        // Retarget edge from exit_node (that used to target exit_succ) to inner_exit
+        // Retarget edge from exit_node (that used to target outside) to inner_exit
         let exit_port = h
-            .node_outputs(self.exit_node)
+            .node_outputs(exit)
             .filter(|p| {
-                let (t, p2) = h
-                    .linked_ports(self.exit_node, *p)
-                    .exactly_one()
-                    .ok()
-                    .unwrap();
+                let (t, p2) = h.linked_ports(exit, *p).exactly_one().ok().unwrap();
                 assert!(p2.index() == 0);
-                t == exit_succ
+                t == outside
             })
             .exactly_one()
             .unwrap();
-        h.disconnect(self.exit_node, exit_port).unwrap();
-        h.connect(self.exit_node, exit_port.index(), inner_exit, 0)
-            .unwrap();
-        // And connect new_block to exit_succ instead
-        h.connect(new_block.node(), 0, exit_succ, 0).unwrap();
+        h.disconnect(exit, exit_port).unwrap();
+        h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
+        // And connect new_block to outside instead
+        h.connect(new_block.node(), 0, outside, 0).unwrap();
 
         Ok(())
     }
 }
 
+/// Errors that can occur in expressing an OutlineCfg rewrite.
 #[derive(Debug, Error)]
 pub enum OutlineCfgError {
-    #[error("The exit node could not be reached from the entry node")]
-    ExitNodeUnreachable,
-    #[error("Exit node does not exit - all its successors can be reached from the entry")]
-    NoExitSuccessors,
-    #[error("Entry node {0:?} and exit node {1:?} are not siblings")]
-    EntryExitNotSiblings(Option<Node>, Option<Node>),
-    #[error("The parent node {0:?} of entry and exit was not a CFG but an {1:?}")]
+    /// The set of blocks were not siblings
+    #[error("The nodes did not all have the same parent")]
+    NotSiblings,
+    /// The parent node was not a CFG node
+    #[error("The parent node {0:?} was not a CFG but an {1:?}")]
     ParentNotCfg(Node, OpType),
-    #[error("Exit node had multiple successors outside CFG: {0}")]
-    MultipleExitSuccessors(#[source] Box<dyn std::error::Error>),
+    /// Multiple blocks had incoming edges
+    #[error("Multiple blocks had predecessors outside the set - at least {0:?} and {1:?}")]
+    MultipleEntryNodes(Node, Node),
+    /// Multiple blocks had outgoing edegs
+    #[error("Multiple blocks had edges leaving the set - at least {0:?} and {1:?}")]
+    MultipleExitNodes(Node, Node),
+    /// One block had multiple outgoing edges
+    #[error("Exit block {0:?} had edges to multiple external blocks {1:?}")]
+    MultipleExitEdges(Node, Vec<Node>),
+    /// No block was identified as an entry block
+    #[error("No block had predecessors outside the set")]
+    NoEntryNode,
+    /// No block was identified as an exit block
+    #[error("No block had a successor outside the set")]
+    NoExitNode,
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use crate::algorithm::nest_cfgs::test::build_conditional_in_loop_cfg;
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
@@ -188,9 +209,6 @@ mod test {
         }
     }
 
-    // TODO test cond_then_loop_separate (head, tail) keeps the backedge in the sub-cfg
-    // (== merge -> sub -> exit, hmm, maybe not that hard)
-
     #[test]
     fn test_outline_cfg_errors() {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
@@ -204,25 +222,17 @@ mod test {
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
         h.validate().unwrap();
         let backup = h.clone();
-        let r = h.apply_rewrite(OutlineCfg {
-            entry_node: merge,
-            exit_node: tail,
-        });
-        assert_matches!(r, Err(OutlineCfgError::MultipleExitSuccessors(_)));
+        let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
+        assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
         assert_eq!(h, backup);
-        let r = h.apply_rewrite(OutlineCfg {
-            entry_node: head,
-            exit_node: h.children(h.root()).next().unwrap(),
-        });
-        assert_matches!(r, Err(OutlineCfgError::ExitNodeUnreachable));
+
+        let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
+        let r = h.apply_rewrite(OutlineCfg::new([left, right, head]));
+        assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b)) => HashSet::from([a,b]) == HashSet::from_iter([left, right, head]));
         assert_eq!(h, backup);
-        // Here all the edges from the exit node target a node (tail) in the region
-        let r = h.apply_rewrite(OutlineCfg {
-            entry_node: tail,
-            exit_node: merge,
-        });
-        // All the edges from the exit node target a node (tail) in the region
-        assert_matches!(r, Err(OutlineCfgError::NoExitSuccessors));
+
+        let r = h.apply_rewrite(OutlineCfg::new([left, right, merge]));
+        assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b)) => HashSet::from([a,b]) == HashSet::from([left, right]));
         assert_eq!(h, backup);
     }
 
@@ -231,24 +241,33 @@ mod test {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
         let head = head.node();
         let tail = tail.node();
+        let parent = h.get_parent(head).unwrap();
+        let [entry, exit]: [Node; 2] = h.children(parent).take(2).collect_vec().try_into().unwrap();
         //               /-> left --\
         //  entry -> head            > merge -> tail -> exit
         //            |  \-> right -/             |
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
         for n in [head, tail, merge] {
             assert_eq!(depth(&h, n), 1);
         }
         h.validate().unwrap();
-        h.apply_rewrite(OutlineCfg {
-            entry_node: head,
-            exit_node: merge,
-        })
-        .unwrap();
+        let blocks = [head, left, right, merge];
+        h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
         h.validate().unwrap();
-        assert_eq!(depth(&h, head), 3);
-        assert_eq!(depth(&h, merge), 3);
-        assert_eq!(depth(&h, tail), 1);
+        for n in blocks {
+            assert_eq!(depth(&h, n), 3);
+        }
+        let new_block = h.output_neighbours(entry).exactly_one().unwrap();
+        for n in [entry, exit, tail, new_block] {
+            assert_eq!(depth(&h, n), 1);
+        }
+        assert_eq!(h.input_neighbours(tail).exactly_one().unwrap(), new_block);
+        assert_eq!(
+            h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
+            HashSet::from([exit, new_block])
+        );
     }
 }
