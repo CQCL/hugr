@@ -201,6 +201,7 @@ mod test {
         resource::ResourceSet,
         type_row,
         types::{LinearType, Signature},
+        Wire,
     };
 
     use super::*;
@@ -343,54 +344,63 @@ mod test {
     fn lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let mut parent = module_builder
-            .define_function("parent", Signature::new_df(type_row![BIT], type_row![BIT]))?;
-
-        let boring_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
+        let okay_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
         let cool_new_resources = ResourceSet::singleton(&"C".into());
-        let all_resources = boring_resources.clone().union(&cool_new_resources);
+        let all_resources = okay_resources.clone().union(&cool_new_resources);
+
+        let mut parent_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
+        parent_sig.output_resources = all_resources.clone();
+        let mut parent = module_builder
+            .define_function("parent", parent_sig)?;
 
         let mut coolify_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        coolify_sig.input_resources = boring_resources.clone();
+        coolify_sig.input_resources = okay_resources.clone();
         coolify_sig.output_resources = all_resources;
 
         let [w] = parent.input_wires_arr();
 
-        let mut boringify_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        boringify_sig.output_resources = boring_resources;
-        let boring = parent.dfg_builder(boringify_sig, [w])?;
-        let [w] = boring.input_wires_arr();
-        // Insert a lift node here with coolify_sig, between inner's input and output
-        let boring = boring.finish_with_outputs([w])?;
+        let mut add_ab_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
+        add_ab_sig.output_resources = okay_resources.clone();
+        // A box which adds resources A and B, via a child Lift node
+        let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
+        let [w] = add_ab.input_wires_arr();
 
-        let [w] = boring.outputs_arr();
+        let lift_a = add_ab.add_dataflow_op(
+            LeafOp::Lift {
+                ty: BIT,
+                new_resource: "A".into(),
+            },
+            [w],
+        )?;
+        let [w] = lift_a.outputs_arr();
 
-        let cool = parent.dfg_builder(coolify_sig, [w])?;
-        let [w] = cool.input_wires_arr();
-        let cool = cool.finish_with_outputs([w])?;
-        let [w] = cool.outputs_arr();
+        let lift_b = add_ab.add_dataflow_op(
+            LeafOp::Lift {
+                ty: BIT,
+                new_resource: "B".into(),
+            },
+            [w],
+        )?;
+        let [w] = lift_b.outputs_arr();
 
+        let add_ab = add_ab.finish_with_outputs([w])?;
+        let [w] = add_ab.outputs_arr();
+
+        let mut add_c = parent.dfg_builder(coolify_sig, [w])?;
+        let [w] = add_c.input_wires_arr();
+        let lift_c = add_c.add_dataflow_op(
+            LeafOp::Lift {
+                ty: BIT,
+                new_resource: "C".into(),
+            },
+            [w],
+        )?;
+        let ws: Vec<Wire> = lift_c.outputs().to_owned().collect();
+        assert_eq!(ws.len(), 1);
+
+        let add_c = add_c.finish_with_outputs(ws)?;
+        let [w] = add_c.outputs_arr();
         parent.finish_with_outputs([w])?;
-        module_builder.finish_hugr()?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn sanity() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-        let mut main = module_builder
-            .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
-
-        let [w] = main.input_wires_arr();
-
-        let inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
-        let inner = main.dfg_builder(inner_sig, [w])?;
-        let [w] = inner.input_wires_arr();
-        let inner = inner.finish_with_outputs([w])?;
-        let [w] = inner.outputs_arr();
-
-        let handle = main.finish_with_outputs([w])?;
         module_builder.finish_hugr()?;
 
         Ok(())
