@@ -1,6 +1,6 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
-use crate::hugr::{Node, Port, ValidationError};
+use crate::hugr::{Node, OpMetadata, Port, ValidationError};
 use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -99,6 +99,17 @@ pub trait Container {
     fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_from_view(parent, child)?)
+    }
+
+    /// Add metadata to the container node.
+    fn set_metadata(&mut self, meta: OpMetadata) {
+        let parent = self.container_node();
+        self.hugr_mut().set_metadata(parent, meta);
+    }
+
+    /// Add metadata to a child node.
+    fn set_child_metadata(&mut self, child: Node, meta: OpMetadata) {
+        self.hugr_mut().set_metadata(child, meta);
     }
 }
 

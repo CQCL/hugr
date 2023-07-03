@@ -9,6 +9,8 @@ use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
 use crate::{Hugr, Port};
 
+use super::OpMetadata;
+
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
     /// Add a node to the graph.
@@ -20,6 +22,14 @@ pub(crate) trait HugrMut {
     ///
     /// Panics if the node is the root node.
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
+
+    /// Returns the metadata associated with a node.
+    fn get_metadata_mut(&mut self, node: Node) -> &mut OpMetadata;
+
+    /// Returns the metadata associated with a node.
+    fn set_metadata(&mut self, node: Node, metadata: OpMetadata) {
+        *self.get_metadata_mut(node) = metadata;
+    }
 
     /// Connect two nodes at the given ports.
     ///
@@ -157,6 +167,10 @@ where
         self.as_mut().graph.remove_node(node.index);
         self.as_mut().op_types.remove(node.index);
         Ok(())
+    }
+
+    fn get_metadata_mut(&mut self, node: Node) -> &mut OpMetadata {
+        self.as_mut().metadata.get_mut(node.index)
     }
 
     fn connect(
