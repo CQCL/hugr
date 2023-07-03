@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
-use crate::utils::display_list;
+use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
 use crate::{resource::ResourceSet, type_row};
 
 /// A type that represents concrete data.
@@ -67,7 +67,7 @@ pub enum Container<T: PrimType> {
     Sum(Box<TypeRow>),
     /// Known size array of T.
     Array(Box<T>, usize),
-    /// Alias defined in AliasDef or AliasDeclare nodes.
+    /// Alias defined in AliasDefn or AliasDecl nodes.
     Alias(SmolStr),
 }
 
@@ -110,7 +110,7 @@ pub enum ClassicType {
     /// A type variable identified by a name.
     Variable(SmolStr),
     /// An arbitrary size integer.
-    Int(u8),
+    Int(HugrIntWidthStore),
     /// A 64-bit floating point number.
     F64,
     /// An arbitrary length string.
@@ -133,7 +133,7 @@ impl ClassicType {
 
     /// Returns a new integer type with the given number of bits.
     #[inline]
-    pub const fn int<const N: u8>() -> Self {
+    pub const fn int<const N: HugrIntWidthStore>() -> Self {
         Self::Int(N)
     }
 

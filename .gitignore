@@ -15,3 +15,10 @@ Cargo.lock
 
 # Failing proptest artifacts
 proptest-regressions/
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# managed by devenv
+.pre-commit-config.yaml

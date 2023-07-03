@@ -1,8 +1,9 @@
 //! Base HUGR builder providing low-level building blocks.
 
+use std::collections::HashMap;
 use std::ops::Range;
 
-use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
+use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
@@ -18,9 +19,6 @@ pub(crate) trait HugrMut {
     /// # Panics
     ///
     /// Panics if the node is the root node.
-    fn remove_op(&mut self, node: Node) -> Result<(), HugrError>;
-
-    /// Remove a node from the graph
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
 
     /// Connect two nodes at the given ports.
@@ -115,6 +113,25 @@ pub(crate) trait HugrMut {
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
+
+    /// Insert another hugr into this one, under a given root node.
+    ///
+    /// Returns the root node of the inserted hugr.
+    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError>;
+
+    /// Copy another hugr into this one, under a given root node.
+    ///
+    /// Returns the root node of the inserted hugr.
+    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
+
+    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
+    /// traversal of the hierarchy.
+    ///
+    /// The rekey function is called for each moved node with the old and new indices.
+    ///
+    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
+    /// preserve the indices.
+    fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node));
 }
 
 impl<T> HugrMut for T
@@ -131,15 +148,11 @@ where
         node.into()
     }
 
-    fn remove_op(&mut self, node: Node) -> Result<(), HugrError> {
+    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
         if node.index == self.as_ref().root {
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
         }
-        self.as_mut().remove_node(node)
-    }
-
-    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
         self.as_mut().hierarchy.remove(node.index);
         self.as_mut().graph.remove_node(node.index);
         self.as_mut().op_types.remove(node.index);
@@ -267,6 +280,98 @@ where
         let cur = self.as_mut().op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
     }
+
+    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
+        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
+        // Update the optypes, taking them from the other graph.
+        for (&node, &new_node) in node_map.iter() {
+            let optype = other.op_types.take(node);
+            self.as_mut().op_types.set(new_node, optype);
+        }
+        Ok(other_root)
+    }
+
+    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
+        // Update the optypes, copying them from the other graph.
+        for (&node, &new_node) in node_map.iter() {
+            let optype = other.get_optype(node.into());
+            self.as_mut().op_types.set(new_node, optype.clone());
+        }
+        Ok(other_root)
+    }
+
+    fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        // Generate the ordered list of nodes
+        let mut ordered = Vec::with_capacity(self.node_count());
+        ordered.extend(self.as_ref().canonical_order());
+
+        // Permute the nodes in the graph to match the order.
+        //
+        // Invariant: All the elements before `position` are in the correct place.
+        for position in 0..ordered.len() {
+            // Find the element's location. If it originally came from a previous position
+            // then it has been swapped somewhere else, so we follow the permutation chain.
+            let mut source: Node = ordered[position];
+            while position > source.index.index() {
+                source = ordered[source.index.index()];
+            }
+
+            let target: Node = NodeIndex::new(position).into();
+            if target != source {
+                let hugr = self.as_mut();
+                hugr.graph.swap_nodes(target.index, source.index);
+                hugr.op_types.swap(target.index, source.index);
+                hugr.hierarchy.swap_nodes(target.index, source.index);
+                rekey(source, target);
+            }
+        }
+        self.as_mut().root = NodeIndex::new(0);
+
+        // Finish by compacting the copy nodes.
+        // The operation nodes will be left in place.
+        // This step is not strictly necessary.
+        self.as_mut().graph.compact_nodes(|_, _| {});
+    }
+}
+
+/// Internal implementation of `insert_hugr` and `insert_view` methods for
+/// AsMut<Hugr>.
+///
+/// Returns the root node of the inserted hierarchy and a mapping from the nodes
+/// in the inserted graph to their new indices in `hugr`.
+///
+/// This function does not update the optypes of the inserted nodes, so the
+/// caller must do that.
+fn insert_hugr_internal(
+    hugr: &mut Hugr,
+    root: Node,
+    other: &impl HugrView,
+) -> Result<(Node, HashMap<NodeIndex, NodeIndex>), HugrError> {
+    let node_map = hugr.graph.insert_graph(other.as_portgraph())?;
+    let other_root = node_map[&other.root().index];
+
+    // Update hierarchy and optypes
+    hugr.hierarchy.push_child(other_root, root.index)?;
+    for (&node, &new_node) in node_map.iter() {
+        other
+            .children(node.into())
+            .try_for_each(|child| -> Result<(), HugrError> {
+                hugr.hierarchy
+                    .push_child(node_map[&child.index], new_node)?;
+                Ok(())
+            })?;
+    }
+
+    // The root node didn't have any ports.
+    let root_optype = other.get_optype(other.root());
+    hugr.set_num_ports(
+        other_root.into(),
+        root_optype.input_count(),
+        root_optype.output_count(),
+    );
+
+    Ok((other_root.into(), node_map))
 }
 
 #[cfg(test)]
@@ -296,7 +401,7 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ops::Def {
+                ops::FuncDefn {
                     name: "main".into(),
                     signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },

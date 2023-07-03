@@ -22,14 +22,14 @@ pub enum OpTag {
     ModuleOp,
     /// Root module operation.
     ModuleRoot,
-    /// A function definition.
-    Def,
     /// A function definition or declaration.
     Function,
     /// A type alias.
     Alias,
     /// A constant declaration.
     Const,
+    /// A function definition.
+    FuncDefn,
 
     /// Node in a Dataflow Sibling Graph.
     DataflowChild,
@@ -45,8 +45,8 @@ pub enum OpTag {
     FnCall,
     /// A constant load operation.
     LoadConst,
-    /// Operations taking const inputs.
-    ConstInput,
+    /// A definition that could be at module level or inside a DSG.
+    ScopedDefn,
     /// A tail-recursive loop.
     TailLoop,
     /// A conditional operation.
@@ -82,20 +82,20 @@ impl OpTag {
             OpTag::Input => &[OpTag::DataflowChild],
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
-            OpTag::Alias => &[OpTag::ModuleOp],
-            OpTag::Def => &[OpTag::Function, OpTag::DataflowChild],
+            OpTag::Alias => &[OpTag::ScopedDefn],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn],
             OpTag::BasicBlock => &[OpTag::Any],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
             OpTag::ModuleRoot => &[OpTag::Any],
-            OpTag::Const => &[OpTag::ModuleOp, OpTag::DataflowChild],
+            OpTag::Const => &[OpTag::ScopedDefn],
             OpTag::Dfg => &[OpTag::DataflowChild],
             OpTag::Cfg => &[OpTag::DataflowChild],
-            OpTag::ConstInput => &[OpTag::DataflowChild],
+            OpTag::ScopedDefn => &[OpTag::DataflowChild, OpTag::ModuleOp],
             OpTag::TailLoop => &[OpTag::DataflowChild],
             OpTag::Conditional => &[OpTag::DataflowChild],
-            OpTag::FnCall => &[OpTag::ConstInput],
-            OpTag::LoadConst => &[OpTag::ConstInput],
+            OpTag::FnCall => &[OpTag::DataflowChild],
+            OpTag::LoadConst => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
             OpTag::Lift => &[OpTag::DataflowChild],
         }
@@ -110,7 +110,7 @@ impl OpTag {
             OpTag::DataflowChild => "Node in a Dataflow Sibling Graph",
             OpTag::Input => "Input node",
             OpTag::Output => "Output node",
-            OpTag::Def => "Function definition",
+            OpTag::FuncDefn => "Function definition",
             OpTag::BasicBlock => "Basic block",
             OpTag::BasicBlockExit => "Exit basic block node",
             OpTag::Case => "Case",
@@ -125,7 +125,7 @@ impl OpTag {
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
-            OpTag::ConstInput => "Dataflow operations that take a Const input.",
+            OpTag::ScopedDefn => "Definitions that can live at global or local scope",
             OpTag::Lift => "Nodes which add resource requirements to a type",
         }
     }

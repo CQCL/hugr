@@ -24,6 +24,15 @@ pub struct OpaqueOp {
 }
 
 impl OpaqueOp {
+    /// Initialize a new named OpaqueOp
+    pub fn new(id: impl Into<SmolStr>, custom: impl CustomOp) -> Self {
+        Self {
+            id: id.into(),
+
+            custom: Box::new(custom),
+        }
+    }
+
     /// The name of the operation, cached for fast equality checks.
     pub fn name(&self) -> SmolStr {
         self.id.clone()
@@ -148,7 +157,7 @@ impl OpDef {
     ) -> Self {
         let inputs: Vec<_> = port_names
             .input_zip(&signature)
-            .chain(port_names.const_input_zip(&signature))
+            .chain(port_names.static_input_zip(&signature))
             .map(|(n, t)| (Some(n.clone()), t.clone()))
             .collect();
 

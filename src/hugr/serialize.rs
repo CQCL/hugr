@@ -9,7 +9,7 @@ use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
-use portgraph::{Direction, LinkError, NodeIndex};
+use portgraph::{Direction, LinkError, NodeIndex, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -33,7 +33,7 @@ enum Versioned {
     Unsupported,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
     #[serde(flatten)]
@@ -65,6 +65,12 @@ pub enum HUGRSerializationError {
         node: Node,
         /// The operation type of the node.
         op_type: OpType,
+    },
+    /// Edges with wrong node indices
+    #[error("The edge endpoint {node:?} is not a node in the graph.")]
+    UnknownEdgeNode {
+        /// The node that has the port without offset.
+        node: Node,
     },
     /// Error building HUGR.
     #[error("HugrError: {0:?}")]
@@ -106,33 +112,24 @@ impl TryFrom<&Hugr> for SerHugrV0 {
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
-        let mut node_rekey: HashMap<Node, Node> = HashMap::new();
-        let mut index_counter = 1..;
-        let mut nodes: Vec<NodeSer> = hugr
-            .nodes()
-            .map(|n| {
-                // Note that we don't rekey the parent here, as we need to fully
-                // populate `node_rekey` first.
-                let (parent, new_node) = if n == hugr.root() {
-                    (n, NodeIndex::new(0).into())
-                } else {
-                    (
-                        hugr.get_parent(n).expect("Unexpected root."),
-                        NodeIndex::new(index_counter.next().unwrap()).into(),
-                    )
-                };
-
-                node_rekey.insert(n, new_node);
-                let opt = hugr.get_optype(n);
-                Ok(NodeSer {
-                    parent,
-                    op: opt.clone(),
-                })
-            })
-            .collect::<Result<_, Self::Error>>()?;
-        for NodeSer { parent, .. } in &mut nodes {
-            *parent = node_rekey[parent];
+        let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
+        for (order, node) in hugr.canonical_order().enumerate() {
+            node_rekey.insert(node, NodeIndex::new(order).into());
         }
+
+        let mut nodes = vec![None; hugr.node_count()];
+        for n in hugr.nodes() {
+            let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
+            let opt = hugr.get_optype(n);
+            nodes[node_rekey[&n].index.index()] = Some(NodeSer {
+                parent,
+                op: opt.clone(),
+            });
+        }
+        let nodes = nodes
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let sig = hugr.get_optype(node).signature();
@@ -140,7 +137,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                 true => Some(offset as u16),
                 false => None,
             };
-            (node, offset)
+            (node_rekey[&node], offset)
         };
 
         let edges: Vec<_> = hugr
@@ -187,7 +184,10 @@ impl TryFrom<SerHugrV0> for Hugr {
             hugr.add_op_with_parent(node_ser.parent, node_ser.op)?;
         }
 
-        let unwrap_offset = |node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
+        let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
+            if !hugr.graph.contains_node(node.index) {
+                return Err(HUGRSerializationError::UnknownEdgeNode { node });
+            }
             let offset = match offset {
                 Some(offset) => offset as usize,
                 None => {
@@ -219,9 +219,13 @@ pub mod test {
 
     use super::*;
     use crate::{
-        builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        builder::{
+            Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+            ModuleBuilder,
+        },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{ClassicType, LinearType, Signature, SimpleType},
+        Port,
     };
     use itertools::Itertools;
     use portgraph::{
@@ -329,5 +333,63 @@ pub mod test {
         // HUGR internal structures are not preserved across serialization, so
         // test equality on SerHugrV0 instead.
         assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
+    }
+
+    #[test]
+    fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
+        let mut dfg = DFGBuilder::new(tp.clone(), tp)?;
+        let mut params: [_; 2] = dfg.input_wires_arr();
+        for p in params.iter_mut() {
+            *p = dfg
+                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .unwrap()
+                .out_wire(0);
+        }
+        let h = dfg.finish_hugr_with_outputs(params)?;
+
+        let ser = serde_json::to_string(&h)?;
+        let h_deser: Hugr = serde_json::from_str(&ser)?;
+
+        // Check the canonicalization works
+        let mut h_canon = h;
+        h_canon.canonicalize_nodes(|_, _| {});
+
+        for node in h_deser.nodes() {
+            assert_eq!(h_deser.get_optype(node), h_canon.get_optype(node));
+            assert_eq!(h_deser.get_parent(node), h_canon.get_parent(node));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn hierarchy_order() {
+        let qb: SimpleType = LinearType::Qubit.into();
+        let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
+        let [old_in, out] = dfg.io();
+        let w = dfg.input_wires();
+        let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
+
+        // Now add a new input
+        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.connect(new_in, 0, out, 0).unwrap();
+        hugr.move_before_sibling(new_in, old_in).unwrap();
+        hugr.remove_node(old_in).unwrap();
+        hugr.validate().unwrap();
+
+        let ser = serde_json::to_vec(&hugr).unwrap();
+        let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
+        new_hugr.validate().unwrap();
+
+        // Check the canonicalization works
+        let mut h_canon = hugr.clone();
+        h_canon.canonicalize_nodes(|_, _| {});
+
+        for node in new_hugr.nodes() {
+            assert_eq!(new_hugr.get_optype(node), h_canon.get_optype(node));
+            assert_eq!(new_hugr.get_parent(node), h_canon.get_parent(node));
+        }
     }
 }

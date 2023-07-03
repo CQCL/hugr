@@ -40,6 +40,7 @@ pub enum ConditionalBuildError {
 }
 
 /// Builder for a [`ops::Conditional`] node's children.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConditionalBuilder<T> {
     pub(super) base: T,
     pub(super) conditional_node: Node,

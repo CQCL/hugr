@@ -2,17 +2,21 @@
 
 mod hugrmut;
 
+pub mod region;
 pub mod rewrite;
 pub mod serialize;
 pub mod typecheck;
 pub mod validate;
 pub mod view;
 
+use std::collections::VecDeque;
+use std::iter;
+
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
-pub use rewrite::{Replace, ReplaceError, Rewrite, SimpleReplacement, SimpleReplacementError};
+pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
@@ -114,7 +118,7 @@ impl Hugr {
                 let optype = self.op_types.get(node);
                 let offset = self.graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Const(ty) => {
+                    EdgeKind::Static(ty) => {
                         PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
                     }
                     EdgeKind::Value(ty) => {
@@ -166,6 +170,21 @@ impl Hugr {
             root,
             op_types,
         }
+    }
+
+    /// Produce a canonical ordering of the nodes.
+    ///
+    /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
+    fn canonical_order(&self) -> impl Iterator<Item = Node> + '_ {
+        // Generate a BFS-ordered list of nodes based on the hierarchy
+        let mut queue = VecDeque::from([self.root.into()]);
+        iter::from_fn(move || {
+            let node = queue.pop_front()?;
+            for child in self.children(node) {
+                queue.push_back(child);
+            }
+            Some(node)
+        })
     }
 }
 
@@ -239,4 +258,17 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+}
+
+#[cfg(test)]
+mod test {
+    use super::Hugr;
+
+    #[test]
+    fn impls_send_and_sync() {
+        // Send and Sync are automatically impl'd by the compiler, if possible.
+        // This test will fail to compile if that wasn't possible.
+        trait Test: Send + Sync {}
+        impl Test for Hugr {}
+    }
 }
