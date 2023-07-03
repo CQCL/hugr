@@ -350,8 +350,7 @@ mod test {
 
         let mut parent_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
         parent_sig.output_resources = all_resources.clone();
-        let mut parent = module_builder
-            .define_function("parent", parent_sig)?;
+        let mut parent = module_builder.define_function("parent", parent_sig)?;
 
         let mut coolify_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
         coolify_sig.input_resources = okay_resources.clone();
@@ -398,7 +397,7 @@ mod test {
             },
             [w],
         )?;
-        let ws: Vec<Wire> = lift_c.outputs().to_owned().collect();
+        let ws: Vec<Wire> = lift_c.outputs().collect();
         assert_eq!(ws.len(), 1);
 
         let add_c = add_c.finish_with_outputs(ws)?;

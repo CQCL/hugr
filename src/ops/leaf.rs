@@ -184,7 +184,11 @@ impl OpTrait for LeafOp {
                 vec![SimpleType::new_sum(variants.clone())],
             ),
             LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
-            LeafOp::Lift { ty, input_resources, new_resource } => {
+            LeafOp::Lift {
+                ty,
+                input_resources,
+                new_resource,
+            } => {
                 let mut sig = Signature::new_df(
                     TypeRow::from(vec![ty.clone()]),
                     TypeRow::from(vec![ty.clone()]),
