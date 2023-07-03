@@ -311,14 +311,7 @@ where
     fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
         let mut ordered = Vec::with_capacity(self.node_count());
-        ordered.push(self.root());
-        let mut i = 0;
-        while let Some(node) = ordered.get(i).copied() {
-            for child in self.children(node) {
-                ordered.push(child);
-            }
-            i += 1;
-        }
+        ordered.extend(self.as_ref().canonical_order());
 
         // Permute the nodes in the graph to match the order.
         //

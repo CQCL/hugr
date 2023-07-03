@@ -1,7 +1,7 @@
 //! Serialization definition for [`Hugr`]
 //! [`Hugr`]: crate::hugr::Hugr
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::hugr::{Hugr, HugrMut};
@@ -113,14 +113,8 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
-        // Generate a BFS-ordered list of nodes based on the hierarchy
-        let mut ordered = VecDeque::from([hugr.root()]);
-        let mut index_counter = (0..).map(|i| NodeIndex::new(i).into());
-        while let Some(node) = ordered.pop_front() {
-            node_rekey.insert(node, index_counter.next().unwrap());
-            for child in hugr.children(node) {
-                ordered.push_back(child);
-            }
+        for (order, node) in hugr.canonical_order().enumerate() {
+            node_rekey.insert(node, NodeIndex::new(order).into());
         }
 
         let mut nodes = vec![None; hugr.node_count()];
