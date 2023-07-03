@@ -423,15 +423,85 @@ inputs of successor `i`.
 Some normalizations are possible:
 
   - If the entry node has no predecessors (i.e. is not a loop header),
-    then its contents can be moved outside the ??-node into a containing
+    then its contents can be moved outside the CFG node into a containing
     DSG.
+  - If the entry node has only one successor and that successor is the
+    exit node, the CFG node itself can be removed.
 
-  - If the entry node’s has only one successor and that successor is the
-    exit node, the CFG-node itself can be removed
+The CFG in the example below has three inputs: one (call it `v`) of type "P"
+(not specified, but with a conversion to boolean represented by "P?"), one of
+type "qubit" and one (call it `t`) of type "angle".
 
-**Example CFG (TODO update w/ Sum types)**
+The CFG has the effect of performing an `Rz` rotation on the qubit with angle
+`x`. where `x` is the constant `C` if `v` and `H(v)` are both true and `G(t)`
+otherwise. (`H` is a function from type "P" to type "P" and `G` is a function
+from type "angle" to type "angle".)
 
-<img src="attachments/2647818241/2647818461.png" width="768px">
+The `DFB` nodes are labelled `Entry` and `BB1` to `BB4`. Note that the first
+output of each of these is a sum type, whose arity is the number of outgoing
+control edges; the remaining outputs are those that are passed to all
+succeeding nodes.
+
+The two nodes labelled "..." are simply arranging their inputs and outputs to
+conform with the requirements of the CFG.
+
+```mermaid
+flowchart
+    subgraph CFG
+        direction TB
+        subgraph Entry
+            direction TB
+            EntryIn["Input"] -- "angle" --> F -- "angle" --> Entry_["P?"]
+            EntryIn -- "qubit" --> Entry_
+            EntryIn -- "X" --> Entry_
+            Entry_ -- "(--|P)" --> EntryOut["Output"]
+            Entry_ -- "angle+qubit" --> EntryOut["Output"]
+        end
+        subgraph BB1
+            direction TB
+            BB1In["Input"] -- "angle" --> G -- "angle" --> BB1_["..."]
+            BB1In -- "qubit" --> BB1_
+            BB1_ -- "()" --> BB1Out["Output"]
+            BB1_ -- "qubit+angle" --> BB1Out["Output"]
+        end
+        subgraph BB2
+            direction TB
+            BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?"]
+            BB2In -- "angle" --> BB2_
+            BB2In -- "qubit" --> BB2_
+            BB2_ -- "(angle|--)" --> BB2Out["Output"]
+            BB2_ -- "qubit" --> BB2Out
+        end
+        subgraph BB3
+            direction TB
+            BB3In["Input"] -- "(Order)" --> C -- "angle" --> BB3_["..."]
+            BB3In -- "qubit" --> BB3_
+            BB3_ -- "()" --> BB3Out["Output"]
+            BB3_ -- "qubit+angle" --> BB3Out
+        end
+        subgraph BB4
+            direction TB
+            BB4In["Input"] -- "qubit" --> Rz
+            BB4In -- "angle" --> Rz
+            Rz -- "qubit" --> BB4_["..."]
+            BB4_ -- "()" --> BB4Out["Output"]
+            BB4_ -- "qubit" --> BB4Out
+        end
+        subgraph Exit
+        end
+        Entry -- "0" --> BB1
+        Entry -- "1" --> BB2
+        BB2 -- "0" --> BB1
+        BB2 -- "1" --> BB3
+        BB1 -- "0" --> BB4
+        BB3 -- "0" --> BB4
+        BB4 -- "0" --> Exit
+    end
+    A -- "P" --> CFG
+    A -- "qubit" --> CFG
+    A -- "angle" --> CFG
+    CFG -- "qubit" --> B
+```
 
 #### Hierarchical Relationships and Constraints
 
