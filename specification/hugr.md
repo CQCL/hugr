@@ -1229,8 +1229,9 @@ nodes as children.
 Replace a set of CFG sibling nodes with a single BasicBlock node having a
 CFG node child which has as its children the set of BasicBlock nodes
 originally specified. The set of basic blocks must satisfy constraints:
-* All (controlflow) edges whose target is in the set but whose source is outside,
-  must have the same target
+* There must be exactly one node in the set with incoming (controlflow) edges
+ from nodes outside the set.
+* The set may not include the entry block
 * There must be exactly one edge from a node in the set to a node outside it.
 
 Situations in which multiple nodes have edges leaving the set, can be converted to
@@ -1238,7 +1239,7 @@ this form by a combination of InsertIdentity operations and one Replace. Similar
 rather than movng the Exit block into the nested CFG, an identity node with a single
 successor can be added just before, with that edge used as the exitting edge.
 
-** Note ** this does not allow moving the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
+** Note ** This means there is no way to move the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
 
 ##### Inlining methods
 
