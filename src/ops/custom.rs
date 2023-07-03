@@ -17,7 +17,7 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     Resource { def: Arc<OpDef>, args: Vec<TypeArg> },
-    Opaque(OpaqueOp),
+    Opaque(OpaqueOp), // If we can't identify the Resource definition
 }
 
 impl From<ExternalOp> for OpaqueOp {
