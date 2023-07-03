@@ -87,13 +87,13 @@ pub struct ResourceOp {
     signature: Signature, // Cache
 }
 
-impl Into<OpaqueOp> for ResourceOp {
-    fn into(self) -> OpaqueOp {
+impl From<ResourceOp> for OpaqueOp {
+    fn from(op: ResourceOp) -> Self {
         let ResourceOp {
             def,
             args,
             signature,
-        } = self;
+        } = op;
         let opt_sig = if def.should_serialize_signature() {
             Some(signature)
         } else {
