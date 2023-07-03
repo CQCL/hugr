@@ -6,18 +6,14 @@ use std::fmt::{self, Display};
 
 use super::{type_param::TypeArg, ClassicType};
 
-/// An opaque type element. Contains an unique identifier and a reference to its definition.
-//
-// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
-// but it adds atomic ops and a serialization-deserialization roundtrip
-// would still generate copies.
+/// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
     /// [`TypeDef`]: crate::resource::TypeDef
-    pub id: SmolStr,
+    id: SmolStr,
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
@@ -41,6 +37,11 @@ impl CustomType {
     /// Returns the unique identifier of the opaque type.
     pub fn id(&self) -> &str {
         &self.id
+    }
+
+    /// Returns the parameters of the opaque type.
+    pub fn params(&self) -> &Vec<TypeArg> {
+        &self.params
     }
 
     /// Returns a [`ClassicType`] containing this opaque type.
