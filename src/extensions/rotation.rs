@@ -94,8 +94,7 @@ impl CustomConst for Constant {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
         };
-        let t2: CustomType = t.into();
-        t2.into()
+        t.custom_type().into()
     }
 }
 
