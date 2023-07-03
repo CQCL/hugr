@@ -393,7 +393,7 @@ mod test {
 
         let lift_a = add_ab.add_dataflow_op(
             LeafOp::Lift {
-                ty: BIT,
+                type_row: type_row![BIT],
                 input_resources: ResourceSet::new(),
                 new_resource: "A".into(),
             },
@@ -403,7 +403,7 @@ mod test {
 
         let lift_b = add_ab.add_dataflow_op(
             LeafOp::Lift {
-                ty: BIT,
+                type_row: type_row![BIT],
                 input_resources: ResourceSet::from_iter(["A".into()]),
                 new_resource: "B".into(),
             },
@@ -420,7 +420,7 @@ mod test {
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             LeafOp::Lift {
-                ty: BIT,
+                type_row: type_row![BIT],
                 input_resources: ab_resources,
                 new_resource: "C".into(),
             },
