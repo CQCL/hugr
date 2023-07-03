@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -95,6 +97,20 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
+    pub(crate) fn from_existing(base: B, cfg_node: Node) -> Result<Self, BuildError> {
+        let OpType::CFG(crate::ops::controlflow::CFG {outputs, ..}) = base.get_optype(cfg_node)
+            else {return Err(BuildError::UnexpectedType{node: cfg_node, op_desc: "Any CFG"});};
+        let n_out_wires = outputs.len();
+        let (_, exit_node) = base.children(cfg_node).take(2).collect_tuple().unwrap();
+        Ok(Self {
+            base,
+            cfg_node,
+            inputs: None,
+            exit_node,
+            n_out_wires,
+        })
+    }
+
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
