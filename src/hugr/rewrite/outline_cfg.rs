@@ -49,8 +49,8 @@ impl OutlineCfg {
                     }
                 }
             }
-            let external = h.output_neighbours(n).filter(|s| !self.0.contains(s));
-            match external.at_most_one() {
+            let external_succs = h.output_neighbours(n).filter(|s| !self.0.contains(s));
+            match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors
                 Ok(Some(o)) => match exit_succ {
                     None => {
