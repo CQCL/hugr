@@ -74,7 +74,7 @@ pub enum LeafOp {
     },
     /// A lift node, which adds a resource to an edge
     Lift {
-        /// The type of the edge
+        /// The types of the edges
         type_row: TypeRow,
         /// The resources which are present in both the inputs and outputs
         input_resources: ResourceSet,
