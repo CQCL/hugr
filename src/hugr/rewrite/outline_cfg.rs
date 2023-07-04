@@ -179,7 +179,7 @@ pub enum OutlineCfgError {
     #[error("The nodes did not all have the same parent")]
     NotSiblings,
     /// The parent node was not a CFG node
-    #[error("The parent node {0:?} was not a CFG but an {1:?}")]
+    #[error("The parent node {0:?} was not a CFG but a {1:?}")]
     ParentNotCfg(Node, OpType),
     /// Multiple blocks had incoming edges
     #[error("Multiple blocks had predecessors outside the set - at least {0:?} and {1:?}")]
