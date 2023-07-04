@@ -1247,8 +1247,6 @@ rather than movng the Exit block into the nested CFG:
    of in-edges, but reducing to one out-edge to the Exit)
 3. The single edge to the Exit node can then be used as the exiting edge.
 
-** Note ** This means there is no way to move the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
-
 ##### Inlining methods
 
 These are the exact inverses of the above.
