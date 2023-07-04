@@ -1,9 +1,11 @@
 use std::hash::Hash;
 
-use super::nest_cfgs::CfgView;
+use super::nest_cfgs::{CfgView, get_blocks, SimpleCfgView};
+use crate::hugr::HugrMut;
+use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::view::HugrView;
 use crate::ops::tag::OpTag;
-use crate::ops::OpTrait;
+use crate::ops::{OpTrait, BasicBlock};
 use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
@@ -87,6 +89,39 @@ impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
         };
         succs.into_iter()
     }
+
+    fn nest_sese_region(&mut self, h: &mut crate::Hugr, entry_edge: (HalfNode,HalfNode), exit_edge: (HalfNode,HalfNode)) -> Result<(), String> {
+        let entry_edge = maybe_split(h, entry_edge);
+        let exit_edge = maybe_split(h, exit_edge);
+        let blocks = get_blocks(&SimpleCfgView::new(self.h), entry_edge, exit_edge)?;
+        h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
+    }
+}
+
+fn maybe_split(h: &mut crate::Hugr, edge: (HalfNode, HalfNode)) -> (Node, Node) {
+    match edge.1 {
+        HalfNode::X(n) => {
+            // The only edge to an X should be from the same N
+            assert_eq!(HalfNode::N(n), edge.0);
+            // And the underlying node cannot be the exit node of the CFG
+            // (as that has no successors, so would not have an X part)
+            let crate::ops::OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(n)
+            else{ panic!("Not a basic block node"); };
+            // Split node!
+            // TODO in the future, use replace API
+            // In the meantime, we'll give the existinfg
+            let new_node = h.add_op(BasicBlock::DFB { inputs: (), other_outputs: (), predicate_variants: () });
+            (n, new_node)
+        },
+        HalfNode::N(n) => {
+            let src = match edge.0 {
+                HalfNode::N(n) => n,
+                HalfNode::X(n) => n
+            };
+            (src,n)
+        }
+    }
+    
 }
 
 #[cfg(test)]

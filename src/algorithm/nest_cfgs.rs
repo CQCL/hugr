@@ -43,6 +43,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
+use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::view::HugrView;
 use crate::ops::tag::OpTag;
 use crate::ops::OpTrait;
@@ -71,6 +72,12 @@ pub trait CfgView<T> {
     fn successors(&self, node: T) -> Self::Iterator<'_>;
     /// Returns an iterator over the predecessors of the specified basic block.
     fn predecessors(&self, node: T) -> Self::Iterator<'_>;
+
+    /// Given an entry edge and exit edge defining a SESE region, mutates the
+    /// Hugr such that all nodes between these edges are placed in a nested CFG.
+    /// Hugr is temporarily passed in until we have a View-like trait that allows applying a rewrite.
+    /// Returns an error if the two edges do not constitute a SESE region.
+    fn nest_sese_region(&mut self, h: &mut crate::Hugr, entry_edge: (T,T), exit_edge: (T,T)) -> Result<(), String>;
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
@@ -160,6 +167,42 @@ impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
     fn predecessors(&self, node: Node) -> Self::Iterator<'_> {
         self.h.neighbours(node, Direction::Incoming)
     }
+
+    fn nest_sese_region(&mut self, h: &mut crate::Hugr, entry_edge: (Node,Node), exit_edge: (Node,Node)) -> Result<(), String> {
+        let blocks = get_blocks(self, entry_edge, exit_edge)?;
+        // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
+        Ok(h.apply_rewrite(OutlineCfg::new(blocks)).unwrap())
+    }
+}
+
+pub fn get_blocks<T: Copy+Eq+Hash+std::fmt::Debug>(v: &impl CfgView<T>, entry_edge: (T,T), exit_edge: (T,T)) -> Result<HashSet<T>, String> {
+    // Identify the nodes in the region
+    let mut blocks = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(entry_edge.1);
+    while let Some(n) = queue.pop_front() {
+        if blocks.insert(n) {
+            if n == exit_edge.0 {
+                let succs: Vec<T> = v.successors(n).collect();
+                let in_succs: Vec<T> = succs.iter().copied().filter(|s| *s != exit_edge.1).collect();
+                if succs.len() == in_succs.len() {
+                    return Err("Exit node missing exit edge".to_string())
+                }
+                queue.extend(in_succs.into_iter())
+            } else {
+                queue.extend(v.successors(n));
+            }
+        }
+    }
+    if blocks.contains(&entry_edge.0) {
+        return Err("Entry edge was from a node in the block".to_string());
+    }
+    for p in v.predecessors(entry_edge.1) {
+        if p != entry_edge.0 && !blocks.contains(&p) {
+            return Err(format!("Entry node had additional external predecessor {:?}", p));
+        }
+    }
+    Ok(blocks)
 }
 
 /// Records an undirected Depth First Search over a CfgView,
