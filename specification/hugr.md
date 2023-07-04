@@ -1245,7 +1245,7 @@ rather than movng the Exit block into the nested CFG:
 2. if there is more than one such incoming edge, these identity nodes can then all be combined
    by a Replace operation that removes them all and adds a single node (keeping the same number
    of in-edges, but reducing to one out-edge to the Exit)
-3. The single edge to the Exit node can then be used as the exitting edge.
+3. The single edge to the Exit node can then be used as the exiting edge.
 
 ** Note ** This means there is no way to move the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
 
