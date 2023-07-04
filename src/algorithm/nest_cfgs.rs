@@ -471,22 +471,15 @@ pub(crate) mod test {
         //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
-        let pred_const = entry.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry.add_constant(ConstValue::simple_unary_predicate())?;
-
-        let entry = n_identity(entry, &pred_const)?;
-        let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, merge)?;
-        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
-        let exit = cfg_builder.exit_block();
-        cfg_builder.branch(&tail, 0, &exit)?;
-
-        let h = cfg_builder.finish_hugr()?;
-
-        let (entry, exit) = (entry.node(), exit.node());
+        let (h, merge, tail) = build_cond_then_loop_cfg()?;
         let (merge, tail) = (merge.node(), tail.node());
+        let [entry, exit]: [Node; 2] = h
+            .children(h.root())
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
 
@@ -644,6 +637,27 @@ pub(crate) mod test {
         )?;
         let tail = build_loop_from_header(cfg, const_pred, header)?;
         Ok((header, tail))
+    }
+
+    //      /-> left --\
+    // entry            > merge -> tail -> exit
+    //      \-> right -/     \-<--<-/
+    pub fn build_cond_then_loop_cfg(
+    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
+        let mut entry = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
+        let pred_const = entry.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = entry.add_constant(ConstValue::simple_unary_predicate())?;
+
+        let entry = n_identity(entry, &pred_const)?;
+        let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
+        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, merge)?;
+        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&tail, 0, &exit)?;
+
+        let h = cfg_builder.finish_hugr()?;
+        Ok((h, merge, tail))
     }
 
     // Build a CFG, returning the Hugr
