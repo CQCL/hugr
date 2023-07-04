@@ -202,7 +202,9 @@ pub enum OutlineCfgError {
 mod test {
     use std::collections::HashSet;
 
-    use crate::algorithm::nest_cfgs::test::build_conditional_in_loop_cfg;
+    use crate::algorithm::nest_cfgs::test::{
+        build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
+    };
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
     use cool_asserts::assert_matches;
@@ -277,5 +279,35 @@ mod test {
             h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
             HashSet::from([exit, new_block])
         );
+    }
+
+    #[test]
+    fn test_outline_cfg_move_entry() {
+        //      /-> left --\
+        // entry            > merge -> head -> tail -> exit
+        //      \-> right -/             \-<--<-/
+        let (mut h, merge, tail) = build_cond_then_loop_cfg(true).unwrap();
+
+        let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
+        let (left, right) = h.output_neighbours(entry).take(2).collect_tuple().unwrap();
+        let (merge, tail) = (merge.node(), tail.node());
+        let head = h.output_neighbours(merge).exactly_one().unwrap();
+
+        h.validate().unwrap();
+        let blocks_to_move = [entry, left, right, merge];
+        let other_blocks = [head, tail, exit];
+        for &n in blocks_to_move.iter().chain(other_blocks.iter()) {
+            assert_eq!(depth(&h, n), 1);
+        }
+        h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
+            .unwrap();
+        h.validate().unwrap();
+        let new_entry = h.children(h.root()).next().unwrap();
+        for n in other_blocks {
+            assert_eq!(depth(&h, n), 1);
+        }
+        for n in blocks_to_move {
+            assert_eq!(h.get_parent(h.get_parent(n).unwrap()).unwrap(), new_entry);
+        }
     }
 }
