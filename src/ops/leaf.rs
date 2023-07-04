@@ -72,13 +72,14 @@ pub enum LeafOp {
         /// The variants of the sum type.
         variants: TypeRow,
     },
-    /// A lift node, which adds a resource to an edge
+    /// A node which adds a resource req to the types of the wires it is passed
+    /// It has no effect on the values passed along the edge
     Lift {
         /// The types of the edges
         type_row: TypeRow,
         /// The resources which are present in both the inputs and outputs
         input_resources: ResourceSet,
-        /// The resources which we're adding
+        /// The resources which we're adding to the inputs
         new_resource: ResourceId,
     },
 }
