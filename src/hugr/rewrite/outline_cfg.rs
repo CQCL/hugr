@@ -13,17 +13,21 @@ use crate::{type_row, Hugr, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
-pub struct OutlineCfg(HashSet<Node>);
+pub struct OutlineCfg {
+    blocks: HashSet<Node>,
+}
 
 impl OutlineCfg {
     /// Create a new OutlineCfg rewrite that will move the provided blocks.
     pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
-        Self(HashSet::from_iter(blocks))
+        Self {
+            blocks: HashSet::from_iter(blocks),
+        }
     }
 
     fn compute_entry_exit_outside(&self, h: &Hugr) -> Result<(Node, Node, Node), OutlineCfgError> {
         let cfg_n = match self
-            .0
+            .blocks
             .iter()
             .map(|n| h.get_parent(*n))
             .unique()
@@ -39,8 +43,11 @@ impl OutlineCfg {
         let cfg_entry = h.children(cfg_n).next().unwrap();
         let mut entry = None;
         let mut exit_succ = None;
-        for &n in self.0.iter() {
-            if n == cfg_entry || h.input_neighbours(n).any(|pred| !self.0.contains(&pred)) {
+        for &n in self.blocks.iter() {
+            if n == cfg_entry
+                || h.input_neighbours(n)
+                    .any(|pred| !self.blocks.contains(&pred))
+            {
                 match entry {
                     None => {
                         entry = Some(n);
@@ -50,7 +57,7 @@ impl OutlineCfg {
                     }
                 }
             }
-            let external_succs = h.output_neighbours(n).filter(|s| !self.0.contains(s));
+            let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors
                 Ok(Some(o)) => match exit_succ {
@@ -123,7 +130,7 @@ impl Rewrite for OutlineCfg {
             .linked_ports(entry, h.node_inputs(entry).exactly_one().unwrap())
             .collect();
         for (pred, br) in preds {
-            if !self.0.contains(&pred) {
+            if !self.blocks.contains(&pred) {
                 h.disconnect(pred, br).unwrap();
                 h.connect(pred, br.index(), new_block, 0).unwrap();
             }
@@ -144,7 +151,7 @@ impl Rewrite for OutlineCfg {
             .insert_before(entry.index, inner_exit.index)
             .unwrap();
         // And remaining nodes
-        for n in self.0 {
+        for n in self.blocks {
             // Do not move the entry node, as we have already
             if n != entry {
                 h.hierarchy.detach(n.index);
