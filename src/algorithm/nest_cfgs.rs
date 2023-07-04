@@ -471,7 +471,7 @@ pub(crate) mod test {
         //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let (h, merge, tail) = build_cond_then_loop_cfg()?;
+        let (h, merge, tail) = build_cond_then_loop_cfg(false)?;
         let (merge, tail) = (merge.node(), tail.node());
         let [entry, exit]: [Node; 2] = h
             .children(h.root())
@@ -639,10 +639,9 @@ pub(crate) mod test {
         Ok((header, tail))
     }
 
-    //      /-> left --\
-    // entry            > merge -> tail -> exit
-    //      \-> right -/     \-<--<-/
+    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
     pub fn build_cond_then_loop_cfg(
+        separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
         let mut entry = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
@@ -651,8 +650,18 @@ pub(crate) mod test {
 
         let entry = n_identity(entry, &pred_const)?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, merge)?;
-        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
+        let head = if separate {
+            let h = n_identity(
+                cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+                &const_unit,
+            )?;
+            cfg_builder.branch(&merge, 0, &h)?;
+            h
+        } else {
+            merge
+        };
+        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
+        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
