@@ -40,7 +40,7 @@ impl CustomType {
     }
 
     /// Returns the parameters of the opaque type.
-    pub fn params(&self) -> &Vec<TypeArg> {
+    pub fn params(&self) -> &[TypeArg] {
         &self.params
     }
 

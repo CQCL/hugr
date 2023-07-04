@@ -210,7 +210,7 @@ impl OpDef {
     /// The signature of the operation.
     pub fn signature(
         &self,
-        args: &Vec<TypeArg>,
+        args: &[TypeArg],
         resources_in: &ResourceSet,
     ) -> Result<Signature, SignatureError> {
         if args.len() != self.args.len() {
