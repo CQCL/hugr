@@ -84,14 +84,10 @@ impl Rewrite for OutlineCfg {
         // These panic()s only happen if the Hugr would not have passed validate()
         let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry) else {panic!("Entry node is not a basic block")};
         let inputs = inputs.clone();
-        let outputs = {
-            let OpType::BasicBlock(s_type) = h.get_optype(exit) else {panic!()};
-            match s_type {
-                BasicBlock::Exit { cfg_outputs } => cfg_outputs,
-                BasicBlock::DFB { inputs, .. } => inputs,
-            }
-        }
-        .clone();
+        let outputs = match h.get_optype(outside) {
+            OpType::BasicBlock(b) => b.dataflow_input().clone(),
+            _ => panic!("External successor not a basic block"),
+        };
         let mut existing_cfg = {
             let parent = h.get_parent(entry).unwrap();
             CFGBuilder::from_existing(h, parent).unwrap()
