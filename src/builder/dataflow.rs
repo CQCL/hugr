@@ -376,15 +376,13 @@ mod test {
 
     #[test]
     fn lift_node() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-
         let ab_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
         let c_resources = ResourceSet::singleton(&"C".into());
         let abc_resources = ab_resources.clone().union(&c_resources);
 
         let mut parent_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
         parent_sig.output_resources = abc_resources.clone();
-        let mut parent = module_builder.define_function("parent", parent_sig)?;
+        let mut parent = DFGBuilder::new(parent_sig)?;
 
         let mut add_c_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
         add_c_sig.input_resources = ab_resources.clone();
@@ -438,8 +436,8 @@ mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_with_outputs([w])?;
-        module_builder.finish_hugr()?;
+        parent.set_outputs([w])?;
+        parent.finish_hugr()?;
 
         Ok(())
     }
