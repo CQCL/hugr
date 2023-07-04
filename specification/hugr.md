@@ -1229,15 +1229,23 @@ nodes as children.
 Replace a set of CFG sibling nodes with a single BasicBlock node having a
 CFG node child which has as its children the set of BasicBlock nodes
 originally specified. The set of basic blocks must satisfy constraints:
-* There must be exactly one node in the set with incoming (controlflow) edges
- from nodes outside the set.
-* The set may not include the entry block
+* There must be at most one node in the set with incoming (controlflow) edges
+ from nodes outside the set. Specifically,
+   * *either* the set includes the CFG's entry node, and any edges from outside
+     the set (there may be none or more) target said entry node;
+   * *or* the set does not include the CFG's entry node, but contains exactly one
+     node which is the target of edges from outside the set.
+* The set may not include the exit block.
 * There must be exactly one edge from a node in the set to a node outside it.
 
 Situations in which multiple nodes have edges leaving the set, can be converted to
-this form by a combination of InsertIdentity operations and one Replace. Similarly,
-rather than movng the Exit block into the nested CFG, an identity node with a single
-successor can be added just before, with that edge used as the exitting edge.
+this form by a combination of InsertIdentity operations and one Replace. Similarly/for example,
+rather than movng the Exit block into the nested CFG:
+1. an identity node with a single successor can be added onto each edge into the Exit
+2. if there is more than one such incoming edge, these identity nodes can then all be combined
+   by a Replace operation that removes them all and adds a single node (keeping the same number
+   of in-edges, but reducing to one out-edge to the Exit)
+3. The single edge to the Exit node can then be used as the exitting edge.
 
 ** Note ** This means there is no way to move the entry block (creating a new block to replace the entry block). Neither does `InsertIdentity` allow inserting a new identity block before the entry block ("inbetween" the containing CFG node and the entry block), as this is not an edge.
 
