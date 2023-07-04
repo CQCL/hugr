@@ -60,8 +60,6 @@ pub enum OpTag {
     BasicBlock,
     /// A control flow exit node.
     BasicBlockExit,
-    /// A lift node, which adds resource requirements to a wires type
-    Lift,
 }
 
 impl OpTag {
@@ -97,7 +95,6 @@ impl OpTag {
             OpTag::FnCall => &[OpTag::DataflowChild],
             OpTag::LoadConst => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
-            OpTag::Lift => &[OpTag::DataflowChild],
         }
     }
 
@@ -126,7 +123,6 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
-            OpTag::Lift => "Nodes which add resource requirements to a type",
         }
     }
 
