@@ -59,19 +59,27 @@ impl DFGBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-    ) -> Result<DFGBuilder<Hugr>, BuildError> {
-        let input = input.into();
-        let output = output.into();
-        let signature = Signature::new_df(input, output);
+    pub fn new(signature: Signature) -> Result<DFGBuilder<Hugr>, BuildError> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
         let base = Hugr::new(dfg_op);
         let root = base.root();
         DFGBuilder::create_with_io(base, root, signature)
+    }
+
+    /// Begin building a new DFG rooted HUGR, which doesn't contain any static
+    /// inputs or resource requirements
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn new_df(
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+    ) -> Result<DFGBuilder<Hugr>, BuildError> {
+        let signature = Signature::new_df(input.into(), output.into());
+        DFGBuilder::new(signature)
     }
 }
 
@@ -331,7 +339,7 @@ mod test {
 
     #[test]
     fn dfg_hugr() -> Result<(), BuildError> {
-        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let dfg_builder = DFGBuilder::new_df(type_row![BIT], type_row![BIT])?;
 
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
@@ -345,7 +353,7 @@ mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let dfg_builder = DFGBuilder::new_df(type_row![BIT], type_row![BIT])?;
         let [i1] = dfg_builder.input_wires_arr();
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 

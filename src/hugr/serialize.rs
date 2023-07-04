@@ -338,7 +338,7 @@ pub mod test {
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
-        let mut dfg = DFGBuilder::new(tp.clone(), tp)?;
+        let mut dfg = DFGBuilder::new_df(tp.clone(), tp)?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
@@ -366,7 +366,7 @@ pub mod test {
     #[test]
     fn hierarchy_order() {
         let qb: SimpleType = LinearType::Qubit.into();
-        let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
+        let dfg = DFGBuilder::new_df([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
