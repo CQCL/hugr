@@ -3,7 +3,6 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use serde::{Deserializer, Serializer};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
@@ -304,23 +303,12 @@ pub struct Resource {
     /// Types defined by this resource.
     types: HashMap<SmolStr, TypeDef>,
     /// Operation declarations with serializable definitions.
-    #[serde(serialize_with = "elide_arcs", deserialize_with = "reinstate_arcs")]
+    // Note: serde will serialize this because we configure with `features=["rc"]`.
+    // That will clone anything that has multiple references, but each
+    // OpDef should appear exactly once in this map (keyed by its name),
+    // and the other references to the OpDef are from ExternalOp's in the Hugr
+    // (which are serialized as OpaqueOp's i.e. Strings).
     operations: HashMap<SmolStr, Arc<OpDef>>,
-}
-
-fn elide_arcs<S: Serializer>(
-    _ops: &HashMap<SmolStr, Arc<OpDef>>,
-    _serializer: S,
-) -> Result<S::Ok, S::Error> {
-    // serde doesn't like Arc - write it out as if it were a HashMap<SmolStr, OpDef>
-    todo!()
-}
-
-fn reinstate_arcs<'de, D: Deserializer<'de>>(
-    _deserializer: D,
-) -> Result<HashMap<SmolStr, Arc<OpDef>>, D::Error> {
-    // Read in HashMap<SmolStr, OpDef> and then put each value inside an Arc::new
-    todo!()
 }
 
 impl Resource {
