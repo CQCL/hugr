@@ -189,6 +189,7 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
+    use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
@@ -345,8 +346,9 @@ mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
         let [i1] = dfg_builder.input_wires_arr();
+        dfg_builder.set_metadata(json!(42));
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         // Create a module, and insert the DFG into it

@@ -9,6 +9,8 @@ use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
 use crate::{Hugr, Port};
 
+use super::NodeMetadata;
+
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
     /// Add a node to the graph.
@@ -20,6 +22,14 @@ pub(crate) trait HugrMut {
     ///
     /// Panics if the node is the root node.
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
+
+    /// Returns the metadata associated with a node.
+    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
+
+    /// Sets the metadata associated with a node.
+    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) {
+        *self.get_metadata_mut(node) = metadata;
+    }
 
     /// Connect two nodes at the given ports.
     ///
@@ -159,6 +169,10 @@ where
         Ok(())
     }
 
+    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
+        self.as_mut().metadata.get_mut(node.index)
+    }
+
     fn connect(
         &mut self,
         src: Node,
@@ -283,20 +297,24 @@ where
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
-        // Update the optypes, taking them from the other graph.
+        // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
+            let meta = other.metadata.take(node);
+            self.as_mut().set_metadata(node.into(), meta);
         }
         Ok(other_root)
     }
 
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
-        // Update the optypes, copying them from the other graph.
+        // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, optype.clone());
+            let meta = other.get_metadata(node.into());
+            self.as_mut().set_metadata(node.into(), meta.clone());
         }
         Ok(other_root)
     }
