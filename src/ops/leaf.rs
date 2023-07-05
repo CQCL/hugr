@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
 use crate::{
+    resource::{ResourceId, ResourceSet},
     type_row,
     types::{
         ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
@@ -71,6 +72,16 @@ pub enum LeafOp {
         /// The variants of the sum type.
         variants: TypeRow,
     },
+    /// A node which adds a resource req to the types of the wires it is passed
+    /// It has no effect on the values passed along the edge
+    Lift {
+        /// The types of the edges
+        type_row: TypeRow,
+        /// The resources which are present in both the inputs and outputs
+        input_resources: ResourceSet,
+        /// The resources which we're adding to the inputs
+        new_resource: ResourceId,
+    },
 }
 
 impl Default for LeafOp {
@@ -103,6 +114,7 @@ impl OpName for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::RzF64 => "RzF64",
+            LeafOp::Lift { .. } => "Lift",
         }
         .into()
     }
@@ -131,6 +143,7 @@ impl OpTrait for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::RzF64 => "Rz rotation.",
+            LeafOp::Lift { .. } => "Add a resource requirement to an edge",
         }
     }
 
@@ -172,6 +185,16 @@ impl OpTrait for LeafOp {
                 vec![SimpleType::new_sum(variants.clone())],
             ),
             LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
+            LeafOp::Lift {
+                type_row,
+                input_resources,
+                new_resource,
+            } => {
+                let mut sig = Signature::new_df(type_row.clone(), type_row.clone());
+                sig.output_resources = ResourceSet::singleton(new_resource).union(input_resources);
+                sig.input_resources = input_resources.clone();
+                sig
+            }
         }
     }
 

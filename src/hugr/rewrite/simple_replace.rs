@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortMut, PortView};
+use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 
 use crate::hugr::{HugrMut, HugrView, OpMetadata};
 use crate::{
@@ -231,8 +231,7 @@ impl Rewrite for SimpleReplacement {
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
         for node in &self.removal {
-            h.graph.remove_node(node.index);
-            h.hierarchy.remove(node.index);
+            h.remove_node(*node).unwrap();
         }
         Ok(())
     }
