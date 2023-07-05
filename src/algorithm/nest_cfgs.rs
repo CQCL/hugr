@@ -583,8 +583,18 @@ pub(crate) mod test {
         for n in [split, left, right, merge, head, tail] {
             assert_eq!(3, depth(&h, n));
         }
-        let first = [split, left, right, merge].iter().map(|n| h.get_parent(*n).unwrap()).unique().exactly_one().unwrap();
-        let second = [head, tail].iter().map(|n| h.get_parent(*n).unwrap()).unique().exactly_one().unwrap();
+        let first = [split, left, right, merge]
+            .iter()
+            .map(|n| h.get_parent(*n).unwrap())
+            .unique()
+            .exactly_one()
+            .unwrap();
+        let second = [head, tail]
+            .iter()
+            .map(|n| h.get_parent(*n).unwrap())
+            .unique()
+            .exactly_one()
+            .unwrap();
         assert_ne!(first, second);
         Ok(())
     }
@@ -844,5 +854,4 @@ pub(crate) mod test {
             None => 0,
         }
     }
-
 }
