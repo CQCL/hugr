@@ -10,7 +10,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::tag::OpTag;
 use crate::ops::{BasicBlock, Const, ConstValue, LoadConstant, OpTrait, OpType, Output};
 use crate::types::{ClassicType, SimpleType, TypeRow};
-use crate::{type_row, Direction, Node, Port};
+use crate::{type_row, Direction, Hugr, Node, Port};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -28,15 +28,15 @@ enum HalfNode {
     X(Node),
 }
 
-struct HalfNodeView<'a, H> {
-    h: &'a H,
+struct HalfNodeView<'a> {
+    h: &'a mut Hugr,
     entry: Node,
     exit: Node,
 }
 
-impl<'a, H: HugrView> HalfNodeView<'a, H> {
+impl<'a> HalfNodeView<'a> {
     #[allow(unused)]
-    pub(crate) fn new(h: &'a H) -> Self {
+    pub(crate) fn new(h: &'a mut Hugr) -> Self {
         let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
@@ -65,7 +65,7 @@ impl<'a, H: HugrView> HalfNodeView<'a, H> {
     }
 }
 
-impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
+impl CfgView<HalfNode> for HalfNodeView<'_> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)
@@ -96,14 +96,13 @@ impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
 
     fn nest_sese_region(
         &mut self,
-        h: &mut crate::Hugr,
         entry_edge: (HalfNode, HalfNode),
         exit_edge: (HalfNode, HalfNode),
     ) -> Result<HalfNode, String> {
-        let entry_edge = maybe_split(h, entry_edge).unwrap();
-        let exit_edge = maybe_split(h, exit_edge).unwrap();
-        let new_block = SimpleCfgView::new(self.h).nest_sese_region(h, entry_edge, exit_edge)?;
-        assert_eq!(h.output_neighbours(new_block).count(), 1);
+        let entry_edge = maybe_split(self.h, entry_edge).unwrap();
+        let exit_edge = maybe_split(self.h, exit_edge).unwrap();
+        let new_block = SimpleCfgView::new(self.h).nest_sese_region(entry_edge, exit_edge)?;
+        assert_eq!(self.h.output_neighbours(new_block).count(), 1);
         Ok(HalfNode::N(new_block))
     }
 }
@@ -210,7 +209,7 @@ mod test {
     use std::collections::HashSet;
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (h, main, tail) = build_conditional_in_loop_cfg(false)?;
+        let (mut h, main, tail) = build_conditional_in_loop_cfg(false)?;
         //               /-> left --\
         //  entry -> main            > merge -> tail -> exit
         //            |  \-> right -/             |
@@ -222,7 +221,7 @@ mod test {
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
-        let v = HalfNodeView::new(&h);
+        let v = HalfNodeView::new(&mut h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
 
