@@ -164,7 +164,7 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
                 };
                 // Check Signature is correct if stored. TODO input_resources
                 let computed_sig = def
-                    .signature(&opaque.args, &ResourceSet::default())
+                    .compute_signature(&opaque.args, &ResourceSet::default())
                     .unwrap();
                 if let Some(sig) = &opaque.signature {
                     if sig != &computed_sig {

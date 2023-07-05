@@ -45,7 +45,6 @@ pub trait CustomSignatureFunc: Send + Sync {
 }
 
 /// An error that can occur in computing the signature of a node.
-/// TODO: there's no real way to plumb this out of OpType::signature()...
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SignatureError {
@@ -216,8 +215,9 @@ impl OpDef {
         }
     }
 
-    /// The signature of the operation.
-    pub fn signature(
+    /// Computes the signature of a node, i.e. an instantiation of this
+    /// OpDef with statically-provided [TypeArg]s.
+    pub fn compute_signature(
         &self,
         args: &[TypeArg],
         resources_in: &ResourceSet,
