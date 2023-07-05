@@ -110,11 +110,11 @@ pub fn transform_cfg_to_nested<T: Copy + std::fmt::Debug + Eq + Hash>(
                     if n != prev_edge.1 || succs.len() > 1 {
                         println!("Nesting {:?} - {:?}", prev_edge, edge);
                         n = view.nest_sese_region(prev_edge, edge).unwrap();
-                        last_edge_in_class.insert(*class, (n, s));
                     } else {
                         println!("Skipping trivial edge {:?}", edge);
                     }
                 }
+                last_edge_in_class.insert(*class, (n, s));
             }
             node_stack.push(s);
         }
@@ -576,6 +576,16 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
+        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
+        h.validate().unwrap();
+        assert_eq!(1, depth(&h, entry));
+        assert_eq!(1, depth(&h, exit));
+        for n in [split, left, right, merge, head, tail] {
+            assert_eq!(3, depth(&h, n));
+        }
+        let first = [split, left, right, merge].iter().map(|n| h.get_parent(*n).unwrap()).unique().exactly_one().unwrap();
+        let second = [head, tail].iter().map(|n| h.get_parent(*n).unwrap()).unique().exactly_one().unwrap();
+        assert_ne!(first, second);
         Ok(())
     }
 
@@ -641,6 +651,15 @@ pub(crate) mod test {
                 Vec::from([(tail, head)])              // The loop back-edge
             ])
         );
+        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
+        h.validate().unwrap();
+        assert_eq!(1, depth(&h, entry));
+        assert_eq!(3, depth(&h, head));
+        for n in [split, left, right, merge] {
+            assert_eq!(5, depth(&h, n));
+        }
+        assert_eq!(3, depth(&h, tail));
+        assert_eq!(1, depth(&h, exit));
         Ok(())
     }
 
@@ -818,4 +837,12 @@ pub(crate) mod test {
         let h = cfg_builder.finish_hugr()?;
         Ok((h, head, tail))
     }
+
+    pub fn depth(h: &impl HugrView, n: Node) -> u32 {
+        match h.get_parent(n) {
+            Some(p) => 1 + depth(h, p),
+            None => 0,
+        }
+    }
+
 }

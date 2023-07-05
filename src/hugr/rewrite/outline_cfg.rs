@@ -210,7 +210,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
+        build_cond_then_loop_cfg, build_conditional_in_loop_cfg, depth
     };
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
@@ -218,13 +218,6 @@ mod test {
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
-
-    fn depth(h: &impl HugrView, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
-    }
 
     #[test]
     fn test_outline_cfg_errors() {
