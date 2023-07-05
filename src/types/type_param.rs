@@ -10,8 +10,8 @@ use super::{ClassicType, SimpleType};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
-/// TODO any other 'leaf' types? We specifically do not want float.
-/// bool should eventually be a Sum type (Container).
+// TODO any other 'leaf' types? We specifically do not want float.
+// bool should eventually be a Sum type (Container).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type] - classic or linear

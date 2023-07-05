@@ -67,7 +67,7 @@ impl OpTrait for ExternalOp {
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::DataflowChild
+        OpTag::Leaf
     }
 
     /// Note that there is no way to indicate failure here! We could fail in [resolve_extension_ops]?
