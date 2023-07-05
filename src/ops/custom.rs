@@ -80,6 +80,7 @@ impl OpTrait for ExternalOp {
 }
 
 // Note *not* Serializable: container (ExternalOp) should have serialized as an OpaqueOp instead.
+/// An operation defined by a [Resource] - an instantiation of an [OpDef].
 #[derive(Clone, Debug)]
 pub struct ResourceOp {
     def: Arc<OpDef>,

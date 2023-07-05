@@ -54,7 +54,16 @@ pub enum SignatureError {
     TypeArgMismatch(String),
 }
 
-/// Trait for resources to provide custom binary code for lowering a node to a Hugr.
+/// Trait for Resources to provide custom binary code that can lower an operation to
+/// a Hugr using only a limited set of other resources. That is, trait
+/// implementations can return a Hugr that implements the operation using only
+/// those resources and that can be used to replace the operation node. This may be
+/// useful for third-party Resources or as a fallback for tools that do not support
+/// the operation natively.
+///
+/// This trait allows the Hugr to be varied according to the operation's [TypeArg]s;
+/// if this is not necessary then a single Hugr can be provided instead via
+/// [OpDef::lowering_to_hugr].
 pub trait CustomLowerFunc: Send + Sync {
     /// Return a Hugr that implements the node using only the specified available resources;
     /// may fail.
