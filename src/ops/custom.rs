@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::hugr::{HugrMut, HugrView};
-use crate::resource::{OpDef, ResourceId, ResourceSet};
+use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
 use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
 use crate::{Hugr, Resource};
 
@@ -79,13 +79,29 @@ impl OpTrait for ExternalOp {
     }
 }
 
-// Note *not* Serializable: container (ExternalOp) should have serialized as an OpaqueOp instead.
-/// An operation defined by a [Resource] - an instantiation of an [OpDef].
+/// An operation defined by an [OpDef] from a loaded [Resource].
+// Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
 #[derive(Clone, Debug)]
 pub struct ResourceOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
     signature: Signature, // Cache
+}
+
+impl ResourceOp {
+    /// Create a new ResourceOp given the type arguments and specified input resources
+    pub fn new(
+        def: Arc<OpDef>,
+        args: &[TypeArg],
+        resources_in: &ResourceSet,
+    ) -> Result<Self, SignatureError> {
+        let signature = def.compute_signature(args, resources_in)?;
+        Ok(Self {
+            def,
+            args: args.to_vec(),
+            signature,
+        })
+    }
 }
 
 impl From<ResourceOp> for OpaqueOp {
@@ -162,23 +178,16 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
                 let Some(def) = r.operations().get(&opaque.op_name) else {
                     panic!("Conflicting declaration of Resource {}, did not find OpDef for {}", r.name(), opaque.op_name);
                 };
-                // Check Signature is correct if stored. TODO input_resources
-                let computed_sig = def
-                    .compute_signature(&opaque.args, &ResourceSet::default())
-                    .unwrap();
+                // TODO input resources. From type checker, or just drop by storing only delta in Signature.
+                let op = ExternalOp::Resource(
+                    ResourceOp::new(def.clone(), &opaque.args, &ResourceSet::default()).unwrap(),
+                );
                 if let Some(sig) = &opaque.signature {
-                    if sig != &computed_sig {
-                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.op_name, computed_sig, sig);
+                    if sig != &op.signature() {
+                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.op_name, op.signature(), sig);
                     };
                 };
-                replacements.push((
-                    n,
-                    ExternalOp::Resource(ResourceOp {
-                        def: def.clone(),
-                        args: opaque.args.clone(),
-                        signature: computed_sig,
-                    }),
-                ));
+                replacements.push((n, op));
             } else if opaque.signature.is_none() {
                 panic!(
                     "Loaded node with operation {} of unknown resource {} and no stored Signature",
