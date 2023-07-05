@@ -43,6 +43,7 @@ enum_dispatch = "0.3.11"
 lazy_static = "1.4.0"
 petgraph = { version="0.6.3", default-features = false}
 context-iterators = "0.2.0"
+serde_json = "1.0.97"
 
 [features]
 pyo3 = ["dep:pyo3"]
@@ -54,7 +55,6 @@ rmp-serde = "1.1.1"
 webbrowser = "0.8.10"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
-serde_json = "1.0.97"
 
 [[bench]]
 name = "bench_main"
