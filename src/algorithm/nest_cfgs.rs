@@ -47,7 +47,7 @@ use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::view::HugrView;
 use crate::ops::tag::OpTag;
 use crate::ops::OpTrait;
-use crate::{Direction, Node};
+use crate::{Direction, Hugr, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
 // (in a BB with one predecessor and one successor, which may then be merged
@@ -80,10 +80,47 @@ pub trait CfgView<T> {
     /// if the two edges do not constitute a SESE region.
     fn nest_sese_region(
         &mut self,
-        h: &mut crate::Hugr,
+        h: &mut Hugr,
         entry_edge: (T, T),
         exit_edge: (T, T),
     ) -> Result<T, String>;
+}
+
+/// Transforms a CFG to nested form.
+/// TODO for now this takes 'h' as extra param until we have some other way of applying a rewrite.
+pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
+    view: &mut impl CfgView<T>,
+    h: &mut Hugr,
+) -> Result<(), String> {
+    let edges = EdgeClassifier::get_edge_classes(view);
+    // Traverse. Any traversal will encounter edges in SESE-respecting order,
+    // but TODO does this stack work for branching/merging?
+    // Might need to traverse dominator tree considering edges from each node, or similar.
+    let mut last_edge_in_class = HashMap::new();
+    let mut seen_nodes = HashSet::new();
+    let mut node_stack = Vec::new();
+    node_stack.push(view.entry_node());
+    while let Some(mut n) = node_stack.pop() {
+        if !seen_nodes.insert(n) {
+            continue;
+        }
+        let succs = view.successors(n).collect_vec();
+        for s in succs {
+            let edge = (n, s);
+            if let Some(class) = edges.get(&edge) {
+                if let Some(&prev_edge) = last_edge_in_class.get(&class) {
+                    // n will be moved into new block.
+                    // TODO OutlineCfg will only work if all other edges from n are *inside* the block...
+                    // so how does this work? Don't we need to traverse successors of n in a particular order,
+                    // i.e. most-nested-blocks first?
+                    n = view.nest_sese_region(h, prev_edge, edge).unwrap();
+                    last_edge_in_class.insert(class, (n, s));
+                }
+            }
+            node_stack.push(s);
+        }
+    }
+    Ok(())
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
@@ -176,7 +213,7 @@ impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
 
     fn nest_sese_region(
         &mut self,
-        h: &mut crate::Hugr,
+        h: &mut Hugr,
         entry_edge: (Node, Node),
         exit_edge: (Node, Node),
     ) -> Result<Node, String> {
