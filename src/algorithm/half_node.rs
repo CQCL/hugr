@@ -2,9 +2,8 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use super::nest_cfgs::{get_blocks, CfgView, SimpleCfgView};
+use super::nest_cfgs::{CfgView, SimpleCfgView};
 use crate::builder::{BuildError, CFGBuilder, Dataflow, SubContainer};
-use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::view::HugrView;
 use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
@@ -100,12 +99,12 @@ impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
         h: &mut crate::Hugr,
         entry_edge: (HalfNode, HalfNode),
         exit_edge: (HalfNode, HalfNode),
-    ) -> Result<(), String> {
+    ) -> Result<HalfNode, String> {
         let entry_edge = maybe_split(h, entry_edge).unwrap();
         let exit_edge = maybe_split(h, exit_edge).unwrap();
-        let blocks = get_blocks(&SimpleCfgView::new(self.h), entry_edge, exit_edge)?;
-        h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        Ok(())
+        let new_block = SimpleCfgView::new(self.h).nest_sese_region(h, entry_edge, exit_edge)?;
+        assert_eq!(h.output_neighbours(new_block).count(), 1);
+        Ok(HalfNode::N(new_block))
     }
 }
 

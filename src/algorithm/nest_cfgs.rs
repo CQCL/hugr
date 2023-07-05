@@ -76,13 +76,14 @@ pub trait CfgView<T> {
     /// Given an entry edge and exit edge defining a SESE region, mutates the
     /// Hugr such that all nodes between these edges are placed in a nested CFG.
     /// Hugr is temporarily passed in until we have a View-like trait that allows applying a rewrite.
-    /// Returns an error if the two edges do not constitute a SESE region.
+    /// Returns the newly-constructed block (containing a nested CFG), or an error
+    /// if the two edges do not constitute a SESE region.
     fn nest_sese_region(
         &mut self,
         h: &mut crate::Hugr,
         entry_edge: (T, T),
         exit_edge: (T, T),
-    ) -> Result<(), String>;
+    ) -> Result<T, String>;
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
@@ -178,11 +179,23 @@ impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
         h: &mut crate::Hugr,
         entry_edge: (Node, Node),
         exit_edge: (Node, Node),
-    ) -> Result<(), String> {
+    ) -> Result<Node, String> {
         let blocks = get_blocks(self, entry_edge, exit_edge)?;
+        let cfg = h.get_parent(entry_edge.0).unwrap();
+        assert!([entry_edge.1, exit_edge.0, exit_edge.1]
+            .iter()
+            .all(|n| h.get_parent(*n).unwrap() == cfg));
         // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        Ok(())
+        // Hmmm, no way to get the node created out from the rewrite...
+        assert!([entry_edge.0, exit_edge.1]
+            .iter()
+            .all(|n| h.get_parent(*n).unwrap() == cfg));
+        let new_cfg = h.get_parent(exit_edge.0).unwrap();
+        assert_eq!(new_cfg, h.get_parent(entry_edge.1).unwrap());
+        let new_block = h.get_parent(new_cfg).unwrap();
+        assert_eq!(cfg, h.get_parent(new_block).unwrap());
+        Ok(new_block)
     }
 }
 
