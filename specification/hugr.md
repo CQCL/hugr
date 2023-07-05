@@ -423,15 +423,87 @@ inputs of successor `i`.
 Some normalizations are possible:
 
   - If the entry node has no predecessors (i.e. is not a loop header),
-    then its contents can be moved outside the ??-node into a containing
+    then its contents can be moved outside the CFG node into a containing
     DSG.
+  - If the entry node has only one successor and that successor is the
+    exit node, the CFG node itself can be removed.
 
-  - If the entry node’s has only one successor and that successor is the
-    exit node, the CFG-node itself can be removed
+The CFG in the example below has three inputs: one (call it `v`) of type "P"
+(not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
+type "qubit" and one (call it `t`) of type "angle".
 
-**Example CFG (TODO update w/ Sum types)**
+The CFG has the effect of performing an `Rz` rotation on the qubit with angle
+`x`. where `x` is the constant `C` if `v` and `H(v)` are both true and `G(F(t))`
+otherwise. (`H` is a function from type "P" to type "P" and `F` and `G` are
+functions from type "angle" to type "angle".)
 
-<img src="attachments/2647818241/2647818461.png" width="768px">
+The `DFB` nodes are labelled `Entry` and `BB1` to `BB4`. Note that the first
+output of each of these is a sum type, whose arity is the number of outgoing
+control edges; the remaining outputs are those that are passed to all
+succeeding nodes.
+
+The three nodes labelled "Const" are simply generating a predicate with one empty
+value to pass to the Output node.
+
+```mermaid
+flowchart
+    subgraph CFG
+        direction TB
+        subgraph Entry
+            direction TB
+            EntryIn["Input"] -- "angle" --> F
+            EntryIn -- "P" --> Entry_["P?1"]
+            Entry_ -- "[()|(P)]" --> EntryOut["Output"]
+            F -- "angle" --> EntryOut
+            EntryIn -- "qubit" --> EntryOut
+        end
+        subgraph BB1
+            direction TB
+            BB1In["Input"] -- "angle" --> G
+            BB1In -. "(Order)" .-> BB1_["Const"]
+            BB1_ -- "[()]" --> BB1Out["Output"]
+            BB1In -- "qubit" --> BB1Out
+            G -- "angle" --> BB1Out
+        end
+        subgraph BB2
+            direction TB
+            BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?2"]
+            BB2_ -- "[(angle)|()]" --> BB2Out["Output"]
+            BB2In -- "angle" --> BB2_
+            BB2In -- "qubit" --> BB2Out
+        end
+        subgraph BB3
+            direction TB
+            BB3In["Input"] -. "(Order)" .-> C
+            BB3In -. "(Order)" .-> BB3_["Const"]
+            BB3_ -- "[()]" --> BB3Out["Output"]
+            BB3In -- "qubit" --> BB3Out
+            C -- "angle" --> BB3Out
+        end
+        subgraph BB4
+            direction TB
+            BB4In["Input"] -- "qubit" --> Rz
+            BB4In -- "angle" --> Rz
+            BB4In -. "(Order)" .-> BB4_["Const"]
+            BB4_ -- "[()]" --> BB4Out["Output"]
+            Rz -- "qubit" --> BB4Out
+        end
+        subgraph Exit
+        end
+        Entry -- "0" --> BB1
+        Entry -- "1" --> BB2
+        BB2 -- "0" --> BB1
+        BB2 -- "1" --> BB3
+        BB1 -- "0" --> BB4
+        BB3 -- "0" --> BB4
+        BB4 -- "0" --> Exit
+    end
+    A -- "P" --> CFG
+    A -- "qubit" --> CFG
+    A -- "angle" --> CFG
+    CFG -- "qubit" --> B
+    linkStyle 25,26,27,28,29,30,31 stroke:#ff3,stroke-width:4px;
+```
 
 #### Hierarchical Relationships and Constraints
 
@@ -569,19 +641,69 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-**Example CFG (TODO update with** `Sum` **types)** the following CFG is
-equivalent to the previous example. Besides the use of Ext
-edges to reduce passing of P and X, I have also used the normalization
-of moving operations out of the exit-block into the surrounding graph;
-this results in the qubit being passed right through so can also be
-elided. Further normalization of moving F out of the entry-block into
-the surrounding graph is also possible. Indeed every time a SESE region
+The following CFG is equivalent to the previous example. In this diagram:
+
+* the thick arrow from "angle source" to "F" is an `Ext` edge (from an
+  ancestral DFG into the CFG's entry block);
+* the thick arrow from "F" to "G" is a `Dom` edge (from a dominating basic
+  block);
+* the `Rz` operation has been moved outside the CFG into the surrounding DFG, so
+  the qubit does not need to be passed in to the CFG.
+
+As a further normalization it would be possible to move F out of the CFG.
+Alternatively, as an optimization it could be moved into the BB1 block.
+
+Indeed every time a SESE region
 is found within a CFG (where block *a* dominates *b*, *b* postdominates
 *a*, and every loop containing either *a* or *b* contains both), it can
 be normalized by moving the region bracketted by *a…b* into its own
 CFG-node.
 
-<img src="attachments/2647818241/2647818458.png" width="512px">
+```mermaid
+flowchart
+    subgraph CFG
+        direction TB
+        subgraph Entry
+            direction TB
+            EntryIn["Input"] -- "P" --> Entry_["P?1"]
+            Entry_ -- "[()|(P)]" --> EntryOut["Output"]
+            F
+        end
+        subgraph BB1
+            direction TB
+            BB1In["Input"] -. "(Order)" .-> BB1_["Const"]
+            BB1_ -- "[()]" --> BB1Out["Output"]
+            G -- "angle" --> BB1Out
+        end
+        subgraph BB2
+            direction TB
+            BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?2"]
+            BB2_ -- "[()|()]" --> BB2Out["Output"]
+        end
+        subgraph BB3
+            direction TB
+            BB3In["Input"] -. "(Order)" .-> C
+            BB3In -. "(Order)" .-> BB3_["Const"]
+            BB3_ -- "[()]" --> BB3Out["Output"]
+            C -- "angle" --> BB3Out
+        end
+        subgraph Exit
+        end
+        Entry -- "0" --> BB1
+        Entry -- "1" --> BB2
+        BB2 -- "0" --> BB1
+        BB2 -- "1" --> BB3
+        BB1 -- "0" --> Exit
+        BB3 -- "0" --> Exit
+    end
+    A -- "P" --> CFG
+    A -- "qubit" --> Rz_out["Rz"]
+    CFG -- "angle" --> Rz_out
+    Rz_out -- "qubit" --> B
+    A == "angle" ==> F
+    F == "angle" ==> G
+    linkStyle 12,13,14,15,16,17 stroke:#ff3,stroke-width:4px;
+```
 
 ### Operation Extensibility
 
