@@ -50,7 +50,7 @@ pyo3 = ["dep:pyo3"]
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
-rstest = "0.17.0"
+rstest = "0.18.1"
 rmp-serde = "1.1.1"
 webbrowser = "0.8.10"
 urlencoding = "2.1.2"
