@@ -469,7 +469,7 @@ flowchart
             direction TB
             BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?"]
             BB2_ -- "[(angle)|()]" --> BB2Out["Output"]
-            BB2In -- "angle" --> BB2Out
+            BB2In -- "angle" --> BB2_
             BB2In -- "qubit" --> BB2Out
         end
         subgraph BB3
@@ -640,19 +640,70 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-**Example CFG (TODO update with** `Sum` **types)** the following CFG is
-equivalent to the previous example. Besides the use of Ext
-edges to reduce passing of P and X, I have also used the normalization
-of moving operations out of the exit-block into the surrounding graph;
-this results in the qubit being passed right through so can also be
-elided. Further normalization of moving F out of the entry-block into
-the surrounding graph is also possible. Indeed every time a SESE region
+The following CFG is equivalent to the previous example. In this diagram:
+
+* the dotted arrow from "angle source" to "F" is an `Ext` edge (from an
+  ancestral DFG into the CFG's entry block);
+* the dotted arrow from "F" to "G" is a `Dom` edge (from a dominating basic
+  block);
+* the `Rz` operation has been moved outside the CFG into the surrounding DFG, so
+  the qubit does not need to be passed in to the CFG.
+
+As a further normalization it would be possible to move F out of the CFG.
+Alternatively, as an optimization it could be moved into the BB1 block.
+
+Indeed every time a SESE region
 is found within a CFG (where block *a* dominates *b*, *b* postdominates
 *a*, and every loop containing either *a* or *b* contains both), it can
 be normalized by moving the region bracketted by *a…b* into its own
 CFG-node.
 
-<img src="attachments/2647818241/2647818458.png" width="512px">
+```mermaid
+flowchart
+    subgraph CFG
+        direction TB
+        subgraph Entry
+            direction TB
+            EntryIn["Input"] -- "P" --> Entry_["P?"]
+            Entry_ -- "[()|(P)]" --> EntryOut["Output"]
+            F
+        end
+        subgraph BB1
+            direction TB
+            BB1In["Input"] -- "(Order)" --> BB1_["..."]
+            BB1_ -- "[()]" --> BB1Out["Output"]
+            G -- "angle" --> BB1Out
+        end
+        subgraph BB2
+            direction TB
+            BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?"]
+            BB2_ -- "[()|()]" --> BB2Out["Output"]
+        end
+        subgraph BB3
+            direction TB
+            BB3In["Input"] -- "(Order)" --> C
+            BB3In -- "(Order)" --> BB3_["..."]
+            BB3_ -- "[()]" --> BB3Out["Output"]
+            C -- "angle" --> BB3Out
+        end
+        subgraph Exit
+        end
+        Entry -- "0" --> BB1
+        Entry -- "1" --> BB2
+        BB2 -- "0" --> BB1
+        BB2 -- "1" --> BB3
+        BB1 -- "0" --> Exit
+        BB3 -- "0" --> Exit
+    end
+    A -- "P" --> CFG
+    Q_pre["qubit source"] -- "qubit" --> Rz_out["Rz"]
+    CFG -- "angle" --> Rz_out
+    Rz_out -- "qubit" --> B
+    Q_pre -- "(Order)" --> A
+    A_pre["angle source"] -. "angle" .-> F
+    A_pre -- "(Order)" --> A
+    F -. "angle" .-> G
+```
 
 ### Operation Extensibility
 
