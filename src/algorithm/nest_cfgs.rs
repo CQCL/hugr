@@ -96,7 +96,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
     // Traverse. Any traversal will encounter edges in SESE-respecting order,
     // but TODO does this stack work for branching/merging?
     // Might need to traverse dominator tree considering edges from each node, or similar.
-    let mut last_edge_in_class = HashMap::new();
+    let mut last_edge_in_class: HashMap<usize, (T,T)> = HashMap::new();
     let mut seen_nodes = HashSet::new();
     let mut node_stack = Vec::new();
     node_stack.push(view.entry_node());
@@ -105,16 +105,18 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
             continue;
         }
         let succs = view.successors(n).collect_vec();
-        for s in succs {
+        for &s in succs.iter() {
             let edge = (n, s);
             if let Some(class) = edges.get(&edge) {
-                if let Some(&prev_edge) = last_edge_in_class.get(&class) {
+                if let Some(&prev_edge) = last_edge_in_class.get(class) {
                     // n will be moved into new block.
                     // TODO OutlineCfg will only work if all other edges from n are *inside* the block...
                     // so how does this work? Don't we need to traverse successors of n in a particular order,
                     // i.e. most-nested-blocks first?
-                    n = view.nest_sese_region(h, prev_edge, edge).unwrap();
-                    last_edge_in_class.insert(class, (n, s));
+                    if n != prev_edge.1 || succs.len()>1 {
+                        n = view.nest_sese_region(h, prev_edge, edge).unwrap();
+                        last_edge_in_class.insert(*class, (n, s));
+                    }
                 }
             }
             node_stack.push(s);
