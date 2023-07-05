@@ -82,7 +82,7 @@ pub trait CfgView<T> {
 }
 
 /// Transforms a CFG to nested form.
-pub fn transform_cfg_to_nested<T: Copy + std::fmt::Debug + Eq + Hash>(
+pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
     view: &mut impl CfgView<T>,
 ) -> Result<(), String> {
     let edges = EdgeClassifier::get_edge_classes(view);
@@ -100,7 +100,6 @@ pub fn transform_cfg_to_nested<T: Copy + std::fmt::Debug + Eq + Hash>(
         let succs = view.successors(n).collect_vec();
         for &s in succs.iter() {
             let edge = (n, s);
-            println!("Processing edge {:?} of class {:?}", edge, edges.get(&edge));
             if let Some(class) = edges.get(&edge) {
                 if let Some(&prev_edge) = last_edge_in_class.get(class) {
                     // n will be moved into new block.
@@ -108,10 +107,7 @@ pub fn transform_cfg_to_nested<T: Copy + std::fmt::Debug + Eq + Hash>(
                     // so how does this work? Don't we need to traverse successors of n in a particular order,
                     // i.e. most-nested-blocks first?
                     if n != prev_edge.1 || succs.len() > 1 {
-                        println!("Nesting {:?} - {:?}", prev_edge, edge);
                         n = view.nest_sese_region(prev_edge, edge).unwrap();
-                    } else {
-                        println!("Skipping trivial edge {:?}", edge);
                     }
                 }
                 last_edge_in_class.insert(*class, (n, s));
