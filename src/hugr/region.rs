@@ -31,7 +31,7 @@ pub struct FlatRegionView<'g> {
     /// Operation types for each node.
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 
-    /// Operation types for each node.
+    /// Metadata types for each node.
     metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 
@@ -192,7 +192,7 @@ pub struct RegionView<'g> {
     /// Operation types for each node.
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 
-    /// Operation types for each node.
+    /// Metadata types for each node.
     metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 

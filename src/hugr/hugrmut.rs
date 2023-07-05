@@ -26,7 +26,7 @@ pub(crate) trait HugrMut {
     /// Returns the metadata associated with a node.
     fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
 
-    /// Returns the metadata associated with a node.
+    /// Sets the metadata associated with a node.
     fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) {
         *self.get_metadata_mut(node) = metadata;
     }
