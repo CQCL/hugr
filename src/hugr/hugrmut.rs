@@ -9,7 +9,7 @@ use crate::hugr::{Direction, HugrError, HugrView, Node};
 use crate::ops::OpType;
 use crate::{Hugr, Port};
 
-use super::OpMetadata;
+use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
@@ -24,10 +24,10 @@ pub(crate) trait HugrMut {
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
 
     /// Returns the metadata associated with a node.
-    fn get_metadata_mut(&mut self, node: Node) -> &mut OpMetadata;
+    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
 
     /// Returns the metadata associated with a node.
-    fn set_metadata(&mut self, node: Node, metadata: OpMetadata) {
+    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) {
         *self.get_metadata_mut(node) = metadata;
     }
 
@@ -169,7 +169,7 @@ where
         Ok(())
     }
 
-    fn get_metadata_mut(&mut self, node: Node) -> &mut OpMetadata {
+    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
         self.as_mut().metadata.get_mut(node.index)
     }
 

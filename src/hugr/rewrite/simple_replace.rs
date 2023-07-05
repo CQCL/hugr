@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 
-use crate::hugr::{HugrMut, HugrView, OpMetadata};
+use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
     ops::{tag::OpTag, OpTrait, OpType},
@@ -101,7 +101,7 @@ impl Rewrite for SimpleReplacement {
             index_map.insert(node.index, new_node_index.index);
 
             // Move the metadata
-            let meta: &OpMetadata = self.replacement.get_metadata(node);
+            let meta: &NodeMetadata = self.replacement.get_metadata(node);
             h.set_metadata(node, meta.clone());
         }
         // Add edges between all newly added nodes matching those in replacement.

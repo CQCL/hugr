@@ -8,7 +8,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx
 use itertools::{Itertools, MapInto};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, OpMetadata};
+use super::{Hugr, NodeMetadata};
 use super::{Node, Port};
 use crate::ops::OpType;
 use crate::Direction;
@@ -56,7 +56,7 @@ pub trait HugrView: sealed::HugrInternals {
     fn get_optype(&self, node: Node) -> &OpType;
 
     /// Returns the metadata associated with a node.
-    fn get_metadata(&self, node: Node) -> &OpMetadata;
+    fn get_metadata(&self, node: Node) -> &NodeMetadata;
 
     /// Returns the number of nodes in the hugr.
     fn node_count(&self) -> usize;
@@ -234,7 +234,7 @@ where
     }
 
     #[inline]
-    fn get_metadata(&self, node: Node) -> &OpMetadata {
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.as_ref().metadata.get(node.index)
     }
 }

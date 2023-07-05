@@ -10,7 +10,7 @@ use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap
 
 use crate::{ops::OpType, Direction, Hugr, Node, Port};
 
-use super::{HugrView, OpMetadata};
+use super::{HugrView, NodeMetadata};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
@@ -32,7 +32,7 @@ pub struct FlatRegionView<'g> {
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 
     /// Operation types for each node.
-    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpMetadata>,
+    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 
 impl<'g> FlatRegionView<'g> {
@@ -99,7 +99,7 @@ impl<'g> HugrView for FlatRegionView<'g> {
     }
 
     #[inline]
-    fn get_metadata(&self, node: Node) -> &OpMetadata {
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.metadata.get(node.index)
     }
 
@@ -193,7 +193,7 @@ pub struct RegionView<'g> {
     op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 
     /// Operation types for each node.
-    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpMetadata>,
+    metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 
 impl<'g> RegionView<'g> {
@@ -260,7 +260,7 @@ impl<'g> HugrView for RegionView<'g> {
     }
 
     #[inline]
-    fn get_metadata(&self, node: Node) -> &OpMetadata {
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.metadata.get(node.index)
     }
 
