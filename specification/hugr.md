@@ -315,30 +315,28 @@ and an Output node, whose outputs and inputs respectively match the inputs and
 outputs of the containing DFG.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> DFG0
-    [*] --> DFG0
-
-    state DFG0 {
+flowchart
+    direction TB
+    subgraph DFG0
+        direction TB
         Input0 --> op0
-        op0 --> DFG1
-        op0 --> op1
         Input0 --> op1
-        op1 --> DFG1
-
-        state DFG1 {
+        op0 --> op1
+        subgraph DFG1
+            direction TB
             Input1 --> op2
             Input1 --> op3
-            op2 --> Output1
-            op3--> Output1
-        }
-
+            op2 --> op4
+            op3 --> op4
+            op4 --> Output1
+        end
+        op0 --> DFG1
+        op1 --> DFG1
         DFG1 --> Output0
-        DFG1 --> Output0
-    }
-
-    DFG0 --> [*]
-    DFG0 --> [*]
+    end
+    A --> DFG0
+    A --> DFG0
+    DFG0 --> B
 ```
 
 #### Control Flow
@@ -615,7 +613,33 @@ Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
 execute \>=0 times.
 
-<img src="attachments/2647818241/2647818338.png" width="768px">
+The diagram below is equivalent to the diagram in the [Dataflow](#dataflow)
+section above, but the input edge to "op3" has been replaced with a non-local
+edge from the surrounding DFG (the thick arrow).
+
+```mermaid
+flowchart
+    direction TB
+    subgraph DFG0
+        direction TB
+        Input0 --> op0
+        Input0 --> op1
+        op0 --> op1
+        subgraph DFG1
+            direction TB
+            Input1 --> op2
+            op2 --> op4
+            op3 --> op4
+            op4 --> Output1
+        end
+        op0 --> DFG1
+        DFG1 --> Output0
+    end
+    op1 ==> op3
+    A --> DFG0
+    A --> DFG0
+    DFG0 --> B
+```
 
 This mechanism allows for some values to be passed into a block
 bypassing the input/output nodes, and we expect this form to make
@@ -1129,13 +1153,13 @@ Unification will demand that resource constraints are equal and, to make
 it so, we will have an operations called **lift** and **liftGraph**
 which can add a resource constraints to values.
 
-<img src="attachments/2647818241/2647818335.png" height="64px">
+$\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
 
 **lift** - Takes as a node weight parameter the single resource
 **X** which it adds to the
-resource requirements of it’s argument.
+resource requirements of its argument.
 
-<img src="attachments/2647818241/2647818332.png" height="64px">
+$\displaystyle{\frac{f : [ \rho ] \textbf{Graph}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Graph}[X, R](\vec{I}, \vec{O})}}$
 
 **liftGraph** - Like **lift**, takes a
 resource X as a constant node
@@ -1164,9 +1188,9 @@ I’m going to define them in terms of resources. We have the “builtin”
 resource which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
-<img src="attachments/2647818241/2647818323.png" height="64px">
+$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
 
-**Call** - This operation, like **to\_const**, uses it’s Static graph as
+**Call** - This operation, like **to\_const**, uses its Static graph as
 a type parameter.
 
 On top of that, we're definitely going to want modules which handle
@@ -1821,7 +1845,7 @@ These operations allow this.
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-<img src="attachments/2647818241/2647818326.png" height="64px">
+$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Graph}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
 
 **loop** - In order to run the *body* graph, we need the resources
 R that the graph requires, so
@@ -1832,12 +1856,12 @@ that *v* is lifted to have resource requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-<img src="attachments/2647818241/2647818329.png" height="64px">
+$\displaystyle{\frac{\Theta : [R] \textbf{Graph}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s resources.
 
-<img src="attachments/2647818241/2647818368.png" height="64px">
+$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Graph}[R](\vec{I}, \vec{O})}}$
 
 **to_const** - For operations which instantiate a graph (**to\_const**
 and **Call**) the functions are given an extra parameter at graph
