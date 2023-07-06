@@ -284,7 +284,7 @@ impl OpDef {
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
 /// - typically these are operations also provided by the Resource.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
     /// The unique name of the type
     pub name: SmolStr,
@@ -301,7 +301,7 @@ pub struct TypeDef {
 pub type ResourceId = SmolStr;
 
 /// A resource is a set of capabilities required to execute a graph.
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Resource {
     /// Unique identifier for the resource.
     pub name: ResourceId,
