@@ -11,7 +11,7 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::types::type_param::check_arg;
+use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::TypeRow;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
@@ -50,7 +50,7 @@ pub trait CustomSignatureFunc: Send + Sync {
 pub enum SignatureError {
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by OpDef: {0}")]
-    TypeArgMismatch(String),
+    TypeArgMismatch(#[from] TypeArgError),
 }
 
 /// Trait for Resources to provide custom binary code that can lower an operation to
@@ -223,12 +223,13 @@ impl OpDef {
         resources_in: &ResourceSet,
     ) -> Result<Signature, SignatureError> {
         if args.len() != self.args.len() {
-            return Err(SignatureError::TypeArgMismatch(
-                "Node provided wrong number of args".to_string(),
-            ));
+            return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
+                args.len(),
+                self.args.len(),
+            )));
         }
         for (a, p) in args.iter().zip(self.args.iter()) {
-            check_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
         }
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {

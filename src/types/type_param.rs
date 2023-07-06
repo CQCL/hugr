@@ -4,6 +4,8 @@
 //!
 //! [`TypeDef`]: crate::resource::TypeDef
 
+use thiserror::Error;
+
 use crate::ops::constant::HugrIntValueStore;
 
 use super::{ClassicType, SimpleType};
@@ -43,19 +45,34 @@ pub enum TypeArg {
 }
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
-pub fn check_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), String> {
+pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
         (TypeArg::Type(_), TypeParam::Type) => (),
         (TypeArg::ClassicType(_), TypeParam::ClassicType) => (),
         (TypeArg::Int(_), TypeParam::Int) => (),
         (TypeArg::List(items), TypeParam::List(ty)) => {
             for item in items {
-                check_arg(item, ty.as_ref())?;
+                check_type_arg(item, ty.as_ref())?;
             }
         }
         _ => {
-            return Err(format!("Mismatched {:?} vs {:?}", arg, param));
+            return Err(TypeArgError::TypeMismatch(arg.clone(), param.clone()));
         }
     };
     Ok(())
+}
+
+/// Errors that can occur fitting a [TypeArg] into a [TypeParam]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+pub enum TypeArgError {
+    /// For now, general case of a type arg not fitting a param.
+    /// We'll have more cases when we allow general Containers.
+    // TODO It may become possible to combine this with ConstTypeError.
+    #[error("Type argument {0:?} does not fit declared parameter {1:?}")]
+    TypeMismatch(TypeArg, TypeParam),
+    /// Wrong number of type arguments.
+    // For now this only happens at the top level (TypeArgs of Op vs TypeParams of OpDef).
+    // However in the future it may be applicable to e.g. contents of Tuples too.
+    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
+    WrongNumber(usize, usize),
 }
