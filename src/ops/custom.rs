@@ -13,12 +13,14 @@ use crate::{Hugr, Node, Resource};
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
 
-/// An instantiation of an [`OpDef`] with values for the type arguments
+/// An instantiation of an operation (declared by a resource) with values for the type arguments
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
-    Resource(ResourceOp), // When we've found the Resource definition
-    Opaque(OpaqueOp),     // When we haven't
+    /// When we've found (loaded) the [Resource] definition and identified the [OpDef]
+    Resource(ResourceOp),
+    /// When we either haven't tried to identify the [Resource] or failed to find it.
+    Opaque(OpaqueOp),
 }
 
 impl From<ExternalOp> for OpaqueOp {
@@ -151,17 +153,17 @@ fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
 }
 
 impl OpaqueOp {
+    /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
     pub fn new(
         resource: ResourceId,
         op_name: impl Into<SmolStr>,
+        description: String,
         args: impl Into<Vec<TypeArg>>,
         signature: Option<Signature>,
     ) -> Self {
-        let op_name: SmolStr = op_name.into();
-        let description = qualify_name(&resource, &op_name).into();
         Self {
             resource,
-            op_name,
+            op_name: op_name.into(),
             description,
             args: args.into(),
             signature,
@@ -213,7 +215,7 @@ pub fn resolve_extension_ops(
 /// when trying to resolve the serialized names against a registry of known Resources.
 #[derive(Clone, Debug, Error)]
 pub enum CustomOpError {
-    // Resource not found, and no signature
+    /// Resource not found, and no signature
     #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
     NoStoredSignature(SmolStr, Node),
     /// The Resource was found but did not contain the expected OpDef

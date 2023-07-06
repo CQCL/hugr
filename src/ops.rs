@@ -2,7 +2,7 @@
 
 pub mod constant;
 pub mod controlflow;
-mod custom;
+pub mod custom;
 pub mod dataflow;
 pub mod handle;
 pub mod leaf;
