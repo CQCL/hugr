@@ -326,17 +326,16 @@ flowchart
             direction TB
             Input1 --> op2
             Input1 --> op3
-            op2 --> Output1
-            op3 --> Output1
+            op2 --> op4
+            op3 --> op4
+            op4 --> Output1
         end
         op0 --> DFG1
         op1 --> DFG1
         DFG1 --> Output0
-        DFG1 --> Output0
     end
     A --> DFG0
     A --> DFG0
-    DFG0 --> B
     DFG0 --> B
 ```
 
@@ -629,17 +628,16 @@ flowchart
         subgraph DFG1
             direction TB
             Input1 --> op2
-            op2 --> Output1
-            op3 --> Output1
+            op2 --> op4
+            op3 --> op4
+            op4 --> Output1
         end
         op0 --> DFG1
-        DFG1 --> Output0
         DFG1 --> Output0
     end
     op1 ==> op3
     A --> DFG0
     A --> DFG0
-    DFG0 --> B
     DFG0 --> B
 ```
 
