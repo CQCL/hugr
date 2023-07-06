@@ -1847,13 +1847,7 @@ These operations allow this.
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-$\displaystyle{
-  \frac{
-    \mathrm{body} : [R] \textbf{Graph}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)
-  }{
-    \textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)
-  }
-}$
+$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Graph}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
 
 **loop** - In order to run the *body* graph, we need the resources
 R that the graph requires, so
