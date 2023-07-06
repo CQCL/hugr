@@ -1,0 +1,22 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: "0" # because we need `main` as well
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install llvm
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "16.0" # should match version used by rustc
+      - name: Compare coverage with main branch
+        run: ./.github/workflows/compare-coverage
