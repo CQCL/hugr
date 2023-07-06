@@ -76,6 +76,7 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
+/// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 enum SignatureFunc {
     // Note: I'd prefer to make the YAML version just implement the same CustomSignatureFunc trait,
