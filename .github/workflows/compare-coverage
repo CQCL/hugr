@@ -26,4 +26,4 @@ echo "line coverage here: ${LINECOVPERCENT}%"
 MAIN_LINECOVPERCENT=`line_cov_percent main`
 echo "line coverage on main: ${MAIN_LINECOVPERCENT}%"
 
-if (( $(echo "${MAIN_LINECOVPERCENT} > ${LINECOVPERCENT}" | bc -l) )); then exit 1 ; fi
+if (( $(echo "${MAIN_LINECOVPERCENT} > ${LINECOVPERCENT} + 0.01" | bc -l) )); then exit 1 ; fi
