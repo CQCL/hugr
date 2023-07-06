@@ -3,11 +3,12 @@
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
 use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
-use crate::{Hugr, Resource};
+use crate::{Hugr, Node, Resource};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
@@ -70,7 +71,8 @@ impl OpTrait for ExternalOp {
         OpTag::Leaf
     }
 
-    /// Note that there is no way to indicate failure here! We could fail in [resolve_extension_ops]?
+    /// Note the case of an OpaqueOp without a signature should already
+    /// have been detected in [resolve_extension_ops]
     fn signature(&self) -> Signature {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
@@ -169,14 +171,17 @@ impl OpaqueOp {
 
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
 #[allow(dead_code)]
-pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
+pub fn resolve_extension_ops(
+    h: &mut Hugr,
+    resource_registry: &HashMap<SmolStr, Resource>,
+) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::CustomOp(ExternalOp::Opaque(opaque))) = h.get_optype(n) {
-            if let Some(r) = rsrcs.get(&opaque.resource) {
+        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) = h.get_optype(n) {
+            if let Some(r) = resource_registry.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
                 let Some(def) = r.operations().get(&opaque.op_name) else {
-                    panic!("Conflicting declaration of Resource {}, did not find OpDef for {}", r.name(), opaque.op_name);
+                    return Err(CustomOpError::OpNotFoundInResource(opaque.op_name.to_string(), r.name().to_string()));
                 };
                 // TODO input resources. From type checker, or just drop by storing only delta in Signature.
                 let op = ExternalOp::Resource(
@@ -184,15 +189,16 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
                 );
                 if let Some(sig) = &opaque.signature {
                     if sig != &op.signature() {
-                        panic!("Resolved {} to a concrete implementation which computed a conflicting signature: {} vs stored {}", opaque.op_name, op.signature(), sig);
+                        return Err(CustomOpError::SignatureMismatch(
+                            def.name.to_string(),
+                            op.signature(),
+                            sig.clone(),
+                        ));
                     };
                 };
                 replacements.push((n, op));
             } else if opaque.signature.is_none() {
-                panic!(
-                    "Loaded node with operation {} of unknown resource {} and no stored Signature",
-                    opaque.op_name, opaque.resource
-                );
+                return Err(CustomOpError::NoStoredSignature(op.name(), n));
             }
         }
     }
@@ -200,4 +206,20 @@ pub fn resolve_extension_ops(h: &mut Hugr, rsrcs: &HashMap<SmolStr, Resource>) {
     for (n, op) in replacements {
         h.replace_op(n, Into::<LeafOp>::into(op));
     }
+    Ok(())
+}
+
+/// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
+/// when trying to resolve the serialized names against a registry of known Resources.
+#[derive(Clone, Debug, Error)]
+pub enum CustomOpError {
+    // Resource not found, and no signature
+    #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
+    NoStoredSignature(SmolStr, Node),
+    /// The Resource was found but did not contain the expected OpDef
+    #[error("Operation {0} not found in Resource {1}")]
+    OpNotFoundInResource(String, String),
+    /// Resource and OpDef found, but computed signature did not match stored
+    #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
+    SignatureMismatch(String, Signature, Signature),
 }
