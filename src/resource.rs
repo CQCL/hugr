@@ -101,10 +101,10 @@ impl Debug for SignatureFunc {
     }
 }
 
+/// Different ways that an OpDef can lower operation nodes i.e. provide a Hugr
+/// that implements the operation using a set of other resources.
 #[derive(serde::Deserialize, serde::Serialize)]
 enum LowerFunc {
-    #[serde(skip)]
-    None,
     #[serde(rename = "hugr")]
     FixedHugr(ResourceSet, Hugr),
     #[serde(skip)]
@@ -114,7 +114,6 @@ enum LowerFunc {
 impl Debug for LowerFunc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::None => write!(f, "None"),
             Self::FixedHugr(_, _) => write!(f, "FixedHugr"),
             Self::CustomFunc(_) => write!(f, "<custom lower>"),
         }
@@ -141,8 +140,10 @@ pub struct OpDef {
 
     #[serde(flatten)]
     signature_func: SignatureFunc,
+    // Some operations cannot lower themselves and tools that do not understand them
+    // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
-    lower_func: LowerFunc,
+    lower_func: Option<LowerFunc>,
 }
 
 impl OpDef {
@@ -163,7 +164,7 @@ impl OpDef {
             args,
             misc,
             signature_func: SignatureFunc::FromYAML { inputs, outputs },
-            lower_func: LowerFunc::None,
+            lower_func: None,
         }
     }
 
@@ -182,7 +183,7 @@ impl OpDef {
             args,
             misc,
             signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
-            lower_func: LowerFunc::None,
+            lower_func: None,
         }
     }
 
@@ -193,11 +194,12 @@ impl OpDef {
         h: Hugr,
         required_resources: ResourceSet, // TODO can we figure these out from 'h' ?
     ) -> Result<Self, Self> {
-        if let LowerFunc::None = self.lower_func {
-            self.lower_func = LowerFunc::FixedHugr(required_resources, h);
-            Ok(self)
-        } else {
-            Err(self)
+        match self.lower_func {
+            None => {
+                self.lower_func = Some(LowerFunc::FixedHugr(required_resources, h));
+                Ok(self)
+            }
+            Some(_) => Err(self),
         }
     }
 
@@ -207,11 +209,12 @@ impl OpDef {
         mut self,
         func: F,
     ) -> Result<Self, Self> {
-        if let LowerFunc::None = self.lower_func {
-            self.lower_func = LowerFunc::CustomFunc(Box::new(func));
-            Ok(self)
-        } else {
-            Err(self)
+        match self.lower_func {
+            None => {
+                self.lower_func = Some(LowerFunc::CustomFunc(Box::new(func)));
+                Ok(self)
+            }
+            Some(_) => Err(self),
         }
     }
 
@@ -265,10 +268,9 @@ impl OpDef {
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available resources that may be used in the Hugr.
     pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
-        match &self.lower_func {
-            LowerFunc::None => None,
+        self.lower_func.as_ref().and_then(|f| match f {
             LowerFunc::FixedHugr(req_res, h) => {
-                if available_resources.is_superset(req_res) {
+                if available_resources.is_superset(&req_res) {
                     Some(h.clone())
                 } else {
                     None
@@ -277,7 +279,7 @@ impl OpDef {
             LowerFunc::CustomFunc(f) => {
                 f.try_lower(&self.name, args, &self.misc, available_resources)
             }
-        }
+        })
     }
 }
 
