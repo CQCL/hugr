@@ -65,13 +65,32 @@ pub enum OpTag {
 impl OpTag {
     /// Returns true if the tag is more general than the given tag.
     #[inline]
-    pub fn contains(self, other: OpTag) -> bool {
-        self == other || other.parent_tags().iter().any(|&tag| self.contains(tag))
+    pub const fn contains(self, other: OpTag) -> bool {
+        // We cannot call iter().any() or even do for loops in const fn yet.
+        // So we have to write this ugly code.
+        if self.eq(other) {
+            return true;
+        }
+        let parents = other.parent_tags();
+        let mut i = 0;
+        while i < parents.len() {
+            if self.contains(parents[i]) {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 
     /// Returns the infimum of the set of tags that strictly contain this tag
+    ///
+    /// Tags are sets of operations. The parent_tags of T define the immediate
+    /// supersets of T. In mathematical terms:
+    /// ```text
+    /// R ∈ parent_tags(T) if R ⊃ T and ∄ Q st. R ⊃ Q ⊃ T .
+    /// ```
     #[inline]
-    fn parent_tags<'a>(self) -> &'a [OpTag] {
+    const fn parent_tags<'a>(self) -> &'a [OpTag] {
         match self {
             OpTag::Any => &[],
             OpTag::None => &[OpTag::Any],
@@ -99,7 +118,7 @@ impl OpTag {
     }
 
     /// Returns a user-friendly description of the set.
-    pub fn description(&self) -> &str {
+    pub const fn description(&self) -> &str {
         match self {
             OpTag::Any => "Any",
             OpTag::None => "None",
@@ -128,8 +147,14 @@ impl OpTag {
 
     /// Returns whether the set is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self == &OpTag::None
+    pub const fn is_empty(&self) -> bool {
+        matches!(self, &OpTag::None)
+    }
+
+    /// Constant equality check.
+    #[inline]
+    pub const fn eq(self, other: OpTag) -> bool {
+        self as u32 == other as u32
     }
 }
 
