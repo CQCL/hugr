@@ -102,12 +102,16 @@ impl Debug for SignatureFunc {
     }
 }
 
-/// Different ways that an OpDef can lower operation nodes i.e. provide a Hugr
+/// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other resources.
 #[derive(serde::Deserialize, serde::Serialize)]
-enum LowerFunc {
+pub enum LowerFunc {
+    /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
+    /// this will generally only be applicable if the [OpDef] has no [TypeParam]s.
     #[serde(rename = "hugr")]
     FixedHugr(ResourceSet, Hugr),
+    /// Custom binary function that can (fallibly) compute a Hugr
+    /// for the particular instance and set of available resources.
     #[serde(skip)]
     CustomFunc(Box<dyn CustomLowerFunc>),
 }
@@ -190,29 +194,12 @@ impl OpDef {
 
     /// Modifies the OpDef with the ability to lower every operation to a
     /// fixed Hugr. Only applicable if the OpDef cannot currently lower itself.
-    pub fn lowering_to_hugr(
+    pub fn with_lowering(
         mut self,
-        h: Hugr,
-        required_resources: ResourceSet, // TODO can we figure these out from 'h' ?
-    ) -> Result<Self, Self> {
+        func: LowerFunc) -> Result<Self, Self> {
         match self.lower_func {
             None => {
-                self.lower_func = Some(LowerFunc::FixedHugr(required_resources, h));
-                Ok(self)
-            }
-            Some(_) => Err(self),
-        }
-    }
-
-    /// Add custom binary code that may try to lower the operation.
-    /// Only applicable if the OpDef currently has no way to lower itself.
-    pub fn with_custom_lower_func<F: CustomLowerFunc + 'static>(
-        mut self,
-        func: F,
-    ) -> Result<Self, Self> {
-        match self.lower_func {
-            None => {
-                self.lower_func = Some(LowerFunc::CustomFunc(Box::new(func)));
+                self.lower_func = Some(func);
                 Ok(self)
             }
             Some(_) => Err(self),
