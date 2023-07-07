@@ -62,7 +62,7 @@ pub trait PrimType: std::fmt::Debug+'static {
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Container<T: PrimType> where [T]: ToOwned {
+pub enum Container<T: PrimType> where [T]: ToOwned<Owned=Vec<T>> {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
@@ -77,7 +77,7 @@ pub enum Container<T: PrimType> where [T]: ToOwned {
     Alias(SmolStr),
 }
 
-impl<T: Display + PrimType> Display for Container<T> where [T]: ToOwned {
+impl<T: Display + PrimType> Display for Container<T> where [T]: ToOwned<Owned=Vec<T>> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Container::List(ty) => write!(f, "List({})", ty.as_ref()),
@@ -287,12 +287,12 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<T: std::fmt::Debug> where [T]: ToOwned + 'static {
+pub struct TypeRow<T: std::fmt::Debug> where [T]: ToOwned<Owned=Vec<T>> + 'static {
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
 
-impl<T: Display+std::fmt::Debug> Display for TypeRow<T> where [T]: ToOwned {
+impl<T: Display+std::fmt::Debug> Display for TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -301,7 +301,7 @@ impl<T: Display+std::fmt::Debug> Display for TypeRow<T> where [T]: ToOwned {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned {
+impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     /// Returns the number of types in the row.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -381,7 +381,7 @@ where [T]: ToOwned<Owned=Vec<T>> {
 impl<F,T: std::fmt::Debug+'static> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [T]>>,
-    [T]: ToOwned
+    [T]: ToOwned<Owned=Vec<T>>
 {
     fn from(types: F) -> Self {
         Self {
@@ -390,7 +390,8 @@ where
     }
 }
 
-impl<T: std::fmt::Debug> Deref for TypeRow<T> where [T]: ToOwned {
+
+impl<T: std::fmt::Debug> Deref for TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {

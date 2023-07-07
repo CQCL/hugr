@@ -65,7 +65,7 @@ pub(crate) enum SerSimpleType {
     },
 }
 
-impl<T: PrimType + Into<SimpleType>> From<Container<T>> for SerSimpleType where [T]: ToOwned {
+impl<T: PrimType + Into<SimpleType>> From<Container<T>> for SerSimpleType where [T]: ToOwned<Owned=Vec<T>> {
     fn from(value: Container<T>) -> Self {
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
