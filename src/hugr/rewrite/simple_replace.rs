@@ -3,9 +3,9 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortMut, PortView};
+use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 
-use crate::hugr::{HugrMut, HugrView};
+use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
     ops::{tag::OpTag, OpTrait, OpType},
@@ -99,6 +99,10 @@ impl Rewrite for SimpleReplacement {
             let op: &OpType = self.replacement.get_optype(node);
             let new_node_index = h.add_op_after(self_output_node_index, op.clone()).unwrap();
             index_map.insert(node.index, new_node_index.index);
+
+            // Move the metadata
+            let meta: &NodeMetadata = self.replacement.get_metadata(node);
+            h.set_metadata(node, meta.clone());
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
@@ -227,8 +231,7 @@ impl Rewrite for SimpleReplacement {
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
         for node in &self.removal {
-            h.graph.remove_node(node.index);
-            h.hierarchy.remove(node.index);
+            h.remove_node(*node).unwrap();
         }
         Ok(())
     }

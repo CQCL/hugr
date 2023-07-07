@@ -1,0 +1,29 @@
+#!/usr/bin/bash
+
+# Compare line coverage of current branch with `main`; exit 1 if it is less.
+
+set -e
+
+export RUSTFLAGS="-C instrument-coverage"
+
+BRANCH=`git rev-parse --abbrev-ref HEAD`
+
+# Print total line coverage on branch (branch name passed as argument).
+line_cov_percent() {
+    rm -f *.profraw *.profdata
+    CURRENT_BRANCH=`git rev-parse --abbrev-ref HEAD`
+    git checkout -q $1
+    TGT=`cargo test --tests 2>&1 | grep Running | awk -F'[()]' '{print $2}'`
+    llvm-profdata merge -sparse default_*.profraw -o hugr.profdata
+    llvm-cov report --ignore-filename-regex='/.cargo/registry' --instr-profile=hugr.profdata --object ${TGT} | grep TOTAL | awk '{print $10}' | tr -dc '[:digit:].'
+    git checkout -q ${CURRENT_BRANCH} # go back to where we were
+    rm -f *.profraw *.profdata # clean up
+}
+
+LINECOVPERCENT=`line_cov_percent ${BRANCH}`
+echo "line coverage here: ${LINECOVPERCENT}%"
+
+MAIN_LINECOVPERCENT=`line_cov_percent main`
+echo "line coverage on main: ${MAIN_LINECOVPERCENT}%"
+
+if (( $(echo "${MAIN_LINECOVPERCENT} > ${LINECOVPERCENT} + 0.03" | bc -l) )); then exit 1 ; fi

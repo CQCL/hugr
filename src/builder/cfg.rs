@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -95,6 +97,22 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
+
+    /// Create a CFGBuilder for an existing CFG node (that already has entry + exit nodes)
+    pub(crate) fn from_existing(base: B, cfg_node: Node) -> Result<Self, BuildError> {
+        let OpType::CFG(crate::ops::controlflow::CFG {outputs, ..}) = base.get_optype(cfg_node)
+            else {return Err(BuildError::UnexpectedType{node: cfg_node, op_desc: "Any CFG"});};
+        let n_out_wires = outputs.len();
+        let (_, exit_node) = base.children(cfg_node).take(2).collect_tuple().unwrap();
+        Ok(Self {
+            base,
+            cfg_node,
+            inputs: None, // This will prevent creating an entry node
+            exit_node,
+            n_out_wires,
+        })
+    }
+
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
@@ -278,6 +296,8 @@ impl BlockBuilder<Hugr> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use cool_asserts::assert_matches;
 
     use crate::builder::build_traits::HugrBuilder;
@@ -319,6 +339,36 @@ mod test {
 
         Ok(())
     }
+    #[test]
+    fn from_existing() -> Result<(), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
+        build_basic_cfg(&mut cfg_builder)?;
+        let h = cfg_builder.finish_hugr()?;
+
+        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
+        assert_matches!(new_builder.simple_entry_builder(type_row![NAT], 1), Err(_));
+        let h2 = new_builder.finish_hugr()?;
+        assert_eq!(h, h2); // No new nodes added
+
+        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
+        let block_builder = new_builder.simple_block_builder(
+            vec![SimpleType::new_simple_predicate(1), NAT].into(),
+            type_row![NAT],
+            1,
+        )?;
+        let new_bb = block_builder.container_node();
+        let [pred, nat]: [Wire; 2] = block_builder.input_wires_arr();
+        block_builder.finish_with_outputs(pred, [nat])?;
+        let h2 = new_builder.finish_hugr()?;
+        let expected_nodes = h
+            .children(h.root())
+            .chain([new_bb])
+            .collect::<HashSet<Node>>();
+        assert_eq!(expected_nodes, HashSet::from_iter(h2.children(h2.root())));
+
+        Ok(())
+    }
+
     fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {

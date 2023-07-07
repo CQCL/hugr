@@ -207,6 +207,27 @@ impl Signature {
     pub fn output_ports(&self) -> impl Iterator<Item = Port> {
         self.ports(Direction::Outgoing)
     }
+
+    /// Returns a slice of the value types for the given direction.
+    #[inline]
+    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
+        match dir {
+            Direction::Incoming => &self.input,
+            Direction::Outgoing => &self.output,
+        }
+    }
+
+    /// Returns a slice of the input value types.
+    #[inline]
+    pub fn input_df_types(&self) -> &[SimpleType] {
+        self.df_types(Direction::Incoming)
+    }
+
+    /// Returns a slice of the output value types.
+    #[inline]
+    pub fn output_df_types(&self) -> &[SimpleType] {
+        self.df_types(Direction::Outgoing)
+    }
 }
 
 impl Signature {
