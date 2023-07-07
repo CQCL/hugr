@@ -326,7 +326,7 @@ impl SignatureDescription {
         }
     }
 
-    fn row_zip<'a, T>(
+    fn row_zip<'a, T: std::fmt::Debug>(
         type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
     ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> where [T]: ToOwned {

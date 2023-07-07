@@ -48,7 +48,7 @@ impl Display for SimpleType {
 }
 
 /// Trait of primitive types (SimpleType or ClassicType).
-pub trait PrimType: 'static {
+pub trait PrimType: std::fmt::Debug+'static {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType and SimpleType
     // currently used to constrain Container<T>
@@ -287,12 +287,12 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<T> where [T]: ToOwned + 'static {
+pub struct TypeRow<T: std::fmt::Debug> where [T]: ToOwned + 'static {
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
 
-impl<T: Display> Display for TypeRow<T> where [T]: ToOwned {
+impl<T: Display+std::fmt::Debug> Display for TypeRow<T> where [T]: ToOwned {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -301,7 +301,7 @@ impl<T: Display> Display for TypeRow<T> where [T]: ToOwned {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl<T> TypeRow<T> where [T]: ToOwned {
+impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned {
     /// Returns the number of types in the row.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -340,7 +340,7 @@ impl TypeRow<SimpleType> {
     }
 }
 
-impl<T> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
+impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -371,14 +371,14 @@ impl<T> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     }
 }
 
-impl<T> Default for TypeRow<T>
-where [T]: ToOwned {
+impl<T: std::fmt::Debug> Default for TypeRow<T>
+where [T]: ToOwned<Owned=Vec<T>> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F,T: 'static> From<F> for TypeRow<T>
+impl<F,T: std::fmt::Debug+'static> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [T]>>,
     [T]: ToOwned
@@ -390,7 +390,7 @@ where
     }
 }
 
-impl<T> Deref for TypeRow<T> where [T]: ToOwned {
+impl<T: std::fmt::Debug> Deref for TypeRow<T> where [T]: ToOwned {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -398,7 +398,7 @@ impl<T> Deref for TypeRow<T> where [T]: ToOwned {
     }
 }
 
-impl<T> DerefMut for TypeRow<T> where [T]: ToOwned {
+impl<T: std::fmt::Debug> DerefMut for TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }
