@@ -266,12 +266,12 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::tag::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
+    use crate::types::{ClassicType, Signature, SimpleType};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
 
-    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    const QB: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr like the following:
     /// --   H   --
@@ -511,7 +511,7 @@ mod test {
 
     #[test]
     fn test_replace_cx_cross() {
-        let q_row: Vec<SimpleType> = vec![LinearType::Qubit.into(), LinearType::Qubit.into()];
+        let q_row: Vec<SimpleType> = vec![SimpleType::Qubit, SimpleType::Qubit];
         let mut builder = DFGBuilder::new(q_row.clone(), q_row).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(LeafOp::CX, [0, 1]).unwrap();

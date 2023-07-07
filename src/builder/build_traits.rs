@@ -16,7 +16,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{LinearType, Signature, SimpleType, TypeRow};
+use crate::types::{Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
 
@@ -660,7 +660,7 @@ fn wire_up<T: Dataflow + ?Sized>(
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ValueKind {
     Classic,
-    Linear(LinearType),
+    Linear(SimpleType),
     Const,
 }
 
@@ -671,10 +671,13 @@ fn get_value_kind(base: &Hugr, src: Node, src_offset: Port) -> ValueKind {
     let wire_kind = base.get_optype(src).port_kind(src_offset).unwrap();
     match wire_kind {
         EdgeKind::Static(_) => ValueKind::Const,
-        EdgeKind::Value(simple_type) => match simple_type {
-            SimpleType::Classic(_) => ValueKind::Classic,
-            SimpleType::Linear(typ) => ValueKind::Linear(typ),
-        },
+        EdgeKind::Value(simple_type) => {
+            if simple_type.is_linear() {
+                ValueKind::Linear(simple_type)
+            } else {
+                ValueKind::Classic
+            }
+        }
         _ => {
             panic!("Wires can only be Const or Value kind")
         }

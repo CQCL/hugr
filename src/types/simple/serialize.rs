@@ -2,7 +2,6 @@ use super::ClassicType;
 
 use super::Container;
 
-use super::LinearType;
 use super::PrimType;
 
 use smol_str::SmolStr;
@@ -116,24 +115,16 @@ impl From<ClassicType> for SerSimpleType {
     }
 }
 
-impl From<LinearType> for SerSimpleType {
-    fn from(value: LinearType) -> Self {
-        match value {
-            LinearType::Qubit => SerSimpleType::Q,
-            LinearType::Container(c) => c.into(),
-            LinearType::Qpaque(inner) => SerSimpleType::Opaque {
-                custom: inner,
-                l: true,
-            },
-        }
-    }
-}
-
 impl From<SimpleType> for SerSimpleType {
     fn from(value: SimpleType) -> Self {
         match value {
-            SimpleType::Linear(l) => l.into(),
             SimpleType::Classic(c) => c.into(),
+            SimpleType::Qubit => SerSimpleType::Q,
+            SimpleType::Qontainer(c) => c.into(),
+            SimpleType::Qpaque(inner) => SerSimpleType::Opaque {
+                custom: inner,
+                l: true,
+            },
         }
     }
 }
@@ -156,7 +147,7 @@ where
 impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
-            SerSimpleType::Q => LinearType::Qubit.into(),
+            SerSimpleType::Q => SimpleType::Qubit,
             SerSimpleType::I { width } => ClassicType::Int(width).into(),
             SerSimpleType::F => ClassicType::F64.into(),
             SerSimpleType::S => ClassicType::String.into(),
@@ -206,7 +197,7 @@ impl From<SerSimpleType> for SimpleType {
             } => Container::<ClassicType>::Array(box_convert_try(*inner), len).into(),
             SerSimpleType::Alias { name: s, l: true } => Container::<SimpleType>::Alias(s).into(),
             SerSimpleType::Alias { name: s, l: false } => Container::<ClassicType>::Alias(s).into(),
-            SerSimpleType::Opaque { custom: c, l: true } => LinearType::Qpaque(c).into(),
+            SerSimpleType::Opaque { custom: c, l: true } => SimpleType::Qpaque(c),
             SerSimpleType::Opaque {
                 custom: c,
                 l: false,

@@ -26,8 +26,12 @@ use crate::{resource::ResourceSet, type_row};
 pub enum SimpleType {
     /// A type containing only classical data. Elements of this type can be copied.
     Classic(ClassicType),
-    /// A type containing linear data. Elements of this type must be used exactly once.
-    Linear(LinearType),
+    /// A qubit.
+    Qubit,
+    /// A linear opaque type that can be downcasted by the extensions that define it.
+    Qpaque(CustomType),
+    /// A nested definition containing other linear types (possibly as well as classical ones)
+    Qontainer(Container<SimpleType>),
 }
 
 mod serialize;
@@ -36,7 +40,9 @@ impl Display for SimpleType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SimpleType::Classic(ty) => ty.fmt(f),
-            SimpleType::Linear(ty) => ty.fmt(f),
+            SimpleType::Qubit => f.write_str("Qubit"),
+            SimpleType::Qpaque(custom) => custom.fmt(f),
+            SimpleType::Qontainer(c) => c.fmt(f),
         }
     }
 }
@@ -94,7 +100,7 @@ impl From<Container<ClassicType>> for SimpleType {
 impl From<Container<SimpleType>> for SimpleType {
     #[inline]
     fn from(value: Container<SimpleType>) -> Self {
-        Self::Linear(LinearType::Container(value))
+        Self::Qontainer(value)
     }
 }
 
@@ -194,32 +200,6 @@ impl PrimType for ClassicType {
     const LINEAR: bool = false;
 }
 
-/// A subselection of [SimpleType] that may contain linear data, i.e. distinct
-/// from [ClassicType] which definitely does not.
-///
-// TODO: Derive pyclass.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum LinearType {
-    /// A qubit.
-    #[default]
-    Qubit,
-    /// A linear opaque operation that can be downcasted by the extensions that define it.
-    Qpaque(CustomType),
-    /// A nested definition containing other linear types.
-    Container(Container<SimpleType>),
-}
-
-impl Display for LinearType {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            LinearType::Qubit => f.write_str("Qubit"),
-            LinearType::Qpaque(custom) => custom.fmt(f),
-            LinearType::Container(c) => c.fmt(f),
-        }
-    }
-}
-
 impl PrimType for SimpleType {
     const LINEAR: bool = true;
 }
@@ -227,7 +207,7 @@ impl PrimType for SimpleType {
 impl SimpleType {
     /// Returns whether the type contains linear data (perhaps as well as classical)
     pub fn is_linear(&self) -> bool {
-        matches!(self, Self::Linear(_))
+        !self.is_classical()
     }
 
     /// Returns whether the type contains only classic data.
@@ -274,12 +254,6 @@ impl SimpleType {
     }
 }
 
-impl Default for SimpleType {
-    fn default() -> Self {
-        Self::Linear(Default::default())
-    }
-}
-
 /// Implementations of Into and TryFrom for SimpleType and &'a SimpleType.
 macro_rules! impl_from_into_simple_type {
     ($target:ident, $matcher:pat, $unpack:expr, $new:expr) => {
@@ -318,7 +292,6 @@ impl_from_into_simple_type!(
     typ,
     SimpleType::Classic
 );
-impl_from_into_simple_type!(LinearType, SimpleType::Linear(typ), typ, SimpleType::Linear);
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

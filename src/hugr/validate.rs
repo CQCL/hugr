@@ -740,13 +740,13 @@ mod test {
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
-    use crate::types::{ClassicType, LinearType, Signature};
+    use crate::types::{ClassicType, Signature};
     use crate::Direction;
     use crate::{type_row, Node};
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-    const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    const Q: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
