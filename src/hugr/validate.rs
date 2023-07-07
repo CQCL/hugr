@@ -805,7 +805,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ops::Const(ConstValue::simple_predicate(0, predicate_size));
-        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
+        let tag_type = SimpleType::new_simple_predicate(predicate_size);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
