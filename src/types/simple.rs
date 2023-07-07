@@ -219,6 +219,7 @@ impl SimpleType {
     pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
             Container::<ClassicType>::Sum(Box::new(row)).into()
         } else {
             Container::<SimpleType>::Sum(Box::new(row)).into()
@@ -229,6 +230,7 @@ impl SimpleType {
     pub fn new_tuple(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
             Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
@@ -370,6 +372,11 @@ impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
     pub fn get_mut(&mut self, offset: usize) -> Option<&mut T> {
         self.types.to_mut().get_mut(offset)
+    }
+
+    pub fn try_convert_elems<D: std::fmt::Debug+Clone+TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> where [D]: ToOwned<Owned=Vec<D>> {
+        let elems: Vec<D> = self.types.into_iter().map(|e| {let r = D::try_from(*e); r}).collect::<Result<_,_>>()?;
+        Ok(TypeRow::from(elems))
     }
 }
 
