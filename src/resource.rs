@@ -148,7 +148,7 @@ pub struct OpDef {
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
-    lower_func: Option<LowerFunc>,
+    lower_funcs: Vec<LowerFunc>,
 }
 
 impl OpDef {
@@ -169,7 +169,7 @@ impl OpDef {
             args,
             misc,
             signature_func: SignatureFunc::FromYAML { inputs, outputs },
-            lower_func: None,
+            lower_funcs: Vec::new(),
         }
     }
 
@@ -188,20 +188,14 @@ impl OpDef {
             args,
             misc,
             signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
-            lower_func: None,
+            lower_funcs: Vec::new(),
         }
     }
 
-    /// Modifies the OpDef with the ability to fallibly lower operations.
-    /// Only applicable if the OpDef currently has no way to lower itself.
-    pub fn with_lowering(mut self, func: LowerFunc) -> Result<Self, Self> {
-        match self.lower_func {
-            None => {
-                self.lower_func = Some(func);
-                Ok(self)
-            }
-            Some(_) => Err(self),
-        }
+    /// Provides a (new) way for the OpDef to fallibly lower operations. Each
+    /// LowerFunc will be attempted in [Self::try_lower] only if previous methods failed.
+    pub fn with_lowering(mut self, func: LowerFunc) {
+        self.lower_funcs.push(func);
     }
 
     /// Computes the signature of a node, i.e. an instantiation of this
@@ -254,18 +248,21 @@ impl OpDef {
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available resources that may be used in the Hugr.
     pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
-        self.lower_func.as_ref().and_then(|f| match f {
-            LowerFunc::FixedHugr(req_res, h) => {
-                if available_resources.is_superset(req_res) {
-                    Some(h.clone())
-                } else {
-                    None
+        self.lower_funcs
+            .iter()
+            .flat_map(|f| match f {
+                LowerFunc::FixedHugr(req_res, h) => {
+                    if available_resources.is_superset(req_res) {
+                        Some(h.clone())
+                    } else {
+                        None
+                    }
                 }
-            }
-            LowerFunc::CustomFunc(f) => {
-                f.try_lower(&self.name, args, &self.misc, available_resources)
-            }
-        })
+                LowerFunc::CustomFunc(f) => {
+                    f.try_lower(&self.name, args, &self.misc, available_resources)
+                }
+            })
+            .next()
     }
 }
 
