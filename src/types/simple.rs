@@ -327,14 +327,16 @@ impl TypeRow<SimpleType> {
     pub fn purely_classical(&self) -> bool {
         self.types.iter().all(SimpleType::is_classical)
     }
+}
 
+impl TypeRow<ClassicType> {
     #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
-    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow<SimpleType>>) -> Self {
+    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
         variant_rows
             .into_iter()
-            .map(|row| SimpleType::Classic(ClassicType::Container(Container::Tuple(Box::new(row)))))
+            .map(|row| ClassicType::Container(Container::Tuple(Box::new(row))))
             .collect_vec()
             .into()
     }
