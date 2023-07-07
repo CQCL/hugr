@@ -143,7 +143,6 @@ As well as the type, dataflow edges are also parametrized by a
     that is the parent of the source; see
     [Non-local Edges](#non-local-edges)
 
-
 ```
 SimpleType ::= ClassicType | LinearType
 
@@ -257,7 +256,6 @@ regions and control-flow regions:
     At link time `FuncDecl` nodes are replaced by `FuncDefn`.
   - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
     `AliasDefn`.
-
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -1039,8 +1037,6 @@ types: `Graph`, `Map` and
 allows named newtypes to be used. Containers are linear if any of their
 components are linear.
 
-
-
 Note: any array can be turned into an equivalent tuple, but arrays also
 support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
 out-of-range? Or by known-range `Sum( ()^N )`?)
@@ -1055,7 +1051,6 @@ i.e. this does not affect behaviour of the HUGR. Row types are used
     the 2-ary version takes the place of a boolean type
   - Arguments to `Opaque` types - where their meaning is
     extension-defined.
-
 
 ### Linearity
 
@@ -1095,8 +1090,6 @@ A Tierkreis runtime could be connected to workers which provide means of
 running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
-
-
 
 ### Type Constraints
 
