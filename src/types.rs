@@ -329,7 +329,7 @@ impl SignatureDescription {
     fn row_zip<'a, T>(
         type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> where [T]: ToOwned {
         name_row
             .iter()
             .chain(&EmptyStringIterator)

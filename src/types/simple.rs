@@ -48,7 +48,7 @@ impl Display for SimpleType {
 }
 
 /// Trait of primitive types (SimpleType or ClassicType).
-pub trait PrimType {
+pub trait PrimType: 'static {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType and SimpleType
     // currently used to constrain Container<T>
@@ -62,7 +62,7 @@ pub trait PrimType {
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Container<T: PrimType> {
+pub enum Container<T: PrimType> where [T]: ToOwned {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
@@ -77,7 +77,7 @@ pub enum Container<T: PrimType> {
     Alias(SmolStr),
 }
 
-impl<T: Display + PrimType> Display for Container<T> {
+impl<T: Display + PrimType> Display for Container<T> where [T]: ToOwned {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Container::List(ty) => write!(f, "List({})", ty.as_ref()),
@@ -287,12 +287,12 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<T> {
+pub struct TypeRow<T> where [T]: ToOwned + 'static {
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
 
-impl<T: Display> Display for TypeRow<T> {
+impl<T: Display> Display for TypeRow<T> where [T]: ToOwned {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -301,7 +301,7 @@ impl<T: Display> Display for TypeRow<T> {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl<T> TypeRow<T> {
+impl<T> TypeRow<T> where [T]: ToOwned {
     /// Returns the number of types in the row.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -340,7 +340,7 @@ impl TypeRow<SimpleType> {
     }
 }
 
-impl<T> TypeRow<T> {
+impl<T> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -371,15 +371,17 @@ impl<T> TypeRow<T> {
     }
 }
 
-impl<T> Default for TypeRow<T> {
+impl<T> Default for TypeRow<T>
+where [T]: ToOwned {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F,T> From<F> for TypeRow<T>
+impl<F,T: 'static> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [T]>>,
+    [T]: ToOwned
 {
     fn from(types: F) -> Self {
         Self {
@@ -388,7 +390,7 @@ where
     }
 }
 
-impl<T> Deref for TypeRow<T> {
+impl<T> Deref for TypeRow<T> where [T]: ToOwned {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -396,7 +398,7 @@ impl<T> Deref for TypeRow<T> {
     }
 }
 
-impl<T> DerefMut for TypeRow<T> {
+impl<T> DerefMut for TypeRow<T> where [T]: ToOwned {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }
