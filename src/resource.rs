@@ -192,8 +192,8 @@ impl OpDef {
         }
     }
 
-    /// Modifies the OpDef with the ability to lower every operation to a
-    /// fixed Hugr. Only applicable if the OpDef cannot currently lower itself.
+    /// Modifies the OpDef with the ability to fallibly lower operations.
+    /// Only applicable if the OpDef currently has no way to lower itself.
     pub fn with_lowering(mut self, func: LowerFunc) -> Result<Self, Self> {
         match self.lower_func {
             None => {
