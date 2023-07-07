@@ -14,9 +14,7 @@ pub struct Module;
 impl_op_name!(Module);
 
 impl OpTagged for Module {
-    fn static_tag() -> OpTag {
-        OpTag::ModuleRoot
-    }
+    const TAG: OpTag = OpTag::ModuleRoot;
 }
 
 impl OpTrait for Module {
@@ -25,7 +23,7 @@ impl OpTrait for Module {
     }
 
     fn tag(&self) -> super::OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 }
 
@@ -42,9 +40,7 @@ pub struct FuncDefn {
 
 impl_op_name!(FuncDefn);
 impl OpTagged for FuncDefn {
-    fn static_tag() -> OpTag {
-        OpTag::FuncDefn
-    }
+    const TAG: OpTag = OpTag::FuncDefn;
 }
 impl OpTrait for FuncDefn {
     fn description(&self) -> &str {
@@ -52,7 +48,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -73,9 +69,7 @@ pub struct FuncDecl {
 
 impl_op_name!(FuncDecl);
 impl OpTagged for FuncDecl {
-    fn static_tag() -> OpTag {
-        OpTag::Function
-    }
+    const TAG: OpTag = OpTag::Function;
 }
 impl OpTrait for FuncDecl {
     fn description(&self) -> &str {
@@ -83,7 +77,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -103,9 +97,7 @@ pub struct AliasDefn {
 }
 impl_op_name!(AliasDefn);
 impl OpTagged for AliasDefn {
-    fn static_tag() -> OpTag {
-        OpTag::Alias
-    }
+    const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDefn {
     fn description(&self) -> &str {
@@ -113,7 +105,7 @@ impl OpTrait for AliasDefn {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 }
 
@@ -128,9 +120,7 @@ pub struct AliasDecl {
 
 impl_op_name!(AliasDecl);
 impl OpTagged for AliasDecl {
-    fn static_tag() -> OpTag {
-        OpTag::Alias
-    }
+    const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDecl {
     fn description(&self) -> &str {
@@ -138,6 +128,6 @@ impl OpTrait for AliasDecl {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 }

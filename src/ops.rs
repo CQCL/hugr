@@ -145,7 +145,7 @@ pub trait OpName {
 /// tag returned by `OpType::tag(&self)`.
 pub trait OpTagged {
     /// The name of the operation.
-    fn static_tag() -> OpTag;
+    const TAG: OpTag;
 }
 
 #[enum_dispatch]

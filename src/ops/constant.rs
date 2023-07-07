@@ -23,9 +23,7 @@ impl OpName for Const {
     }
 }
 impl OpTagged for Const {
-    fn static_tag() -> OpTag {
-        OpTag::Const
-    }
+    const TAG: OpTag = OpTag::Const;
 }
 impl OpTrait for Const {
     fn description(&self) -> &str {
@@ -33,7 +31,7 @@ impl OpTrait for Const {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {

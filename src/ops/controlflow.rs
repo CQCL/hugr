@@ -22,12 +22,10 @@ pub struct TailLoop {
 impl_op_name!(TailLoop);
 
 impl DataflowOpTrait for TailLoop {
+    const TAG: OpTag = OpTag::TailLoop;
+
     fn description(&self) -> &str {
         "A tail-controlled loop"
-    }
-
-    fn static_tag() -> OpTag {
-        OpTag::TailLoop
     }
 
     fn signature(&self) -> Signature {
@@ -71,12 +69,10 @@ pub struct Conditional {
 impl_op_name!(Conditional);
 
 impl DataflowOpTrait for Conditional {
+    const TAG: OpTag = OpTag::Conditional;
+
     fn description(&self) -> &str {
         "HUGR conditional operation"
-    }
-
-    fn static_tag() -> OpTag {
-        OpTag::Conditional
     }
 
     fn signature(&self) -> Signature {
@@ -110,12 +106,10 @@ pub struct CFG {
 impl_op_name!(CFG);
 
 impl DataflowOpTrait for CFG {
+    const TAG: OpTag = OpTag::Cfg;
+
     fn description(&self) -> &str {
         "A dataflow node defined by a child CFG"
-    }
-
-    fn static_tag() -> OpTag {
-        OpTag::Cfg
     }
 
     fn signature(&self) -> Signature {
@@ -150,9 +144,7 @@ impl OpName for BasicBlock {
 }
 
 impl OpTagged for BasicBlock {
-    fn static_tag() -> OpTag {
-        OpTag::BasicBlock
-    }
+    const TAG: OpTag = OpTag::BasicBlock;
 }
 
 impl OpTrait for BasicBlock {
@@ -217,9 +209,7 @@ pub struct Case {
 impl_op_name!(Case);
 
 impl OpTagged for Case {
-    fn static_tag() -> OpTag {
-        OpTag::Case
-    }
+    const TAG: OpTag = OpTag::Case;
 }
 
 impl OpTrait for Case {
@@ -228,7 +218,7 @@ impl OpTrait for Case {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 }
 

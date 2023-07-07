@@ -119,9 +119,7 @@ impl OpName for LeafOp {
 }
 
 impl OpTagged for LeafOp {
-    fn static_tag() -> OpTag {
-        OpTag::Leaf
-    }
+    const TAG: OpTag = OpTag::Leaf;
 }
 
 impl OpTrait for LeafOp {
@@ -152,7 +150,7 @@ impl OpTrait for LeafOp {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::static_tag()
+        <Self as OpTagged>::TAG
     }
 
     /// The signature of the operation.
