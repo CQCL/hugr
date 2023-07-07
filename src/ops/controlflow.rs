@@ -12,11 +12,11 @@ use super::{impl_op_name, OpName, OpTrait};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TailLoop {
     /// Types that are only input
-    pub just_inputs: TypeRow,
+    pub just_inputs: TypeRow<SimpleType>,
     /// Types that are only output
-    pub just_outputs: TypeRow,
+    pub just_outputs: TypeRow<SimpleType>,
     /// Types that are appended to both input and output
-    pub rest: TypeRow,
+    pub rest: TypeRow<SimpleType>,
 }
 
 impl_op_name!(TailLoop);
@@ -42,7 +42,7 @@ impl DataflowOpTrait for TailLoop {
 
 impl TailLoop {
     /// Build the output TypeRow of the child graph of a TailLoop node.
-    pub(crate) fn body_output_row(&self) -> TypeRow {
+    pub(crate) fn body_output_row(&self) -> TypeRow<SimpleType> {
         let predicate =
             SimpleType::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
         let mut outputs = vec![predicate];
@@ -51,7 +51,7 @@ impl TailLoop {
     }
 
     /// Build the input TypeRow of the child graph of a TailLoop node.
-    pub(crate) fn body_input_row(&self) -> TypeRow {
+    pub(crate) fn body_input_row(&self) -> TypeRow<SimpleType> {
         let mut inputs = self.just_inputs.clone();
         inputs.to_mut().extend_from_slice(&self.rest);
         inputs
@@ -62,11 +62,11 @@ impl TailLoop {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conditional {
     /// The possible rows of the predicate input
-    pub predicate_inputs: Vec<TypeRow>,
+    pub predicate_inputs: Vec<TypeRow<SimpleType>>,
     /// Remaining input types
-    pub other_inputs: TypeRow,
+    pub other_inputs: TypeRow<SimpleType>,
     /// Output types
-    pub outputs: TypeRow,
+    pub outputs: TypeRow<SimpleType>,
 }
 impl_op_name!(Conditional);
 
@@ -91,7 +91,7 @@ impl DataflowOpTrait for Conditional {
 
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
-    pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
+    pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow<SimpleType>> {
         let mut inputs = self.predicate_inputs.get(case)?.clone();
 
         inputs.to_mut().extend_from_slice(&self.other_inputs);
@@ -103,8 +103,8 @@ impl Conditional {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
 pub struct CFG {
-    pub inputs: TypeRow,
-    pub outputs: TypeRow,
+    pub inputs: TypeRow<SimpleType>,
+    pub outputs: TypeRow<SimpleType>,
 }
 
 impl_op_name!(CFG);
@@ -130,13 +130,13 @@ impl DataflowOpTrait for CFG {
 pub enum BasicBlock {
     /// A CFG basic block node. The signature is that of the internal Dataflow graph.
     DFB {
-        inputs: TypeRow,
-        other_outputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        inputs: TypeRow<SimpleType>,
+        other_outputs: TypeRow<SimpleType>,
+        predicate_variants: Vec<TypeRow<SimpleType>>,
     },
     /// The single exit node of the CFG, has no children,
     /// stores the types of the CFG node output.
-    Exit { cfg_outputs: TypeRow },
+    Exit { cfg_outputs: TypeRow<SimpleType> },
 }
 
 impl OpName for BasicBlock {
@@ -176,7 +176,7 @@ impl OpTrait for BasicBlock {
 
 impl BasicBlock {
     /// The input signature of the contained dataflow graph.
-    pub fn dataflow_input(&self) -> &TypeRow {
+    pub fn dataflow_input(&self) -> &TypeRow<SimpleType> {
         match self {
             BasicBlock::DFB { inputs, .. } => inputs,
             BasicBlock::Exit { cfg_outputs } => cfg_outputs,
@@ -185,7 +185,7 @@ impl BasicBlock {
 
     /// The correct inputs of any successors. Returns None if successor is not a
     /// valid index.
-    pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
+    pub fn successor_input(&self, successor: usize) -> Option<TypeRow<SimpleType>> {
         match self {
             BasicBlock::DFB {
                 predicate_variants,
@@ -222,12 +222,12 @@ impl OpTrait for Case {
 
 impl Case {
     /// The input signature of the contained dataflow graph.
-    pub fn dataflow_input(&self) -> &TypeRow {
+    pub fn dataflow_input(&self) -> &TypeRow<SimpleType> {
         &self.signature.input
     }
 
     /// The output signature of the contained dataflow graph.
-    pub fn dataflow_output(&self) -> &TypeRow {
+    pub fn dataflow_output(&self) -> &TypeRow<SimpleType> {
         &self.signature.output
     }
 }

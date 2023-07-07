@@ -109,7 +109,7 @@ impl CustomSignatureFunc for AngleAdd {
         _name: &SmolStr,
         _arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
+    ) -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError> {
         let t: TypeRow = vec![SimpleType::Classic(
             Into::<CustomType>::into(Type::Angle).into(),
         )]

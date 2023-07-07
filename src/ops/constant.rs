@@ -59,7 +59,9 @@ pub enum ConstValue {
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
-        variants: TypeRow,
+        // The *type* could have linear types in other variants, so long as
+        // the value was of another variant
+        variants: TypeRow<SimpleType>,
         val: Box<ConstValue>,
     },
     /// A tuple of constant values.
@@ -173,7 +175,7 @@ impl ConstValue {
     }
 
     /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow<SimpleType>>) -> Self {
         let variants = TypeRow::predicate_variants_row(variant_rows);
         assert!(variants.get(tag) == Some(&SimpleType::new_unit()));
         ConstValue::Sum {
@@ -184,7 +186,7 @@ impl ConstValue {
     }
 
     /// Constant Sum over Tuples with just one variant
-    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
+    pub fn unary_predicate(row: impl Into<TypeRow<SimpleType>>) -> Self {
         Self::predicate(0, [row.into()])
     }
 

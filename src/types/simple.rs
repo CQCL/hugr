@@ -68,9 +68,9 @@ pub enum Container<T: PrimType> {
     /// Hash map from hashable key type to value T.
     Map(Box<(ClassicType, T)>),
     /// Product type, known-size tuple over elements of type row.
-    Tuple(Box<TypeRow>),
+    Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
-    Sum(Box<TypeRow>),
+    Sum(Box<TypeRow<T>>),
     /// Known size array of T.
     Array(Box<T>, usize),
     /// Alias defined in AliasDefn or AliasDecl nodes.
@@ -157,7 +157,7 @@ impl ClassicType {
 
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
         Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
             variant_rows,
         ))))
@@ -216,7 +216,7 @@ impl SimpleType {
     }
 
     /// New Sum type, variants defined by TypeRow.
-    pub fn new_sum(row: impl Into<TypeRow>) -> Self {
+    pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
             Container::<ClassicType>::Sum(Box::new(row)).into()
@@ -226,7 +226,7 @@ impl SimpleType {
     }
 
     /// New Tuple type, elements defined by TypeRow.
-    pub fn new_tuple(row: impl Into<TypeRow>) -> Self {
+    pub fn new_tuple(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
             Container::<ClassicType>::Tuple(Box::new(row)).into()
@@ -244,7 +244,7 @@ impl SimpleType {
 
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
         Self::Classic(ClassicType::new_predicate(variant_rows))
     }
 
@@ -287,12 +287,12 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow {
+pub struct TypeRow<T> {
     /// The datatypes in the row.
-    types: Cow<'static, [SimpleType]>,
+    types: Cow<'static, [T]>,
 }
 
-impl Display for TypeRow {
+impl<T: Display> Display for TypeRow<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -301,7 +301,7 @@ impl Display for TypeRow {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl TypeRow {
+impl<T> TypeRow<T> {
     /// Returns the number of types in the row.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -313,7 +313,9 @@ impl TypeRow {
     pub fn is_empty(&self) -> bool {
         self.types.len() == 0
     }
+}
 
+impl TypeRow<SimpleType> {
     /// Returns whether the row contains only linear data.
     #[inline(always)]
     pub fn purely_linear(&self) -> bool {
@@ -325,41 +327,11 @@ impl TypeRow {
     pub fn purely_classical(&self) -> bool {
         self.types.iter().all(SimpleType::is_classical)
     }
-}
-impl TypeRow {
-    /// Create a new empty row.
-    pub const fn new() -> Self {
-        Self {
-            types: Cow::Owned(Vec::new()),
-        }
-    }
-
-    /// Iterator over the types in the row.
-    pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
-        self.types.iter()
-    }
-
-    /// Mutable iterator over the types in the row.
-    pub fn to_mut(&mut self) -> &mut Vec<SimpleType> {
-        self.types.to_mut()
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: usize) -> Option<&SimpleType> {
-        self.types.get(offset)
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: usize) -> Option<&mut SimpleType> {
-        self.types.to_mut().get_mut(offset)
-    }
 
     #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
-    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow<SimpleType>>) -> Self {
         variant_rows
             .into_iter()
             .map(|row| SimpleType::Classic(ClassicType::Container(Container::Tuple(Box::new(row)))))
@@ -368,32 +340,63 @@ impl TypeRow {
     }
 }
 
-impl Default for TypeRow {
+impl<T> TypeRow<T> {
+    /// Create a new empty row.
+    pub const fn new() -> Self {
+        Self {
+            types: Cow::Owned(Vec::new()),
+        }
+    }
+
+    /// Iterator over the types in the row.
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.types.iter()
+    }
+
+    /// Mutable iterator over the types in the row.
+    pub fn to_mut(&mut self) -> &mut Vec<T> {
+        self.types.to_mut()
+    }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get(&self, offset: usize) -> Option<&T> {
+        self.types.get(offset)
+    }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get_mut(&mut self, offset: usize) -> Option<&mut T> {
+        self.types.to_mut().get_mut(offset)
+    }
+}
+
+impl<T> Default for TypeRow<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> From<T> for TypeRow
+impl<F,T> From<F> for TypeRow<T>
 where
-    T: Into<Cow<'static, [SimpleType]>>,
+    F: Into<Cow<'static, [T]>>,
 {
-    fn from(types: T) -> Self {
+    fn from(types: F) -> Self {
         Self {
-            types: types.into(),
+            types: types.into()
         }
     }
 }
 
-impl Deref for TypeRow {
-    type Target = [SimpleType];
+impl<T> Deref for TypeRow<T> {
+    type Target = [T];
 
     fn deref(&self) -> &Self::Target {
         &self.types
     }
 }
 
-impl DerefMut for TypeRow {
+impl<T> DerefMut for TypeRow<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

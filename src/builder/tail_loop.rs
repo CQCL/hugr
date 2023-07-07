@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow};
+use crate::types::{Signature, TypeRow, SimpleType};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -49,7 +49,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     }
 
     /// The output types of the child graph, including the predicate as the first.
-    pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
+    pub fn internal_output_row(&self) -> Result<TypeRow<SimpleType>, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }
 }
@@ -72,9 +72,9 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
     pub fn new(
-        just_inputs: impl Into<TypeRow>,
-        inputs_outputs: impl Into<TypeRow>,
-        just_outputs: impl Into<TypeRow>,
+        just_inputs: impl Into<TypeRow<SimpleType>>,
+        inputs_outputs: impl Into<TypeRow<SimpleType>>,
+        just_outputs: impl Into<TypeRow<SimpleType>>,
     ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),

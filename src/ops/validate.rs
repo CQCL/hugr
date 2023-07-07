@@ -241,8 +241,8 @@ pub enum ChildrenValidationError {
     #[error("The {node_desc} node of a {container_desc} has a signature of {actual:?}, which differs from the expected type row {expected:?}")]
     IOSignatureMismatch {
         child: NodeIndex,
-        actual: TypeRow,
-        expected: TypeRow,
+        actual: TypeRow<SimpleType>,
+        expected: TypeRow<SimpleType>,
         node_desc: &'static str,
         container_desc: &'static str,
     },
@@ -255,7 +255,7 @@ pub enum ChildrenValidationError {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate_rows: Vec<TypeRow>,
+        actual_predicate_rows: Vec<TypeRow<SimpleType>>,
     },
 }
 
@@ -382,8 +382,8 @@ impl ValidateOp for super::Case {
 /// nodes outside of the first and second elements respectively, and that those
 /// have the correct signature.
 fn validate_io_nodes<'a>(
-    expected_input: &TypeRow,
-    expected_output: &TypeRow,
+    expected_input: &TypeRow<SimpleType>,
+    expected_output: &TypeRow<SimpleType>,
     container_desc: &'static str,
     mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
 ) -> Result<(), ChildrenValidationError> {

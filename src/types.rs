@@ -50,11 +50,11 @@ impl EdgeKind {
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Value inputs of the function.
-    pub input: TypeRow,
+    pub input: TypeRow<SimpleType>,
     /// Value outputs of the function.
-    pub output: TypeRow,
+    pub output: TypeRow<SimpleType>,
     /// Possible static input (for call / load-constant).
-    pub static_input: TypeRow,
+    pub static_input: TypeRow<ClassicType>,
     /// The resource requirements of all the inputs
     pub input_resources: ResourceSet,
     /// The resource requirements of all the outputs
@@ -233,9 +233,9 @@ impl Signature {
 impl Signature {
     /// Create a new signature.
     pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-        static_input: impl Into<TypeRow>,
+        input: impl Into<TypeRow<SimpleType>>,
+        output: impl Into<TypeRow<SimpleType>>,
+        static_input: impl Into<TypeRow<ClassicType>>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -247,13 +247,13 @@ impl Signature {
     }
 
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    pub fn new_linear(linear: impl Into<TypeRow<SimpleType>>) -> Self {
         let linear = linear.into();
         Signature::new_df(linear.clone(), linear)
     }
 
     /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new_df(input: impl Into<TypeRow<SimpleType>>, output: impl Into<TypeRow<SimpleType>>) -> Self {
         Signature::new(input, output, type_row![])
     }
 }
@@ -326,10 +326,10 @@ impl SignatureDescription {
         }
     }
 
-    fn row_zip<'a>(
-        type_row: &'a TypeRow,
+    fn row_zip<'a, T>(
+        type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a SimpleType)> {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
         name_row
             .iter()
             .chain(&EmptyStringIterator)

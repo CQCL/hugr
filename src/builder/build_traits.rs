@@ -277,7 +277,7 @@ pub trait Dataflow: Container {
     fn cfg_builder(
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        output_types: TypeRow,
+        output_types: TypeRow<SimpleType>,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
@@ -336,7 +336,7 @@ pub trait Dataflow: Container {
         &mut self,
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        just_out_types: TypeRow,
+        just_out_types: TypeRow<SimpleType>,
     ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
@@ -368,9 +368,9 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
+        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow<SimpleType>>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        output_types: TypeRow,
+        output_types: TypeRow<SimpleType>,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -452,7 +452,7 @@ pub trait Dataflow: Container {
     fn make_tag(
         &mut self,
         tag: usize,
-        variants: impl Into<TypeRow>,
+        variants: impl Into<TypeRow<SimpleType>>,
         value: Wire,
     ) -> Result<Wire, BuildError> {
         let make_op = self.add_dataflow_op(
@@ -470,7 +470,7 @@ pub trait Dataflow: Container {
     fn make_predicate(
         &mut self,
         tag: usize,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        predicate_variants: impl IntoIterator<Item = TypeRow<SimpleType>>,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;

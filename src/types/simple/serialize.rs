@@ -40,11 +40,11 @@ pub(crate) enum SerSimpleType {
         l: bool,
     },
     Tuple {
-        row: Box<TypeRow>,
+        row: Box<TypeRow<SimpleType>>,
         l: bool,
     },
     Sum {
-        row: Box<TypeRow>,
+        row: Box<TypeRow<SimpleType>>,
         l: bool,
     },
     Array {

@@ -56,7 +56,7 @@ pub enum ConstTypeError {
     /// A mismatch between the embedded type and the type we're checking
     /// against, as above, but for rows instead of simple types
     #[error("Type mismatch for const - expected {0}, found {1}")]
-    TypeRowMismatch(TypeRow, TypeRow),
+    TypeRowMismatch(TypeRow<SimpleType>, TypeRow<SimpleType>),
 }
 
 lazy_static! {

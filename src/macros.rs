@@ -64,7 +64,7 @@ macro_rules! type_row {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$($t),*];
-            let row: types::TypeRow = ROW.into();
+            let row: types::TypeRow<_> = ROW.into();
             row
         }
     };
@@ -72,7 +72,7 @@ macro_rules! type_row {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$t; $n];
-            let row: types::TypeRow = ROW.into();
+            let row: types::TypeRow<_> = ROW.into();
             row
         }
     };

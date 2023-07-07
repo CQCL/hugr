@@ -30,7 +30,7 @@ pub(super) trait DataflowOpTrait {
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
-    fn new(types: impl Into<TypeRow>) -> Self;
+    fn new(types: impl Into<TypeRow<SimpleType>>) -> Self;
     /// Helper method to add resource requirements to an I/O node
     fn with_resources(self, rs: ResourceSet) -> Self;
 }
@@ -40,7 +40,7 @@ pub trait IOTrait {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     /// Input value types
-    pub types: TypeRow,
+    pub types: TypeRow<SimpleType>,
     /// Resources attached to output wires
     pub resources: ResourceSet,
 }
@@ -48,7 +48,7 @@ pub struct Input {
 impl_op_name!(Input);
 
 impl IOTrait for Input {
-    fn new(types: impl Into<TypeRow>) -> Self {
+    fn new(types: impl Into<TypeRow<SimpleType>>) -> Self {
         Input {
             types: types.into(),
             resources: ResourceSet::new(),
@@ -65,7 +65,7 @@ impl IOTrait for Input {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
     /// Output value types
-    pub types: TypeRow,
+    pub types: TypeRow<SimpleType>,
     /// Resources expected from input wires
     pub resources: ResourceSet,
 }
@@ -73,7 +73,7 @@ pub struct Output {
 impl_op_name!(Output);
 
 impl IOTrait for Output {
-    fn new(types: impl Into<TypeRow>) -> Self {
+    fn new(types: impl Into<TypeRow<SimpleType>>) -> Self {
         Output {
             types: types.into(),
             resources: ResourceSet::new(),

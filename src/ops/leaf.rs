@@ -54,25 +54,25 @@ pub enum LeafOp {
     /// An operation that packs all its inputs into a tuple.
     MakeTuple {
         ///Tuple element types.
-        tys: TypeRow,
+        tys: TypeRow<SimpleType>,
     },
     /// An operation that unpacks a tuple into its components.
     UnpackTuple {
         ///Tuple element types.
-        tys: TypeRow,
+        tys: TypeRow<SimpleType>,
     },
     /// An operation that creates a tagged sum value from one of its variants.
     Tag {
         /// The variant to create.
         tag: usize,
         /// The variants of the sum type.
-        variants: TypeRow,
+        variants: TypeRow<SimpleType>,
     },
     /// A node which adds a resource req to the types of the wires it is passed
     /// It has no effect on the values passed along the edge
     Lift {
         /// The types of the edges
-        type_row: TypeRow,
+        type_row: TypeRow<SimpleType>,
         /// The resources which are present in both the inputs and outputs
         input_resources: ResourceSet,
         /// The resources which we're adding to the inputs
