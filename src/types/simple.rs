@@ -15,7 +15,7 @@ use super::{custom::CustomType, Signature};
 use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
 use crate::{resource::ResourceSet, type_row};
 
-/// A type that represents concrete data.
+/// A type that represents concrete data. Can include both linear and classical parts.
 ///
 // TODO: Derive pyclass
 //
@@ -24,7 +24,7 @@ use crate::{resource::ResourceSet, type_row};
 #[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
 #[non_exhaustive]
 pub enum SimpleType {
-    /// A type containing classical data. Elements of this type can be copied.
+    /// A type containing only classical data. Elements of this type can be copied.
     Classic(ClassicType),
     /// A type containing linear data. Elements of this type must be used exactly once.
     Linear(LinearType),
@@ -41,13 +41,13 @@ impl Display for SimpleType {
     }
 }
 
-/// Trait of primitive types (ClassicType or LinearType).
+/// Trait of primitive types (SimpleType or ClassicType).
 pub trait PrimType {
     // may be updated with functions in future for necessary shared functionality
-    // across ClassicType and LinearType
+    // across ClassicType and SimpleType
     // currently used to constrain Container<T>
 
-    /// Is this type linear
+    /// Is this type linear? (I.e. does it have any linear components?)
     const LINEAR: bool;
 }
 
@@ -91,9 +91,9 @@ impl From<Container<ClassicType>> for SimpleType {
     }
 }
 
-impl From<Container<LinearType>> for SimpleType {
+impl From<Container<SimpleType>> for SimpleType {
     #[inline]
-    fn from(value: Container<LinearType>) -> Self {
+    fn from(value: Container<SimpleType>) -> Self {
         Self::Linear(LinearType::Container(value))
     }
 }
@@ -194,7 +194,8 @@ impl PrimType for ClassicType {
     const LINEAR: bool = false;
 }
 
-/// A type that represents concrete linear data.
+/// A subselection of [SimpleType] that may contain linear data, i.e. distinct
+/// from [ClassicType] which definitely does not.
 ///
 // TODO: Derive pyclass.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -206,7 +207,7 @@ pub enum LinearType {
     /// A linear opaque operation that can be downcasted by the extensions that define it.
     Qpaque(CustomType),
     /// A nested definition containing other linear types.
-    Container(Container<LinearType>),
+    Container(Container<SimpleType>),
 }
 
 impl Display for LinearType {
@@ -219,12 +220,12 @@ impl Display for LinearType {
     }
 }
 
-impl PrimType for LinearType {
+impl PrimType for SimpleType {
     const LINEAR: bool = true;
 }
 
 impl SimpleType {
-    /// Returns whether the type contains only linear data.
+    /// Returns whether the type contains linear data (perhaps as well as classical)
     pub fn is_linear(&self) -> bool {
         matches!(self, Self::Linear(_))
     }
@@ -240,7 +241,7 @@ impl SimpleType {
         if row.purely_classical() {
             Container::<ClassicType>::Sum(Box::new(row)).into()
         } else {
-            Container::<LinearType>::Sum(Box::new(row)).into()
+            Container::<SimpleType>::Sum(Box::new(row)).into()
         }
     }
 
@@ -250,7 +251,7 @@ impl SimpleType {
         if row.purely_classical() {
             Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
-            Container::<LinearType>::Tuple(Box::new(row)).into()
+            Container::<SimpleType>::Tuple(Box::new(row)).into()
         }
     }
 
