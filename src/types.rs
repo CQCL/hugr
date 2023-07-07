@@ -2,6 +2,7 @@
 
 pub mod custom;
 pub mod simple;
+pub mod type_param;
 
 use std::fmt::{self, Display, Write};
 use std::ops::Index;
@@ -31,8 +32,6 @@ pub enum EdgeKind {
     Static(ClassicType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
-    /// An edge specifying a resource set.
-    Resource(ResourceSet),
 }
 
 impl EdgeKind {

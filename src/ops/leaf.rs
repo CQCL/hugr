@@ -2,7 +2,8 @@
 
 use smol_str::SmolStr;
 
-use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
+use super::custom::ExternalOp;
+use super::{tag::OpTag, OpName, OpTrait};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
@@ -18,10 +19,7 @@ use crate::{
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
-    CustomOp {
-        /// The underlying opaque operation.
-        custom: OpaqueOp,
-    },
+    CustomOp(ExternalOp),
     /// A Hadamard gate.
     H,
     /// A T gate.
@@ -95,7 +93,7 @@ impl OpName for LeafOp {
     /// The name of the operation.
     fn name(&self) -> SmolStr {
         match self {
-            LeafOp::CustomOp { custom: opaque } => return opaque.name(),
+            LeafOp::CustomOp(ext) => return ext.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -124,7 +122,7 @@ impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
-            LeafOp::CustomOp { custom: opaque } => opaque.description(),
+            LeafOp::CustomOp(ext) => ext.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
             LeafOp::S => "S gate",
@@ -173,7 +171,7 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp { custom: opaque } => opaque.signature(),
+            LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
@@ -201,7 +199,7 @@ impl OpTrait for LeafOp {
     /// Optional description of the ports in the signature.
     fn signature_desc(&self) -> SignatureDescription {
         match self {
-            LeafOp::CustomOp { custom: opaque } => opaque.signature_desc(),
+            LeafOp::CustomOp(ext) => ext.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }

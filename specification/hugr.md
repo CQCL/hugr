@@ -861,7 +861,7 @@ resources:
   types:
   - name: QubitVector
     # Opaque types can take type arguments, with specified names
-    args: [["size", u64]]
+    args: [["size", Int]]
   operations:
   - name: measure
     description: "measure a qubit"
@@ -889,9 +889,9 @@ resources:
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     args:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: U64
-      - j: U64
-      - k: U64
+      - i: Int
+      - j: Int
+      - k: Int
     signature:
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
@@ -900,7 +900,7 @@ resources:
   - name: max_float
     description: "Variable number of inputs"
     args:
-      - n: U64
+      - n: Int
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
@@ -909,19 +909,30 @@ resources:
     description: "Concatenate two arrays. Resource provides a compute_signature implementation."
     args:
       - t: Type  # Classic or Quantum
-      - i: U64
-      - j: U64
+      - i: Int
+      - j: Int
     # inputs could be: Array<i>(t), Array<j>(t)
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
     # Hence, no signature block => will look up a compute_signature in registry.
+  - name: GraphOp
+    description: "Involves running an argument Graph. E.g. run it some variable number of times."
+    args:
+      - r: ResourceSet
+    signature:
+      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]]
+      outputs: [[null, Int]]
+      resources: r # Indicates that running this operation also invokes resources r
+    lowering:
+      file: "graph_op_hugr.bin"
+      resources: ["arithmetic", r] # r is the ResourceSet in "args"
 ```
 
 The declaration of the `args` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `args` is given by the following production:
 ```
-TypeParam ::= "Type" | "ClassicType" | "F64" | "U64" | "I64" | "Opaque"(name, ...) | "List"(TypeParam)
+TypeParam ::= "Type" | "ClassicType" | Int | "List"(TypeParam)
 ```
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
@@ -930,9 +941,11 @@ Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
 Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists. The optional `misc` field is used for arbitrary
-YAML, which is read in as-is and passed to compiler passes and (if no `signature` is present) the
-`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+must have children `inputs` and `outputs`, each lists, and may have `resources`.
+
+The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
+ passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+
 The optional `args` field can be used to specify the types of static+const arguments to each operation
 ---for example the matrix needed to define an SU2 operation. If `args` are not specified
 then it is assumed empty.

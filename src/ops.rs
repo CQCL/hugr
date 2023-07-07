@@ -12,8 +12,6 @@ pub mod validate;
 use crate::types::{EdgeKind, Signature, SignatureDescription};
 use crate::{Direction, Port};
 
-pub use custom::{CustomOp, OpDef, OpaqueOp};
-
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
 

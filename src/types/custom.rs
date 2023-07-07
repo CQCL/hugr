@@ -1,28 +1,37 @@
 //! Opaque types, used to represent a user-defined [`SimpleType`].
+//!
+//! [`SimpleType`]: super::SimpleType
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use super::{ClassicType, SimpleType, TypeRow};
+use super::{type_param::TypeArg, ClassicType};
 
-/// An opaque type element. Contains an unique identifier and a reference to its definition.
-//
-// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
-// but it adds atomic ops and a serialization-deserialization roundtrip
-// would still generate copies.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// An opaque type element. Contains the unique identifier of its definition.
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
     /// Unique identifier of the opaque type.
+    /// Same as the corresponding [`TypeDef`]
+    ///
+    /// [`TypeDef`]: crate::resource::TypeDef
     id: SmolStr,
-    params: Box<TypeRow>,
+    /// Arguments that fit the [`TypeParam`]s declared by the typedef
+    ///
+    /// [`TypeParam`]: super::type_param::TypeParam
+    params: Vec<TypeArg>,
 }
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: SmolStr, params: impl Into<TypeRow>) -> Self {
+    pub fn new(id: impl Into<SmolStr>, params: impl Into<Vec<TypeArg>>) -> Self {
         Self {
-            id,
-            params: Box::new(params.into()),
+            id: id.into(),
+            params: params.into(),
         }
+    }
+
+    /// Creates a new opaque type with no parameters
+    pub const fn new_simple(id: SmolStr) -> Self {
+        Self { id, params: vec![] }
     }
 
     /// Returns the unique identifier of the opaque type.
@@ -31,7 +40,7 @@ impl CustomType {
     }
 
     /// Returns the parameters of the opaque type.
-    pub fn params(&self) -> &TypeRow {
+    pub fn params(&self) -> &[TypeArg] {
         &self.params
     }
 
@@ -41,22 +50,14 @@ impl CustomType {
     }
 }
 
-impl PartialEq for CustomType {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.id, self.params.as_ref())
+        write!(f, "{}({:?})", self.id, self.params)
     }
 }
 
-impl Eq for CustomType {}
-
-impl From<CustomType> for SimpleType {
+impl From<CustomType> for ClassicType {
     fn from(ty: CustomType) -> Self {
-        SimpleType::Classic(ty.classic_type())
+        ty.classic_type()
     }
 }
