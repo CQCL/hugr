@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
-use super::{tag::OpTag, OpName, OpTrait};
+use super::{OpName, OpTag, OpTagged, OpTrait};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
@@ -118,6 +118,12 @@ impl OpName for LeafOp {
     }
 }
 
+impl OpTagged for LeafOp {
+    fn static_tag() -> OpTag {
+        OpTag::Leaf
+    }
+}
+
 impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
@@ -146,7 +152,7 @@ impl OpTrait for LeafOp {
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Leaf
+        <Self as OpTagged>::static_tag()
     }
 
     /// The signature of the operation.

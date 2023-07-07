@@ -5,8 +5,8 @@ use smol_str::SmolStr;
 use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
-use super::tag::OpTag;
-use super::{impl_op_name, OpName, OpTrait};
+use super::OpTag;
+use super::{impl_op_name, OpName, OpTagged, OpTrait};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -26,7 +26,7 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> OpTag {
         OpTag::TailLoop
     }
 
@@ -75,7 +75,7 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> OpTag {
         OpTag::Conditional
     }
 
@@ -114,7 +114,7 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> OpTag {
         OpTag::Cfg
     }
 
@@ -146,6 +146,12 @@ impl OpName for BasicBlock {
             BasicBlock::DFB { .. } => "DFB".into(),
             BasicBlock::Exit { .. } => "Exit".into(),
         }
+    }
+}
+
+impl OpTagged for BasicBlock {
+    fn static_tag() -> OpTag {
+        OpTag::BasicBlock
     }
 }
 
@@ -210,13 +216,19 @@ pub struct Case {
 
 impl_op_name!(Case);
 
+impl OpTagged for Case {
+    fn static_tag() -> OpTag {
+        OpTag::Case
+    }
+}
+
 impl OpTrait for Case {
     fn description(&self) -> &str {
         "A case node inside a conditional"
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Case
+        <Self as OpTagged>::static_tag()
     }
 }
 

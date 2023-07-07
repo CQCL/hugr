@@ -1,13 +1,14 @@
 //! Dataflow operations.
 
-use super::{impl_op_name, tag::OpTag, OpTrait};
+use super::OpTagged;
+use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
-    fn tag(&self) -> OpTag;
+    fn static_tag() -> super::OpTag;
     fn signature(&self) -> Signature;
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -91,7 +92,7 @@ impl DataflowOpTrait for Input {
         "The input node for this dataflow subgraph"
     }
 
-    fn tag(&self) -> super::tag::OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::Input
     }
 
@@ -110,7 +111,7 @@ impl DataflowOpTrait for Output {
         "The output node for this dataflow subgraph"
     }
 
-    fn tag(&self) -> super::tag::OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::Output
     }
 
@@ -131,7 +132,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     }
 
     fn tag(&self) -> OpTag {
-        DataflowOpTrait::tag(self)
+        <Self as DataflowOpTrait>::static_tag()
     }
     fn signature(&self) -> Signature {
         DataflowOpTrait::signature(self)
@@ -142,6 +143,11 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
+    }
+}
+impl<T: DataflowOpTrait> OpTagged for T {
+    fn static_tag() -> OpTag {
+        <Self as DataflowOpTrait>::static_tag()
     }
 }
 
@@ -162,7 +168,7 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::FnCall
     }
 
@@ -187,7 +193,7 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::FnCall
     }
 
@@ -213,7 +219,7 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::LoadConst
     }
 
@@ -239,7 +245,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn tag(&self) -> OpTag {
+    fn static_tag() -> super::OpTag {
         OpTag::Dfg
     }
 
