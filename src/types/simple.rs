@@ -321,7 +321,7 @@ impl TypeRow<SimpleType> {
     /// Returns whether the row contains only linear data.
     #[inline(always)]
     pub fn purely_linear(&self) -> bool {
-        self.types.iter().all(|typ| typ.is_linear())
+        self.types.iter().all(SimpleType::is_linear)
     }
 
     /// Returns whether the row contains only classic data.
