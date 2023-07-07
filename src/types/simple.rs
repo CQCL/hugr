@@ -371,17 +371,6 @@ impl TypeRow {
         }
     }
 
-    /// Create a new row from a Cow slice of types.
-    ///
-    /// See [`type_row!`] for a more ergonomic way to create a statically allocated rows.
-    ///
-    /// [`type_row!`]: crate::macros::type_row.
-    pub fn from(types: impl Into<Cow<'static, [SimpleType]>>) -> Self {
-        Self {
-            types: types.into(),
-        }
-    }
-
     /// Iterator over the types in the row.
     pub fn iter(&self) -> impl Iterator<Item = &SimpleType> {
         self.types.iter()
@@ -427,7 +416,9 @@ where
     T: Into<Cow<'static, [SimpleType]>>,
 {
     fn from(types: T) -> Self {
-        Self::from(types.into())
+        Self {
+            types: types.into(),
+        }
     }
 }
 
