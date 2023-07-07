@@ -62,7 +62,7 @@ pub enum SignatureError {
 ///
 /// This trait allows the Hugr to be varied according to the operation's [TypeArg]s;
 /// if this is not necessary then a single Hugr can be provided instead via
-/// [OpDef::lowering_to_hugr].
+/// [LowerFunc::FixedHugr].
 pub trait CustomLowerFunc: Send + Sync {
     /// Return a Hugr that implements the node using only the specified available resources;
     /// may fail.
@@ -194,9 +194,7 @@ impl OpDef {
 
     /// Modifies the OpDef with the ability to lower every operation to a
     /// fixed Hugr. Only applicable if the OpDef cannot currently lower itself.
-    pub fn with_lowering(
-        mut self,
-        func: LowerFunc) -> Result<Self, Self> {
+    pub fn with_lowering(mut self, func: LowerFunc) -> Result<Self, Self> {
         match self.lower_func {
             None => {
                 self.lower_func = Some(func);
