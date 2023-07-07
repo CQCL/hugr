@@ -271,7 +271,7 @@ impl OpDef {
     pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
         self.lower_func.as_ref().and_then(|f| match f {
             LowerFunc::FixedHugr(req_res, h) => {
-                if available_resources.is_superset(&req_res) {
+                if available_resources.is_superset(req_res) {
                     Some(h.clone())
                 } else {
                     None
