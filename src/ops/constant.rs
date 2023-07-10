@@ -169,21 +169,23 @@ impl ConstValue {
 
     /// Constant Sum over units, used as predicates.
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
-        Self::predicate(tag, std::iter::repeat(type_row![]).take(size))
+        Self::predicate(tag, Self::unit(), std::iter::repeat(type_row![]).take(size))
     }
 
     /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
+    pub fn predicate(
+        tag: usize,
+        val: ConstValue,
+        variant_rows: impl IntoIterator<Item = TypeRow>,
+    ) -> Self {
+        let variants = TypeRow::predicate_variants_row(variant_rows);
+        let const_type = SimpleType::Classic(val.const_type());
+        assert!(Some(&const_type) == variants.get(tag));
         ConstValue::Sum {
             tag,
-            variants: TypeRow::predicate_variants_row(variant_rows),
-            val: Box::new(Self::unit()),
+            variants,
+            val: Box::new(val),
         }
-    }
-
-    /// Constant Sum over Tuples with just one variant
-    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
-        Self::predicate(0, [row.into()])
     }
 
     /// Constant Sum over Tuples with just one variant of unit type
