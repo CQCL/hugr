@@ -285,12 +285,12 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<T: std::fmt::Debug + Clone + 'static> {
+pub struct TypeRow<T: PrimType> {
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
 
-impl<T: Display + std::fmt::Debug + Clone + 'static> Display for TypeRow<T> {
+impl<T: Display + PrimType> Display for TypeRow<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -299,7 +299,7 @@ impl<T: Display + std::fmt::Debug + Clone + 'static> Display for TypeRow<T> {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl<T: std::fmt::Debug + Clone + 'static> TypeRow<T> {
+impl<T: PrimType> TypeRow<T> {
     /// Returns the number of types in the row.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -342,7 +342,7 @@ impl TypeRow<ClassicType> {
     }
 }
 
-impl<T: std::fmt::Debug + Clone + 'static> TypeRow<T> {
+impl<T: PrimType> TypeRow<T> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -377,9 +377,7 @@ impl<T: std::fmt::Debug + Clone + 'static> TypeRow<T> {
         self.types.to_mut().get_mut(offset)
     }
 
-    fn try_convert_elems<D: std::fmt::Debug + Clone + TryFrom<T> + 'static>(
-        self,
-    ) -> Result<TypeRow<D>, D::Error> {
+    fn try_convert_elems<D: PrimType + TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> {
         let elems: Vec<D> = self
             .into_owned()
             .into_iter()
@@ -389,13 +387,13 @@ impl<T: std::fmt::Debug + Clone + 'static> TypeRow<T> {
     }
 }
 
-impl<T: std::fmt::Debug + Clone + 'static> Default for TypeRow<T> {
+impl<T: PrimType> Default for TypeRow<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, T: std::fmt::Debug + Clone + 'static> From<F> for TypeRow<T>
+impl<F, T: PrimType> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [T]>>,
 {
@@ -406,7 +404,7 @@ where
     }
 }
 
-impl<T: std::fmt::Debug + Clone + 'static> Deref for TypeRow<T> {
+impl<T: PrimType> Deref for TypeRow<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -414,7 +412,7 @@ impl<T: std::fmt::Debug + Clone + 'static> Deref for TypeRow<T> {
     }
 }
 
-impl<T: std::fmt::Debug + Clone + 'static> DerefMut for TypeRow<T> {
+impl<T: PrimType> DerefMut for TypeRow<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

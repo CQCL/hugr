@@ -19,6 +19,8 @@ use crate::hugr::{Direction, Port};
 use crate::utils::display_list;
 use crate::{resource::ResourceSet, type_row};
 
+use self::simple::PrimType;
+
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -329,7 +331,7 @@ impl SignatureDescription {
         }
     }
 
-    fn row_zip<'a, T: std::fmt::Debug + Clone + 'static>(
+    fn row_zip<'a, T: PrimType>(
         type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
     ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
