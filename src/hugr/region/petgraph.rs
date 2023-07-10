@@ -1,6 +1,7 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
 use super::{FlatRegionView, RegionView};
+use crate::hugr::view::sealed::HugrInternals;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
@@ -12,22 +13,34 @@ use portgraph::NodeIndex;
 
 macro_rules! impl_region_petgraph_traits {
     ($hugr:ident) => {
-        impl<'a> petgraph::visit::GraphBase for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::GraphBase for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             type NodeId = Node;
             type EdgeId = ((Node, Port), (Node, Port));
         }
 
-        impl<'a> petgraph::visit::GraphProp for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::GraphProp for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             type EdgeType = petgraph::Directed;
         }
 
-        impl<'a> petgraph::visit::NodeCount for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::NodeCount for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             fn node_count(&self) -> usize {
                 HugrView::node_count(self)
             }
         }
 
-        impl<'a> petgraph::visit::NodeIndexable for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::NodeIndexable for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             fn node_bound(&self) -> usize {
                 HugrView::node_count(self)
             }
@@ -41,32 +54,42 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a> petgraph::visit::EdgeCount for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::EdgeCount for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             fn edge_count(&self) -> usize {
                 HugrView::edge_count(self)
             }
         }
 
-        impl<'a> petgraph::visit::Data for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::Data for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             type NodeWeight = OpType;
             type EdgeWeight = EdgeKind;
         }
 
-        impl<'g, 'a> petgraph::visit::IntoNodeIdentifiers for &'g $hugr<'a> {
-            type NodeIdentifiers = <$hugr<'a> as HugrView>::Nodes<'g>;
+        impl<'g, 'a, Base> petgraph::visit::IntoNodeIdentifiers for &'g $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
+            type NodeIdentifiers = <$hugr<'a, Base> as HugrView>::Nodes<'g>;
 
             fn node_identifiers(self) -> Self::NodeIdentifiers {
                 self.nodes()
             }
         }
 
-        impl<'g, 'a> petgraph::visit::IntoNodeReferences for &'g $hugr<'a>
+        impl<'g, 'a, Base> petgraph::visit::IntoNodeReferences for &'g $hugr<'a, Base>
         where
             'g: 'a,
+            Base: HugrInternals + HugrView,
         {
             type NodeRef = HugrNodeRef<'a>;
             type NodeReferences =
-                MapWithCtx<<$hugr<'a> as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
+                MapWithCtx<<$hugr<'a, Base> as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
 
             fn node_references(self) -> Self::NodeReferences {
                 self.nodes()
@@ -75,16 +98,22 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'g, 'a> petgraph::visit::IntoNeighbors for &'g $hugr<'a> {
-            type Neighbors = <$hugr<'a> as HugrView>::Neighbours<'g>;
+        impl<'g, 'a, Base> petgraph::visit::IntoNeighbors for &'g $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
+            type Neighbors = <$hugr<'a, Base> as HugrView>::Neighbours<'g>;
 
             fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
                 self.output_neighbours(n)
             }
         }
 
-        impl<'g, 'a> petgraph::visit::IntoNeighborsDirected for &'g $hugr<'a> {
-            type NeighborsDirected = <$hugr<'a> as HugrView>::Neighbours<'g>;
+        impl<'g, 'a, Base> petgraph::visit::IntoNeighborsDirected for &'g $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
+            type NeighborsDirected = <$hugr<'a, Base> as HugrView>::Neighbours<'g>;
 
             fn neighbors_directed(
                 self,
@@ -95,7 +124,10 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a> petgraph::visit::Visitable for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::Visitable for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             type Map = std::collections::HashSet<Self::NodeId>;
 
             fn visit_map(&self) -> Self::Map {
@@ -107,7 +139,10 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a> petgraph::visit::GetAdjacencyMatrix for $hugr<'a> {
+        impl<'a, Base> petgraph::visit::GetAdjacencyMatrix for $hugr<'a, Base>
+        where
+            Base: HugrInternals + HugrView,
+        {
             type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
 
             fn adjacency_matrix(&self) -> Self::AdjMatrix {

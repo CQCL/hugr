@@ -251,7 +251,10 @@ pub(crate) mod sealed {
         type Portgraph: LinkView;
 
         /// Returns a reference to the underlying portgraph.
-        fn as_portgraph(&self) -> &Self::Portgraph;
+        fn portgraph(&self) -> &Self::Portgraph;
+
+        /// Returns a the Hugr at the base of a chain of views.
+        fn base_hugr(&self) -> &Hugr;
     }
 
     impl<T> HugrInternals for T
@@ -260,8 +263,14 @@ pub(crate) mod sealed {
     {
         type Portgraph = MultiPortGraph;
 
-        fn as_portgraph(&self) -> &Self::Portgraph {
+        #[inline]
+        fn portgraph(&self) -> &Self::Portgraph {
             &self.as_ref().graph
+        }
+
+        #[inline]
+        fn base_hugr(&self) -> &Hugr {
+            self.as_ref()
         }
     }
 }
