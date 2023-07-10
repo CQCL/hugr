@@ -259,17 +259,17 @@ mod test {
         let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
         let c = b.add_constant(ConstValue::predicate(
             0,
-            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.14)]),
+            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
             pred_rows.clone(),
         ))?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty]))?;
         let c = b.add_constant(ConstValue::predicate(
             1,
             ConstValue::Tuple(vec![]),
-            pred_rows.clone(),
+            pred_rows,
         ))?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();

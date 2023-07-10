@@ -166,7 +166,7 @@ mod test {
             typecheck_const(&ClassicType::Int(32), &ConstValue::i64(3)),
             Err(ConstTypeError::IntWidthMismatch(32, 64))
         );
-        typecheck_const(&ClassicType::F64, &ConstValue::F64(3.14)).unwrap();
+        typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();
         assert_eq!(
             typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
             Err(ConstTypeError::Failed(ClassicType::F64))
