@@ -12,11 +12,11 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::types::type_param::{check_type_arg, TypeArgError};
-use crate::types::{TypeRow, SimpleType};
 use crate::types::{
     type_param::{TypeArg, TypeParam},
     Signature, SignatureDescription,
 };
+use crate::types::{SimpleType, TypeRow};
 use crate::Hugr;
 
 /// Trait for resources to provide custom binary code for computing signature.

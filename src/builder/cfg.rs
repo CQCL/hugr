@@ -7,7 +7,11 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::{SimpleType, ClassicType}};
+use crate::{
+    hugr::view::HugrView,
+    type_row,
+    types::{ClassicType, SimpleType},
+};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
@@ -54,7 +58,10 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(input: impl Into<TypeRow<SimpleType>>, output: impl Into<TypeRow<SimpleType>>) -> Result<Self, BuildError> {
+    pub fn new(
+        input: impl Into<TypeRow<SimpleType>>,
+        output: impl Into<TypeRow<SimpleType>>,
+    ) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
         let cfg_op = ops::CFG {
@@ -298,11 +305,11 @@ impl BlockBuilder<Hugr> {
 mod test {
     use std::collections::HashSet;
 
-    use cool_asserts::assert_matches;
-
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
+    use crate::macros::classic_row;
     use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+    use cool_asserts::assert_matches;
 
     use super::*;
     #[test]
@@ -372,7 +379,10 @@ mod test {
     fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
-        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
+        let sum2_variants = vec![
+            classic_row![ClassicType::i64()],
+            classic_row![ClassicType::i64()],
+        ];
         let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();

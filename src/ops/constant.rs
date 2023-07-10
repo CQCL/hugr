@@ -122,10 +122,7 @@ impl ConstValue {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
             }
             Self::Tuple(vals) => {
-                let row: Vec<_> = vals
-                    .iter()
-                    .map(|val| val.const_type())
-                    .collect();
+                let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();
                 ClassicType::Container(Container::Tuple(Box::new(row.into())))
             }
             Self::F64(_) => ClassicType::F64,
@@ -175,7 +172,10 @@ impl ConstValue {
     }
 
     /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
+    pub fn predicate(
+        tag: usize,
+        variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>,
+    ) -> Self {
         let variants = TypeRow::predicate_variants_row(variant_rows);
         assert!(variants.get(tag) == Some(&ClassicType::new_unit()));
         ConstValue::Sum {

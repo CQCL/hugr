@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SimpleType, TypeRow, ClassicType};
+use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -32,9 +32,7 @@ impl DataflowOpTrait for TailLoop {
 
     fn signature(&self) -> Signature {
         let [inputs, outputs] =
-            [&self.just_inputs, &self.just_outputs].map(|row| {
-                predicate_first(row, &self.rest)
-            });
+            [&self.just_inputs, &self.just_outputs].map(|row| predicate_first(row, &self.rest));
         Signature::new_df(inputs, outputs)
     }
 }
@@ -89,7 +87,10 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow<SimpleType>> {
-        Some(predicate_first(self.predicate_inputs.get(case)?, &self.other_inputs))
+        Some(predicate_first(
+            self.predicate_inputs.get(case)?,
+            &self.other_inputs,
+        ))
     }
 }
 
@@ -185,9 +186,7 @@ impl BasicBlock {
                 predicate_variants,
                 other_outputs: outputs,
                 ..
-            } => {
-                Some(predicate_first(predicate_variants.get(successor)?, outputs))
-            }
+            } => Some(predicate_first(predicate_variants.get(successor)?, outputs)),
             BasicBlock::Exit { .. } => panic!("Exit should have no successors"),
         }
     }
@@ -225,5 +224,11 @@ impl Case {
 }
 
 fn predicate_first(pred: &TypeRow<ClassicType>, rest: &TypeRow<SimpleType>) -> TypeRow<SimpleType> {
-    TypeRow::from(pred.iter().cloned().map(SimpleType::Classic).chain(rest.iter().cloned()).collect::<Vec<_>>())
+    TypeRow::from(
+        pred.iter()
+            .cloned()
+            .map(SimpleType::Classic)
+            .chain(rest.iter().cloned())
+            .collect::<Vec<_>>(),
+    )
 }

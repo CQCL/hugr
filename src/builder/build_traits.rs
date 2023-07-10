@@ -16,7 +16,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{Signature, SimpleType, TypeRow, ClassicType};
+use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
 
@@ -475,7 +475,12 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
         let variants = TypeRow::predicate_variants_row(predicate_variants);
-        let variants = variants.into_owned().into_iter().map(SimpleType::Classic).collect::<Vec<_>>().into();
+        let variants = variants
+            .into_owned()
+            .into_iter()
+            .map(SimpleType::Classic)
+            .collect::<Vec<_>>()
+            .into();
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }

@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow, SimpleType, ClassicType};
+use crate::types::{ClassicType, Signature, SimpleType, TypeRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -96,6 +96,7 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
+        classic_row,
         hugr::ValidationError,
         ops::ConstValue,
         type_row,
@@ -107,7 +108,7 @@ mod test {
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], type_row![NAT])?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![ClassicType::i64()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
 
@@ -129,8 +130,11 @@ mod test {
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
-                    let mut loop_b =
-                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
+                    let mut loop_b = fbuild.tail_loop_builder(
+                        vec![(ClassicType::bit(), b1)],
+                        vec![],
+                        classic_row![ClassicType::i64()],
+                    )?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(ConstValue::true_val())?;
                     let [b1] = loop_b.input_wires_arr();

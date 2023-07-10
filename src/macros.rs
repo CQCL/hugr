@@ -77,5 +77,38 @@ macro_rules! type_row {
         }
     };
 }
+
+/// Like [type_row!] but for rows of [ClassicType]s
+///
+/// [ClassicType]: types::ClassicType
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! classic_row {
+    () => {
+        {
+            $crate::types::TypeRow::new()
+        }
+    };
+    ($($t:expr),+ $(,)?) => {
+        {
+            use $crate::types;
+            static ROW: &[types::ClassicType] = &[$($t),*];
+            let row: types::TypeRow<_> = ROW.into();
+            row
+        }
+    };
+    ($t:expr; $n:expr) => {
+        {
+            use $crate::types;
+            static ROW: &[types::ClassicType] = &[$t; $n];
+            let row: types::TypeRow<_> = ROW.into();
+            row
+        }
+    };
+}
+
 #[allow(unused_imports)]
 pub use type_row;
+
+#[allow(unused_imports)]
+pub use classic_row;
