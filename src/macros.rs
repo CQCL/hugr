@@ -45,11 +45,11 @@ pub(crate) use impl_box_clone;
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
 /// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-/// let static_row: TypeRow = type_row![B, B];
-/// let dynamic_row: TypeRow = vec![B, B, B].into();
+/// let static_row: TypeRow<SimpleType> = type_row![B, B];
+/// let dynamic_row: TypeRow<SimpleType> = vec![B, B, B].into();
 /// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
 ///
-/// let repeated_row: TypeRow = type_row![B; 2];
+/// let repeated_row: TypeRow<SimpleType> = type_row![B; 2];
 /// assert_eq!(repeated_row, static_row);
 /// ```
 #[allow(unused_macros)]

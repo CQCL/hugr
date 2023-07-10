@@ -387,6 +387,16 @@ impl<T: PrimType> TypeRow<T> {
             .collect::<Result<_, _>>()?;
         Ok(TypeRow::from(elems))
     }
+
+    /// Converts the elements of this TypeRow into some other type that they can `.into()`
+    pub fn map_into<T2: PrimType + From<T>>(self) -> TypeRow<T2> {
+        TypeRow::from(
+            self.into_owned()
+                .into_iter()
+                .map(T2::from)
+                .collect::<Vec<T2>>(),
+        )
+    }
 }
 
 impl<T: PrimType> Default for TypeRow<T> {

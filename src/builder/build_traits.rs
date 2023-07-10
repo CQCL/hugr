@@ -474,13 +474,7 @@ pub trait Dataflow: Container {
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
-        let variants = TypeRow::predicate_variants_row(predicate_variants);
-        let variants = variants
-            .into_owned()
-            .into_iter()
-            .map(SimpleType::Classic)
-            .collect::<Vec<_>>()
-            .into();
+        let variants = TypeRow::predicate_variants_row(predicate_variants).map_into();
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
