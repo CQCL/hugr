@@ -256,9 +256,7 @@ impl SimpleType {
 
     /// New unit type, defined as an empty Tuple.
     pub fn new_unit() -> Self {
-        Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
-            TypeRow::new(),
-        ))))
+        Self::new_tuple(vec![])
     }
 
     /// New Sum of Tuple types, used as predicates in branching.
