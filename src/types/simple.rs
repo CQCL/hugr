@@ -254,11 +254,6 @@ impl SimpleType {
         }
     }
 
-    /// New unit type, defined as an empty Tuple.
-    pub fn new_unit() -> Self {
-        Self::new_tuple(vec![])
-    }
-
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
