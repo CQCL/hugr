@@ -329,13 +329,10 @@ impl SignatureDescription {
         }
     }
 
-    fn row_zip<'a, T: std::fmt::Debug>(
+    fn row_zip<'a, T: std::fmt::Debug + Clone + 'static>(
         type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)>
-    where
-        [T]: ToOwned<Owned = Vec<T>>,
-    {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
         name_row
             .iter()
             .chain(&EmptyStringIterator)
