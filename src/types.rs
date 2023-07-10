@@ -104,12 +104,11 @@ impl Signature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            self.static_input
-                .get(port.index() - self.input.len())?
-                .clone()
-                .try_into()
-                .ok()
-                .map(EdgeKind::Static)
+            Some(EdgeKind::Static(
+                self.static_input
+                    .get(port.index() - self.input.len())?
+                    .clone(),
+            ))
         } else {
             self.get_df(port).cloned().map(EdgeKind::Value)
         }
