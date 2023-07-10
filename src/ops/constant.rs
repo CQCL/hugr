@@ -235,3 +235,71 @@ pub trait CustomConst:
 
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
+
+#[cfg(test)]
+mod test {
+    use super::ConstValue;
+    use crate::{
+        builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        type_row,
+        types::{ClassicType, SimpleType, TypeRow},
+    };
+
+    #[test]
+    fn test_predicate() -> Result<(), BuildError> {
+        let pred_rows = vec![
+            type_row![
+                SimpleType::Classic(ClassicType::i64()),
+                SimpleType::Classic(ClassicType::F64)
+            ],
+            type_row![],
+        ];
+        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let c = b.add_constant(ConstValue::predicate(
+            0,
+            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.14)]),
+            pred_rows.clone(),
+        ))?;
+        let w = b.load_const(&c)?;
+        b.finish_hugr_with_outputs([w]).unwrap();
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let c = b.add_constant(ConstValue::predicate(
+            1,
+            ConstValue::Tuple(vec![]),
+            pred_rows.clone(),
+        ))?;
+        let w = b.load_const(&c)?;
+        b.finish_hugr_with_outputs([w]).unwrap();
+
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic] // Pending resolution of https://github.com/CQCL-DEV/hugr/issues/231
+    fn test_bad_predicate() {
+        let pred_rows = vec![
+            type_row![
+                SimpleType::Classic(ClassicType::i64()),
+                SimpleType::Classic(ClassicType::F64)
+            ],
+            type_row![],
+        ];
+        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
+        // Until #231 is fixed, this is made to fail by an assert in ConstValue::predicate
+        let c = b
+            .add_constant(ConstValue::predicate(
+                0,
+                ConstValue::Tuple(vec![]),
+                pred_rows,
+            ))
+            .unwrap();
+        let w = b.load_const(&c).unwrap();
+        // When #231 is fixed, there should be a validation error here instead
+        b.finish_hugr_with_outputs([w]).unwrap_err();
+    }
+}
