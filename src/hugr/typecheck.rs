@@ -149,3 +149,54 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         (ty, _) => Err(ConstTypeError::Failed(ty.clone())),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use cool_asserts::assert_matches;
+
+    use crate::{type_row, types::ClassicType};
+
+    use super::*;
+
+    #[test]
+    fn test_typecheck_const() {
+        const INT: ClassicType = ClassicType::Int(64);
+        typecheck_const(&INT, &ConstValue::i64(3)).unwrap();
+        assert_eq!(
+            typecheck_const(&ClassicType::Int(32), &ConstValue::i64(3)),
+            Err(ConstTypeError::IntWidthMismatch(32, 64))
+        );
+        typecheck_const(&ClassicType::F64, &ConstValue::F64(3.14)).unwrap();
+        assert_eq!(
+            typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
+            Err(ConstTypeError::Failed(ClassicType::F64))
+        );
+        let tuple_ty = ClassicType::Container(Container::Tuple(Box::new(type_row![
+            SimpleType::Classic(INT),
+            SimpleType::Classic(ClassicType::F64)
+        ])));
+        typecheck_const(
+            &tuple_ty,
+            &ConstValue::Tuple(vec![ConstValue::i64(7), ConstValue::F64(5.1)]),
+        )
+        .unwrap();
+        assert_matches!(
+            typecheck_const(
+                &tuple_ty,
+                &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::i64(2)])
+            ),
+            Err(ConstTypeError::Failed(_))
+        );
+        assert_eq!(
+            typecheck_const(
+                &tuple_ty,
+                &ConstValue::Tuple(vec![
+                    ConstValue::i64(5),
+                    ConstValue::F64(3.3),
+                    ConstValue::i64(2)
+                ])
+            ),
+            Err(ConstTypeError::TupleWrongLength)
+        );
+    }
+}
