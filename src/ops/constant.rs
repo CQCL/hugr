@@ -180,6 +180,10 @@ impl ConstValue {
     ) -> Self {
         let variants = TypeRow::predicate_variants_row(variant_rows);
         let const_type = SimpleType::Classic(val.const_type());
+        // TODO This assert is not appropriate for a public API and if the specified `val`
+        // is not of tuple type matching the `tag`th element of `variant_rows` then
+        // really the Hugr will fail in validate. However it doesn't at the moment
+        // (https://github.com/CQCL-DEV/hugr/issues/231).
         assert!(Some(&const_type) == variants.get(tag));
         ConstValue::Sum {
             tag,
