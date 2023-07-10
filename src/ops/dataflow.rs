@@ -221,7 +221,7 @@ impl DataflowOpTrait for LoadConstant {
         Signature::new(
             TypeRow::new(),
             vec![SimpleType::Classic(self.datatype.clone())],
-            vec![SimpleType::Classic(self.datatype.clone())],
+            vec![self.datatype.clone()],
         )
     }
 }
