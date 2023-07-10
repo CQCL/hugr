@@ -194,10 +194,8 @@ impl ValidateOp for super::TailLoop {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        let expected_output = SimpleType::new_sum(vec![
-            SimpleType::new_tuple(self.just_inputs.clone()),
-            SimpleType::new_tuple(self.just_outputs.clone()),
-        ]);
+        let expected_output =
+            SimpleType::new_predicate(vec![self.just_inputs.clone(), self.just_outputs.clone()]);
         let mut expected_output = vec![expected_output];
         expected_output.extend_from_slice(&self.rest);
         let expected_output: TypeRow = expected_output.into();
