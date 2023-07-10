@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
+use crate::types::{EdgeKind, Signature, SimpleType, TypeRow, ClassicType};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -12,9 +12,9 @@ use super::{impl_op_name, OpName, OpTrait};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TailLoop {
     /// Types that are only input
-    pub just_inputs: TypeRow<SimpleType>,
+    pub just_inputs: TypeRow<ClassicType>,
     /// Types that are only output
-    pub just_outputs: TypeRow<SimpleType>,
+    pub just_outputs: TypeRow<ClassicType>,
     /// Types that are appended to both input and output
     pub rest: TypeRow<SimpleType>,
 }
@@ -32,9 +32,8 @@ impl DataflowOpTrait for TailLoop {
 
     fn signature(&self) -> Signature {
         let [inputs, outputs] =
-            [self.just_inputs.clone(), self.just_outputs.clone()].map(|mut row| {
-                row.to_mut().extend(self.rest.iter().cloned());
-                row
+            [&self.just_inputs, &self.just_outputs].map(|row| {
+                predicate_first(row, &self.rest)
             });
         Signature::new_df(inputs, outputs)
     }
@@ -52,9 +51,7 @@ impl TailLoop {
 
     /// Build the input TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_input_row(&self) -> TypeRow<SimpleType> {
-        let mut inputs = self.just_inputs.clone();
-        inputs.to_mut().extend_from_slice(&self.rest);
-        inputs
+        predicate_first(&self.just_inputs, &self.rest)
     }
 }
 
@@ -62,7 +59,7 @@ impl TailLoop {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conditional {
     /// The possible rows of the predicate input
-    pub predicate_inputs: Vec<TypeRow<SimpleType>>,
+    pub predicate_inputs: Vec<TypeRow<ClassicType>>,
     /// Remaining input types
     pub other_inputs: TypeRow<SimpleType>,
     /// Output types
@@ -92,10 +89,7 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow<SimpleType>> {
-        let mut inputs = self.predicate_inputs.get(case)?.clone();
-
-        inputs.to_mut().extend_from_slice(&self.other_inputs);
-        Some(inputs)
+        Some(predicate_first(self.predicate_inputs.get(case)?, &self.other_inputs))
     }
 }
 
@@ -132,7 +126,7 @@ pub enum BasicBlock {
     DFB {
         inputs: TypeRow<SimpleType>,
         other_outputs: TypeRow<SimpleType>,
-        predicate_variants: Vec<TypeRow<SimpleType>>,
+        predicate_variants: Vec<TypeRow<ClassicType>>,
     },
     /// The single exit node of the CFG, has no children,
     /// stores the types of the CFG node output.
@@ -192,9 +186,7 @@ impl BasicBlock {
                 other_outputs: outputs,
                 ..
             } => {
-                let mut row = predicate_variants.get(successor)?.clone();
-                row.to_mut().extend_from_slice(outputs);
-                Some(row)
+                Some(predicate_first(predicate_variants.get(successor)?, outputs))
             }
             BasicBlock::Exit { .. } => panic!("Exit should have no successors"),
         }
@@ -230,4 +222,8 @@ impl Case {
     pub fn dataflow_output(&self) -> &TypeRow<SimpleType> {
         &self.signature.output
     }
+}
+
+fn predicate_first(pred: &TypeRow<ClassicType>, rest: &TypeRow<SimpleType>) -> TypeRow<SimpleType> {
+    TypeRow::from(pred.iter().cloned().map(SimpleType::Classic).chain(rest.iter().cloned()).collect::<Vec<_>>())
 }

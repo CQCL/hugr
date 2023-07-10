@@ -153,6 +153,13 @@ impl ClassicType {
         Self::int::<1>()
     }
 
+    /// New unit type, defined as an empty Tuple.
+    pub fn new_unit() -> Self {
+        Self::Container(Container::Tuple(Box::new(
+            TypeRow::new(),
+        )))
+    }
+
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
@@ -233,13 +240,6 @@ impl SimpleType {
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
         }
-    }
-
-    /// New unit type, defined as an empty Tuple.
-    pub fn new_unit() -> Self {
-        Self::Classic(ClassicType::Container(Container::Tuple(Box::new(
-            TypeRow::new(),
-        ))))
     }
 
     /// New Sum of Tuple types, used as predicates in branching.
@@ -360,6 +360,11 @@ impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
         self.types.to_mut()
     }
 
+    /// Allow access (consumption) of the contained elements
+    pub fn into_owned(self) -> Vec<T> {
+        self.types.into_owned()
+    }
+
     #[inline(always)]
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
     pub fn get(&self, offset: usize) -> Option<&T> {
@@ -372,8 +377,8 @@ impl<T: std::fmt::Debug> TypeRow<T> where [T]: ToOwned<Owned=Vec<T>> {
         self.types.to_mut().get_mut(offset)
     }
 
-    pub fn try_convert_elems<D: std::fmt::Debug+Clone+TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> where [D]: ToOwned<Owned=Vec<D>> {
-        let elems: Vec<D> = self.types.into_iter().map(|e| {let r = D::try_from(*e); r}).collect::<Result<_,_>>()?;
+    fn try_convert_elems<D: std::fmt::Debug+Clone+TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> where [D]: ToOwned<Owned=Vec<D>> {
+        let elems: Vec<D> = self.into_owned().into_iter().map(D::try_from).collect::<Result<_,_>>()?;
         Ok(TypeRow::from(elems))
     }
 }

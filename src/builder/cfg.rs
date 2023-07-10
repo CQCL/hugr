@@ -7,7 +7,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
+use crate::{hugr::view::HugrView, type_row, types::{SimpleType, ClassicType}};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
@@ -123,7 +123,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     pub fn block_builder(
         &mut self,
         inputs: TypeRow<SimpleType>,
-        predicate_variants: Vec<TypeRow<SimpleType>>,
+        predicate_variants: Vec<TypeRow<ClassicType>>,
         other_outputs: TypeRow<SimpleType>,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
@@ -132,7 +132,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     fn any_block_builder(
         &mut self,
         inputs: TypeRow<SimpleType>,
-        predicate_variants: Vec<TypeRow<SimpleType>>,
+        predicate_variants: Vec<TypeRow<ClassicType>>,
         other_outputs: TypeRow<SimpleType>,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
@@ -182,7 +182,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder(
         &mut self,
-        predicate_variants: Vec<TypeRow<SimpleType>>,
+        predicate_variants: Vec<TypeRow<ClassicType>>,
         other_outputs: TypeRow<SimpleType>,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
@@ -244,7 +244,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     fn create(
         base: B,
         block_n: Node,
-        predicate_variants: Vec<TypeRow<SimpleType>>,
+        predicate_variants: Vec<TypeRow<ClassicType>>,
         other_outputs: TypeRow<SimpleType>,
         inputs: TypeRow<SimpleType>,
     ) -> Result<Self, BuildError> {
@@ -276,7 +276,7 @@ impl BlockBuilder<Hugr> {
     /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow<SimpleType>>,
-        predicate_variants: impl IntoIterator<Item = TypeRow<SimpleType>>,
+        predicate_variants: impl IntoIterator<Item = TypeRow<ClassicType>>,
         other_outputs: impl Into<TypeRow<SimpleType>>,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();

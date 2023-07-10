@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use std::collections::HashSet;
 
 use crate::hugr::*;
-use crate::types::{SimpleType, TypeRow};
+use crate::types::TypeRow;
 
 // For static typechecking
 use crate::ops::ConstValue;
@@ -43,9 +43,6 @@ pub enum ConstTypeError {
     /// The length of the tuple value doesn't match the length of the tuple type
     #[error("Tuple of wrong length")]
     TupleWrongLength,
-    /// Const values aren't allowed to be linear
-    #[error("Linear types not allowed in const nodes")]
-    LinearTypeDisallowed,
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
@@ -56,7 +53,7 @@ pub enum ConstTypeError {
     /// A mismatch between the embedded type and the type we're checking
     /// against, as above, but for rows instead of simple types
     #[error("Type mismatch for const - expected {0}, found {1}")]
-    TypeRowMismatch(TypeRow<SimpleType>, TypeRow<SimpleType>),
+    TypeRowMismatch(TypeRow<ClassicType>, TypeRow<ClassicType>),
 }
 
 lazy_static! {
@@ -107,10 +104,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     return Err(ConstTypeError::TupleWrongLength);
                 }
                 for (ty, tm) in row.iter().zip(xs.iter()) {
-                    match ty {
-                        SimpleType::Classic(ty) => typecheck_const(ty, tm)?,
-                        _ => return Err(ConstTypeError::LinearTypeDisallowed),
-                    }
+                    typecheck_const(ty, tm)?
                 }
                 Ok(())
             }
@@ -125,10 +119,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     ));
                 }
                 let ty = variants.get(*tag).unwrap();
-                match ty {
-                    SimpleType::Classic(ty) => typecheck_const(ty, val.as_ref()),
-                    _ => Err(ConstTypeError::LinearTypeDisallowed),
-                }
+                typecheck_const(ty, val.as_ref())
             }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },

@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow, SimpleType};
+use crate::types::{Signature, TypeRow, SimpleType, ClassicType};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -72,9 +72,9 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
     pub fn new(
-        just_inputs: impl Into<TypeRow<SimpleType>>,
+        just_inputs: impl Into<TypeRow<ClassicType>>,
         inputs_outputs: impl Into<TypeRow<SimpleType>>,
-        just_outputs: impl Into<TypeRow<SimpleType>>,
+        just_outputs: impl Into<TypeRow<ClassicType>>,
     ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),

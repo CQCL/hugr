@@ -362,7 +362,7 @@ impl SignatureDescription {
     pub fn static_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &ClassicType)> {
         Self::row_zip(&signature.static_input, &self.static_input)
     }
 }

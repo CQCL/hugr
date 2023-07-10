@@ -16,7 +16,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::types::{Signature, SimpleType, TypeRow, ClassicType};
 
 use itertools::Itertools;
 
@@ -281,7 +281,7 @@ pub trait Dataflow: Container {
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
-        let inputs: TypeRow = input_types.into();
+        let inputs: TypeRow<SimpleType> = input_types.into();
 
         let (cfg_node, _) = add_op_with_wires(
             self,
@@ -334,11 +334,11 @@ pub trait Dataflow: Container {
     /// the [`ops::TailLoop`] node.
     fn tail_loop_builder(
         &mut self,
-        just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
+        just_inputs: impl IntoIterator<Item = (ClassicType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
-        just_out_types: TypeRow<SimpleType>,
+        just_out_types: TypeRow<ClassicType>,
     ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
-        let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
+        let (input_types, mut input_wires): (Vec<ClassicType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             inputs_outputs.into_iter().unzip();
@@ -368,7 +368,7 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow<SimpleType>>, Wire),
+        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow<ClassicType>>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow<SimpleType>,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
@@ -377,7 +377,7 @@ pub trait Dataflow: Container {
             other_inputs.into_iter().unzip();
 
         input_wires.extend(rest_input_wires);
-        let inputs: TypeRow = input_types.into();
+        let inputs: TypeRow<SimpleType> = input_types.into();
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
         let n_cases = predicate_inputs.len();
         let n_out_wires = output_types.len();
@@ -470,11 +470,12 @@ pub trait Dataflow: Container {
     fn make_predicate(
         &mut self,
         tag: usize,
-        predicate_variants: impl IntoIterator<Item = TypeRow<SimpleType>>,
+        predicate_variants: impl IntoIterator<Item = TypeRow<ClassicType>>,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
         let variants = TypeRow::predicate_variants_row(predicate_variants);
+        let variants = variants.into_owned().into_iter().map(SimpleType::Classic).collect::<Vec<_>>().into();
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }

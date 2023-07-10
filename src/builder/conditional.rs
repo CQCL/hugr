@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow, SimpleType};
+use crate::types::{Signature, TypeRow, SimpleType, ClassicType};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -146,7 +146,7 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = TypeRow<SimpleType>>,
+        predicate_inputs: impl IntoIterator<Item = TypeRow<ClassicType>>,
         other_inputs: impl Into<TypeRow<SimpleType>>,
         outputs: impl Into<TypeRow<SimpleType>>,
     ) -> Result<Self, BuildError> {

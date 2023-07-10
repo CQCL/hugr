@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{SimpleType, TypeRow};
+use crate::types::{SimpleType, TypeRow, ClassicType};
 use crate::Direction;
 
 use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
@@ -255,7 +255,7 @@ pub enum ChildrenValidationError {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate_rows: Vec<TypeRow<SimpleType>>,
+        actual_predicate_rows: Vec<TypeRow<ClassicType>>,
     },
 }
 
@@ -342,7 +342,7 @@ impl ValidateOp for BasicBlock {
                 other_outputs: outputs,
             } => {
                 let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
-                let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
+                let node_outputs: TypeRow<SimpleType> = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children

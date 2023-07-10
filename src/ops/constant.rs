@@ -177,7 +177,7 @@ impl ConstValue {
     /// Constant Sum over Tuples, used as predicates.
     pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
         let variants = TypeRow::predicate_variants_row(variant_rows);
-        assert!(variants.get(tag) == Some(&SimpleType::new_unit()));
+        assert!(variants.get(tag) == Some(&ClassicType::new_unit()));
         ConstValue::Sum {
             tag,
             variants,
@@ -186,7 +186,7 @@ impl ConstValue {
     }
 
     /// Constant Sum over Tuples with just one variant
-    pub fn unary_predicate(row: impl Into<TypeRow<SimpleType>>) -> Self {
+    pub fn unary_predicate(row: impl Into<TypeRow<ClassicType>>) -> Self {
         Self::predicate(0, [row.into()])
     }
 
