@@ -19,7 +19,7 @@ use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WI
 pub enum ConstTypeError {
     /// This case hasn't been implemented. Possibly because we don't have value
     /// constructors to check against it
-    #[error("Const type checking unimplemented for {0}")]
+    #[error("Unimplemented: there are no constants of type {0}")]
     Unimplemented(ClassicType),
     /// The given type and term are incompatible
     #[error("Invalid const value for type {0}")]
@@ -100,7 +100,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                 Err(ConstTypeError::IntWidthMismatch(*exp_width, *width))
             }
         }
-        (ty @ ClassicType::F64, _) => Err(ConstTypeError::Unimplemented(ty.clone())),
+        (ClassicType::F64, ConstValue::F64(_)) => Ok(()),
         (ty @ ClassicType::Container(c), tm) => match (c, tm) {
             (Container::Tuple(row), ConstValue::Tuple(xs)) => {
                 if row.len() != xs.len() {
@@ -114,6 +114,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                 }
                 Ok(())
             }
+            (Container::Tuple(_), _) => Err(ConstTypeError::Failed(ty.clone())),
             (Container::Sum(row), ConstValue::Sum { tag, variants, val }) => {
                 if tag > &row.len() {
                     return Err(ConstTypeError::InvalidSumTag);
@@ -130,6 +131,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     _ => Err(ConstTypeError::LinearTypeDisallowed),
                 }
             }
+            (Container::Sum(_), _) => Err(ConstTypeError::Failed(ty.clone())),
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ty @ ClassicType::Graph(_), _) => Err(ConstTypeError::Unimplemented(ty.clone())),
