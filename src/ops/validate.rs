@@ -162,10 +162,7 @@ impl ValidateOp for super::Conditional {
         for (i, (child, optype)) in children.into_iter().enumerate() {
             let OpType::Case(case_op) = optype else {panic!("Child check should have already checked valid ops.")};
             let sig = &case_op.signature;
-            if let Some(expected_inputs) = self.case_input_row(i) {
-                if sig.input == expected_inputs && sig.output == self.outputs {
-                    continue;
-                }
+            if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
                     optype: optype.clone(),
