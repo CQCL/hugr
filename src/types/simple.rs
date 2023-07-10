@@ -21,7 +21,6 @@ use crate::{resource::ResourceSet, type_row};
 //
 // TODO: Compare performance vs flattening this into a single enum
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
 #[non_exhaustive]
 pub enum SimpleType {
     /// A type containing only classical data. Elements of this type can be copied.
@@ -31,10 +30,9 @@ pub enum SimpleType {
     /// A linear opaque type that can be downcasted by the extensions that define it.
     Qpaque(CustomType),
     /// A nested definition containing other linear types (possibly as well as classical ones)
+    #[serde(skip)]
     Qontainer(Container<SimpleType>),
 }
-
-mod serialize;
 
 impl Display for SimpleType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
