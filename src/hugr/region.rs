@@ -1,4 +1,15 @@
 //! Region-level views of a HUGR.
+//!
+//! A region is a subgraph of a HUGR that includes a root node and some of its
+//! descendants. The root node is the only node in the region that has no parent
+//! in the region.
+//!
+//! [`FlatRegionView`] includes only the root node and its direct children,
+//! while [`RegionView`] includes all the descendants of the root.
+//!
+//! Both views implement the [`Region`] trait, so they can be used
+//! interchangeably. They implement [`HugrView`] as well as petgraph's _visit_
+//! traits.
 
 pub mod petgraph;
 
@@ -326,6 +337,42 @@ impl<'g> HugrView for RegionView<'g> {
     }
 }
 
+/// A common trait for views of a hugr region.
+pub trait Region<'a>:
+    HugrView
+    + ::petgraph::visit::GraphBase<NodeId = Node>
+    + ::petgraph::visit::GraphProp
+    + ::petgraph::visit::NodeCount
+    + ::petgraph::visit::NodeIndexable
+    + ::petgraph::visit::EdgeCount
+    + ::petgraph::visit::Visitable
+    + ::petgraph::visit::GetAdjacencyMatrix
+    + ::petgraph::visit::Visitable
+where
+    for<'g> &'g Self:
+        ::petgraph::visit::IntoNeighborsDirected + ::petgraph::visit::IntoNodeIdentifiers,
+{
+}
+
+impl<'a> Region<'a> for FlatRegionView<'a> {}
+impl<'a> Region<'a> for RegionView<'a> {}
+
+impl<'g> super::view::sealed::HugrInternals for FlatRegionView<'g> {
+    type Portgraph = FlatRegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+}
+
+impl<'g> super::view::sealed::HugrInternals for RegionView<'g> {
+    type Portgraph = RegionGraph<'g>;
+
+    fn as_portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -399,21 +446,5 @@ mod test {
         assert_eq!(region.children(inner).count(), 2);
 
         Ok(())
-    }
-}
-
-impl<'g> super::view::sealed::HugrInternals for FlatRegionView<'g> {
-    type Portgraph = FlatRegionGraph<'g>;
-
-    fn as_portgraph(&self) -> &Self::Portgraph {
-        &self.graph
-    }
-}
-
-impl<'g> super::view::sealed::HugrInternals for RegionView<'g> {
-    type Portgraph = RegionGraph<'g>;
-
-    fn as_portgraph(&self) -> &Self::Portgraph {
-        &self.graph
     }
 }
