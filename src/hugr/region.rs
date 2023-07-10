@@ -315,7 +315,7 @@ where
 }
 
 /// A common trait for views of a hugr region.
-pub trait Region<'a, Base>:
+pub trait Region<'a, Base = Hugr>:
     HugrView
     + ::petgraph::visit::GraphBase<NodeId = Node>
     + ::petgraph::visit::GraphProp
