@@ -12,7 +12,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use super::OpTag;
-use super::{OpName, OpTagged, OpTrait};
+use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -22,7 +22,7 @@ impl OpName for Const {
         self.0.name()
     }
 }
-impl OpTagged for Const {
+impl StaticTag for Const {
     const TAG: OpTag = OpTag::Const;
 }
 impl OpTrait for Const {
@@ -31,7 +31,7 @@ impl OpTrait for Const {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {

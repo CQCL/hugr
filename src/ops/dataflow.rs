@@ -1,6 +1,6 @@
 //! Dataflow operations.
 
-use super::OpTagged;
+use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
@@ -140,7 +140,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::other_output(self)
     }
 }
-impl<T: DataflowOpTrait> OpTagged for T {
+impl<T: DataflowOpTrait> StaticTag for T {
     const TAG: OpTag = T::TAG;
 }
 

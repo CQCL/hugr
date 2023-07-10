@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::types::{ClassicType, EdgeKind, Signature, SimpleType};
 
-use super::OpTagged;
+use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
 
 /// The root of a module, parent of all other `OpType`s.
@@ -13,7 +13,7 @@ pub struct Module;
 
 impl_op_name!(Module);
 
-impl OpTagged for Module {
+impl StaticTag for Module {
     const TAG: OpTag = OpTag::ModuleRoot;
 }
 
@@ -23,7 +23,7 @@ impl OpTrait for Module {
     }
 
     fn tag(&self) -> super::OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 }
 
@@ -39,7 +39,7 @@ pub struct FuncDefn {
 }
 
 impl_op_name!(FuncDefn);
-impl OpTagged for FuncDefn {
+impl StaticTag for FuncDefn {
     const TAG: OpTag = OpTag::FuncDefn;
 }
 impl OpTrait for FuncDefn {
@@ -48,7 +48,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -68,7 +68,7 @@ pub struct FuncDecl {
 }
 
 impl_op_name!(FuncDecl);
-impl OpTagged for FuncDecl {
+impl StaticTag for FuncDecl {
     const TAG: OpTag = OpTag::Function;
 }
 impl OpTrait for FuncDecl {
@@ -77,7 +77,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -96,7 +96,7 @@ pub struct AliasDefn {
     pub definition: SimpleType,
 }
 impl_op_name!(AliasDefn);
-impl OpTagged for AliasDefn {
+impl StaticTag for AliasDefn {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDefn {
@@ -105,7 +105,7 @@ impl OpTrait for AliasDefn {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 }
 
@@ -119,7 +119,7 @@ pub struct AliasDecl {
 }
 
 impl_op_name!(AliasDecl);
-impl OpTagged for AliasDecl {
+impl StaticTag for AliasDecl {
     const TAG: OpTag = OpTag::Alias;
 }
 impl OpTrait for AliasDecl {
@@ -128,6 +128,6 @@ impl OpTrait for AliasDecl {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 }

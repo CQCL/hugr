@@ -143,7 +143,7 @@ pub trait OpName {
 ///
 /// This is implemented by all OpType variants, and always contains the dynamic
 /// tag returned by `OpType::tag(&self)`.
-pub trait OpTagged {
+pub trait StaticTag {
     /// The name of the operation.
     const TAG: OpTag;
 }

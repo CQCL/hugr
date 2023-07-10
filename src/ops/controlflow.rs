@@ -6,7 +6,7 @@ use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
 use super::OpTag;
-use super::{impl_op_name, OpName, OpTagged, OpTrait};
+use super::{impl_op_name, OpName, OpTrait, StaticTag};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -143,7 +143,7 @@ impl OpName for BasicBlock {
     }
 }
 
-impl OpTagged for BasicBlock {
+impl StaticTag for BasicBlock {
     const TAG: OpTag = OpTag::BasicBlock;
 }
 
@@ -208,7 +208,7 @@ pub struct Case {
 
 impl_op_name!(Case);
 
-impl OpTagged for Case {
+impl StaticTag for Case {
     const TAG: OpTag = OpTag::Case;
 }
 
@@ -218,7 +218,7 @@ impl OpTrait for Case {
     }
 
     fn tag(&self) -> OpTag {
-        <Self as OpTagged>::TAG
+        <Self as StaticTag>::TAG
     }
 }
 
