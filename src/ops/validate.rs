@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 use crate::Direction;
 
-use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
+use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]

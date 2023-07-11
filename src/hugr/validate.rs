@@ -10,15 +10,15 @@ use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
-use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
+use crate::ops::OpTag;
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
 use crate::types::ClassicType;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::region::FlatRegionView;
+use super::region::{FlatRegionView, Region};
 use super::view::HugrView;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -123,7 +123,7 @@ impl<'a> ValidationContext<'a> {
 
             let parent_optype = self.hugr.get_optype(parent);
             let allowed_children = parent_optype.validity_flags().allowed_children;
-            if !allowed_children.contains(optype.tag()) {
+            if !allowed_children.is_superset(optype.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
                     child_optype: optype.clone(),
@@ -296,7 +296,7 @@ impl<'a> ValidationContext<'a> {
             let all_children = self.hugr.children(node);
             let mut first_two_children = all_children.clone().take(2);
             let first_child = self.hugr.get_optype(first_two_children.next().unwrap());
-            if !flags.allowed_first_child.contains(first_child.tag()) {
+            if !flags.allowed_first_child.is_superset(first_child.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
                     parent_optype: optype.clone(),
@@ -310,7 +310,7 @@ impl<'a> ValidationContext<'a> {
                 .next()
                 .map(|child| self.hugr.get_optype(child))
             {
-                if !flags.allowed_second_child.contains(second_child.tag()) {
+                if !flags.allowed_second_child.is_superset(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
                         parent: node,
                         parent_optype: optype.clone(),
@@ -396,7 +396,7 @@ impl<'a> ValidationContext<'a> {
         let non_defn_count = self
             .hugr
             .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).tag()))
+            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).tag()))
             .count();
         if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
@@ -440,7 +440,7 @@ impl<'a> ValidationContext<'a> {
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
                     // edges coming from FuncDecl or FuncDefn
-                    if !OpTag::Function.contains(from_optype.tag()) {
+                    if !OpTag::Function.is_superset(from_optype.tag()) {
                         return Err(InterGraphEdgeError::InvalidConstSrc {
                             from,
                             from_offset,
