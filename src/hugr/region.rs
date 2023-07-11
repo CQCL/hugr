@@ -2,7 +2,8 @@
 //!
 //! A region is a subgraph of a HUGR that includes a root node and some of its
 //! descendants. The root node is the only node in the region that has no parent
-//! in the region.
+//! in the region. Non-local edges between nodes inside and outside the region
+//! are ignored.
 //!
 //! [`FlatRegionView`] includes only the root node and its direct children,
 //! while [`RegionView`] includes all the descendants of the root.
@@ -38,14 +39,14 @@ where
     /// The chosen root node.
     root: Node,
 
-    /// The filtered graph encoding the adjacency structure of the HUGR.
+    /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g, Base>,
 
     /// The rest of the HUGR.
     hugr: &'g Base,
 }
 
-impl<'g, Base: Clone> Clone for FlatRegionView<'g, Base>
+impl<'g, Base> Clone for FlatRegionView<'g, Base>
 where
     Base: HugrInternals + HugrView + Clone,
 {
