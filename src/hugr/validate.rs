@@ -273,7 +273,7 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            self.validate_intergraph_edge(node, port, optype, other_node, other_offset)?;
+            self.validate_edge(node, port, optype, other_node, other_offset)?;
         }
 
         Ok(())
@@ -408,16 +408,14 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Check inter-graph edges. These are classical value edges between a copy
-    /// node and another non-sibling node.
-    ///
-    /// They come in two flavors depending on the type of the parent node of the
-    /// source:
-    /// - External edges, from a copy node to a sibling's descendant. There must
-    ///   also be an order edge between the copy and the sibling.
-    /// - Dominator edges, from a copy node in a BasicBlock node to a descendant of a
-    ///   post-dominated sibling of the BasicBlock.
-    fn validate_intergraph_edge(
+    /// Check the edge is valid, i.e. the source/target nodes are at appropriate
+    /// positions in the hierarchy for some locality:
+    /// - Local edges, of any kind;
+    /// - External edges, for static and value edges only: from a node to a sibling's descendant.
+    ///   For Value edges, there must also be an order edge between the copy and the sibling.
+    /// - Dominator edge, for static and value edges only: from a node in a BasicBlock node to
+    ///   a descendant of a post-dominating sibling of the BasicBlock.
+    fn validate_edge(
         &mut self,
         from: Node,
         from_offset: Port,
