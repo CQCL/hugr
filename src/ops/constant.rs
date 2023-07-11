@@ -178,16 +178,9 @@ impl ConstValue {
         val: ConstValue,
         variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Self {
-        let variants = TypeRow::predicate_variants_row(variant_rows);
-        let const_type = SimpleType::Classic(val.const_type());
-        // TODO This assert is not appropriate for a public API and if the specified `val`
-        // is not of tuple type matching the `tag`th element of `variant_rows` then
-        // really the Hugr will fail in validate. However it doesn't at the moment
-        // (https://github.com/CQCL-DEV/hugr/issues/231).
-        assert!(Some(&const_type) == variants.get(tag));
         ConstValue::Sum {
             tag,
-            variants,
+            variants: TypeRow::predicate_variants_row(variant_rows),
             val: Box::new(val),
         }
     }
@@ -238,11 +231,13 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
         type_row,
-        types::{ClassicType, SimpleType, TypeRow},
+        types::{ClassicType, SimpleType, TypeRow}, hugr::{ValidationError, typecheck::ConstTypeError},
     };
 
     #[test]
@@ -278,7 +273,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // Pending resolution of https://github.com/CQCL-DEV/hugr/issues/231
     fn test_bad_predicate() {
         let pred_rows = vec![
             type_row![
@@ -299,7 +293,7 @@ mod test {
             ))
             .unwrap();
         let w = b.load_const(&c).unwrap();
-        // When #231 is fixed, there should be a validation error here instead
-        b.finish_hugr_with_outputs([w]).unwrap_err();
+        assert_matches!(b.finish_hugr_with_outputs([w]),
+            Err(BuildError::InvalidHUGR(ValidationError::ConstTypeError(ConstTypeError::TupleWrongLength))));
     }
 }
