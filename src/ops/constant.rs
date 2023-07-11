@@ -11,8 +11,8 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-use super::tag::OpTag;
-use super::{OpName, OpTrait};
+use super::OpTag;
+use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -22,13 +22,16 @@ impl OpName for Const {
         self.0.name()
     }
 }
+impl StaticTag for Const {
+    const TAG: OpTag = OpTag::Const;
+}
 impl OpTrait for Const {
     fn description(&self) -> &str {
         self.0.description()
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Const
+        <Self as StaticTag>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {

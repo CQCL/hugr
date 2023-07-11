@@ -3,7 +3,7 @@
 use crate::{
     ops::{
         handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID},
-        tag::OpTag,
+        OpTag,
     },
     Port,
 };

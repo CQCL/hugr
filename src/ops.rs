@@ -15,7 +15,6 @@ use crate::{Direction, Port};
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
-use self::tag::OpTag;
 use enum_dispatch::enum_dispatch;
 
 pub use constant::{Const, ConstValue};
@@ -23,6 +22,7 @@ pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
+pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, OpName, ValidateOp)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -139,13 +139,24 @@ pub trait OpName {
     fn name(&self) -> SmolStr;
 }
 
+/// Trait statically querying the tag of an operation.
+///
+/// This is implemented by all OpType variants, and always contains the dynamic
+/// tag returned by `OpType::tag(&self)`.
+pub trait StaticTag {
+    /// The name of the operation.
+    const TAG: OpTag;
+}
+
 #[enum_dispatch]
 /// Trait implemented by all OpType variants.
 pub trait OpTrait {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
+
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
