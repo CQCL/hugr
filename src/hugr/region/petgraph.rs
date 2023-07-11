@@ -8,12 +8,12 @@ use crate::types::EdgeKind;
 use crate::{Node, Port};
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
-use petgraph::visit::NodeRef;
+use petgraph::visit as pv;
 use portgraph::NodeIndex;
 
 macro_rules! impl_region_petgraph_traits {
     ($hugr:ident) => {
-        impl<'a, Base> petgraph::visit::GraphBase for $hugr<'a, Base>
+        impl<'a, Base> pv::GraphBase for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -21,14 +21,14 @@ macro_rules! impl_region_petgraph_traits {
             type EdgeId = ((Node, Port), (Node, Port));
         }
 
-        impl<'a, Base> petgraph::visit::GraphProp for $hugr<'a, Base>
+        impl<'a, Base> pv::GraphProp for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
             type EdgeType = petgraph::Directed;
         }
 
-        impl<'a, Base> petgraph::visit::NodeCount for $hugr<'a, Base>
+        impl<'a, Base> pv::NodeCount for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -37,7 +37,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Base> petgraph::visit::NodeIndexable for $hugr<'a, Base>
+        impl<'a, Base> pv::NodeIndexable for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -54,7 +54,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Base> petgraph::visit::EdgeCount for $hugr<'a, Base>
+        impl<'a, Base> pv::EdgeCount for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -63,7 +63,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Base> petgraph::visit::Data for $hugr<'a, Base>
+        impl<'a, Base> pv::Data for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -71,7 +71,7 @@ macro_rules! impl_region_petgraph_traits {
             type EdgeWeight = EdgeKind;
         }
 
-        impl<'g, 'a, Base> petgraph::visit::IntoNodeIdentifiers for &'g $hugr<'a, Base>
+        impl<'g, 'a, Base> pv::IntoNodeIdentifiers for &'g $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -82,7 +82,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'g, 'a, Base> petgraph::visit::IntoNodeReferences for &'g $hugr<'a, Base>
+        impl<'g, 'a, Base> pv::IntoNodeReferences for &'g $hugr<'a, Base>
         where
             'g: 'a,
             Base: HugrInternals + HugrView,
@@ -98,7 +98,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'g, 'a, Base> petgraph::visit::IntoNeighbors for &'g $hugr<'a, Base>
+        impl<'g, 'a, Base> pv::IntoNeighbors for &'g $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -109,7 +109,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'g, 'a, Base> petgraph::visit::IntoNeighborsDirected for &'g $hugr<'a, Base>
+        impl<'g, 'a, Base> pv::IntoNeighborsDirected for &'g $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -124,7 +124,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Base> petgraph::visit::Visitable for $hugr<'a, Base>
+        impl<'a, Base> pv::Visitable for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -139,7 +139,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Base> petgraph::visit::GetAdjacencyMatrix for $hugr<'a, Base>
+        impl<'a, Base> pv::GetAdjacencyMatrix for $hugr<'a, Base>
         where
             Base: HugrInternals + HugrView,
         {
@@ -186,7 +186,7 @@ impl<'a> HugrNodeRef<'a> {
     }
 }
 
-impl NodeRef for HugrNodeRef<'_> {
+impl pv::NodeRef for HugrNodeRef<'_> {
     type NodeId = Node;
 
     type Weight = OpType;

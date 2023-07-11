@@ -15,6 +15,7 @@ pub mod petgraph;
 
 use std::iter;
 
+use ::petgraph::visit as pv;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, PortIndex, PortView};
@@ -317,17 +318,16 @@ where
 /// A common trait for views of a hugr region.
 pub trait Region<'a, Base = Hugr>:
     HugrView
-    + ::petgraph::visit::GraphBase<NodeId = Node>
-    + ::petgraph::visit::GraphProp
-    + ::petgraph::visit::NodeCount
-    + ::petgraph::visit::NodeIndexable
-    + ::petgraph::visit::EdgeCount
-    + ::petgraph::visit::Visitable
-    + ::petgraph::visit::GetAdjacencyMatrix
-    + ::petgraph::visit::Visitable
+    + pv::GraphBase<NodeId = Node>
+    + pv::GraphProp
+    + pv::NodeCount
+    + pv::NodeIndexable
+    + pv::EdgeCount
+    + pv::Visitable
+    + pv::GetAdjacencyMatrix
+    + pv::Visitable
 where
-    for<'g> &'g Self:
-        ::petgraph::visit::IntoNeighborsDirected + ::petgraph::visit::IntoNodeIdentifiers,
+    for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
 {
     /// Create a region view of a HUGR given a root node.
     fn new(hugr: &'a Base, root: Node) -> Self;
