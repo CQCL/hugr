@@ -430,44 +430,43 @@ impl<'a> ValidationContext<'a> {
             .get_parent(from)
             .expect("Root nodes cannot have ports");
         let to_parent = self.hugr.get_parent(to);
-        if Some(from_parent) == to_parent {
-            // Regular edge
-            return Ok(());
-        }
+        let local = Some(from_parent) == to_parent;
 
-        match from_optype.port_kind(from_offset).unwrap() {
+        let is_static = match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
             EdgeKind::Static(typ) => {
                 if let OpType::Const(ops::Const(val)) = from_optype {
-                    return typecheck_const(&typ, val).map_err(ValidationError::from);
+                    typecheck_const(&typ, val).map_err(ValidationError::from)?;
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
                     // edges coming from FuncDecl or FuncDefn
-                    return if OpTag::Function.contains(from_optype.tag()) {
-                        Ok(())
-                    } else {
-                        Err(InterGraphEdgeError::InvalidConstSrc {
+                    if !OpTag::Function.contains(from_optype.tag()) {
+                        return Err(InterGraphEdgeError::InvalidConstSrc {
                             from,
                             from_offset,
                             typ,
                         }
                         .into())
                     };
-                }
+                };
+                true
             }
-            EdgeKind::Value(SimpleType::Classic(_)) => {}
+            EdgeKind::Value(SimpleType::Classic(_)) => false,
             ty => {
-                return Err(InterGraphEdgeError::NonClassicalData {
-                    from,
-                    from_offset,
-                    to,
-                    to_offset,
-                    ty,
+                if !local {
+                    return Err(InterGraphEdgeError::NonClassicalData {
+                        from,
+                        from_offset,
+                        to,
+                        to_offset,
+                        ty,
+                    }
+                    .into())
                 }
-                .into())
+                false
             }
-        }
-
+        };
+        if local {return Ok(());}
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
         // case), or the parent of `from_parent` (in the dominator case).
@@ -479,7 +478,8 @@ impl<'a> ValidationContext<'a> {
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
             if ancestor_parent == from_parent {
-                // External edge. Must have an order edge.
+                // External edge.
+                if !is_static { // Must have an order edge§
                 self.hugr
                     .graph
                     .get_connections(from.index, ancestor.index)
@@ -494,6 +494,7 @@ impl<'a> ValidationContext<'a> {
                         to_offset,
                         to_ancestor: ancestor,
                     })?;
+                }
                 return Ok(());
             } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
