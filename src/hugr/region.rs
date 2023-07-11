@@ -317,7 +317,7 @@ where
 }
 
 /// A common trait for views of a hugr region.
-pub trait Region<'a, Base = Hugr>:
+pub trait Region<'a>:
     HugrView
     + pv::GraphBase<NodeId = Node>
     + pv::GraphProp
@@ -330,14 +330,19 @@ pub trait Region<'a, Base = Hugr>:
 where
     for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
 {
+    /// The base from which the region is derived.
+    type Base;
+
     /// Create a region view of a HUGR given a root node.
-    fn new(hugr: &'a Base, root: Node) -> Self;
+    fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
-impl<'a, Base> Region<'a, Base> for FlatRegionView<'a, Base>
+impl<'a, Base> Region<'a> for FlatRegionView<'a, Base>
 where
     Base: HugrInternals + HugrView,
 {
+    type Base = Base;
+
     fn new(hugr: &'a Base, root: Node) -> Self {
         Self {
             root,
@@ -351,10 +356,12 @@ where
     }
 }
 
-impl<'a, Base> Region<'a, Base> for RegionView<'a, Base>
+impl<'a, Base> Region<'a> for RegionView<'a, Base>
 where
     Base: HugrInternals + HugrView,
 {
+    type Base = Base;
+
     fn new(hugr: &'a Base, root: Node) -> Self {
         Self {
             root,
