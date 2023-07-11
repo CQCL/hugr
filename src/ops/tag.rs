@@ -65,13 +65,32 @@ pub enum OpTag {
 impl OpTag {
     /// Returns true if the tag is more general than the given tag.
     #[inline]
-    pub fn contains(self, other: OpTag) -> bool {
-        self == other || other.parent_tags().iter().any(|&tag| self.contains(tag))
+    pub const fn is_superset(self, other: OpTag) -> bool {
+        // We cannot call iter().any() or even do for loops in const fn yet.
+        // So we have to write this ugly code.
+        if self.eq(other) {
+            return true;
+        }
+        let parents = other.immediate_supersets();
+        let mut i = 0;
+        while i < parents.len() {
+            if self.is_superset(parents[i]) {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 
     /// Returns the infimum of the set of tags that strictly contain this tag
+    ///
+    /// Tags are sets of operations. The parent_tags of T define the immediate
+    /// supersets of T. In mathematical terms:
+    /// ```text
+    /// R ∈ parent_tags(T) if R ⊃ T and ∄ Q st. R ⊃ Q ⊃ T .
+    /// ```
     #[inline]
-    fn parent_tags<'a>(self) -> &'a [OpTag] {
+    const fn immediate_supersets<'a>(self) -> &'a [OpTag] {
         match self {
             OpTag::Any => &[],
             OpTag::None => &[OpTag::Any],
@@ -99,7 +118,7 @@ impl OpTag {
     }
 
     /// Returns a user-friendly description of the set.
-    pub fn description(&self) -> &str {
+    pub const fn description(&self) -> &str {
         match self {
             OpTag::Any => "Any",
             OpTag::None => "None",
@@ -128,8 +147,14 @@ impl OpTag {
 
     /// Returns whether the set is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self == &OpTag::None
+    pub const fn is_empty(&self) -> bool {
+        matches!(self, &OpTag::None)
+    }
+
+    /// Constant equality check.
+    #[inline]
+    pub const fn eq(self, other: OpTag) -> bool {
+        self as u32 == other as u32
     }
 }
 
@@ -143,9 +168,9 @@ impl PartialOrd for OpTag {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         if self == other {
             Some(cmp::Ordering::Equal)
-        } else if self.contains(*other) {
+        } else if self.is_superset(*other) {
             Some(cmp::Ordering::Greater)
-        } else if other.contains(*self) {
+        } else if other.is_superset(*self) {
             Some(cmp::Ordering::Less)
         } else {
             None
@@ -159,20 +184,20 @@ mod test {
 
     #[test]
     fn tag_contains() {
-        assert!(OpTag::Any.contains(OpTag::Any));
-        assert!(OpTag::None.contains(OpTag::None));
-        assert!(OpTag::ModuleOp.contains(OpTag::ModuleOp));
-        assert!(OpTag::DataflowChild.contains(OpTag::DataflowChild));
-        assert!(OpTag::BasicBlock.contains(OpTag::BasicBlock));
+        assert!(OpTag::Any.is_superset(OpTag::Any));
+        assert!(OpTag::None.is_superset(OpTag::None));
+        assert!(OpTag::ModuleOp.is_superset(OpTag::ModuleOp));
+        assert!(OpTag::DataflowChild.is_superset(OpTag::DataflowChild));
+        assert!(OpTag::BasicBlock.is_superset(OpTag::BasicBlock));
 
-        assert!(OpTag::Any.contains(OpTag::None));
-        assert!(OpTag::Any.contains(OpTag::ModuleOp));
-        assert!(OpTag::Any.contains(OpTag::DataflowChild));
-        assert!(OpTag::Any.contains(OpTag::BasicBlock));
+        assert!(OpTag::Any.is_superset(OpTag::None));
+        assert!(OpTag::Any.is_superset(OpTag::ModuleOp));
+        assert!(OpTag::Any.is_superset(OpTag::DataflowChild));
+        assert!(OpTag::Any.is_superset(OpTag::BasicBlock));
 
-        assert!(!OpTag::None.contains(OpTag::Any));
-        assert!(!OpTag::None.contains(OpTag::ModuleOp));
-        assert!(!OpTag::None.contains(OpTag::DataflowChild));
-        assert!(!OpTag::None.contains(OpTag::BasicBlock));
+        assert!(!OpTag::None.is_superset(OpTag::Any));
+        assert!(!OpTag::None.is_superset(OpTag::ModuleOp));
+        assert!(!OpTag::None.is_superset(OpTag::DataflowChild));
+        assert!(!OpTag::None.is_superset(OpTag::BasicBlock));
     }
 }

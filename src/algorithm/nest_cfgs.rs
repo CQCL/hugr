@@ -44,7 +44,7 @@ use std::hash::Hash;
 use itertools::Itertools;
 
 use crate::hugr::view::HugrView;
-use crate::ops::tag::OpTag;
+use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
@@ -398,7 +398,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::hugr::region::FlatRegionView;
+    use crate::hugr::region::{FlatRegionView, Region};
     use crate::ops::{
         handle::{BasicBlockID, ConstID, NodeHandle},
         ConstValue,
