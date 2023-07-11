@@ -446,7 +446,7 @@ impl<'a> ValidationContext<'a> {
                             from_offset,
                             typ,
                         }
-                        .into())
+                        .into());
                     };
                 };
                 true
@@ -461,12 +461,14 @@ impl<'a> ValidationContext<'a> {
                         to_offset,
                         ty,
                     }
-                    .into())
+                    .into());
                 }
                 false
             }
         };
-        if local {return Ok(());}
+        if local {
+            return Ok(());
+        }
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
         // case), or the parent of `from_parent` (in the dominator case).
@@ -479,21 +481,22 @@ impl<'a> ValidationContext<'a> {
         {
             if ancestor_parent == from_parent {
                 // External edge.
-                if !is_static { // Must have an order edge§
-                self.hugr
-                    .graph
-                    .get_connections(from.index, ancestor.index)
-                    .find(|&(p, _)| {
-                        let offset = self.hugr.graph.port_offset(p).unwrap();
-                        from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
-                    })
-                    .ok_or(InterGraphEdgeError::MissingOrderEdge {
-                        from,
-                        from_offset,
-                        to,
-                        to_offset,
-                        to_ancestor: ancestor,
-                    })?;
+                if !is_static {
+                    // Must have an order edge§
+                    self.hugr
+                        .graph
+                        .get_connections(from.index, ancestor.index)
+                        .find(|&(p, _)| {
+                            let offset = self.hugr.graph.port_offset(p).unwrap();
+                            from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
+                        })
+                        .ok_or(InterGraphEdgeError::MissingOrderEdge {
+                            from,
+                            from_offset,
+                            to,
+                            to_offset,
+                            to_ancestor: ancestor,
+                        })?;
                 }
                 return Ok(());
             } else if Some(ancestor_parent) == from_parent_parent {
