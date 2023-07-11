@@ -104,7 +104,7 @@ where
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.hugr.base_hugr().hierarchy.child_count(self.root.index) + 1
+        self.base_hugr().hierarchy.child_count(self.root.index) + 1
     }
 
     #[inline]

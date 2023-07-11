@@ -253,7 +253,7 @@ pub(crate) mod sealed {
         /// Returns a reference to the underlying portgraph.
         fn portgraph(&self) -> &Self::Portgraph;
 
-        /// Returns a the Hugr at the base of a chain of views.
+        /// Returns the Hugr at the base of a chain of views.
         fn base_hugr(&self) -> &Hugr;
     }
 
