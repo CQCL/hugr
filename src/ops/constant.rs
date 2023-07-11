@@ -241,6 +241,7 @@ mod test {
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        hugr::{typecheck::ConstTypeError, ValidationError},
         type_row,
         types::{ClassicType, SimpleType, TypeRow},
     };
@@ -299,7 +300,11 @@ mod test {
             ))
             .unwrap();
         let w = b.load_const(&c).unwrap();
-        // When #231 is fixed, there should be a validation error here instead
-        b.finish_hugr_with_outputs([w]).unwrap_err();
+        assert_eq!(
+            b.finish_hugr_with_outputs([w]),
+            Err(BuildError::InvalidHUGR(ValidationError::ConstTypeError(
+                ConstTypeError::TupleWrongLength
+            )))
+        );
     }
 }
