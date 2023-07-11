@@ -449,9 +449,8 @@ impl<'a> ValidationContext<'a> {
                 };
                 true
             }
-            EdgeKind::Value(SimpleType::Classic(_)) => false,
             ty => {
-                if !local {
+                if !local && !matches!(ty, EdgeKind::Value(SimpleType::Classic(_))) {
                     return Err(InterGraphEdgeError::NonClassicalData {
                         from,
                         from_offset,
