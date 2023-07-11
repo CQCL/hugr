@@ -467,6 +467,7 @@ impl<'a> ValidationContext<'a> {
         if local {
             return Ok(());
         }
+
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
         // case), or the parent of `from_parent` (in the dominator case).

@@ -286,7 +286,6 @@ mod test {
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
-        // Until #231 is fixed, this is made to fail by an assert in ConstValue::predicate
         let c = b
             .add_constant(ConstValue::predicate(
                 0,
