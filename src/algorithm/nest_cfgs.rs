@@ -44,7 +44,7 @@ use std::hash::Hash;
 use itertools::Itertools;
 
 use crate::hugr::view::HugrView;
-use crate::ops::tag::OpTag;
+use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
