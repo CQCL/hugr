@@ -499,7 +499,7 @@ impl<'a> ValidationContext<'a> {
             } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if ancestor_parent_op.tag() == OpTag::Cfg {
+                if ancestor_parent_op.tag() != OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,
