@@ -26,9 +26,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     /// and 'misc' data from the resource definition YAML
     fn compute_signature(
         &self,
-        name: &SmolStr,
         arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
 
     /// Describe the signature of a node, given the operation name,
@@ -41,6 +39,18 @@ pub trait CustomSignatureFunc: Send + Sync {
         _misc: &HashMap<String, serde_yaml::Value>,
     ) -> SignatureDescription {
         SignatureDescription::default()
+    }
+}
+
+impl<F> CustomSignatureFunc for F
+where
+    F: Fn(&[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> + Send + Sync,
+{
+    fn compute_signature(
+        &self,
+        arg_values: &[TypeArg],
+    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
+        self(arg_values)
     }
 }
 
@@ -219,7 +229,7 @@ impl OpDef {
                 // Sig should be computed solely from inputs + outputs + args.
                 todo!()
             }
-            SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
+            SignatureFunc::CustomFunc(bf) => bf.compute_signature(args)?,
         };
         assert!(res.contains(&self.resource));
         let mut sig = Signature::new_df(ins, outs);
