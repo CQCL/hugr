@@ -234,14 +234,12 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
-
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
         hugr::{typecheck::ConstTypeError, ValidationError},
         type_row,
-        types::{ClassicType, SimpleType, TypeRow}, hugr::{ValidationError, typecheck::ConstTypeError},
+        types::{ClassicType, SimpleType, TypeRow},
     };
 
     #[test]
