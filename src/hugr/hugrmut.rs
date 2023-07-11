@@ -366,7 +366,7 @@ fn insert_hugr_internal(
     root: Node,
     other: &impl HugrView,
 ) -> Result<(Node, HashMap<NodeIndex, NodeIndex>), HugrError> {
-    let node_map = hugr.graph.insert_graph(other.as_portgraph())?;
+    let node_map = hugr.graph.insert_graph(other.portgraph())?;
     let other_root = node_map[&other.root().index];
 
     // Update hierarchy and optypes

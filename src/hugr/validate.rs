@@ -18,7 +18,7 @@ use crate::types::ClassicType;
 use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::region::FlatRegionView;
+use super::region::{FlatRegionView, Region};
 use super::view::HugrView;
 
 /// Structure keeping track of pre-computed information used in the validation
