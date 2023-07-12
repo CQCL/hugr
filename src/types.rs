@@ -69,12 +69,6 @@ impl Signature {
         self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 
-    /// Returns whether the data wires in the signature are purely linear.
-    #[inline(always)]
-    pub fn purely_linear(&self) -> bool {
-        self.input.purely_linear() && self.output.purely_linear()
-    }
-
     /// Returns whether the data wires in the signature are purely classical.
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {

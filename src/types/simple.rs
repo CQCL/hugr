@@ -307,12 +307,6 @@ impl TypeRow {
         self.types.len() == 0
     }
 
-    /// Returns whether the row contains only linear data.
-    #[inline(always)]
-    pub fn purely_linear(&self) -> bool {
-        self.types.iter().all(|typ| typ.is_linear())
-    }
-
     /// Returns whether the row contains only classic data.
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
