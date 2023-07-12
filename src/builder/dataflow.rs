@@ -193,6 +193,7 @@ mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
+    use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
     use crate::{
@@ -328,6 +329,34 @@ mod test {
         };
 
         assert_matches!(builder(), Ok(_));
+    }
+
+    #[test]
+    fn error_on_linear_inter_graph_edge() {
+        let builder = || -> Result<Hugr, BuildError> {
+            let mut f_build =
+                FunctionBuilder::new("main", Signature::new_df(type_row![QB], type_row![QB]))?;
+
+            let [i1] = f_build.input_wires_arr();
+            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+            let i1 = noop.out_wire(0);
+
+            let mut nested =
+                f_build.dfg_builder(Signature::new_df(type_row![], type_row![QB]), [])?;
+
+            let id = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+
+            let nested = nested.finish_with_outputs([id.out_wire(0)])?;
+
+            f_build.finish_hugr_with_outputs([nested.out_wire(0)])
+        };
+
+        assert_matches!(
+            builder(),
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonClassicalData { .. })
+            ))
+        );
     }
 
     #[test]
