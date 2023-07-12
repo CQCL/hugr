@@ -497,7 +497,7 @@ impl<'a> ValidationContext<'a> {
                         })?;
                 }
                 return Ok(());
-            } else if Some(ancestor_parent) == from_parent_parent {
+            } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
                 if ancestor_parent_op.tag() != OpTag::Cfg {

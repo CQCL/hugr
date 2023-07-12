@@ -427,11 +427,14 @@ pub(crate) mod test {
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry_builder = cfg_builder.simple_entry_builder(type_row![NAT], 1)?;
-        let pred_const = entry_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry_builder, &const_unit)?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
         let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
@@ -678,12 +681,14 @@ pub(crate) mod test {
         //let sum2_type = SimpleType::new_predicate(2);
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry_builder = cfg_builder.simple_entry_builder(type_row![NAT], 1)?;
 
-        let pred_const = entry_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry_builder, &const_unit)?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
