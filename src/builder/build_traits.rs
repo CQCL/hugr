@@ -611,17 +611,16 @@ fn wire_up<T: Dataflow + ?Sized>(
     let src_parent = base.get_parent(src);
     let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
-    let ty = base.get_optype(src).port_kind(src_offset).unwrap();
-    // Non-local value sources require a state edge to an ancestor of dst
-    if !local_source {
-        if let EdgeKind::Value(typ) = &ty {
+    if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_offset).unwrap() {
+        if !local_source {
+            // Non-local value sources require a state edge to an ancestor of dst
             if typ.is_linear() {
                 let val_err: ValidationError = InterGraphEdgeError::NonClassicalData {
                     from: src,
                     from_offset: Port::new_outgoing(src_port),
                     to: dst,
                     to_offset: Port::new_incoming(dst_port),
-                    ty,
+                    ty: EdgeKind::Value(typ),
                 }
                 .into();
                 return Err(val_err.into());
@@ -629,31 +628,29 @@ fn wire_up<T: Dataflow + ?Sized>(
 
             let src_parent = src_parent.expect("Node has no parent");
             let Some(src_sibling) =
-                    iter::successors(dst_parent, |&p| base.get_parent(p))
-                        .tuple_windows()
-                        .find_map(|(ancestor, ancestor_parent)| {
-                            (ancestor_parent == src_parent).then_some(ancestor)
-                        })
-                else {
-                    let val_err: ValidationError = InterGraphEdgeError::NoRelation {
-                        from: src,
-                        from_offset: Port::new_outgoing(src_port),
-                        to: dst,
-                        to_offset: Port::new_incoming(dst_port),
-                    }.into();
-                    return Err(val_err.into());
-                };
+                        iter::successors(dst_parent, |&p| base.get_parent(p))
+                            .tuple_windows()
+                            .find_map(|(ancestor, ancestor_parent)| {
+                                (ancestor_parent == src_parent).then_some(ancestor)
+                            })
+                    else {
+                        let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+                            from: src,
+                            from_offset: Port::new_outgoing(src_port),
+                            to: dst,
+                            to_offset: Port::new_incoming(dst_port),
+                        }.into();
+                        return Err(val_err.into());
+                    };
 
             // TODO: Avoid adding duplicate edges
             // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
             base.add_other_edge(src, src_sibling)?;
-        }
-    }
-
-    // Don't copy linear edges.
-    if base.linked_ports(src, src_offset).next().is_some() {
-        if let EdgeKind::Value(SimpleType::Linear(lty)) = ty {
-            return Err(BuildError::NoCopyLinear(lty));
+        } else if base.linked_ports(src, src_offset).next().is_some() {
+            // Don't copy linear edges.
+            if let SimpleType::Linear(lty) = typ {
+                return Err(BuildError::NoCopyLinear(lty));
+            }
         }
     }
 
