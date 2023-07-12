@@ -158,7 +158,7 @@ As well as the type, dataflow edges are also parametrized by a
 ```
 SimpleType ::= ClassicType | LinearType
 
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
 ```
@@ -209,10 +209,9 @@ source node, to an incoming port of the target node.
 
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
-do not include a resource specification. Only a few nodes may be
+are classical, and do not include a resource specification. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
-these edges; see
-[operations](#node-operations).
+these edges; see [operations](#node-operations).
 
 #### `Order` edges
 
@@ -545,7 +544,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
 | Value          | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
-| Static         | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
+| Static         | Local or Ext - see [Non-local edges](#non-local-edges) |
 
 ### Exception Handling
 
@@ -585,8 +584,10 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 **For classical values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
-parent(n<sub>2</sub>) when the edge's locality is either Ext or Dom, as
-follows:
+parent(n<sub>2</sub>) when the edge's locality is:
+  * for Value edges, Ext or Dom;
+  * for Static edges, Ext.
+Each of these localities have additional constraints as follows:
 
 1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
     parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from parent(n<sub>1</sub>) to
@@ -1978,8 +1979,8 @@ an edge weight.
   - **node index**: An identifier for a node that is unique within the
     HUGR.
 
-  - **non-local edge**: A Value or Static edge with Locality Ext or Dom
-    (i.e. not Local)
+  - **non-local edge**: A Value or Static edge with Locality Ext,
+    or a Value edge with locality Dom (i.e. not Local)
 
   - **operation**: TODO
 
