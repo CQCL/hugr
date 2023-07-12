@@ -158,7 +158,7 @@ As well as the type, dataflow edges are also parametrized by a
 ```
 SimpleType ::= ClassicType | LinearType
 
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Locality, ClassicType) | Order | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
 ```
@@ -209,10 +209,9 @@ source node, to an incoming port of the target node.
 
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
-do not include a resource specification. Only a few nodes may be
+are classical, and do not include a resource specification. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
-these edges; see
-[operations](#node-operations).
+these edges; see [operations](#node-operations).
 
 #### `Order` edges
 
@@ -256,8 +255,12 @@ edges. The following operations are *only* valid as immediate children of a
     replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
     named opaque type.
 
-The following operations are valid at the module level, but *also* in dataflow
-regions:
+There may also be other [scoped definitions](#scoped-definitions).
+
+#### Scoped Definitions
+
+The following operations are valid at the module level as well as in dataflow
+regions and control-flow regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
     weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
@@ -282,7 +285,7 @@ not be executable.
 
 Within dataflow regions, which include function definitions,
 the following basic dataflow operations are available (in addition to the
-operations valid at both Module level and within dataflow regions):
+[scoped definitions](#scoped-definitions)):
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
@@ -403,15 +406,13 @@ There are two kinds of `BasicBlock`: `DFB` (dataflow block) and `Exit`.
 `DFB` nodes are CFG basic blocks. Edges between them are
 control-flow (as opposed to dataflow), and express traditional
 control-flow concepts of branch/merge. Each `DFB` node is
-parent to a dataflow sibling graph.
+parent to a dataflow sibling graph. `Exit` blocks have only incoming control-flow edges, and no children.
 
 A `CFG` node is a dataflow node which is defined by a child control
-sibling graph. All children except the second are `DFB`-nodes,
-the first is the entry block. The second child is an
-`Exit` node, which has no children, this is the single exit
-point of the CFG and the inputs to this node match the outputs of
-the CFG-node. The inputs to the CFG-node are wired to the inputs of
-the entry block.
+sibling graph. The children are all `BasicBlock`s or [scoped definitions](#scoped-definitions).
+The first child is the entry block and must be a `DFB`, with inputs the same as the CFG-node; the second child is an
+`Exit` node, whose inputs match the outputs of the CFG-node.
+The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the DSG contained in a `BasicBlock` has type
 `Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
@@ -543,7 +544,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
 | Value          | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
-| Static         | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
+| Static         | Local or Ext - see [Non-local edges](#non-local-edges) |
 
 ### Exception Handling
 
@@ -583,8 +584,10 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 **For classical values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
-parent(n<sub>2</sub>) when the edge's locality is either Ext or Dom, as
-follows:
+parent(n<sub>2</sub>) when the edge's locality is:
+  * for Value edges, Ext or Dom;
+  * for Static edges, Ext.
+Each of these localities have additional constraints as follows:
 
 1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
     parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from parent(n<sub>1</sub>) to
@@ -1994,8 +1997,8 @@ an edge weight.
   - **node index**: An identifier for a node that is unique within the
     HUGR.
 
-  - **non-local edge**: A Value or Static edge with Locality Ext or Dom
-    (i.e. not Local)
+  - **non-local edge**: A Value or Static edge with Locality Ext,
+    or a Value edge with locality Dom (i.e. not Local)
 
   - **operation**: TODO
 
