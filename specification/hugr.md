@@ -1672,6 +1672,24 @@ implementation of this design document is available on GitHub.
 `panic`: panics unconditionally; no inputs, any type of outputs (these
 are never produced)
 
+### Logic Resource
+
+The Logic Resource provides a boolean type and basic logical operations.
+
+The boolean type `bool` is defined to be `Sum((),())`, with the convention that the
+first option in the sum represents "false" and the second represents "true".
+
+The following operations are defined:
+
+| Name    | Inputs         | Outputs | Meaning                                |
+| ------- | -------------- | ------- | -------------------------------------- |
+| `true`  | none           | `bool`  | const node producing the value "true"  |
+| `false` | none           | `bool`  | const node producing the value "false" |
+| `not`   | `bool`         | `bool`  | logical "not"                          |
+| `and`   | `bool`, `bool` | `bool`  | logical "and"                          |
+| `or`    | `bool`, `bool` | `bool`  | logical "or"                           |
+| `xor`   | `bool`, `bool` | `bool`  | logical "xor"                          |
+
 ### Arithmetic Resource
 
 The Arithmetic Resource provides types and operations for integer and
