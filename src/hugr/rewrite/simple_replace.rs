@@ -8,7 +8,7 @@ use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
-    ops::{tag::OpTag, OpTrait, OpType},
+    ops::{OpTag, OpTrait, OpType},
     Hugr, Port,
 };
 use thiserror::Error;
@@ -264,7 +264,7 @@ mod test {
     };
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
-    use crate::ops::tag::OpTag;
+    use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
     use crate::types::{ClassicType, Signature, SimpleType};
     use crate::{type_row, Port};

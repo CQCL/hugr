@@ -11,8 +11,8 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-use super::tag::OpTag;
-use super::{OpName, OpTrait};
+use super::OpTag;
+use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -22,13 +22,16 @@ impl OpName for Const {
         self.0.name()
     }
 }
+impl StaticTag for Const {
+    const TAG: OpTag = OpTag::Const;
+}
 impl OpTrait for Const {
     fn description(&self) -> &str {
         self.0.description()
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Const
+        <Self as StaticTag>::TAG
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -169,23 +172,20 @@ impl ConstValue {
 
     /// Constant Sum over units, used as predicates.
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
-        Self::predicate(tag, std::iter::repeat(type_row![]).take(size))
+        Self::predicate(tag, Self::unit(), std::iter::repeat(type_row![]).take(size))
     }
 
     /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(tag: usize, variant_rows: impl IntoIterator<Item = TypeRow>) -> Self {
-        let variants = TypeRow::predicate_variants_row(variant_rows);
-        assert!(variants.get(tag) == Some(&SimpleType::new_unit()));
+    pub fn predicate(
+        tag: usize,
+        val: ConstValue,
+        variant_rows: impl IntoIterator<Item = TypeRow>,
+    ) -> Self {
         ConstValue::Sum {
             tag,
-            variants,
-            val: Box::new(Self::unit()),
+            variants: TypeRow::predicate_variants_row(variant_rows),
+            val: Box::new(val),
         }
-    }
-
-    /// Constant Sum over Tuples with just one variant
-    pub fn unary_predicate(row: impl Into<TypeRow>) -> Self {
-        Self::predicate(0, [row.into()])
     }
 
     /// Constant Sum over Tuples with just one variant of unit type
@@ -231,3 +231,74 @@ pub trait CustomConst:
 
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
+
+#[cfg(test)]
+mod test {
+    use super::ConstValue;
+    use crate::{
+        builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        hugr::{typecheck::ConstTypeError, ValidationError},
+        type_row,
+        types::{ClassicType, SimpleType, TypeRow},
+    };
+
+    #[test]
+    fn test_predicate() -> Result<(), BuildError> {
+        let pred_rows = vec![
+            type_row![
+                SimpleType::Classic(ClassicType::i64()),
+                SimpleType::Classic(ClassicType::F64)
+            ],
+            type_row![],
+        ];
+        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let c = b.add_constant(ConstValue::predicate(
+            0,
+            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
+            pred_rows.clone(),
+        ))?;
+        let w = b.load_const(&c)?;
+        b.finish_hugr_with_outputs([w]).unwrap();
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty]))?;
+        let c = b.add_constant(ConstValue::predicate(
+            1,
+            ConstValue::Tuple(vec![]),
+            pred_rows,
+        ))?;
+        let w = b.load_const(&c)?;
+        b.finish_hugr_with_outputs([w]).unwrap();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bad_predicate() {
+        let pred_rows = vec![
+            type_row![
+                SimpleType::Classic(ClassicType::i64()),
+                SimpleType::Classic(ClassicType::F64)
+            ],
+            type_row![],
+        ];
+        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
+
+        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
+        let c = b
+            .add_constant(ConstValue::predicate(
+                0,
+                ConstValue::Tuple(vec![]),
+                pred_rows,
+            ))
+            .unwrap();
+        let w = b.load_const(&c).unwrap();
+        assert_eq!(
+            b.finish_hugr_with_outputs([w]),
+            Err(BuildError::InvalidHUGR(ValidationError::ConstTypeError(
+                ConstTypeError::TupleWrongLength
+            )))
+        );
+    }
+}

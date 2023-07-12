@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 use crate::Direction;
 
-use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
+use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -202,7 +202,8 @@ impl ValidateOp for super::TailLoop {
 impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::BasicBlock,
+            allowed_children: OpTag::ControlFlowChild,
+            allowed_first_child: OpTag::BasicBlock,
             allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,

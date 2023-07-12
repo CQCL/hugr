@@ -193,7 +193,7 @@ mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::ops::tag::OpTag;
+    use crate::ops::OpTag;
     use crate::ops::OpTrait;
     use crate::types::SimpleType;
     use crate::{

@@ -6,7 +6,7 @@ use crate::Node;
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::tag::OpTag;
+use super::OpTag;
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].
@@ -25,7 +25,7 @@ pub trait NodeHandle: Clone {
 
     /// Cast the handle to a different more general tag.
     fn try_cast<T: NodeHandle + From<Node>>(&self) -> Option<T> {
-        T::TAG.contains(Self::TAG).then(|| self.node().into())
+        T::TAG.is_superset(Self::TAG).then(|| self.node().into())
     }
 }
 
