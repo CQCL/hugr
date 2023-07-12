@@ -53,8 +53,8 @@ pub trait PrimType {
     // across ClassicType and SimpleType
     // currently used to constrain Container<T>
 
-    /// Is this type linear? (I.e. does it have any linear components?)
-    const LINEAR: bool;
+    /// Is this type classical? (I.e. can it be copied - not if it has *any* linear component)
+    const CLASSIC: bool;
 }
 
 /// A type that represents a container of other types.
@@ -197,11 +197,11 @@ impl Display for ClassicType {
 }
 
 impl PrimType for ClassicType {
-    const LINEAR: bool = false;
+    const CLASSIC: bool = true;
 }
 
 impl PrimType for SimpleType {
-    const LINEAR: bool = true;
+    const CLASSIC: bool = false;
 }
 
 impl SimpleType {
