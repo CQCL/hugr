@@ -644,11 +644,13 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
-        let pred_const = entry.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry, &pred_const)?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
+            &pred_const,
+        )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
         let head = if separate {
             let h = n_identity(
