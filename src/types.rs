@@ -35,7 +35,7 @@ pub enum EdgeKind {
 }
 
 impl EdgeKind {
-    /// Returns whether the type contains only linear data.
+    /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         match self {
             EdgeKind::Value(t) => !t.is_classical(),
