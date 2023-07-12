@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::hugr::{Hugr, HugrMut};
-use crate::ops::OpTrait;
 use crate::ops::OpType;
+use crate::types::SignatureTrait;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -129,7 +129,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.clone(),
+                op: opt.op.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
         }
@@ -218,7 +218,7 @@ impl TryFrom<SerHugrV0> for Hugr {
                         .other_port_index(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
-                            op_type: op_type.clone(),
+                            op_type: op_type.op.clone(),
                         })?
                         .index()
                 }
@@ -245,8 +245,12 @@ pub mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{ClassicType, LinearType, Signature, SimpleType},
+        resource::ResourceSet,
+        types::{
+            AbstractSignature, ClassicType, LinearType, Signature, SignatureTrait, SimpleType,
+        },
         Port,
     };
     use itertools::Itertools;
@@ -274,7 +278,7 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: Signature::new_df(
+                signature: AbstractSignature::new_df(
                     vec![ClassicType::bit().into(); inputs - 1],
                     vec![ClassicType::bit().into(); outputs - 1],
                 ),
@@ -307,7 +311,10 @@ pub mod test {
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
-            op_types[n] = gen_optype(&g, n);
+            op_types[n] = NodeType {
+                op: gen_optype(&g, n),
+                input_resources: ResourceSet::new(),
+            };
         }
 
         let hg = Hugr {

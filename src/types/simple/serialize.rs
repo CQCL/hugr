@@ -13,10 +13,10 @@ use super::TypeRow;
 
 use super::SimpleType;
 
-use super::super::Signature;
+use super::super::{AbstractSignature};
 
 use crate::ops::constant::HugrIntWidthStore;
-use crate::resource::ResourceSet;
+
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(tag = "t")]
@@ -28,8 +28,7 @@ pub(crate) enum SerSimpleType {
     F,
     S,
     G {
-        resources: Box<ResourceSet>,
-        signature: Box<Signature>,
+        signature: Box<AbstractSignature>,
     },
     List {
         inner: Box<SimpleType>,
@@ -102,8 +101,7 @@ impl From<ClassicType> for SerSimpleType {
             ClassicType::Int(w) => SerSimpleType::I { width: w },
             ClassicType::F64 => SerSimpleType::F,
             ClassicType::Graph(inner) => SerSimpleType::G {
-                resources: Box::new(inner.0),
-                signature: Box::new(inner.1),
+                signature: Box::new(*inner),
             },
             ClassicType::String => SerSimpleType::S,
             ClassicType::Container(c) => c.into(),
@@ -160,10 +158,7 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::I { width } => ClassicType::Int(width).into(),
             SerSimpleType::F => ClassicType::F64.into(),
             SerSimpleType::S => ClassicType::String.into(),
-            SerSimpleType::G {
-                resources,
-                signature,
-            } => ClassicType::Graph(Box::new((*resources, *signature))).into(),
+            SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple {
                 row: inner,
                 l: true,

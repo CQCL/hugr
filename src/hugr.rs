@@ -15,6 +15,7 @@ use std::iter;
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
+use delegate::delegate;
 use derive_more::From;
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
@@ -24,8 +25,9 @@ use portgraph::{Hierarchy, LinkView, PortMut, PortView, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{OpName, OpType};
-use crate::types::EdgeKind;
+use crate::ops::{tag::OpTag, OpName, OpTrait, OpType};
+use crate::resource::ResourceSet;
+use crate::types::{AbstractSignature, EdgeKind, Signature, SignatureDescription};
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -40,10 +42,63 @@ pub struct Hugr {
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    op_types: UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Node metadata
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct NodeType {
+    pub op: OpType,
+    pub input_resources: ResourceSet,
+}
+
+impl NodeType {
+    pub fn signature(&self) -> Signature {
+        self.op
+            .op_signature()
+            .with_input_resources(self.input_resources.clone())
+    }
+}
+
+// TODO: This is kind of a code smell?
+impl<T> From<T> for NodeType
+where
+    T: Into<OpType>,
+{
+    fn from(x: T) -> NodeType {
+        NodeType {
+            op: x.into(),
+            input_resources: ResourceSet::new(),
+        }
+    }
+}
+
+impl NodeType {
+    delegate! {
+        to self.op {
+            pub fn other_port(&self, dir: Direction) -> Option<EdgeKind>;
+            pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind>;
+            pub fn other_port_index(&self, dir: Direction) -> Option<Port>;
+            pub fn port_count(&self, dir: Direction) -> usize;
+            pub fn input_count(&self) -> usize;
+            pub fn output_count(&self) -> usize;
+       }
+    }
+}
+
+impl OpTrait for NodeType {
+    delegate! {
+        to self.op {
+            fn description(&self) -> &str;
+            fn tag(&self) -> OpTag;
+            fn op_signature(&self) -> AbstractSignature;
+            fn signature_desc(&self) -> SignatureDescription;
+            fn other_input(&self) -> Option<EdgeKind>;
+            fn other_output(&self) -> Option<EdgeKind>;
+        }
+    }
 }
 
 impl Default for Hugr {
@@ -113,12 +168,12 @@ impl Hugr {
                 NodeStyle::Box(format!(
                     "({ni}) {name}",
                     ni = n.index(),
-                    name = self.op_types[n].name()
+                    name = self.op_types[n].op.name()
                 ))
             })
             .with_port_style(|port| {
                 let node = self.graph.port_node(port).unwrap();
-                let optype = self.op_types.get(node);
+                let optype = &self.op_types.get(node).op;
                 let offset = self.graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
                     EdgeKind::Static(ty) => {
@@ -136,7 +191,7 @@ impl Hugr {
             })
             .with_edge_style(|src, tgt| {
                 let src_node = self.graph.port_node(src).unwrap();
-                let src_optype = self.op_types.get(src_node);
+                let src_optype = &self.op_types.get(src_node).op;
                 let src_offset = self.graph.port_offset(src).unwrap();
                 let tgt_node = self.graph.port_node(tgt).unwrap();
 
@@ -168,7 +223,10 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        op_types[root] = root_op.into();
+        op_types[root] = NodeType {
+            op: root_op.into(),
+            input_resources: ResourceSet::new(),
+        };
 
         Self {
             graph,

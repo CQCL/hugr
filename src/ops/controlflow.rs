@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
+use crate::types::{AbstractSignature, EdgeKind, SignatureTrait, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -30,13 +30,13 @@ impl DataflowOpTrait for TailLoop {
         OpTag::TailLoop
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         let [inputs, outputs] =
             [self.just_inputs.clone(), self.just_outputs.clone()].map(|mut row| {
                 row.to_mut().extend(self.rest.iter().cloned());
                 row
             });
-        Signature::new_df(inputs, outputs)
+        AbstractSignature::new_df(inputs, outputs)
     }
 }
 
@@ -79,13 +79,13 @@ impl DataflowOpTrait for Conditional {
         OpTag::Conditional
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         let mut inputs = self.other_inputs.clone();
         inputs.to_mut().insert(
             0,
             SimpleType::new_predicate(self.predicate_inputs.clone().into_iter()),
         );
-        Signature::new_df(inputs, self.outputs.clone())
+        AbstractSignature::new_df(inputs, self.outputs.clone())
     }
 }
 
@@ -118,8 +118,8 @@ impl DataflowOpTrait for CFG {
         OpTag::Cfg
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new_df(self.inputs.clone(), self.outputs.clone())
+    fn signature(&self) -> AbstractSignature {
+        AbstractSignature::new_df(self.inputs.clone(), self.outputs.clone())
     }
 }
 
@@ -205,7 +205,7 @@ impl BasicBlock {
 /// Case ops - nodes valid inside Conditional nodes.
 pub struct Case {
     /// The signature of the contained dataflow graph.
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 
 impl_op_name!(Case);

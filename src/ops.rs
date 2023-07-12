@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{EdgeKind, Signature, SignatureDescription};
+use crate::types::{AbstractSignature, EdgeKind, SignatureDescription, SignatureTrait};
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;
@@ -73,7 +73,7 @@ impl OpType {
 
     /// Returns the edge kind for the given port.
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.signature();
+        let signature = self.op_signature();
         let port = port.into();
         let dir = port.direction();
         match port.index() < signature.port_count(dir) {
@@ -89,7 +89,7 @@ impl OpType {
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
-            Some(Port::new(dir, self.signature().port_count(dir)))
+            Some(Port::new(dir, self.op_signature().port_count(dir)))
         } else {
             None
         }
@@ -97,7 +97,7 @@ impl OpType {
 
     /// Returns the number of ports for the given direction.
     pub fn port_count(&self, dir: Direction) -> usize {
-        let signature = self.signature();
+        let signature = self.op_signature();
         let has_other_ports = self.other_port(dir).is_some();
         let non_df_count = self
             .validity_flags()
@@ -149,7 +149,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
-    fn signature(&self) -> Signature {
+    fn op_signature(&self) -> AbstractSignature {
         Default::default()
     }
     /// Optional description of the ports in the signature.

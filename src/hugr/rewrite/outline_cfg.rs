@@ -36,7 +36,7 @@ impl OutlineCfg {
             Ok(Some(n)) => n,
             _ => return Err(OutlineCfgError::NotSiblings),
         };
-        let o = h.get_optype(cfg_n);
+        let o = &h.get_optype(cfg_n).op;
         if !matches!(o, OpType::CFG(_)) {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
@@ -90,10 +90,10 @@ impl Rewrite for OutlineCfg {
         let (entry, exit, outside) = self.compute_entry_exit_outside(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry)
+        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = &h.get_optype(entry).op
             else {panic!("Entry node is not a basic block")};
         let inputs = inputs.clone();
-        let outputs = match h.get_optype(outside) {
+        let outputs = match &h.get_optype(outside).op {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };

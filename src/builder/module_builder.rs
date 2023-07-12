@@ -12,13 +12,16 @@ use crate::{
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::ops::OpType;
-
+use crate::resource::ResourceSet;
 use crate::types::Signature;
 
 use crate::Node;
 use smol_str::SmolStr;
 
-use crate::{hugr::HugrMut, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    Hugr,
+};
 
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
@@ -75,7 +78,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
-            self.hugr().get_optype(f_node)
+            &self.hugr().get_optype(f_node).op
         {
             (signature.clone(), name.clone())
         } else {
@@ -92,7 +95,12 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             },
         );
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        let db = DFGBuilder::create_with_io(
+            self.hugr_mut(),
+            f_node,
+            // TODO: Make this a parameter
+            signature.with_input_resources(ResourceSet::new()),
+        )?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -108,9 +116,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(ops::FuncDecl {
-            signature,
-            name: name.into(),
+        let declare_n = self.add_child_op(NodeType {
+            op: ops::FuncDecl {
+                signature: signature.signature,
+                name: name.into(),
+            }
+            .into(),
+            input_resources: signature.input_resources,
         })?;
 
         Ok(declare_n.into())
@@ -170,6 +182,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
+        types::{Signature, SignatureTrait},
     };
 
     use super::*;

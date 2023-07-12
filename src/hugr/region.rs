@@ -8,7 +8,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap};
 
-use crate::{ops::OpType, Direction, Hugr, Node, Port};
+use crate::{hugr::NodeType, Direction, Hugr, Node, Port};
 
 use super::{HugrView, NodeMetadata};
 
@@ -29,7 +29,7 @@ pub struct FlatRegionView<'g> {
     hierarchy: &'g Hierarchy,
 
     /// Operation types for each node.
-    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Metadata types for each node.
     metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
@@ -94,7 +94,7 @@ impl<'g> HugrView for FlatRegionView<'g> {
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
+    fn get_optype(&self, node: Node) -> &NodeType {
         self.op_types.get(node.index)
     }
 
@@ -190,7 +190,7 @@ pub struct RegionView<'g> {
     hierarchy: &'g Hierarchy,
 
     /// Operation types for each node.
-    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Metadata types for each node.
     metadata: &'g UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
@@ -255,7 +255,7 @@ impl<'g> HugrView for RegionView<'g> {
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
+    fn get_optype(&self, node: Node) -> &NodeType {
         self.op_types.get(node.index)
     }
 
@@ -332,7 +332,7 @@ mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{ClassicType, LinearType, Signature, SimpleType},
+        types::{ClassicType, LinearType, Signature, SignatureTrait, SimpleType},
     };
 
     use super::*;

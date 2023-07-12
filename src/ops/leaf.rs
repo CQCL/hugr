@@ -8,7 +8,8 @@ use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
     types::{
-        ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
+        AbstractSignature, ClassicType, EdgeKind, LinearType, SignatureDescription,
+        SignatureTrait, SimpleType, TypeRow,
     },
 };
 
@@ -76,6 +77,7 @@ pub enum LeafOp {
         /// The types of the edges
         type_row: TypeRow,
         /// The resources which are present in both the inputs and outputs
+        /// TODO: We shouldn't need this, but let's keep it until everything builds...
         input_resources: ResourceSet,
         /// The resources which we're adding to the inputs
         new_resource: ResourceId,
@@ -150,15 +152,17 @@ impl OpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        // Static signatures. The `TypeRow`s in the `Signature` use a
+    fn op_signature(&self) -> AbstractSignature {
+        // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
         const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
         match self {
-            LeafOp::Noop { ty: typ } => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
+            LeafOp::Noop { ty: typ } => {
+                AbstractSignature::new_df(vec![typ.clone()], vec![typ.clone()])
+            }
             LeafOp::H
             | LeafOp::Reset
             | LeafOp::T
@@ -167,32 +171,28 @@ impl OpTrait for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => Signature::new_linear(type_row![Q]),
-            LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
-            LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
-            LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp(ext) => ext.signature(),
+            | LeafOp::Z => AbstractSignature::new_linear(type_row![Q]),
+            LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![Q, Q]),
+            LeafOp::Measure => AbstractSignature::new_df(type_row![Q], type_row![Q, B]),
+            LeafOp::Xor => AbstractSignature::new_df(type_row![B, B], type_row![B]),
+            LeafOp::CustomOp(ext) => ext.op_signature(),
             LeafOp::MakeTuple { tys: types } => {
-                Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
+                AbstractSignature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                Signature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
+                AbstractSignature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
             }
-            LeafOp::Tag { tag, variants } => Signature::new_df(
+            LeafOp::Tag { tag, variants } => AbstractSignature::new_df(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![SimpleType::new_sum(variants.clone())],
             ),
-            LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
+            LeafOp::RzF64 => AbstractSignature::new_df(type_row![Q, F], type_row![Q]),
             LeafOp::Lift {
                 type_row,
-                input_resources,
+                input_resources: _,
                 new_resource,
-            } => {
-                let mut sig = Signature::new_df(type_row.clone(), type_row.clone());
-                sig.output_resources = ResourceSet::singleton(new_resource).union(input_resources);
-                sig.input_resources = input_resources.clone();
-                sig
-            }
+            } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
+                .with_resource_delta(&ResourceSet::singleton(new_resource)),
         }
     }
 
@@ -217,11 +217,11 @@ impl OpTrait for LeafOp {
 impl LeafOp {
     /// Returns the number of linear inputs (also outputs) of the operation.
     pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
+        self.op_signature().linear().count()
     }
 
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
-        self.signature().purely_classical()
+        self.op_signature().purely_classical()
     }
 }

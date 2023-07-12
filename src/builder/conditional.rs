@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow};
+use crate::types::{Signature, SignatureTrait, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -13,6 +13,8 @@ use super::{
     BuildError, ConditionalID,
 };
 
+use crate::resource::ResourceSet;
+use crate::types::AbstractSignature;
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
@@ -102,6 +104,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let cond: ops::Conditional = control_op
             .clone()
+            .op
             .try_into()
             .expect("Parent node does not have Conditional optype.");
         let inputs = cond
@@ -114,7 +117,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: Signature::new_df(inputs.clone(), outputs.clone()),
+            signature: AbstractSignature::new_df(inputs.clone(), outputs.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -179,13 +182,18 @@ impl CaseBuilder<Hugr> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = Signature::new_df(input, output);
+        let signature = AbstractSignature::new_df(input, output);
         let op = ops::Case {
             signature: signature.clone(),
         };
         let base = Hugr::new(op);
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
+        let dfg_builder = DFGBuilder::create_with_io(
+            base,
+            root,
+            // TODO: Make this a parameter
+            signature.with_input_resources(ResourceSet::new()),
+        )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

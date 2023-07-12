@@ -15,7 +15,7 @@ use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::TypeRow;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
-    Signature, SignatureDescription,
+    AbstractSignature, SignatureDescription, SignatureTrait,
 };
 use crate::Hugr;
 
@@ -29,6 +29,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
+        // TODO: Make return type an AbstractSignature
     ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
 
     /// Describe the signature of a node, given the operation name,
@@ -203,8 +204,8 @@ impl OpDef {
     pub fn compute_signature(
         &self,
         args: &[TypeArg],
-        resources_in: &ResourceSet,
-    ) -> Result<Signature, SignatureError> {
+        _resources_in: &ResourceSet,
+    ) -> Result<AbstractSignature, SignatureError> {
         if args.len() != self.args.len() {
             return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
                 args.len(),
@@ -222,9 +223,8 @@ impl OpDef {
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
         assert!(res.contains(&self.resource));
-        let mut sig = Signature::new_df(ins, outs);
-        sig.input_resources = resources_in.clone();
-        sig.output_resources = res.union(resources_in); // Pass input requirements through
+        let mut sig = AbstractSignature::new_df(ins, outs);
+        sig.resource_reqs = res;
         Ok(sig)
     }
 
@@ -407,6 +407,10 @@ impl ResourceSet {
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
         ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ResourceId> {
+        self.0.iter()
     }
 }
 

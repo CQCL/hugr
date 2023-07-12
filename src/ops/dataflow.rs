@@ -3,12 +3,14 @@
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
-use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
+use crate::types::{
+    AbstractSignature, ClassicType, EdgeKind, SignatureTrait, SimpleType, TypeRow,
+};
 
 pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn tag(&self) -> OpTag;
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> AbstractSignature;
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -99,10 +101,9 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> Signature {
-        let mut sig = Signature::new_df(TypeRow::new(), self.types.clone());
-        sig.output_resources = self.resources.clone();
-        sig
+    fn signature(&self) -> AbstractSignature {
+        AbstractSignature::new_df(TypeRow::new(), self.types.clone())
+            .with_resource_delta(&self.resources)
     }
 }
 impl DataflowOpTrait for Output {
@@ -114,10 +115,10 @@ impl DataflowOpTrait for Output {
         OpTag::Output
     }
 
-    fn signature(&self) -> Signature {
-        let mut sig = Signature::new_df(self.types.clone(), TypeRow::new());
-        sig.input_resources = self.resources.clone();
-        sig
+    // TODO: We know what the input resources should be, so we *could* give an
+    // instantiated Signature instead
+    fn signature(&self) -> AbstractSignature {
+        AbstractSignature::new_df(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -133,7 +134,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         DataflowOpTrait::tag(self)
     }
-    fn signature(&self) -> Signature {
+    fn op_signature(&self) -> AbstractSignature {
         DataflowOpTrait::signature(self)
     }
     fn other_input(&self) -> Option<EdgeKind> {
@@ -153,7 +154,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 impl_op_name!(Call);
 
@@ -166,8 +167,8 @@ impl DataflowOpTrait for Call {
         OpTag::FnCall
     }
 
-    fn signature(&self) -> Signature {
-        Signature {
+    fn signature(&self) -> AbstractSignature {
+        AbstractSignature {
             static_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
             ..self.signature.clone()
         }
@@ -178,7 +179,7 @@ impl DataflowOpTrait for Call {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
     /// Signature of function being called
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 impl_op_name!(CallIndirect);
 
@@ -191,7 +192,7 @@ impl DataflowOpTrait for CallIndirect {
         OpTag::FnCall
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         let mut s = self.signature.clone();
         s.input.to_mut().insert(
             0,
@@ -217,8 +218,8 @@ impl DataflowOpTrait for LoadConstant {
         OpTag::LoadConst
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(
+    fn signature(&self) -> AbstractSignature {
+        AbstractSignature::new(
             TypeRow::new(),
             vec![SimpleType::Classic(self.datatype.clone())],
             vec![SimpleType::Classic(self.datatype.clone())],
@@ -230,7 +231,7 @@ impl DataflowOpTrait for LoadConstant {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DFG {
     /// Signature of DFG node
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 
 impl_op_name!(DFG);
@@ -243,7 +244,7 @@ impl DataflowOpTrait for DFG {
         OpTag::Dfg
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         self.signature.clone()
     }
 }

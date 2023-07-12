@@ -14,8 +14,7 @@ use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
-use crate::types::ClassicType;
-use crate::types::{EdgeKind, SimpleType};
+use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::region::FlatRegionView;
@@ -107,7 +106,7 @@ impl<'a> ValidationContext<'a> {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
-        let optype = self.hugr.get_optype(node);
+        let optype = &self.hugr.get_optype(node).op;
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -121,7 +120,7 @@ impl<'a> ValidationContext<'a> {
                 return Err(ValidationError::NoParent { node });
             };
 
-            let parent_optype = self.hugr.get_optype(parent);
+            let parent_optype = &self.hugr.get_optype(parent).op;
             let allowed_children = parent_optype.validity_flags().allowed_children;
             if !allowed_children.contains(optype.tag()) {
                 return Err(ValidationError::InvalidParentOp {
@@ -149,13 +148,13 @@ impl<'a> ValidationContext<'a> {
                 // Check port connections
                 for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
                     let port = Port::new(dir, i);
-                    self.validate_port(node, port, port_index, optype)?;
+                    self.validate_port(node, port, port_index, &optype)?;
                 }
             }
         }
 
         // Check operation-specific constraints
-        self.validate_operation(node, optype)?;
+        self.validate_operation(node, &optype)?;
 
         Ok(())
     }
@@ -296,11 +295,11 @@ impl<'a> ValidationContext<'a> {
             let all_children = self.hugr.children(node);
             let mut first_two_children = all_children.clone().take(2);
             let first_child = self.hugr.get_optype(first_two_children.next().unwrap());
-            if !flags.allowed_first_child.contains(first_child.tag()) {
+            if !flags.allowed_first_child.contains(first_child.op.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
                     parent_optype: optype.clone(),
-                    optype: first_child.clone(),
+                    optype: first_child.op.clone(),
                     expected: flags.allowed_first_child,
                     position: "first",
                 });
@@ -308,7 +307,7 @@ impl<'a> ValidationContext<'a> {
 
             if let Some(second_child) = first_two_children
                 .next()
-                .map(|child| self.hugr.get_optype(child))
+                .map(|child| &self.hugr.get_optype(child).op)
             {
                 if !flags.allowed_second_child.contains(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
@@ -321,7 +320,7 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             // Additional validations running over the full list of children optypes
-            let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
+            let children_optypes = all_children.map(|c| (c.index, &self.hugr.get_optype(c).op));
             if let Err(source) = optype.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -347,8 +346,8 @@ impl<'a> ValidationContext<'a> {
                                 target,
                                 source_port: self.hugr.graph.port_offset(source_port).unwrap(),
                                 target_port: self.hugr.graph.port_offset(target_port).unwrap(),
-                                source_op: source_op.clone(),
-                                target_op: target_op.clone(),
+                                source_op: source_op.op.clone(),
+                                target_op: target_op.op.clone(),
                             };
                             if let Err(source) = edge_check(edge_data) {
                                 return Err(ValidationError::InvalidEdges {
@@ -396,7 +395,7 @@ impl<'a> ValidationContext<'a> {
         let non_defn_count = self
             .hugr
             .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).tag()))
+            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).op.tag()))
             .count();
         if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
@@ -498,13 +497,13 @@ impl<'a> ValidationContext<'a> {
             } else if Some(ancestor_parent) == from_parent_parent {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if ancestor_parent_op.tag() == OpTag::Cfg {
+                if ancestor_parent_op.op.tag() == OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,
                         to,
                         to_offset,
-                        ancestor_parent_op: ancestor_parent_op.clone(),
+                        ancestor_parent_op: ancestor_parent_op.op.clone(),
                     }
                     .into());
                 }
@@ -740,7 +739,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
-    use crate::types::{ClassicType, LinearType, Signature};
+    use crate::types::{AbstractSignature, ClassicType, LinearType, Signature, SignatureTrait};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -754,7 +753,7 @@ mod test {
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
         let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
-            signature: Signature::new_df(type_row![B], vec![B; copies]),
+            signature: AbstractSignature::new_df(type_row![B], vec![B; copies]),
         }
         .into();
 
@@ -879,7 +878,7 @@ mod test {
     #[test]
     fn dfg_root() {
         let dfg_op: OpType = ops::DFG {
-            signature: Signature::new_linear(type_row![B]),
+            signature: AbstractSignature::new_linear(type_row![B]),
         }
         .into();
 
@@ -908,7 +907,7 @@ mod test {
             .unwrap();
 
         // Add a definition without children
-        let def_sig = Signature::new_df(type_row![B], type_row![B, B]);
+        let def_sig = AbstractSignature::new_df(type_row![B], type_row![B, B]);
         let new_def = b
             .add_op_with_parent(
                 root,
@@ -1076,7 +1075,7 @@ mod test {
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
         let mut h = Hugr::new(ops::DFG {
-            signature: Signature::new_df(type_row![B, B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
         });
         let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
         let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
@@ -1084,7 +1083,7 @@ mod test {
         let sub_dfg = h.add_op_with_parent(
             h.root(),
             ops::DFG {
-                signature: Signature::new_linear(type_row![B]),
+                signature: AbstractSignature::new_linear(type_row![B]),
             },
         )?;
         // this Xor has its 2nd input unconnected
@@ -1118,7 +1117,7 @@ mod test {
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = Hugr::new(ops::DFG {
-            signature: Signature::new_df(type_row![B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![B], type_row![B]),
         });
         let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
         let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
@@ -1162,12 +1161,9 @@ mod test {
             .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
         let [main_input] = main.input_wires_arr();
 
-        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
-
-        // Inner DFG has resource requirements that the wire wont satisfy
-        let rs = ResourceSet::from_iter(["A".into(), "B".into()]);
-        inner_sig.input_resources = rs.clone();
-        inner_sig.output_resources = rs;
+        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+            // Inner DFG has resource requirements that the wire wont satisfy
+            .with_input_resources(ResourceSet::from_iter(["A".into(), "B".into()]));
 
         let f_builder = main.dfg_builder(inner_sig, [main_input])?;
         let f_inputs = f_builder.input_wires();
@@ -1193,8 +1189,9 @@ mod test {
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let mut inner_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
-        inner_sig.output_resources.insert(&"A".into());
+        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+            .with_resource_delta(&ResourceSet::singleton(&"A".into()))
+            .with_input_resources(ResourceSet::new());
 
         let f_builder = main.dfg_builder(inner_sig, [main_input])?;
         let f_inputs = f_builder.input_wires();
@@ -1216,20 +1213,20 @@ mod test {
 
         let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
 
-        let mut main_sig = Signature::new_df(type_row![], type_row![NAT]);
-        main_sig.output_resources = all_rs.clone();
+        let main_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+            .with_resource_delta(&all_rs)
+            .with_input_resources(ResourceSet::new());
 
         let mut main = module_builder.define_function("main", main_sig)?;
 
-        let mut inner_left_sig = Signature::new_df(type_row![], type_row![NAT]);
-        inner_left_sig.output_resources.insert(&"A".into());
+        let inner_left_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+            .with_input_resources(ResourceSet::singleton(&"A".into()));
 
-        let mut inner_right_sig = Signature::new_df(type_row![], type_row![NAT]);
-        inner_right_sig.output_resources.insert(&"B".into());
+        let inner_right_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+            .with_input_resources(ResourceSet::singleton(&"B".into()));
 
-        let mut inner_mult_sig = Signature::new_df(type_row![NAT, NAT], type_row![NAT]);
-        inner_mult_sig.input_resources = all_rs.clone();
-        inner_mult_sig.output_resources = all_rs;
+        let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
+            .with_input_resources(all_rs.clone());
 
         let [left_wire] = main
             .dfg_builder(inner_left_sig, [])?

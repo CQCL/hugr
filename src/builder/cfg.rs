@@ -11,7 +11,7 @@ use crate::{hugr::view::HugrView, type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
+use crate::types::{Signature, SignatureTrait};
 
 use crate::Node;
 use crate::{hugr::HugrMut, types::TypeRow, Hugr};
@@ -100,7 +100,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Create a CFGBuilder for an existing CFG node (that already has entry + exit nodes)
     pub(crate) fn from_existing(base: B, cfg_node: Node) -> Result<Self, BuildError> {
-        let OpType::CFG(crate::ops::controlflow::CFG {outputs, ..}) = base.get_optype(cfg_node)
+        let OpType::CFG(crate::ops::controlflow::CFG {outputs, ..}) = &base.get_optype(cfg_node).op
             else {return Err(BuildError::UnexpectedType{node: cfg_node, op_desc: "Any CFG"});};
         let n_out_wires = outputs.len();
         let (_, exit_node) = base.children(cfg_node).take(2).collect_tuple().unwrap();

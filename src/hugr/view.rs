@@ -8,7 +8,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx
 use itertools::{Itertools, MapInto};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, NodeMetadata};
+use super::{Hugr, NodeMetadata, NodeType};
 use super::{Node, Port};
 use crate::ops::OpType;
 use crate::Direction;
@@ -45,7 +45,7 @@ pub trait HugrView: sealed::HugrInternals {
     fn root(&self) -> Node;
 
     /// Return the type of the HUGR root node.
-    fn root_type(&self) -> &OpType {
+    fn root_type(&self) -> &NodeType {
         self.get_optype(self.root())
     }
 
@@ -53,7 +53,7 @@ pub trait HugrView: sealed::HugrInternals {
     fn get_parent(&self, node: Node) -> Option<Node>;
 
     /// Returns the operation type of a node.
-    fn get_optype(&self, node: Node) -> &OpType;
+    fn get_optype(&self, node: Node) -> &NodeType;
 
     /// Returns the metadata associated with a node.
     fn get_metadata(&self, node: Node) -> &NodeMetadata;
@@ -169,7 +169,7 @@ where
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
+    fn get_optype(&self, node: Node) -> &NodeType {
         self.as_ref().op_types.get(node.index)
     }
 

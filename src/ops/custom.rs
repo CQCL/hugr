@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::hugr::{HugrMut, HugrView};
 use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
-use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
+use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
 use crate::{Hugr, Node, Resource};
 
 use super::tag::OpTag;
@@ -75,7 +75,7 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> Signature {
+    fn op_signature(&self) -> AbstractSignature {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
             Self::Resource(ResourceOp { signature, .. }) => signature.clone(),
@@ -89,7 +89,7 @@ impl OpTrait for ExternalOp {
 pub struct ResourceOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: Signature, // Cache
+    signature: AbstractSignature, // Cache
 }
 
 impl ResourceOp {
@@ -145,7 +145,7 @@ pub struct OpaqueOp {
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Option<Signature>,
+    signature: Option<AbstractSignature>,
 }
 
 fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
@@ -159,7 +159,7 @@ impl OpaqueOp {
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Option<Signature>,
+        signature: Option<AbstractSignature>,
     ) -> Self {
         Self {
             resource,
@@ -179,7 +179,9 @@ pub fn resolve_extension_ops(
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) = h.get_optype(n) {
+        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) =
+            &h.get_optype(n).op
+        {
             if let Some(r) = resource_registry.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
                 let Some(def) = r.operations().get(&opaque.op_name) else {
@@ -190,10 +192,10 @@ pub fn resolve_extension_ops(
                     ResourceOp::new(def.clone(), &opaque.args, &ResourceSet::default()).unwrap(),
                 );
                 if let Some(sig) = &opaque.signature {
-                    if sig != &op.signature() {
+                    if sig != &op.op_signature() {
                         return Err(CustomOpError::SignatureMismatch(
                             def.name.to_string(),
-                            op.signature(),
+                            op.op_signature(),
                             sig.clone(),
                         ));
                     };
@@ -223,5 +225,5 @@ pub enum CustomOpError {
     OpNotFoundInResource(String, String),
     /// Resource and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, Signature, Signature),
+    SignatureMismatch(String, AbstractSignature, AbstractSignature),
 }

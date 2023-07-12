@@ -11,9 +11,9 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use smol_str::SmolStr;
 
-use super::{custom::CustomType, Signature};
+use super::{custom::CustomType, AbstractSignature};
 use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
-use crate::{resource::ResourceSet, type_row};
+use crate::{type_row};
 
 /// A type that represents concrete data.
 ///
@@ -116,7 +116,7 @@ pub enum ClassicType {
     /// An arbitrary length string.
     String,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
-    Graph(Box<(ResourceSet, Signature)>),
+    Graph(Box<AbstractSignature>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
     /// An opaque operation that can be downcasted by the extensions that define it.
@@ -126,9 +126,10 @@ pub enum ClassicType {
 impl ClassicType {
     /// Create a graph type with the given signature, using default resources.
     /// TODO in the future we'll probably need versions of this that take resources.
+    /// TODO ^^
     #[inline]
-    pub fn graph_from_sig(signature: Signature) -> Self {
-        ClassicType::Graph(Box::new((Default::default(), signature)))
+    pub fn graph_from_sig(signature: AbstractSignature) -> Self {
+        ClassicType::Graph(Box::new(signature))
     }
 
     /// Returns a new integer type with the given number of bits.
@@ -180,8 +181,8 @@ impl Display for ClassicType {
             ClassicType::F64 => f.write_str("F64"),
             ClassicType::String => f.write_str("String"),
             ClassicType::Graph(data) => {
-                let (rs, sig) = data.as_ref();
-                write!(f, "[{:?}]", rs)?;
+                let sig = data.as_ref();
+                write!(f, "[{:?}]", sig.resource_reqs)?;
                 sig.fmt(f)
             }
             ClassicType::Container(c) => c.fmt(f),

@@ -7,8 +7,9 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, ValidationError};
 use crate::ops;
 
-use crate::types::{Signature, TypeRow};
+use crate::types::{AbstractSignature, Signature, SignatureTrait, TypeRow};
 
+use crate::resource::ResourceSet;
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
@@ -27,20 +28,20 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         parent: Node,
         signature: Signature,
     ) -> Result<Self, BuildError> {
-        let num_in_wires = signature.input.len();
-        let num_out_wires = signature.output.len();
+        let num_in_wires = signature.input().len();
+        let num_out_wires = signature.output().len();
         base.as_mut().add_op_with_parent(
             parent,
             ops::Input {
-                types: signature.input.clone(),
-                resources: signature.input_resources,
+                types: signature.input().clone(),
+                resources: signature.input_resources.clone(),
             },
         )?;
         base.as_mut().add_op_with_parent(
             parent,
             ops::Output {
-                types: signature.output.clone(),
-                resources: signature.output_resources,
+                types: signature.output().clone(),
+                resources: signature.output_resources(),
             },
         )?;
 
@@ -65,13 +66,18 @@ impl DFGBuilder<Hugr> {
     ) -> Result<DFGBuilder<Hugr>, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = Signature::new_df(input, output);
+        let signature = AbstractSignature::new_df(input, output);
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
         let base = Hugr::new(dfg_op);
         let root = base.root();
-        DFGBuilder::create_with_io(base, root, signature)
+        DFGBuilder::create_with_io(
+            base,
+            root,
+            // TODO: Make input resources a parameter
+            signature.with_input_resources(ResourceSet::new()),
+        )
     }
 }
 
@@ -135,7 +141,7 @@ impl FunctionBuilder<Hugr> {
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
         let op = ops::FuncDefn {
-            signature: signature.clone(),
+            signature: signature.clone().into(),
             name: name.into(),
         };
 
@@ -376,21 +382,24 @@ mod test {
         let c_resources = ResourceSet::singleton(&"C".into());
         let abc_resources = ab_resources.clone().union(&c_resources);
 
-        let mut parent_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        parent_sig.output_resources = abc_resources.clone();
-        let mut parent = module_builder.define_function("parent", parent_sig)?;
+        let parent_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
+            .with_resource_delta(&abc_resources);
+        let mut parent = module_builder.define_function(
+            "parent",
+            parent_sig.with_input_resources(ResourceSet::new()),
+        )?;
 
-        let mut add_c_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        add_c_sig.input_resources = ab_resources.clone();
-        add_c_sig.output_resources = abc_resources;
+        let add_c_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
+            .with_input_resources(abc_resources);
 
         let [w] = parent.input_wires_arr();
 
-        let mut add_ab_sig = Signature::new_df(type_row![BIT], type_row![BIT]);
-        add_ab_sig.output_resources = ab_resources.clone();
+        let add_ab_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
+            .with_resource_delta(&ab_resources);
 
         // A box which adds resources A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
+        let mut add_ab =
+            parent.dfg_builder(add_ab_sig.with_input_resources(ResourceSet::new()), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(

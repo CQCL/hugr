@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow};
+use crate::types::{Signature, SignatureTrait, TypeRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -38,8 +38,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     /// Get a reference to the [`ops::TailLoop`]
     /// that defines the signature of the [`ops::TailLoop`]
     pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
-        if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
-            Ok(tail_loop)
+        if let OpType::TailLoop(tail_loop) = &self.hugr().get_optype(self.container_node()).op {
+            Ok(&tail_loop)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),

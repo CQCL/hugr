@@ -5,8 +5,8 @@ use std::ops::Range;
 
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
-use crate::hugr::{Direction, HugrError, HugrView, Node};
-use crate::ops::OpType;
+use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType};
+
 use crate::{Hugr, Port};
 
 use super::NodeMetadata;
@@ -14,7 +14,7 @@ use super::NodeMetadata;
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
     /// Add a node to the graph.
-    fn add_op(&mut self, op: impl Into<OpType>) -> Node;
+    fn add_op(&mut self, op: impl Into<NodeType>) -> Node;
 
     /// Remove a node from the graph.
     ///
@@ -96,7 +96,7 @@ pub(crate) trait HugrMut {
     fn add_op_with_parent(
         &mut self,
         parent: Node,
-        op: impl Into<OpType>,
+        op: impl Into<NodeType>,
     ) -> Result<Node, HugrError>;
 
     /// Add a node to the graph as the previous sibling of another node.
@@ -107,7 +107,7 @@ pub(crate) trait HugrMut {
     ///
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
+    fn add_op_before(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError>;
 
     /// Add a node to the graph as the next sibling of another node.
     ///
@@ -117,12 +117,13 @@ pub(crate) trait HugrMut {
     ///
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
+    fn add_op_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError>;
 
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
+    /// TODO: Add a version which ignores input resources
+    fn replace_op(&mut self, node: Node, op: impl Into<NodeType>) -> NodeType;
 
     /// Insert another hugr into this one, under a given root node.
     ///
@@ -148,12 +149,12 @@ impl<T> HugrMut for T
 where
     T: AsRef<Hugr> + AsMut<Hugr>,
 {
-    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        let op: OpType = op.into();
+    fn add_op(&mut self, op: impl Into<NodeType>) -> Node {
+        let op: NodeType = op.into();
         let node = self
             .as_mut()
             .graph
-            .add_node(op.input_count(), op.output_count());
+            .add_node(op.op.input_count(), op.op.output_count());
         self.as_mut().op_types[node] = op;
         node.into()
     }
@@ -201,10 +202,12 @@ where
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
         let src_port: Port = self
             .get_optype(src)
+            .op
             .other_port_index(Direction::Outgoing)
             .expect("Source operation has no non-dataflow outgoing edges");
         let dst_port: Port = self
             .get_optype(dst)
+            .op
             .other_port_index(Direction::Incoming)
             .expect("Destination operation has no non-dataflow incoming edges");
         self.connect(src, src_port.index(), dst, dst_port.index())?;
@@ -265,7 +268,7 @@ where
     fn add_op_with_parent(
         &mut self,
         parent: Node,
-        op: impl Into<OpType>,
+        op: impl Into<NodeType>,
     ) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
         self.as_mut()
@@ -274,7 +277,7 @@ where
         Ok(node)
     }
 
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+    fn add_op_before(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
         self.as_mut()
             .hierarchy
@@ -282,7 +285,7 @@ where
         Ok(node)
     }
 
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+    fn add_op_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
         self.as_mut()
             .hierarchy
@@ -290,7 +293,7 @@ where
         Ok(node)
     }
 
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
+    fn replace_op(&mut self, node: Node, op: impl Into<NodeType>) -> NodeType {
         let cur = self.as_mut().op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
     }
@@ -385,8 +388,8 @@ fn insert_hugr_internal(
     let root_optype = other.get_optype(other.root());
     hugr.set_num_ports(
         other_root.into(),
-        root_optype.input_count(),
-        root_optype.output_count(),
+        root_optype.op.input_count(),
+        root_optype.op.output_count(),
     );
 
     Ok((other_root.into(), node_map))
@@ -398,10 +401,11 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{ClassicType, Signature, SimpleType},
+        types::{AbstractSignature, ClassicType, SignatureTrait, SimpleType},
     };
 
     use super::*;
+    use crate::resource::ResourceSet;
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
@@ -419,9 +423,13 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                ops::FuncDefn {
-                    name: "main".into(),
-                    signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                NodeType {
+                    op: ops::FuncDefn {
+                        name: "main".into(),
+                        signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                    }
+                    .into(),
+                    input_resources: ResourceSet::new(),
                 },
             )
             .expect("Failed to add function definition node");
