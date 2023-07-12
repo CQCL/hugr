@@ -413,7 +413,7 @@ impl<'a> ValidationContext<'a> {
     /// - Local edges, of any kind;
     /// - External edges, for static and value edges only: from a node to a sibling's descendant.
     ///   For Value edges, there must also be an order edge between the copy and the sibling.
-    /// - Dominator edge, for static and value edges only: from a node in a BasicBlock node to
+    /// - Dominator edges, for value edges only: from a node in a BasicBlock node to
     ///   a descendant of a post-dominating sibling of the BasicBlock.
     fn validate_edge(
         &mut self,
