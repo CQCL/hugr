@@ -480,7 +480,7 @@ impl<'a> ValidationContext<'a> {
             if ancestor_parent == from_parent {
                 // External edge.
                 if !is_static {
-                    // Must have an order edge§
+                    // Must have an order edge.
                     self.hugr
                         .graph
                         .get_connections(from.index, ancestor.index)
