@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
 use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError, TypeDef};
-use crate::types::{type_param::TypeArg, ClassicType, CustomType, SimpleType, TypeRow};
+use crate::types::{type_param::TypeArg, CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -89,12 +89,12 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn const_type(&self) -> ClassicType {
+    fn const_type(&self) -> CustomType {
         let t: Type = match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
         };
-        t.custom_type().into()
+        t.custom_type()
     }
 }
 

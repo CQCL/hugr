@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::{
     macros::impl_box_clone,
     type_row,
-    types::{ClassicType, Container, EdgeKind, SimpleType, TypeRow},
+    types::{ClassicType, Container, CustomType, EdgeKind, SimpleType, TypeRow},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -68,7 +68,7 @@ pub enum ConstValue {
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
     /// An opaque constant value.
-    Opaque(SimpleType, Box<dyn CustomConst>),
+    Opaque(CustomType, Box<dyn CustomConst>),
 }
 
 impl PartialEq for ConstValue {
@@ -118,7 +118,7 @@ impl ConstValue {
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int { value: _, width } => ClassicType::Int(*width),
-            Self::Opaque(_, b) => (*b).const_type(),
+            Self::Opaque(_, b) => ClassicType::Opaque((*b).const_type()),
             Self::Sum { variants, .. } => {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
             }
@@ -211,7 +211,7 @@ impl ConstValue {
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque(SimpleType::Classic(v.const_type()), Box::new(v))
+        Self::Opaque(v.const_type(), Box::new(v))
     }
 }
 
@@ -227,7 +227,8 @@ pub trait CustomConst:
     fn name(&self) -> SmolStr;
 
     /// Returns the type of the constant.
-    fn const_type(&self) -> ClassicType;
+    // TODO it would be good to ensure that this is a *classic* CustomType not a linear one!
+    fn const_type(&self) -> CustomType;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn eq(&self, other: &dyn CustomConst) -> bool {

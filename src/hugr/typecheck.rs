@@ -139,10 +139,12 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         (ClassicType::Variable(_), _) => Err(ConstTypeError::ConstCantBeVar),
         (ClassicType::Opaque(ty), ConstValue::Opaque(_tm, ty2)) => {
             // The type we're checking against
-            let ty_exp = ty.clone().classic_type();
             let ty_act = ty2.const_type();
-            if ty_exp != ty_act {
-                return Err(ConstTypeError::TypeMismatch(ty_exp, ty_act));
+            if &ty_act != ty {
+                return Err(ConstTypeError::TypeMismatch(
+                    ty.clone().into(),
+                    ty_act.into(),
+                ));
             }
             Ok(())
         }
