@@ -31,6 +31,8 @@ pub enum OpTag {
     /// A function definition.
     FuncDefn,
 
+    /// Node in a Control-flow Sibling Graph
+    ControlFlowChild,
     /// Node in a Dataflow Sibling Graph.
     DataflowChild,
     /// A nested data-flow operation.
@@ -95,20 +97,25 @@ impl OpTag {
             OpTag::Any => &[],
             OpTag::None => &[OpTag::Any],
             OpTag::ModuleOp => &[OpTag::Any],
+            OpTag::ControlFlowChild => &[OpTag::Any],
             OpTag::DataflowChild => &[OpTag::Any],
             OpTag::Input => &[OpTag::DataflowChild],
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ScopedDefn],
             OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn],
-            OpTag::BasicBlock => &[OpTag::Any],
+            OpTag::BasicBlock => &[OpTag::ControlFlowChild],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any],
             OpTag::ModuleRoot => &[OpTag::Any],
             OpTag::Const => &[OpTag::ScopedDefn],
             OpTag::Dfg => &[OpTag::DataflowChild],
             OpTag::Cfg => &[OpTag::DataflowChild],
-            OpTag::ScopedDefn => &[OpTag::DataflowChild, OpTag::ModuleOp],
+            OpTag::ScopedDefn => &[
+                OpTag::DataflowChild,
+                OpTag::ControlFlowChild,
+                OpTag::ModuleOp,
+            ],
             OpTag::TailLoop => &[OpTag::DataflowChild],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::FnCall => &[OpTag::DataflowChild],
@@ -123,6 +130,7 @@ impl OpTag {
             OpTag::Any => "Any",
             OpTag::None => "None",
             OpTag::ModuleOp => "Module operations",
+            OpTag::ControlFlowChild => "Node in a Controlflow Sibling Graph",
             OpTag::DataflowChild => "Node in a Dataflow Sibling Graph",
             OpTag::Input => "Input node",
             OpTag::Output => "Output node",

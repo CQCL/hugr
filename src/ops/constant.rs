@@ -181,16 +181,9 @@ impl ConstValue {
         val: ConstValue,
         variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Self {
-        let variants = TypeRow::predicate_variants_row(variant_rows);
-        let const_type = SimpleType::Classic(val.const_type());
-        // TODO This assert is not appropriate for a public API and if the specified `val`
-        // is not of tuple type matching the `tag`th element of `variant_rows` then
-        // really the Hugr will fail in validate. However it doesn't at the moment
-        // (https://github.com/CQCL-DEV/hugr/issues/231).
-        assert!(Some(&const_type) == variants.get(tag));
         ConstValue::Sum {
             tag,
-            variants,
+            variants: TypeRow::predicate_variants_row(variant_rows),
             val: Box::new(val),
         }
     }
@@ -282,7 +275,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // Pending resolution of https://github.com/CQCL-DEV/hugr/issues/231
     fn test_bad_predicate() {
         let pred_rows = vec![
             type_row![
@@ -294,7 +286,6 @@ mod test {
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
-        // Until #231 is fixed, this is made to fail by an assert in ConstValue::predicate
         let c = b
             .add_constant(ConstValue::predicate(
                 0,
