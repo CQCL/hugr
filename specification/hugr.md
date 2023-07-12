@@ -256,8 +256,12 @@ edges. The following operations are *only* valid as immediate children of a
     replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
     named opaque type.
 
-The following operations are valid at the module level, but *also* in dataflow
-regions:
+There may also be other [scoped definitions](#scoped-definitions).
+
+#### Scoped Definitions
+
+The following operations are valid at the module level as well as in dataflow
+regions and control-flow regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
     weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
@@ -282,7 +286,7 @@ not be executable.
 
 Within dataflow regions, which include function definitions,
 the following basic dataflow operations are available (in addition to the
-operations valid at both Module level and within dataflow regions):
+[scoped definitions](#scoped-definitions)):
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
@@ -403,15 +407,13 @@ There are two kinds of `BasicBlock`: `DFB` (dataflow block) and `Exit`.
 `DFB` nodes are CFG basic blocks. Edges between them are
 control-flow (as opposed to dataflow), and express traditional
 control-flow concepts of branch/merge. Each `DFB` node is
-parent to a dataflow sibling graph.
+parent to a dataflow sibling graph. `Exit` blocks have only incoming control-flow edges, and no children.
 
 A `CFG` node is a dataflow node which is defined by a child control
-sibling graph. All children except the second are `DFB`-nodes,
-the first is the entry block. The second child is an
-`Exit` node, which has no children, this is the single exit
-point of the CFG and the inputs to this node match the outputs of
-the CFG-node. The inputs to the CFG-node are wired to the inputs of
-the entry block.
+sibling graph. The children are all `BasicBlock`s or [scoped definitions](#scoped-definitions).
+The first child is the entry block and must be a `DFB`, with inputs the same as the CFG-node; the second child is an
+`Exit` node, whose inputs match the outputs of the CFG-node.
+The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the DSG contained in a `BasicBlock` has type
 `Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
