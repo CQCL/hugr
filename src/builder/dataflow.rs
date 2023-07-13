@@ -194,6 +194,7 @@ mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::validate::InterGraphEdgeError;
+    use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
     use crate::{
@@ -332,31 +333,28 @@ mod test {
     }
 
     #[test]
-    fn error_on_linear_inter_graph_edge() {
-        let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build =
-                FunctionBuilder::new("main", Signature::new_df(type_row![QB], type_row![QB]))?;
+    fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
+        let mut f_build =
+            FunctionBuilder::new("main", Signature::new_df(type_row![QB], type_row![QB]))?;
 
-            let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
-            let i1 = noop.out_wire(0);
+        let [i1] = f_build.input_wires_arr();
+        let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+        let i1 = noop.out_wire(0);
 
-            let mut nested =
-                f_build.dfg_builder(Signature::new_df(type_row![], type_row![QB]), [])?;
+        let mut nested = f_build.dfg_builder(Signature::new_df(type_row![], type_row![QB]), [])?;
 
-            let id = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+        let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
 
-            let nested = nested.finish_with_outputs([id.out_wire(0)])?;
-
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)])
-        };
-
+        // The error would anyway be caught in validation when we finish the Hugr,
+        // but the builder catches it earlier
         assert_matches!(
-            builder(),
+            id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
             Err(BuildError::InvalidHUGR(
                 ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonClassicalData { .. })
             ))
         );
+
+        Ok(())
     }
 
     #[test]
