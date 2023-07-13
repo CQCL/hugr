@@ -1684,14 +1684,14 @@ first option in the sum represents "false" and the second represents "true".
 
 The following operations are defined:
 
-| Name    | Inputs         | Outputs | Meaning                                |
-| ------- | -------------- | ------- | -------------------------------------- |
-| `true`  | none           | `bool`  | const node producing the value "true"  |
-| `false` | none           | `bool`  | const node producing the value "false" |
-| `not`   | `bool`         | `bool`  | logical "not"                          |
-| `and`   | `bool`, `bool` | `bool`  | logical "and"                          |
-| `or`    | `bool`, `bool` | `bool`  | logical "or"                           |
-| `xor`   | `bool`, `bool` | `bool`  | logical "xor"                          |
+| Name     | Inputs     | Outputs | Meaning                       |
+| -------- | ---------- | ------- | ----------------------------- |
+| `not`    | `bool`     | `bool`  | logical "not"                 |
+| `and<N>` | `bool` x N | `bool`  | N-ary logical "and" (N \>= 0) |
+| `or<N>`  | `bool` x N | `bool`  | N-ary logical "or"  (N \>= 0) |
+
+Note that an `and<0>` operation produces the constant value "true" and an
+`or<0>` operation produces the constant value "false".
 
 ### Arithmetic Resource
 
