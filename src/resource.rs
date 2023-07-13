@@ -409,6 +409,7 @@ impl ResourceSet {
         ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
     }
 
+    /// Iterate over the contained ResourceIds
     pub fn iter(&self) -> impl Iterator<Item = &ResourceId> {
         self.0.iter()
     }

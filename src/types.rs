@@ -48,6 +48,8 @@ impl EdgeKind {
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // TODO: Make input, output, static_input private and expose them only in SignatureTrait
+/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
+/// and also the target (value) of a call (static).
 pub struct AbstractSignature {
     /// Value inputs of the function.
     pub input: TypeRow,
@@ -59,12 +61,13 @@ pub struct AbstractSignature {
     pub resource_reqs: ResourceSet,
 }
 
-/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
-/// and also the target (value) of a call (static).
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// A concrete signature, which has been instantiated with a set of input resources
 pub struct Signature {
+    /// The underlying signature
     pub signature: AbstractSignature,
+    /// The resources which are associated with the inputs and carried through
     pub input_resources: ResourceSet,
 }
 
@@ -83,11 +86,13 @@ impl AbstractSignature {
         }
     }
 
+    /// Builder method, add resource_reqs to an AbstractSignature
     pub fn with_resource_delta(mut self, rs: &ResourceSet) -> Self {
         self.resource_reqs = self.resource_reqs.union(rs);
         self
     }
 
+    /// Instantiate an AbstractSignature, converting it to a concrete one
     pub fn with_input_resources(self, rs: ResourceSet) -> Signature {
         Signature {
             signature: self,
@@ -121,6 +126,7 @@ impl Signature {
         }
     }
 
+    /// Calculate the resource requirements of the output wires
     pub fn output_resources(&self) -> ResourceSet {
         self.input_resources
             .clone()
@@ -128,6 +134,7 @@ impl Signature {
     }
 }
 
+/// Functions for dealing with concrete and abstract signatures
 pub trait SignatureTrait {
     /// Create a new signature with only dataflow inputs and outputs.
     fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self;
@@ -175,8 +182,13 @@ pub trait SignatureTrait {
     /// Returns a slice of the output value types.
     fn output_df_types(&self) -> &[SimpleType];
 
+    /// Returns the input row
     fn input(&self) -> &TypeRow;
+
+    /// Returns the output row
     fn output(&self) -> &TypeRow;
+
+    /// Returns the static inputs
     fn static_input(&self) -> &TypeRow;
 }
 
@@ -394,15 +406,23 @@ impl SignatureTrait for Signature {
     }
 }
 
+// Implement iterators, which can't be put in a trait
 impl Signature {
     delegate! {
         to self.signature {
+            /// Delegate
             pub fn linear(&self) -> impl Iterator<Item = &SimpleType>;
+            /// Delegate
             pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port>;
+            /// Delegate
             pub fn input_ports_df(&self) -> impl Iterator<Item = Port>;
+            /// Delegate
             pub fn output_ports_df(&self) -> impl Iterator<Item = Port>;
+            /// Delegate
             pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port>;
+            /// Delegate
             pub fn input_ports(&self) -> impl Iterator<Item = Port>;
+            /// Delegate
             pub fn output_ports(&self) -> impl Iterator<Item = Port>;
         }
     }

@@ -49,12 +49,16 @@ pub struct Hugr {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// The type of a node on a graph
 pub struct NodeType {
+    /// The underlying OpType
     pub op: OpType,
+    /// The resources that the signature has been specialised to
     pub input_resources: ResourceSet,
 }
 
 impl NodeType {
+    /// Use the input resources to calculate the concrete signature of the node
     pub fn signature(&self) -> Signature {
         self.op
             .op_signature()
@@ -78,11 +82,17 @@ where
 impl NodeType {
     delegate! {
         to self.op {
+            /// Delegate
             pub fn other_port(&self, dir: Direction) -> Option<EdgeKind>;
+            /// Delegate
             pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind>;
+            /// Delegate
             pub fn other_port_index(&self, dir: Direction) -> Option<Port>;
+            /// Delegate
             pub fn port_count(&self, dir: Direction) -> usize;
+            /// Delegate
             pub fn input_count(&self) -> usize;
+            /// Delegate
             pub fn output_count(&self) -> usize;
        }
     }
