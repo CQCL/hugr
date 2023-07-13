@@ -210,22 +210,22 @@ impl Wire {
 /// Falls back to [`Wire`] if the wire is not linear or if it's not possible to
 /// track the origin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Unit {
+pub enum CircuitUnit {
     /// Arbitrary input wire.
     Wire(Wire),
     /// Index to region input.
     Linear(usize),
 }
 
-impl From<usize> for Unit {
+impl From<usize> for CircuitUnit {
     fn from(value: usize) -> Self {
-        Unit::Linear(value)
+        CircuitUnit::Linear(value)
     }
 }
 
-impl From<Wire> for Unit {
+impl From<Wire> for CircuitUnit {
     fn from(value: Wire) -> Self {
-        Unit::Wire(value)
+        CircuitUnit::Wire(value)
     }
 }
 

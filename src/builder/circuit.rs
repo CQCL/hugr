@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::hugr::Unit;
+use crate::hugr::CircuitUnit;
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
@@ -55,7 +55,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[inline]
     /// The same as [`CircuitBuilder::append_with_outputs`] except it assumes no outputs and
     /// instead returns a reference to self to allow chaining.
-    pub fn append_and_consume<A: Into<Unit>>(
+    pub fn append_and_consume<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -66,7 +66,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     }
 
     /// Append an `op` with some inputs being the stored wires.
-    /// Any inputs of the form [`AppendWire::I`] are used to index the
+    /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
     /// stored wires.
     /// The outputs at those indices are used to replace the stored wire.
     /// The remaining outputs are returned.
@@ -74,7 +74,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// # Errors
     ///
     /// This function will return an error if an index is invalid.
-    pub fn append_with_outputs<A: Into<Unit>>(
+    pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -86,9 +86,9 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
             .into_iter()
             .map(Into::into)
             .enumerate()
-            .map(|(input_port, a_w): (usize, Unit)| match a_w {
-                Unit::Wire(wire) => Some(wire),
-                Unit::Linear(wire_index) => {
+            .map(|(input_port, a_w): (usize, CircuitUnit)| match a_w {
+                CircuitUnit::Wire(wire) => Some(wire),
+                CircuitUnit::Linear(wire_index) => {
                     linear_inputs.insert(input_port, wire_index);
                     self.wires.get(wire_index).copied()
                 }
@@ -175,7 +175,10 @@ mod test {
 
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
-                    .append_and_consume(LeafOp::RzF64, [Unit::Linear(0), Unit::Wire(angle)])?
+                    .append_and_consume(
+                        LeafOp::RzF64,
+                        [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                    )?
                     .append_with_outputs(LeafOp::Measure, [0])?;
 
                 let out_qbs = linear.finish();
