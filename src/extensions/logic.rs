@@ -6,7 +6,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::{OpDef, ResourceSet, SignatureError},
+    resource::{OpDef, ResourceSet},
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         SimpleType,
@@ -49,14 +49,14 @@ pub fn resource() -> Resource {
         HashMap::default(),
         |arg_values: &[TypeArg]| {
             let a = arg_values.iter().exactly_one().unwrap();
-            let n: Result<u128, SignatureError> = match a {
-                TypeArg::Int(n) => Ok(*n),
+            let n: u128 = match a {
+                TypeArg::Int(n) => *n,
                 _ => {
                     return Err(TypeArgError::TypeMismatch(a.clone(), TypeParam::Int).into());
                 }
             };
             Ok((
-                vec![bool_type(); n.unwrap() as usize].into(),
+                vec![bool_type(); n as usize].into(),
                 vec![bool_type()].into(),
                 ResourceSet::default(),
             ))
@@ -70,14 +70,14 @@ pub fn resource() -> Resource {
         HashMap::default(),
         |arg_values: &[TypeArg]| {
             let a = arg_values.iter().exactly_one().unwrap();
-            let n: Result<u128, SignatureError> = match a {
-                TypeArg::Int(n) => Ok(*n),
+            let n: u128 = match a {
+                TypeArg::Int(n) => *n,
                 _ => {
                     return Err(TypeArgError::TypeMismatch(a.clone(), TypeParam::Int).into());
                 }
             };
             Ok((
-                vec![bool_type(); n.unwrap() as usize].into(),
+                vec![bool_type(); n as usize].into(),
                 vec![bool_type()].into(),
                 ResourceSet::default(),
             ))
