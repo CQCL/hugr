@@ -434,7 +434,7 @@ impl Signature {
     pub fn get_resources(&self, dir: &Direction) -> ResourceSet {
         match dir {
             Direction::Incoming => self.input_resources.clone(),
-            Direction::Outgoing => self.output_resources().clone(),
+            Direction::Outgoing => self.output_resources(),
         }
     }
 }

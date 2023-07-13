@@ -32,10 +32,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         let num_out_wires = signature.output().len();
         base.as_mut().add_op_with_parent(
             parent,
-            NodeType::pure(ops::Input {
-                types: signature.input().clone(),
-                resources: signature.input_resources.clone(),
-            }),
+            NodeType {
+                op: ops::Input {
+                    types: signature.input().clone(),
+                    resources: signature.input_resources.clone(),
+                }
+                .into(),
+                input_resources: ResourceSet::new(),
+            },
         )?;
         base.as_mut().add_op_with_parent(
             parent,
@@ -45,7 +49,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
                     resources: signature.output_resources(),
                 }
                 .into(),
-                input_resources: signature.output_resources().clone(),
+                input_resources: signature.output_resources(),
             },
         )?;
 
@@ -231,7 +235,7 @@ mod test {
 
                 let [int, qb] = func_builder.input_wires_arr();
 
-                let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+                let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb])?;
 
                 let inner_builder = func_builder
                     .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
@@ -281,7 +285,7 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
+                let xor = f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, b1])?;
                 f_build.finish_with_outputs([xor.out_wire(0), b1])
             },
             "Copy input and use with binary function",
@@ -290,8 +294,9 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor1 = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
-                let xor2 = f_build.add_dataflow_op(LeafOp::Xor, [b1, xor1.out_wire(0)])?;
+                let xor1 = f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, b1])?;
+                let xor2 =
+                    f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, xor1.out_wire(0)])?;
                 f_build.finish_with_outputs([xor2.out_wire(0), b1])
             },
             "Copy multiple times",
@@ -324,13 +329,13 @@ mod test {
                 FunctionBuilder::new("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
+            let noop = f_build.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested =
                 f_build.dfg_builder(Signature::new_df(type_row![], type_row![BIT]), [])?;
 
-            let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
+            let id = nested.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
@@ -407,20 +412,24 @@ mod test {
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
-            LeafOp::Lift {
+            NodeType::pure(LeafOp::Lift {
                 type_row: type_row![BIT],
                 input_resources: ResourceSet::new(),
                 new_resource: "A".into(),
-            },
+            }),
             [w],
         )?;
         let [w] = lift_a.outputs_arr();
 
         let lift_b = add_ab.add_dataflow_op(
-            LeafOp::Lift {
-                type_row: type_row![BIT],
+            NodeType {
+                op: LeafOp::Lift {
+                    type_row: type_row![BIT],
+                    input_resources: ResourceSet::from_iter(["A".into()]),
+                    new_resource: "B".into(),
+                }
+                .into(),
                 input_resources: ResourceSet::from_iter(["A".into()]),
-                new_resource: "B".into(),
             },
             [w],
         )?;
@@ -434,10 +443,14 @@ mod test {
         let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
-            LeafOp::Lift {
-                type_row: type_row![BIT],
+            NodeType {
+                op: LeafOp::Lift {
+                    type_row: type_row![BIT],
+                    input_resources: ab_resources.clone(),
+                    new_resource: "C".into(),
+                }
+                .into(),
                 input_resources: ab_resources,
-                new_resource: "C".into(),
             },
             [w],
         )?;

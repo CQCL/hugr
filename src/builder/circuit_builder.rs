@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use crate::hugr::NodeType;
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
@@ -118,7 +119,13 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         let input_wires = input_wires.ok_or(CircuitBuildError::InvalidWireIndex)?;
 
-        let output_wires = self.builder.add_dataflow_op(op, input_wires)?.outputs();
+        let output_wires = self
+            .builder
+            .add_dataflow_op(
+                NodeType::pure(op), // TODO: Add resource param
+                input_wires,
+            )?
+            .outputs();
         let nonlinear_outputs: Vec<Wire> = output_wires
             .enumerate()
             .filter_map(|(output_port, wire)| {

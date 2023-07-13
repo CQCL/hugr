@@ -347,9 +347,9 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            LeafOp::Noop {
+                            NodeType::pure(LeafOp::Noop {
                                 ty: f_build.get_wire_type(in_wire).unwrap(),
-                            },
+                            }),
                             [in_wire],
                         )
                         .unwrap()
@@ -382,9 +382,9 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            LeafOp::Noop {
+                            NodeType::pure(LeafOp::Noop {
                                 ty: f_build.get_wire_type(in_wire).unwrap(),
-                            },
+                            }),
                             [in_wire],
                         )
                         .unwrap()
@@ -409,7 +409,7 @@ pub mod test {
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .add_dataflow_op(NodeType::pure(LeafOp::Xor), [*p, *p])
                 .unwrap()
                 .out_wire(0);
         }
