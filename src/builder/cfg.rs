@@ -14,7 +14,11 @@ use crate::ops::{self, BasicBlock, OpType};
 use crate::types::{Signature, SignatureTrait};
 
 use crate::Node;
-use crate::{hugr::HugrMut, types::TypeRow, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    types::TypeRow,
+    Hugr,
+};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
@@ -88,7 +92,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
-            .add_op_with_parent(cfg_node, exit_block_type)?;
+            // Make the resources a parameter
+            .add_op_with_parent(cfg_node, NodeType::pure(exit_block_type))?;
         Ok(Self {
             base,
             cfg_node,
@@ -144,9 +149,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
-            self.hugr_mut().add_op_before(exit, op)
+            // TODO: Make resources a parameter
+            self.hugr_mut().add_op_before(exit, NodeType::pure(op))
         } else {
-            self.hugr_mut().add_op_with_parent(parent, op)
+            // TODO: Make resources a parameter
+            self.hugr_mut()
+                .add_op_with_parent(parent, NodeType::pure(op))
         }?;
 
         BlockBuilder::create(

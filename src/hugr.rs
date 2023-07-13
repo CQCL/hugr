@@ -58,6 +58,14 @@ pub struct NodeType {
 }
 
 impl NodeType {
+    /// Instantiate an OpType with no resources
+    pub fn pure(op: impl Into<OpType>) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: ResourceSet::new(),
+        }
+    }
+
     /// Use the input resources to calculate the concrete signature of the node
     pub fn signature(&self) -> Signature {
         self.op
@@ -66,16 +74,18 @@ impl NodeType {
     }
 }
 
-// TODO: This is kind of a code smell?
-impl<T> From<T> for NodeType
-where
-    T: Into<OpType>,
-{
-    fn from(x: T) -> NodeType {
+impl OpType {
+    /// Convert an OpType to a NodeType by giving it some input resources
+    pub fn with_resources(self, rs: ResourceSet) -> NodeType {
         NodeType {
-            op: x.into(),
-            input_resources: ResourceSet::new(),
+            op: self,
+            input_resources: rs,
         }
+    }
+
+    /// Convenient wrapper for with_resources
+    pub fn with_no_resources(self) -> NodeType {
+        self.with_resources(ResourceSet::new())
     }
 }
 

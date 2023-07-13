@@ -3,9 +3,7 @@
 use super::{impl_op_name, tag::OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
-use crate::types::{
-    AbstractSignature, ClassicType, EdgeKind, SignatureTrait, SimpleType, TypeRow,
-};
+use crate::types::{AbstractSignature, ClassicType, EdgeKind, SignatureTrait, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;

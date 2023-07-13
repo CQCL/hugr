@@ -5,7 +5,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::hugr::{Hugr, HugrMut};
+use crate::hugr::{Hugr, HugrMut, NodeType};
 use crate::ops::OpType;
 use crate::types::SignatureTrait;
 use crate::Node;
@@ -38,7 +38,7 @@ enum Versioned {
 struct NodeSer {
     parent: Node,
     #[serde(flatten)]
-    op: OpType,
+    op: NodeType,
 }
 
 /// Version 0 of the HUGR serialization format.
@@ -129,7 +129,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.op.clone(),
+                op: opt.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
         }
@@ -195,7 +195,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
+        let mut hugr = Hugr::with_capacity(root_type.op, nodes.len(), edges.len() * 2);
 
         for node_ser in nodes {
             hugr.add_op_with_parent(node_ser.parent, node_ser.op)?;
@@ -439,7 +439,7 @@ pub mod test {
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        let new_in = hugr.add_op(NodeType::pure(Input::new([qb].to_vec())));
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();

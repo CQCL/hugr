@@ -8,8 +8,8 @@ use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
     types::{
-        AbstractSignature, ClassicType, EdgeKind, LinearType, SignatureDescription,
-        SignatureTrait, SimpleType, TypeRow,
+        AbstractSignature, ClassicType, EdgeKind, LinearType, SignatureDescription, SignatureTrait,
+        SimpleType, TypeRow,
     },
 };
 

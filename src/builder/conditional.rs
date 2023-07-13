@@ -16,7 +16,10 @@ use super::{
 use crate::resource::ResourceSet;
 use crate::types::AbstractSignature;
 use crate::Node;
-use crate::{hugr::HugrMut, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    Hugr,
+};
 
 use std::collections::HashSet;
 
@@ -122,9 +125,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                self.hugr_mut().add_op_before(sibling_node, case_op)?
+                // TODO: Make this non-pure
+                self.hugr_mut().add_op_before(sibling_node, NodeType::pure(case_op))?
             } else {
-                self.add_child_op(case_op)?
+                self.add_child_op(NodeType::pure(case_op))?
             };
 
         self.case_nodes[case] = Some(case_node);

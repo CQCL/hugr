@@ -7,7 +7,7 @@ use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
-    hugr::{Node, Rewrite},
+    hugr::{Node, NodeType, Rewrite},
     ops::{tag::OpTag, OpTrait, OpType},
     types::SignatureTrait,
     Hugr, Port,
@@ -98,7 +98,9 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = &self.replacement.get_optype(node).op;
-            let new_node_index = h.add_op_after(self_output_node_index, op.clone()).unwrap();
+            let new_node_index = h
+                .add_op_after(self_output_node_index, NodeType::pure(op.clone()))
+                .unwrap();
             index_map.insert(node.index, new_node_index.index);
 
             // Move the metadata

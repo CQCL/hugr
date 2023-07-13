@@ -436,17 +436,17 @@ mod test {
 
         {
             let f_in = builder
-                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
+                .add_op_with_parent(f, NodeType::pure(ops::Input::new(type_row![NAT])))
                 .unwrap();
             let f_out = builder
-                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
+                .add_op_with_parent(f, NodeType::pure(ops::Output::new(type_row![NAT, NAT])))
                 .unwrap();
             let noop = builder
                 .add_op_with_parent(
                     f,
-                    LeafOp::Noop {
+                    NodeType::pure(LeafOp::Noop {
                         ty: ClassicType::i64().into(),
-                    },
+                    }),
                 )
                 .unwrap();
 

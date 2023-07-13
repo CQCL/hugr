@@ -64,8 +64,7 @@ pub trait Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(ops::Const(val))?;
-
+        let const_n = self.add_child_op(NodeType::pure(ops::Const(val)))?;
         Ok((const_n, typ).into())
     }
 
@@ -81,10 +80,10 @@ pub trait Container {
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let f_node = self.add_child_op(ops::FuncDefn {
+        let f_node = self.add_child_op(NodeType::pure(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone().into(),
-        })?;
+        }))?;
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -564,7 +563,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 
     let op: OpType = op.into();
     let sig = op.op_signature();
-    let op_node = data_builder.add_child_op(op)?;
+    let op_node = data_builder.add_child_op(NodeType::pure(op))?;
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

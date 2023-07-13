@@ -12,8 +12,8 @@ use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, AbstractSignature};
+use crate::type_row;
 use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
-use crate::{type_row};
 
 /// A type that represents concrete data.
 ///

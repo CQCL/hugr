@@ -89,10 +89,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            ops::FuncDefn {
+            NodeType::pure(ops::FuncDefn {
                 name,
                 signature: signature.clone(),
-            },
+            }),
         );
 
         let db = DFGBuilder::create_with_io(
@@ -145,10 +145,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // every 0-input node.
         let name: SmolStr = name.into();
         let linear = typ.is_linear();
-        let node = self.add_child_op(ops::AliasDefn {
+        let node = self.add_child_op(NodeType::pure(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
-        })?;
+        }))?;
 
         Ok(AliasID::new(node, name, linear))
     }
@@ -163,10 +163,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         linear: bool,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(ops::AliasDecl {
+        let node = self.add_child_op(NodeType::pure(ops::AliasDecl {
             name: name.clone(),
             linear,
-        })?;
+        }))?;
 
         Ok(AliasID::new(node, name, linear))
     }

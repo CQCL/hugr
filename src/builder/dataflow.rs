@@ -4,7 +4,7 @@ use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
 use std::marker::PhantomData;
 
-use crate::hugr::{HugrView, ValidationError};
+use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
 use crate::types::{AbstractSignature, Signature, SignatureTrait, TypeRow};
@@ -32,16 +32,20 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         let num_out_wires = signature.output().len();
         base.as_mut().add_op_with_parent(
             parent,
-            ops::Input {
+            NodeType::pure(ops::Input {
                 types: signature.input().clone(),
                 resources: signature.input_resources.clone(),
-            },
+            }),
         )?;
         base.as_mut().add_op_with_parent(
             parent,
-            ops::Output {
-                types: signature.output().clone(),
-                resources: signature.output_resources(),
+            NodeType {
+                op: ops::Output {
+                    types: signature.output().clone(),
+                    resources: signature.output_resources(),
+                }
+                .into(),
+                input_resources: signature.output_resources().clone(),
             },
         )?;
 

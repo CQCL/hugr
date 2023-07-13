@@ -13,10 +13,9 @@ use super::TypeRow;
 
 use super::SimpleType;
 
-use super::super::{AbstractSignature};
+use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
-
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(tag = "t")]

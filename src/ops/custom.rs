@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::hugr::{HugrMut, HugrView};
+use crate::hugr::{HugrMut, HugrView, NodeType};
 use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
 use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
 use crate::{Hugr, Node, Resource};
@@ -208,7 +208,8 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        h.replace_op(n, Into::<LeafOp>::into(op));
+        let node_type = NodeType::pure(Into::<LeafOp>::into(op));
+        h.replace_op(n, node_type);
     }
     Ok(())
 }
