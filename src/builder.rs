@@ -31,7 +31,7 @@ mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
 mod circuit_builder;
-pub use circuit_builder::{AppendWire, CircuitBuilder};
+pub use circuit_builder::CircuitBuilder;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 /// Error while building the HUGR.
