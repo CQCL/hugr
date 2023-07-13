@@ -148,13 +148,13 @@ impl<'a> ValidationContext<'a> {
                 // Check port connections
                 for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
                     let port = Port::new(dir, i);
-                    self.validate_port(node, port, port_index, &optype)?;
+                    self.validate_port(node, port, port_index, optype)?;
                 }
             }
         }
 
         // Check operation-specific constraints
-        self.validate_operation(node, &optype)?;
+        self.validate_operation(node, optype)?;
 
         Ok(())
     }

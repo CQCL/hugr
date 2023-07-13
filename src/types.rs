@@ -540,7 +540,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.input(), &self.input)
+        Self::row_zip(signature.input(), &self.input)
     }
 
     /// Iterate over the output wires of the signature and their names.
@@ -550,7 +550,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.output(), &self.output)
+        Self::row_zip(signature.output(), &self.output)
     }
 
     /// Iterate over the static input wires of the signature and their names.
@@ -558,7 +558,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.static_input(), &self.static_input)
+        Self::row_zip(signature.static_input(), &self.static_input)
     }
 }
 

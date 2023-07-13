@@ -39,7 +39,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     /// that defines the signature of the [`ops::TailLoop`]
     pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
         if let OpType::TailLoop(tail_loop) = &self.hugr().get_optype(self.container_node()).op {
-            Ok(&tail_loop)
+            Ok(tail_loop)
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
