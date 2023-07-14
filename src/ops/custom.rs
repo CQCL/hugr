@@ -23,6 +23,16 @@ pub enum ExternalOp {
     Opaque(OpaqueOp),
 }
 
+impl ExternalOp {
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        match self {
+            Self::Opaque(op) => op.args(),
+            Self::Resource(op) => op.args(),
+        }
+    }
+}
+
 impl From<ExternalOp> for OpaqueOp {
     fn from(value: ExternalOp) -> Self {
         match value {
@@ -106,6 +116,11 @@ impl ResourceOp {
             signature,
         })
     }
+
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
 }
 
 impl From<ResourceOp> for OpaqueOp {
@@ -168,6 +183,11 @@ impl OpaqueOp {
             args: args.into(),
             signature,
         }
+    }
+
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
     }
 }
 
