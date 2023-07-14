@@ -74,21 +74,25 @@ pub struct FuncID<const DEF: bool>(Node);
 pub struct AliasID<const DEF: bool> {
     node: Node,
     name: SmolStr,
-    linear: bool,
+    classical: bool,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: Node, name: SmolStr, linear: bool) -> Self {
-        Self { node, name, linear }
+    pub fn new(node: Node, name: SmolStr, classical: bool) -> Self {
+        Self {
+            node,
+            name,
+            classical,
+        }
     }
 
     /// Construct new AliasID
     pub fn get_alias_type(&self) -> SimpleType {
-        if self.linear {
-            Container::<SimpleType>::Alias(self.name.clone()).into()
-        } else {
+        if self.classical {
             Container::<ClassicType>::Alias(self.name.clone()).into()
+        } else {
+            Container::<SimpleType>::Alias(self.name.clone()).into()
         }
     }
     /// Retrieve the underlying core type
