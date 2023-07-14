@@ -80,7 +80,7 @@ macro_rules! type_row {
 
 /// Like [type_row!] but for rows of [ClassicType]s
 ///
-/// [ClassicType]: types::ClassicType
+/// [ClassicType]: crate::types::ClassicType
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! classic_row {

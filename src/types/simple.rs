@@ -284,7 +284,7 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "pyo3", pyclass)]
+//#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow<T: PrimType> {
@@ -300,7 +300,7 @@ impl<T: Display + PrimType> Display for TypeRow<T> {
     }
 }
 
-#[cfg_attr(feature = "pyo3", pymethods)]
+//#[cfg_attr(feature = "pyo3", pymethods)] // TODO: expose unparameterized versions
 impl<T: PrimType> TypeRow<T> {
     /// Returns the number of types in the row.
     #[inline(always)]
