@@ -139,8 +139,9 @@ of edge for different relationships.
 
 `Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
 A `Value` edge can carry data of any `SimpleType`: either a `ClassicType`
-(ordinary classical data) or a `LinearType` (data which cannot be copied,
-including quantum data). A `Static` edge can only carry a `ClassicType`. For
+(ordinary classical data, which can be freely copied or discarded) or a
+`LinearType` (which cannot - e.g. anything including quantum data).
+A `Static` edge can only carry a `ClassicType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
@@ -1042,7 +1043,7 @@ ClassicType ::= int<N>
               | Container(ClassicType)
 LinearType ::= Qubit
               | QPaque(Name, #)
-              | Container(LinearType)
+              | Container(SimpleType)  -- Sometimes called 'Qontainer'
 ```
 
 SimpleTypes are the types of *values* which can be sent down wires,
@@ -1065,8 +1066,8 @@ Container types are defined in terms of statically-known element types.
 Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
 types: `Graph`, `Map` and
 `List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
-allows named newtypes to be used. Containers are linear if any of their
-components are linear.
+allows named newtypes to be used. Containers are classic (copyable) only
+if all of their components are classic.
 
 
 
@@ -1099,7 +1100,7 @@ ports can have any number of connected edges (0 is equivalent to a discard).
 
 Our linear types behave like other values passed down a wire. Quantum
 gates behave just like other nodes on the graph with inputs and outputs,
-but there is only one edge leaving or entering each port. In fully
+but there is only one edge leaving (or entering) each port. In fully
 qubit-counted contexts programs take in a number of qubits as input and
 return the same number, with no discarding. See
 [quantum resource](#quantum-resource)
@@ -1135,20 +1136,12 @@ resource requirements.
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
 example, the `Map` type can only be constructed when the type that we
-map from is `Hashable`. For the Hugr, we may need this `Hashable`
-constraint, as well as a `Nonlinear` constraint. Finally there may be a
-`const-able` or `serializable` constraint meaning that the value can be
-put into a `const`-node: this implies the type is `Nonlinear` (but not
-vice versa).
+map from is `Hashable`. For the Hugr, we will need this `Hashable`
+constraint, as well as a `Classic` constraint.
 
-**TODO**: is this set of constraints (nonlinear, const-able, hashable)
-fixed? Then Map is in the core HUGR spec.
-
-Or, can extensions (resources) add new constraints? This is probably too
-complex, but then both hashable and Map could be in the Tierkreis
-resource.
-
-(Or, can we do Map without hashable?)
+**TODO**: fix this set of constraints (classic/copyable, hashable);
+extensions/resources *cannot* add new constraints. Use hashable for
+static type parameters, put Map in Tierkreis resource not core spec.
 
 ### Resources
 
