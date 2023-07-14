@@ -245,3 +245,25 @@ pub enum CustomOpError {
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
     SignatureMismatch(String, Signature, Signature),
 }
+
+#[cfg(test)]
+mod test {
+    use crate::types::ClassicType;
+
+    use super::*;
+
+    #[test]
+    fn new_opaque_op() {
+        let op = OpaqueOp::new(
+            "res".into(),
+            "op",
+            "desc".into(),
+            vec![TypeArg::ClassicType(ClassicType::F64)],
+            None,
+        );
+        let op: ExternalOp = op.into();
+        assert_eq!(op.name(), "res.op");
+        assert_eq!(op.description(), "desc");
+        assert_eq!(op.args(), &[TypeArg::ClassicType(ClassicType::F64)]);
+    }
+}
