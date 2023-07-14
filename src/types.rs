@@ -76,23 +76,6 @@ impl Signature {
     }
 }
 impl Signature {
-    /// Returns the linear part of the signature
-    /// TODO: This fails when mixing different linear types.
-    #[inline(always)]
-    pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
-        debug_assert_eq!(
-            self.input
-                .iter()
-                .filter(|t| t.is_linear())
-                .collect::<Vec<_>>(),
-            self.output
-                .iter()
-                .filter(|t| t.is_linear())
-                .collect::<Vec<_>>()
-        );
-        self.input.iter().filter(|t| t.is_linear())
-    }
-
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {

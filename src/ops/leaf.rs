@@ -217,11 +217,6 @@ impl OpTrait for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
-    }
-
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()
