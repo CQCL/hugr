@@ -205,11 +205,6 @@ impl PrimType for SimpleType {
 }
 
 impl SimpleType {
-    /// Returns whether the type contains linear data (perhaps as well as classical)
-    pub fn is_linear(&self) -> bool {
-        !self.is_classical()
-    }
-
     /// Returns whether the type contains only classic data.
     pub fn is_classical(&self) -> bool {
         matches!(self, Self::Classic(_))

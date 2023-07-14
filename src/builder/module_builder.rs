@@ -132,7 +132,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let linear = typ.is_linear();
+        let linear = !typ.is_classical();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,

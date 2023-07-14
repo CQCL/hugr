@@ -38,7 +38,7 @@ impl EdgeKind {
     /// Returns whether the type contains only linear data.
     pub fn is_linear(&self) -> bool {
         match self {
-            EdgeKind::Value(t) => t.is_linear(),
+            EdgeKind::Value(t) => !t.is_classical(),
             _ => false,
         }
     }
