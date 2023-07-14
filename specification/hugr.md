@@ -138,9 +138,9 @@ of edge for different relationships.
   children.
 
 `Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
-A `Value` edge can carry data of any `SimpleType`: either a `ClassicType`
-(ordinary classical data, which can be freely copied or discarded) or a
-`LinearType` (which cannot - e.g. anything including quantum data).
+A `Value` edge can carry data of any `SimpleType`: these include the `ClassicType`s
+(which can be freely copied or discarded - i.e. ordinary classical data)
+as well as anything which cannot - e.g. quantum data.
 A `Static` edge can only carry a `ClassicType`. For
 more details see the [Type System](#type-system) section.
 
@@ -156,9 +156,9 @@ As well as the type, dataflow edges are also parametrized by a
     [Non-local Edges](#non-local-edges)
 
 
-```
-SimpleType ::= ClassicType | LinearType
+`SimpleType` $\supset$ `ClassicType`
 
+```
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
@@ -176,7 +176,7 @@ edges, with `Static` edges following `Value` edges in the ordering.
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `ClassicType` may have any number of edges associated with
-it (including zero, which means "discard"). A port with a `LinearType`, and a target port of any type,
+it (including zero, which means "discard"). Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once. See [Linearity](#linearity).
 
@@ -1022,12 +1022,11 @@ A grammar of available types is defined below.
 ```haskell
 Type ::= [Resources]SimpleType
 -- Rows are ordered lists, not sets
-#    ::= #(LinearType), #(ClassicType) 
+#    ::= #(SimpleType)
 #(T) ::= (T)*
 
 Resources ::= (Resource)* -- set not list
 
-SimpleType  ::= ClassicType | LinearType
 Container(T) ::= List(T)
               | Tuple(#(T))
               | Array<u64>(T)
@@ -1041,9 +1040,10 @@ ClassicType ::= int<N>
               | Graph[R](#, #)
               | Opaque(Name, #)
               | Container(ClassicType)
-LinearType ::= Qubit
+SimpleType ::= Qubit
               | QPaque(Name, #)
               | Container(SimpleType)  -- Sometimes called 'Qontainer'
+              | ClassicType
 ```
 
 SimpleTypes are the types of *values* which can be sent down wires,
@@ -1093,18 +1093,19 @@ i.e. this does not affect behaviour of the HUGR. Row types are used
 ### Linearity
 
 For expressing and rewriting quantum programs we draw a distinction between
-`ClassicType` and `LinearType`, the latter being values which must be used
+arbitrary `SimpleType`s and the subset of `ClassicType`s. Only `ClassicType`s
+may be used more than once or discarded; the former must always be used
 exactly once. This leads to a constraint on the HUGR that outgoing ports
-of `LinearType` must have exactly one edge leaving them. `ClassicType` outgoing
-ports can have any number of connected edges (0 is equivalent to a discard).
+must have exactly one edge leaving them unless they are `ClassicType`, where
+outgoing ports may have anynum number of connected edges (0 is equivalent
+to a discard). All incoming ports must have exactly one edge connected to them.
 
-Our linear types behave like other values passed down a wire. Quantum
-gates behave just like other nodes on the graph with inputs and outputs,
-but there is only one edge leaving (or entering) each port. In fully
-qubit-counted contexts programs take in a number of qubits as input and
-return the same number, with no discarding. See
-[quantum resource](#quantum-resource)
-for more.
+# Our linear types behave like other values passed down a wire.
+# Quantum gates behave just like other nodes on the graph with
+# inputs and outputs, but there is only one edge leaving (or entering) each port.
+In fully qubit-counted contexts programs take in a number of qubits
+as input and return the same number, with no discarding. See
+[quantum resource](#quantum-resource) for more.
 
 ### Resources
 
