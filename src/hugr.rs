@@ -81,11 +81,6 @@ impl OpType {
             input_resources: rs,
         }
     }
-
-    /// Convenient wrapper for with_resources
-    pub fn with_no_resources(self) -> NodeType {
-        self.with_resources(ResourceSet::new())
-    }
 }
 
 impl NodeType {
