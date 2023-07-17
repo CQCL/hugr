@@ -26,14 +26,11 @@ represent (typed) data or control dependencies.
 
   - Modular design, allowing new operations, data types, and rewrite
     methods defined by third-parties.
-
   - Represent mixed quantum-classical programs, allowing for efficient
     lowering through bespoke compilation to dedicated targets.
-
   - Efficiently serializable. Different tools should be able to send and
     receive HUGRs via a serialized interface when sharing the in-memory
     structure is not possible.
-
   - Provide a common interface for rewrite operations with support for
     opaque types.  
 
@@ -42,7 +39,6 @@ represent (typed) data or control dependencies.
   - Translations to other representations. While the HUGR should be able
     to encode programs in languages such as QIR, the translation should
     be implemented by separate crates.
-
   - Execution, or any kind of interpretation of the program. The HUGR
     describes the graph representation and control flow, without fixing
     the semantics of any extension operations defined outside the core
@@ -52,11 +48,9 @@ represent (typed) data or control dependencies.
 
   - A directed graph structure with extensible operation types in the
     nodes and data types in the edges.
-
   - Indexed connection ports for each operation node, which may be
     connected to another port with the same data type or remain
     unconnected.
-
   - Control-flow support with ability to capture both LLVM SSACFG style
     programs and programs from future front-ends designed to target
     HUGR. These including the upcoming Python eDSL for quantum-classical
@@ -66,19 +60,14 @@ represent (typed) data or control dependencies.
     programmer-facing control flow constructs that map to the preferred
     constructs in HUGR without first having to pass through an
     LLVM/SSACFG intermediate.
-
   - Support for nested structures. The nodes form a tree-like hierarchy
     with nested graphs encoded as children of their containing node.
-
   - User-defined metadata, such as debug information, can be efficiently
     attached to nodes and queried.
-
   - All user-provided information can be encoded and decoded in a stable
     (versioned) efficient serialized format.
-
   - A type system for checking valid operation connectivity + (nice to
     have) only operations supported on specific targets are used.
-
   - A space efficient and user friendly specification of a subgraph and
     replacement graph, along with an efficient routine for performing
     the replacement.
@@ -153,7 +142,6 @@ As well as the type, dataflow edges are also parametrized by a
   - `Dom`: Edges from a dominating basic block in a control-flow graph
     that is the parent of the source; see
     [Non-local Edges](#non-local-edges)
-
 
 ```
 SimpleType ::= ClassicType | LinearType
@@ -250,7 +238,6 @@ edges. The following operations are *only* valid as immediate children of a
     edge for each use of the function. The function name is used at link time to
     look up definitions in linked
     modules (other hugr instances specified to the linker).
-  
   - `AliasDecl`: an external type alias declaration. At link time this can be
     replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
     named opaque type.
@@ -264,14 +251,11 @@ regions and control-flow regions:
 
   - `Const<T>` : a static constant value of type T stored in the node
     weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
-
   - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
     The function body is defined by the sibling graph formed by its children.
     At link time `FuncDecl` nodes are replaced by `FuncDefn`.
-
   - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
     `AliasDefn`.
-
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -293,20 +277,16 @@ the following basic dataflow operations are available (in addition to the
     ordering of operations can be achieved by topologically sorting the
     nodes starting from `Input` with respect to the Value and Order
     edges.
-
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Graph>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
-
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
     take no dataflow input, to ensure they lie in the causal cone of the
     `Input` node when traversing.
-
   - `identity<T>`: pass-through, no operation is performed.
-
   - `DFG`: A nested dataflow graph.
     These nodes are parents in the hierarchy.
     The signature of the operation comprises the output signature of the child
@@ -552,13 +532,10 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
   - Any operation may panic, e.g. integer divide when denominator is
     zero
-
   - Panicking aborts the current graph, and recursively the container
     node also panics, etc.
-
   - Nodes that are independent of the panicking node may have executed
     or not, at the discretion of the runtime/compiler.
-
   - If there are multiple nodes that may panic where neither has
     dependences on the other (including Order edges), it is at the
     discretion of the compiler as to which one panics first
@@ -575,7 +552,6 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
     like a DFG-node. This contains a DSG, and (like a DFG node) has
     inputs matching the child DSG; but one output, of type
     `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-
   - There is also a higher-order `catch` operation in the Tierkreis
     resource, taking a graph argument; and `run_circuit` will return the
     same way.
@@ -742,10 +718,8 @@ tooling. Here “extension tooling” can be our own, e.g. TKET2 or
 Tierkreis. These operations cover various flavours:
 
   - Instruction sets specific to a target.
-
   - Operations that are best expressed in some other format that can be
     compiled in to a graph (e.g. ZX).
-
   - Ephemeral operations used by specific compiler passes.
 
 A nice-to-have for this extensibility is a human-friendly format for
@@ -802,7 +776,6 @@ of individual operations is computed:
 
 1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
    that is built into tools that process the HUGR.
-
 2. The extension self-registers binary code (e.g. a Rust trait) providing a function
    `compute_signature` that computes the type.
 
@@ -826,7 +799,6 @@ resources to provide semantics portable across tools.
 1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
    that takes the type arguments and a set of target resources and may fallibly return
    a subgraph or function-body-HUGR using only those target resources.
-
 2. They may provide a HUGR, that declares functions implementing those operations. This
    is a simple case of the above (where the binary code is a constant function) but
    easy to pass between tools. However note this will only be possible for operations
@@ -965,7 +937,6 @@ node weights) or separated from it (keep a separate map from node ID to
 metadata). The advantages of the first approach are:
 
   - just one object to have around, not two;
-
   - reassignment of node IDs doesn't mess with metadata.
 
 The advantages of the second approach are:
@@ -973,7 +944,6 @@ The advantages of the second approach are:
   - Metadata should make no difference to the semantics of the hugr (by
     definition, otherwise it isn't metadata but data), so it makes sense
     to be separated from the core structure.
-
   - We can be more agile with the details, such as formatting and
     versioning.
 
@@ -1013,7 +983,6 @@ The type system will resemble the tierkreis type system, but with some
 extensions. Namely, the things the tierkreis type system is missing are:
 
   - User-defined types
-
   - Resource management - knowing what plugins a given graph depends on
 
 A grammar of available types is defined below.
@@ -1068,8 +1037,6 @@ types: `Graph`, `Map` and
 allows named newtypes to be used. Containers are linear if any of their
 components are linear.
 
-
-
 Note: any array can be turned into an equivalent tuple, but arrays also
 support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
 out-of-range? Or by known-range `Sum( ()^N )`?)
@@ -1079,15 +1046,11 @@ simple types. Types in the row can optionally be given names in metadata
 i.e. this does not affect behaviour of the HUGR. Row types are used
 
   - in the signatures for `Graph` inputs and outputs, and functions
-
   - Tuples - the 0-ary Tuple `()` aka `unit` takes no storage
-
   - Sums - allowing a bounded nat: `Sum((),(),())` is a ternary value;
     the 2-ary version takes the place of a boolean type
-
   - Arguments to `Opaque` types - where their meaning is
     extension-defined.
-
 
 ### Linearity
 
@@ -1127,8 +1090,6 @@ A Tierkreis runtime could be connected to workers which provide means of
 running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
-
-
 
 ### Type Constraints
 
@@ -1545,16 +1506,13 @@ Other policies could include:
   - to each of the new nodes added, insert a piece of metadata in its
     `History` section that captures all the chosen metadata with the
     keys of the replaced nodes:
-    
       - ` History: {Replaced: [{node1: old_node1_metadata, node2:
         old_node2_metadata, ...}, {...}, ...]}  `where `Replaced`
         specifies an ordered list of replacements, and the new
         replacement appends to the list (or creates a new list if
         `Replaced` doesn't yet exist);
-
   - to the root node of Γ, attach metadata capturing a serialization of the
     replacement (both the set of nodes replaced and its replacement):
-    
       - `History: {Replacements: [...]}`
 
 Further policies may be defined in the future; none of these polices
@@ -1585,20 +1543,13 @@ of the child-rewiring lists.
 ### Goals
 
   - Fast serialization/deserialization in Rust.
-
   - Ability to generate and consume from Python.
-
   - Reasonably small sized files/payloads.
-
   - Ability to send over wire. Myqos will need to do things like:
-    
       - Store the program in a database
-    
       - Search the program(?) (Increasingly
         unlikely with larger more complicated programs)
-    
       - Validate the data
-    
       - **Most important:** version the data for compiler/runtime
         compatibility
 
@@ -1719,9 +1670,7 @@ interpretations of a value:
 
   - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
     $a_i \in \\{0,1\\}$;
-
   - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
-
   - as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
 An asterix ( \* ) in the tables below indicates that the definition
@@ -1870,11 +1819,9 @@ These operations allow this.
   - `CallIndirect`: Call a function indirectly. Like `Call`, but the
     first input is a standard dataflow graph type. This is essentially
     `eval` in Tierkreis.
-
   - `catch`: like `CallIndirect`, the first argument is of type
     `Graph[R]<I,O>` and the rest of the arguments are of type `I`.
     However the result is not `O` but `Sum(O,ErrorType)`
-
   - `parallel`, `sequence`, `partial`? Note that these could be executed
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
@@ -1908,134 +1855,90 @@ an edge weight.
 
   - **BasicBlock node**: A child of a CFG node (i.e. a basic block
     within a control-flow graph).
-
   - **Call node**: TODO
-
   - **child node**: A child of a node is an adjacent node in the
     hierarchy that is further from the root node; equivalently, the
     target of a hierarchy edge from the current (parent) node.
-
   - **const edge**: TODO
-
   - **const node**: TODO
-
   - **container node**: TODO
-
   - **control-flow edge**: An edge between BasicBlock nodes in the same
     CFG (i.e. having the same parent CFG node).
-
   - **control-flow graph (CFG)**: The set of all children of a given CFG
     node, with all the edges between them. Includes exactly one entry
     and one exit node. Nodes are basic blocks, edges point to possible
     successors.
-
   - **Dataflow edge** either a Value edge or a Static edge; has a type,
     and runs between an output port and an input port.
-
   - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
     Dataflow container node, with all edges between them. Includes
     exactly one input node (unique node having no input edges) and one
     output node (unique node having no output edges). Nodes are
     processes that operate on input data and produce output data. Edges
     in a DSG are either value or order edges. The DSG must be acyclic.
-
   - **data-dependency node**: an input, output, operation, DFG, CFG,
     Conditional or TailLoop node. All incoming and outgoing edges are
     value edges.
-
   - **FuncDecl node**: child of a module, indicates that an external
     function exists but without giving a definition. May be the source
     of Static-edges to Call nodes and others.
-
   - **FuncDefn node**: child of a module node, defines a function (by being
     parent to the function’s body). May be the source of Static-edges to
     Call nodes and others.
-
   - **DFG node**: A node representing a data-flow graph. Its children
     are all data-dependency nodes.
-
   - **edge kind**: There are five kinds of edge: value edge, order edge,
     control-flow edge, Static edge, and hierarchy edge.
-
   - **edge type:** Typing information attached to a value edge or Static
     edge (representing the data type of value that the edge carries).
-
   - **entry node**: The distinguished node of a CFG representing the
     point where execution begins.
-
   - **exit node**: The distinguished node of a CFG representing the
     point where execution ends.
-
   - **function:** TODO
-
   - **Conditional node:** TODO
-
   - **hierarchy**: A tree whose nodes comprise all nodes of the HUGR,
     rooted at the HUGR's root node.
-
   - **hierarchy edge**: An edge in the hierarchy tree. The edge is considered to
     be directed, with the source node the parent of the target node.
-
   - **input node**: The distinguished node of a DSG representing the
     point where data processing begins.
-
   - **input signature**: The input signature of a node is the mapping
     from identifiers of input ports to their associated edge types.
-
   - **Inter-graph Edge**: Deprecated, see *non-local edge*
-
   - **CFG node**: A node representing a control-flow graph. Its children
     are all BasicBlock nodes, of which there is exactly one entry node
     and exactly one exit node.
-
   - **load-constant node**: TODO
-
   - **metadata:** TODO
-
   - **module**: TODO
-
   - **node index**: An identifier for a node that is unique within the
     HUGR.
-
   - **non-local edge**: A Value or Static edge with Locality Ext,
     or a Value edge with locality Dom (i.e. not Local)
-
   - **operation**: TODO
-
   - **output node**: The distinguished node of a DSG representing the
     point where data processing ends.
-
   - **output signature**: The output signature of a node is the mapping
     from identifiers of output ports to their associated edge types.
-
   - **parent node**: The parent of a non-root node is the adjacent node
     in the hierarchy that is nearer to the root node.
-
   - **port**: A notional entry or exit point from a data-dependency
     node, which has an identifier that is unique for the given node.
     Each incoming or outgoing value edge is associated with a specific
     port.
-
   - **port index**: An identifier for a port that is unique within the
     HUGR.
-
   - **replacement**: TODO
-
   - **resource**: TODO
-
   - **sibling graph**: TODO
-
   - **signature**: The signature of a node is the combination of its
     input and output signatures.
-
   - **simple type**: a quantum or classical type annotated with the
     Resources required to produce the value
-
   - **order edge**: An edge implying dependency of the target node on
     the source node.
-
   - **TailLoop node**: TODO
-
   - **value edge:** An edge between data-dependency nodes. Has a fixed
     edge type.
 
@@ -2049,11 +1952,9 @@ an edge weight.
     flow without introduction of extra variables (dynamic overhead, i.e.
     runtime cost) and/or code duplication (static overhead, i.e. code
     size).
-    
       - Specifically, the most common case is *shortcircuit evaluation*:
         `if (P && Q) then A; else B;` where Q is only evaluated if P is
         true.
-
   - We *could* parse a CFG into a DSG with only Conditional-nodes and
     TailLoop-nodes by introducing extra variables, as per [Google
     paper](https://dl.acm.org/doi/pdf/10.1145/2693261), and then expect
@@ -2062,7 +1963,6 @@ an edge weight.
     undesirable for using the HUGR as a common interchange format (e.g.
     QIR → HUGR → LLVM) when little optimization is being done (perhaps
     no cross-basic-block optimization).
-
   - It’s possible that maintaining support for CFGs-nodes may become a
     burden, i.e. if we find we are not using CFGs much. However, I
     believe that this burden can be kept acceptably low if we are
@@ -2084,21 +1984,18 @@ e.g. for authors of "rewrite rules" and other optimisations.
     eliminated at compile-time (ensuring no runtime cost), but only if
     stringent well-formedness conditions are maintained on the DSG, and
     there are issues with variable liveness.
-
   - [Lawrence's
     thesis](https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-705.pdf)
     handles some cases (e.g. shortcircuit evaluation) but cannot handle
     arbitrary (even reducible) control flow and the multi-stage approach
     makes it hard to see what amount of code duplication will be
     necessary to turn the IR back into a CFG (e.g. following a rewrite).
-
   - We could extend Conditional/TailLoop nodes to be more expressive
     (i.e. allowing them or others to capture *more* common cases, indeed
     arbitrary reducible code, in a DSG-like fashion), perhaps something
     like WASM. However although this would allow removing the CFG, the
     DSG nodes get more complicated, and start to behave in very
     non-DSG-like ways.
-
   - We could use function calls to avoid code duplication (essentially
     the return address is the extra boolean variable, likely to be very
     cheap). However, I think this means pattern-matching will want to
@@ -2114,19 +2011,14 @@ differences include:
 
   - MLIR uses names everywhere, which internally are mapped to some kind
     of hyperedge; we have explicit edges in the structure.
-    
       - However, we can think of every output nodeport being a unique
         SSA/SSI name.
-    
       - MLIR does not do linearity or SSI.
-
   - Our CFGs are Single Entry Single Exit (results defined by the output
     node of the exit block), rather than MLIR’s Single Entry Multiple
     Exit (with `return` instruction)
-
   - MLIR allows multiple regions inside a single operation, whereas we
     introduce extra levels of hierarchy to allow this.
-
   - I note re. closures that MLIR expects the enclosing scope to make
     sure any referenced values are kept ‘live’ for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
