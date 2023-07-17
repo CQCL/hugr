@@ -37,8 +37,8 @@ pub(crate) use impl_box_clone;
 /// [`TypeRow::from`] instead.
 ///
 /// [`SimpleType`]: crate::types::SimpleType
-/// [`TypeRow`]: crate::types::TypeRow
-/// [`TypeRow::from`]: crate::types::TypeRow::from
+/// [`TypeRow`]: crate::types::simple::TypeRow
+/// [`TypeRow::from`]: crate::types::simple::TypeRow::from
 ///
 /// Example:
 /// ```
