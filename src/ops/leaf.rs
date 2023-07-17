@@ -76,9 +76,6 @@ pub enum LeafOp {
     Lift {
         /// The types of the edges
         type_row: TypeRow,
-        /// The resources which are present in both the inputs and outputs
-        /// TODO: We shouldn't need this, but let's keep it until everything builds...
-        input_resources: ResourceSet,
         /// The resources which we're adding to the inputs
         new_resource: ResourceId,
     },
@@ -193,7 +190,6 @@ impl OpTrait for LeafOp {
             LeafOp::RzF64 => AbstractSignature::new_df(type_row![Q, F], type_row![Q]),
             LeafOp::Lift {
                 type_row,
-                input_resources: _,
                 new_resource,
             } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
                 .with_resource_delta(&ResourceSet::singleton(new_resource)),

@@ -441,7 +441,6 @@ mod test {
         let lift_a = add_ab.add_dataflow_op(
             NodeType::pure(LeafOp::Lift {
                 type_row: type_row![BIT],
-                input_resources: ResourceSet::new(),
                 new_resource: "A".into(),
             }),
             [w],
@@ -452,7 +451,6 @@ mod test {
             NodeType {
                 op: LeafOp::Lift {
                     type_row: type_row![BIT],
-                    input_resources: ResourceSet::from_iter(["A".into()]),
                     new_resource: "B".into(),
                 }
                 .into(),
@@ -473,7 +471,6 @@ mod test {
             NodeType {
                 op: LeafOp::Lift {
                     type_row: type_row![BIT],
-                    input_resources: ab_resources.clone(),
                     new_resource: "C".into(),
                 }
                 .into(),
