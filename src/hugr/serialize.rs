@@ -246,7 +246,7 @@ pub mod test {
             ModuleBuilder,
         },
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{ClassicType, LinearType, Signature, SimpleType},
+        types::{ClassicType, Signature, SimpleType},
         Port,
     };
     use itertools::Itertools;
@@ -255,7 +255,7 @@ pub mod test {
     };
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    const QB: SimpleType = SimpleType::Qubit;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -425,7 +425,7 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb: SimpleType = LinearType::Qubit.into();
+        let qb = SimpleType::Qubit;
         let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();

@@ -4,8 +4,7 @@ use thiserror::Error;
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-
-use crate::types::LinearType;
+use crate::types::SimpleType;
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -63,7 +62,7 @@ pub enum BuildError {
 
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
-    NoCopyLinear(LinearType),
+    NoCopyLinear(SimpleType),
 
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
@@ -72,7 +71,7 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod test {
-    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
+    use crate::types::{ClassicType, Signature, SimpleType};
     use crate::Hugr;
 
     use super::handle::BuildHandle;
@@ -82,7 +81,7 @@ mod test {
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
     pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
-    pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    pub(super) const QB: SimpleType = SimpleType::Qubit;
 
     /// Wire up inputs of a Dataflow container to the outputs.
     pub(super) fn n_identity<T: DataflowSubContainer>(
