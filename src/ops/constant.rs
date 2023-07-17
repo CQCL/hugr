@@ -236,6 +236,7 @@ mod test {
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        classic_row,
         hugr::{typecheck::ConstTypeError, ValidationError},
         type_row,
         types::{ClassicType, SimpleType, TypeRow},
@@ -244,7 +245,7 @@ mod test {
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         let pred_rows = vec![
-            TypeRow::from(vec![ClassicType::i64(), ClassicType::F64]),
+            classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
@@ -273,7 +274,7 @@ mod test {
     #[test]
     fn test_bad_predicate() {
         let pred_rows = vec![
-            TypeRow::from(vec![ClassicType::i64(), ClassicType::F64]),
+            classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
