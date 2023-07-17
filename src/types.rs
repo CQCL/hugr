@@ -106,7 +106,6 @@ impl From<Signature> for AbstractSignature {
     }
 }
 
-#[cfg_attr(feature = "pyo3", pymethods)]
 impl Signature {
     /// Create a new signature.
     pub fn new(
@@ -143,7 +142,10 @@ impl AbstractSignature {
         let linear = linear.into();
         Self::new_df(linear.clone(), linear)
     }
+}
 
+#[cfg_attr(feature = "pyo3", pymethods)]
+impl AbstractSignature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
