@@ -406,28 +406,6 @@ impl SignatureTrait for Signature {
     }
 }
 
-// Implement iterators, which can't be put in a trait
-impl Signature {
-    delegate! {
-        to self.signature {
-            /// Delegate
-            pub fn linear(&self) -> impl Iterator<Item = &SimpleType>;
-            /// Delegate
-            pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port>;
-            /// Delegate
-            pub fn input_ports_df(&self) -> impl Iterator<Item = Port>;
-            /// Delegate
-            pub fn output_ports_df(&self) -> impl Iterator<Item = Port>;
-            /// Delegate
-            pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port>;
-            /// Delegate
-            pub fn input_ports(&self) -> impl Iterator<Item = Port>;
-            /// Delegate
-            pub fn output_ports(&self) -> impl Iterator<Item = Port>;
-        }
-    }
-}
-
 impl Signature {
     /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
