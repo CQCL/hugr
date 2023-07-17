@@ -44,6 +44,25 @@ pub trait CustomSignatureFunc: Send + Sync {
     }
 }
 
+impl<F> CustomSignatureFunc for F
+where
+    F: Fn(
+            &[TypeArg],
+        )
+            -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError>
+        + Send
+        + Sync,
+{
+    fn compute_signature(
+        &self,
+        _name: &SmolStr,
+        arg_values: &[TypeArg],
+        _misc: &HashMap<String, serde_yaml::Value>,
+    ) -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError> {
+        self(arg_values)
+    }
+}
+
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]

@@ -66,7 +66,7 @@ pub(crate) enum SerSimpleType {
 }
 
 impl PrimType for SerSimpleType {
-    const LINEAR: bool = true;
+    const CLASSIC: bool = false;
 }
 
 impl<T: PrimType> From<Container<T>> for SerSimpleType
@@ -78,27 +78,30 @@ where
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
                 row: Box::new(inner.map_into()),
-                l: T::LINEAR,
+                l: !T::CLASSIC,
             },
             Container::List(inner) => SerSimpleType::List {
                 inner: Box::new((*inner).into()),
-                l: T::LINEAR,
+                l: !T::CLASSIC,
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
                 row: Box::new(inner.map_into()),
-                l: T::LINEAR,
+                l: !T::CLASSIC,
             },
             Container::Map(inner) => SerSimpleType::Map {
                 k: Box::new(inner.0.into()),
                 v: Box::new(inner.1.into()),
-                l: T::LINEAR,
+                l: !T::CLASSIC,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
                 inner: box_convert(*inner),
                 len,
-                l: T::LINEAR,
+                l: !T::CLASSIC,
             },
-            Container::Alias(name) => SerSimpleType::Alias { name, l: T::LINEAR },
+            Container::Alias(name) => SerSimpleType::Alias {
+                name,
+                l: !T::CLASSIC,
+            },
         }
     }
 }

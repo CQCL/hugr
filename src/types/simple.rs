@@ -53,8 +53,8 @@ pub trait PrimType: std::fmt::Debug + Clone + 'static {
     // across ClassicType and SimpleType
     // currently used to constrain Container<T>
 
-    /// Is this type linear? (I.e. does it have any linear components?)
-    const LINEAR: bool;
+    /// Is this type classical? (I.e. can it be copied - not if it has *any* linear component)
+    const CLASSIC: bool;
 }
 
 /// A type that represents a container of other types.
@@ -202,19 +202,14 @@ impl Display for ClassicType {
 }
 
 impl PrimType for ClassicType {
-    const LINEAR: bool = false;
+    const CLASSIC: bool = true;
 }
 
 impl PrimType for SimpleType {
-    const LINEAR: bool = true;
+    const CLASSIC: bool = false;
 }
 
 impl SimpleType {
-    /// Returns whether the type contains linear data (perhaps as well as classical)
-    pub fn is_linear(&self) -> bool {
-        !self.is_classical()
-    }
-
     /// Returns whether the type contains only classic data.
     pub fn is_classical(&self) -> bool {
         matches!(self, Self::Classic(_))
@@ -316,12 +311,6 @@ impl<T: PrimType> TypeRow<T> {
 }
 
 impl TypeRow<SimpleType> {
-    /// Returns whether the row contains only linear data.
-    #[inline(always)]
-    pub fn purely_linear(&self) -> bool {
-        self.types.iter().all(SimpleType::is_linear)
-    }
-
     /// Returns whether the row contains only classic data.
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {

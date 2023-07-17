@@ -6,7 +6,7 @@ use crate::Node;
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::tag::OpTag;
+use super::OpTag;
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].
@@ -25,7 +25,7 @@ pub trait NodeHandle: Clone {
 
     /// Cast the handle to a different more general tag.
     fn try_cast<T: NodeHandle + From<Node>>(&self) -> Option<T> {
-        T::TAG.contains(Self::TAG).then(|| self.node().into())
+        T::TAG.is_superset(Self::TAG).then(|| self.node().into())
     }
 }
 
@@ -74,21 +74,25 @@ pub struct FuncID<const DEF: bool>(Node);
 pub struct AliasID<const DEF: bool> {
     node: Node,
     name: SmolStr,
-    linear: bool,
+    classical: bool,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: Node, name: SmolStr, linear: bool) -> Self {
-        Self { node, name, linear }
+    pub fn new(node: Node, name: SmolStr, classical: bool) -> Self {
+        Self {
+            node,
+            name,
+            classical,
+        }
     }
 
     /// Construct new AliasID
     pub fn get_alias_type(&self) -> SimpleType {
-        if self.linear {
-            Container::<SimpleType>::Alias(self.name.clone()).into()
-        } else {
+        if self.classical {
             Container::<ClassicType>::Alias(self.name.clone()).into()
+        } else {
+            Container::<SimpleType>::Alias(self.name.clone()).into()
         }
     }
     /// Retrieve the underlying core type

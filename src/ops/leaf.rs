@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
-use super::{tag::OpTag, OpName, OpTrait};
+use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
@@ -116,6 +116,10 @@ impl OpName for LeafOp {
     }
 }
 
+impl StaticTag for LeafOp {
+    const TAG: OpTag = OpTag::Leaf;
+}
+
 impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
@@ -144,7 +148,7 @@ impl OpTrait for LeafOp {
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Leaf
+        <Self as StaticTag>::TAG
     }
 
     /// The signature of the operation.
@@ -213,11 +217,6 @@ impl OpTrait for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
-    }
-
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()

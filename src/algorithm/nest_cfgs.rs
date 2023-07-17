@@ -44,7 +44,7 @@ use std::hash::Hash;
 use itertools::Itertools;
 
 use crate::hugr::view::HugrView;
-use crate::ops::tag::OpTag;
+use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
@@ -398,7 +398,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::hugr::region::FlatRegionView;
+    use crate::hugr::region::{FlatRegionView, Region};
     use crate::ops::{
         handle::{BasicBlockID, ConstID, NodeHandle},
         ConstValue,
@@ -427,11 +427,14 @@ pub(crate) mod test {
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry_builder = cfg_builder.simple_entry_builder(type_row![NAT], 1)?;
-        let pred_const = entry_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry_builder, &const_unit)?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
         let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
@@ -644,11 +647,13 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry = cfg_builder.simple_entry_builder(type_row![NAT], 2)?;
-        let pred_const = entry.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry, &pred_const)?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
+            &pred_const,
+        )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
         let head = if separate {
             let h = n_identity(
@@ -676,12 +681,14 @@ pub(crate) mod test {
         //let sum2_type = SimpleType::new_predicate(2);
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let mut entry_builder = cfg_builder.simple_entry_builder(type_row![NAT], 1)?;
 
-        let pred_const = entry_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = entry_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
 
-        let entry = n_identity(entry_builder, &const_unit)?;
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
+            &const_unit,
+        )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
