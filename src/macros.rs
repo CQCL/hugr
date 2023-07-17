@@ -28,25 +28,26 @@ macro_rules! impl_box_clone {
 }
 pub(crate) use impl_box_clone;
 
-/// Creates a [`TypeRow`] backed by statically defined data, avoiding
+/// Creates a [`SimpleRow`] backed by statically defined data, avoiding
 /// allocations.
 ///
 /// The parameters must be constants of type [`SimpleType`].
 ///
 /// For type rows that cannot be statically defined, use a vector or slice with
-/// [`TypeRow::from`] instead.
+/// [`SimpleRow::from`] instead.
 ///
 /// [`SimpleType`]: crate::types::SimpleType
-/// [`TypeRow`]: crate::types::simple::TypeRow
-/// [`TypeRow::from`]: crate::types::simple::TypeRow::from
+/// [`SimpleRow`]: crate::types::SimpleRow
+/// [`SimpleRow::from`]: crate::types::SimpleRow::from
 ///
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{ClassicType, SimpleType, Signature, SimpleRow};
 /// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-/// let static_row: SimpleRow = type_row![B, B];
-/// let dynamic_row: SimpleRow = vec![B, B, B].into();
+/// const QB: SimpleType = SimpleType::Qubit;
+/// let static_row: SimpleRow = type_row![B, QB];
+/// let dynamic_row: SimpleRow = vec![B, B, QB].into();
 /// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
 ///
 /// let repeated_row: SimpleRow = type_row![B; 2];
@@ -78,9 +79,28 @@ macro_rules! type_row {
     };
 }
 
-/// Like [type_row!] but for rows of [ClassicType]s
+/// Like [type_row!] but creates a [`ClassicRow`], from parameters
+/// that must all be constants of type [`ClassicType`].
 ///
-/// [ClassicType]: crate::types::ClassicType
+/// For type rows that cannot be statically defined, use a vector or slice with
+/// [`ClassicRow::from`] instead.
+///
+/// [`ClassicType`]: crate::types::ClassicType
+/// [`ClassicRow`]: crate::types::ClassicRow
+/// [`ClassicRow::from`]: crate::types::ClassicRow::from
+///
+/// Example:
+/// ```
+/// # use hugr::macros::type_row;
+/// # use hugr::types::{ClassicType, SimpleType, Signature, SimpleRow};
+/// const B: ClassicType = ClassicType::bit();
+/// const I: ClassicType = ClassicType::int(64);
+/// let static_row: ClassicRow = classic_row![B, QB];
+/// let dynamic_row: ClassicRow = vec![B, B, QB].into();
+///
+/// let repeated_row: SimpleRow = type_row![B; 2];
+/// assert_eq!(repeated_row, static_row);
+/// ```
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! classic_row {
