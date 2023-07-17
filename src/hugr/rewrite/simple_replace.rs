@@ -604,7 +604,13 @@ mod test {
 
         let outputs = repl
             .node_inputs(repl_output)
-            .filter(|&p| repl.get_optype(repl_output).op.op_signature().get(p).is_some())
+            .filter(|&p| {
+                repl.get_optype(repl_output)
+                    .op
+                    .op_signature()
+                    .get(p)
+                    .is_some()
+            })
             .map(|p| ((repl_output, p), p))
             .collect();
 

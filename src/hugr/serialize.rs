@@ -247,9 +247,7 @@ pub mod test {
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         resource::ResourceSet,
-        types::{
-            AbstractSignature, ClassicType, LinearType, Signature, SimpleType,
-        },
+        types::{AbstractSignature, ClassicType, LinearType, Signature, SimpleType},
         Port,
     };
     use itertools::Itertools;
