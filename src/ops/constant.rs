@@ -118,7 +118,7 @@ impl ConstValue {
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int { value: _, width } => ClassicType::Int(*width),
-            Self::Opaque(_, b) => ClassicType::Opaque((*b).const_type()),
+            Self::Opaque(_, b) => ClassicType::Opaque((*b).custom_type()),
             Self::Sum { variants, .. } => {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
             }
@@ -211,7 +211,7 @@ impl ConstValue {
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque(v.const_type(), Box::new(v))
+        Self::Opaque(v.custom_type(), Box::new(v))
     }
 }
 
@@ -228,7 +228,7 @@ pub trait CustomConst:
 
     /// Returns the type of the constant.
     // TODO it would be good to ensure that this is a *classic* CustomType not a linear one!
-    fn const_type(&self) -> CustomType;
+    fn custom_type(&self) -> CustomType;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn eq(&self, other: &dyn CustomConst) -> bool {

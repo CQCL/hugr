@@ -89,7 +89,7 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn const_type(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         let t: Type = match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
