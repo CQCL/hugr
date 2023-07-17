@@ -162,7 +162,7 @@ mod test {
         },
         ops::LeafOp,
         type_row,
-        types::{Signature, SignatureTrait},
+        types::Signature,
     };
 
     #[test]

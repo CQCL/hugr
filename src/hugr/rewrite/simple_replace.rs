@@ -9,7 +9,6 @@ use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, NodeType, Rewrite},
     ops::{OpTag, OpTrait, OpType},
-    types::SignatureTrait,
     Hugr, Port,
 };
 use thiserror::Error;
@@ -541,7 +540,7 @@ mod test {
             .collect();
         let inputs = h
             .node_outputs(input)
-            .filter(|&p| h.get_optype(input).signature().get(p).is_some())
+            .filter(|&p| h.get_optype(input).op.op_signature().get(p).is_some())
             .map(|p| {
                 let link = h.linked_ports(input, p).next().unwrap();
                 (link, link)
@@ -549,7 +548,7 @@ mod test {
             .collect();
         let outputs = h
             .node_inputs(output)
-            .filter(|&p| h.get_optype(output).signature().get(p).is_some())
+            .filter(|&p| h.get_optype(output).op.op_signature().get(p).is_some())
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
@@ -605,7 +604,7 @@ mod test {
 
         let outputs = repl
             .node_inputs(repl_output)
-            .filter(|&p| repl.get_optype(repl_output).signature().get(p).is_some())
+            .filter(|&p| repl.get_optype(repl_output).op.op_signature().get(p).is_some())
             .map(|p| ((repl_output, p), p))
             .collect();
 

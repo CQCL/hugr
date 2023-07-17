@@ -11,7 +11,7 @@ use crate::{hugr::view::HugrView, type_row, types::SimpleType};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::{Signature, SignatureTrait};
+use crate::types::Signature;
 
 use crate::Node;
 use crate::{

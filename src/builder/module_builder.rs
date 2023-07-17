@@ -182,7 +182,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
-        types::{Signature, SignatureTrait},
+        types::Signature,
     };
 
     use super::*;

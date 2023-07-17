@@ -375,44 +375,34 @@ impl AbstractSignature {
     }
 }
 
-impl SignatureTrait for Signature {
-    fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+impl Signature {
+    /// Create a new signature with only dataflow inputs and outputs.
+    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         AbstractSignature::new_df(input, output).with_input_resources(ResourceSet::new())
     }
 
-    fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    /// Create a new signature with the same input and output types.
+    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         AbstractSignature::new_linear(linear).with_input_resources(ResourceSet::new())
     }
 
-    delegate! {
-        to self.signature {
-            fn is_empty(&self) -> bool;
-            fn purely_linear(&self) -> bool;
-            fn purely_classical(&self) -> bool;
-            fn get(&self, port: Port) -> Option<EdgeKind>;
-            fn get_df(&self, port: Port) -> Option<&SimpleType>;
-            fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType>;
-            fn port_count(&self, dir: Direction) -> usize;
-            fn input_count(&self) -> usize;
-            fn output_count(&self) -> usize;
-            fn df_port_count(&self, dir: Direction) -> usize;
-            fn df_types(&self, dir: Direction) -> &[SimpleType];
-            fn input_df_types(&self) -> &[SimpleType];
-            fn output_df_types(&self) -> &[SimpleType];
-            fn input(&self) -> &TypeRow;
-            fn output(&self) -> &TypeRow;
-            fn static_input(&self) -> &TypeRow;
-        }
-    }
-}
-
-impl Signature {
     /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
     pub fn get_resources(&self, dir: &Direction) -> ResourceSet {
         match dir {
             Direction::Incoming => self.input_resources.clone(),
             Direction::Outgoing => self.output_resources(),
+        }
+    }
+
+    delegate! {
+        to self.signature {
+            /// Inputs of the abstract signature
+            pub fn input(&self) -> &TypeRow;
+            /// Outputs of the abstract signature
+            pub fn output(&self) -> &TypeRow;
+            /// Static inputs of the abstract signature
+            pub fn static_input(&self) -> &TypeRow;
         }
     }
 }

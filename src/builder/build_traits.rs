@@ -205,7 +205,7 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
+        let num_outputs = hugr.get_optype(hugr.root()).op_signature().output_count();
         let node = self.add_hugr_view(hugr)?;
 
         let [inp, _] = self.io();

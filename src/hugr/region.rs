@@ -416,7 +416,7 @@ mod test {
         hugr::NodeType,
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{ClassicType, LinearType, Signature, SignatureTrait, SimpleType},
+        types::{ClassicType, LinearType, Signature, SimpleType},
     };
 
     use super::*;
