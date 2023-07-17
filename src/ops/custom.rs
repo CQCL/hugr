@@ -23,6 +23,16 @@ pub enum ExternalOp {
     Opaque(OpaqueOp),
 }
 
+impl ExternalOp {
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        match self {
+            Self::Opaque(op) => op.args(),
+            Self::Resource(op) => op.args(),
+        }
+    }
+}
+
 impl From<ExternalOp> for OpaqueOp {
     fn from(value: ExternalOp) -> Self {
         match value {
@@ -106,6 +116,11 @@ impl ResourceOp {
             signature,
         })
     }
+
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
 }
 
 impl From<ResourceOp> for OpaqueOp {
@@ -169,6 +184,11 @@ impl OpaqueOp {
             signature,
         }
     }
+
+    /// Return the argument values for this operation.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
 }
 
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
@@ -227,4 +247,26 @@ pub enum CustomOpError {
     /// Resource and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
     SignatureMismatch(String, AbstractSignature, AbstractSignature),
+}
+
+#[cfg(test)]
+mod test {
+    use crate::types::ClassicType;
+
+    use super::*;
+
+    #[test]
+    fn new_opaque_op() {
+        let op = OpaqueOp::new(
+            "res".into(),
+            "op",
+            "desc".into(),
+            vec![TypeArg::ClassicType(ClassicType::F64)],
+            None,
+        );
+        let op: ExternalOp = op.into();
+        assert_eq!(op.name(), "res.op");
+        assert_eq!(op.description(), "desc");
+        assert_eq!(op.args(), &[TypeArg::ClassicType(ClassicType::F64)]);
+    }
 }

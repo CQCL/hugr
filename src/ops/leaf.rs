@@ -7,10 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
-    types::{
-        AbstractSignature, ClassicType, EdgeKind, LinearType, SignatureDescription, SimpleType,
-        TypeRow,
-    },
+    types::{AbstractSignature, ClassicType, EdgeKind, SignatureDescription, SimpleType, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -84,7 +81,7 @@ pub enum LeafOp {
 impl Default for LeafOp {
     fn default() -> Self {
         Self::Noop {
-            ty: SimpleType::default(),
+            ty: SimpleType::Qubit,
         }
     }
 }
@@ -156,7 +153,7 @@ impl OpTrait for LeafOp {
     fn op_signature(&self) -> AbstractSignature {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
-        const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
+        const Q: SimpleType = SimpleType::Qubit;
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
         const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
@@ -215,11 +212,6 @@ impl OpTrait for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.op_signature().linear().count()
-    }
-
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
         self.op_signature().purely_classical()

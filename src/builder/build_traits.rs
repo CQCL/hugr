@@ -653,7 +653,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_offset).unwrap() {
         if !local_source {
             // Non-local value sources require a state edge to an ancestor of dst
-            if typ.is_linear() {
+            if !typ.is_classical() {
                 let val_err: ValidationError = InterGraphEdgeError::NonClassicalData {
                     from: src,
                     from_offset: Port::new_outgoing(src_port),
@@ -685,11 +685,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             // TODO: Avoid adding duplicate edges
             // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
             base.add_other_edge(src, src_sibling)?;
-        } else if base.linked_ports(src, src_offset).next().is_some() {
+        } else if !typ.is_classical() && base.linked_ports(src, src_offset).next().is_some() {
             // Don't copy linear edges.
-            if let SimpleType::Linear(lty) = typ {
-                return Err(BuildError::NoCopyLinear(lty));
-            }
+            return Err(BuildError::NoCopyLinear(typ));
         }
     }
 

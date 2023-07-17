@@ -211,6 +211,7 @@ mod test {
     use crate::ops::handle::NodeHandle;
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
+    use crate::types::SimpleType;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -219,7 +220,7 @@ mod test {
         ops::LeafOp,
         resource::ResourceSet,
         type_row,
-        types::{LinearType, Signature},
+        types::Signature,
         Wire,
     };
 
@@ -321,7 +322,7 @@ mod test {
             Ok(module_builder.finish_hugr()?)
         };
 
-        assert_eq!(builder(), Err(BuildError::NoCopyLinear(LinearType::Qubit)));
+        assert_eq!(builder(), Err(BuildError::NoCopyLinear(SimpleType::Qubit)));
     }
 
     #[test]

@@ -11,7 +11,7 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicType, Container, LinearType, SimpleType, TypeRow};
+pub use simple::{ClassicType, Container, SimpleType, TypeRow};
 
 use delegate::delegate;
 use smol_str::SmolStr;
@@ -36,10 +36,10 @@ pub enum EdgeKind {
 }
 
 impl EdgeKind {
-    /// Returns whether the type contains only linear data.
+    /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         match self {
-            EdgeKind::Value(t) => t.is_linear(),
+            EdgeKind::Value(t) => !t.is_classical(),
             _ => false,
         }
     }
@@ -150,12 +150,6 @@ impl AbstractSignature {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
-    }
-
-    /// Returns whether the data wires in the signature are purely linear.
-    #[inline(always)]
-    pub fn purely_linear(&self) -> bool {
-        self.input.purely_linear() && self.output.purely_linear()
     }
 
     /// Returns whether the data wires in the signature are purely classical.
@@ -276,14 +270,14 @@ impl AbstractSignature {
         debug_assert_eq!(
             self.input
                 .iter()
-                .filter(|t| t.is_linear())
+                .filter(|t| !t.is_classical())
                 .collect::<Vec<_>>(),
             self.output
                 .iter()
-                .filter(|t| t.is_linear())
+                .filter(|t| !t.is_classical())
                 .collect::<Vec<_>>()
         );
-        self.input.iter().filter(|t| t.is_linear())
+        self.input.iter().filter(|t| !t.is_classical())
     }
 
     /// Returns the value `Port`s in the signature for a given direction.
