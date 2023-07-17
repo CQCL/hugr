@@ -125,9 +125,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                // TODO: Make this non-pure
+                // TODO: Allow this to be non-pure
                 self.hugr_mut().add_op_before(sibling_node, NodeType::pure(case_op))?
             } else {
+                // TODO: Allow this to be non-pure
                 self.add_child_op(NodeType::pure(case_op))?
             };
 

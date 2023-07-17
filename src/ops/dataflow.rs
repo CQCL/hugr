@@ -110,7 +110,7 @@ impl DataflowOpTrait for Output {
         "The output node for this dataflow subgraph"
     }
 
-    // TODO: We know what the input resources should be, so we *could* give an
+    // Note: We know what the input resources should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new_df(self.types.clone(), TypeRow::new())

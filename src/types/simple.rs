@@ -125,8 +125,6 @@ pub enum ClassicType {
 
 impl ClassicType {
     /// Create a graph type with the given signature, using default resources.
-    /// TODO in the future we'll probably need versions of this that take resources.
-    /// TODO ^^
     #[inline]
     pub fn graph_from_sig(signature: AbstractSignature) -> Self {
         ClassicType::Graph(Box::new(signature))
