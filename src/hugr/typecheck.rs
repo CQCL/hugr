@@ -21,9 +21,6 @@ pub enum ConstTypeError {
     /// constructors to check against it
     #[error("Unimplemented: there are no constants of type {0}")]
     Unimplemented(ClassicType),
-    /// The given type and term are incompatible
-    #[error("Invalid const value for type {0}")]
-    Failed(ClassicType),
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
     #[error("Const int {1} too large for type I{0}")]
@@ -49,8 +46,7 @@ pub enum ConstTypeError {
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
-    /// For a value which embeds its type (e.g. sum or opaque) - a mismatch
-    /// between the embedded type and the type we're checking against
+    /// A mismatch between the type expected and the actual type of the constant
     #[error("Type mismatch for const - expected {0}, found {1}")]
     TypeMismatch(ClassicType, ClassicType),
     /// A mismatch between the embedded type and the type we're checking
@@ -114,7 +110,9 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                 }
                 Ok(())
             }
-            (Container::Tuple(_), _) => Err(ConstTypeError::Failed(ty.clone())),
+            (Container::Tuple(_), _) => {
+                Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
+            }
             (Container::Sum(row), ConstValue::Sum { tag, variants, val }) => {
                 if tag > &row.len() {
                     return Err(ConstTypeError::InvalidSumTag);
@@ -131,7 +129,9 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     _ => Err(ConstTypeError::LinearTypeDisallowed),
                 }
             }
-            (Container::Sum(_), _) => Err(ConstTypeError::Failed(ty.clone())),
+            (Container::Sum(_), _) => {
+                Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
+            }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ty @ ClassicType::Graph(_), _) => Err(ConstTypeError::Unimplemented(ty.clone())),
@@ -146,7 +146,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             }
             Ok(())
         }
-        (ty, _) => Err(ConstTypeError::Failed(ty.clone())),
+        (ty, _) => Err(ConstTypeError::TypeMismatch(ty.clone(), val.const_type())),
     }
 }
 
@@ -169,7 +169,10 @@ mod test {
         typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();
         assert_eq!(
             typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
-            Err(ConstTypeError::Failed(ClassicType::F64))
+            Err(ConstTypeError::TypeMismatch(
+                ClassicType::F64,
+                ClassicType::Int(64)
+            ))
         );
         let tuple_ty = ClassicType::Container(Container::Tuple(Box::new(type_row![
             SimpleType::Classic(INT),
@@ -185,7 +188,7 @@ mod test {
                 &tuple_ty,
                 &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::i64(2)])
             ),
-            Err(ConstTypeError::Failed(_))
+            Err(ConstTypeError::TypeMismatch(_, _))
         );
         assert_eq!(
             typecheck_const(
