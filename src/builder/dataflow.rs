@@ -426,7 +426,8 @@ mod test {
         )?;
 
         let add_c_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_input_resources(abc_resources);
+            .with_resource_delta(&c_resources)
+            .with_input_resources(ab_resources.clone());
 
         let [w] = parent.input_wires_arr();
 
