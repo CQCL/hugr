@@ -137,13 +137,11 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         (ty @ ClassicType::Graph(_), _) => Err(ConstTypeError::Unimplemented(ty.clone())),
         (ty @ ClassicType::String, _) => Err(ConstTypeError::Unimplemented(ty.clone())),
         (ClassicType::Variable(_), _) => Err(ConstTypeError::ConstCantBeVar),
-        (ClassicType::Opaque(ty), ConstValue::Opaque(_tm, ty2)) => {
-            // The type we're checking against
-            let ty_act = ty2.custom_type();
-            if &ty_act != ty {
+        (ClassicType::Opaque(ty), ConstValue::Opaque(ty_act, _val)) => {
+            if ty_act != ty {
                 return Err(ConstTypeError::TypeMismatch(
                     ty.clone().into(),
-                    ty_act.into(),
+                    ty_act.clone().into(),
                 ));
             }
             Ok(())
