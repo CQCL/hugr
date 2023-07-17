@@ -52,9 +52,6 @@ pub trait PrimType: std::fmt::Debug + Clone + 'static {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType and SimpleType
     // currently used to constrain Container<T>
-
-    /// Is this type classical? (I.e. can it be copied - not if it has *any* linear component)
-    const CLASSIC: bool;
 }
 
 /// A type that represents a container of other types.
@@ -201,13 +198,9 @@ impl Display for ClassicType {
     }
 }
 
-impl PrimType for ClassicType {
-    const CLASSIC: bool = true;
-}
+impl PrimType for ClassicType {}
 
-impl PrimType for SimpleType {
-    const CLASSIC: bool = false;
-}
+impl PrimType for SimpleType {}
 
 impl SimpleType {
     /// Returns whether the type contains only classic data.

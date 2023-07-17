@@ -65,11 +65,21 @@ pub(crate) enum SerSimpleType {
     },
 }
 
-impl PrimType for SerSimpleType {
+impl PrimType for SerSimpleType {}
+
+trait SerializableType: PrimType {
+    const CLASSIC: bool;
+}
+
+impl SerializableType for ClassicType {
+    const CLASSIC: bool = true;
+}
+
+impl SerializableType for SimpleType {
     const CLASSIC: bool = false;
 }
 
-impl<T: PrimType> From<Container<T>> for SerSimpleType
+impl<T: SerializableType> From<Container<T>> for SerSimpleType
 where
     SerSimpleType: From<T>,
     SimpleType: From<T>,
