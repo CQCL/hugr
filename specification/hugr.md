@@ -1097,7 +1097,7 @@ arbitrary `SimpleType`s and the subset of `ClassicType`s. Only `ClassicType`s
 may be used more than once or discarded; the former must always be used
 exactly once. This leads to a constraint on the HUGR that outgoing ports
 must have exactly one edge leaving them unless they are `ClassicType`, where
-outgoing ports may have anynum number of connected edges (0 is equivalent
+outgoing ports may have any number of connected edges (0 is equivalent
 to a discard). All incoming ports must have exactly one edge connected to them.
 
 # Our linear types behave like other values passed down a wire.
