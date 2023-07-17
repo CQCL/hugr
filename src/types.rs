@@ -60,7 +60,6 @@ pub struct AbstractSignature {
     pub resource_reqs: ResourceSet,
 }
 
-#[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// A concrete signature, which has been instantiated with a set of input resources
 pub struct Signature {
@@ -132,18 +131,6 @@ impl Signature {
     }
 }
 
-impl AbstractSignature {
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self::new(input, output, type_row![])
-    }
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
-        let linear = linear.into();
-        Self::new_df(linear.clone(), linear)
-    }
-}
-
 #[cfg_attr(feature = "pyo3", pymethods)]
 impl AbstractSignature {
     /// The number of wires in the signature.
@@ -156,6 +143,18 @@ impl AbstractSignature {
     #[inline(always)]
     pub fn purely_classical(&self) -> bool {
         self.input.purely_classical() && self.output.purely_classical()
+    }
+}
+
+impl AbstractSignature {
+    /// Create a new signature with only dataflow inputs and outputs.
+    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+        Self::new(input, output, type_row![])
+    }
+    /// Create a new signature with the same input and output types.
+    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+        let linear = linear.into();
+        Self::new_df(linear.clone(), linear)
     }
 
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
