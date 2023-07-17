@@ -47,7 +47,6 @@ impl EdgeKind {
 
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// TODO: Make input, output, static_input private and expose them only in SignatureTrait
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
 pub struct AbstractSignature {
@@ -134,93 +133,37 @@ impl Signature {
     }
 }
 
-/// Functions for dealing with concrete and abstract signatures
-pub trait SignatureTrait {
+impl AbstractSignature {
     /// Create a new signature with only dataflow inputs and outputs.
-    fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self;
-    /// Create a new signature with the same input and output types.
-    fn new_linear(linear: impl Into<TypeRow>) -> Self;
-
-    /// The number of wires in the signature.
-    fn is_empty(&self) -> bool;
-
-    /// Returns whether the data wires in the signature are purely linear.
-    fn purely_linear(&self) -> bool;
-
-    /// Returns whether the data wires in the signature are purely classical.
-    fn purely_classical(&self) -> bool;
-
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
-    fn get(&self, port: Port) -> Option<EdgeKind>;
-
-    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
-    fn get_df(&self, port: Port) -> Option<&SimpleType>;
-
-    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
-    fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType>;
-
-    /// Returns the number of value and static ports in the signature.
-    fn port_count(&self, dir: Direction) -> usize;
-
-    /// Returns the number of input value and static ports in the signature.
-    fn input_count(&self) -> usize;
-
-    /// Returns the number of output value and static ports in the signature.
-    fn output_count(&self) -> usize;
-
-    /// Returns the number of value ports in the signature.
-    fn df_port_count(&self, dir: Direction) -> usize;
-
-    /// Returns a slice of the value types for the given direction.
-    fn df_types(&self, dir: Direction) -> &[SimpleType];
-
-    /// Returns a slice of the input value types.
-    fn input_df_types(&self) -> &[SimpleType];
-
-    /// Returns a slice of the output value types.
-    fn output_df_types(&self) -> &[SimpleType];
-
-    /// Returns the input row
-    fn input(&self) -> &TypeRow;
-
-    /// Returns the output row
-    fn output(&self) -> &TypeRow;
-
-    /// Returns the static inputs
-    fn static_input(&self) -> &TypeRow;
-}
-
-impl SignatureTrait for AbstractSignature {
-    fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Self::new(input, output, type_row![])
     }
-    fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    /// Create a new signature with the same input and output types.
+    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self::new_df(linear.clone(), linear)
     }
 
     /// The number of wires in the signature.
     #[inline(always)]
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
 
     /// Returns whether the data wires in the signature are purely linear.
     #[inline(always)]
-    fn purely_linear(&self) -> bool {
+    pub fn purely_linear(&self) -> bool {
         self.input.purely_linear() && self.output.purely_linear()
     }
 
     /// Returns whether the data wires in the signature are purely classical.
     #[inline(always)]
-    fn purely_classical(&self) -> bool {
+    pub fn purely_classical(&self) -> bool {
         self.input.purely_classical() && self.output.purely_classical()
     }
 
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
-    fn get(&self, port: Port) -> Option<EdgeKind> {
+    pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
             self.static_input
                 .get(port.index() - self.input.len())?
@@ -236,7 +179,7 @@ impl SignatureTrait for AbstractSignature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds or if it is not a value.
     #[inline]
-    fn get_df(&self, port: Port) -> Option<&SimpleType> {
+    pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
         match port.direction() {
             Direction::Incoming => self.input.get(port.index()),
             Direction::Outgoing => self.output.get(port.index()),
@@ -246,7 +189,7 @@ impl SignatureTrait for AbstractSignature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds or if it is not a value.
     #[inline]
-    fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
+    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
         match port.direction() {
             Direction::Incoming => self.input.get_mut(port.index()),
             Direction::Outgoing => self.output.get_mut(port.index()),
@@ -255,7 +198,7 @@ impl SignatureTrait for AbstractSignature {
 
     /// Returns the number of value and static ports in the signature.
     #[inline]
-    fn port_count(&self, dir: Direction) -> usize {
+    pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
             Direction::Incoming => self.input.len() + self.static_input.len(),
             Direction::Outgoing => self.output.len(),
@@ -264,19 +207,19 @@ impl SignatureTrait for AbstractSignature {
 
     /// Returns the number of input value and static ports in the signature.
     #[inline]
-    fn input_count(&self) -> usize {
+    pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
     /// Returns the number of output value and static ports in the signature.
     #[inline]
-    fn output_count(&self) -> usize {
+    pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
     /// Returns the number of value ports in the signature.
     #[inline]
-    fn df_port_count(&self, dir: Direction) -> usize {
+    pub fn df_port_count(&self, dir: Direction) -> usize {
         match dir {
             Direction::Incoming => self.input.len(),
             Direction::Outgoing => self.output.len(),
@@ -285,7 +228,7 @@ impl SignatureTrait for AbstractSignature {
 
     /// Returns a slice of the value types for the given direction.
     #[inline]
-    fn df_types(&self, dir: Direction) -> &[SimpleType] {
+    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
         match dir {
             Direction::Incoming => &self.input,
             Direction::Outgoing => &self.output,
@@ -294,28 +237,31 @@ impl SignatureTrait for AbstractSignature {
 
     /// Returns a slice of the input value types.
     #[inline]
-    fn input_df_types(&self) -> &[SimpleType] {
+    pub fn input_df_types(&self) -> &[SimpleType] {
         self.df_types(Direction::Incoming)
     }
 
     /// Returns a slice of the output value types.
     #[inline]
-    fn output_df_types(&self) -> &[SimpleType] {
+    pub fn output_df_types(&self) -> &[SimpleType] {
         self.df_types(Direction::Outgoing)
     }
 
     #[inline]
-    fn input(&self) -> &TypeRow {
+    /// Returns the input row
+    pub fn input(&self) -> &TypeRow {
         &self.input
     }
 
     #[inline]
-    fn output(&self) -> &TypeRow {
+    /// Returns the output row
+    pub fn output(&self) -> &TypeRow {
         &self.output
     }
 
     #[inline]
-    fn static_input(&self) -> &TypeRow {
+    /// Returns the row of static inputs
+    pub fn static_input(&self) -> &TypeRow {
         &self.static_input
     }
 }

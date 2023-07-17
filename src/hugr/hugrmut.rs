@@ -401,7 +401,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{AbstractSignature, ClassicType, SignatureTrait, SimpleType},
+        types::{AbstractSignature, ClassicType, SimpleType},
     };
 
     use super::*;

@@ -7,7 +7,6 @@ use thiserror::Error;
 
 use crate::hugr::{Hugr, HugrMut, NodeType};
 use crate::ops::{OpTrait, OpType};
-use crate::types::SignatureTrait;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -249,7 +248,7 @@ pub mod test {
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         resource::ResourceSet,
         types::{
-            AbstractSignature, ClassicType, LinearType, Signature, SignatureTrait, SimpleType,
+            AbstractSignature, ClassicType, LinearType, Signature, SimpleType,
         },
         Port,
     };

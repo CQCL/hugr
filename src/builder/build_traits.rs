@@ -18,7 +18,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{Signature, SignatureTrait, SimpleType, TypeRow};
+use crate::types::{Signature, SimpleType, TypeRow};
 
 use itertools::Itertools;
 

@@ -741,7 +741,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
-    use crate::types::{AbstractSignature, ClassicType, LinearType, Signature, SignatureTrait};
+    use crate::types::{AbstractSignature, ClassicType, LinearType, Signature};
     use crate::Direction;
     use crate::{type_row, Node};
 

@@ -4,7 +4,7 @@ use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, ClassicType, EdgeKind, SignatureTrait, SimpleType, TypeRow};
+use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
     const TAG: OpTag;

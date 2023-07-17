@@ -15,7 +15,7 @@ use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::TypeRow;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
-    AbstractSignature, SignatureDescription, SignatureTrait,
+    AbstractSignature, SignatureDescription,
 };
 use crate::Hugr;
 

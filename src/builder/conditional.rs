@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, SignatureTrait, TypeRow};
+use crate::types::{Signature, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;

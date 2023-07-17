@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{AbstractSignature, Signature, SignatureTrait, TypeRow};
+use crate::types::{AbstractSignature, Signature, TypeRow};
 
 use crate::resource::ResourceSet;
 use crate::Node;

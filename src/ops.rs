@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{AbstractSignature, EdgeKind, SignatureDescription, SignatureTrait};
+use crate::types::{AbstractSignature, EdgeKind, SignatureDescription};
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;

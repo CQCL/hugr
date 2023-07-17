@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{AbstractSignature, EdgeKind, SignatureTrait, SimpleType, TypeRow};
+use crate::types::{AbstractSignature, EdgeKind, SimpleType, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
 use super::OpTag;
