@@ -212,7 +212,8 @@ impl SimpleType {
     pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
-            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
+            // This should succeed given purely_classical has returned True
+            let row = row.try_convert_elems().unwrap();
             Container::<ClassicType>::Sum(Box::new(row)).into()
         } else {
             Container::<SimpleType>::Sum(Box::new(row)).into()
@@ -223,7 +224,8 @@ impl SimpleType {
     pub fn new_tuple(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
-            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
+            // This should succeed given purely_classical has returned True
+            let row = row.try_convert_elems().unwrap();
             Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
