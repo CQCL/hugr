@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::{
     classic_row,
     macros::impl_box_clone,
-    types::{ClassicType, Container, EdgeKind, SimpleType, TypeRow},
+    types::{ClassicRow, ClassicType, Container, EdgeKind, SimpleType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -64,7 +64,7 @@ pub enum ConstValue {
         tag: usize,
         // We require the type to be entirely Classic (i.e. we don't allow
         // a classic variant of a Sum with other variants that are linear)
-        variants: TypeRow<ClassicType>,
+        variants: ClassicRow,
         val: Box<ConstValue>,
     },
     /// A tuple of constant values.
@@ -182,11 +182,11 @@ impl ConstValue {
     pub fn predicate(
         tag: usize,
         val: ConstValue,
-        variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>,
+        variant_rows: impl IntoIterator<Item = ClassicRow>,
     ) -> Self {
         ConstValue::Sum {
             tag,
-            variants: TypeRow::predicate_variants_row(variant_rows),
+            variants: ClassicRow::predicate_variants_row(variant_rows),
             val: Box::new(val),
         }
     }
@@ -243,7 +243,7 @@ mod test {
         classic_row,
         hugr::{typecheck::ConstTypeError, ValidationError},
         type_row,
-        types::{ClassicType, SimpleType, TypeRow},
+        types::{ClassicType, SimpleRow, SimpleType},
     };
 
     #[test]
@@ -254,7 +254,7 @@ mod test {
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
         let c = b.add_constant(ConstValue::predicate(
             0,
             ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
@@ -263,7 +263,7 @@ mod test {
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty]))?;
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty]))?;
         let c = b.add_constant(ConstValue::predicate(
             1,
             ConstValue::Tuple(vec![]),
@@ -283,7 +283,7 @@ mod test {
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty])).unwrap();
         let c = b
             .add_constant(ConstValue::predicate(
                 0,

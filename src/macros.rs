@@ -43,13 +43,13 @@ pub(crate) use impl_box_clone;
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
-/// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
+/// # use hugr::types::{ClassicType, SimpleType, Signature, SimpleRow};
 /// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-/// let static_row: TypeRow<SimpleType> = type_row![B, B];
-/// let dynamic_row: TypeRow<SimpleType> = vec![B, B, B].into();
+/// let static_row: SimpleRow = type_row![B, B];
+/// let dynamic_row: SimpleRow = vec![B, B, B].into();
 /// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
 ///
-/// let repeated_row: TypeRow<SimpleType> = type_row![B; 2];
+/// let repeated_row: SimpleRow = type_row![B; 2];
 /// assert_eq!(repeated_row, static_row);
 /// ```
 #[allow(unused_macros)]
@@ -57,14 +57,14 @@ pub(crate) use impl_box_clone;
 macro_rules! type_row {
     () => {
         {
-            $crate::types::TypeRow::new()
+            $crate::types::simple::TypeRow::new()
         }
     };
     ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$($t),*];
-            let row: types::TypeRow<_> = ROW.into();
+            let row: types::SimpleRow = ROW.into();
             row
         }
     };
@@ -72,7 +72,7 @@ macro_rules! type_row {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$t; $n];
-            let row: types::TypeRow<_> = ROW.into();
+            let row: types::SimpleRow = ROW.into();
             row
         }
     };
@@ -86,14 +86,14 @@ macro_rules! type_row {
 macro_rules! classic_row {
     () => {
         {
-            $crate::types::TypeRow::new()
+            $crate::types::ClassicRow::new()
         }
     };
     ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
             static ROW: &[types::ClassicType] = &[$($t),*];
-            let row: types::TypeRow<_> = ROW.into();
+            let row: types::ClassicRow = ROW.into();
             row
         }
     };

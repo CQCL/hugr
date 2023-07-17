@@ -154,12 +154,12 @@ impl ClassicType {
 
     /// New unit type, defined as an empty Tuple.
     pub fn new_unit() -> Self {
-        Self::Container(Container::Tuple(Box::new(TypeRow::new())))
+        Self::Container(Container::Tuple(Box::new(classic_row![])))
     }
 
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
             variant_rows,
         ))))
@@ -234,7 +234,7 @@ impl SimpleType {
 
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>) -> Self {
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         Self::Classic(ClassicType::new_predicate(variant_rows))
     }
 
@@ -282,6 +282,12 @@ pub struct TypeRow<T: PrimType> {
     types: Cow<'static, [T]>,
 }
 
+/// A row of [SimpleType]s
+pub type SimpleRow = TypeRow<SimpleType>;
+
+/// A row of [ClassicType]s
+pub type ClassicRow = TypeRow<ClassicType>;
+
 impl<T: Display + PrimType> Display for TypeRow<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
@@ -317,9 +323,7 @@ impl TypeRow<ClassicType> {
     #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
-    pub fn predicate_variants_row(
-        variant_rows: impl IntoIterator<Item = TypeRow<ClassicType>>,
-    ) -> Self {
+    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         variant_rows
             .into_iter()
             .map(|row| ClassicType::Container(Container::Tuple(Box::new(row))))

@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
-use crate::types::{ClassicType, CustomType, SimpleType, TypeRow};
+use crate::types::{ClassicType, CustomType, SimpleRow, SimpleType};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -34,8 +34,7 @@ pub fn resource() -> Resource {
         vec![],
         HashMap::default(),
         |_arg_values: &[TypeArg]| {
-            let t: TypeRow<SimpleType> =
-                vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            let t: SimpleRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
             Ok((t.clone(), t, ResourceSet::default()))
         },
     );

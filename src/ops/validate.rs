@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{ClassicType, SimpleType, TypeRow};
+use crate::types::{ClassicRow, SimpleRow, SimpleType};
 use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -242,8 +242,8 @@ pub enum ChildrenValidationError {
     #[error("The {node_desc} node of a {container_desc} has a signature of {actual:?}, which differs from the expected type row {expected:?}")]
     IOSignatureMismatch {
         child: NodeIndex,
-        actual: TypeRow<SimpleType>,
-        expected: TypeRow<SimpleType>,
+        actual: SimpleRow,
+        expected: SimpleRow,
         node_desc: &'static str,
         container_desc: &'static str,
     },
@@ -256,7 +256,7 @@ pub enum ChildrenValidationError {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate_rows: Vec<TypeRow<ClassicType>>,
+        actual_predicate_rows: Vec<ClassicRow>,
     },
 }
 
@@ -343,8 +343,7 @@ impl ValidateOp for BasicBlock {
                 other_outputs: outputs,
             } => {
                 let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
-                let node_outputs: TypeRow<SimpleType> =
-                    [&[predicate_type], outputs.as_ref()].concat().into();
+                let node_outputs: SimpleRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children
@@ -384,8 +383,8 @@ impl ValidateOp for super::Case {
 /// nodes outside of the first and second elements respectively, and that those
 /// have the correct signature.
 fn validate_io_nodes<'a>(
-    expected_input: &TypeRow<SimpleType>,
-    expected_output: &TypeRow<SimpleType>,
+    expected_input: &SimpleRow,
+    expected_output: &SimpleRow,
     container_desc: &'static str,
     mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
 ) -> Result<(), ChildrenValidationError> {

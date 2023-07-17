@@ -14,9 +14,8 @@ use thiserror::Error;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::{
     type_param::{TypeArg, TypeParam},
-    Signature, SignatureDescription,
+    Signature, SignatureDescription, SimpleRow,
 };
-use crate::types::{SimpleType, TypeRow};
 use crate::Hugr;
 
 /// Trait for resources to provide custom binary code for computing signature.
@@ -29,7 +28,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError>;
+    ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError>;
 
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
@@ -46,19 +45,14 @@ pub trait CustomSignatureFunc: Send + Sync {
 
 impl<F> CustomSignatureFunc for F
 where
-    F: Fn(
-            &[TypeArg],
-        )
-            -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError>
-        + Send
-        + Sync,
+    F: Fn(&[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> + Send + Sync,
 {
     fn compute_signature(
         &self,
         _name: &SmolStr,
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow<SimpleType>, TypeRow<SimpleType>, ResourceSet), SignatureError> {
+    ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
         self(arg_values)
     }
 }

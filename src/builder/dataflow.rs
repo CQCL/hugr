@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, ValidationError};
 use crate::ops;
 
-use crate::types::{Signature, SimpleType, TypeRow};
+use crate::types::{Signature, SimpleRow};
 
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
@@ -60,8 +60,8 @@ impl DFGBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(
-        input: impl Into<TypeRow<SimpleType>>,
-        output: impl Into<TypeRow<SimpleType>>,
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
     ) -> Result<DFGBuilder<Hugr>, BuildError> {
         let input = input.into();
         let output = output.into();

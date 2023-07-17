@@ -11,7 +11,7 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicType, Container, SimpleType, TypeRow};
+pub use simple::{ClassicRow, ClassicType, Container, SimpleRow, SimpleType};
 
 use smol_str::SmolStr;
 
@@ -19,7 +19,7 @@ use crate::hugr::{Direction, Port};
 use crate::utils::display_list;
 use crate::{resource::ResourceSet, type_row};
 
-use self::simple::PrimType;
+use self::simple::{PrimType, TypeRow};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -52,11 +52,11 @@ impl EdgeKind {
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Value inputs of the function.
-    pub input: TypeRow<SimpleType>,
+    pub input: SimpleRow,
     /// Value outputs of the function.
-    pub output: TypeRow<SimpleType>,
+    pub output: SimpleRow,
     /// Possible static input (for call / load-constant).
-    pub static_input: TypeRow<ClassicType>,
+    pub static_input: ClassicRow,
     /// The resource requirements of all the inputs
     pub input_resources: ResourceSet,
     /// The resource requirements of all the outputs
@@ -211,9 +211,9 @@ impl Signature {
 impl Signature {
     /// Create a new signature.
     pub fn new(
-        input: impl Into<TypeRow<SimpleType>>,
-        output: impl Into<TypeRow<SimpleType>>,
-        static_input: impl Into<TypeRow<ClassicType>>,
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+        static_input: impl Into<ClassicRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -225,16 +225,13 @@ impl Signature {
     }
 
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow<SimpleType>>) -> Self {
+    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
         let linear = linear.into();
         Signature::new_df(linear.clone(), linear)
     }
 
     /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(
-        input: impl Into<TypeRow<SimpleType>>,
-        output: impl Into<TypeRow<SimpleType>>,
-    ) -> Self {
+    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
         Signature::new(input, output, type_row![])
     }
 }
