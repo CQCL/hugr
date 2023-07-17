@@ -10,14 +10,14 @@ use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
-use crate::ops::tag::OpTag;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
+use crate::ops::OpTag;
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::region::FlatRegionView;
+use super::region::{FlatRegionView, Region};
 use super::view::HugrView;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -122,7 +122,7 @@ impl<'a> ValidationContext<'a> {
 
             let parent_optype = &self.hugr.get_optype(parent).op;
             let allowed_children = parent_optype.validity_flags().allowed_children;
-            if !allowed_children.contains(optype.tag()) {
+            if !allowed_children.is_superset(optype.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
                     child_optype: optype.clone(),
@@ -272,7 +272,7 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            self.validate_intergraph_edge(node, port, optype, other_node, other_offset)?;
+            self.validate_edge(node, port, optype, other_node, other_offset)?;
         }
 
         Ok(())
@@ -295,7 +295,7 @@ impl<'a> ValidationContext<'a> {
             let all_children = self.hugr.children(node);
             let mut first_two_children = all_children.clone().take(2);
             let first_child = self.hugr.get_optype(first_two_children.next().unwrap());
-            if !flags.allowed_first_child.contains(first_child.op.tag()) {
+            if !flags.allowed_first_child.is_superset(first_child.op.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
                     parent_optype: optype.clone(),
@@ -309,7 +309,7 @@ impl<'a> ValidationContext<'a> {
                 .next()
                 .map(|child| &self.hugr.get_optype(child).op)
             {
-                if !flags.allowed_second_child.contains(second_child.tag()) {
+                if !flags.allowed_second_child.is_superset(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
                         parent: node,
                         parent_optype: optype.clone(),
@@ -395,7 +395,7 @@ impl<'a> ValidationContext<'a> {
         let non_defn_count = self
             .hugr
             .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.contains(self.hugr.get_optype(*n).op.tag()))
+            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).op.tag()))
             .count();
         if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
@@ -407,16 +407,14 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Check inter-graph edges. These are classical value edges between a copy
-    /// node and another non-sibling node.
-    ///
-    /// They come in two flavors depending on the type of the parent node of the
-    /// source:
-    /// - External edges, from a copy node to a sibling's descendant. There must
-    ///   also be an order edge between the copy and the sibling.
-    /// - Dominator edges, from a copy node in a BasicBlock node to a descendant of a
-    ///   post-dominated sibling of the BasicBlock.
-    fn validate_intergraph_edge(
+    /// Check the edge is valid, i.e. the source/target nodes are at appropriate
+    /// positions in the hierarchy for some locality:
+    /// - Local edges, of any kind;
+    /// - External edges, for static and value edges only: from a node to a sibling's descendant.
+    ///   For Value edges, there must also be an order edge between the copy and the sibling.
+    /// - Dominator edges, for value edges only: from a node in a BasicBlock node to
+    ///   a descendant of a post-dominating sibling of the BasicBlock.
+    fn validate_edge(
         &mut self,
         from: Node,
         from_offset: Port,
@@ -429,42 +427,43 @@ impl<'a> ValidationContext<'a> {
             .get_parent(from)
             .expect("Root nodes cannot have ports");
         let to_parent = self.hugr.get_parent(to);
-        if Some(from_parent) == to_parent {
-            // Regular edge
-            return Ok(());
-        }
+        let local = Some(from_parent) == to_parent;
 
-        match from_optype.port_kind(from_offset).unwrap() {
+        let is_static = match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
             EdgeKind::Static(typ) => {
                 if let OpType::Const(ops::Const(val)) = from_optype {
-                    return typecheck_const(&typ, val).map_err(ValidationError::from);
+                    typecheck_const(&typ, val).map_err(ValidationError::from)?;
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
                     // edges coming from FuncDecl or FuncDefn
-                    return if OpTag::Function.contains(from_optype.tag()) {
-                        Ok(())
-                    } else {
-                        Err(InterGraphEdgeError::InvalidConstSrc {
+                    if !OpTag::Function.is_superset(from_optype.tag()) {
+                        return Err(InterGraphEdgeError::InvalidConstSrc {
                             from,
                             from_offset,
                             typ,
                         }
-                        .into())
+                        .into());
                     };
-                }
+                };
+                true
             }
-            EdgeKind::Value(SimpleType::Classic(_)) => {}
             ty => {
-                return Err(InterGraphEdgeError::NonClassicalData {
-                    from,
-                    from_offset,
-                    to,
-                    to_offset,
-                    ty,
+                if !local && !matches!(ty, EdgeKind::Value(SimpleType::Classic(_))) {
+                    return Err(InterGraphEdgeError::NonClassicalData {
+                        from,
+                        from_offset,
+                        to,
+                        to_offset,
+                        ty,
+                    }
+                    .into());
                 }
-                .into())
+                false
             }
+        };
+        if local {
+            return Ok(());
         }
 
         // To detect either external or dominator edges, we traverse the ancestors
@@ -478,26 +477,29 @@ impl<'a> ValidationContext<'a> {
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
             if ancestor_parent == from_parent {
-                // External edge. Must have an order edge.
-                self.hugr
-                    .graph
-                    .get_connections(from.index, ancestor.index)
-                    .find(|&(p, _)| {
-                        let offset = self.hugr.graph.port_offset(p).unwrap();
-                        from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
-                    })
-                    .ok_or(InterGraphEdgeError::MissingOrderEdge {
-                        from,
-                        from_offset,
-                        to,
-                        to_offset,
-                        to_ancestor: ancestor,
-                    })?;
+                // External edge.
+                if !is_static {
+                    // Must have an order edge.
+                    self.hugr
+                        .graph
+                        .get_connections(from.index, ancestor.index)
+                        .find(|&(p, _)| {
+                            let offset = self.hugr.graph.port_offset(p).unwrap();
+                            from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
+                        })
+                        .ok_or(InterGraphEdgeError::MissingOrderEdge {
+                            from,
+                            from_offset,
+                            to,
+                            to_offset,
+                            to_ancestor: ancestor,
+                        })?;
+                }
                 return Ok(());
-            } else if Some(ancestor_parent) == from_parent_parent {
+            } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if ancestor_parent_op.op.tag() == OpTag::Cfg {
+                if ancestor_parent_op.op.tag() != OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,
@@ -1249,7 +1251,7 @@ mod test {
             .with_input_resources(ResourceSet::singleton(&"B".into()));
 
         let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
-            .with_input_resources(all_rs.clone());
+            .with_input_resources(all_rs);
 
         let [left_wire] = main
             .dfg_builder(inner_left_sig, [])?

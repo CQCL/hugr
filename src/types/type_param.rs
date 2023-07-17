@@ -15,6 +15,7 @@ use super::{ClassicType, SimpleType};
 // TODO any other 'leaf' types? We specifically do not want float.
 // bool should eventually be a Sum type (Container).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type] - classic or linear
     Type,
@@ -27,10 +28,14 @@ pub enum TypeParam {
     ///
     /// [`Container`]: crate::types::simple::Container
     List(Box<TypeParam>),
+    /// Argument is a [TypeArg::Value], containing a yaml-encoded object
+    /// interpretable by the operation.
+    Value,
 }
 
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
 pub enum TypeArg {
     /// Where the TypeDef declares that an argument is a [TypeParam::Type]
     Type(SimpleType),
@@ -42,6 +47,8 @@ pub enum TypeArg {
     /// Where an argument has type [TypeParam::List]`<T>` - all elements will implicitly
     /// be of the same variety of TypeArg, representing a `T`.
     List(Vec<TypeArg>),
+    /// Where the TypeDef declares a [TypeParam::Value]
+    Value(serde_yaml::Value),
 }
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
@@ -55,6 +62,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                 check_type_arg(item, ty.as_ref())?;
             }
         }
+        (TypeArg::Value(_), TypeParam::Value) => (),
         _ => {
             return Err(TypeArgError::TypeMismatch(arg.clone(), param.clone()));
         }

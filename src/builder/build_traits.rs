@@ -18,7 +18,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{LinearType, Signature, SignatureTrait, SimpleType, TypeRow};
+use crate::types::{Signature, SignatureTrait, SimpleType, TypeRow};
 
 use itertools::Itertools;
 
@@ -650,34 +650,46 @@ fn wire_up<T: Dataflow + ?Sized>(
     let src_parent = base.get_parent(src);
     let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
-    // Non-local value sources require a state edge to an ancestor of dst
-    if !local_source && get_value_kind(base, src, src_offset) == ValueKind::Classic {
-        let src_parent = src_parent.expect("Node has no parent");
-        let Some(src_sibling) =
-                iter::successors(dst_parent, |&p| base.get_parent(p))
-                    .tuple_windows()
-                    .find_map(|(ancestor, ancestor_parent)| {
-                        (ancestor_parent == src_parent).then_some(ancestor)
-                    })
-            else {
-                let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+    if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_offset).unwrap() {
+        if !local_source {
+            // Non-local value sources require a state edge to an ancestor of dst
+            if typ.is_linear() {
+                let val_err: ValidationError = InterGraphEdgeError::NonClassicalData {
                     from: src,
                     from_offset: Port::new_outgoing(src_port),
                     to: dst,
                     to_offset: Port::new_incoming(dst_port),
-                }.into();
+                    ty: EdgeKind::Value(typ),
+                }
+                .into();
                 return Err(val_err.into());
-            };
+            }
 
-        // TODO: Avoid adding duplicate edges
-        // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
-        base.add_other_edge(src, src_sibling)?;
-    }
+            let src_parent = src_parent.expect("Node has no parent");
+            let Some(src_sibling) =
+                        iter::successors(dst_parent, |&p| base.get_parent(p))
+                            .tuple_windows()
+                            .find_map(|(ancestor, ancestor_parent)| {
+                                (ancestor_parent == src_parent).then_some(ancestor)
+                            })
+                    else {
+                        let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+                            from: src,
+                            from_offset: Port::new_outgoing(src_port),
+                            to: dst,
+                            to_offset: Port::new_incoming(dst_port),
+                        }.into();
+                        return Err(val_err.into());
+                    };
 
-    // Don't copy linear edges.
-    if base.linked_ports(src, src_offset).next().is_some() {
-        if let ValueKind::Linear(typ) = get_value_kind(base, src, src_offset) {
-            return Err(BuildError::NoCopyLinear(typ));
+            // TODO: Avoid adding duplicate edges
+            // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
+            base.add_other_edge(src, src_sibling)?;
+        } else if base.linked_ports(src, src_offset).next().is_some() {
+            // Don't copy linear edges.
+            if let SimpleType::Linear(lty) = typ {
+                return Err(BuildError::NoCopyLinear(lty));
+            }
         }
     }
 
@@ -693,31 +705,6 @@ fn wire_up<T: Dataflow + ?Sized>(
                 .unwrap(),
             EdgeKind::Value(_)
         ))
-}
-
-/// Return type for `get_value_kind`
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ValueKind {
-    Classic,
-    Linear(LinearType),
-    Const,
-}
-
-/// Check the kind of a port is a classical Value and return it
-/// Return None if Const kind
-/// Panics if port not valid for Op or port is not Const/Value
-fn get_value_kind(base: &Hugr, src: Node, src_offset: Port) -> ValueKind {
-    let wire_kind = base.get_optype(src).port_kind(src_offset).unwrap();
-    match wire_kind {
-        EdgeKind::Static(_) => ValueKind::Const,
-        EdgeKind::Value(simple_type) => match simple_type {
-            SimpleType::Classic(_) => ValueKind::Classic,
-            SimpleType::Linear(typ) => ValueKind::Linear(typ),
-        },
-        _ => {
-            panic!("Wires can only be Const or Value kind")
-        }
-    }
 }
 
 /// Trait implemented by builders of Dataflow Hugrs

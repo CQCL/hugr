@@ -19,13 +19,12 @@ use delegate::delegate;
 use derive_more::From;
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
-use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, LinkView, PortMut, PortView, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{tag::OpTag, OpName, OpTrait, OpType};
+use crate::ops::{tag::OpTag, OpTrait, OpType};
 use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, EdgeKind, Signature, SignatureDescription};
 
@@ -177,53 +176,6 @@ impl Hugr {
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
         rw.apply(self)
-    }
-
-    /// Return dot string showing underlying graph and hierarchy side by side.
-    pub fn dot_string(&self) -> String {
-        self.graph
-            .dot_format()
-            .with_hierarchy(&self.hierarchy)
-            .with_node_style(|n| {
-                NodeStyle::Box(format!(
-                    "({ni}) {name}",
-                    ni = n.index(),
-                    name = self.op_types[n].op.name()
-                ))
-            })
-            .with_port_style(|port| {
-                let node = self.graph.port_node(port).unwrap();
-                let optype = &self.op_types.get(node).op;
-                let offset = self.graph.port_offset(port).unwrap();
-                match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Static(ty) => {
-                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
-                    }
-                    EdgeKind::Value(ty) => {
-                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
-                    }
-                    EdgeKind::StateOrder => match self.graph.port_links(port).count() > 0 {
-                        true => PortStyle::text("", false),
-                        false => PortStyle::Hidden,
-                    },
-                    _ => PortStyle::text("", true),
-                }
-            })
-            .with_edge_style(|src, tgt| {
-                let src_node = self.graph.port_node(src).unwrap();
-                let src_optype = &self.op_types.get(src_node).op;
-                let src_offset = self.graph.port_offset(src).unwrap();
-                let tgt_node = self.graph.port_node(tgt).unwrap();
-
-                if self.hierarchy.parent(src_node) != self.hierarchy.parent(tgt_node) {
-                    EdgeStyle::Dashed
-                } else if src_optype.port_kind(src_offset) == Some(EdgeKind::StateOrder) {
-                    EdgeStyle::Dotted
-                } else {
-                    EdgeStyle::Solid
-                }
-            })
-            .finish()
     }
 }
 

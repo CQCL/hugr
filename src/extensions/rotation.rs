@@ -12,8 +12,9 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::resource::{CustomSignatureFunc, OpDef, ResourceSet, SignatureError, TypeDef};
-use crate::types::{type_param::TypeArg, ClassicType, CustomType, SimpleType, TypeRow};
+use crate::resource::{OpDef, ResourceSet, TypeDef};
+use crate::types::type_param::TypeArg;
+use crate::types::{ClassicType, CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -27,15 +28,18 @@ pub fn resource() -> Resource {
     resource.add_type(Type::Angle.type_def());
     resource.add_type(Type::Quaternion.type_def());
 
-    resource
-        .add_op(OpDef::new_with_custom_sig(
-            "AngleAdd".into(),
-            "".into(),
-            vec![],
-            HashMap::default(),
-            AngleAdd,
-        ))
-        .unwrap();
+    let op = OpDef::new_with_custom_sig(
+        "AngleAdd".into(),
+        "".into(),
+        vec![],
+        HashMap::default(),
+        |_arg_values: &[TypeArg]| {
+            let t: TypeRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            Ok((t.clone(), t, ResourceSet::default()))
+        },
+    );
+
+    resource.add_op(op).unwrap();
     resource
 }
 
@@ -95,26 +99,6 @@ impl CustomConst for Constant {
             Constant::Quaternion(_) => Type::Quaternion,
         };
         t.custom_type().into()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AngleAdd;
-
-/// When we have a YAML type-scheme interpreter, we'll be able to use that;
-/// there is no need for a binary compute_signature for a case this simple.
-impl CustomSignatureFunc for AngleAdd {
-    fn compute_signature(
-        &self,
-        _name: &SmolStr,
-        _arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
-        let t: TypeRow = vec![SimpleType::Classic(
-            Into::<CustomType>::into(Type::Angle).into(),
-        )]
-        .into();
-        Ok((t.clone(), t, ResourceSet::default()))
     }
 }
 

@@ -1,13 +1,14 @@
 //! Dataflow operations.
 
-use super::{impl_op_name, tag::OpTag, OpTrait};
+use super::StaticTag;
+use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, ClassicType, EdgeKind, SignatureTrait, SimpleType, TypeRow};
 
 pub(super) trait DataflowOpTrait {
+    const TAG: OpTag;
     fn description(&self) -> &str;
-    fn tag(&self) -> OpTag;
     fn signature(&self) -> AbstractSignature;
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -87,12 +88,10 @@ impl IOTrait for Output {
 }
 
 impl DataflowOpTrait for Input {
+    const TAG: OpTag = OpTag::Input;
+
     fn description(&self) -> &str {
         "The input node for this dataflow subgraph"
-    }
-
-    fn tag(&self) -> super::tag::OpTag {
-        OpTag::Input
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -105,12 +104,10 @@ impl DataflowOpTrait for Input {
     }
 }
 impl DataflowOpTrait for Output {
+    const TAG: OpTag = OpTag::Output;
+
     fn description(&self) -> &str {
         "The output node for this dataflow subgraph"
-    }
-
-    fn tag(&self) -> super::tag::OpTag {
-        OpTag::Output
     }
 
     // TODO: We know what the input resources should be, so we *could* give an
@@ -128,9 +125,8 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
     }
-
     fn tag(&self) -> OpTag {
-        DataflowOpTrait::tag(self)
+        T::TAG
     }
     fn op_signature(&self) -> AbstractSignature {
         DataflowOpTrait::signature(self)
@@ -142,6 +138,9 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
     }
+}
+impl<T: DataflowOpTrait> StaticTag for T {
+    const TAG: OpTag = T::TAG;
 }
 
 /// Call a function directly.
@@ -157,12 +156,10 @@ pub struct Call {
 impl_op_name!(Call);
 
 impl DataflowOpTrait for Call {
+    const TAG: OpTag = OpTag::FnCall;
+
     fn description(&self) -> &str {
         "Call a function directly"
-    }
-
-    fn tag(&self) -> OpTag {
-        OpTag::FnCall
     }
 
     fn signature(&self) -> AbstractSignature {
@@ -182,12 +179,10 @@ pub struct CallIndirect {
 impl_op_name!(CallIndirect);
 
 impl DataflowOpTrait for CallIndirect {
+    const TAG: OpTag = OpTag::FnCall;
+
     fn description(&self) -> &str {
         "Call a function indirectly"
-    }
-
-    fn tag(&self) -> OpTag {
-        OpTag::FnCall
     }
 
     fn signature(&self) -> AbstractSignature {
@@ -208,12 +203,10 @@ pub struct LoadConstant {
 }
 impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
+    const TAG: OpTag = OpTag::LoadConst;
+
     fn description(&self) -> &str {
         "Load a static constant in to the local dataflow graph"
-    }
-
-    fn tag(&self) -> OpTag {
-        OpTag::LoadConst
     }
 
     fn signature(&self) -> AbstractSignature {
@@ -234,12 +227,10 @@ pub struct DFG {
 
 impl_op_name!(DFG);
 impl DataflowOpTrait for DFG {
+    const TAG: OpTag = OpTag::Dfg;
+
     fn description(&self) -> &str {
         "A simply nested dataflow graph"
-    }
-
-    fn tag(&self) -> OpTag {
-        OpTag::Dfg
     }
 
     fn signature(&self) -> AbstractSignature {
