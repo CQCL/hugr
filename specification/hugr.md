@@ -156,9 +156,9 @@ As well as the type, dataflow edges are also parametrized by a
     [Non-local Edges](#non-local-edges)
 
 
-`SimpleType` $\supset$ `ClassicType`
-
 ```
+SimpleType ⊃ ClassicType -- In the absence of unicode: "SimpleType is a superset of ClassicType"
+
 EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
