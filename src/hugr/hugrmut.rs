@@ -154,7 +154,7 @@ where
         let node = self
             .as_mut()
             .graph
-            .add_node(op.op.input_count(), op.op.output_count());
+            .add_node(op.input_count(), op.output_count());
         self.as_mut().op_types[node] = op;
         node.into()
     }
@@ -202,12 +202,10 @@ where
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
         let src_port: Port = self
             .get_optype(src)
-            .op
             .other_port_index(Direction::Outgoing)
             .expect("Source operation has no non-dataflow outgoing edges");
         let dst_port: Port = self
             .get_optype(dst)
-            .op
             .other_port_index(Direction::Incoming)
             .expect("Destination operation has no non-dataflow incoming edges");
         self.connect(src, src_port.index(), dst, dst_port.index())?;
@@ -388,8 +386,8 @@ fn insert_hugr_internal(
     let root_optype = other.get_optype(other.root());
     hugr.set_num_ports(
         other_root.into(),
-        root_optype.op.input_count(),
-        root_optype.op.output_count(),
+        root_optype.input_count(),
+        root_optype.output_count(),
     );
 
     Ok((other_root.into(), node_map))
