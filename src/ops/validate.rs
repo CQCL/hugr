@@ -202,7 +202,8 @@ impl ValidateOp for super::TailLoop {
 impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::BasicBlock,
+            allowed_children: OpTag::ControlFlowChild,
+            allowed_first_child: OpTag::BasicBlock,
             allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,

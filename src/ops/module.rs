@@ -114,8 +114,8 @@ impl OpTrait for AliasDefn {
 pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
-    /// Flag to signify type is linear
-    pub linear: bool,
+    /// Flag to signify type is classical
+    pub classical: bool,
 }
 
 impl_op_name!(AliasDecl);
