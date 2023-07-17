@@ -3,8 +3,8 @@
 use std::any::Any;
 
 use crate::{
+    classic_row,
     macros::impl_box_clone,
-    type_row,
     types::{ClassicType, Container, EdgeKind, SimpleType, TypeRow},
 };
 
@@ -171,7 +171,11 @@ impl ConstValue {
 
     /// Constant Sum over units, used as predicates.
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
-        Self::predicate(tag, Self::unit(), std::iter::repeat(type_row![]).take(size))
+        Self::predicate(
+            tag,
+            Self::unit(),
+            std::iter::repeat(classic_row![]).take(size),
+        )
     }
 
     /// Constant Sum over Tuples, used as predicates.

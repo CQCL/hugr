@@ -12,8 +12,8 @@ use pyo3::prelude::*;
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
-use crate::{ops::constant::HugrIntWidthStore, utils::display_list};
-use crate::{resource::ResourceSet, type_row};
+use crate::resource::ResourceSet;
+use crate::{classic_row, ops::constant::HugrIntWidthStore, utils::display_list};
 
 /// A type that represents concrete data. Can include both linear and classical parts.
 ///
@@ -167,7 +167,7 @@ impl ClassicType {
 
     /// New simple predicate with empty Tuple variants
     pub fn new_simple_predicate(size: usize) -> Self {
-        Self::new_predicate(std::iter::repeat(type_row![]).take(size))
+        Self::new_predicate(std::iter::repeat(classic_row![]).take(size))
     }
 }
 
