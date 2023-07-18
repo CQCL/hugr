@@ -27,26 +27,26 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> Container for CFGBuilder<B> {
-    type BaseMut<'a> = &'a mut Hugr where B: 'a;
-    type BaseView<'a> = &'a Hugr where B: 'a;
+impl<B: HugrMut> Container for CFGBuilder<&mut B> {
+    type BaseMut<'a> = &'a mut B where Self: 'a, B: 'a;
+    type BaseView<'a> = &'a B where Self: 'a, B: 'a;
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.base.as_mut()
+    fn hugr_mut(&mut self) -> &mut B {
+        self.base
     }
 
     #[inline]
-    fn hugr(&self) -> &Hugr {
-        self.base.as_ref()
+    fn hugr(&self) -> &B {
+        self.base
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
+impl<H: HugrMut> SubContainer for CFGBuilder<&mut H> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -67,6 +67,24 @@ impl CFGBuilder<Hugr> {
         let base = Hugr::new(cfg_op);
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
+    }
+}
+
+impl Container for CFGBuilder<Hugr> {
+    type BaseMut<'a> = &'a mut Hugr where Self: 'a;
+
+    type BaseView<'a> = &'a Hugr where Self: 'a;
+
+    fn container_node(&self) -> Node {
+        self.cfg_node
+    }
+
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        &mut self.base
+    }
+
+    fn hugr(&self) -> Self::BaseView<'_> {
+        &self.base
     }
 }
 

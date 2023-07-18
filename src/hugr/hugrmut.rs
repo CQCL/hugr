@@ -12,7 +12,7 @@ use crate::{Hugr, Port};
 use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
-pub(crate) trait HugrMut {
+pub(crate) trait HugrMut: HugrView {
     /// Add a node to the graph.
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
 
@@ -144,17 +144,14 @@ pub(crate) trait HugrMut {
     fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node));
 }
 
-impl<T> HugrMut for T
-where
-    T: AsRef<Hugr> + AsMut<Hugr>,
+impl HugrMut for Hugr
 {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
         let node = self
-            .as_mut()
             .graph
             .add_node(op.input_count(), op.output_count());
-        self.as_mut().op_types[node] = op;
+        self.op_types[node] = op;
         node.into()
     }
 
@@ -163,14 +160,14 @@ where
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
         }
-        self.as_mut().hierarchy.remove(node.index);
-        self.as_mut().graph.remove_node(node.index);
-        self.as_mut().op_types.remove(node.index);
+        self.hierarchy.remove(node.index);
+        self.graph.remove_node(node.index);
+        self.op_types.remove(node.index);
         Ok(())
     }
 
     fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
-        self.as_mut().metadata.get_mut(node.index)
+        self.metadata.get_mut(node.index)
     }
 
     fn connect(
@@ -180,15 +177,14 @@ where
         dst: Node,
         dst_port: usize,
     ) -> Result<(), HugrError> {
-        self.as_mut()
-            .graph
+        self.graph
             .link_nodes(src.index, src_port, dst.index, dst_port)?;
         Ok(())
     }
 
     fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
         let offset = port.offset;
-        let port = self.as_mut().graph.port_index(node.index, offset).ok_or(
+        let port = self.graph.port_index(node.index, offset).ok_or(
             portgraph::LinkError::UnknownOffset {
                 node: node.index,
                 offset,
@@ -350,6 +346,90 @@ where
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
         self.as_mut().graph.compact_nodes(|_, _| {});
+    }
+}
+
+impl<T: HugrMut> HugrMut for &mut T {
+    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        (*self).add_op(op)
+    }
+
+    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
+        (*self).remove_node(node)
+    }
+
+    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
+        (*self).get_metadata_mut(node)
+    }
+
+    fn connect(
+        &mut self,
+        src: Node,
+        src_port: usize,
+        dst: Node,
+        dst_port: usize,
+    ) -> Result<(), HugrError> {
+        (*self).connect(src, src_port, dst, dst_port)
+    }
+
+    fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
+        (*self).disconnect(node, port)
+    }
+
+    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+        (*self).add_other_edge(src, dst)
+    }
+
+    fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
+        (*self).set_num_ports(node, incoming, outgoing)
+    }
+
+    fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
+        (*self).add_ports(node, direction, amount)
+    }
+
+    fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
+        (*self).set_parent(node, parent)
+    }
+
+    fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
+        (*self).move_after_sibling(node, after)
+    }
+
+    fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
+        (*self).move_before_sibling(node, before)
+    }
+
+    fn add_op_with_parent(
+        &mut self,
+        parent: Node,
+        op: impl Into<OpType>,
+    ) -> Result<Node, HugrError> {
+        (*self).add_op_with_parent(parent, op)
+    }
+
+    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+        (*self).add_op_before(sibling, op)
+    }
+
+    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+        (*self).add_op_after(sibling, op)
+    }
+
+    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
+        (*self).replace_op(node, op)
+    }
+
+    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
+        (*self).insert_hugr(root, other)
+    }
+
+    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+        (*self).insert_from_view(root, other)
+    }
+
+    fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node)) {
+        (*self).canonicalize_nodes(rekey)
     }
 }
 
