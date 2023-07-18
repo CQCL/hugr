@@ -49,6 +49,9 @@ pub struct ConditionalBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ConditionalBuilder<T> {
+    type BaseMut<'a> = &'a mut Hugr where T: 'a;
+    type BaseView<'a> = &'a Hugr where T: 'a;
+
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node

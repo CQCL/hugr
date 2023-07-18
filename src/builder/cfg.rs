@@ -28,6 +28,8 @@ pub struct CFGBuilder<T> {
 }
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> Container for CFGBuilder<B> {
+    type BaseMut<'a> = &'a mut Hugr where B: 'a;
+    type BaseView<'a> = &'a Hugr where B: 'a;
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node

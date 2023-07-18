@@ -34,12 +34,14 @@ use crate::hugr::HugrMut;
 /// Implementations of this trait allow the child sibling graph to be added to
 /// the HUGR.
 pub trait Container {
+    type BaseMut<'a>: HugrMut where Self: 'a;
+    type BaseView<'a>: HugrView where Self: 'a;
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> &mut Hugr;
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_>;
     /// Immutable reference to HUGR being built
-    fn hugr(&self) -> &Hugr;
+    fn hugr(&self) -> Self::BaseView<'_>;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();

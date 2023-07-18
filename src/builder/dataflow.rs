@@ -83,6 +83,8 @@ impl HugrBuilder for DFGBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for DFGBuilder<T> {
+    type BaseMut<'a> = &'a mut Hugr where T: 'a;
+    type BaseView<'a> = &'a Hugr where T: 'a;
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
@@ -148,6 +150,8 @@ impl FunctionBuilder<Hugr> {
 }
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
+    type BaseMut<'a> = &'a mut Hugr where B: 'a, T: 'a;
+    type BaseView<'a> = &'a Hugr where B: 'a, T: 'a;
     #[inline]
     fn container_node(&self) -> Node {
         self.0.container_node()
