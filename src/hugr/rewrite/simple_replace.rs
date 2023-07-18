@@ -3,7 +3,6 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::NodeIndex;
 
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
@@ -71,7 +70,7 @@ impl Rewrite for SimpleReplacement {
         // 3. Do the replacement.
         // 3.1. Add copies of all replacement nodes and edges to h. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in self.replacement) to new NodeIndex (in self).
-        let mut index_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
+        let mut index_map: HashMap<Node, Node> = HashMap::new();
         let replacement_nodes = self
             .replacement
             .children(self.replacement.root())
@@ -90,13 +89,13 @@ impl Rewrite for SimpleReplacement {
                 return Err(SimpleReplacementError::InvalidReplacementNode());
             }
         }
-        let self_output_node_index = h.children(self.parent).nth(1).unwrap();
+        let self_output_node = h.children(self.parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
-            let new_node_index = h.add_op_after(self_output_node_index, op.clone()).unwrap();
-            index_map.insert(node.index, new_node_index.index);
+            let new_node = h.add_op_after(self_output_node, op.clone()).unwrap();
+            index_map.insert(node, new_node);
 
             // Move the metadata
             let meta: &NodeMetadata = self.replacement.get_metadata(node);
@@ -105,18 +104,13 @@ impl Rewrite for SimpleReplacement {
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
-            let new_node_index = index_map.get(&node.index).unwrap();
+            let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
                 for target in self.replacement.linked_ports(node, outport) {
                     if self.replacement.get_optype(target.0).tag() != OpTag::Output {
-                        let new_target = index_map.get(&target.0.index).unwrap();
-                        h.connect(
-                            Node::from(*new_node_index),
-                            outport.index(),
-                            Node::from(*new_target),
-                            target.1.index(),
-                        )
-                        .unwrap();
+                        let new_target = index_map.get(&target.0).unwrap();
+                        h.connect(*new_node, outport.index(), *new_target, target.1.index())
+                            .unwrap();
                     }
                 }
             }
@@ -131,11 +125,11 @@ impl Rewrite for SimpleReplacement {
                     .exactly_one()
                     .unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
-                let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
+                let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
-                    Node::from(rem_inp_pred_node),
+                    rem_inp_pred_node,
                     rem_inp_pred_port.index(),
-                    Node::from(*new_inp_node_index),
+                    *new_inp_node,
                     rep_inp_port.offset.index(),
                 )
                 .unwrap();
@@ -150,10 +144,10 @@ impl Rewrite for SimpleReplacement {
                 .exactly_one()
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
-                let new_out_node_index = index_map.get(&rep_out_pred_node.index).unwrap();
+                let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
                 h.connect(
-                    Node::from(*new_out_node_index),
+                    *new_out_node,
                     rep_out_pred_port.index(),
                     *rem_out_node,
                     rem_out_port.index(),
