@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
+use portgraph::{LinkMut, LinkView, NodeIndex, PortView};
 
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
@@ -144,22 +144,20 @@ impl Rewrite for SimpleReplacement {
         // predecessor of p to (the new copy of) q.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
             if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
-                let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
-                let rem_inp_port_index = h
-                    .graph
-                    .port_index(rem_inp_node.index, rem_inp_port.offset)
+                let (rem_inp_pred_node, rem_inp_pred_port) = h
+                    .linked_ports(*rem_inp_node, *rem_inp_port)
+                    .exactly_one()
                     .unwrap();
-                let rem_inp_predecessor_subport = h.graph.port_link(rem_inp_port_index).unwrap();
-                let rem_inp_predecessor_port_index = rem_inp_predecessor_subport.port();
-                let new_inp_port_index = h
-                    .graph
-                    .port_index(*new_inp_node_index, rep_inp_port.offset)
-                    .unwrap();
-                h.graph.unlink_subport(rem_inp_predecessor_subport);
-                h.graph
-                    .link_ports(rem_inp_predecessor_port_index, new_inp_port_index)
-                    .unwrap();
+                h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
+                let new_inp_node_index = index_map.get(&rep_inp_node.index).unwrap();
+                h.connect(
+                    Node::from(rem_inp_pred_node),
+                    rem_inp_pred_port.index(),
+                    Node::from(*new_inp_node_index),
+                    rep_inp_port.offset.index(),
+                )
+                .unwrap();
             }
         }
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
