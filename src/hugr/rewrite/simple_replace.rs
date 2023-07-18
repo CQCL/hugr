@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use portgraph::{LinkMut, LinkView, NodeIndex, PortView};
+use portgraph::NodeIndex;
 
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
@@ -108,34 +108,17 @@ impl Rewrite for SimpleReplacement {
         // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
             let new_node_index = index_map.get(&node.index).unwrap();
-            for node_successor in self.replacement.output_neighbours(node).unique() {
-                if self.replacement.get_optype(node_successor).tag() != OpTag::Output {
-                    let new_node_successor_index = index_map.get(&node_successor.index).unwrap();
-                    for connection in self
-                        .replacement
-                        .graph
-                        .get_connections(node.index, node_successor.index)
-                    {
-                        let src_offset = self
-                            .replacement
-                            .graph
-                            .port_offset(connection.0)
-                            .unwrap()
-                            .index();
-                        let tgt_offset = self
-                            .replacement
-                            .graph
-                            .port_offset(connection.1)
-                            .unwrap()
-                            .index();
-                        h.graph
-                            .link_nodes(
-                                *new_node_index,
-                                src_offset,
-                                *new_node_successor_index,
-                                tgt_offset,
-                            )
-                            .unwrap();
+            for outport in self.replacement.node_outputs(node) {
+                for target in self.replacement.linked_ports(node, outport) {
+                    if self.replacement.get_optype(target.0).tag() != OpTag::Output {
+                        let new_target = index_map.get(&target.0.index).unwrap();
+                        h.connect(
+                            Node::from(*new_node_index),
+                            outport.index(),
+                            Node::from(*new_target),
+                            target.1.index(),
+                        )
+                        .unwrap();
                     }
                 }
             }
