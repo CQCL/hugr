@@ -163,45 +163,21 @@ impl Rewrite for SimpleReplacement {
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
         // edge from (the new copy of) the predecessor of q to p.
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
-            let rem_out_port_index = h
-                .graph
-                .port_index(rem_out_node.index, rem_out_port.offset)
-                .unwrap();
-            let rep_out_port_index = self
+            let (rep_out_pred_node, rep_out_pred_port) = self
                 .replacement
-                .graph
-                .port_index(replacement_output_node.index, rep_out_port.offset)
+                .linked_ports(replacement_output_node, *rep_out_port)
+                .exactly_one()
                 .unwrap();
-            let rep_out_predecessor_port_index = self
-                .replacement
-                .graph
-                .port_link(rep_out_port_index)
+            if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
+                let new_out_node_index = index_map.get(&rep_out_pred_node.index).unwrap();
+                h.disconnect(*rem_out_node, *rem_out_port).unwrap();
+                h.connect(
+                    Node::from(*new_out_node_index),
+                    rep_out_pred_port.index(),
+                    *rem_out_node,
+                    rem_out_port.index(),
+                )
                 .unwrap();
-            let rep_out_predecessor_node_index = self
-                .replacement
-                .graph
-                .port_node(rep_out_predecessor_port_index)
-                .unwrap();
-            if self
-                .replacement
-                .get_optype(rep_out_predecessor_node_index.into())
-                .tag()
-                != OpTag::Input
-            {
-                let rep_out_predecessor_port_offset = self
-                    .replacement
-                    .graph
-                    .port_offset(rep_out_predecessor_port_index)
-                    .unwrap();
-                let new_out_node_index = index_map.get(&rep_out_predecessor_node_index).unwrap();
-                let new_out_port_index = h
-                    .graph
-                    .port_index(*new_out_node_index, rep_out_predecessor_port_offset)
-                    .unwrap();
-                h.graph.unlink_port(rem_out_port_index);
-                h.graph
-                    .link_ports(new_out_port_index, rem_out_port_index)
-                    .unwrap();
             }
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
