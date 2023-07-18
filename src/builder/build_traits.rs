@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
