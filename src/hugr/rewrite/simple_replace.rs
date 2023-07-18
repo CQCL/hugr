@@ -186,21 +186,19 @@ impl Rewrite for SimpleReplacement {
             let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
                 // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
-                let rem_inp_port_index = h
-                    .graph
-                    .port_index(rem_inp_node.index, rem_inp_port.offset)
+                let (rem_inp_pred_node, rem_inp_pred_port) = h
+                    .linked_ports(*rem_inp_node, *rem_inp_port)
+                    .exactly_one()
                     .unwrap();
-                let rem_inp_predecessor_port_index =
-                    h.graph.port_link(rem_inp_port_index).unwrap().port();
-                let rem_out_port_index = h
-                    .graph
-                    .port_index(rem_out_node.index, rem_out_port.offset)
-                    .unwrap();
-                h.graph.unlink_port(rem_inp_port_index);
-                h.graph.unlink_port(rem_out_port_index);
-                h.graph
-                    .link_ports(rem_inp_predecessor_port_index, rem_out_port_index)
-                    .unwrap();
+                h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
+                h.disconnect(*rem_out_node, *rem_out_port).unwrap();
+                h.connect(
+                    rem_inp_pred_node,
+                    rem_inp_pred_port.index(),
+                    *rem_out_node,
+                    rem_out_port.index(),
+                )
+                .unwrap();
             }
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
