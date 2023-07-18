@@ -64,9 +64,7 @@ impl Rewrite for SimpleReplacement {
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
         for node in &self.removal {
-            if h.hierarchy.parent(node.index) != Some(self.parent.index)
-                || h.hierarchy.has_children(node.index)
-            {
+            if h.get_parent(*node) != Some(self.parent) || h.children(*node).next().is_some() {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
             }
         }
