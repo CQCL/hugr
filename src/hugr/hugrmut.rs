@@ -153,7 +153,7 @@ impl HugrMut for Hugr {
     }
 
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
-        if node.index == self.as_ref().root {
+        if node.index == self.root {
             // TODO: Add a HugrMutError ?
             panic!("cannot remove root node");
         }
@@ -187,7 +187,7 @@ impl HugrMut for Hugr {
                 offset,
             },
         )?;
-        self.as_mut().graph.unlink_port(port);
+        self.graph.unlink_port(port);
         Ok(())
     }
 
@@ -206,15 +206,14 @@ impl HugrMut for Hugr {
 
     #[inline]
     fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
-        self.as_mut()
-            .graph
+        self.graph
             .set_num_ports(node.index, incoming, outgoing, |_, _| {})
     }
 
     #[inline]
     fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
-        let mut incoming = self.as_mut().graph.num_inputs(node.index);
-        let mut outgoing = self.as_mut().graph.num_outputs(node.index);
+        let mut incoming = self.graph.num_inputs(node.index);
+        let mut outgoing = self.graph.num_outputs(node.index);
         let increment = |num: &mut usize| {
             let new = num.saturating_add_signed(amount);
             let range = *num..new;
@@ -225,33 +224,26 @@ impl HugrMut for Hugr {
             Direction::Incoming => increment(&mut incoming),
             Direction::Outgoing => increment(&mut outgoing),
         };
-        self.as_mut()
-            .graph
+        self.graph
             .set_num_ports(node.index, incoming, outgoing, |_, _| {});
         range
     }
 
     fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
-        self.as_mut().hierarchy.detach(node.index);
-        self.as_mut()
-            .hierarchy
-            .push_child(node.index, parent.index)?;
+        self.hierarchy.detach(node.index);
+        self.hierarchy.push_child(node.index, parent.index)?;
         Ok(())
     }
 
     fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-        self.as_mut().hierarchy.detach(node.index);
-        self.as_mut()
-            .hierarchy
-            .insert_after(node.index, after.index)?;
+        self.hierarchy.detach(node.index);
+        self.hierarchy.insert_after(node.index, after.index)?;
         Ok(())
     }
 
     fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
-        self.as_mut().hierarchy.detach(node.index);
-        self.as_mut()
-            .hierarchy
-            .insert_before(node.index, before.index)?;
+        self.hierarchy.detach(node.index);
+        self.hierarchy.insert_before(node.index, before.index)?;
         Ok(())
     }
 
@@ -261,53 +253,47 @@ impl HugrMut for Hugr {
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.as_mut()
-            .hierarchy
-            .push_child(node.index, parent.index)?;
+        self.hierarchy.push_child(node.index, parent.index)?;
         Ok(node)
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.as_mut()
-            .hierarchy
-            .insert_before(node.index, sibling.index)?;
+        self.hierarchy.insert_before(node.index, sibling.index)?;
         Ok(node)
     }
 
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
         let node = self.add_op(op.into());
-        self.as_mut()
-            .hierarchy
-            .insert_after(node.index, sibling.index)?;
+        self.hierarchy.insert_after(node.index, sibling.index)?;
         Ok(node)
     }
 
     fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
-        let cur = self.as_mut().op_types.get_mut(node.index);
+        let cur = self.op_types.get_mut(node.index);
         std::mem::replace(cur, op.into())
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
-        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
+        let (other_root, node_map) = insert_hugr_internal(self, root, &other)?;
         // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
-            self.as_mut().op_types.set(new_node, optype);
+            self.op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
-            self.as_mut().set_metadata(node.into(), meta);
+            self.set_metadata(node.into(), meta);
         }
         Ok(other_root)
     }
 
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
-        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
+        let (other_root, node_map) = insert_hugr_internal(self, root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.get_optype(node.into());
-            self.as_mut().op_types.set(new_node, optype.clone());
+            self.op_types.set(new_node, optype.clone());
             let meta = other.get_metadata(node.into());
-            self.as_mut().set_metadata(node.into(), meta.clone());
+            self.set_metadata(node.into(), meta.clone());
         }
         Ok(other_root)
     }
@@ -330,19 +316,18 @@ impl HugrMut for Hugr {
 
             let target: Node = NodeIndex::new(position).into();
             if target != source {
-                let hugr = self.as_mut();
-                hugr.graph.swap_nodes(target.index, source.index);
-                hugr.op_types.swap(target.index, source.index);
-                hugr.hierarchy.swap_nodes(target.index, source.index);
+                self.graph.swap_nodes(target.index, source.index);
+                self.op_types.swap(target.index, source.index);
+                self.hierarchy.swap_nodes(target.index, source.index);
                 rekey(source, target);
             }
         }
-        self.as_mut().root = NodeIndex::new(0);
+        self.root = NodeIndex::new(0);
 
         // Finish by compacting the copy nodes.
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
-        self.as_mut().graph.compact_nodes(|_, _| {});
+        self.graph.compact_nodes(|_, _| {});
     }
 }
 

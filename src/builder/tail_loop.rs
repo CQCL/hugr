@@ -109,7 +109,7 @@ mod test {
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
 
-            let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
+            let break_wire = loop_b.make_break(loop_b.loop_signature()?, [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
             loop_b.finish_hugr()
         };
@@ -129,7 +129,7 @@ mod test {
                 let loop_id = {
                     let mut loop_b =
                         fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
-                    let signature = loop_b.loop_signature()?.clone();
+                    let signature = loop_b.loop_signature()?;
                     let const_wire = loop_b.add_load_const(ConstValue::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {

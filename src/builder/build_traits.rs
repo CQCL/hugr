@@ -53,7 +53,7 @@ impl Buildable for Hugr {
     }
 
     fn hugr(&self) -> Self::BaseView<'_> {
-        &self
+        self
     }
 }
 
@@ -67,7 +67,7 @@ impl<H: HugrMut + HugrView> Buildable for &mut H {
     }
 
     fn hugr(&self) -> Self::BaseView<'_> {
-        &self
+        self
     }
 }
 

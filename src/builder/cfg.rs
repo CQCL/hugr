@@ -190,7 +190,8 @@ impl<B: Buildable> CFGBuilder<B> {
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
-        let inputs = (&mut self.inputs)
+        let inputs = self
+            .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
         self.any_block_builder(inputs, predicate_variants, other_outputs, true)
