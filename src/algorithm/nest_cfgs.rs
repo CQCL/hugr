@@ -118,6 +118,20 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
     Ok(())
 }
 
+pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
+    fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
+        if h.get_optype(n).tag() == OpTag::Cfg {
+            transform_cfg_to_nested(&mut SimpleCfgView::new_subtree(h, n))?;
+        }
+        let children = h.children(n).collect::<Vec<_>>();
+        for node in children {
+            traverse(h, node)?;
+        }
+        Ok(())
+    }
+    traverse(h, h.root())
+}
+
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
 type CfgEdge<T> = (T, T);
 
@@ -176,9 +190,14 @@ pub struct SimpleCfgView<'a> {
     exit: Node,
 }
 impl<'a> SimpleCfgView<'a> {
-    /// Creates a SimpleCfgView for the specified CSG of a Hugr
+    /// Creates a SimpleCfgView for a CFG-rooted Hugr
     pub fn new(h: &'a mut Hugr) -> Self {
-        let mut children = h.children(h.root());
+        Self::new_subtree(h, h.root())
+    }
+
+    /// Creates a SimpleCfgView for the specified CSG of a Hugr
+    pub fn new_subtree(h: &'a mut Hugr, n: Node) -> Self {
+        let mut children = h.children(n);
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
