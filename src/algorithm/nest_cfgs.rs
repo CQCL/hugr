@@ -115,9 +115,15 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
             node_stack.push(s);
         }
     }
+    // TODO we should probably now try to merge consecutive basic blocks
+    // (i.e. where a BB has a single successor, that has a single predecessor)
+    // and thus convert CF dependencies into (parallelizable) dataflow.
     Ok(())
 }
 
+/// Attempt to transform all CFGs in the given Hugr into nested form.
+/// This traverses every node in the entire Hugr, so is quite an expensive way,
+/// but it'll do for the time being while we experiment.
 pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
     fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
         if h.get_optype(n).tag() == OpTag::Cfg {
