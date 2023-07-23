@@ -2,13 +2,12 @@
 
 use smol_str::SmolStr;
 
-use super::{tag::OpTag, OpName, OpTrait, OpaqueOp};
+use super::custom::ExternalOp;
+use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
-    types::{
-        ClassicType, EdgeKind, LinearType, Signature, SignatureDescription, SimpleType, TypeRow,
-    },
+    types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleType, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -18,10 +17,7 @@ use crate::{
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
-    CustomOp {
-        /// The underlying opaque operation.
-        custom: OpaqueOp,
-    },
+    CustomOp(ExternalOp),
     /// A Hadamard gate.
     H,
     /// A T gate.
@@ -87,7 +83,7 @@ pub enum LeafOp {
 impl Default for LeafOp {
     fn default() -> Self {
         Self::Noop {
-            ty: SimpleType::default(),
+            ty: SimpleType::Qubit,
         }
     }
 }
@@ -95,7 +91,7 @@ impl OpName for LeafOp {
     /// The name of the operation.
     fn name(&self) -> SmolStr {
         match self {
-            LeafOp::CustomOp { custom: opaque } => return opaque.name(),
+            LeafOp::CustomOp(ext) => return ext.name(),
             LeafOp::H => "H",
             LeafOp::T => "T",
             LeafOp::S => "S",
@@ -120,11 +116,15 @@ impl OpName for LeafOp {
     }
 }
 
+impl StaticTag for LeafOp {
+    const TAG: OpTag = OpTag::Leaf;
+}
+
 impl OpTrait for LeafOp {
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
-            LeafOp::CustomOp { custom: opaque } => opaque.description(),
+            LeafOp::CustomOp(ext) => ext.description(),
             LeafOp::H => "Hadamard gate",
             LeafOp::T => "T gate",
             LeafOp::S => "S gate",
@@ -148,14 +148,14 @@ impl OpTrait for LeafOp {
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Leaf
+        <Self as StaticTag>::TAG
     }
 
     /// The signature of the operation.
     fn signature(&self) -> Signature {
         // Static signatures. The `TypeRow`s in the `Signature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
-        const Q: SimpleType = SimpleType::Linear(LinearType::Qubit);
+        const Q: SimpleType = SimpleType::Qubit;
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
         const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
@@ -173,7 +173,7 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp { custom: opaque } => opaque.signature(),
+            LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
@@ -201,7 +201,7 @@ impl OpTrait for LeafOp {
     /// Optional description of the ports in the signature.
     fn signature_desc(&self) -> SignatureDescription {
         match self {
-            LeafOp::CustomOp { custom: opaque } => opaque.signature_desc(),
+            LeafOp::CustomOp(ext) => ext.signature_desc(),
             // TODO: More port descriptions
             _ => Default::default(),
         }
@@ -217,11 +217,6 @@ impl OpTrait for LeafOp {
 }
 
 impl LeafOp {
-    /// Returns the number of linear inputs (also outputs) of the operation.
-    pub fn linear_count(&self) -> usize {
-        self.signature().linear().count()
-    }
-
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
         self.signature().purely_classical()

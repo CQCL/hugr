@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 use portgraph::{LinkMut, LinkView, MultiMut, NodeIndex, PortView};
 
-use crate::hugr::{HugrMut, HugrView};
+use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
-    ops::{tag::OpTag, OpTrait, OpType},
+    ops::{OpTag, OpTrait, OpType},
     Hugr, Port,
 };
 use thiserror::Error;
@@ -99,6 +99,10 @@ impl Rewrite for SimpleReplacement {
             let op: &OpType = self.replacement.get_optype(node);
             let new_node_index = h.add_op_after(self_output_node_index, op.clone()).unwrap();
             index_map.insert(node.index, new_node_index.index);
+
+            // Move the metadata
+            let meta: &NodeMetadata = self.replacement.get_metadata(node);
+            h.set_metadata(node, meta.clone());
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
@@ -260,14 +264,14 @@ mod test {
     };
     use crate::hugr::view::HugrView;
     use crate::hugr::{Hugr, Node};
-    use crate::ops::tag::OpTag;
+    use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
+    use crate::types::{ClassicType, Signature, SimpleType};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
 
-    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    const QB: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr like the following:
     /// --   H   --
@@ -507,7 +511,7 @@ mod test {
 
     #[test]
     fn test_replace_cx_cross() {
-        let q_row: Vec<SimpleType> = vec![LinearType::Qubit.into(), LinearType::Qubit.into()];
+        let q_row: Vec<SimpleType> = vec![SimpleType::Qubit, SimpleType::Qubit];
         let mut builder = DFGBuilder::new(q_row.clone(), q_row).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(LeafOp::CX, [0, 1]).unwrap();

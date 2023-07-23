@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::{SimpleType, TypeRow};
 use crate::Direction;
 
-use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
+use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -162,11 +162,7 @@ impl ValidateOp for super::Conditional {
         for (i, (child, optype)) in children.into_iter().enumerate() {
             let OpType::Case(case_op) = optype else {panic!("Child check should have already checked valid ops.")};
             let sig = &case_op.signature;
-            let predicate_value = &self.predicate_inputs[i];
-            if sig.input[0..predicate_value.len()] != predicate_value[..]
-                || sig.input[predicate_value.len()..] != self.other_inputs[..]
-                || sig.output != self.outputs
-            {
+            if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
                     optype: optype.clone(),
@@ -194,20 +190,9 @@ impl ValidateOp for super::TailLoop {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        let expected_output = SimpleType::new_sum(vec![
-            SimpleType::new_tuple(self.just_inputs.clone()),
-            SimpleType::new_tuple(self.just_outputs.clone()),
-        ]);
-        let mut expected_output = vec![expected_output];
-        expected_output.extend_from_slice(&self.rest);
-        let expected_output: TypeRow = expected_output.into();
-
-        let mut expected_input = self.just_inputs.clone();
-        expected_input.to_mut().extend_from_slice(&self.rest);
-
         validate_io_nodes(
-            &expected_input,
-            &expected_output,
+            &self.body_input_row(),
+            &self.body_output_row(),
             "tail-controlled loop graph",
             children,
         )
@@ -217,7 +202,8 @@ impl ValidateOp for super::TailLoop {
 impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::BasicBlock,
+            allowed_children: OpTag::ControlFlowChild,
+            allowed_first_child: OpTag::BasicBlock,
             allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,

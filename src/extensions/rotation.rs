@@ -6,14 +6,15 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use cgmath::num_traits::ToPrimitive;
 use num_rational::Rational64;
 use smol_str::SmolStr;
+use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::ops::CustomOp;
-use crate::resource::ResourceSet;
-use crate::types::{ClassicType, CustomType, Signature, SimpleType, TypeRow};
+use crate::resource::{OpDef, ResourceSet, TypeDef};
+use crate::types::type_param::TypeArg;
+use crate::types::{CustomType, SimpleType, TypeRow};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -24,10 +25,21 @@ pub const fn resource_id() -> SmolStr {
 pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
-    resource.add_type(Type::Angle.into());
-    resource.add_type(Type::Quaternion.into());
+    resource.add_type(Type::Angle.type_def());
+    resource.add_type(Type::Quaternion.type_def());
 
-    resource.add_opaque_op(AngleAdd.into());
+    let op = OpDef::new_with_custom_sig(
+        "AngleAdd".into(),
+        "".into(),
+        vec![],
+        HashMap::default(),
+        |_arg_values: &[TypeArg]| {
+            let t: TypeRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            Ok((t.clone(), t, ResourceSet::default()))
+        },
+    );
+
+    resource.add_op(op).unwrap();
     resource
 }
 
@@ -47,11 +59,14 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), TypeRow::new())
+        CustomType::new(self.name(), [])
     }
 
-    pub fn classic_type(self) -> ClassicType {
-        self.custom_type().classic_type()
+    pub fn type_def(self) -> TypeDef {
+        TypeDef {
+            name: self.name(),
+            args: vec![],
+        }
     }
 }
 
@@ -78,32 +93,12 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn const_type(&self) -> ClassicType {
-        match self {
+    fn custom_type(&self) -> CustomType {
+        let t: Type = match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
-        }
-        .classic_type()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AngleAdd;
-
-#[typetag::serde]
-impl CustomOp for AngleAdd {
-    fn name(&self) -> SmolStr {
-        "AngleAdd".into()
-    }
-
-    fn signature(&self) -> Signature {
-        // TODO: Is there a way to make this static? The Opaque simple type requires initializing a Box...
-        Signature::new_linear(vec![SimpleType::Classic(Type::Angle.classic_type())])
-    }
-
-    fn resources(&self) -> &ResourceSet {
-        // TODO: Don't return a reference? We need to initialize the resource set.
-        todo!()
+        };
+        t.custom_type()
     }
 }
 

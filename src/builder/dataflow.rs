@@ -189,11 +189,15 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
+    use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::ops::tag::OpTag;
+    use crate::hugr::validate::InterGraphEdgeError;
+    use crate::ops::handle::NodeHandle;
+    use crate::ops::OpTag;
     use crate::ops::OpTrait;
+    use crate::types::SimpleType;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -202,7 +206,7 @@ mod test {
         ops::LeafOp,
         resource::ResourceSet,
         type_row,
-        types::{LinearType, Signature},
+        types::Signature,
         Wire,
     };
 
@@ -303,7 +307,7 @@ mod test {
             Ok(module_builder.finish_hugr()?)
         };
 
-        assert_eq!(builder(), Err(BuildError::NoCopyLinear(LinearType::Qubit)));
+        assert_eq!(builder(), Err(BuildError::NoCopyLinear(SimpleType::Qubit)));
     }
 
     #[test]
@@ -330,6 +334,31 @@ mod test {
     }
 
     #[test]
+    fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
+        let mut f_build =
+            FunctionBuilder::new("main", Signature::new_df(type_row![QB], type_row![QB]))?;
+
+        let [i1] = f_build.input_wires_arr();
+        let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+        let i1 = noop.out_wire(0);
+
+        let mut nested = f_build.dfg_builder(Signature::new_df(type_row![], type_row![QB]), [])?;
+
+        let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
+
+        // The error would anyway be caught in validation when we finish the Hugr,
+        // but the builder catches it earlier
+        assert_matches!(
+            id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonClassicalData { .. })
+            ))
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn dfg_hugr() -> Result<(), BuildError> {
         let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
 
@@ -345,8 +374,9 @@ mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
         let [i1] = dfg_builder.input_wires_arr();
+        dfg_builder.set_metadata(json!(42));
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         // Create a module, and insert the DFG into it

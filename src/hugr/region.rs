@@ -1,62 +1,69 @@
 //! Region-level views of a HUGR.
+//!
+//! A region is a subgraph of a HUGR that includes a root node and some of its
+//! descendants. The root node is the only node in the region that has no parent
+//! in the region. Non-local edges between nodes inside and outside the region
+//! are ignored.
+//!
+//! [`FlatRegionView`] includes only the root node and its direct children,
+//! while [`RegionView`] includes all the descendants of the root.
+//!
+//! Both views implement the [`Region`] trait, so they can be used
+//! interchangeably. They implement [`HugrView`] as well as petgraph's _visit_
+//! traits.
 
 pub mod petgraph;
 
 use std::iter;
 
+use ::petgraph::visit as pv;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{Hierarchy, LinkView, MultiPortGraph, PortView, UnmanagedDenseMap};
+use portgraph::{LinkView, PortIndex, PortView};
 
 use crate::{ops::OpType, Direction, Hugr, Node, Port};
 
-use super::HugrView;
+use super::view::sealed::HugrInternals;
+use super::{HugrView, NodeMetadata};
 
-type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
+type FlatRegionGraph<'g, Base> =
+    portgraph::view::FlatRegion<'g, <Base as HugrInternals>::Portgraph>;
 
 /// Single region view of a HUGR. Includes only the root node and its direct children.
 ///
 /// For a view that includes all the descendants of the root, see [`RegionView`].
-#[derive(Clone, Debug)]
-pub struct FlatRegionView<'g> {
+pub struct FlatRegionView<'g, Base = Hugr>
+where
+    Base: HugrInternals,
+{
     /// The chosen root node.
     root: Node,
 
-    /// The graph encoding the adjacency structure of the HUGR.
-    graph: FlatRegionGraph<'g>,
+    /// The filtered portgraph encoding the adjacency structure of the HUGR.
+    graph: FlatRegionGraph<'g, Base>,
 
-    /// The node hierarchy.
-    hierarchy: &'g Hierarchy,
-
-    /// Operation types for each node.
-    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    /// The rest of the HUGR.
+    hugr: &'g Base,
 }
 
-impl<'g> FlatRegionView<'g> {
-    /// Create a new region view of a HUGR containing only a root and its direct
-    /// children.
-    pub fn new(hugr: &'g Hugr, root: Node) -> Self {
-        let Hugr {
-            graph,
-            hierarchy,
-            op_types,
-            ..
-        } = hugr;
-        Self {
-            root,
-            graph: FlatRegionGraph::new_flat_region(graph, hierarchy, root.index),
-            hierarchy,
-            op_types,
-        }
+impl<'g, Base> Clone for FlatRegionView<'g, Base>
+where
+    Base: HugrInternals + HugrView + Clone,
+{
+    fn clone(&self) -> Self {
+        FlatRegionView::new(self.hugr, self.root)
     }
 }
 
-impl<'g> HugrView for FlatRegionView<'g> {
+impl<'g, Base> HugrView for FlatRegionView<'g, Base>
+where
+    Base: HugrInternals + HugrView,
+{
     type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
     where
         Self: 'a;
 
-    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
+    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g, Base> as PortView>::NodePortOffsets<'a>, Port>
     where
         Self: 'a;
 
@@ -64,12 +71,12 @@ impl<'g> HugrView for FlatRegionView<'g> {
     where
         Self: 'a;
 
-    type Neighbours<'a> = MapInto<<FlatRegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
+    type Neighbours<'a> = MapInto<<FlatRegionGraph<'g, Base> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
 
     type PortLinks<'a> = MapWithCtx<
-        <FlatRegionGraph<'g> as LinkView>::PortLinks<'a>,
+        <FlatRegionGraph<'g, Base> as LinkView>::PortLinks<'a>,
         &'a Self,
         (Node, Port),
     > where
@@ -82,20 +89,22 @@ impl<'g> HugrView for FlatRegionView<'g> {
 
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hierarchy
-            .parent(node.index)
-            .map(Into::into)
-            .filter(|&n| n == self.root)
+        self.hugr.get_parent(node).filter(|&n| n == self.root)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.op_types.get(node.index)
+        self.hugr.get_optype(node)
+    }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        self.hugr.get_metadata(node)
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.hierarchy.child_count(self.root.index) + 1
+        self.base_hugr().hierarchy.child_count(self.root.index) + 1
     }
 
     #[inline]
@@ -109,7 +118,11 @@ impl<'g> HugrView for FlatRegionView<'g> {
     #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
         // Faster implementation than filtering all the nodes in the internal graph.
-        let children = self.hierarchy.children(self.root.index).map_into();
+        let children = self
+            .base_hugr()
+            .hierarchy
+            .children(self.root.index)
+            .map_into();
         iter::once(self.root).chain(children)
     }
 
@@ -129,7 +142,7 @@ impl<'g> HugrView for FlatRegionView<'g> {
             .port_links(port)
             .with_context(self)
             .map_with_context(|(_, link), region| {
-                let port = link.port();
+                let port: PortIndex = link.into();
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
@@ -144,7 +157,7 @@ impl<'g> HugrView for FlatRegionView<'g> {
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
         match node == self.root {
-            true => self.hierarchy.children(node.index).map_into(),
+            true => self.base_hugr().hierarchy.children(node.index).map_into(),
             false => portgraph::hierarchy::Children::default().map_into(),
         }
     }
@@ -160,7 +173,7 @@ impl<'g> HugrView for FlatRegionView<'g> {
     }
 }
 
-type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
+type RegionGraph<'g, Base> = portgraph::view::Region<'g, <Base as HugrInternals>::Portgraph>;
 
 /// Single region view of a HUGR. Includes only the root node and its
 /// descendants.
@@ -168,46 +181,38 @@ type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
 /// For a view that includes only the direct children of the root, see
 /// [`FlatRegionView`]. Prefer using [`FlatRegionView`] over this type when
 /// possible, as it is more efficient.
-#[derive(Clone, Debug)]
-pub struct RegionView<'g> {
+pub struct RegionView<'g, Base>
+where
+    Base: HugrInternals,
+{
     /// The chosen root node.
     root: Node,
 
     /// The graph encoding the adjacency structure of the HUGR.
-    graph: RegionGraph<'g>,
+    graph: RegionGraph<'g, Base>,
 
     /// The node hierarchy.
-    hierarchy: &'g Hierarchy,
-
-    /// Operation types for each node.
-    op_types: &'g UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    hugr: &'g Base,
 }
 
-impl<'g> RegionView<'g> {
-    /// Create a new region view of a HUGR containing only a root node and its
-    /// descendants.
-    pub fn new(hugr: &'g Hugr, root: Node) -> Self {
-        let Hugr {
-            graph,
-            hierarchy,
-            op_types,
-            ..
-        } = hugr;
-        Self {
-            root,
-            graph: RegionGraph::new_region(graph, hierarchy, root.index),
-            hierarchy,
-            op_types,
-        }
+impl<'g, Base: Clone> Clone for RegionView<'g, Base>
+where
+    Base: HugrInternals + HugrView,
+{
+    fn clone(&self) -> Self {
+        RegionView::new(self.hugr, self.root)
     }
 }
 
-impl<'g> HugrView for RegionView<'g> {
-    type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
+impl<'g, Base> HugrView for RegionView<'g, Base>
+where
+    Base: HugrInternals + HugrView,
+{
+    type Nodes<'a> = MapInto<<RegionGraph<'g, Base> as PortView>::Nodes<'a>, Node>
     where
         Self: 'a;
 
-    type NodePorts<'a> = MapInto<<RegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
+    type NodePorts<'a> = MapInto<<RegionGraph<'g, Base> as PortView>::NodePortOffsets<'a>, Port>
     where
         Self: 'a;
 
@@ -215,12 +220,12 @@ impl<'g> HugrView for RegionView<'g> {
     where
         Self: 'a;
 
-    type Neighbours<'a> = MapInto<<RegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
+    type Neighbours<'a> = MapInto<<RegionGraph<'g, Base> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
 
     type PortLinks<'a> = MapWithCtx<
-        <RegionGraph<'g> as LinkView>::PortLinks<'a>,
+        <RegionGraph<'g, Base> as LinkView>::PortLinks<'a>,
         &'a Self,
         (Node, Port),
     > where
@@ -233,15 +238,20 @@ impl<'g> HugrView for RegionView<'g> {
 
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hierarchy
-            .parent(node.index)
-            .filter(|&parent| self.graph.contains_node(parent))
+        self.hugr
+            .get_parent(node)
+            .filter(|&parent| self.graph.contains_node(parent.index))
             .map(Into::into)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.op_types.get(node.index)
+        self.hugr.get_optype(node)
+    }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        self.hugr.get_metadata(node)
     }
 
     #[inline]
@@ -275,7 +285,7 @@ impl<'g> HugrView for RegionView<'g> {
             .port_links(port)
             .with_context(self)
             .map_with_context(|(_, link), region| {
-                let port = link.port();
+                let port: PortIndex = link.into();
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
@@ -290,7 +300,7 @@ impl<'g> HugrView for RegionView<'g> {
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
         match self.graph.contains_node(node.index) {
-            true => self.hierarchy.children(node.index).map_into(),
+            true => self.base_hugr().hierarchy.children(node.index).map_into(),
             false => portgraph::hierarchy::Children::default().map_into(),
         }
     }
@@ -306,19 +316,112 @@ impl<'g> HugrView for RegionView<'g> {
     }
 }
 
+/// A common trait for views of a hugr region.
+pub trait Region<'a>:
+    HugrView
+    + pv::GraphBase<NodeId = Node>
+    + pv::GraphProp
+    + pv::NodeCount
+    + pv::NodeIndexable
+    + pv::EdgeCount
+    + pv::Visitable
+    + pv::GetAdjacencyMatrix
+    + pv::Visitable
+where
+    for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
+{
+    /// The base from which the region is derived.
+    type Base;
+
+    /// Create a region view of a HUGR given a root node.
+    fn new(hugr: &'a Self::Base, root: Node) -> Self;
+}
+
+impl<'a, Base> Region<'a> for FlatRegionView<'a, Base>
+where
+    Base: HugrInternals + HugrView,
+{
+    type Base = Base;
+
+    fn new(hugr: &'a Base, root: Node) -> Self {
+        Self {
+            root,
+            graph: FlatRegionGraph::<Base>::new_flat_region(
+                hugr.portgraph(),
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
+            hugr,
+        }
+    }
+}
+
+impl<'a, Base> Region<'a> for RegionView<'a, Base>
+where
+    Base: HugrInternals + HugrView,
+{
+    type Base = Base;
+
+    fn new(hugr: &'a Base, root: Node) -> Self {
+        Self {
+            root,
+            graph: RegionGraph::<Base>::new_region(
+                hugr.portgraph(),
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
+            hugr,
+        }
+    }
+}
+
+impl<'g, Base> super::view::sealed::HugrInternals for FlatRegionView<'g, Base>
+where
+    Base: HugrInternals,
+{
+    type Portgraph = FlatRegionGraph<'g, Base>;
+
+    #[inline]
+    fn portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+
+    #[inline]
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr.base_hugr()
+    }
+}
+
+impl<'g, Base> super::view::sealed::HugrInternals for RegionView<'g, Base>
+where
+    Base: HugrInternals,
+{
+    type Portgraph = RegionGraph<'g, Base>;
+
+    #[inline]
+    fn portgraph(&self) -> &Self::Portgraph {
+        &self.graph
+    }
+
+    #[inline]
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr.base_hugr()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{ClassicType, LinearType, Signature, SimpleType},
+        types::{ClassicType, Signature, SimpleType},
     };
 
     use super::*;
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    const QB: SimpleType = SimpleType::Qubit;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
@@ -379,21 +482,5 @@ mod test {
         assert_eq!(region.children(inner).count(), 2);
 
         Ok(())
-    }
-}
-
-impl<'g> super::view::sealed::HugrInternals for FlatRegionView<'g> {
-    type Portgraph = FlatRegionGraph<'g>;
-
-    fn as_portgraph(&self) -> &Self::Portgraph {
-        &self.graph
-    }
-}
-
-impl<'g> super::view::sealed::HugrInternals for RegionView<'g> {
-    type Portgraph = RegionGraph<'g>;
-
-    fn as_portgraph(&self) -> &Self::Portgraph {
-        &self.graph
     }
 }

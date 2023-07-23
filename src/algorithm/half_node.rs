@@ -7,7 +7,7 @@ use crate::builder::{BuildError, CFGBuilder, Dataflow, SubContainer};
 use crate::hugr::view::HugrView;
 use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
-use crate::ops::tag::OpTag;
+use crate::ops::OpTag;
 use crate::ops::{BasicBlock, Const, ConstValue, LoadConstant, OpTrait, OpType, Output};
 use crate::types::{ClassicType, SimpleType, TypeRow};
 use crate::{type_row, Direction, Hugr, Node, Port};

@@ -6,11 +6,13 @@ use std::ops::Deref;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
 use itertools::{Itertools, MapInto};
+use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::Hugr;
+use super::{Hugr, NodeMetadata};
 use super::{Node, Port};
-use crate::ops::OpType;
+use crate::ops::{OpName, OpType};
+use crate::types::EdgeKind;
 use crate::Direction;
 
 /// A trait for inspecting HUGRs.
@@ -54,6 +56,9 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the operation type of a node.
     fn get_optype(&self, node: Node) -> &OpType;
+
+    /// Returns the metadata associated with a node.
+    fn get_metadata(&self, node: Node) -> &NodeMetadata;
 
     /// Returns the number of nodes in the hugr.
     fn node_count(&self) -> usize;
@@ -132,6 +137,55 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
+
+    /// Return dot string showing underlying graph and hierarchy side by side.
+    fn dot_string(&self) -> String {
+        let hugr = self.base_hugr();
+        let graph = self.portgraph();
+        graph
+            .dot_format()
+            .with_hierarchy(&hugr.hierarchy)
+            .with_node_style(|n| {
+                NodeStyle::Box(format!(
+                    "({ni}) {name}",
+                    ni = n.index(),
+                    name = self.get_optype(n.into()).name()
+                ))
+            })
+            .with_port_style(|port| {
+                let node = graph.port_node(port).unwrap();
+                let optype = self.get_optype(node.into());
+                let offset = graph.port_offset(port).unwrap();
+                match optype.port_kind(offset).unwrap() {
+                    EdgeKind::Static(ty) => {
+                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+                    }
+                    EdgeKind::Value(ty) => {
+                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+                    }
+                    EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
+                        true => PortStyle::text("", false),
+                        false => PortStyle::Hidden,
+                    },
+                    _ => PortStyle::text("", true),
+                }
+            })
+            .with_edge_style(|src, tgt| {
+                let src_node = graph.port_node(src).unwrap();
+                let src_optype = self.get_optype(src_node.into());
+                let src_offset = graph.port_offset(src).unwrap();
+                let tgt_node = graph.port_node(tgt).unwrap();
+
+                if hugr.hierarchy.parent(src_node) != hugr.hierarchy.parent(tgt_node) {
+                    EdgeStyle::Dashed
+                } else if src_optype.port_kind(src_offset) == Some(EdgeKind::StateOrder) {
+                    EdgeStyle::Dotted
+                } else {
+                    EdgeStyle::Solid
+                }
+            })
+            .finish()
+    }
 }
 
 impl<T> HugrView for T
@@ -229,6 +283,11 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.as_ref().graph.all_neighbours(node.index).map_into()
     }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        self.as_ref().metadata.get(node.index)
+    }
 }
 
 pub(crate) mod sealed {
@@ -243,7 +302,10 @@ pub(crate) mod sealed {
         type Portgraph: LinkView;
 
         /// Returns a reference to the underlying portgraph.
-        fn as_portgraph(&self) -> &Self::Portgraph;
+        fn portgraph(&self) -> &Self::Portgraph;
+
+        /// Returns the Hugr at the base of a chain of views.
+        fn base_hugr(&self) -> &Hugr;
     }
 
     impl<T> HugrInternals for T
@@ -252,8 +314,14 @@ pub(crate) mod sealed {
     {
         type Portgraph = MultiPortGraph;
 
-        fn as_portgraph(&self) -> &Self::Portgraph {
+        #[inline]
+        fn portgraph(&self) -> &Self::Portgraph {
             &self.as_ref().graph
+        }
+
+        #[inline]
+        fn base_hugr(&self) -> &Hugr {
+            self.as_ref()
         }
     }
 }
