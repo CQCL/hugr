@@ -211,7 +211,7 @@ impl<T: CustomConst> From<T> for ConstValue {
     }
 }
 
-/// Constant value for opaque [`SimpleType`]s.
+/// Constant value for opaque [`CustomType`]s.
 ///
 /// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
