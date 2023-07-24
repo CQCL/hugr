@@ -168,10 +168,7 @@ mod test {
             typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
             Err(ConstTypeError::Failed(ClassicType::F64))
         );
-        let tuple_ty = ClassicType::Container(Container::Tuple(Box::new(classic_row![
-            INT,
-            ClassicType::F64,
-        ])));
+        let tuple_ty = ClassicType::new_tuple(classic_row![INT, ClassicType::F64,]);
         typecheck_const(
             &tuple_ty,
             &ConstValue::Tuple(vec![ConstValue::i64(7), ConstValue::F64(5.1)]),

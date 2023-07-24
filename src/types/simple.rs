@@ -87,9 +87,9 @@ impl<T: Display + PrimType> Display for Container<T> {
     }
 }
 
-impl From<Container<HashableType>> for SimpleType {
+impl From<Container<HashableType>> for ClassicType {
     fn from(value: Container<HashableType>) -> Self {
-        Self::Classic(ClassicType::Hashable(HashableType::Container(value)))
+        ClassicType::Hashable(HashableType::Container(value))
     }
 }
 
@@ -183,12 +183,34 @@ impl ClassicType {
         Self::Container(Container::Tuple(Box::new(classic_row![])))
     }
 
+    /// New Tuple type, elements defined by TypeRow
+    pub fn new_tuple(row: impl Into<TypeRow<ClassicType>>) -> Self {
+        let row = row.into();
+        if row.purely_hashable() {
+            // This should succeed given purely_hashable returned True
+            let row = row.try_convert_elems().unwrap();
+            Container::<HashableType>::Tuple(Box::new(row)).into()
+        } else {
+            ClassicType::Container(Container::Tuple(Box::new(row)))
+        }
+    }
+
+    /// New Sum type, variants defined by TypeRow
+    pub fn new_sum(row: impl Into<TypeRow<ClassicType>>) -> Self {
+        let row = row.into();
+        if row.purely_hashable() {
+            // This should succeed given purely_hashable returned True
+            let row = row.try_convert_elems().unwrap();
+            Container::<HashableType>::Sum(Box::new(row)).into()
+        } else {
+            ClassicType::Container(Container::Sum(Box::new(row)))
+        }
+    }
+
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
-        Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
-            variant_rows,
-        ))))
+        Self::new_sum(TypeRow::predicate_variants_row(variant_rows))
     }
 
     /// New simple predicate with empty Tuple variants
@@ -253,12 +275,7 @@ impl SimpleType {
         if row.purely_classical() {
             // This should succeed given purely_classical has returned True
             let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
-            if row.purely_hashable() {
-                let row = row.try_convert_elems().unwrap();
-                Container::<HashableType>::Sum(Box::new(row)).into()
-            } else {
-                Container::<ClassicType>::Sum(Box::new(row)).into()
-            }
+            ClassicType::new_sum(row).into()
         } else {
             Container::<SimpleType>::Sum(Box::new(row)).into()
         }
@@ -267,13 +284,10 @@ impl SimpleType {
     /// New Tuple type, elements defined by TypeRow.
     pub fn new_tuple(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
-        if row.purely_hashable() {
-            let row = row.try_convert_elems().unwrap();
-            Container::<HashableType>::Tuple(Box::new(row)).into()
-        } else if row.purely_classical() {
+        if row.purely_classical() {
             // This should succeed given purely_classical has returned True
             let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
-            Container::<ClassicType>::Tuple(Box::new(row)).into()
+            ClassicType::new_tuple(row).into()
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
         }
@@ -406,7 +420,7 @@ impl TypeRow<ClassicType> {
     pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         variant_rows
             .into_iter()
-            .map(|row| ClassicType::Container(Container::Tuple(Box::new(row))))
+            .map(ClassicType::new_tuple)
             .collect_vec()
             .into()
     }
