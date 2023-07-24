@@ -52,9 +52,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }
-}
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
     /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,
