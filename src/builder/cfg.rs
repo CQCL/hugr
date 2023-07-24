@@ -7,18 +7,12 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{
-    hugr::view::HugrView,
-    type_row,
-    types::{ClassicRow, SimpleRow, SimpleType},
-};
-
+use crate::hugr::view::HugrView;
+use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
-
-use crate::Node;
-use crate::{hugr::HugrMut, Hugr};
+use crate::types::{ClassicRow, Signature, SimpleRow, SimpleType};
+use crate::{type_row, Hugr, Node};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
