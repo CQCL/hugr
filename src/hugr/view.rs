@@ -188,10 +188,7 @@ pub trait HugrView: sealed::HugrInternals {
     }
 }
 
-impl<T> HugrView for T
-where
-    T: AsRef<Hugr>,
-{
+impl HugrView for Hugr {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
@@ -290,6 +287,162 @@ where
     }
 }
 
+impl<T: HugrView + sealed::HugrInternals> HugrView for &T {
+    type Nodes<'a> = T::Nodes<'a>
+    where
+        Self: 'a;
+
+    type NodePorts<'a> = T::NodePorts<'a>
+    where
+        Self: 'a;
+
+    type Children<'a> = T::Children<'a>
+    where
+        Self: 'a;
+
+    type Neighbours<'a> = T::Neighbours<'a>
+    where
+        Self: 'a;
+
+    type PortLinks<'a> = T::PortLinks<'a>
+    where
+        Self: 'a;
+
+    fn root(&self) -> Node {
+        (**self).root()
+    }
+
+    fn get_parent(&self, node: Node) -> Option<Node> {
+        (**self).get_parent(node)
+    }
+
+    fn get_optype(&self, node: Node) -> &OpType {
+        (**self).get_optype(node)
+    }
+
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        (**self).get_metadata(node)
+    }
+
+    fn node_count(&self) -> usize {
+        (**self).node_count()
+    }
+
+    fn edge_count(&self) -> usize {
+        (**self).edge_count()
+    }
+
+    fn nodes(&self) -> Self::Nodes<'_> {
+        (**self).nodes()
+    }
+
+    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
+        (**self).node_ports(node, dir)
+    }
+
+    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
+        (**self).all_node_ports(node)
+    }
+
+    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+        (**self).linked_ports(node, port)
+    }
+
+    fn num_ports(&self, node: Node, dir: Direction) -> usize {
+        (**self).num_ports(node, dir)
+    }
+
+    fn children(&self, node: Node) -> Self::Children<'_> {
+        (**self).children(node)
+    }
+
+    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
+        (**self).neighbours(node, dir)
+    }
+
+    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+        (**self).all_neighbours(node)
+    }
+}
+
+impl<T: HugrView + sealed::HugrInternals> HugrView for &mut T {
+    type Nodes<'a> = T::Nodes<'a>
+    where
+        Self: 'a;
+
+    type NodePorts<'a> = T::NodePorts<'a>
+    where
+        Self: 'a;
+
+    type Children<'a> = T::Children<'a>
+    where
+        Self: 'a;
+
+    type Neighbours<'a> = T::Neighbours<'a>
+    where
+        Self: 'a;
+
+    type PortLinks<'a> = T::PortLinks<'a>
+    where
+        Self: 'a;
+
+    fn root(&self) -> Node {
+        (**self).root()
+    }
+
+    fn get_parent(&self, node: Node) -> Option<Node> {
+        (**self).get_parent(node)
+    }
+
+    fn get_optype(&self, node: Node) -> &OpType {
+        (**self).get_optype(node)
+    }
+
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        (**self).get_metadata(node)
+    }
+
+    fn node_count(&self) -> usize {
+        (**self).node_count()
+    }
+
+    fn edge_count(&self) -> usize {
+        (**self).edge_count()
+    }
+
+    fn nodes(&self) -> Self::Nodes<'_> {
+        (**self).nodes()
+    }
+
+    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
+        (**self).node_ports(node, dir)
+    }
+
+    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
+        (**self).all_node_ports(node)
+    }
+
+    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+        (**self).linked_ports(node, port)
+    }
+
+    fn num_ports(&self, node: Node, dir: Direction) -> usize {
+        (**self).num_ports(node, dir)
+    }
+
+    fn children(&self, node: Node) -> Self::Children<'_> {
+        (**self).children(node)
+    }
+
+    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
+        (**self).neighbours(node, dir)
+    }
+
+    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+        (**self).all_neighbours(node)
+    }
+}
+
 pub(crate) mod sealed {
     use super::*;
 
@@ -308,20 +461,38 @@ pub(crate) mod sealed {
         fn base_hugr(&self) -> &Hugr;
     }
 
-    impl<T> HugrInternals for T
-    where
-        T: AsRef<super::Hugr>,
-    {
+    impl HugrInternals for Hugr {
         type Portgraph = MultiPortGraph;
 
         #[inline]
         fn portgraph(&self) -> &Self::Portgraph {
-            &self.as_ref().graph
+            &self.graph
         }
 
-        #[inline]
         fn base_hugr(&self) -> &Hugr {
-            self.as_ref()
+            &self
+        }
+    }
+
+    impl<T: HugrInternals> HugrInternals for &mut T {
+        type Portgraph = T::Portgraph;
+        fn portgraph(&self) -> &Self::Portgraph {
+            (**self).portgraph()
+        }
+
+        fn base_hugr(&self) -> &Hugr {
+            (**self).base_hugr()
+        }
+    }
+
+    impl<T: HugrInternals> HugrInternals for &T {
+        type Portgraph = T::Portgraph;
+        fn portgraph(&self) -> &Self::Portgraph {
+            (**self).portgraph()
+        }
+
+        fn base_hugr(&self) -> &Hugr {
+            (**self).base_hugr()
         }
     }
 }

@@ -12,7 +12,7 @@ use crate::{Hugr, Port};
 use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
-pub(crate) trait HugrMut: HugrView {
+pub trait HugrMut: HugrView {
     /// Add a node to the graph.
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
 
@@ -144,13 +144,10 @@ pub(crate) trait HugrMut: HugrView {
     fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node));
 }
 
-impl HugrMut for Hugr
-{
+impl HugrMut for Hugr {
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
         let op: OpType = op.into();
-        let node = self
-            .graph
-            .add_node(op.input_count(), op.output_count());
+        let node = self.graph.add_node(op.input_count(), op.output_count());
         self.op_types[node] = op;
         node.into()
     }

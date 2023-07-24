@@ -1,5 +1,5 @@
 use super::{
-    build_traits::HugrBuilder,
+    build_traits::{Buildable, HugrBuilder},
     dataflow::{DFGBuilder, FunctionBuilder},
     BuildError, Container,
 };
@@ -24,21 +24,20 @@ use crate::{hugr::HugrMut, Hugr};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
-    type BaseMut<'a> = &'a mut Hugr where T: 'a;
-    type BaseView<'a> = &'a Hugr where T: 'a;
+impl<T: Buildable> Container for ModuleBuilder<T> {
+    type Base = T;
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().root()
+        self.0.root()
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.0.as_mut()
+    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
+        self.0.hugr_mut()
     }
 
-    fn hugr(&self) -> &Hugr {
-        self.0.as_ref()
+    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
+        self.0.hugr()
     }
 }
 
@@ -63,7 +62,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
+impl<T: Buildable> ModuleBuilder<T> {
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
@@ -74,7 +73,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<FunctionBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
             self.hugr().get_optype(f_node)

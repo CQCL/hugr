@@ -1,4 +1,4 @@
-use super::build_traits::{HugrBuilder, SubContainer};
+use super::build_traits::{Buildable, HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
@@ -21,7 +21,7 @@ pub struct DFGBuilder<T> {
     pub(crate) num_out_wires: usize,
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
+impl<T: Buildable> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
@@ -29,14 +29,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input.len();
         let num_out_wires = signature.output.len();
-        base.as_mut().add_op_with_parent(
+        base.hugr_mut().add_op_with_parent(
             parent,
             ops::Input {
                 types: signature.input.clone(),
                 resources: signature.input_resources,
             },
         )?;
-        base.as_mut().add_op_with_parent(
+        base.hugr_mut().add_op_with_parent(
             parent,
             ops::Output {
                 types: signature.output.clone(),
@@ -82,26 +82,25 @@ impl HugrBuilder for DFGBuilder<Hugr> {
     }
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for DFGBuilder<T> {
-    type BaseMut<'a> = &'a mut Hugr where T: 'a;
-    type BaseView<'a> = &'a Hugr where T: 'a;
+impl<B: Buildable> Container for DFGBuilder<B> {
+    type Base = B;
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.base.as_mut()
+    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
+        self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &Hugr {
-        self.base.as_ref()
+    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
+        self.base.hugr()
     }
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> SubContainer for DFGBuilder<T> {
+impl<T: Buildable> SubContainer for DFGBuilder<T> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -109,7 +108,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> SubContainer for DFGBuilder<T> {
     }
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
+impl<T: Buildable> Dataflow for DFGBuilder<T> {
     #[inline]
     fn num_inputs(&self) -> usize {
         self.num_in_wires
@@ -149,33 +148,32 @@ impl FunctionBuilder<Hugr> {
     }
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
-    type BaseMut<'a> = &'a mut Hugr where B: 'a, T: 'a;
-    type BaseView<'a> = &'a Hugr where B: 'a, T: 'a;
+impl<B: Buildable, T> Container for DFGWrapper<B, T> {
+    type Base = B;
     #[inline]
     fn container_node(&self) -> Node {
         self.0.container_node()
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
         self.0.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &Hugr {
+    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
         self.0.hugr()
     }
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Dataflow for DFGWrapper<B, T> {
+impl<B: Buildable, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn num_inputs(&self) -> usize {
-        self.0.num_inputs()
+        Dataflow::num_inputs(&self.0)
     }
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
+impl<B: Buildable, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
     type ContainerHandle = T;
 
     #[inline]

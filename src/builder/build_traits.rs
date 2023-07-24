@@ -29,19 +29,59 @@ use crate::Hugr;
 
 use crate::hugr::HugrMut;
 
+pub trait Buildable: HugrMut {
+    type BaseMut<'a>: Buildable
+    where
+        Self: 'a;
+    type BaseView<'a>: HugrView
+    where
+        Self: 'a;
+    /// The underlying [`Hugr`] being built
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_>;
+    /// Immutable reference to HUGR being built
+    fn hugr(&self) -> Self::BaseView<'_>;
+}
+
+impl Buildable for Hugr {
+    type BaseMut<'a> = &'a mut Hugr where Self: 'a;
+
+    type BaseView<'a> = &'a Hugr where Self: 'a;
+
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self
+    }
+
+    fn hugr(&self) -> Self::BaseView<'_> {
+        &self
+    }
+}
+
+impl<H: HugrMut + HugrView> Buildable for &mut H {
+    type BaseMut<'a> = &'a mut H where Self: 'a;
+
+    type BaseView<'a> = &'a H where Self: 'a;
+
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self
+    }
+
+    fn hugr(&self) -> Self::BaseView<'_> {
+        &self
+    }
+}
+
 /// Trait for HUGR container builders.
 /// Containers are nodes that are parents of sibling graphs.
 /// Implementations of this trait allow the child sibling graph to be added to
 /// the HUGR.
 pub trait Container {
-    type BaseMut<'a>: HugrMut where Self: 'a;
-    type BaseView<'a>: HugrView where Self: 'a;
+    type Base: Buildable;
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> Self::BaseMut<'_>;
+    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_>;
     /// Immutable reference to HUGR being built
-    fn hugr(&self) -> Self::BaseView<'_>;
+    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_>;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
@@ -81,7 +121,7 @@ pub trait Container {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<FunctionBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
         let f_node = self.add_child_op(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone(),
@@ -254,7 +294,7 @@ pub trait Dataflow: Container {
         &mut self,
         signature: Signature,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<DFGBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
         let (dfg_n, _) = add_op_with_wires(
             self,
             ops::DFG {
@@ -280,7 +320,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<CFGBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: TypeRow = input_types.into();
@@ -339,7 +379,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: TypeRow,
-    ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<TailLoopBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
         let (input_types, mut input_wires): (Vec<SimpleType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -373,7 +413,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: TypeRow,
-    ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<ConditionalBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -528,9 +568,7 @@ pub trait Dataflow: Container {
         function: &FuncID<DEFINED>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let hugr = self.hugr();
-        let def_op = hugr.get_optype(function.node());
-        let signature = match def_op {
+        let signature = match self.hugr().get_optype(function.node()) {
             OpType::FuncDefn(ops::FuncDefn { signature, .. })
             | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
             _ => {
@@ -542,7 +580,7 @@ pub trait Dataflow: Container {
         };
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
-        let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
+        let src_port = self.hugr().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
             .connect(function.node(), src_port, op_id.node(), const_in_port)?;
@@ -588,9 +626,10 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-    let base = data_builder.hugr_mut();
+    let base = data_builder.hugr();
     let op = base.get_optype(op_node);
     let some_df_outputs = !op.signature().output.is_empty();
+    drop(base);
     if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node
@@ -607,7 +646,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
-    let base = data_builder.hugr_mut();
+    let mut base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.get_parent(src);
@@ -654,14 +693,10 @@ fn wire_up<T: Dataflow + ?Sized>(
         }
     }
 
-    data_builder
-        .hugr_mut()
-        .connect(src, src_port, dst, dst_port)?;
+    base.connect(src, src_port, dst, dst_port)?;
     Ok(local_source
         && matches!(
-            data_builder
-                .hugr_mut()
-                .get_optype(dst)
+            base.get_optype(dst)
                 .port_kind(Port::new_incoming(dst_port))
                 .unwrap(),
             EdgeKind::Value(_)

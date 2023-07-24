@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use super::{
-    build_traits::SubContainer,
+    build_traits::{Buildable, SubContainer},
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
@@ -27,26 +27,25 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: HugrMut> Container for CFGBuilder<&mut B> {
-    type BaseMut<'a> = &'a mut B where Self: 'a, B: 'a;
-    type BaseView<'a> = &'a B where Self: 'a, B: 'a;
+impl<B: Buildable> Container for CFGBuilder<B> {
+    type Base = B;
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut B {
-        self.base
+    fn hugr_mut(&mut self) -> B::BaseMut<'_> {
+        self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &B {
-        self.base
+    fn hugr(&self) -> B::BaseView<'_> {
+        self.base.hugr()
     }
 }
 
-impl<H: HugrMut> SubContainer for CFGBuilder<&mut H> {
+impl<B: Buildable> SubContainer for CFGBuilder<B> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -70,24 +69,6 @@ impl CFGBuilder<Hugr> {
     }
 }
 
-impl Container for CFGBuilder<Hugr> {
-    type BaseMut<'a> = &'a mut Hugr where Self: 'a;
-
-    type BaseView<'a> = &'a Hugr where Self: 'a;
-
-    fn container_node(&self) -> Node {
-        self.cfg_node
-    }
-
-    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
-        &mut self.base
-    }
-
-    fn hugr(&self) -> Self::BaseView<'_> {
-        &self.base
-    }
-}
-
 impl HugrBuilder for CFGBuilder<Hugr> {
     fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
         self.base.validate()?;
@@ -95,7 +76,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
+impl<B: Buildable> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -107,7 +88,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             cfg_outputs: output,
         });
         let exit_node = base
-            .as_mut()
+            .hugr_mut()
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -145,7 +126,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
     }
 
@@ -155,7 +137,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
         entry: bool,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
@@ -189,7 +172,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         inputs: TypeRow,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -204,9 +188,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        let inputs = self
-            .inputs
+    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
+        let inputs = (&mut self.inputs)
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
         self.any_block_builder(inputs, predicate_variants, other_outputs, true)
@@ -222,7 +206,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         outputs: TypeRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
@@ -251,7 +236,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 /// Builder for a [`BasicBlock::DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+impl<B: Buildable> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
     /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -261,6 +246,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
     }
+
     fn create(
         base: B,
         block_n: Node,
@@ -364,12 +350,13 @@ mod test {
         build_basic_cfg(&mut cfg_builder)?;
         let h = cfg_builder.finish_hugr()?;
 
-        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
+        let mut h2 = h.clone();
+        let mut new_builder = CFGBuilder::from_existing(&mut h2, h.root())?;
         assert_matches!(new_builder.simple_entry_builder(type_row![NAT], 1), Err(_));
-        let h2 = new_builder.finish_hugr()?;
+        new_builder.finish_sub_container()?;
         assert_eq!(h, h2); // No new nodes added
 
-        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
+        let mut new_builder = CFGBuilder::from_existing(&mut h2, h.root())?;
         let block_builder = new_builder.simple_block_builder(
             vec![SimpleType::new_simple_predicate(1), NAT].into(),
             type_row![NAT],
@@ -378,7 +365,7 @@ mod test {
         let new_bb = block_builder.container_node();
         let [pred, nat]: [Wire; 2] = block_builder.input_wires_arr();
         block_builder.finish_with_outputs(pred, [nat])?;
-        let h2 = new_builder.finish_hugr()?;
+        new_builder.finish_sub_container()?;
         let expected_nodes = h
             .children(h.root())
             .chain([new_bb])
@@ -388,9 +375,10 @@ mod test {
         Ok(())
     }
 
-    fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg_builder: &mut CFGBuilder<T>,
-    ) -> Result<(), BuildError> {
+    fn build_basic_cfg<T: Buildable>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError>
+    where
+        CFGBuilder<T>: Container,
+    {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
         let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {

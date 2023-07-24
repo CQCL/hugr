@@ -4,7 +4,7 @@ use crate::hugr::view::HugrView;
 use crate::types::{Signature, TypeRow};
 use crate::{Hugr, Node};
 
-use super::build_traits::SubContainer;
+use super::build_traits::{Buildable, SubContainer};
 use super::handle::BuildHandle;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
@@ -14,7 +14,7 @@ use super::{
 /// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
+impl<B: Buildable> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
@@ -37,9 +37,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
     /// Get a reference to the [`ops::TailLoop`]
     /// that defines the signature of the [`ops::TailLoop`]
-    pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
+    pub fn loop_signature(&self) -> Result<ops::TailLoop, BuildError> {
         if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
-            Ok(tail_loop)
+            Ok(tail_loop.clone())
         } else {
             Err(BuildError::UnexpectedType {
                 node: self.container_node(),
@@ -50,7 +50,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 
     /// The output types of the child graph, including the predicate as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
-        self.loop_signature().map(ops::TailLoop::body_output_row)
+        self.loop_signature().map(|tl| tl.body_output_row())
     }
 
     /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]

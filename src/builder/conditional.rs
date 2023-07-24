@@ -4,7 +4,7 @@ use crate::types::{Signature, TypeRow};
 use crate::ops;
 use crate::ops::handle::CaseID;
 
-use super::build_traits::SubContainer;
+use super::build_traits::{Buildable, SubContainer};
 use super::handle::BuildHandle;
 use super::HugrBuilder;
 use super::{
@@ -48,9 +48,8 @@ pub struct ConditionalBuilder<T> {
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ConditionalBuilder<T> {
-    type BaseMut<'a> = &'a mut Hugr where T: 'a;
-    type BaseView<'a> = &'a Hugr where T: 'a;
+impl<T: Buildable> Container for ConditionalBuilder<T> {
+    type Base = T;
 
     #[inline]
     fn container_node(&self) -> Node {
@@ -58,17 +57,17 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ConditionalBuilder<T> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Hugr {
-        self.base.as_mut()
+    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
+        self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &Hugr {
-        self.base.as_ref()
+    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
+        self.base.hugr()
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for ConditionalBuilder<H> {
+impl<H: Buildable> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -88,7 +87,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for ConditionalBuilder<H> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
+impl<B: Buildable> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics
@@ -99,12 +98,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut Hugr>, BuildError> {
+    pub fn case_builder(
+        &mut self,
+        case: usize,
+    ) -> Result<CaseBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    {
         let conditional = self.conditional_node;
-        let control_op = self.hugr().get_optype(self.conditional_node);
+        let control_op = self.hugr().get_optype(self.conditional_node).clone();
 
         let cond: ops::Conditional = control_op
-            .clone()
             .try_into()
             .expect("Parent node does not have Conditional optype.");
         let inputs = cond
