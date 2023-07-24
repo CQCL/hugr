@@ -245,12 +245,12 @@ impl From<ClassicType> for SimpleType {
 }
 
 impl TryFrom<SimpleType> for ClassicType {
-    type Error = &'static str;
+    type Error = String;
 
     fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
         match op {
             SimpleType::Classic(typ) => Ok(typ),
-            _ => Err("Invalid type conversion"),
+            _ => Err(format!("Invalid type conversion, {:?} is not classic", op)),
         }
     }
 }
