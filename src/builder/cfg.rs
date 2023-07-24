@@ -256,8 +256,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
-}
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
