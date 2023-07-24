@@ -11,15 +11,13 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicRow, ClassicType, Container, SimpleRow, SimpleType};
+pub use simple::{ClassicRow, ClassicType, Container, PrimType, SimpleRow, SimpleType, TypeRow};
 
 use smol_str::SmolStr;
 
 use crate::hugr::{Direction, Port};
 use crate::utils::display_list;
 use crate::{resource::ResourceSet, type_row};
-
-use self::simple::{PrimType, TypeRow};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
