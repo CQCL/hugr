@@ -171,12 +171,6 @@ impl ClassicType {
     }
 }
 
-impl Default for ClassicType {
-    fn default() -> Self {
-        Self::int::<1>()
-    }
-}
-
 impl Display for ClassicType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
