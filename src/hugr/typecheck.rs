@@ -125,19 +125,14 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             (Container::Sum(_), _) => Err(ConstTypeError::Failed(ty.clone())),
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
-        (ty @ ClassicType::Hashable(HashableType::Container(c)), tm) => match c {
+        (ClassicType::Hashable(HashableType::Container(c)), tm) => {
             // Here we deliberately build malformed Container-of-Hashable types
             // (rather than Hashable-of-Container) in order to reuse logic above
-            Container::Tuple(row) => typecheck_const(
-                &ClassicType::Container(Container::Tuple(Box::new(row.clone().map_into()))),
+            typecheck_const(
+                &ClassicType::Container(c.clone().map_vals(&ClassicType::Hashable)),
                 tm,
-            ),
-            Container::Sum(row) => typecheck_const(
-                &ClassicType::Container(Container::Sum(Box::new(row.clone().map_into()))),
-                tm,
-            ),
-            _ => Err(ConstTypeError::Unimplemented(ty.clone())),
-        },
+            )
+        }
         (ty @ ClassicType::Graph(_), _) => Err(ConstTypeError::Unimplemented(ty.clone())),
         (ty @ ClassicType::Hashable(HashableType::String), _) => {
             Err(ConstTypeError::Unimplemented(ty.clone()))

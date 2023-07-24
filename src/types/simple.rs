@@ -74,6 +74,31 @@ pub enum Container<T: PrimType> {
     Alias(SmolStr),
 }
 
+impl<T: PrimType> Container<T> {
+    /// Applies the specified function to the value types of this Container
+    pub fn map_vals<T2: PrimType>(self, f: &impl Fn(T) -> T2) -> Container<T2> {
+        fn map_row<T: PrimType, T2: PrimType>(
+            row: TypeRow<T>,
+            f: &impl Fn(T) -> T2,
+        ) -> Box<TypeRow<T2>> {
+            Box::new(TypeRow::from(
+                row.into_owned().into_iter().map(f).collect::<Vec<T2>>(),
+            ))
+        }
+        match self {
+            Self::List(elem) => Container::List(Box::new(f(*elem))),
+            Self::Map(kv) => {
+                let (k, v) = *kv;
+                Container::Map(Box::new((k, f(v))))
+            }
+            Self::Tuple(elems) => Container::Tuple(map_row(*elems, f)),
+            Self::Sum(variants) => Container::Sum(map_row(*variants, f)),
+            Self::Array(elem, sz) => Container::Array(Box::new(f(*elem)), sz),
+            Self::Alias(s) => Container::Alias(s),
+        }
+    }
+}
+
 impl<T: Display + PrimType> Display for Container<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
