@@ -2,6 +2,7 @@ use super::ClassicType;
 
 use super::Container;
 
+use super::HashableType;
 use super::PrimType;
 
 use smol_str::SmolStr;
@@ -79,6 +80,12 @@ impl SerializableType for SimpleType {
     const CLASSIC: bool = false;
 }
 
+impl SerializableType for HashableType {
+    // TODO: Consider, do we want a const HASHABLE:bool (and appropriate flags
+    // in SerSimpleType enum members) - or a single enum {Simple, Classic, Hashable} ?
+    const CLASSIC: bool = true;
+}
+
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
 where
     SerSimpleType: From<T>,
@@ -116,22 +123,31 @@ where
     }
 }
 
+impl From<HashableType> for SerSimpleType {
+    fn from(value: HashableType) -> Self {
+        match value {
+            HashableType::Variable(s) => SerSimpleType::Var { name: s },
+            HashableType::Int(w) => SerSimpleType::I { width: w },
+            HashableType::String => SerSimpleType::S,
+            HashableType::Container(c) => c.into(),
+        }
+    }
+}
+
 impl From<ClassicType> for SerSimpleType {
     fn from(value: ClassicType) -> Self {
         match value {
-            ClassicType::Int(w) => SerSimpleType::I { width: w },
             ClassicType::F64 => SerSimpleType::F,
             ClassicType::Graph(inner) => SerSimpleType::G {
                 resources: Box::new(inner.0),
                 signature: Box::new(inner.1),
             },
-            ClassicType::String => SerSimpleType::S,
             ClassicType::Container(c) => c.into(),
             ClassicType::Opaque(inner) => SerSimpleType::Opaque {
                 custom: inner,
                 l: false,
             },
-            ClassicType::Variable(s) => SerSimpleType::Var { name: s },
+            ClassicType::Hashable(h) => h.into(),
         }
     }
 }
@@ -169,9 +185,9 @@ impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => ClassicType::Int(width).into(),
+            SerSimpleType::I { width } => HashableType::Int(width).into(),
             SerSimpleType::F => ClassicType::F64.into(),
-            SerSimpleType::S => ClassicType::String.into(),
+            SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G {
                 resources,
                 signature,
@@ -226,7 +242,9 @@ impl From<SerSimpleType> for SimpleType {
                 custom: c,
                 l: false,
             } => ClassicType::Opaque(c).into(),
-            SerSimpleType::Var { name: s } => ClassicType::Variable(s).into(),
+            SerSimpleType::Var { name: s } => {
+                ClassicType::Hashable(HashableType::Variable(s)).into()
+            }
         }
     }
 }

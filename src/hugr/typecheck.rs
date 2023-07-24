@@ -9,7 +9,7 @@ use crate::hugr::*;
 
 // For static typechecking
 use crate::ops::ConstValue;
-use crate::types::simple::ClassicRow;
+use crate::types::simple::{ClassicRow, HashableType};
 use crate::types::{ClassicType, Container};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
@@ -77,7 +77,7 @@ fn check_valid_width(width: HugrIntWidthStore) -> Result<(), ConstTypeError> {
 /// Typecheck a constant value
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
     match (typ, val) {
-        (ClassicType::Int(exp_width), ConstValue::Int { value, width }) => {
+        (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int { value, width }) => {
             // Check that the types make sense
             check_valid_width(*exp_width)?;
             check_valid_width(*width)?;
@@ -126,8 +126,12 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ty @ ClassicType::Graph(_), _) => Err(ConstTypeError::Unimplemented(ty.clone())),
-        (ty @ ClassicType::String, _) => Err(ConstTypeError::Unimplemented(ty.clone())),
-        (ClassicType::Variable(_), _) => Err(ConstTypeError::ConstCantBeVar),
+        (ty @ ClassicType::Hashable(HashableType::String), _) => {
+            Err(ConstTypeError::Unimplemented(ty.clone()))
+        }
+        (ClassicType::Hashable(HashableType::Variable(_)), _) => {
+            Err(ConstTypeError::ConstCantBeVar)
+        }
         (ClassicType::Opaque(ty), ConstValue::Opaque(_tm, ty2)) => {
             // The type we're checking against
             let ty_act = ty2.custom_type();
@@ -153,10 +157,10 @@ mod test {
 
     #[test]
     fn test_typecheck_const() {
-        const INT: ClassicType = ClassicType::Int(64);
+        const INT: ClassicType = ClassicType::int::<64>();
         typecheck_const(&INT, &ConstValue::i64(3)).unwrap();
         assert_eq!(
-            typecheck_const(&ClassicType::Int(32), &ConstValue::i64(3)),
+            typecheck_const(&HashableType::Int(32).into(), &ConstValue::i64(3)),
             Err(ConstTypeError::IntWidthMismatch(32, 64))
         );
         typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();

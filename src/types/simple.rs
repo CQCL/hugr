@@ -110,20 +110,33 @@ impl From<Container<SimpleType>> for SimpleType {
 #[serde(try_from = "SimpleType", into = "SimpleType")]
 #[non_exhaustive]
 pub enum ClassicType {
-    /// A type variable identified by a name.
-    Variable(SmolStr),
-    /// An arbitrary size integer.
-    Int(HugrIntWidthStore),
     /// A 64-bit floating point number.
     F64,
-    /// An arbitrary length string.
-    String,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
+    /// TODO this can be moved out into an extension/resource
     Graph(Box<(ResourceSet, Signature)>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
+    /// A type which can be hashed
+    Hashable(HashableType),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "ClassicType", into = "ClassicType")]
+#[non_exhaustive]
+pub enum HashableType {
+    /// A type variable identified by a name.
+    /// TODO of course this is not necessarily hashable, or even classic,
+    /// depending on how it is instantiated...
+    Variable(SmolStr),
+    /// An arbitrary size integer.
+    Int(HugrIntWidthStore),
+    /// An arbitrary length string.
+    String,
+    /// A container (all of whose elements can be hashed)
+    Container(Container<HashableType>),
 }
 
 impl ClassicType {
@@ -137,7 +150,7 @@ impl ClassicType {
     /// Returns a new integer type with the given number of bits.
     #[inline]
     pub const fn int<const N: HugrIntWidthStore>() -> Self {
-        Self::Int(N)
+        Self::Hashable(HashableType::Int(N))
     }
 
     /// Returns a new 64-bit integer type.
@@ -174,13 +187,7 @@ impl ClassicType {
 impl Display for ClassicType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ClassicType::Variable(x) => f.write_str(x),
-            ClassicType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
-            }
             ClassicType::F64 => f.write_str("F64"),
-            ClassicType::String => f.write_str("String"),
             ClassicType::Graph(data) => {
                 let (rs, sig) = data.as_ref();
                 write!(f, "[{:?}]", rs)?;
@@ -188,6 +195,21 @@ impl Display for ClassicType {
             }
             ClassicType::Container(c) => c.fmt(f),
             ClassicType::Opaque(custom) => custom.fmt(f),
+            ClassicType::Hashable(h) => h.fmt(f),
+        }
+    }
+}
+
+impl Display for HashableType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            HashableType::Variable(x) => f.write_str(x),
+            HashableType::Int(i) => {
+                f.write_char('I')?;
+                f.write_str(&i.to_string())
+            }
+            HashableType::String => f.write_str("String"),
+            HashableType::Container(c) => c.fmt(f),
         }
     }
 }
@@ -195,6 +217,8 @@ impl Display for ClassicType {
 impl PrimType for ClassicType {}
 
 impl PrimType for SimpleType {}
+
+impl PrimType for HashableType {}
 
 impl SimpleType {
     /// Returns whether the type contains only classic data.
@@ -244,6 +268,19 @@ impl From<ClassicType> for SimpleType {
     }
 }
 
+impl From<HashableType> for ClassicType {
+    fn from(typ: HashableType) -> Self {
+        ClassicType::Hashable(typ)
+    }
+}
+
+impl From<HashableType> for SimpleType {
+    fn from(value: HashableType) -> Self {
+        let c: ClassicType = value.into();
+        c.into()
+    }
+}
+
 impl TryFrom<SimpleType> for ClassicType {
     type Error = String;
 
@@ -251,6 +288,17 @@ impl TryFrom<SimpleType> for ClassicType {
         match op {
             SimpleType::Classic(typ) => Ok(typ),
             _ => Err(format!("Invalid type conversion, {:?} is not classic", op)),
+        }
+    }
+}
+
+impl TryFrom<ClassicType> for HashableType {
+    type Error = String;
+
+    fn try_from(op: ClassicType) -> Result<Self, Self::Error> {
+        match op {
+            ClassicType::Hashable(typ) => Ok(typ),
+            _ => Err(format!("Invalid type conversion, {:?} is not hashable", op)),
         }
     }
 }
