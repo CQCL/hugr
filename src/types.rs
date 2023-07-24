@@ -68,13 +68,8 @@ impl Signature {
     pub fn is_empty(&self) -> bool {
         self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
-
-    /// Returns whether the data wires in the signature are purely classical.
-    #[inline(always)]
-    pub fn purely_classical(&self) -> bool {
-        self.input.purely_classical() && self.output.purely_classical()
-    }
 }
+
 impl Signature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
