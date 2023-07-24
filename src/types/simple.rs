@@ -417,3 +417,42 @@ impl<T: PrimType> DerefMut for TypeRow<T> {
         self.types.to_mut()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cool_asserts::assert_matches;
+
+    #[test]
+    fn new_tuple() {
+        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::Int(4))];
+        let ty = SimpleType::new_tuple(simp);
+        assert_matches!(ty, SimpleType::Qontainer(Container::Tuple(_)));
+
+        let clas: ClassicRow = vec![
+            ClassicType::F64,
+            ClassicType::Container(Container::List(Box::new(ClassicType::F64))),
+        ]
+        .into();
+        let ty = SimpleType::new_tuple(clas.map_into());
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Container(Container::Tuple(_)))
+        );
+    }
+
+    #[test]
+    fn new_sum() {
+        let clas = vec![
+            SimpleType::Classic(ClassicType::F64),
+            SimpleType::Classic(ClassicType::Container(Container::List(Box::new(
+                ClassicType::F64,
+            )))),
+        ];
+        let ty = SimpleType::new_sum(clas);
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Container(Container::Sum(_)))
+        );
+    }
+}
