@@ -296,21 +296,6 @@ impl<T: Display + PrimType> Display for TypeRow<T> {
     }
 }
 
-//#[cfg_attr(feature = "pyo3", pymethods)] // TODO: expose unparameterized versions
-impl<T: PrimType> TypeRow<T> {
-    /// Returns the number of types in the row.
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.types.len()
-    }
-
-    /// Returns `true` if the row contains no types.
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.types.len() == 0
-    }
-}
-
 impl TypeRow<SimpleType> {
     /// Returns whether the row contains only classic data.
     #[inline(always)]
@@ -332,6 +317,8 @@ impl TypeRow<ClassicType> {
     }
 }
 
+// TODO some of these, but not all, will probably want exposing via
+// pyo3 wrappers eventually.
 impl<T: PrimType> TypeRow<T> {
     /// Create a new empty row.
     pub const fn new() -> Self {
@@ -343,6 +330,18 @@ impl<T: PrimType> TypeRow<T> {
     /// Iterator over the types in the row.
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.types.iter()
+    }
+
+    /// Returns the number of types in the row.
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.types.len()
+    }
+
+    /// Returns `true` if the row contains no types.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.types.len() == 0
     }
 
     /// Mutable iterator over the types in the row.
