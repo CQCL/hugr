@@ -351,13 +351,12 @@ mod test {
         build_basic_cfg(&mut cfg_builder)?;
         let h = cfg_builder.finish_hugr()?;
 
-        let mut h2 = h.clone();
-        let mut new_builder = CFGBuilder::from_existing(&mut h2, h.root())?;
+        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
         assert_matches!(new_builder.simple_entry_builder(type_row![NAT], 1), Err(_));
-        new_builder.finish_sub_container()?;
+        let h2 = new_builder.finish_hugr()?;
         assert_eq!(h, h2); // No new nodes added
 
-        let mut new_builder = CFGBuilder::from_existing(&mut h2, h.root())?;
+        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
         let block_builder = new_builder.simple_block_builder(
             vec![SimpleType::new_simple_predicate(1), NAT].into(),
             type_row![NAT],
@@ -366,7 +365,7 @@ mod test {
         let new_bb = block_builder.container_node();
         let [pred, nat]: [Wire; 2] = block_builder.input_wires_arr();
         block_builder.finish_with_outputs(pred, [nat])?;
-        new_builder.finish_sub_container()?;
+        let h2 = new_builder.finish_hugr()?;
         let expected_nodes = h
             .children(h.root())
             .chain([new_bb])
