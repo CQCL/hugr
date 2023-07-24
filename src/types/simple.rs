@@ -87,6 +87,12 @@ impl<T: Display + PrimType> Display for Container<T> {
     }
 }
 
+impl From<Container<HashableType>> for SimpleType {
+    fn from(value: Container<HashableType>) -> Self {
+        Self::Classic(ClassicType::Hashable(HashableType::Container(value)))
+    }
+}
+
 impl From<Container<ClassicType>> for SimpleType {
     #[inline]
     fn from(value: Container<ClassicType>) -> Self {
@@ -123,6 +129,8 @@ pub enum ClassicType {
     Hashable(HashableType),
 }
 
+/// A type that represents concrete classical data that supports hashing
+/// and a strong notion of equality. (So, e.g., no floating-point.)
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "ClassicType", into = "ClassicType")]
 #[non_exhaustive]
@@ -140,6 +148,11 @@ pub enum HashableType {
 }
 
 impl ClassicType {
+    /// Returns whether the type contains only hashable data.
+    pub fn is_hashable(&self) -> bool {
+        matches!(self, Self::Hashable(_))
+    }
+
     /// Create a graph type with the given signature, using default resources.
     /// TODO in the future we'll probably need versions of this that take resources.
     #[inline]
@@ -226,13 +239,26 @@ impl SimpleType {
         matches!(self, Self::Classic(_))
     }
 
+    /// Returns whether the type contains only hashable data.
+    pub fn is_hashable(&self) -> bool {
+        match self {
+            Self::Classic(c) => c.is_hashable(),
+            _ => false,
+        }
+    }
+
     /// New Sum type, variants defined by TypeRow.
     pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
             // This should succeed given purely_classical has returned True
-            let row = row.try_convert_elems().unwrap();
-            Container::<ClassicType>::Sum(Box::new(row)).into()
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
+            if row.purely_hashable() {
+                let row = row.try_convert_elems().unwrap();
+                Container::<HashableType>::Sum(Box::new(row)).into()
+            } else {
+                Container::<ClassicType>::Sum(Box::new(row)).into()
+            }
         } else {
             Container::<SimpleType>::Sum(Box::new(row)).into()
         }
@@ -241,9 +267,12 @@ impl SimpleType {
     /// New Tuple type, elements defined by TypeRow.
     pub fn new_tuple(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
-        if row.purely_classical() {
-            // This should succeed given purely_classical has returned True
+        if row.purely_hashable() {
             let row = row.try_convert_elems().unwrap();
+            Container::<HashableType>::Tuple(Box::new(row)).into()
+        } else if row.purely_classical() {
+            // This should succeed given purely_classical has returned True
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
             Container::<ClassicType>::Tuple(Box::new(row)).into()
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
@@ -295,11 +324,23 @@ impl TryFrom<SimpleType> for ClassicType {
 impl TryFrom<ClassicType> for HashableType {
     type Error = String;
 
-    fn try_from(op: ClassicType) -> Result<Self, Self::Error> {
-        match op {
+    fn try_from(value: ClassicType) -> Result<Self, Self::Error> {
+        match value {
             ClassicType::Hashable(typ) => Ok(typ),
-            _ => Err(format!("Invalid type conversion, {:?} is not hashable", op)),
+            _ => Err(format!(
+                "Invalid type conversion, {:?} is not hashable",
+                value
+            )),
         }
+    }
+}
+
+impl TryFrom<SimpleType> for HashableType {
+    type Error = String;
+
+    fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
+        let typ: ClassicType = op.try_into()?;
+        typ.try_into()
     }
 }
 
@@ -344,9 +385,21 @@ impl TypeRow<SimpleType> {
     pub fn purely_classical(&self) -> bool {
         self.types.iter().all(SimpleType::is_classical)
     }
+
+    /// Returns whether the row contains only hashable classic data.
+    #[inline(always)]
+    pub fn purely_hashable(&self) -> bool {
+        self.types.iter().all(SimpleType::is_hashable)
+    }
 }
 
 impl TypeRow<ClassicType> {
+    /// Returns whether the row contains only hashable data.
+    #[inline(always)]
+    pub fn purely_hashable(&self) -> bool {
+        self.types.iter().all(ClassicType::is_hashable)
+    }
+
     #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
@@ -466,7 +519,7 @@ mod test {
 
     #[test]
     fn new_tuple() {
-        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::Int(4))];
+        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::F64)];
         let ty = SimpleType::new_tuple(simp);
         assert_matches!(ty, SimpleType::Qontainer(Container::Tuple(_)));
 
@@ -479,6 +532,18 @@ mod test {
         assert_matches!(
             ty,
             SimpleType::Classic(ClassicType::Container(Container::Tuple(_)))
+        );
+
+        let hash = vec![
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(8))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::String)),
+        ];
+        let ty = SimpleType::new_tuple(hash);
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+                Container::Tuple(_)
+            )))
         );
     }
 
@@ -494,6 +559,15 @@ mod test {
         assert_matches!(
             ty,
             SimpleType::Classic(ClassicType::Container(Container::Sum(_)))
+        );
+
+        let hash: TypeRow<HashableType> = vec![HashableType::Int(4), HashableType::String].into();
+        let ty = SimpleType::new_sum(hash.map_into());
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+                Container::Sum(_)
+            )))
         );
     }
 }
