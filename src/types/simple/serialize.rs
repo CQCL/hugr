@@ -4,6 +4,7 @@ use super::Container;
 
 use super::HashableType;
 use super::PrimType;
+use super::TypeClass;
 
 use smol_str::SmolStr;
 
@@ -33,57 +34,61 @@ pub(crate) enum SerSimpleType {
     },
     List {
         inner: Box<SimpleType>,
-        l: bool,
+        c: TypeClass,
     },
     Map {
         k: Box<SerSimpleType>,
         v: Box<SerSimpleType>,
-        l: bool,
+        c: TypeClass,
     },
     Tuple {
         row: Box<TypeRow<SerSimpleType>>,
-        l: bool,
+        c: TypeClass,
     },
     Sum {
         row: Box<TypeRow<SerSimpleType>>,
-        l: bool,
+        c: TypeClass,
     },
     Array {
         inner: Box<SerSimpleType>,
         len: usize,
-        l: bool,
+        c: TypeClass,
     },
     Opaque {
         custom: CustomType,
-        l: bool,
+        c: TypeClass,
     },
     Alias {
         name: SmolStr,
-        l: bool,
+        c: TypeClass,
     },
     Var {
         name: SmolStr,
     },
 }
 
-impl PrimType for SerSimpleType {}
+impl PrimType for SerSimpleType {
+    fn class(&self) -> TypeClass {
+        unimplemented!()
+    }
+}
 
 trait SerializableType: PrimType {
-    const CLASSIC: bool;
+    const CLASS: TypeClass;
 }
 
 impl SerializableType for ClassicType {
-    const CLASSIC: bool = true;
+    const CLASS: TypeClass = TypeClass::Classic;
 }
 
 impl SerializableType for SimpleType {
-    const CLASSIC: bool = false;
+    const CLASS: TypeClass = TypeClass::Any;
 }
 
 impl SerializableType for HashableType {
     // TODO: Consider, do we want a const HASHABLE:bool (and appropriate flags
     // in SerSimpleType enum members) - or a single enum {Simple, Classic, Hashable} ?
-    const CLASSIC: bool = true;
+    const CLASS: TypeClass = TypeClass::Hashable;
 }
 
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
@@ -95,30 +100,27 @@ where
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
                 row: Box::new(inner.map_into()),
-                l: !T::CLASSIC,
+                c: T::CLASS,
             },
             Container::List(inner) => SerSimpleType::List {
                 inner: Box::new((*inner).into()),
-                l: !T::CLASSIC,
+                c: T::CLASS, // We could inspect inner.class(), but this should have been done already
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
                 row: Box::new(inner.map_into()),
-                l: !T::CLASSIC,
+                c: T::CLASS,
             },
             Container::Map(inner) => SerSimpleType::Map {
                 k: Box::new(inner.0.into()),
                 v: Box::new(inner.1.into()),
-                l: !T::CLASSIC,
+                c: T::CLASS,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
                 inner: box_convert(*inner),
                 len,
-                l: !T::CLASSIC,
+                c: T::CLASS,
             },
-            Container::Alias(name) => SerSimpleType::Alias {
-                name,
-                l: !T::CLASSIC,
-            },
+            Container::Alias(name) => SerSimpleType::Alias { name, c: T::CLASS },
         }
     }
 }
@@ -128,6 +130,10 @@ impl From<HashableType> for SerSimpleType {
         match value {
             HashableType::Variable(s) => SerSimpleType::Var { name: s },
             HashableType::Int(w) => SerSimpleType::I { width: w },
+            HashableType::Opaque(c) => SerSimpleType::Opaque {
+                custom: c,
+                c: TypeClass::Hashable,
+            },
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
         }
@@ -145,7 +151,7 @@ impl From<ClassicType> for SerSimpleType {
             ClassicType::Container(c) => c.into(),
             ClassicType::Opaque(inner) => SerSimpleType::Opaque {
                 custom: inner,
-                l: false,
+                c: TypeClass::Classic,
             },
             ClassicType::Hashable(h) => h.into(),
         }
@@ -160,7 +166,7 @@ impl From<SimpleType> for SerSimpleType {
             SimpleType::Qontainer(c) => c.into(),
             SimpleType::Qpaque(inner) => SerSimpleType::Opaque {
                 custom: inner,
-                l: true,
+                c: TypeClass::Any,
             },
         }
     }
@@ -194,33 +200,65 @@ impl From<SerSimpleType> for SimpleType {
             } => ClassicType::Graph(Box::new((*resources, *signature))).into(),
             SerSimpleType::Tuple {
                 row: inner,
-                l: true,
+                c: TypeClass::Any,
             } => Container::<SimpleType>::Tuple(Box::new(inner.map_into())).into(),
             SerSimpleType::Tuple {
                 row: inner,
-                l: false,
+                c: TypeClass::Classic,
             } => {
                 Container::<ClassicType>::Tuple(Box::new(inner.try_convert_elems().unwrap())).into()
             }
+            SerSimpleType::Tuple {
+                row: inner,
+                c: TypeClass::Hashable,
+            } => Container::<HashableType>::Tuple(Box::new(inner.try_convert_elems().unwrap()))
+                .into(),
             SerSimpleType::Sum {
                 row: inner,
-                l: true,
+                c: TypeClass::Any,
             } => Container::<SimpleType>::Sum(Box::new(inner.map_into())).into(),
             SerSimpleType::Sum {
                 row: inner,
-                l: false,
+                c: TypeClass::Classic,
             } => Container::<ClassicType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into(),
-            SerSimpleType::List { inner, l: true } => {
-                Container::<SimpleType>::List(box_convert_try(*inner)).into()
+            SerSimpleType::Sum {
+                row: inner,
+                c: TypeClass::Hashable,
+            } => {
+                Container::<HashableType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into()
             }
-            SerSimpleType::List { inner, l: false } => {
-                Container::<ClassicType>::List(box_convert_try(*inner)).into()
-            }
-            SerSimpleType::Map { k, v, l: true } => {
-                Container::<SimpleType>::Map(Box::new(((*k).try_into().unwrap(), (*v).into())))
-                    .into()
-            }
-            SerSimpleType::Map { k, v, l: false } => Container::<ClassicType>::Map(Box::new((
+            SerSimpleType::List {
+                inner,
+                c: TypeClass::Any,
+            } => Container::<SimpleType>::List(box_convert_try(*inner)).into(),
+            SerSimpleType::List {
+                inner,
+                c: TypeClass::Classic,
+            } => Container::<ClassicType>::List(box_convert_try(*inner)).into(),
+            SerSimpleType::List {
+                inner,
+                c: TypeClass::Hashable,
+            } => Container::<HashableType>::List(box_convert_try(*inner)).into(),
+            SerSimpleType::Map {
+                k,
+                v,
+                c: TypeClass::Any,
+            } => Container::<SimpleType>::Map(Box::new(((*k).try_into().unwrap(), (*v).into())))
+                .into(),
+            SerSimpleType::Map {
+                k,
+                v,
+                c: TypeClass::Classic,
+            } => Container::<ClassicType>::Map(Box::new((
+                (*k).try_into().unwrap(),
+                (*v).try_into().unwrap(),
+            )))
+            .into(),
+            SerSimpleType::Map {
+                k,
+                v,
+                c: TypeClass::Hashable,
+            } => Container::<HashableType>::Map(Box::new((
                 (*k).try_into().unwrap(),
                 (*v).try_into().unwrap(),
             )))
@@ -228,20 +266,42 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Array {
                 inner,
                 len,
-                l: true,
+                c: TypeClass::Any,
             } => Container::<SimpleType>::Array(box_convert_try(*inner), len).into(),
             SerSimpleType::Array {
                 inner,
                 len,
-                l: false,
+                c: TypeClass::Classic,
             } => Container::<ClassicType>::Array(box_convert_try(*inner), len).into(),
-            SerSimpleType::Alias { name: s, l: true } => Container::<SimpleType>::Alias(s).into(),
-            SerSimpleType::Alias { name: s, l: false } => Container::<ClassicType>::Alias(s).into(),
-            SerSimpleType::Opaque { custom: c, l: true } => SimpleType::Qpaque(c),
+            SerSimpleType::Array {
+                inner,
+                len,
+                c: TypeClass::Hashable,
+            } => Container::<HashableType>::Array(box_convert_try(*inner), len).into(),
+            SerSimpleType::Alias {
+                name: s,
+                c: TypeClass::Any,
+            } => Container::<SimpleType>::Alias(s).into(),
+            SerSimpleType::Alias {
+                name: s,
+                c: TypeClass::Classic,
+            } => Container::<ClassicType>::Alias(s).into(),
+            SerSimpleType::Alias {
+                name: s,
+                c: TypeClass::Hashable,
+            } => Container::<HashableType>::Alias(s).into(),
             SerSimpleType::Opaque {
                 custom: c,
-                l: false,
+                c: TypeClass::Any,
+            } => SimpleType::Qpaque(c),
+            SerSimpleType::Opaque {
+                custom: c,
+                c: TypeClass::Classic,
             } => ClassicType::Opaque(c).into(),
+            SerSimpleType::Opaque {
+                custom: c,
+                c: TypeClass::Hashable,
+            } => HashableType::Opaque(c).into(),
             SerSimpleType::Var { name: s } => {
                 ClassicType::Hashable(HashableType::Variable(s)).into()
             }
@@ -258,6 +318,16 @@ impl TryFrom<SerSimpleType> for ClassicType {
             Ok(c)
         } else {
             Err(format!("Not a ClassicType: {}", s))
+        }
+    }
+}
+
+impl TryFrom<SerSimpleType> for HashableType {
+    type Error = String;
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        match value.try_into()? {
+            ClassicType::Hashable(h) => Ok(h),
+            ty => Err(format!("Classic type is not hashable: {}", ty)),
         }
     }
 }

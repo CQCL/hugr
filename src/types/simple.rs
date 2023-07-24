@@ -47,11 +47,51 @@ impl Display for SimpleType {
     }
 }
 
+/// Categorizes types into three classes according to basic operations supported.
+#[derive(
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+// TODO: make serde serialize as C-style enum
+pub enum TypeClass {
+    /// Any value, including linear and quantum values;
+    /// cannot necessarily be copied or discarded. See [SimpleType]
+    Any,
+    /// Subset of [TypeClass::Any]; types that can be copied and discarded. See [ClassicType]
+    Classic,
+    /// Subset of [TypeClass::Classic]: types that can also be hashed and support
+    /// a strong notion of equality. See [HashableType]
+    Hashable,
+}
+
+impl TypeClass {
+    /// Do types in this class contain only classic data
+    /// (which can be copied and discarded, i.e. [ClassicType]s)
+    pub fn is_classical(self) -> bool {
+        self != Self::Any
+    }
+
+    /// Do types in this class contain only hashable classic data
+    /// (with a strong notion of equality, i.e. [HashableType]s)
+    pub fn is_hashable(self) -> bool {
+        self == Self::Hashable
+    }
+}
+
 /// Trait of primitive types (SimpleType or ClassicType).
 pub trait PrimType: std::fmt::Debug + Clone + 'static {
     // may be updated with functions in future for necessary shared functionality
-    // across ClassicType and SimpleType
-    // currently used to constrain Container<T>
+    // across ClassicType, SimpleType and HashableType.
+    // Currently used to constrain Container<T>
+    /// Tells us the [TypeClass] of the type represented by the receiver.
+    fn class(&self) -> TypeClass;
 }
 
 /// A type that represents a container of other types.
@@ -118,6 +158,13 @@ impl From<Container<HashableType>> for ClassicType {
     }
 }
 
+impl From<Container<HashableType>> for SimpleType {
+    fn from(value: Container<HashableType>) -> Self {
+        let ty: ClassicType = value.into();
+        ty.into()
+    }
+}
+
 impl From<Container<ClassicType>> for SimpleType {
     #[inline]
     fn from(value: Container<ClassicType>) -> Self {
@@ -168,6 +215,8 @@ pub enum HashableType {
     Int(HugrIntWidthStore),
     /// An arbitrary length string.
     String,
+    /// An opaque type defined by an extension as being hashable
+    Opaque(CustomType),
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
 }
@@ -268,32 +317,39 @@ impl Display for HashableType {
                 f.write_char('I')?;
                 f.write_str(&i.to_string())
             }
+            HashableType::Opaque(custom) => custom.fmt(f),
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
         }
     }
 }
 
-impl PrimType for ClassicType {}
-
-impl PrimType for SimpleType {}
-
-impl PrimType for HashableType {}
-
-impl SimpleType {
-    /// Returns whether the type contains only classic data.
-    pub fn is_classical(&self) -> bool {
-        matches!(self, Self::Classic(_))
-    }
-
-    /// Returns whether the type contains only hashable data.
-    pub fn is_hashable(&self) -> bool {
-        match self {
-            Self::Classic(c) => c.is_hashable(),
-            _ => false,
+impl PrimType for ClassicType {
+    fn class(&self) -> TypeClass {
+        if self.is_hashable() {
+            TypeClass::Hashable
+        } else {
+            TypeClass::Classic
         }
     }
+}
 
+impl PrimType for SimpleType {
+    fn class(&self) -> TypeClass {
+        match self {
+            Self::Classic(c) => c.class(),
+            _ => TypeClass::Any,
+        }
+    }
+}
+
+impl PrimType for HashableType {
+    fn class(&self) -> TypeClass {
+        TypeClass::Hashable
+    }
+}
+
+impl SimpleType {
     /// New Sum type, variants defined by TypeRow.
     pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
@@ -420,28 +476,21 @@ impl<T: Display + PrimType> Display for TypeRow<T> {
 
 impl TypeRow<SimpleType> {
     /// Returns whether the row contains only classic data.
-    #[inline(always)]
+    /// (Note: this is defined only on [`TypeRow<SimpleType>`] because
+    /// it is guaranteed true for any other TypeRow)
+    #[inline]
     pub fn purely_classical(&self) -> bool {
-        self.types.iter().all(SimpleType::is_classical)
-    }
-
-    /// Returns whether the row contains only hashable classic data.
-    #[inline(always)]
-    pub fn purely_hashable(&self) -> bool {
-        self.types.iter().all(SimpleType::is_hashable)
+        self.types
+            .iter()
+            .map(PrimType::class)
+            .all(TypeClass::is_classical)
     }
 }
 
 impl TypeRow<ClassicType> {
-    /// Returns whether the row contains only hashable data.
-    #[inline(always)]
-    pub fn purely_hashable(&self) -> bool {
-        self.types.iter().all(ClassicType::is_hashable)
-    }
-
-    #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
+    #[inline]
     pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         variant_rows
             .into_iter()
@@ -476,6 +525,15 @@ impl<T: PrimType> TypeRow<T> {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.types.len() == 0
+    }
+
+    /// Returns whether the row contains only hashable classic data.
+    #[inline(always)]
+    pub fn purely_hashable(&self) -> bool {
+        self.types
+            .iter()
+            .map(PrimType::class)
+            .all(TypeClass::is_hashable)
     }
 
     /// Mutable iterator over the types in the row.
