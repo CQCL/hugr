@@ -541,7 +541,7 @@ impl<T: PrimType> TypeRow<T> {
     }
 
     /// Returns the smallest [TypeTag] that contains all elements of the row
-    pub fn common_class(&self) -> TypeTag {
+    pub fn containing_tag(&self) -> TypeTag {
         self.types
             .iter()
             .map(PrimType::tag)
