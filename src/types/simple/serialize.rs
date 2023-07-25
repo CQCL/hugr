@@ -86,8 +86,6 @@ impl SerializableType for SimpleType {
 }
 
 impl SerializableType for HashableType {
-    // TODO: Consider, do we want a const HASHABLE:bool (and appropriate flags
-    // in SerSimpleType enum members) - or a single enum {Simple, Classic, Hashable} ?
     const CLASS: TypeClass = TypeClass::Hashable;
 }
 
