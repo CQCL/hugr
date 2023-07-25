@@ -9,6 +9,7 @@ use std::{
 use itertools::Itertools;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, Signature};
@@ -49,26 +50,18 @@ impl Display for SimpleType {
 
 /// Categorizes types into three classes according to basic operations supported.
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Debug,
-    derive_more::Display,
-    serde::Serialize,
-    serde::Deserialize,
+    Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize_repr, Deserialize_repr,
 )]
-// TODO: make serde serialize as C-style enum
+#[repr(u8)]
 pub enum TypeClass {
     /// Any value, including linear and quantum values;
     /// cannot necessarily be copied or discarded. See [SimpleType]
-    Any,
+    Any = 0,
     /// Subset of [TypeClass::Any]; types that can be copied and discarded. See [ClassicType]
-    Classic,
+    Classic = 1,
     /// Subset of [TypeClass::Classic]: types that can also be hashed and support
     /// a strong notion of equality. See [HashableType]
-    Hashable,
+    Hashable = 2,
 }
 
 impl TypeClass {
