@@ -69,7 +69,7 @@ pub enum ConstValue {
     },
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
-    /// An opaque constant value.
+    /// An opaque constant value, with cached type.
     Opaque(CustomType, Box<dyn CustomConst>),
 }
 
