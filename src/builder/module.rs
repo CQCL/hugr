@@ -32,11 +32,11 @@ impl<T: Buildable> Container for ModuleBuilder<T> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut {
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::Base {
         self.0.hugr_mut()
     }
 
-    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
+    fn hugr(&self) -> &<Self::Base as Buildable>::Base {
         self.0.hugr()
     }
 }
@@ -73,7 +73,7 @@ impl<T: Buildable> ModuleBuilder<T> {
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
+    ) -> Result<FunctionBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError>
     {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =

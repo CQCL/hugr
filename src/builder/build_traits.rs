@@ -31,26 +31,21 @@ use crate::Hugr;
 use crate::hugr::HugrMut;
 
 pub trait Buildable: HugrMut {
-    type BaseMut: Buildable;
-    type BaseView<'a>: HugrView
-    where
-        Self: 'a;
+    type Base: Buildable;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> &mut Self::BaseMut;
+    fn hugr_mut(&mut self) -> &mut Self::Base;
     /// Immutable reference to HUGR being built
-    fn hugr(&self) -> Self::BaseView<'_>;
+    fn hugr(&self) -> &Self::Base;
 }
 
 impl<H: HugrMut + HugrView> Buildable for H {
-    type BaseMut = H;
+    type Base = H;
 
-    type BaseView<'a> = &'a H where Self: 'a;
-
-    fn hugr_mut(&mut self) -> &mut Self::BaseMut {
+    fn hugr_mut(&mut self) -> &mut Self::Base {
         self
     }
 
-    fn hugr(&self) -> Self::BaseView<'_> {
+    fn hugr(&self) -> &Self::Base {
         self
     }
 }
@@ -64,9 +59,9 @@ pub trait Container {
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut;
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::Base;
     /// Immutable reference to HUGR being built
-    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_>;
+    fn hugr(&self) -> &<Self::Base as Buildable>::Base;
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
@@ -106,7 +101,7 @@ pub trait Container {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut <Self::Base as Buildable>::Base>, BuildError> {
         let f_node = self.add_child_op(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone(),
@@ -279,7 +274,7 @@ pub trait Dataflow: Container {
         &mut self,
         signature: Signature,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<DFGBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
+    ) -> Result<DFGBuilder<&mut <Self::Base as Buildable>::Base>, BuildError> {
         let (dfg_n, _) = add_op_with_wires(
             self,
             ops::DFG {
@@ -305,7 +300,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<CFGBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
+    ) -> Result<CFGBuilder<&mut <Self::Base as Buildable>::Base>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: SimpleRow = input_types.into();
@@ -364,7 +359,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (ClassicType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: ClassicRow,
-    ) -> Result<TailLoopBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
+    ) -> Result<TailLoopBuilder<&mut <Self::Base as Buildable>::Base>, BuildError> {
         let (input_types, mut input_wires): (Vec<ClassicType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -398,7 +393,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = ClassicRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<ConditionalBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
+    ) -> Result<ConditionalBuilder<&mut <Self::Base as Buildable>::Base>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -614,7 +609,6 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     let base = data_builder.hugr();
     let op = base.get_optype(op_node);
     let some_df_outputs = !op.signature().output.is_empty();
-    drop(base);
     if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node

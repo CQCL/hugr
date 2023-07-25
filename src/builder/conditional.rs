@@ -57,12 +57,12 @@ impl<T: Buildable> Container for ConditionalBuilder<T> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut {
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::Base {
         self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_> {
+    fn hugr(&self) -> &<Self::Base as Buildable>::Base {
         self.base.hugr()
     }
 }
@@ -101,8 +101,7 @@ impl<B: Buildable> ConditionalBuilder<B> {
     pub fn case_builder(
         &mut self,
         case: usize,
-    ) -> Result<CaseBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<CaseBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node).clone();
 

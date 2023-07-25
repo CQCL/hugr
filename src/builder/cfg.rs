@@ -33,12 +33,12 @@ impl<B: Buildable> Container for CFGBuilder<B> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> &mut B::BaseMut {
+    fn hugr_mut(&mut self) -> &mut B::Base {
         self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> B::BaseView<'_> {
+    fn hugr(&self) -> &B::Base {
         self.base.hugr()
     }
 }
@@ -127,8 +127,7 @@ impl<B: Buildable> CFGBuilder<B> {
         inputs: SimpleRow,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
     }
 
@@ -138,8 +137,7 @@ impl<B: Buildable> CFGBuilder<B> {
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
         entry: bool,
-    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
@@ -173,8 +171,7 @@ impl<B: Buildable> CFGBuilder<B> {
         inputs: SimpleRow,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -189,8 +186,7 @@ impl<B: Buildable> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         let inputs = self
             .inputs
             .take()
@@ -208,8 +204,7 @@ impl<B: Buildable> CFGBuilder<B> {
         &mut self,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
-    {
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::Base>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
