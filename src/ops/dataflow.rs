@@ -128,7 +128,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn op_signature(&self) -> AbstractSignature {
+    fn signature(&self) -> AbstractSignature {
         DataflowOpTrait::signature(self)
     }
     fn other_input(&self) -> Option<EdgeKind> {

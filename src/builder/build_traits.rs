@@ -183,7 +183,7 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).op_signature().output_count();
+        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr(hugr)?;
 
         let [inp, _] = self.io();
@@ -205,7 +205,7 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).op_signature().output_count();
+        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr_view(hugr)?;
 
         let [inp, _] = self.io();
@@ -627,7 +627,7 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     }
     let base = data_builder.hugr_mut();
     let op = base.get_optype(op_node);
-    let some_df_outputs = !op.op_signature().output.is_empty();
+    let some_df_outputs = !op.signature().output.is_empty();
     if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node

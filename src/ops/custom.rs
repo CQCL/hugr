@@ -85,7 +85,7 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn op_signature(&self) -> AbstractSignature {
+    fn signature(&self) -> AbstractSignature {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
             Self::Resource(ResourceOp { signature, .. }) => signature.clone(),
@@ -210,10 +210,10 @@ pub fn resolve_extension_ops(
                     ResourceOp::new(def.clone(), &opaque.args, &ResourceSet::default()).unwrap(),
                 );
                 if let Some(sig) = &opaque.signature {
-                    if sig != &op.op_signature() {
+                    if sig != &op.signature() {
                         return Err(CustomOpError::SignatureMismatch(
                             def.name.to_string(),
-                            op.op_signature(),
+                            op.signature(),
                             sig.clone(),
                         ));
                     };

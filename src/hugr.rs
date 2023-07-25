@@ -67,7 +67,7 @@ impl NodeType {
     /// Use the input resources to calculate the concrete signature of the node
     pub fn signature(&self) -> Signature {
         self.op
-            .op_signature()
+            .signature()
             .with_input_resources(self.input_resources.clone())
     }
 }

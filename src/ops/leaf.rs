@@ -152,7 +152,7 @@ impl OpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn op_signature(&self) -> AbstractSignature {
+    fn signature(&self) -> AbstractSignature {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Qubit;
@@ -175,7 +175,7 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![Q, Q]),
             LeafOp::Measure => AbstractSignature::new_df(type_row![Q], type_row![Q, B]),
             LeafOp::Xor => AbstractSignature::new_df(type_row![B, B], type_row![B]),
-            LeafOp::CustomOp(ext) => ext.op_signature(),
+            LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 AbstractSignature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
@@ -216,6 +216,6 @@ impl OpTrait for LeafOp {
 impl LeafOp {
     /// Returns true if the operation has only classical inputs and outputs.
     pub fn is_pure_classical(&self) -> bool {
-        self.op_signature().purely_classical()
+        self.signature().purely_classical()
     }
 }
