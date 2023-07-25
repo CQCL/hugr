@@ -129,7 +129,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         inputs: SimpleRow,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<BlockBuilder<&mut B>, BuildError> {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
     }
 
@@ -139,7 +139,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
         entry: bool,
-    ) -> Result<BlockBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<BlockBuilder<&mut B>, BuildError> {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
@@ -173,7 +173,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         inputs: SimpleRow,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<BlockBuilder<&mut B>, BuildError> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -188,7 +188,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<BlockBuilder<&mut B>, BuildError> {
         let inputs = self
             .inputs
             .take()
@@ -206,7 +206,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         &mut self,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<BlockBuilder<&mut B>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 

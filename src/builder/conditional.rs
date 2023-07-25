@@ -99,10 +99,7 @@ impl<B: HugrMut> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder(
-        &mut self,
-        case: usize,
-    ) -> Result<CaseBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut B>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node).clone();
 

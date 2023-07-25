@@ -70,7 +70,7 @@ impl<T: HugrMut> ModuleBuilder<T> {
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut <Self as Buildable>::Base>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut T>, BuildError> {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
             self.hugr().get_optype(f_node)
