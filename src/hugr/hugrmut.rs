@@ -1,5 +1,6 @@
 //! Base HUGR builder providing low-level building blocks.
 
+use delegate::delegate;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -332,86 +333,41 @@ impl HugrMut for Hugr {
 }
 
 impl<T: HugrMut> HugrMut for &mut T {
-    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        (*self).add_op(op)
-    }
+    delegate! {
+        to (*self) {
+            fn add_op(&mut self, op: impl Into<OpType>) -> Node;
+            fn remove_node(&mut self, node: Node) -> Result<(), HugrError>;
+            fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
 
-    fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
-        (*self).remove_node(node)
-    }
+            fn connect(
+                &mut self,
+                src: Node,
+                src_port: usize,
+                dst: Node,
+                dst_port: usize,
+            ) -> Result<(), HugrError>;
 
-    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
-        (*self).get_metadata_mut(node)
-    }
+            fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError>;
+            fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError>;
+            fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize);
+            fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize>;
+            fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError>;
+            fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError>;
+            fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError>;
 
-    fn connect(
-        &mut self,
-        src: Node,
-        src_port: usize,
-        dst: Node,
-        dst_port: usize,
-    ) -> Result<(), HugrError> {
-        (*self).connect(src, src_port, dst, dst_port)
-    }
+            fn add_op_with_parent(
+                &mut self,
+                parent: Node,
+                op: impl Into<OpType>,
+            ) -> Result<Node, HugrError>;
 
-    fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
-        (*self).disconnect(node, port)
-    }
-
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
-        (*self).add_other_edge(src, dst)
-    }
-
-    fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
-        (*self).set_num_ports(node, incoming, outgoing)
-    }
-
-    fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
-        (*self).add_ports(node, direction, amount)
-    }
-
-    fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
-        (*self).set_parent(node, parent)
-    }
-
-    fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-        (*self).move_after_sibling(node, after)
-    }
-
-    fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
-        (*self).move_before_sibling(node, before)
-    }
-
-    fn add_op_with_parent(
-        &mut self,
-        parent: Node,
-        op: impl Into<OpType>,
-    ) -> Result<Node, HugrError> {
-        (*self).add_op_with_parent(parent, op)
-    }
-
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        (*self).add_op_before(sibling, op)
-    }
-
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        (*self).add_op_after(sibling, op)
-    }
-
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
-        (*self).replace_op(node, op)
-    }
-
-    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
-        (*self).insert_hugr(root, other)
-    }
-
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
-        (*self).insert_from_view(root, other)
-    }
-
-    fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node)) {
-        (*self).canonicalize_nodes(rekey)
+            fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
+            fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
+            fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
+            fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError>;
+            fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError>;
+            fn canonicalize_nodes(&mut self, rekey: impl FnMut(Node, Node));
+        }
     }
 }
 
