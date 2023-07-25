@@ -108,7 +108,7 @@ pub enum Container<T: PrimType> {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
-    Map(Box<(ClassicType, T)>),
+    Map(Box<(HashableType, T)>),
     /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
