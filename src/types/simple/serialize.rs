@@ -185,6 +185,16 @@ where
     Box::new((value).into())
 }
 
+macro_rules! handle_container {
+   ($tag:ident, $variant:ident($($r:expr),*)) => {
+        match $tag {
+            TypeTag::Any => (Container::<SimpleType>::$variant($($r),*)).into(),
+            TypeTag::Classic => (Container::<ClassicType>::$variant($($r),*)).into(),
+            TypeTag::Hashable => (Container::<HashableType>::$variant($($r),*)).into()
+        }
+    }
+}
+
 impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
@@ -196,115 +206,29 @@ impl From<SerSimpleType> for SimpleType {
                 resources,
                 signature,
             } => ClassicType::Graph(Box::new((*resources, *signature))).into(),
-            SerSimpleType::Tuple {
-                row: inner,
-                c: TypeTag::Any,
-            } => {
-                Container::<SimpleType>::Tuple(Box::new(inner.try_convert_elems().unwrap())).into()
+            SerSimpleType::Tuple { row: inner, c } => {
+                handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
             }
-            SerSimpleType::Tuple {
-                row: inner,
-                c: TypeTag::Classic,
-            } => {
-                Container::<ClassicType>::Tuple(Box::new(inner.try_convert_elems().unwrap())).into()
+            SerSimpleType::Sum { row: inner, c } => {
+                handle_container!(c, Sum(Box::new(inner.try_convert_elems().unwrap())))
             }
-            SerSimpleType::Tuple {
-                row: inner,
-                c: TypeTag::Hashable,
-            } => Container::<HashableType>::Tuple(Box::new(inner.try_convert_elems().unwrap()))
-                .into(),
-            SerSimpleType::Sum {
-                row: inner,
-                c: TypeTag::Any,
-            } => Container::<SimpleType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into(),
-            SerSimpleType::Sum {
-                row: inner,
-                c: TypeTag::Classic,
-            } => Container::<ClassicType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into(),
-            SerSimpleType::Sum {
-                row: inner,
-                c: TypeTag::Hashable,
-            } => {
-                Container::<HashableType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into()
+            SerSimpleType::List { inner, c } => handle_container!(c, List(box_convert_try(*inner))),
+            SerSimpleType::Map { k, v, c } => handle_container!(
+                c,
+                Map(Box::new((
+                    (*k).try_into().unwrap(),
+                    (*v).try_into().unwrap(),
+                )))
+            ),
+            SerSimpleType::Array { inner, len, c } => {
+                handle_container!(c, Array(box_convert_try(*inner), len))
             }
-            SerSimpleType::List {
-                inner,
-                c: TypeTag::Any,
-            } => Container::<SimpleType>::List(box_convert_try(*inner)).into(),
-            SerSimpleType::List {
-                inner,
-                c: TypeTag::Classic,
-            } => Container::<ClassicType>::List(box_convert_try(*inner)).into(),
-            SerSimpleType::List {
-                inner,
-                c: TypeTag::Hashable,
-            } => Container::<HashableType>::List(box_convert_try(*inner)).into(),
-            SerSimpleType::Map {
-                k,
-                v,
-                c: TypeTag::Any,
-            } => Container::<SimpleType>::Map(Box::new((
-                (*k).try_into().unwrap(),
-                (*v).try_into().unwrap(),
-            )))
-            .into(),
-            SerSimpleType::Map {
-                k,
-                v,
-                c: TypeTag::Classic,
-            } => Container::<ClassicType>::Map(Box::new((
-                (*k).try_into().unwrap(),
-                (*v).try_into().unwrap(),
-            )))
-            .into(),
-            SerSimpleType::Map {
-                k,
-                v,
-                c: TypeTag::Hashable,
-            } => Container::<HashableType>::Map(Box::new((
-                (*k).try_into().unwrap(),
-                (*v).try_into().unwrap(),
-            )))
-            .into(),
-            SerSimpleType::Array {
-                inner,
-                len,
-                c: TypeTag::Any,
-            } => Container::<SimpleType>::Array(box_convert_try(*inner), len).into(),
-            SerSimpleType::Array {
-                inner,
-                len,
-                c: TypeTag::Classic,
-            } => Container::<ClassicType>::Array(box_convert_try(*inner), len).into(),
-            SerSimpleType::Array {
-                inner,
-                len,
-                c: TypeTag::Hashable,
-            } => Container::<HashableType>::Array(box_convert_try(*inner), len).into(),
-            SerSimpleType::Alias {
-                name: s,
-                c: TypeTag::Any,
-            } => Container::<SimpleType>::Alias(s).into(),
-            SerSimpleType::Alias {
-                name: s,
-                c: TypeTag::Classic,
-            } => Container::<ClassicType>::Alias(s).into(),
-            SerSimpleType::Alias {
-                name: s,
-                c: TypeTag::Hashable,
-            } => Container::<HashableType>::Alias(s).into(),
-            SerSimpleType::Opaque {
-                custom: c,
-                c: TypeTag::Any,
-            } => SimpleType::Qpaque(c),
-            SerSimpleType::Opaque {
-                custom: c,
-                c: TypeTag::Classic,
-            } => ClassicType::Opaque(c).into(),
-            SerSimpleType::Opaque {
-                custom: c,
-                c: TypeTag::Hashable,
-            } => HashableType::Opaque(c).into(),
+            SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
+            SerSimpleType::Opaque { custom, c } => match c {
+                TypeTag::Any => SimpleType::Qpaque(custom),
+                TypeTag::Classic => ClassicType::Opaque(custom).into(),
+                TypeTag::Hashable => HashableType::Opaque(custom).into(),
+            },
             SerSimpleType::Var { name: s } => {
                 ClassicType::Hashable(HashableType::Variable(s)).into()
             }
