@@ -4,7 +4,7 @@ use super::{
     BuildError, Container,
 };
 
-use crate::{hugr::ValidationError, ops, types::SimpleType};
+use crate::{hugr::ValidationError, ops, types::SimpleType, HugrView};
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::ops::OpType;
@@ -19,19 +19,21 @@ use crate::{hugr::HugrMut, Hugr};
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
-impl<B: HugrMut> Buildable for ModuleBuilder<B> {
-    type Base = B;
+impl<B: Buildable> Buildable for ModuleBuilder<B> {
+    type BaseMut<'a> = B::BaseMut<'a> where Self: 'a;
+    type BaseView<'a> = B::BaseView<'a> where Self: 'a;
+
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Self::Base {
-        &mut self.0
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self.0.hugr_mut()
     }
 
-    fn hugr(&self) -> &Self::Base {
-        &self.0
+    fn hugr(&self) -> Self::BaseView<'_> {
+        self.0.hugr()
     }
 }
 
-impl<T: HugrMut> Container for ModuleBuilder<T> {
+impl<T: Buildable + HugrMut> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.root()
@@ -59,7 +61,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: HugrMut> ModuleBuilder<T> {
+impl<T: Buildable + HugrMut> ModuleBuilder<T> {
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
@@ -70,7 +72,7 @@ impl<T: HugrMut> ModuleBuilder<T> {
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
-    ) -> Result<FunctionBuilder<&mut T>, BuildError> {
+    ) -> Result<FunctionBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
             self.hugr().get_optype(f_node)

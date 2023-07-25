@@ -48,27 +48,28 @@ pub struct ConditionalBuilder<T> {
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<B: HugrMut> Buildable for ConditionalBuilder<B> {
-    type Base = B;
+impl<B: Buildable + HugrMut> Buildable for ConditionalBuilder<B> {
+    type BaseMut<'a> = B::BaseMut<'a> where Self: 'a;
+    type BaseView<'a> = B::BaseView<'a> where Self: 'a;
     #[inline]
-    fn hugr_mut(&mut self) -> &mut Self::Base {
-        &mut self.base
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &Self::Base {
-        &self.base
+    fn hugr(&self) -> Self::BaseView<'_> {
+        self.base.hugr()
     }
 }
 
-impl<T: HugrMut> Container for ConditionalBuilder<T> {
+impl<T: Buildable + HugrMut> Container for ConditionalBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node
     }
 }
 
-impl<H: HugrMut> SubContainer for ConditionalBuilder<H> {
+impl<H: Buildable + HugrMut> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -88,7 +89,7 @@ impl<H: HugrMut> SubContainer for ConditionalBuilder<H> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-impl<B: HugrMut> ConditionalBuilder<B> {
+impl<B: Buildable + HugrMut> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics
@@ -99,7 +100,10 @@ impl<B: HugrMut> ConditionalBuilder<B> {
     ///
     /// This function will return an error if the case has already been built,
     /// `case` is not a valid index or if there is an error adding nodes.
-    pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut B>, BuildError> {
+    pub fn case_builder(
+        &mut self,
+        case: usize,
+    ) -> Result<CaseBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node).clone();
 

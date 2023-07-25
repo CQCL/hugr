@@ -31,22 +31,29 @@ use crate::Hugr;
 use crate::hugr::HugrMut;
 
 pub trait Buildable {
-    type Base: HugrMut;
+    type BaseMut<'a>: Buildable + HugrMut
+    where
+        Self: 'a;
+    type BaseView<'a>: HugrView
+    where
+        Self: 'a;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> &mut Self::Base;
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_>;
     /// Immutable reference to HUGR being built
-    fn hugr(&self) -> &Self::Base;
+    fn hugr(&self) -> Self::BaseView<'_>;
 }
 
-impl<H: HugrMut> Buildable for H {
-    type Base = H;
+impl<T: AsMut<Hugr> + AsRef<Hugr>> Buildable for T {
+    type BaseMut<'a> = &'a mut Hugr where Self: 'a;
 
-    fn hugr_mut(&mut self) -> &mut Self::Base {
-        self
+    type BaseView<'a> = &'a Hugr where Self: 'a;
+
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self.as_mut()
     }
 
-    fn hugr(&self) -> &Self::Base {
-        self
+    fn hugr(&self) -> Self::BaseView<'_> {
+        self.as_ref()
     }
 }
 
@@ -57,7 +64,6 @@ impl<H: HugrMut> Buildable for H {
 pub trait Container: Buildable {
     /// The container node.
     fn container_node(&self) -> Node;
-
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
@@ -97,7 +103,7 @@ pub trait Container: Buildable {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<&mut Self::Base>, BuildError> {
+    ) -> Result<FunctionBuilder<Self::BaseMut<'_>>, BuildError> {
         let f_node = self.add_child_op(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone(),
@@ -270,7 +276,7 @@ pub trait Dataflow: Container {
         &mut self,
         signature: Signature,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<DFGBuilder<&mut Self::Base>, BuildError> {
+    ) -> Result<DFGBuilder<Self::BaseMut<'_>>, BuildError> {
         let (dfg_n, _) = add_op_with_wires(
             self,
             ops::DFG {
@@ -296,7 +302,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<CFGBuilder<&mut Self::Base>, BuildError> {
+    ) -> Result<CFGBuilder<Self::BaseMut<'_>>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: SimpleRow = input_types.into();
@@ -355,7 +361,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (ClassicType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: ClassicRow,
-    ) -> Result<TailLoopBuilder<&mut Self::Base>, BuildError> {
+    ) -> Result<TailLoopBuilder<Self::BaseMut<'_>>, BuildError> {
         let (input_types, mut input_wires): (Vec<ClassicType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -389,7 +395,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = ClassicRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<ConditionalBuilder<&mut Self::Base>, BuildError> {
+    ) -> Result<ConditionalBuilder<Self::BaseMut<'_>>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -605,6 +611,7 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     let base = data_builder.hugr();
     let op = base.get_optype(op_node);
     let some_df_outputs = !op.signature().output.is_empty();
+    drop(base);
     if !any_local_df_inputs && some_df_outputs {
         // If op has no inputs add a StateOrder edge from input to place in
         // causal cone of Input node
@@ -621,7 +628,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
-    let base = data_builder.hugr_mut();
+    let mut base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.get_parent(src);

@@ -44,7 +44,6 @@ html-escape = "0.2.13"
 bitvec = { version = "1.0.1", features = ["serde"] }
 enum_dispatch = "0.3.11"
 lazy_static = "1.4.0"
-delegate = "0.10.0"
 petgraph = { version="0.6.3", default-features = false}
 context-iterators = "0.2.0"
 serde_json = "1.0.97"

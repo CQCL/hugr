@@ -25,27 +25,28 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: HugrMut> Buildable for CFGBuilder<B> {
-    type Base = B;
+impl<B: Buildable> Buildable for CFGBuilder<B> {
+    type BaseMut<'a> = B::BaseMut<'a> where Self: 'a;
+    type BaseView<'a> = B::BaseView<'a> where Self: 'a;
     #[inline]
-    fn hugr_mut(&mut self) -> &mut B {
-        &mut self.base
+    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+        self.base.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &B {
-        &self.base
+    fn hugr(&self) -> Self::BaseView<'_> {
+        self.base.hugr()
     }
 }
 
-impl<B: HugrMut> Container for CFGBuilder<B> {
+impl<B: Buildable + HugrMut> Container for CFGBuilder<B> {
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
     }
 }
 
-impl<B: HugrMut> SubContainer for CFGBuilder<B> {
+impl<B: Buildable + HugrMut> SubContainer for CFGBuilder<B> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -79,7 +80,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: HugrMut> CFGBuilder<B> {
+impl<B: Buildable + HugrMut> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -129,7 +130,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         inputs: SimpleRow,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut B>, BuildError> {
+    ) -> Result<BlockBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
     }
 
@@ -139,7 +140,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
         entry: bool,
-    ) -> Result<BlockBuilder<&mut B>, BuildError> {
+    ) -> Result<BlockBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
@@ -173,7 +174,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         inputs: SimpleRow,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut B>, BuildError> {
+    ) -> Result<BlockBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
 
@@ -188,7 +189,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<&mut B>, BuildError> {
+    ) -> Result<BlockBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         let inputs = self
             .inputs
             .take()
@@ -206,7 +207,7 @@ impl<B: HugrMut> CFGBuilder<B> {
         &mut self,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<&mut B>, BuildError> {
+    ) -> Result<BlockBuilder<<Self as Buildable>::BaseMut<'_>>, BuildError> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
@@ -235,7 +236,7 @@ impl<B: HugrMut> CFGBuilder<B> {
 /// Builder for a [`BasicBlock::DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<B: HugrMut> BlockBuilder<B> {
+impl<B: Buildable + HugrMut> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
     /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -374,7 +375,9 @@ mod test {
         Ok(())
     }
 
-    fn build_basic_cfg<T: HugrMut>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError>
+    fn build_basic_cfg<T: Buildable + HugrMut>(
+        cfg_builder: &mut CFGBuilder<T>,
+    ) -> Result<(), BuildError>
     where
         CFGBuilder<T>: Container,
     {

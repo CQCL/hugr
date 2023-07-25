@@ -5,7 +5,6 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
-use delegate::delegate;
 use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
@@ -189,7 +188,10 @@ pub trait HugrView: sealed::HugrInternals {
     }
 }
 
-impl HugrView for Hugr {
+impl<T> HugrView for T
+where
+    T: AsRef<Hugr>,
+{
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
@@ -209,50 +211,51 @@ impl HugrView for Hugr {
 
     #[inline]
     fn root(&self) -> Node {
-        self.root.into()
+        self.as_ref().root.into()
     }
 
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hierarchy.parent(node.index).map(Into::into)
+        self.as_ref().hierarchy.parent(node.index).map(Into::into)
     }
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        self.op_types.get(node.index)
+        self.as_ref().op_types.get(node.index)
     }
 
     #[inline]
     fn node_count(&self) -> usize {
-        self.graph.node_count()
+        self.as_ref().graph.node_count()
     }
 
     #[inline]
     fn edge_count(&self) -> usize {
-        self.graph.link_count()
+        self.as_ref().graph.link_count()
     }
 
     #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
-        self.graph.nodes_iter().map_into()
+        self.as_ref().graph.nodes_iter().map_into()
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.graph.port_offsets(node.index, dir).map_into()
+        self.as_ref().graph.port_offsets(node.index, dir).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.graph.all_port_offsets(node.index).map_into()
+        self.as_ref().graph.all_port_offsets(node.index).map_into()
     }
 
     #[inline]
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
-        let port = self.graph.port_index(node.index, port.offset).unwrap();
-        self.graph
+        let hugr = self.as_ref();
+        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
+        hugr.graph
             .port_links(port)
-            .with_context(self)
+            .with_context(hugr)
             .map_with_context(|(_, link), hugr| {
                 let port = link.port();
                 let node = hugr.graph.port_node(port).unwrap();
@@ -263,68 +266,27 @@ impl HugrView for Hugr {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.index, dir)
+        self.as_ref().graph.num_ports(node.index, dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
-        self.hierarchy.children(node.index).map_into()
+        self.as_ref().hierarchy.children(node.index).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.graph.neighbours(node.index, dir).map_into()
+        self.as_ref().graph.neighbours(node.index, dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.graph.all_neighbours(node.index).map_into()
+        self.as_ref().graph.all_neighbours(node.index).map_into()
     }
 
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
-        self.metadata.get(node.index)
-    }
-}
-
-impl<T: HugrView + sealed::HugrInternals> HugrView for &mut T {
-    type Nodes<'a> = T::Nodes<'a>
-    where
-        Self: 'a;
-
-    type NodePorts<'a> = T::NodePorts<'a>
-    where
-        Self: 'a;
-
-    type Children<'a> = T::Children<'a>
-    where
-        Self: 'a;
-
-    type Neighbours<'a> = T::Neighbours<'a>
-    where
-        Self: 'a;
-
-    type PortLinks<'a> = T::PortLinks<'a>
-    where
-        Self: 'a;
-
-    delegate! {
-        to (**self) {
-            fn root(&self) -> Node;
-            fn get_parent(&self, node: Node) -> Option<Node>;
-            fn get_optype(&self, node: Node) -> &OpType;
-            fn get_metadata(&self, node: Node) -> &NodeMetadata;
-            fn node_count(&self) -> usize;
-            fn edge_count(&self) -> usize;
-            fn nodes(&self) -> Self::Nodes<'_>;
-            fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
-            fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
-            fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
-            fn num_ports(&self, node: Node, dir: Direction) -> usize;
-            fn children(&self, node: Node) -> Self::Children<'_>;
-            fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_>;
-            fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
-        }
+        self.as_ref().metadata.get(node.index)
     }
 }
 
@@ -346,38 +308,20 @@ pub(crate) mod sealed {
         fn base_hugr(&self) -> &Hugr;
     }
 
-    impl HugrInternals for Hugr {
+    impl<T> HugrInternals for T
+    where
+        T: AsRef<super::Hugr>,
+    {
         type Portgraph = MultiPortGraph;
 
         #[inline]
         fn portgraph(&self) -> &Self::Portgraph {
-            &self.graph
+            &self.as_ref().graph
         }
 
+        #[inline]
         fn base_hugr(&self) -> &Hugr {
-            self
-        }
-    }
-
-    impl<T: HugrInternals> HugrInternals for &mut T {
-        type Portgraph = T::Portgraph;
-        fn portgraph(&self) -> &Self::Portgraph {
-            (**self).portgraph()
-        }
-
-        fn base_hugr(&self) -> &Hugr {
-            (**self).base_hugr()
-        }
-    }
-
-    impl<T: HugrInternals> HugrInternals for &T {
-        type Portgraph = T::Portgraph;
-        fn portgraph(&self) -> &Self::Portgraph {
-            (**self).portgraph()
-        }
-
-        fn base_hugr(&self) -> &Hugr {
-            (**self).base_hugr()
+            self.as_ref()
         }
     }
 }
