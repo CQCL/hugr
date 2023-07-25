@@ -495,7 +495,6 @@ impl TypeRow<SimpleType> {
 impl TypeRow<ClassicType> {
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
-    #[inline]
     pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         variant_rows
             .into_iter()
