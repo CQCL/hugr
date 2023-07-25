@@ -24,7 +24,7 @@ use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{tag::OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{tag::OpTag, OpTrait, OpType};
 use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, EdgeKind, Signature, SignatureDescription};
 
@@ -80,65 +80,6 @@ impl OpType {
             op: self,
             input_resources: rs,
         }
-    }
-}
-
-impl OpType {
-    /// The edge kind for the non-dataflow or constant-input ports of the
-    /// operation, not described by the signature.
-    ///
-    /// If not None, a single extra multiport of that kind will be present on
-    /// the given direction.
-    pub fn other_port(&self, dir: Direction) -> Option<EdgeKind> {
-        match dir {
-            Direction::Incoming => self.other_input(),
-            Direction::Outgoing => self.other_output(),
-        }
-    }
-
-    /// Returns the edge kind for the given port.
-    pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.op_signature();
-        let port = port.into();
-        let dir = port.direction();
-        match port.index() < signature.port_count(dir) {
-            true => signature.get(port),
-            false => self.other_port(dir),
-        }
-    }
-
-    /// The non-dataflow port for the operation, not described by the signature.
-    /// See `[OpType::other_port]`.
-    ///
-    /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
-    pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
-        let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
-        if self.other_port(dir).is_some() && non_df_count == 1 {
-            Some(Port::new(dir, self.op_signature().port_count(dir)))
-        } else {
-            None
-        }
-    }
-
-    /// Returns the number of ports for the given direction.
-    pub fn port_count(&self, dir: Direction) -> usize {
-        let signature = self.op_signature();
-        let has_other_ports = self.other_port(dir).is_some();
-        let non_df_count = self
-            .validity_flags()
-            .non_df_port_count(dir)
-            .unwrap_or(has_other_ports as usize);
-        signature.port_count(dir) + non_df_count
-    }
-
-    /// Returns the number of inputs ports for the operation.
-    pub fn input_count(&self) -> usize {
-        self.port_count(Direction::Incoming)
-    }
-
-    /// Returns the number of outputs ports for the operation.
-    pub fn output_count(&self) -> usize {
-        self.port_count(Direction::Outgoing)
     }
 }
 
