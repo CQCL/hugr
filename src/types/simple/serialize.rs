@@ -258,3 +258,32 @@ impl TryFrom<SerSimpleType> for HashableType {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::hugr::serialize::test::ser_roundtrip;
+    use crate::types::{ClassicType, Container, HashableType, SimpleType};
+
+    #[test]
+    fn serialize_types_roundtrip() {
+        // A Simple tuple
+        let t = SimpleType::new_tuple(vec![
+            SimpleType::Qubit,
+            SimpleType::Classic(ClassicType::F64),
+        ]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        // A Classic sum
+        let t = SimpleType::new_sum(vec![
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
+            SimpleType::Classic(ClassicType::F64),
+        ]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        // A Hashable list
+        let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+            Container::List(Box::new(HashableType::Int(8))),
+        )));
+        assert_eq!(ser_roundtrip(&t), t);
+    }
+}
