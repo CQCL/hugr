@@ -199,7 +199,9 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Tuple {
                 row: inner,
                 c: TypeTag::Any,
-            } => Container::<SimpleType>::Tuple(Box::new(inner.map_into())).into(),
+            } => {
+                Container::<SimpleType>::Tuple(Box::new(inner.try_convert_elems().unwrap())).into()
+            }
             SerSimpleType::Tuple {
                 row: inner,
                 c: TypeTag::Classic,
@@ -214,7 +216,7 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Sum {
                 row: inner,
                 c: TypeTag::Any,
-            } => Container::<SimpleType>::Sum(Box::new(inner.map_into())).into(),
+            } => Container::<SimpleType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into(),
             SerSimpleType::Sum {
                 row: inner,
                 c: TypeTag::Classic,
@@ -241,8 +243,11 @@ impl From<SerSimpleType> for SimpleType {
                 k,
                 v,
                 c: TypeTag::Any,
-            } => Container::<SimpleType>::Map(Box::new(((*k).try_into().unwrap(), (*v).into())))
-                .into(),
+            } => Container::<SimpleType>::Map(Box::new((
+                (*k).try_into().unwrap(),
+                (*v).try_into().unwrap(),
+            )))
+            .into(),
             SerSimpleType::Map {
                 k,
                 v,
