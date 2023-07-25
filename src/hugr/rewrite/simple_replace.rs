@@ -58,7 +58,7 @@ impl Rewrite for SimpleReplacement {
 
     fn apply(self, h: &mut Hugr) -> Result<(), SimpleReplacementError> {
         // 1. Check the parent node exists and is a DFG node.
-        if h.get_optype(self.parent).op.tag() != OpTag::Dfg {
+        if h.get_optype(self.parent).tag() != OpTag::Dfg {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
@@ -82,7 +82,7 @@ impl Rewrite for SimpleReplacement {
             if !self
                 .replacement
                 .get_optype(node)
-                .signature()
+                .op_signature()
                 .static_input()
                 .is_empty()
             {
@@ -93,7 +93,7 @@ impl Rewrite for SimpleReplacement {
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
-            let op: &OpType = &self.replacement.get_optype(node).op;
+            let op: &OpType = self.replacement.get_optype(node);
             let new_node = h
                 .add_op_after(self_output_node, NodeType::pure(op.clone()))
                 .unwrap();
@@ -109,7 +109,7 @@ impl Rewrite for SimpleReplacement {
             let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
                 for target in self.replacement.linked_ports(node, outport) {
-                    if self.replacement.get_optype(target.0).op.tag() != OpTag::Output {
+                    if self.replacement.get_optype(target.0).tag() != OpTag::Output {
                         let new_target = index_map.get(&target.0).unwrap();
                         h.connect(*new_node, outport.index(), *new_target, target.1.index())
                             .unwrap();
@@ -120,7 +120,7 @@ impl Rewrite for SimpleReplacement {
         // 3.2. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
         // predecessor of p to (the new copy of) q.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
-            if self.replacement.get_optype(*rep_inp_node).op.tag() != OpTag::Output {
+            if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .linked_ports(*rem_inp_node, *rem_inp_port)
@@ -326,12 +326,12 @@ mod test {
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
-            .find(|node: &Node| h.get_optype(*node).op.tag() == OpTag::Dfg)
+            .find(|node: &Node| h.get_optype(*node).tag() == OpTag::Dfg)
             .unwrap();
         // 2. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
             .nodes()
-            .find(|node: &Node| h.get_optype(*node).op == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
             .unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
         let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
@@ -341,7 +341,7 @@ mod test {
         // 4.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
             .nodes()
-            .find(|node: &Node| n.get_optype(*node).op == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *n.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
@@ -412,12 +412,12 @@ mod test {
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
-            .find(|node: &Node| h.get_optype(*node).op.tag() == OpTag::Dfg)
+            .find(|node: &Node| h.get_optype(*node).tag() == OpTag::Dfg)
             .unwrap();
         // 2. Locate the CX in h
         let h_node_cx: Node = h
             .nodes()
-            .find(|node: &Node| h.get_optype(*node).op == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
             .unwrap();
         let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
@@ -426,7 +426,7 @@ mod test {
         // 4.1. Locate the Output and its predecessor H in n
         let n_node_output = n
             .nodes()
-            .find(|node: &Node| n.get_optype(*node).op.tag() == OpTag::Output)
+            .find(|node: &Node| n.get_optype(*node).tag() == OpTag::Output)
             .unwrap();
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
@@ -482,11 +482,11 @@ mod test {
         let parent = h.root();
         let removal = h
             .nodes()
-            .filter(|&n| h.get_optype(n).op.tag() == OpTag::Leaf)
+            .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect();
         let inputs = h
             .node_outputs(input)
-            .filter(|&p| h.get_optype(input).op.op_signature().get(p).is_some())
+            .filter(|&p| h.get_optype(input).op_signature().get(p).is_some())
             .map(|p| {
                 let link = h.linked_ports(input, p).next().unwrap();
                 (link, link)
@@ -494,7 +494,7 @@ mod test {
             .collect();
         let outputs = h
             .node_inputs(output)
-            .filter(|&p| h.get_optype(output).op.op_signature().get(p).is_some())
+            .filter(|&p| h.get_optype(output).op_signature().get(p).is_some())
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
@@ -538,7 +538,7 @@ mod test {
         let parent = h.root();
         let removal = h
             .nodes()
-            .filter(|&n| h.get_optype(n).op.tag() == OpTag::Leaf)
+            .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
             .collect();
 
         let first_out_p = h.node_outputs(input).next().unwrap();
@@ -550,13 +550,7 @@ mod test {
 
         let outputs = repl
             .node_inputs(repl_output)
-            .filter(|&p| {
-                repl.get_optype(repl_output)
-                    .op
-                    .op_signature()
-                    .get(p)
-                    .is_some()
-            })
+            .filter(|&p| repl.get_optype(repl_output).op_signature().get(p).is_some())
             .map(|p| ((repl_output, p), p))
             .collect();
 

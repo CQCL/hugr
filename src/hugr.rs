@@ -83,7 +83,7 @@ impl OpType {
     }
 }
 
-impl NodeType {
+impl OpType {
     /// The edge kind for the non-dataflow or constant-input ports of the
     /// operation, not described by the signature.
     ///
@@ -112,7 +112,7 @@ impl NodeType {
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
-        let non_df_count = self.op.validity_flags().non_df_port_count(dir).unwrap_or(1);
+        let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
             Some(Port::new(dir, self.op_signature().port_count(dir)))
         } else {
@@ -125,7 +125,6 @@ impl NodeType {
         let signature = self.op_signature();
         let has_other_ports = self.other_port(dir).is_some();
         let non_df_count = self
-            .op
             .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
@@ -221,6 +220,7 @@ impl Hugr {
     }
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
+    // TODO: Make this take a NodeType
     pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();

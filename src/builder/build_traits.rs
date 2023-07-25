@@ -560,7 +560,7 @@ pub trait Dataflow: Container {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
-        let signature = match &def_op.op {
+        let signature = match &def_op {
             OpType::FuncDefn(ops::FuncDefn { signature, .. })
             | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
             _ => {

@@ -107,7 +107,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let cond: ops::Conditional = control_op
             .clone()
-            .op
             .try_into()
             .expect("Parent node does not have Conditional optype.");
         let inputs = cond

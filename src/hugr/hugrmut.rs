@@ -154,7 +154,7 @@ where
         let node = self
             .as_mut()
             .graph
-            .add_node(op.input_count(), op.output_count());
+            .add_node(op.op.input_count(), op.op.output_count());
         self.as_mut().op_types[node] = op;
         node.into()
     }
@@ -312,8 +312,8 @@ where
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let optype = other.get_optype(node.into());
-            self.as_mut().op_types.set(new_node, optype.clone());
+            let nodetype = other.get_nodetype(node.into());
+            self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.get_metadata(node.into());
             self.as_mut().set_metadata(node.into(), meta.clone());
         }

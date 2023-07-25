@@ -48,14 +48,17 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Return the type of the HUGR root node.
     fn root_type(&self) -> &NodeType {
-        self.get_optype(self.root())
+        self.get_nodetype(self.root())
     }
 
     /// Returns the parent of a node.
     fn get_parent(&self, node: Node) -> Option<Node>;
 
     /// Returns the operation type of a node.
-    fn get_optype(&self, node: Node) -> &NodeType;
+    fn get_optype(&self, node: Node) -> &OpType;
+
+    /// Returns the type of a node.
+    fn get_nodetype(&self, node: Node) -> &NodeType;
 
     /// Returns the metadata associated with a node.
     fn get_metadata(&self, node: Node) -> &NodeMetadata;
@@ -149,7 +152,7 @@ pub trait HugrView: sealed::HugrInternals {
                 NodeStyle::Box(format!(
                     "({ni}) {name}",
                     ni = n.index(),
-                    name = self.get_optype(n.into()).op.name()
+                    name = self.get_optype(n.into()).name()
                 ))
             })
             .with_port_style(|port| {
@@ -220,7 +223,12 @@ where
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &NodeType {
+    fn get_optype(&self, node: Node) -> &OpType {
+        &self.as_ref().op_types.get(node.index).op
+    }
+
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
         self.as_ref().op_types.get(node.index)
     }
 

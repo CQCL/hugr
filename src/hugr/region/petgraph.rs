@@ -181,7 +181,7 @@ impl<'a> HugrNodeRef<'a> {
     pub(self) fn from_node(node: Node, hugr: &'a impl HugrView) -> Self {
         Self {
             node,
-            op: &hugr.get_optype(node).op,
+            op: hugr.get_optype(node),
         }
     }
 }

@@ -21,7 +21,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, PortIndex, PortView};
 
-use crate::{hugr::NodeType, Direction, Hugr, Node, Port};
+use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
 use super::view::sealed::HugrInternals;
 use super::{HugrView, NodeMetadata};
@@ -93,8 +93,13 @@ where
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &NodeType {
+    fn get_optype(&self, node: Node) -> &OpType {
         self.hugr.get_optype(node)
+    }
+
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
+        self.hugr.get_nodetype(node)
     }
 
     #[inline]
@@ -245,8 +250,13 @@ where
     }
 
     #[inline]
-    fn get_optype(&self, node: Node) -> &NodeType {
+    fn get_optype(&self, node: Node) -> &OpType {
         self.hugr.get_optype(node)
+    }
+
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
+        self.hugr.get_nodetype(node)
     }
 
     #[inline]

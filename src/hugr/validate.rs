@@ -9,10 +9,7 @@ use petgraph::visit::{DfsPostOrder, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::hugr::{
-    typecheck::{typecheck_const, ConstTypeError},
-    NodeType,
-};
+use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::OpTag;
 use crate::ops::{self, OpTrait, OpType, ValidateOp};
@@ -109,7 +106,7 @@ impl<'a> ValidationContext<'a> {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
-        let node_type = self.hugr.get_optype(node);
+        let op_type = self.hugr.get_optype(node);
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -123,12 +120,12 @@ impl<'a> ValidationContext<'a> {
                 return Err(ValidationError::NoParent { node });
             };
 
-            let parent_optype = &self.hugr.get_optype(parent).op;
+            let parent_optype = self.hugr.get_optype(parent);
             let allowed_children = parent_optype.validity_flags().allowed_children;
-            if !allowed_children.is_superset(node_type.op.tag()) {
+            if !allowed_children.is_superset(op_type.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
-                    child_optype: node_type.op.clone(),
+                    child_optype: op_type.clone(),
                     parent,
                     parent_optype: parent_optype.clone(),
                     allowed_children,
@@ -138,12 +135,12 @@ impl<'a> ValidationContext<'a> {
             for dir in Direction::BOTH {
                 // Check that we have the correct amount of ports and edges.
                 let num_ports = self.hugr.graph.num_ports(node.index, dir);
-                if num_ports != node_type.port_count(dir) {
+                if num_ports != op_type.port_count(dir) {
                     return Err(ValidationError::WrongNumberOfPorts {
                         node,
-                        optype: node_type.op.clone(),
+                        optype: op_type.clone(),
                         actual: num_ports,
-                        expected: node_type.port_count(dir),
+                        expected: op_type.port_count(dir),
                         dir,
                     });
                 }
@@ -151,13 +148,13 @@ impl<'a> ValidationContext<'a> {
                 // Check port connections
                 for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
                     let port = Port::new(dir, i);
-                    self.validate_port(node, port, port_index, node_type)?;
+                    self.validate_port(node, port, port_index, op_type)?;
                 }
             }
         }
 
         // Check operation-specific constraints
-        self.validate_operation(node, node_type)?;
+        self.validate_operation(node, op_type)?;
 
         Ok(())
     }
@@ -211,9 +208,9 @@ impl<'a> ValidationContext<'a> {
         node: Node,
         port: Port,
         port_index: portgraph::PortIndex,
-        node_type: &NodeType,
+        op_type: &OpType,
     ) -> Result<(), ValidationError> {
-        let port_kind = node_type.port_kind(port).unwrap();
+        let port_kind = op_type.port_kind(port).unwrap();
         let dir = port.direction();
 
         let mut links = self.hugr.graph.port_links(port_index).peekable();
@@ -223,7 +220,7 @@ impl<'a> ValidationContext<'a> {
             Direction::Incoming => {
                 port_kind != EdgeKind::StateOrder
                     && port_kind != EdgeKind::ControlFlow
-                    && node_type.op.tag() != OpTag::Case
+                    && op_type.tag() != OpTag::Case
             }
             // Linear dataflow values must be connected.
             Direction::Outgoing => port_kind.is_linear(),
@@ -275,7 +272,7 @@ impl<'a> ValidationContext<'a> {
                 });
             }
 
-            self.validate_edge(node, port, node_type, other_node, other_offset)?;
+            self.validate_edge(node, port, op_type, other_node, other_offset)?;
         }
 
         Ok(())
@@ -284,25 +281,25 @@ impl<'a> ValidationContext<'a> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_operation(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
-        let flags = node_type.op.validity_flags();
+    fn validate_operation(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
+        let flags = op_type.validity_flags();
 
         if self.hugr.hierarchy.child_count(node.index) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
-                    optype: node_type.op.clone(),
+                    optype: op_type.clone(),
                 });
             }
 
             let all_children = self.hugr.children(node);
             let mut first_two_children = all_children.clone().take(2);
             let first_child = self.hugr.get_optype(first_two_children.next().unwrap());
-            if !flags.allowed_first_child.is_superset(first_child.op.tag()) {
+            if !flags.allowed_first_child.is_superset(first_child.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
-                    parent_optype: node_type.op.clone(),
-                    optype: first_child.op.clone(),
+                    parent_optype: op_type.clone(),
+                    optype: first_child.clone(),
                     expected: flags.allowed_first_child,
                     position: "first",
                 });
@@ -310,12 +307,12 @@ impl<'a> ValidationContext<'a> {
 
             if let Some(second_child) = first_two_children
                 .next()
-                .map(|child| &self.hugr.get_optype(child).op)
+                .map(|child| self.hugr.get_optype(child))
             {
                 if !flags.allowed_second_child.is_superset(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
                         parent: node,
-                        parent_optype: node_type.op.clone(),
+                        parent_optype: op_type.clone(),
                         optype: second_child.clone(),
                         expected: flags.allowed_second_child,
                         position: "second",
@@ -323,11 +320,11 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             // Additional validations running over the full list of children optypes
-            let children_optypes = all_children.map(|c| (c.index, &self.hugr.get_optype(c).op));
-            if let Err(source) = node_type.op.validate_children(children_optypes) {
+            let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
+            if let Err(source) = op_type.validate_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
-                    parent_optype: node_type.op.clone(),
+                    parent_optype: op_type.clone(),
                     source,
                 });
             }
@@ -349,13 +346,13 @@ impl<'a> ValidationContext<'a> {
                                 target,
                                 source_port: self.hugr.graph.port_offset(source_port).unwrap(),
                                 target_port: self.hugr.graph.port_offset(target_port).unwrap(),
-                                source_op: source_op.op.clone(),
-                                target_op: target_op.op.clone(),
+                                source_op: source_op.clone(),
+                                target_op: target_op.clone(),
                             };
                             if let Err(source) = edge_check(edge_data) {
                                 return Err(ValidationError::InvalidEdges {
                                     parent: node,
-                                    parent_optype: node_type.op.clone(),
+                                    parent_optype: op_type.clone(),
                                     source,
                                 });
                             }
@@ -365,12 +362,12 @@ impl<'a> ValidationContext<'a> {
             }
 
             if flags.requires_dag {
-                self.validate_children_dag(node, node_type)?;
+                self.validate_children_dag(node, op_type)?;
             }
         } else if flags.requires_children {
             return Err(ValidationError::ContainerWithoutChildren {
                 node,
-                optype: node_type.op.clone(),
+                optype: op_type.clone(),
             });
         }
 
@@ -383,11 +380,7 @@ impl<'a> ValidationContext<'a> {
     ///
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
-    fn validate_children_dag(
-        &self,
-        parent: Node,
-        node_type: &NodeType,
-    ) -> Result<(), ValidationError> {
+    fn validate_children_dag(&self, parent: Node, op_type: &OpType) -> Result<(), ValidationError> {
         if !self.hugr.hierarchy.has_children(parent.index) {
             // No children, nothing to do
             return Ok(());
@@ -402,12 +395,12 @@ impl<'a> ValidationContext<'a> {
         let non_defn_count = self
             .hugr
             .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).op.tag()))
+            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).tag()))
             .count();
         if nodes_visited != non_defn_count {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
-                optype: node_type.op.clone(),
+                optype: op_type.clone(),
             });
         }
 
@@ -425,7 +418,7 @@ impl<'a> ValidationContext<'a> {
         &mut self,
         from: Node,
         from_offset: Port,
-        from_optype: &NodeType,
+        from_optype: &OpType,
         to: Node,
         to_offset: Port,
     ) -> Result<(), ValidationError> {
@@ -439,7 +432,7 @@ impl<'a> ValidationContext<'a> {
         let is_static = match from_optype.port_kind(from_offset).unwrap() {
             // Inter-graph constant wires do not have restrictions
             EdgeKind::Static(typ) => {
-                if let OpType::Const(ops::Const(val)) = &from_optype.op {
+                if let OpType::Const(ops::Const(val)) = &from_optype {
                     typecheck_const(&typ, val).map_err(ValidationError::from)?;
                 } else {
                     // If const edges aren't coming from const nodes, they're graph
@@ -506,13 +499,13 @@ impl<'a> ValidationContext<'a> {
             } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
-                if ancestor_parent_op.op.tag() != OpTag::Cfg {
+                if ancestor_parent_op.tag() != OpTag::Cfg {
                     return Err(InterGraphEdgeError::NonCFGAncestor {
                         from,
                         from_offset,
                         to,
                         to_offset,
-                        ancestor_parent_op: ancestor_parent_op.op.clone(),
+                        ancestor_parent_op: ancestor_parent_op.clone(),
                     }
                     .into());
                 }

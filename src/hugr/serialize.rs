@@ -124,7 +124,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         let mut metadata = vec![json!(null); hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
-            let opt = hugr.get_optype(n);
+            let opt = hugr.get_nodetype(n);
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
@@ -138,7 +138,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
-            let sig = hugr.get_optype(node).op.op_signature();
+            let sig = hugr.get_optype(node).op_signature();
             let offset = match offset < sig.port_count(dir) {
                 true => Some(offset as u16),
                 false => None,
@@ -217,7 +217,7 @@ impl TryFrom<SerHugrV0> for Hugr {
                         .other_port_index(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
-                            op_type: op_type.op.clone(),
+                            op_type: op_type.clone(),
                         })?
                         .index()
                 }
