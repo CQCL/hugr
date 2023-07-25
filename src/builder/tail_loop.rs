@@ -15,7 +15,7 @@ use super::{
 /// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<B: Buildable + HugrMut> TailLoopBuilder<B> {
+impl<B: HugrMut> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,

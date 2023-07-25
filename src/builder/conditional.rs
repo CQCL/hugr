@@ -48,7 +48,7 @@ pub struct ConditionalBuilder<T> {
     pub(super) case_nodes: Vec<Option<Node>>,
 }
 
-impl<B: Buildable + HugrMut> Buildable for ConditionalBuilder<B> {
+impl<B: HugrMut> Buildable for ConditionalBuilder<B> {
     type Base = B;
     #[inline]
     fn hugr_mut(&mut self) -> &mut Self::Base {
@@ -61,14 +61,14 @@ impl<B: Buildable + HugrMut> Buildable for ConditionalBuilder<B> {
     }
 }
 
-impl<T: Buildable + HugrMut> Container for ConditionalBuilder<T> {
+impl<T: HugrMut> Container for ConditionalBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.conditional_node
     }
 }
 
-impl<H: Buildable + HugrMut> SubContainer for ConditionalBuilder<H> {
+impl<H: HugrMut> SubContainer for ConditionalBuilder<H> {
     type ContainerHandle = BuildHandle<ConditionalID>;
 
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -88,7 +88,7 @@ impl<H: Buildable + HugrMut> SubContainer for ConditionalBuilder<H> {
         Ok((self.conditional_node, self.n_out_wires).into())
     }
 }
-impl<B: Buildable + HugrMut> ConditionalBuilder<B> {
+impl<B: HugrMut> ConditionalBuilder<B> {
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics

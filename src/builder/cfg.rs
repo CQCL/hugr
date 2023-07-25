@@ -25,7 +25,7 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: Buildable + HugrMut> Buildable for CFGBuilder<B> {
+impl<B: HugrMut> Buildable for CFGBuilder<B> {
     type Base = B;
     #[inline]
     fn hugr_mut(&mut self) -> &mut B {
@@ -38,14 +38,14 @@ impl<B: Buildable + HugrMut> Buildable for CFGBuilder<B> {
     }
 }
 
-impl<B: Buildable + HugrMut> Container for CFGBuilder<B> {
+impl<B: HugrMut> Container for CFGBuilder<B> {
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
     }
 }
 
-impl<B: Buildable + HugrMut> SubContainer for CFGBuilder<B> {
+impl<B: HugrMut> SubContainer for CFGBuilder<B> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -79,7 +79,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: Buildable + HugrMut> CFGBuilder<B> {
+impl<B: HugrMut> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -235,7 +235,7 @@ impl<B: Buildable + HugrMut> CFGBuilder<B> {
 /// Builder for a [`BasicBlock::DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<B: Buildable + HugrMut> BlockBuilder<B> {
+impl<B: HugrMut> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
     /// predicate.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -374,9 +374,7 @@ mod test {
         Ok(())
     }
 
-    fn build_basic_cfg<T: Buildable + HugrMut>(
-        cfg_builder: &mut CFGBuilder<T>,
-    ) -> Result<(), BuildError>
+    fn build_basic_cfg<T: HugrMut>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError>
     where
         CFGBuilder<T>: Container,
     {

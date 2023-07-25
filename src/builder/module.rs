@@ -19,7 +19,7 @@ use crate::{hugr::HugrMut, Hugr};
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
-impl<B: Buildable + HugrMut> Buildable for ModuleBuilder<B> {
+impl<B: HugrMut> Buildable for ModuleBuilder<B> {
     type Base = B;
     #[inline]
     fn hugr_mut(&mut self) -> &mut Self::Base {
@@ -31,7 +31,7 @@ impl<B: Buildable + HugrMut> Buildable for ModuleBuilder<B> {
     }
 }
 
-impl<T: Buildable + HugrMut> Container for ModuleBuilder<T> {
+impl<T: HugrMut> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.root()
@@ -59,7 +59,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: Buildable + HugrMut> ModuleBuilder<T> {
+impl<T: HugrMut> ModuleBuilder<T> {
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
