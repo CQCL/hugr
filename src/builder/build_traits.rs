@@ -31,38 +31,22 @@ use crate::Hugr;
 use crate::hugr::HugrMut;
 
 pub trait Buildable: HugrMut {
-    type BaseMut<'a>: Buildable
-    where
-        Self: 'a;
+    type BaseMut: Buildable;
     type BaseView<'a>: HugrView
     where
         Self: 'a;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> Self::BaseMut<'_>;
+    fn hugr_mut(&mut self) -> &mut Self::BaseMut;
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> Self::BaseView<'_>;
 }
 
-impl Buildable for Hugr {
-    type BaseMut<'a> = &'a mut Hugr where Self: 'a;
-
-    type BaseView<'a> = &'a Hugr where Self: 'a;
-
-    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
-        self
-    }
-
-    fn hugr(&self) -> Self::BaseView<'_> {
-        self
-    }
-}
-
-impl<H: HugrMut + HugrView> Buildable for &mut H {
-    type BaseMut<'a> = &'a mut H where Self: 'a;
+impl<H: HugrMut + HugrView> Buildable for H {
+    type BaseMut = H;
 
     type BaseView<'a> = &'a H where Self: 'a;
 
-    fn hugr_mut(&mut self) -> Self::BaseMut<'_> {
+    fn hugr_mut(&mut self) -> &mut Self::BaseMut {
         self
     }
 
@@ -80,7 +64,7 @@ pub trait Container {
     /// The container node.
     fn container_node(&self) -> Node;
     /// The underlying [`Hugr`] being built
-    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_>;
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut;
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> <Self::Base as Buildable>::BaseView<'_>;
     /// Add an [`OpType`] as the final child of the container.
@@ -122,7 +106,7 @@ pub trait Container {
         &mut self,
         name: impl Into<String>,
         signature: Signature,
-    ) -> Result<FunctionBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
+    ) -> Result<FunctionBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
         let f_node = self.add_child_op(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone(),
@@ -295,7 +279,7 @@ pub trait Dataflow: Container {
         &mut self,
         signature: Signature,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<DFGBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
+    ) -> Result<DFGBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
         let (dfg_n, _) = add_op_with_wires(
             self,
             ops::DFG {
@@ -321,7 +305,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<CFGBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
+    ) -> Result<CFGBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
         let (input_types, input_wires): (Vec<SimpleType>, Vec<Wire>) = inputs.into_iter().unzip();
 
         let inputs: SimpleRow = input_types.into();
@@ -380,7 +364,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (ClassicType, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         just_out_types: ClassicRow,
-    ) -> Result<TailLoopBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
+    ) -> Result<TailLoopBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
         let (input_types, mut input_wires): (Vec<ClassicType>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
@@ -414,7 +398,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = ClassicRow>, Wire),
         other_inputs: impl IntoIterator<Item = (SimpleType, Wire)>,
         output_types: SimpleRow,
-    ) -> Result<ConditionalBuilder<<Self::Base as Buildable>::BaseMut<'_>>, BuildError> {
+    ) -> Result<ConditionalBuilder<&mut <Self::Base as Buildable>::BaseMut>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<SimpleType>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
@@ -647,7 +631,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: usize,
 ) -> Result<bool, BuildError> {
-    let mut base = data_builder.hugr_mut();
+    let base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.get_parent(src);

@@ -90,7 +90,7 @@ impl<B: Buildable> Container for DFGBuilder<B> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut {
         self.base.hugr_mut()
     }
 
@@ -156,7 +156,7 @@ impl<B: Buildable, T> Container for DFGWrapper<B, T> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> <Self::Base as Buildable>::BaseMut<'_> {
+    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::BaseMut {
         self.0.hugr_mut()
     }
 

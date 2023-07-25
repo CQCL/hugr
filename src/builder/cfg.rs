@@ -33,7 +33,7 @@ impl<B: Buildable> Container for CFGBuilder<B> {
     }
 
     #[inline]
-    fn hugr_mut(&mut self) -> B::BaseMut<'_> {
+    fn hugr_mut(&mut self) -> &mut B::BaseMut {
         self.base.hugr_mut()
     }
 
@@ -127,7 +127,7 @@ impl<B: Buildable> CFGBuilder<B> {
         inputs: SimpleRow,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
     {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
     }
@@ -138,7 +138,7 @@ impl<B: Buildable> CFGBuilder<B> {
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
         entry: bool,
-    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
     {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
@@ -173,7 +173,7 @@ impl<B: Buildable> CFGBuilder<B> {
         inputs: SimpleRow,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
     {
         self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
     }
@@ -189,7 +189,7 @@ impl<B: Buildable> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<ClassicRow>,
         other_outputs: SimpleRow,
-    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
     {
         let inputs = self
             .inputs
@@ -208,7 +208,7 @@ impl<B: Buildable> CFGBuilder<B> {
         &mut self,
         outputs: SimpleRow,
         n_cases: usize,
-    ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
+    ) -> Result<BlockBuilder<&mut <<Self as Container>::Base as Buildable>::BaseMut>, BuildError>
     {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
