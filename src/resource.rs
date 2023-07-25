@@ -14,6 +14,7 @@ use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
+mod unify;
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
