@@ -7,7 +7,7 @@ use super::{
 use crate::{
     hugr::{view::HugrView, ValidationError},
     ops,
-    types::{simple::TypeClass, PrimType, SimpleType},
+    types::{simple::TypeTag, PrimType, SimpleType},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -132,13 +132,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let class = typ.class();
+        let tag = typ.tag();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
 
-        Ok(AliasID::new(node, name, class))
+        Ok(AliasID::new(node, name, tag))
     }
 
     /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
@@ -148,15 +148,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        class: TypeClass,
+        tag: TypeTag,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
-            class,
+            tag,
         })?;
 
-        Ok(AliasID::new(node, name, class))
+        Ok(AliasID::new(node, name, tag))
     }
 }
 
@@ -196,8 +196,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeClass::Any)?;
+            let qubit_state_type = module_builder.add_alias_declare("qubit_state", TypeTag::Any)?;
 
             let f_build = module_builder.define_function(
                 "main",

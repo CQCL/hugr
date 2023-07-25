@@ -53,19 +53,19 @@ impl Display for SimpleType {
     Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize_repr, Deserialize_repr,
 )]
 #[repr(u8)]
-pub enum TypeClass {
+pub enum TypeTag {
     /// Any value, including linear and quantum values;
     /// cannot necessarily be copied or discarded. See [SimpleType]
     Any = 0,
-    /// Subset of [TypeClass::Any]; types that can be copied and discarded. See [ClassicType]
+    /// Subset of [TypeTag::Any]; types that can be copied and discarded. See [ClassicType]
     Classic = 1,
-    /// Subset of [TypeClass::Classic]: types that can also be hashed and support
+    /// Subset of [TypeTag::Classic]: types that can also be hashed and support
     /// a strong notion of equality. See [HashableType]
     Hashable = 2,
 }
 
-impl TypeClass {
-    /// Returns the smallest TypeClass containing both the receiver and argument.
+impl TypeTag {
+    /// Returns the smallest TypeTag containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
     fn union(self, other: Self) -> Self {
         if self == Self::Any || other == Self::Any {
@@ -77,13 +77,13 @@ impl TypeClass {
         }
     }
 
-    /// Do types in this class contain only classic data
+    /// Do types in this tag contain only classic data
     /// (which can be copied and discarded, i.e. [ClassicType]s)
     pub fn is_classical(self) -> bool {
         self != Self::Any
     }
 
-    /// Do types in this class contain only hashable classic data
+    /// Do types in this tag contain only hashable classic data
     /// (with a strong notion of equality, i.e. [HashableType]s)
     pub fn is_hashable(self) -> bool {
         self == Self::Hashable
@@ -95,8 +95,8 @@ pub trait PrimType: std::fmt::Debug + Clone + 'static {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
-    /// Tells us the [TypeClass] of the type represented by the receiver.
-    fn class(&self) -> TypeClass;
+    /// Tells us the [TypeTag] of the type represented by the receiver.
+    fn tag(&self) -> TypeTag;
 }
 
 /// A type that represents a container of other types.
@@ -330,27 +330,27 @@ impl Display for HashableType {
 }
 
 impl PrimType for ClassicType {
-    fn class(&self) -> TypeClass {
+    fn tag(&self) -> TypeTag {
         if self.is_hashable() {
-            TypeClass::Hashable
+            TypeTag::Hashable
         } else {
-            TypeClass::Classic
+            TypeTag::Classic
         }
     }
 }
 
 impl PrimType for SimpleType {
-    fn class(&self) -> TypeClass {
+    fn tag(&self) -> TypeTag {
         match self {
-            Self::Classic(c) => c.class(),
-            _ => TypeClass::Any,
+            Self::Classic(c) => c.tag(),
+            _ => TypeTag::Any,
         }
     }
 }
 
 impl PrimType for HashableType {
-    fn class(&self) -> TypeClass {
-        TypeClass::Hashable
+    fn tag(&self) -> TypeTag {
+        TypeTag::Hashable
     }
 }
 
@@ -487,8 +487,8 @@ impl TypeRow<SimpleType> {
     pub fn purely_classical(&self) -> bool {
         self.types
             .iter()
-            .map(PrimType::class)
-            .all(TypeClass::is_classical)
+            .map(PrimType::tag)
+            .all(TypeTag::is_classical)
     }
 }
 
@@ -536,16 +536,16 @@ impl<T: PrimType> TypeRow<T> {
     pub fn purely_hashable(&self) -> bool {
         self.types
             .iter()
-            .map(PrimType::class)
-            .all(TypeClass::is_hashable)
+            .map(PrimType::tag)
+            .all(TypeTag::is_hashable)
     }
 
-    /// Returns the smallest [TypeClass] that contains all elements of the row
-    pub fn common_class(&self) -> TypeClass {
+    /// Returns the smallest [TypeTag] that contains all elements of the row
+    pub fn common_class(&self) -> TypeTag {
         self.types
             .iter()
-            .map(PrimType::class)
-            .fold(TypeClass::Hashable, TypeClass::union)
+            .map(PrimType::tag)
+            .fold(TypeTag::Hashable, TypeTag::union)
     }
 
     /// Mutable iterator over the types in the row.
