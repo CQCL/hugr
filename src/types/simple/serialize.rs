@@ -286,4 +286,15 @@ mod test {
         )));
         assert_eq!(ser_roundtrip(&t), t);
     }
+
+    #[test]
+    fn serialize_types_current_behaviour() {
+        // This list should be represented as a HashableType::Container.
+        let malformed = SimpleType::Qontainer(Container::List(Box::new(SimpleType::Classic(
+            ClassicType::Hashable(HashableType::Int(8)),
+        ))));
+        // If this behaviour changes, i.e. to return the well-formed version, that'd be fine.
+        // Just to document current serialization behaviour that we leave it untouched.
+        assert_eq!(ser_roundtrip(&malformed), malformed);
+    }
 }
