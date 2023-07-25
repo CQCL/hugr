@@ -100,7 +100,7 @@ where
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
                 row: Box::new(inner.map_into()),
-                c: T::CLASS,
+                c: T::CLASS, // We could inspect inner.common_class(), but this should have been done already
             },
             Container::List(inner) => SerSimpleType::List {
                 inner: Box::new((*inner).into()),

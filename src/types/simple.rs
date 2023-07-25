@@ -65,6 +65,18 @@ pub enum TypeClass {
 }
 
 impl TypeClass {
+    /// Returns the smallest TypeClass containing both the receiver and argument.
+    /// (This will be one of the receiver or the argument.)
+    fn union(self, other: Self) -> Self {
+        if self == Self::Any || other == Self::Any {
+            Self::Any
+        } else if self == Self::Classic || other == Self::Classic {
+            Self::Classic
+        } else {
+            Self::Hashable
+        }
+    }
+
     /// Do types in this class contain only classic data
     /// (which can be copied and discarded, i.e. [ClassicType]s)
     pub fn is_classical(self) -> bool {
@@ -527,6 +539,14 @@ impl<T: PrimType> TypeRow<T> {
             .iter()
             .map(PrimType::class)
             .all(TypeClass::is_hashable)
+    }
+
+    /// Returns the smallest [TypeClass] that contains all elements of the row
+    pub fn common_class(&self) -> TypeClass {
+        self.types
+            .iter()
+            .map(PrimType::class)
+            .fold(TypeClass::Hashable, TypeClass::union)
     }
 
     /// Mutable iterator over the types in the row.
