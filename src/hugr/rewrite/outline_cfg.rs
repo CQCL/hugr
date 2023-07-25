@@ -93,7 +93,7 @@ impl Rewrite for OutlineCfg {
         let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry)
             else {panic!("Entry node is not a basic block")};
         let inputs = inputs.clone();
-        let outputs = match &h.get_optype(outside) {
+        let outputs = match h.get_optype(outside) {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };

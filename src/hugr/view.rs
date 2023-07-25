@@ -157,7 +157,7 @@ pub trait HugrView: sealed::HugrInternals {
             })
             .with_port_style(|port| {
                 let node = graph.port_node(port).unwrap();
-                let optype = &self.get_optype(node.into());
+                let optype = self.get_optype(node.into());
                 let offset = graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
                     EdgeKind::Static(ty) => {
@@ -175,7 +175,7 @@ pub trait HugrView: sealed::HugrInternals {
             })
             .with_edge_style(|src, tgt| {
                 let src_node = graph.port_node(src).unwrap();
-                let src_optype = &self.get_optype(src_node.into());
+                let src_optype = self.get_optype(src_node.into());
                 let src_offset = graph.port_offset(src).unwrap();
                 let tgt_node = graph.port_node(tgt).unwrap();
 

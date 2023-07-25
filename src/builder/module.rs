@@ -78,7 +78,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
         let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
-            &self.hugr().get_optype(f_node)
+            self.hugr().get_optype(f_node)
         {
             (signature.clone(), name.clone())
         } else {

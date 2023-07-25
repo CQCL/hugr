@@ -199,8 +199,7 @@ pub fn resolve_extension_ops(
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) = &h.get_optype(n)
-        {
+        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) = h.get_optype(n) {
             if let Some(r) = resource_registry.get(&opaque.resource) {
                 // Fail if the Resource was found but did not have the expected operation
                 let Some(def) = r.operations().get(&opaque.op_name) else {
