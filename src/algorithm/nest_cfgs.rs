@@ -401,6 +401,7 @@ pub(crate) mod test {
         BuildError, Buildable, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
     use crate::hugr::region::{FlatRegionView, Region};
+    use crate::hugr::HugrMut;
     use crate::ops::{
         handle::{BasicBlockID, ConstID, NodeHandle},
         ConstValue,
@@ -579,7 +580,7 @@ pub(crate) mod test {
         dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
     }
 
-    fn build_if_then_else_merge<T: Buildable>(
+    fn build_if_then_else_merge<T: Buildable + HugrMut>(
         cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         unit_const: &ConstID,
@@ -592,7 +593,7 @@ pub(crate) mod test {
         Ok((split, merge))
     }
 
-    fn build_then_else_merge_from_if<T: Buildable>(
+    fn build_then_else_merge_from_if<T: Buildable + HugrMut>(
         cfg: &mut CFGBuilder<T>,
         unit_const: &ConstID,
         split: BasicBlockID,
@@ -617,7 +618,7 @@ pub(crate) mod test {
     }
 
     // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
-    fn build_loop_from_header<T: Buildable>(
+    fn build_loop_from_header<T: Buildable + HugrMut>(
         cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         header: BasicBlockID,
@@ -631,7 +632,7 @@ pub(crate) mod test {
     }
 
     // Result is header and tail. Caller must provide 0th successor of header (linking to tail), and 0th successor of tail.
-    fn build_loop<T: Buildable>(
+    fn build_loop<T: Buildable + HugrMut>(
         cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         unit_const: &ConstID,

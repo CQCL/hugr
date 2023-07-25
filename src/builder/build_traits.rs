@@ -30,8 +30,8 @@ use crate::Hugr;
 
 use crate::hugr::HugrMut;
 
-pub trait Buildable: HugrMut {
-    type Base: Buildable;
+pub trait Buildable {
+    type Base: Buildable + HugrMut;
     /// The underlying [`Hugr`] being built
     fn hugr_mut(&mut self) -> &mut Self::Base;
     /// Immutable reference to HUGR being built

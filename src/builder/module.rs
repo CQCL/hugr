@@ -24,7 +24,7 @@ use crate::{hugr::HugrMut, Hugr};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<T: Buildable> Container for ModuleBuilder<T> {
+impl<T: Buildable + HugrMut> Container for ModuleBuilder<T> {
     type Base = T;
     #[inline]
     fn container_node(&self) -> Node {
@@ -62,7 +62,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: Buildable> ModuleBuilder<T> {
+impl<T: Buildable + HugrMut> ModuleBuilder<T> {
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///

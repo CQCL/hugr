@@ -77,7 +77,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: Buildable> CFGBuilder<B> {
+impl<B: Buildable + HugrMut> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -372,7 +372,9 @@ mod test {
         Ok(())
     }
 
-    fn build_basic_cfg<T: Buildable>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError>
+    fn build_basic_cfg<T: Buildable + HugrMut>(
+        cfg_builder: &mut CFGBuilder<T>,
+    ) -> Result<(), BuildError>
     where
         CFGBuilder<T>: Container,
     {
