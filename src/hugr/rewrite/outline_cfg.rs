@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::builder::{CFGBuilder, Container, Dataflow, SubContainer};
+use crate::builder::{Buildable, CFGBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::handle::NodeHandle;

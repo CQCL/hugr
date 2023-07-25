@@ -82,25 +82,27 @@ impl HugrBuilder for DFGBuilder<Hugr> {
     }
 }
 
-impl<B: Buildable> Container for DFGBuilder<B> {
+impl<B: Buildable + HugrMut> Buildable for DFGBuilder<B> {
     type Base = B;
+    #[inline]
+    fn hugr_mut(&mut self) -> &mut Self::Base {
+        &mut self.base
+    }
+
+    #[inline]
+    fn hugr(&self) -> &Self::Base {
+        &self.base
+    }
+}
+
+impl<B: Buildable + HugrMut> Container for DFGBuilder<B> {
     #[inline]
     fn container_node(&self) -> Node {
         self.dfg_node
     }
-
-    #[inline]
-    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::Base {
-        self.base.hugr_mut()
-    }
-
-    #[inline]
-    fn hugr(&self) -> &<Self::Base as Buildable>::Base {
-        self.base.hugr()
-    }
 }
 
-impl<T: Buildable> SubContainer for DFGBuilder<T> {
+impl<T: Buildable + HugrMut> SubContainer for DFGBuilder<T> {
     type ContainerHandle = BuildHandle<DfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -108,7 +110,7 @@ impl<T: Buildable> SubContainer for DFGBuilder<T> {
     }
 }
 
-impl<T: Buildable> Dataflow for DFGBuilder<T> {
+impl<T: Buildable + HugrMut> Dataflow for DFGBuilder<T> {
     #[inline]
     fn num_inputs(&self) -> usize {
         self.num_in_wires
@@ -148,32 +150,34 @@ impl FunctionBuilder<Hugr> {
     }
 }
 
-impl<B: Buildable, T> Container for DFGWrapper<B, T> {
+impl<B: Buildable + HugrMut, T> Buildable for DFGWrapper<B, T> {
     type Base = B;
     #[inline]
-    fn container_node(&self) -> Node {
-        self.0.container_node()
-    }
-
-    #[inline]
-    fn hugr_mut(&mut self) -> &mut <Self::Base as Buildable>::Base {
+    fn hugr_mut(&mut self) -> &mut Self::Base {
         self.0.hugr_mut()
     }
 
     #[inline]
-    fn hugr(&self) -> &<Self::Base as Buildable>::Base {
+    fn hugr(&self) -> &Self::Base {
         self.0.hugr()
     }
 }
 
-impl<B: Buildable, T> Dataflow for DFGWrapper<B, T> {
+impl<B: Buildable + HugrMut, T> Container for DFGWrapper<B, T> {
+    #[inline]
+    fn container_node(&self) -> Node {
+        self.0.container_node()
+    }
+}
+
+impl<B: Buildable + HugrMut, T> Dataflow for DFGWrapper<B, T> {
     #[inline]
     fn num_inputs(&self) -> usize {
         Dataflow::num_inputs(&self.0)
     }
 }
 
-impl<B: Buildable, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
+impl<B: Buildable + HugrMut, T: From<BuildHandle<DfgID>>> SubContainer for DFGWrapper<B, T> {
     type ContainerHandle = T;
 
     #[inline]
