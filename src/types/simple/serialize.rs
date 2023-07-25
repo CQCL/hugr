@@ -16,7 +16,7 @@ use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
 pub(crate) enum SerSimpleType {
     Q,
@@ -33,20 +33,20 @@ pub(crate) enum SerSimpleType {
         l: bool,
     },
     Map {
-        k: Box<SimpleType>,
-        v: Box<SimpleType>,
+        k: Box<SerSimpleType>,
+        v: Box<SerSimpleType>,
         l: bool,
     },
     Tuple {
-        row: Box<TypeRow>,
+        row: Box<TypeRow<SerSimpleType>>,
         l: bool,
     },
     Sum {
-        row: Box<TypeRow>,
+        row: Box<TypeRow<SerSimpleType>>,
         l: bool,
     },
     Array {
-        inner: Box<SimpleType>,
+        inner: Box<SerSimpleType>,
         len: usize,
         l: bool,
     },
@@ -63,19 +63,37 @@ pub(crate) enum SerSimpleType {
     },
 }
 
-impl<T: PrimType + Into<SimpleType>> From<Container<T>> for SerSimpleType {
+impl PrimType for SerSimpleType {}
+
+trait SerializableType: PrimType {
+    const CLASSIC: bool;
+}
+
+impl SerializableType for ClassicType {
+    const CLASSIC: bool = true;
+}
+
+impl SerializableType for SimpleType {
+    const CLASSIC: bool = false;
+}
+
+impl<T: SerializableType> From<Container<T>> for SerSimpleType
+where
+    SerSimpleType: From<T>,
+    SimpleType: From<T>,
+{
     fn from(value: Container<T>) -> Self {
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
-                row: inner,
+                row: Box::new(inner.map_into()),
                 l: !T::CLASSIC,
             },
             Container::List(inner) => SerSimpleType::List {
-                inner: box_convert(*inner),
+                inner: Box::new((*inner).into()),
                 l: !T::CLASSIC,
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
-                row: inner,
+                row: Box::new(inner.map_into()),
                 l: !T::CLASSIC,
             },
             Container::Map(inner) => SerSimpleType::Map {
@@ -155,19 +173,21 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Tuple {
                 row: inner,
                 l: true,
-            } => Container::<SimpleType>::Tuple(box_convert_try(*inner)).into(),
+            } => Container::<SimpleType>::Tuple(Box::new(inner.map_into())).into(),
             SerSimpleType::Tuple {
                 row: inner,
                 l: false,
-            } => Container::<ClassicType>::Tuple(box_convert_try(*inner)).into(),
+            } => {
+                Container::<ClassicType>::Tuple(Box::new(inner.try_convert_elems().unwrap())).into()
+            }
             SerSimpleType::Sum {
                 row: inner,
                 l: true,
-            } => Container::<SimpleType>::Sum(box_convert_try(*inner)).into(),
+            } => Container::<SimpleType>::Sum(Box::new(inner.map_into())).into(),
             SerSimpleType::Sum {
                 row: inner,
                 l: false,
-            } => Container::<ClassicType>::Sum(box_convert_try(*inner)).into(),
+            } => Container::<ClassicType>::Sum(Box::new(inner.try_convert_elems().unwrap())).into(),
             SerSimpleType::List { inner, l: true } => {
                 Container::<SimpleType>::List(box_convert_try(*inner)).into()
             }
@@ -175,7 +195,8 @@ impl From<SerSimpleType> for SimpleType {
                 Container::<ClassicType>::List(box_convert_try(*inner)).into()
             }
             SerSimpleType::Map { k, v, l: true } => {
-                Container::<SimpleType>::Map(Box::new(((*k).try_into().unwrap(), *v))).into()
+                Container::<SimpleType>::Map(Box::new(((*k).try_into().unwrap(), (*v).into())))
+                    .into()
             }
             SerSimpleType::Map { k, v, l: false } => Container::<ClassicType>::Map(Box::new((
                 (*k).try_into().unwrap(),
@@ -200,6 +221,19 @@ impl From<SerSimpleType> for SimpleType {
                 l: false,
             } => ClassicType::Opaque(c).into(),
             SerSimpleType::Var { name: s } => ClassicType::Variable(s).into(),
+        }
+    }
+}
+
+impl TryFrom<SerSimpleType> for ClassicType {
+    type Error = String;
+
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        let s: SimpleType = value.into();
+        if let SimpleType::Classic(c) = s {
+            Ok(c)
+        } else {
+            Err(format!("Not a ClassicType: {}", s))
         }
     }
 }

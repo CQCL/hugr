@@ -202,11 +202,6 @@ pub struct Port {
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// A DataFlow wire, defined by a Value-kind output port of a node
-// Stores node and offset to output port
-pub struct Wire(Node, usize);
-
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
@@ -299,6 +294,11 @@ impl Port {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// A DataFlow wire, defined by a Value-kind output port of a node
+// Stores node and offset to output port
+pub struct Wire(Node, usize);
+
 impl Wire {
     /// Create a new wire from a node and a port.
     #[inline]
@@ -316,6 +316,31 @@ impl Wire {
     #[inline]
     pub fn source(&self) -> Port {
         Port::new_outgoing(self.1)
+    }
+}
+
+/// Enum for uniquely identifying the origin of linear wires in a circuit-like
+/// dataflow region.
+///
+/// Falls back to [`Wire`] if the wire is not linear or if it's not possible to
+/// track the origin.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CircuitUnit {
+    /// Arbitrary input wire.
+    Wire(Wire),
+    /// Index to region input.
+    Linear(usize),
+}
+
+impl From<usize> for CircuitUnit {
+    fn from(value: usize) -> Self {
+        CircuitUnit::Linear(value)
+    }
+}
+
+impl From<Wire> for CircuitUnit {
+    fn from(value: Wire) -> Self {
+        CircuitUnit::Wire(value)
     }
 }
 

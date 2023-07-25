@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
-use crate::types::{ClassicType, CustomType, SimpleType, TypeRow};
+use crate::types::{CustomType, SimpleRow, SimpleType};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -34,7 +34,7 @@ pub fn resource() -> Resource {
         vec![],
         HashMap::default(),
         |_arg_values: &[TypeArg]| {
-            let t: TypeRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            let t: SimpleRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
             Ok((t.clone(), t, ResourceSet::default()))
         },
     );
@@ -93,12 +93,12 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn const_type(&self) -> ClassicType {
+    fn custom_type(&self) -> CustomType {
         let t: Type = match self {
             Constant::Angle(_) => Type::Angle,
             Constant::Quaternion(_) => Type::Quaternion,
         };
-        t.custom_type().into()
+        t.custom_type()
     }
 }
 

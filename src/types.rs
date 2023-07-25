@@ -11,7 +11,7 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicType, Container, SimpleType, TypeRow};
+pub use simple::{ClassicRow, ClassicType, Container, PrimType, SimpleRow, SimpleType, TypeRow};
 
 use delegate::delegate;
 use smol_str::SmolStr;
@@ -51,11 +51,11 @@ impl EdgeKind {
 /// and also the target (value) of a call (static).
 pub struct AbstractSignature {
     /// Value inputs of the function.
-    pub input: TypeRow,
+    pub input: SimpleRow,
     /// Value outputs of the function.
-    pub output: TypeRow,
+    pub output: SimpleRow,
     /// Possible static input (for call / load-constant).
-    pub static_input: TypeRow,
+    pub static_input: ClassicRow,
     /// The resource requirements which are added by the operation
     pub resource_reqs: ResourceSet,
 }
@@ -65,16 +65,16 @@ pub struct AbstractSignature {
 pub struct Signature {
     /// The underlying signature
     pub signature: AbstractSignature,
-    /// The resources which are associated with the inputs and carried through
+    /// The resources which are associated with all the inputs and carried through
     pub input_resources: ResourceSet,
 }
 
 impl AbstractSignature {
     /// Create a new signature.
     pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-        static_input: impl Into<TypeRow>,
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+        static_input: impl Into<ClassicRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -108,9 +108,9 @@ impl From<Signature> for AbstractSignature {
 impl Signature {
     /// Create a new signature.
     pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-        static_input: impl Into<TypeRow>,
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+        static_input: impl Into<ClassicRow>,
     ) -> Self {
         Self {
             signature: AbstractSignature {
@@ -148,11 +148,11 @@ impl AbstractSignature {
 
 impl AbstractSignature {
     /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
         Self::new(input, output, type_row![])
     }
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
         let linear = linear.into();
         Self::new_df(linear.clone(), linear)
     }
@@ -160,12 +160,11 @@ impl AbstractSignature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            self.static_input
-                .get(port.index() - self.input.len())?
-                .clone()
-                .try_into()
-                .ok()
-                .map(EdgeKind::Static)
+            Some(EdgeKind::Static(
+                self.static_input
+                    .get(port.index() - self.input.len())?
+                    .clone(),
+            ))
         } else {
             self.get_df(port).cloned().map(EdgeKind::Value)
         }
@@ -244,19 +243,19 @@ impl AbstractSignature {
 
     #[inline]
     /// Returns the input row
-    pub fn input(&self) -> &TypeRow {
+    pub fn input(&self) -> &SimpleRow {
         &self.input
     }
 
     #[inline]
     /// Returns the output row
-    pub fn output(&self) -> &TypeRow {
+    pub fn output(&self) -> &SimpleRow {
         &self.output
     }
 
     #[inline]
     /// Returns the row of static inputs
-    pub fn static_input(&self) -> &TypeRow {
+    pub fn static_input(&self) -> &ClassicRow {
         &self.static_input
     }
 }
@@ -318,12 +317,12 @@ impl AbstractSignature {
 
 impl Signature {
     /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
         AbstractSignature::new_df(input, output).with_input_resources(ResourceSet::new())
     }
 
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
         AbstractSignature::new_linear(linear).with_input_resources(ResourceSet::new())
     }
 
@@ -339,11 +338,11 @@ impl Signature {
     delegate! {
         to self.signature {
             /// Inputs of the abstract signature
-            pub fn input(&self) -> &TypeRow;
+            pub fn input(&self) -> &SimpleRow;
             /// Outputs of the abstract signature
-            pub fn output(&self) -> &TypeRow;
+            pub fn output(&self) -> &SimpleRow;
             /// Static inputs of the abstract signature
-            pub fn static_input(&self) -> &TypeRow;
+            pub fn static_input(&self) -> &ClassicRow;
         }
     }
 }
@@ -427,10 +426,10 @@ impl SignatureDescription {
         }
     }
 
-    fn row_zip<'a>(
-        type_row: &'a TypeRow,
+    fn row_zip<'a, T: PrimType>(
+        type_row: &'a TypeRow<T>,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a SimpleType)> {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
         name_row
             .iter()
             .chain(&EmptyStringIterator)
@@ -463,7 +462,7 @@ impl SignatureDescription {
     pub fn static_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &ClassicType)> {
         Self::row_zip(signature.static_input(), &self.static_input)
     }
 }

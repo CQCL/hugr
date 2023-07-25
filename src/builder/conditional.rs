@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{Signature, TypeRow};
+use crate::types::{ClassicRow, Signature, SimpleRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -154,9 +154,9 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = TypeRow>,
-        other_inputs: impl Into<TypeRow>,
-        outputs: impl Into<TypeRow>,
+        predicate_inputs: impl IntoIterator<Item = ClassicRow>,
+        other_inputs: impl Into<SimpleRow>,
+        outputs: impl Into<SimpleRow>,
     ) -> Result<Self, BuildError> {
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
         let other_inputs = other_inputs.into();
@@ -184,7 +184,10 @@ impl ConditionalBuilder<Hugr> {
 
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
+    pub fn new(
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+    ) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
         let signature = AbstractSignature::new_df(input, output);
