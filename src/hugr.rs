@@ -15,7 +15,6 @@ use std::iter;
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
-use delegate::delegate;
 use derive_more::From;
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
@@ -24,9 +23,9 @@ use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::view::HugrView;
-use crate::ops::{tag::OpTag, OpTrait, OpType};
+use crate::ops::{OpTrait, OpType};
 use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, EdgeKind, Signature, SignatureDescription};
+use crate::types::Signature;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -79,19 +78,6 @@ impl OpType {
         NodeType {
             op: self,
             input_resources: rs,
-        }
-    }
-}
-
-impl OpTrait for NodeType {
-    delegate! {
-        to self.op {
-            fn description(&self) -> &str;
-            fn tag(&self) -> OpTag;
-            fn op_signature(&self) -> AbstractSignature;
-            fn signature_desc(&self) -> SignatureDescription;
-            fn other_input(&self) -> Option<EdgeKind>;
-            fn other_output(&self) -> Option<EdgeKind>;
         }
     }
 }

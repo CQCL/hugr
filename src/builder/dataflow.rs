@@ -208,16 +208,13 @@ mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::handle::NodeHandle;
-    use crate::ops::OpTag;
-    use crate::ops::OpTrait;
+    use crate::ops::{handle::NodeHandle, LeafOp, OpTag, OpTrait};
     use crate::types::SimpleType;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
             BuildError,
         },
-        ops::LeafOp,
         resource::ResourceSet,
         type_row,
         types::Signature,
@@ -381,7 +378,7 @@ mod test {
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
+        assert_matches!(hugr.root_type().op.tag(), OpTag::Dfg);
 
         Ok(())
     }
