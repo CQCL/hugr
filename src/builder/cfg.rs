@@ -7,14 +7,12 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
-
+use crate::hugr::view::HugrView;
+use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
-
-use crate::Node;
-use crate::{hugr::HugrMut, types::TypeRow, Hugr};
+use crate::types::{ClassicRow, Signature, SimpleRow, SimpleType};
+use crate::{type_row, Hugr, Node};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
@@ -22,7 +20,7 @@ use crate::{hugr::HugrMut, types::TypeRow, Hugr};
 pub struct CFGBuilder<T> {
     pub(super) base: T,
     pub(super) cfg_node: Node,
-    pub(super) inputs: Option<TypeRow>,
+    pub(super) inputs: Option<SimpleRow>,
     pub(super) exit_node: Node,
     pub(super) n_out_wires: usize,
 }
@@ -55,7 +53,10 @@ impl<B: Buildable> SubContainer for CFGBuilder<B> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
+    pub fn new(
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+    ) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
         let cfg_op = ops::CFG {
@@ -80,8 +81,8 @@ impl<B: Buildable> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
-        input: TypeRow,
-        output: TypeRow,
+        input: SimpleRow,
+        output: SimpleRow,
     ) -> Result<Self, BuildError> {
         let n_out_wires = output.len();
         let exit_block_type = OpType::BasicBlock(BasicBlock::Exit {
@@ -123,9 +124,9 @@ impl<B: Buildable> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn block_builder(
         &mut self,
-        inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
-        other_outputs: TypeRow,
+        inputs: SimpleRow,
+        predicate_variants: Vec<ClassicRow>,
+        other_outputs: SimpleRow,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
         self.any_block_builder(inputs, predicate_variants, other_outputs, false)
@@ -133,9 +134,9 @@ impl<B: Buildable> CFGBuilder<B> {
 
     fn any_block_builder(
         &mut self,
-        inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
-        other_outputs: TypeRow,
+        inputs: SimpleRow,
+        predicate_variants: Vec<ClassicRow>,
+        other_outputs: SimpleRow,
         entry: bool,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
@@ -169,8 +170,8 @@ impl<B: Buildable> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        inputs: SimpleRow,
+        outputs: SimpleRow,
         n_cases: usize,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
@@ -186,8 +187,8 @@ impl<B: Buildable> CFGBuilder<B> {
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder(
         &mut self,
-        predicate_variants: Vec<TypeRow>,
-        other_outputs: TypeRow,
+        predicate_variants: Vec<ClassicRow>,
+        other_outputs: SimpleRow,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
         let inputs = self
@@ -205,7 +206,7 @@ impl<B: Buildable> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_entry_builder(
         &mut self,
-        outputs: TypeRow,
+        outputs: SimpleRow,
         n_cases: usize,
     ) -> Result<BlockBuilder<<<Self as Container>::Base as Buildable>::BaseMut<'_>>, BuildError>
     {
@@ -251,15 +252,15 @@ impl<B: Buildable> BlockBuilder<B> {
     fn create(
         base: B,
         block_n: Node,
-        predicate_variants: Vec<TypeRow>,
-        other_outputs: TypeRow,
-        inputs: TypeRow,
+        predicate_variants: Vec<ClassicRow>,
+        other_outputs: SimpleRow,
+        inputs: SimpleRow,
     ) -> Result<Self, BuildError> {
         // The node outputs a predicate before the data outputs of the block node
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = Signature::new_df(inputs, TypeRow::from(node_outputs));
+        let signature = Signature::new_df(inputs, SimpleRow::from(node_outputs));
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
@@ -281,9 +282,9 @@ impl<B: Buildable> BlockBuilder<B> {
 impl BlockBuilder<Hugr> {
     /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
-        inputs: impl Into<TypeRow>,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
-        other_outputs: impl Into<TypeRow>,
+        inputs: impl Into<SimpleRow>,
+        predicate_variants: impl IntoIterator<Item = ClassicRow>,
+        other_outputs: impl Into<SimpleRow>,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
@@ -304,11 +305,12 @@ impl BlockBuilder<Hugr> {
 mod test {
     use std::collections::HashSet;
 
-    use cool_asserts::assert_matches;
-
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
+    use crate::macros::classic_row;
+    use crate::types::ClassicType;
     use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+    use cool_asserts::assert_matches;
 
     use super::*;
     #[test]
@@ -379,7 +381,10 @@ mod test {
     where
         CFGBuilder<T>: Container,
     {
-        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
+        let sum2_variants = vec![
+            classic_row![ClassicType::i64()],
+            classic_row![ClassicType::i64()],
+        ];
         let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();

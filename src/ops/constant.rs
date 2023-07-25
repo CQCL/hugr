@@ -3,9 +3,9 @@
 use std::any::Any;
 
 use crate::{
+    classic_row,
     macros::impl_box_clone,
-    type_row,
-    types::{ClassicType, Container, CustomType, EdgeKind, SimpleType, TypeRow},
+    types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -62,12 +62,14 @@ pub enum ConstValue {
     /// A constant specifying a variant of a Sum type.
     Sum {
         tag: usize,
-        variants: TypeRow,
+        // We require the type to be entirely Classic (i.e. we don't allow
+        // a classic variant of a Sum with other variants that are linear)
+        variants: ClassicRow,
         val: Box<ConstValue>,
     },
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
-    /// An opaque constant value.
+    /// An opaque constant value, with cached type.
     Opaque(CustomType, Box<dyn CustomConst>),
 }
 
@@ -123,10 +125,7 @@ impl ConstValue {
                 ClassicType::Container(Container::Sum(Box::new(variants.clone())))
             }
             Self::Tuple(vals) => {
-                let row: Vec<_> = vals
-                    .iter()
-                    .map(|val| SimpleType::Classic(val.const_type()))
-                    .collect();
+                let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();
                 ClassicType::Container(Container::Tuple(Box::new(row.into())))
             }
             Self::F64(_) => ClassicType::F64,
@@ -172,18 +171,22 @@ impl ConstValue {
 
     /// Constant Sum over units, used as predicates.
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
-        Self::predicate(tag, Self::unit(), std::iter::repeat(type_row![]).take(size))
+        Self::predicate(
+            tag,
+            Self::unit(),
+            std::iter::repeat(classic_row![]).take(size),
+        )
     }
 
     /// Constant Sum over Tuples, used as predicates.
     pub fn predicate(
         tag: usize,
         val: ConstValue,
-        variant_rows: impl IntoIterator<Item = TypeRow>,
+        variant_rows: impl IntoIterator<Item = ClassicRow>,
     ) -> Self {
         ConstValue::Sum {
             tag,
-            variants: TypeRow::predicate_variants_row(variant_rows),
+            variants: ClassicRow::predicate_variants_row(variant_rows),
             val: Box::new(val),
         }
     }
@@ -208,7 +211,7 @@ impl<T: CustomConst> From<T> for ConstValue {
     }
 }
 
-/// Constant value for opaque [`SimpleType`]s.
+/// Constant value for opaque [`CustomType`]s.
 ///
 /// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
@@ -238,23 +241,21 @@ mod test {
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        classic_row,
         hugr::{typecheck::ConstTypeError, ValidationError},
         type_row,
-        types::{ClassicType, SimpleType, TypeRow},
+        types::{ClassicType, SimpleRow, SimpleType},
     };
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         let pred_rows = vec![
-            type_row![
-                SimpleType::Classic(ClassicType::i64()),
-                SimpleType::Classic(ClassicType::F64)
-            ],
+            classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty.clone()]))?;
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
         let c = b.add_constant(ConstValue::predicate(
             0,
             ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
@@ -263,7 +264,7 @@ mod test {
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty]))?;
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty]))?;
         let c = b.add_constant(ConstValue::predicate(
             1,
             ConstValue::Tuple(vec![]),
@@ -278,15 +279,12 @@ mod test {
     #[test]
     fn test_bad_predicate() {
         let pred_rows = vec![
-            type_row![
-                SimpleType::Classic(ClassicType::i64()),
-                SimpleType::Classic(ClassicType::F64)
-            ],
+            classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], TypeRow::from(vec![pred_ty])).unwrap();
+        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty])).unwrap();
         let c = b
             .add_constant(ConstValue::predicate(
                 0,
