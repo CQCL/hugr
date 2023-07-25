@@ -6,10 +6,10 @@ use lazy_static::lazy_static;
 use std::collections::HashSet;
 
 use crate::hugr::*;
-use crate::types::{SimpleType, TypeRow};
 
 // For static typechecking
 use crate::ops::ConstValue;
+use crate::types::simple::ClassicRow;
 use crate::types::{ClassicType, Container};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
@@ -40,9 +40,6 @@ pub enum ConstTypeError {
     /// The length of the tuple value doesn't match the length of the tuple type
     #[error("Tuple of wrong length")]
     TupleWrongLength,
-    /// Const values aren't allowed to be linear
-    #[error("Linear types not allowed in const nodes")]
-    LinearTypeDisallowed,
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
@@ -52,7 +49,7 @@ pub enum ConstTypeError {
     /// A mismatch between the embedded type and the type we're checking
     /// against, as above, but for rows instead of simple types
     #[error("Type mismatch for const - expected {0}, found {1}")]
-    TypeRowMismatch(TypeRow, TypeRow),
+    TypeRowMismatch(ClassicRow, ClassicRow),
 }
 
 lazy_static! {
@@ -103,10 +100,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     return Err(ConstTypeError::TupleWrongLength);
                 }
                 for (ty, tm) in row.iter().zip(xs.iter()) {
-                    match ty {
-                        SimpleType::Classic(ty) => typecheck_const(ty, tm)?,
-                        _ => return Err(ConstTypeError::LinearTypeDisallowed),
-                    }
+                    typecheck_const(ty, tm)?
                 }
                 Ok(())
             }
@@ -124,10 +118,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                     ));
                 }
                 let ty = variants.get(*tag).unwrap();
-                match ty {
-                    SimpleType::Classic(ty) => typecheck_const(ty, val.as_ref()),
-                    _ => Err(ConstTypeError::LinearTypeDisallowed),
-                }
+                typecheck_const(ty, val.as_ref())
             }
             (Container::Sum(_), _) => {
                 Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
@@ -154,7 +145,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::{type_row, types::ClassicType};
+    use crate::{classic_row, types::ClassicType};
 
     use super::*;
 
@@ -174,9 +165,9 @@ mod test {
                 ClassicType::Int(64)
             ))
         );
-        let tuple_ty = ClassicType::Container(Container::Tuple(Box::new(type_row![
-            SimpleType::Classic(INT),
-            SimpleType::Classic(ClassicType::F64)
+        let tuple_ty = ClassicType::Container(Container::Tuple(Box::new(classic_row![
+            INT,
+            ClassicType::F64,
         ])));
         typecheck_const(
             &tuple_ty,

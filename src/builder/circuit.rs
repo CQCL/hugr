@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use crate::hugr::CircuitUnit;
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
@@ -14,28 +15,6 @@ use crate::Wire;
 pub struct CircuitBuilder<'a, T: ?Sized> {
     wires: Vec<Wire>,
     builder: &'a mut T,
-}
-
-/// Enum for specifying a [`CircuitBuilder`] input wire using either an index to
-/// the builder vector of wires, or an arbitrary other wire.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AppendWire {
-    /// Arbitrary input wire.
-    W(Wire),
-    /// Index to CircuitBuilder vector of wires.
-    I(usize),
-}
-
-impl From<usize> for AppendWire {
-    fn from(value: usize) -> Self {
-        AppendWire::I(value)
-    }
-}
-
-impl From<Wire> for AppendWire {
-    fn from(value: Wire) -> Self {
-        AppendWire::W(value)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -76,7 +55,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[inline]
     /// The same as [`CircuitBuilder::append_with_outputs`] except it assumes no outputs and
     /// instead returns a reference to self to allow chaining.
-    pub fn append_and_consume<A: Into<AppendWire>>(
+    pub fn append_and_consume<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -87,7 +66,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     }
 
     /// Append an `op` with some inputs being the stored wires.
-    /// Any inputs of the form [`AppendWire::I`] are used to index the
+    /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
     /// stored wires.
     /// The outputs at those indices are used to replace the stored wire.
     /// The remaining outputs are returned.
@@ -95,7 +74,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// # Errors
     ///
     /// This function will return an error if an index is invalid.
-    pub fn append_with_outputs<A: Into<AppendWire>>(
+    pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -107,9 +86,9 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
             .into_iter()
             .map(Into::into)
             .enumerate()
-            .map(|(input_port, a_w): (usize, AppendWire)| match a_w {
-                AppendWire::W(wire) => Some(wire),
-                AppendWire::I(wire_index) => {
+            .map(|(input_port, a_w): (usize, CircuitUnit)| match a_w {
+                CircuitUnit::Wire(wire) => Some(wire),
+                CircuitUnit::Linear(wire_index) => {
                     linear_inputs.insert(input_port, wire_index);
                     self.wires.get(wire_index).copied()
                 }
@@ -187,7 +166,6 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
-        use AppendWire::{I, W};
         let build_res = build_main(
             Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
             |mut f_build| {
@@ -197,7 +175,10 @@ mod test {
 
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
-                    .append_and_consume(LeafOp::RzF64, [I(0), W(angle)])?
+                    .append_and_consume(
+                        LeafOp::RzF64,
+                        [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                    )?
                     .append_with_outputs(LeafOp::Measure, [0])?;
 
                 let out_qbs = linear.finish();

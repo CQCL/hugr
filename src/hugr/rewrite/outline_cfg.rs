@@ -97,7 +97,7 @@ impl Rewrite for OutlineCfg {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };
-        let is_outer_entry = h.children(h.get_parent(entry).unwrap()).next().unwrap() == entry;
+        let outer_entry = h.children(h.get_parent(entry).unwrap()).next().unwrap();
 
         // 2. New CFG node will be contained in new single-successor BB
         let mut existing_cfg = {
@@ -135,27 +135,20 @@ impl Rewrite for OutlineCfg {
                 h.connect(pred, br.index(), new_block, 0).unwrap();
             }
         }
-        if is_outer_entry {
+        if entry == outer_entry {
             // new_block must be the entry node, i.e. first child, of the enclosing CFG
             // (the current entry node will be reparented inside new_block below)
-            let parent = h.hierarchy.detach(new_block.index).unwrap();
-            h.hierarchy
-                .push_front_child(new_block.index, parent)
-                .unwrap();
+            h.move_before_sibling(new_block, outer_entry).unwrap();
         }
 
         // 5. Children of new CFG.
         // Entry node must be first
-        h.hierarchy.detach(entry.index);
-        h.hierarchy
-            .insert_before(entry.index, inner_exit.index)
-            .unwrap();
+        h.move_before_sibling(entry, inner_exit).unwrap();
         // And remaining nodes
         for n in self.blocks {
             // Do not move the entry node, as we have already
             if n != entry {
-                h.hierarchy.detach(n.index);
-                h.hierarchy.push_child(n.index, cfg_node.index).unwrap();
+                h.set_parent(n, cfg_node).unwrap();
             }
         }
 

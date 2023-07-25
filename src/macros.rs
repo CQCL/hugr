@@ -28,43 +28,44 @@ macro_rules! impl_box_clone {
 }
 pub(crate) use impl_box_clone;
 
-/// Creates a [`TypeRow`] backed by statically defined data, avoiding
+/// Creates a [`SimpleRow`] backed by statically defined data, avoiding
 /// allocations.
 ///
 /// The parameters must be constants of type [`SimpleType`].
 ///
 /// For type rows that cannot be statically defined, use a vector or slice with
-/// [`TypeRow::from`] instead.
+/// [`SimpleRow::from`] instead.
 ///
 /// [`SimpleType`]: crate::types::SimpleType
-/// [`TypeRow`]: crate::types::TypeRow
-/// [`TypeRow::from`]: crate::types::TypeRow::from
+/// [`SimpleRow`]: crate::types::SimpleRow
+/// [`SimpleRow::from`]: crate::types::SimpleRow::from
 ///
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
-/// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
+/// # use hugr::types::{ClassicType, SimpleType, Signature, SimpleRow};
 /// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-/// let static_row: TypeRow = type_row![B, B];
-/// let dynamic_row: TypeRow = vec![B, B, B].into();
-/// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
+/// const QB: SimpleType = SimpleType::Qubit;
+/// let static_row: SimpleRow = type_row![B, QB];
+/// let dynamic_row: SimpleRow = vec![B, B, B].into();
+/// let sig: Signature = Signature::new_df(static_row, dynamic_row);
 ///
-/// let repeated_row: TypeRow = type_row![B; 2];
-/// assert_eq!(repeated_row, static_row);
+/// let repeated_row: SimpleRow = type_row![B; 3];
+/// assert_eq!(repeated_row, sig.output);
 /// ```
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! type_row {
     () => {
         {
-            $crate::types::TypeRow::new()
+            $crate::types::simple::TypeRow::new()
         }
     };
     ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$($t),*];
-            let row: types::TypeRow = ROW.into();
+            let row: types::SimpleRow = ROW.into();
             row
         }
     };
@@ -72,10 +73,62 @@ macro_rules! type_row {
         {
             use $crate::types;
             static ROW: &[types::SimpleType] = &[$t; $n];
-            let row: types::TypeRow = ROW.into();
+            let row: types::SimpleRow = ROW.into();
             row
         }
     };
 }
+
+/// Like [type_row!] but creates a [`ClassicRow`], from parameters
+/// that must all be constants of type [`ClassicType`].
+///
+/// For type rows that cannot be statically defined, use a vector or slice with
+/// [`ClassicRow::from`] instead.
+///
+/// [`ClassicType`]: crate::types::ClassicType
+/// [`ClassicRow`]: crate::types::ClassicRow
+/// [`ClassicRow::from`]: crate::types::ClassicRow::from
+///
+/// Example:
+/// ```
+/// # use hugr::macros::classic_row;
+/// # use hugr::types::{ClassicType, Signature, ClassicRow};
+/// const B: ClassicType = ClassicType::bit();
+/// const I: ClassicType = ClassicType::int::<2>();
+/// let static_row: ClassicRow = classic_row![B, B];
+/// let dynamic_row: ClassicRow = vec![B, B, I].into();
+///
+/// let repeated_row: ClassicRow = classic_row![B; 2];
+/// assert_eq!(repeated_row, static_row);
+/// ```
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! classic_row {
+    () => {
+        {
+            $crate::types::ClassicRow::new()
+        }
+    };
+    ($($t:expr),+ $(,)?) => {
+        {
+            use $crate::types;
+            static ROW: &[types::ClassicType] = &[$($t),*];
+            let row: types::ClassicRow = ROW.into();
+            row
+        }
+    };
+    ($t:expr; $n:expr) => {
+        {
+            use $crate::types;
+            static ROW: &[types::ClassicType] = &[$t; $n];
+            let row: types::ClassicRow = ROW.into();
+            row
+        }
+    };
+}
+
 #[allow(unused_imports)]
 pub use type_row;
+
+#[allow(unused_imports)]
+pub use classic_row;

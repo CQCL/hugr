@@ -17,8 +17,8 @@ pub use build_traits::{
 mod dataflow;
 pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
 
-mod module_builder;
-pub use module_builder::ModuleBuilder;
+mod module;
+pub use module::ModuleBuilder;
 
 mod cfg;
 pub use cfg::{BlockBuilder, CFGBuilder};
@@ -29,8 +29,8 @@ pub use tail_loop::TailLoopBuilder;
 mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
-mod circuit_builder;
-pub use circuit_builder::{AppendWire, CircuitBuilder};
+mod circuit;
+pub use circuit::CircuitBuilder;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 /// Error while building the HUGR.
@@ -66,7 +66,7 @@ pub enum BuildError {
 
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
-    CircuitError(#[from] circuit_builder::CircuitBuildError),
+    CircuitError(#[from] circuit::CircuitBuildError),
 }
 
 #[cfg(test)]
