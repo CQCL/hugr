@@ -89,7 +89,7 @@ impl<const DEF: bool> AliasID<DEF> {
         match self.tag {
             TypeTag::Hashable => Container::<HashableType>::Alias(self.name.clone()).into(),
             TypeTag::Classic => Container::<ClassicType>::Alias(self.name.clone()).into(),
-            TypeTag::Any => Container::<SimpleType>::Alias(self.name.clone()).into(),
+            TypeTag::Simple => Container::<SimpleType>::Alias(self.name.clone()).into(),
         }
     }
     /// Retrieve the underlying core type

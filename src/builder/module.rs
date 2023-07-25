@@ -196,7 +196,8 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type = module_builder.add_alias_declare("qubit_state", TypeTag::Any)?;
+            let qubit_state_type =
+                module_builder.add_alias_declare("qubit_state", TypeTag::Simple)?;
 
             let f_build = module_builder.define_function(
                 "main",

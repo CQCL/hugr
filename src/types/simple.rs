@@ -54,10 +54,10 @@ impl Display for SimpleType {
 )]
 #[repr(u8)]
 pub enum TypeTag {
-    /// Any value, including linear and quantum values;
-    /// cannot necessarily be copied or discarded. See [SimpleType]
-    Any = 0,
-    /// Subset of [TypeTag::Any]; types that can be copied and discarded. See [ClassicType]
+    /// Any [SimpleType], including linear and quantum types;
+    /// cannot necessarily be copied or discarded.
+    Simple = 0,
+    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [ClassicType]
     Classic = 1,
     /// Subset of [TypeTag::Classic]: types that can also be hashed and support
     /// a strong notion of equality. See [HashableType]
@@ -68,8 +68,8 @@ impl TypeTag {
     /// Returns the smallest TypeTag containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
     fn union(self, other: Self) -> Self {
-        if self == Self::Any || other == Self::Any {
-            Self::Any
+        if self == Self::Simple || other == Self::Simple {
+            Self::Simple
         } else if self == Self::Classic || other == Self::Classic {
             Self::Classic
         } else {
@@ -80,7 +80,7 @@ impl TypeTag {
     /// Do types in this tag contain only classic data
     /// (which can be copied and discarded, i.e. [ClassicType]s)
     pub fn is_classical(self) -> bool {
-        self != Self::Any
+        self != Self::Simple
     }
 
     /// Do types in this tag contain only hashable classic data
@@ -343,7 +343,7 @@ impl PrimType for SimpleType {
     fn tag(&self) -> TypeTag {
         match self {
             Self::Classic(c) => c.tag(),
-            _ => TypeTag::Any,
+            _ => TypeTag::Simple,
         }
     }
 }

@@ -82,7 +82,7 @@ impl SerializableType for ClassicType {
 }
 
 impl SerializableType for SimpleType {
-    const TAG: TypeTag = TypeTag::Any;
+    const TAG: TypeTag = TypeTag::Simple;
 }
 
 impl SerializableType for HashableType {
@@ -164,7 +164,7 @@ impl From<SimpleType> for SerSimpleType {
             SimpleType::Qontainer(c) => c.into(),
             SimpleType::Qpaque(inner) => SerSimpleType::Opaque {
                 custom: inner,
-                c: TypeTag::Any,
+                c: TypeTag::Simple,
             },
         }
     }
@@ -188,7 +188,7 @@ where
 macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
-            TypeTag::Any => (Container::<SimpleType>::$variant($($r),*)).into(),
+            TypeTag::Simple => (Container::<SimpleType>::$variant($($r),*)).into(),
             TypeTag::Classic => (Container::<ClassicType>::$variant($($r),*)).into(),
             TypeTag::Hashable => (Container::<HashableType>::$variant($($r),*)).into()
         }
@@ -225,7 +225,7 @@ impl From<SerSimpleType> for SimpleType {
             }
             SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
             SerSimpleType::Opaque { custom, c } => match c {
-                TypeTag::Any => SimpleType::Qpaque(custom),
+                TypeTag::Simple => SimpleType::Qpaque(custom),
                 TypeTag::Classic => ClassicType::Opaque(custom).into(),
                 TypeTag::Hashable => HashableType::Opaque(custom).into(),
             },
