@@ -74,19 +74,19 @@ impl PrimType for SerSimpleType {
 }
 
 trait SerializableType: PrimType {
-    const CLASS: TypeTag;
+    const TAG: TypeTag;
 }
 
 impl SerializableType for ClassicType {
-    const CLASS: TypeTag = TypeTag::Classic;
+    const TAG: TypeTag = TypeTag::Classic;
 }
 
 impl SerializableType for SimpleType {
-    const CLASS: TypeTag = TypeTag::Any;
+    const TAG: TypeTag = TypeTag::Any;
 }
 
 impl SerializableType for HashableType {
-    const CLASS: TypeTag = TypeTag::Hashable;
+    const TAG: TypeTag = TypeTag::Hashable;
 }
 
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
@@ -98,27 +98,27 @@ where
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
                 row: Box::new(inner.map_into()),
-                c: T::CLASS, // We could inspect inner.common_class(), but this should have been done already
+                c: T::TAG, // We could inspect inner.common_class(), but this should have been done already
             },
             Container::List(inner) => SerSimpleType::List {
                 inner: Box::new((*inner).into()),
-                c: T::CLASS, // We could inspect inner.tag(), but this should have been done already
+                c: T::TAG, // We could inspect inner.tag(), but this should have been done already
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
                 row: Box::new(inner.map_into()),
-                c: T::CLASS,
+                c: T::TAG,
             },
             Container::Map(inner) => SerSimpleType::Map {
                 k: Box::new(inner.0.into()),
                 v: Box::new(inner.1.into()),
-                c: T::CLASS,
+                c: T::TAG,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
                 inner: box_convert(*inner),
                 len,
-                c: T::CLASS,
+                c: T::TAG,
             },
-            Container::Alias(name) => SerSimpleType::Alias { name, c: T::CLASS },
+            Container::Alias(name) => SerSimpleType::Alias { name, c: T::TAG },
         }
     }
 }
