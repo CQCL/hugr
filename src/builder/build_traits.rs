@@ -38,7 +38,7 @@ pub trait Buildable {
     fn hugr(&self) -> &Self::Base;
 }
 
-impl<H: HugrMut + HugrView> Buildable for H {
+impl<H: HugrMut> Buildable for H {
     type Base = H;
 
     fn hugr_mut(&mut self) -> &mut Self::Base {
