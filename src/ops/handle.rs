@@ -1,7 +1,6 @@
 //! Handles to nodes in HUGR.
 //!
-use crate::types::simple::{HashableType, TypeTag};
-use crate::types::{ClassicType, Container, SimpleType};
+use crate::types::{ClassicType, Container, HashableType, SimpleType, TypeTag};
 use crate::Node;
 
 use derive_more::From as DerFrom;

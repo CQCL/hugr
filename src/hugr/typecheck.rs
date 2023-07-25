@@ -9,8 +9,7 @@ use crate::hugr::*;
 
 // For static typechecking
 use crate::ops::ConstValue;
-use crate::types::simple::{ClassicRow, HashableType};
-use crate::types::{ClassicType, Container};
+use crate::types::{ClassicRow, ClassicType, Container, HashableType};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 

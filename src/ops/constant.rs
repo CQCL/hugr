@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::{
     classic_row,
     macros::impl_box_clone,
-    types::{simple::HashableType, ClassicRow, ClassicType, CustomType, EdgeKind},
+    types::{ClassicRow, ClassicType, CustomType, EdgeKind, HashableType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};

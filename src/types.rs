@@ -11,7 +11,10 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicRow, ClassicType, Container, PrimType, SimpleRow, SimpleType, TypeRow};
+pub use simple::{
+    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType, TypeRow,
+    TypeTag,
+};
 
 use smol_str::SmolStr;
 
