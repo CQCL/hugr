@@ -1141,7 +1141,7 @@ mod test {
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::Int(1),
+                datatype: ClassicType::int::<1>(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;

@@ -11,7 +11,10 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
-pub use simple::{ClassicRow, ClassicType, Container, PrimType, SimpleRow, SimpleType, TypeRow};
+pub use simple::{
+    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType, TypeRow,
+    TypeTag,
+};
 
 use smol_str::SmolStr;
 
@@ -38,7 +41,7 @@ impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         match self {
-            EdgeKind::Value(t) => !t.is_classical(),
+            EdgeKind::Value(t) => !t.tag().is_classical(),
             _ => false,
         }
     }
@@ -68,13 +71,8 @@ impl Signature {
     pub fn is_empty(&self) -> bool {
         self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
     }
-
-    /// Returns whether the data wires in the signature are purely classical.
-    #[inline(always)]
-    pub fn purely_classical(&self) -> bool {
-        self.input.purely_classical() && self.output.purely_classical()
-    }
 }
+
 impl Signature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
