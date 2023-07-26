@@ -257,8 +257,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
-}
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
@@ -292,6 +291,16 @@ impl BlockBuilder<Hugr> {
         let base = Hugr::new(op);
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
+    }
+
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    pub fn finish_hugr_with_outputs(
+        mut self,
+        branch_wire: Wire,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError> {
+        self.set_outputs(branch_wire, outputs)?;
+        self.finish_hugr().map_err(BuildError::InvalidHUGR)
     }
 }
 
