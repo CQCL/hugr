@@ -4,11 +4,10 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::builder::{CFGBuilder, Container, Dataflow, SubContainer};
+use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{BasicBlock, ConstValue, OpType};
+use crate::ops::{BasicBlock, ConstValue, OpTag, OpTrait, OpType};
 use crate::{type_row, Hugr, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -97,35 +96,38 @@ impl Rewrite for OutlineCfg {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };
-        let outer_entry = h.children(h.get_parent(entry).unwrap()).next().unwrap();
+        let outer_cfg = h.get_parent(entry).unwrap();
+        let outer_entry = h.children(outer_cfg).next().unwrap();
 
-        // 2. New CFG node will be contained in new single-successor BB
-        let mut existing_cfg = {
-            let parent = h.get_parent(entry).unwrap();
-            CFGBuilder::from_existing(h, parent).unwrap()
+        // 2. new_block contains input node, sub-cfg, exit node all connected
+        let new_block = {
+            let mut new_block_bldr =
+                BlockBuilder::new//existing_cfg.block_builder
+                (inputs.clone(), vec![type_row![]], outputs.clone())
+                .unwrap();
+            let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
+            let cfg = new_block_bldr.cfg_builder(wires_in, outputs).unwrap();
+            cfg.exit_block(); // Makes inner exit block (but no entry block)
+            let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+            let predicate = new_block_bldr
+                .add_constant(ConstValue::simple_predicate(0, 1))
+                .unwrap();
+            let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
+            let new_block_hugr = new_block_bldr
+                .finish_hugr_with_outputs(pred_wire, cfg_outputs)
+                .unwrap();
+            h.insert_hugr(outer_cfg, new_block_hugr).unwrap()
         };
-        let mut new_block = existing_cfg
-            .block_builder(inputs.clone(), vec![type_row![]], outputs.clone())
-            .unwrap();
 
-        // 3. new_block contains input node, sub-cfg, exit node all connected
-        let wires_in = inputs.iter().cloned().zip(new_block.input_wires());
-        let cfg = new_block.cfg_builder(wires_in, outputs).unwrap();
-        let cfg_node = cfg.container_node();
-        let inner_exit = cfg.exit_block().node();
-        let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
-        let predicate = new_block
-            .add_constant(ConstValue::simple_predicate(0, 1))
+        // 3. Extract Cfg node created above (it moved when we called insert_hugr)
+        let cfg_node = h
+            .children(new_block)
+            .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
+            .exactly_one()
             .unwrap();
-        let pred_wire = new_block.load_const(&predicate).unwrap();
-        let new_block = new_block
-            .finish_with_outputs(pred_wire, cfg_outputs)
-            .unwrap()
-            .node();
+        let inner_exit = h.children(cfg_node).next().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
-        let h = existing_cfg.hugr_mut();
-
         let preds: Vec<_> = h
             .linked_ports(entry, h.node_inputs(entry).exactly_one().unwrap())
             .collect();
