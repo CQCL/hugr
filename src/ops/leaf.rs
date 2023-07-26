@@ -212,10 +212,3 @@ impl OpTrait for LeafOp {
         Some(EdgeKind::StateOrder)
     }
 }
-
-impl LeafOp {
-    /// Returns true if the operation has only classical inputs and outputs.
-    pub fn is_pure_classical(&self) -> bool {
-        self.signature().purely_classical()
-    }
-}

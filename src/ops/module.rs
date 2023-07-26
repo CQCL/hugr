@@ -2,6 +2,7 @@
 
 use smol_str::SmolStr;
 
+use crate::types::simple::TypeTag;
 use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleType};
 
 use super::StaticTag;
@@ -115,7 +116,7 @@ pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is classical
-    pub classical: bool,
+    pub tag: TypeTag,
 }
 
 impl_op_name!(AliasDecl);

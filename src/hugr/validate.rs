@@ -1160,7 +1160,7 @@ mod test {
             h.root(),
             NodeType {
                 op: ops::LoadConstant {
-                    datatype: ClassicType::Int(1),
+                    datatype: ClassicType::int::<1>(),
                 }
                 .into(),
                 input_resources: ResourceSet::new(),

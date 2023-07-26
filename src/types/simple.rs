@@ -9,6 +9,7 @@ use std::{
 use itertools::Itertools;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
 use super::{custom::CustomType, AbstractSignature};
@@ -46,11 +47,55 @@ impl Display for SimpleType {
     }
 }
 
+/// Categorizes types into three classes according to basic operations supported.
+#[derive(
+    Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize_repr, Deserialize_repr,
+)]
+#[repr(u8)]
+pub enum TypeTag {
+    /// Any [SimpleType], including linear and quantum types;
+    /// cannot necessarily be copied or discarded.
+    Simple = 0,
+    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [ClassicType]
+    Classic = 1,
+    /// Subset of [TypeTag::Classic]: types that can also be hashed and support
+    /// a strong notion of equality. See [HashableType]
+    Hashable = 2,
+}
+
+impl TypeTag {
+    /// Returns the smallest TypeTag containing both the receiver and argument.
+    /// (This will be one of the receiver or the argument.)
+    fn union(self, other: Self) -> Self {
+        if self == Self::Simple || other == Self::Simple {
+            Self::Simple
+        } else if self == Self::Classic || other == Self::Classic {
+            Self::Classic
+        } else {
+            Self::Hashable
+        }
+    }
+
+    /// Do types in this tag contain only classic data
+    /// (which can be copied and discarded, i.e. [ClassicType]s)
+    pub fn is_classical(self) -> bool {
+        self != Self::Simple
+    }
+
+    /// Do types in this tag contain only hashable classic data
+    /// (with a strong notion of equality, i.e. [HashableType]s)
+    pub fn is_hashable(self) -> bool {
+        self == Self::Hashable
+    }
+}
+
 /// Trait of primitive types (SimpleType or ClassicType).
 pub trait PrimType: std::fmt::Debug + Clone + 'static {
     // may be updated with functions in future for necessary shared functionality
-    // across ClassicType and SimpleType
-    // currently used to constrain Container<T>
+    // across ClassicType, SimpleType and HashableType.
+    // Currently used to constrain Container<T>
+    /// Tells us the [TypeTag] of the type represented by the receiver.
+    fn tag(&self) -> TypeTag;
 }
 
 /// A type that represents a container of other types.
@@ -62,7 +107,7 @@ pub enum Container<T: PrimType> {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
-    Map(Box<(ClassicType, T)>),
+    Map(Box<(HashableType, T)>),
     /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
@@ -71,6 +116,31 @@ pub enum Container<T: PrimType> {
     Array(Box<T>, usize),
     /// Alias defined in AliasDefn or AliasDecl nodes.
     Alias(SmolStr),
+}
+
+impl<T: PrimType> Container<T> {
+    /// Applies the specified function to the value types of this Container
+    pub fn map_vals<T2: PrimType>(self, f: &impl Fn(T) -> T2) -> Container<T2> {
+        fn map_row<T: PrimType, T2: PrimType>(
+            row: TypeRow<T>,
+            f: &impl Fn(T) -> T2,
+        ) -> Box<TypeRow<T2>> {
+            Box::new(TypeRow::from(
+                row.into_owned().into_iter().map(f).collect::<Vec<T2>>(),
+            ))
+        }
+        match self {
+            Self::List(elem) => Container::List(Box::new(f(*elem))),
+            Self::Map(kv) => {
+                let (k, v) = *kv;
+                Container::Map(Box::new((k, f(v))))
+            }
+            Self::Tuple(elems) => Container::Tuple(map_row(*elems, f)),
+            Self::Sum(variants) => Container::Sum(map_row(*variants, f)),
+            Self::Array(elem, sz) => Container::Array(Box::new(f(*elem)), sz),
+            Self::Alias(s) => Container::Alias(s),
+        }
+    }
 }
 
 impl<T: Display + PrimType> Display for Container<T> {
@@ -83,6 +153,19 @@ impl<T: Display + PrimType> Display for Container<T> {
             Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
             Container::Alias(str) => f.write_str(str),
         }
+    }
+}
+
+impl From<Container<HashableType>> for ClassicType {
+    fn from(value: Container<HashableType>) -> Self {
+        ClassicType::Hashable(HashableType::Container(value))
+    }
+}
+
+impl From<Container<HashableType>> for SimpleType {
+    fn from(value: Container<HashableType>) -> Self {
+        let ty: ClassicType = value.into();
+        ty.into()
     }
 }
 
@@ -109,23 +192,45 @@ impl From<Container<SimpleType>> for SimpleType {
 #[serde(try_from = "SimpleType", into = "SimpleType")]
 #[non_exhaustive]
 pub enum ClassicType {
-    /// A type variable identified by a name.
-    Variable(SmolStr),
-    /// An arbitrary size integer.
-    Int(HugrIntWidthStore),
     /// A 64-bit floating point number.
     F64,
-    /// An arbitrary length string.
-    String,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
+    /// TODO this can be moved out into an extension/resource
     Graph(Box<AbstractSignature>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
     /// An opaque operation that can be downcasted by the extensions that define it.
     Opaque(CustomType),
+    /// A type which can be hashed
+    Hashable(HashableType),
+}
+
+/// A type that represents concrete classical data that supports hashing
+/// and a strong notion of equality. (So, e.g., no floating-point.)
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "ClassicType", into = "ClassicType")]
+#[non_exhaustive]
+pub enum HashableType {
+    /// A type variable identified by a name.
+    /// TODO of course this is not necessarily hashable, or even classic,
+    /// depending on how it is instantiated...
+    Variable(SmolStr),
+    /// An arbitrary size integer.
+    Int(HugrIntWidthStore),
+    /// An arbitrary length string.
+    String,
+    /// An opaque type defined by an extension as being hashable
+    Opaque(CustomType),
+    /// A container (all of whose elements can be hashed)
+    Container(Container<HashableType>),
 }
 
 impl ClassicType {
+    /// Returns whether the type contains only hashable data.
+    pub fn is_hashable(&self) -> bool {
+        matches!(self, Self::Hashable(_))
+    }
+
     /// Create a graph type with the given signature, using default resources.
     #[inline]
     pub fn graph_from_sig(signature: AbstractSignature) -> Self {
@@ -135,7 +240,7 @@ impl ClassicType {
     /// Returns a new integer type with the given number of bits.
     #[inline]
     pub const fn int<const N: HugrIntWidthStore>() -> Self {
-        Self::Int(N)
+        Self::Hashable(HashableType::Int(N))
     }
 
     /// Returns a new 64-bit integer type.
@@ -155,12 +260,34 @@ impl ClassicType {
         Self::Container(Container::Tuple(Box::new(classic_row![])))
     }
 
+    /// New Tuple type, elements defined by TypeRow
+    pub fn new_tuple(row: impl Into<TypeRow<ClassicType>>) -> Self {
+        let row = row.into();
+        if row.purely_hashable() {
+            // This should succeed given purely_hashable returned True
+            let row = row.try_convert_elems().unwrap();
+            Container::<HashableType>::Tuple(Box::new(row)).into()
+        } else {
+            ClassicType::Container(Container::Tuple(Box::new(row)))
+        }
+    }
+
+    /// New Sum type, variants defined by TypeRow
+    pub fn new_sum(row: impl Into<TypeRow<ClassicType>>) -> Self {
+        let row = row.into();
+        if row.purely_hashable() {
+            // This should succeed given purely_hashable returned True
+            let row = row.try_convert_elems().unwrap();
+            Container::<HashableType>::Sum(Box::new(row)).into()
+        } else {
+            ClassicType::Container(Container::Sum(Box::new(row)))
+        }
+    }
+
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
-        Self::Container(Container::Sum(Box::new(TypeRow::predicate_variants_row(
-            variant_rows,
-        ))))
+        Self::new_sum(TypeRow::predicate_variants_row(variant_rows))
     }
 
     /// New simple predicate with empty Tuple variants
@@ -169,22 +296,10 @@ impl ClassicType {
     }
 }
 
-impl Default for ClassicType {
-    fn default() -> Self {
-        Self::int::<1>()
-    }
-}
-
 impl Display for ClassicType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ClassicType::Variable(x) => f.write_str(x),
-            ClassicType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
-            }
             ClassicType::F64 => f.write_str("F64"),
-            ClassicType::String => f.write_str("String"),
             ClassicType::Graph(data) => {
                 let sig = data.as_ref();
                 write!(f, "[{:?}]", sig.resource_reqs)?;
@@ -192,27 +307,59 @@ impl Display for ClassicType {
             }
             ClassicType::Container(c) => c.fmt(f),
             ClassicType::Opaque(custom) => custom.fmt(f),
+            ClassicType::Hashable(h) => h.fmt(f),
         }
     }
 }
 
-impl PrimType for ClassicType {}
+impl Display for HashableType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            HashableType::Variable(x) => f.write_str(x),
+            HashableType::Int(i) => {
+                f.write_char('I')?;
+                f.write_str(&i.to_string())
+            }
+            HashableType::Opaque(custom) => custom.fmt(f),
+            HashableType::String => f.write_str("String"),
+            HashableType::Container(c) => c.fmt(f),
+        }
+    }
+}
 
-impl PrimType for SimpleType {}
+impl PrimType for ClassicType {
+    fn tag(&self) -> TypeTag {
+        if self.is_hashable() {
+            TypeTag::Hashable
+        } else {
+            TypeTag::Classic
+        }
+    }
+}
+
+impl PrimType for SimpleType {
+    fn tag(&self) -> TypeTag {
+        match self {
+            Self::Classic(c) => c.tag(),
+            _ => TypeTag::Simple,
+        }
+    }
+}
+
+impl PrimType for HashableType {
+    fn tag(&self) -> TypeTag {
+        TypeTag::Hashable
+    }
+}
 
 impl SimpleType {
-    /// Returns whether the type contains only classic data.
-    pub fn is_classical(&self) -> bool {
-        matches!(self, Self::Classic(_))
-    }
-
     /// New Sum type, variants defined by TypeRow.
     pub fn new_sum(row: impl Into<TypeRow<SimpleType>>) -> Self {
         let row = row.into();
         if row.purely_classical() {
             // This should succeed given purely_classical has returned True
-            let row = row.try_convert_elems().unwrap();
-            Container::<ClassicType>::Sum(Box::new(row)).into()
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
+            ClassicType::new_sum(row).into()
         } else {
             Container::<SimpleType>::Sum(Box::new(row)).into()
         }
@@ -223,8 +370,8 @@ impl SimpleType {
         let row = row.into();
         if row.purely_classical() {
             // This should succeed given purely_classical has returned True
-            let row = row.try_convert_elems().unwrap();
-            Container::<ClassicType>::Tuple(Box::new(row)).into()
+            let row: TypeRow<ClassicType> = row.try_convert_elems().unwrap();
+            ClassicType::new_tuple(row).into()
         } else {
             Container::<SimpleType>::Tuple(Box::new(row)).into()
         }
@@ -248,14 +395,50 @@ impl From<ClassicType> for SimpleType {
     }
 }
 
+impl From<HashableType> for ClassicType {
+    fn from(typ: HashableType) -> Self {
+        ClassicType::Hashable(typ)
+    }
+}
+
+impl From<HashableType> for SimpleType {
+    fn from(value: HashableType) -> Self {
+        let c: ClassicType = value.into();
+        c.into()
+    }
+}
+
 impl TryFrom<SimpleType> for ClassicType {
-    type Error = &'static str;
+    type Error = String;
 
     fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
         match op {
             SimpleType::Classic(typ) => Ok(typ),
-            _ => Err("Invalid type conversion"),
+            _ => Err(format!("Invalid type conversion, {:?} is not classic", op)),
         }
+    }
+}
+
+impl TryFrom<ClassicType> for HashableType {
+    type Error = String;
+
+    fn try_from(value: ClassicType) -> Result<Self, Self::Error> {
+        match value {
+            ClassicType::Hashable(typ) => Ok(typ),
+            _ => Err(format!(
+                "Invalid type conversion, {:?} is not hashable",
+                value
+            )),
+        }
+    }
+}
+
+impl TryFrom<SimpleType> for HashableType {
+    type Error = String;
+
+    fn try_from(op: SimpleType) -> Result<Self, Self::Error> {
+        let typ: ClassicType = op.try_into()?;
+        typ.try_into()
     }
 }
 
@@ -296,20 +479,24 @@ impl<T: Display + PrimType> Display for TypeRow<T> {
 
 impl TypeRow<SimpleType> {
     /// Returns whether the row contains only classic data.
-    #[inline(always)]
+    /// (Note: this is defined only on [`TypeRow<SimpleType>`] because
+    /// it is guaranteed true for any other TypeRow)
+    #[inline]
     pub fn purely_classical(&self) -> bool {
-        self.types.iter().all(SimpleType::is_classical)
+        self.types
+            .iter()
+            .map(PrimType::tag)
+            .all(TypeTag::is_classical)
     }
 }
 
 impl TypeRow<ClassicType> {
-    #[inline]
     /// Return the type row of variants required to define a Sum of Tuples type
     /// given the rows of each tuple
     pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = ClassicRow>) -> Self {
         variant_rows
             .into_iter()
-            .map(|row| ClassicType::Container(Container::Tuple(Box::new(row))))
+            .map(ClassicType::new_tuple)
             .collect_vec()
             .into()
     }
@@ -340,6 +527,23 @@ impl<T: PrimType> TypeRow<T> {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.types.len() == 0
+    }
+
+    /// Returns whether the row contains only hashable classic data.
+    #[inline(always)]
+    pub fn purely_hashable(&self) -> bool {
+        self.types
+            .iter()
+            .map(PrimType::tag)
+            .all(TypeTag::is_hashable)
+    }
+
+    /// Returns the smallest [TypeTag] that contains all elements of the row
+    pub fn containing_tag(&self) -> TypeTag {
+        self.types
+            .iter()
+            .map(PrimType::tag)
+            .fold(TypeTag::Hashable, TypeTag::union)
     }
 
     /// Mutable iterator over the types in the row.
@@ -422,7 +626,7 @@ mod test {
 
     #[test]
     fn new_tuple() {
-        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::Int(4))];
+        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::F64)];
         let ty = SimpleType::new_tuple(simp);
         assert_matches!(ty, SimpleType::Qontainer(Container::Tuple(_)));
 
@@ -435,6 +639,18 @@ mod test {
         assert_matches!(
             ty,
             SimpleType::Classic(ClassicType::Container(Container::Tuple(_)))
+        );
+
+        let hash = vec![
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(8))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::String)),
+        ];
+        let ty = SimpleType::new_tuple(hash);
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+                Container::Tuple(_)
+            )))
         );
     }
 
@@ -450,6 +666,15 @@ mod test {
         assert_matches!(
             ty,
             SimpleType::Classic(ClassicType::Container(Container::Sum(_)))
+        );
+
+        let hash: TypeRow<HashableType> = vec![HashableType::Int(4), HashableType::String].into();
+        let ty = SimpleType::new_sum(hash.map_into());
+        assert_matches!(
+            ty,
+            SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+                Container::Sum(_)
+            )))
         );
     }
 }

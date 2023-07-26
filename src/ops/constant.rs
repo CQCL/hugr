@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::{
     classic_row,
     macros::impl_box_clone,
-    types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind},
+    types::{ClassicRow, ClassicType, CustomType, EdgeKind, HashableType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -69,7 +69,7 @@ pub enum ConstValue {
     },
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
-    /// An opaque constant value.
+    /// An opaque constant value, with cached type.
     Opaque(CustomType, Box<dyn CustomConst>),
 }
 
@@ -119,14 +119,12 @@ impl ConstValue {
     /// Returns the datatype of the constant.
     pub fn const_type(&self) -> ClassicType {
         match self {
-            Self::Int { value: _, width } => ClassicType::Int(*width),
+            Self::Int { value: _, width } => HashableType::Int(*width).into(),
             Self::Opaque(_, b) => ClassicType::Opaque((*b).custom_type()),
-            Self::Sum { variants, .. } => {
-                ClassicType::Container(Container::Sum(Box::new(variants.clone())))
-            }
+            Self::Sum { variants, .. } => ClassicType::new_sum(variants.clone()),
             Self::Tuple(vals) => {
                 let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();
-                ClassicType::Container(Container::Tuple(Box::new(row.into())))
+                ClassicType::new_tuple(row)
             }
             Self::F64(_) => ClassicType::F64,
         }
