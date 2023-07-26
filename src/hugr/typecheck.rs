@@ -122,6 +122,15 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             (Container::Sum(_), _) => {
                 Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
             }
+            (Container::Opaque(ty), ConstValue::Opaque(ty_act, _val)) => {
+                if ty_act != ty {
+                    return Err(ConstTypeError::TypeMismatch(
+                        ty.clone().into(),
+                        ty_act.clone().into(),
+                    ));
+                }
+                Ok(())
+            }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ClassicType::Hashable(HashableType::Container(c)), tm) => {
@@ -138,15 +147,6 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         }
         (ClassicType::Hashable(HashableType::Variable(_)), _) => {
             Err(ConstTypeError::ConstCantBeVar)
-        }
-        (ClassicType::Opaque(ty), ConstValue::Opaque(ty_act, _val)) => {
-            if ty_act != ty {
-                return Err(ConstTypeError::TypeMismatch(
-                    ty.clone().into(),
-                    ty_act.clone().into(),
-                ));
-            }
-            Ok(())
         }
         (ty, _) => Err(ConstTypeError::TypeMismatch(ty.clone(), val.const_type())),
     }
