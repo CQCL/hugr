@@ -125,7 +125,7 @@ impl Rewrite for OutlineCfg {
             .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
             .exactly_one()
             .unwrap();
-        let inner_exit = h.children(cfg_node).next().unwrap();
+        let inner_exit = h.children(cfg_node).exactly_one().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
