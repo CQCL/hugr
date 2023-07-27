@@ -75,6 +75,7 @@ impl Type {
             params: vec![],
             description: self.description().to_string(),
             resource: None,
+            tag: crate::types::TypeTag::Classic.into(),
         }
     }
 }

@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::ops::constant::HugrIntValueStore;
 
-use super::{ClassicType, SimpleType};
+use super::{ClassicType, PrimType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -49,6 +49,19 @@ pub enum TypeArg {
     List(Vec<TypeArg>),
     /// Where the TypeDef declares a [TypeParam::Value]
     Value(serde_yaml::Value),
+}
+
+impl TypeArg {
+    /// Report [`TypeArg`] if param is a type
+    pub fn tag(&self) -> Option<TypeTag> {
+        match self {
+            TypeArg::Type(s) => Some(s.tag()),
+            TypeArg::ClassicType(c) => Some(c.tag()),
+            // assume list is well formed - all elements of same type
+            TypeArg::List(t) => t.iter().next().and_then(TypeArg::tag),
+            _ => None,
+        }
+    }
 }
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
