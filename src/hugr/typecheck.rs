@@ -9,7 +9,7 @@ use crate::hugr::*;
 
 // For static typechecking
 use crate::ops::ConstValue;
-use crate::types::{ClassicRow, ClassicType, Container, HashableType};
+use crate::types::{ClassicRow, ClassicType, Container, HashableType, PrimType, TypeRow};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
@@ -69,6 +69,32 @@ fn check_valid_width(width: HugrIntWidthStore) -> Result<(), ConstTypeError> {
     }
 }
 
+fn map_vals<T: PrimType, T2: PrimType>(
+    container: Container<T>,
+    f: &impl Fn(T) -> T2,
+) -> Container<T2> {
+    fn map_row<T: PrimType, T2: PrimType>(
+        row: TypeRow<T>,
+        f: &impl Fn(T) -> T2,
+    ) -> Box<TypeRow<T2>> {
+        Box::new(TypeRow::from(
+            row.into_owned().into_iter().map(f).collect::<Vec<T2>>(),
+        ))
+    }
+    match container {
+        Container::List(elem) => Container::List(Box::new(f(*elem))),
+        Container::Map(kv) => {
+            let (k, v) = *kv;
+            Container::Map(Box::new((k, f(v))))
+        }
+        Container::Tuple(elems) => Container::Tuple(map_row(*elems, f)),
+        Container::Sum(variants) => Container::Sum(map_row(*variants, f)),
+        Container::Array(elem, sz) => Container::Array(Box::new(f(*elem)), sz),
+        Container::Alias(s) => Container::Alias(s),
+        Container::Opaque(custom) => Container::Opaque(custom),
+    }
+}
+
 /// Typecheck a constant value
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
     match (typ, val) {
@@ -122,13 +148,22 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             (Container::Sum(_), _) => {
                 Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
             }
+            (Container::Opaque(ty), ConstValue::Opaque(ty_act, _val)) => {
+                if ty_act != ty {
+                    return Err(ConstTypeError::TypeMismatch(
+                        ty.clone().into(),
+                        ty_act.clone().into(),
+                    ));
+                }
+                Ok(())
+            }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ClassicType::Hashable(HashableType::Container(c)), tm) => {
             // Here we deliberately build malformed Container-of-Hashable types
             // (rather than Hashable-of-Container) in order to reuse logic above
             typecheck_const(
-                &ClassicType::Container(c.clone().map_vals(&ClassicType::Hashable)),
+                &ClassicType::Container(map_vals(c.clone(), &ClassicType::Hashable)),
                 tm,
             )
         }
@@ -138,15 +173,6 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         }
         (ClassicType::Hashable(HashableType::Variable(_)), _) => {
             Err(ConstTypeError::ConstCantBeVar)
-        }
-        (ClassicType::Opaque(ty), ConstValue::Opaque(ty_act, _val)) => {
-            if ty_act != ty {
-                return Err(ConstTypeError::TypeMismatch(
-                    ty.clone().into(),
-                    ty_act.clone().into(),
-                ));
-            }
-            Ok(())
         }
         (ty, _) => Err(ConstTypeError::TypeMismatch(ty.clone(), val.const_type())),
     }

@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use super::{type_param::TypeArg, ClassicType};
+use super::{type_param::TypeArg, ClassicType, Container};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -46,7 +46,7 @@ impl CustomType {
 
     /// Returns a [`ClassicType`] containing this opaque type.
     pub const fn classic_type(self) -> ClassicType {
-        ClassicType::Opaque(self)
+        ClassicType::Container(Container::Opaque(self))
     }
 }
 

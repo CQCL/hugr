@@ -5,7 +5,7 @@ use std::any::Any;
 use crate::{
     classic_row,
     macros::impl_box_clone,
-    types::{ClassicRow, ClassicType, CustomType, EdgeKind, HashableType},
+    types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind, HashableType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -120,7 +120,7 @@ impl ConstValue {
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int { value: _, width } => HashableType::Int(*width).into(),
-            Self::Opaque(_, b) => ClassicType::Opaque((*b).custom_type()),
+            Self::Opaque(_, b) => Container::Opaque((*b).custom_type()).into(),
             Self::Sum { variants, .. } => ClassicType::new_sum(variants.clone()),
             Self::Tuple(vals) => {
                 let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();

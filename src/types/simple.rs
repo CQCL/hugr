@@ -29,8 +29,6 @@ pub enum SimpleType {
     Classic(ClassicType),
     /// A qubit.
     Qubit,
-    /// A linear opaque type that can be downcasted by the extensions that define it.
-    Qpaque(CustomType),
     /// A nested definition containing other linear types (possibly as well as classical ones)
     Qontainer(Container<SimpleType>),
 }
@@ -42,7 +40,6 @@ impl Display for SimpleType {
         match self {
             SimpleType::Classic(ty) => ty.fmt(f),
             SimpleType::Qubit => f.write_str("Qubit"),
-            SimpleType::Qpaque(custom) => custom.fmt(f),
             SimpleType::Qontainer(c) => c.fmt(f),
         }
     }
@@ -125,31 +122,9 @@ pub enum Container<T: PrimType> {
     Array(Box<T>, usize),
     /// Alias defined in AliasDefn or AliasDecl nodes.
     Alias(SmolStr),
-}
-
-impl<T: PrimType> Container<T> {
-    /// Applies the specified function to the value types of this Container
-    pub fn map_vals<T2: PrimType>(self, f: &impl Fn(T) -> T2) -> Container<T2> {
-        fn map_row<T: PrimType, T2: PrimType>(
-            row: TypeRow<T>,
-            f: &impl Fn(T) -> T2,
-        ) -> Box<TypeRow<T2>> {
-            Box::new(TypeRow::from(
-                row.into_owned().into_iter().map(f).collect::<Vec<T2>>(),
-            ))
-        }
-        match self {
-            Self::List(elem) => Container::List(Box::new(f(*elem))),
-            Self::Map(kv) => {
-                let (k, v) = *kv;
-                Container::Map(Box::new((k, f(v))))
-            }
-            Self::Tuple(elems) => Container::Tuple(map_row(*elems, f)),
-            Self::Sum(variants) => Container::Sum(map_row(*variants, f)),
-            Self::Array(elem, sz) => Container::Array(Box::new(f(*elem)), sz),
-            Self::Alias(s) => Container::Alias(s),
-        }
-    }
+    /// An opaque type that can be downcasted by the extensions that define it.
+    /// This will always have a [`TypeTag`] contained within that of the Container
+    Opaque(CustomType),
 }
 
 impl<T: Display + PrimType> Display for Container<T> {
@@ -161,6 +136,7 @@ impl<T: Display + PrimType> Display for Container<T> {
             Container::Sum(row) => write!(f, "Sum({})", row.as_ref()),
             Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
             Container::Alias(str) => f.write_str(str),
+            Container::Opaque(c) => write!(f, "Opaque({})", c),
         }
     }
 }
@@ -208,8 +184,6 @@ pub enum ClassicType {
     Graph(Box<(ResourceSet, Signature)>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
-    /// An opaque operation that can be downcasted by the extensions that define it.
-    Opaque(CustomType),
     /// A type which can be hashed
     Hashable(HashableType),
 }
@@ -228,8 +202,6 @@ pub enum HashableType {
     Int(HugrIntWidthStore),
     /// An arbitrary length string.
     String,
-    /// An opaque type defined by an extension as being hashable
-    Opaque(CustomType),
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
 }
@@ -316,7 +288,6 @@ impl Display for ClassicType {
                 sig.fmt(f)
             }
             ClassicType::Container(c) => c.fmt(f),
-            ClassicType::Opaque(custom) => custom.fmt(f),
             ClassicType::Hashable(h) => h.fmt(f),
         }
     }
@@ -330,7 +301,6 @@ impl Display for HashableType {
                 f.write_char('I')?;
                 f.write_str(&i.to_string())
             }
-            HashableType::Opaque(custom) => custom.fmt(f),
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
         }
