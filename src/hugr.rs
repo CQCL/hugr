@@ -84,7 +84,7 @@ impl NodeType {
     pub fn signature(&self) -> Option<Signature> {
         self.input_resources
             .clone()
-            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
+            .map(|rs| self.op.signature().with_input_resources(rs))
     }
 }
 
@@ -100,7 +100,7 @@ impl OpType {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module)
+        Self::new(NodeType::pure(crate::ops::Module))
     }
 }
 
@@ -158,20 +158,20 @@ pub type NodeMetadata = serde_json::Value;
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
     /// Create a new Hugr, with a single root node.
-    pub(crate) fn new(root_op: impl Into<OpType>) -> Self {
-        Self::with_capacity(root_op, 0, 0)
+    pub(crate) fn new(root_node: NodeType) -> Self {
+        Self::with_capacity(root_node, 0, 0)
     }
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
     // TODO: Make this take a NodeType
-    pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
+    pub(crate) fn with_capacity(root_node: NodeType, nodes: usize, ports: usize) -> Self {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
         // TODO: These resources should be open in principle, but lets wait
         // until resources can be inferred for open sets until changing this
-        op_types[root] = NodeType::pure(root_op);
+        op_types[root] = root_node;
 
         Self {
             graph,

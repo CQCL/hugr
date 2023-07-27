@@ -403,7 +403,6 @@ mod test {
     };
 
     use super::*;
-    
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 

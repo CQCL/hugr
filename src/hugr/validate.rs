@@ -79,12 +79,12 @@ impl<'a> ValidationContext<'a> {
         let node_type = self.hugr.get_nodetype(*node);
 
         match node_type.signature() {
-            None => return Err(ValidationError::MissingInputResources(node.clone())),
+            None => return Err(ValidationError::MissingInputResources(*node)),
             Some(sig) => {
                 for dir in Direction::BOTH {
                     assert!(self
                         .resources
-                        .insert((*node, dir), sig.get_resources(&dir).clone())
+                        .insert((*node, dir), sig.get_resources(&dir))
                         .is_none());
                 }
             }
@@ -883,7 +883,7 @@ mod test {
         }
         .into();
 
-        let b = Hugr::new(leaf_op);
+        let b = Hugr::new(NodeType::pure(leaf_op));
         assert_eq!(b.validate(), Ok(()));
     }
 
@@ -894,7 +894,7 @@ mod test {
         }
         .into();
 
-        let mut b = Hugr::new(dfg_op);
+        let mut b = Hugr::new(NodeType::pure(dfg_op));
         let root = b.root();
         add_df_children(&mut b, root, 1);
         assert_eq!(b.validate(), Ok(()));
@@ -1089,9 +1089,9 @@ mod test {
 
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
-        let mut h = Hugr::new(ops::DFG {
+        let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
-        });
+        }));
         let input =
             h.add_op_with_parent(h.root(), NodeType::pure(ops::Input::new(type_row![B, B])))?;
         let output =
@@ -1135,9 +1135,9 @@ mod test {
 
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
-        let mut h = Hugr::new(ops::DFG {
+        let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: AbstractSignature::new_df(type_row![B], type_row![B]),
-        });
+        }));
         let input =
             h.add_op_with_parent(h.root(), NodeType::pure(ops::Input::new(type_row![B])))?;
         let output =
