@@ -53,7 +53,7 @@ pub enum TypeArg {
     /// be of the same variety of TypeArg, i.e. `T`s.
     List(Vec<TypeArg>),
     /// Where the TypeDef declares a [TypeParam::Value] of [Container::Opaque]
-    Value(serde_yaml::Value),
+    CustomValue(serde_yaml::Value),
 }
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
@@ -74,7 +74,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         (TypeArg::String(_), TypeParam::Value(HashableType::String)) => Ok(()),
         (arg, TypeParam::Value(HashableType::Container(ctr))) => match ctr {
             Container::Opaque(_) => match arg {
-                TypeArg::Value(_) => Ok(()), // Are there more checks we should do here?
+                TypeArg::CustomValue(_) => Ok(()), // Are there more checks we should do here?
                 _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
             },
             Container::List(elem) => check_type_arg(
