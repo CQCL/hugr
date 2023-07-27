@@ -486,12 +486,13 @@ pub trait Dataflow: Container {
         variants: impl Into<SimpleRow>,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        let tag_op: OpType = LeafOp::Tag {
-            tag,
-            variants: variants.into(),
-        }
-        .into();
-        let make_op = self.add_dataflow_op(NodeType::pure(tag_op), vec![value])?;
+        let make_op = self.add_dataflow_op(
+            NodeType::pure(LeafOp::Tag {
+                tag,
+                variants: variants.into(),
+            }),
+            vec![value],
+        )?;
         Ok(make_op.out_wire(0))
     }
 
@@ -505,8 +506,8 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
         let variants = ClassicRow::predicate_variants_row(predicate_variants).map_into();
-        let tag_op: OpType = LeafOp::Tag { tag, variants }.into();
-        let make_op = self.add_dataflow_op(NodeType::pure(tag_op), vec![tuple])?;
+        let make_op =
+            self.add_dataflow_op(NodeType::pure(LeafOp::Tag { tag, variants }), vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
 
