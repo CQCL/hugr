@@ -5,6 +5,9 @@ use serde_json::json;
 use std::collections::HashMap;
 use thiserror::Error;
 
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
 use crate::hugr::{Hugr, HugrMut};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
@@ -82,6 +85,13 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<HUGRSerializationError> for PyErr {
+    fn from(err: HUGRSerializationError) -> Self {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 impl Serialize for Hugr {

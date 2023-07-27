@@ -7,8 +7,6 @@ use std::{
 };
 
 use itertools::Itertools;
-#[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
