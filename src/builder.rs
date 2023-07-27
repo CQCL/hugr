@@ -2,6 +2,9 @@
 //!
 use thiserror::Error;
 
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::SimpleType;
@@ -67,6 +70,14 @@ pub enum BuildError {
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<BuildError> for PyErr {
+    fn from(err: BuildError) -> Self {
+        // We may want to define more specific python-level errors at some point.
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 #[cfg(test)]

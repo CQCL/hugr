@@ -9,6 +9,9 @@ use petgraph::visit::{DfsPostOrder, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
 use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::OpTag;
@@ -676,6 +679,14 @@ pub enum ValidationError {
     },
     #[error("Missing input resources for node {0:?}")]
     MissingInputResources(Node),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<ValidationError> for PyErr {
+    fn from(err: ValidationError) -> Self {
+        // We may want to define more specific python-level errors at some point.
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 /// Errors related to the inter-graph edge validations.

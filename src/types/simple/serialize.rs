@@ -118,6 +118,7 @@ where
                 c: T::TAG,
             },
             Container::Alias(name) => SerSimpleType::Alias { name, c: T::TAG },
+            Container::Opaque(custom) => SerSimpleType::Opaque { custom, c: T::TAG },
         }
     }
 }
@@ -127,10 +128,6 @@ impl From<HashableType> for SerSimpleType {
         match value {
             HashableType::Variable(s) => SerSimpleType::Var { name: s },
             HashableType::Int(w) => SerSimpleType::I { width: w },
-            HashableType::Opaque(c) => SerSimpleType::Opaque {
-                custom: c,
-                c: TypeTag::Hashable,
-            },
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
         }
@@ -145,10 +142,6 @@ impl From<ClassicType> for SerSimpleType {
                 signature: Box::new(*inner),
             },
             ClassicType::Container(c) => c.into(),
-            ClassicType::Opaque(inner) => SerSimpleType::Opaque {
-                custom: inner,
-                c: TypeTag::Classic,
-            },
             ClassicType::Hashable(h) => h.into(),
         }
     }
@@ -160,10 +153,6 @@ impl From<SimpleType> for SerSimpleType {
             SimpleType::Classic(c) => c.into(),
             SimpleType::Qubit => SerSimpleType::Q,
             SimpleType::Qontainer(c) => c.into(),
-            SimpleType::Qpaque(inner) => SerSimpleType::Opaque {
-                custom: inner,
-                c: TypeTag::Simple,
-            },
         }
     }
 }
@@ -219,11 +208,9 @@ impl From<SerSimpleType> for SimpleType {
                 handle_container!(c, Array(box_convert_try(*inner), len))
             }
             SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
-            SerSimpleType::Opaque { custom, c } => match c {
-                TypeTag::Simple => SimpleType::Qpaque(custom),
-                TypeTag::Classic => ClassicType::Opaque(custom).into(),
-                TypeTag::Hashable => HashableType::Opaque(custom).into(),
-            },
+            SerSimpleType::Opaque { custom, c } => {
+                handle_container!(c, Opaque(custom))
+            }
             SerSimpleType::Var { name: s } => {
                 ClassicType::Hashable(HashableType::Variable(s)).into()
             }

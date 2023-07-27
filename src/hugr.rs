@@ -22,6 +22,9 @@ use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
 pub use self::view::HugrView;
 use crate::ops::{OpTrait, OpType};
 use crate::resource::ResourceSet;
@@ -29,6 +32,7 @@ use crate::types::Signature;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
     graph: MultiPortGraph,
@@ -131,12 +135,14 @@ impl AsMut<Hugr> for Hugr {
     serde::Deserialize,
 )]
 #[serde(transparent)]
+#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Node {
     index: portgraph::NodeIndex,
 }
 
 /// A handle to a port for a node in the HUGR.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
+#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Port {
     offset: portgraph::PortOffset,
 }
@@ -298,6 +304,14 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<HugrError> for PyErr {
+    fn from(err: HugrError) -> Self {
+        // We may want to define more specific python-level errors at some point.
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 #[cfg(test)]
