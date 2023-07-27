@@ -13,13 +13,9 @@ use crate::types::{ClassicRow, ClassicType, Container, HashableType, PrimType, T
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
-/// Errors that arise from typechecking constants
-#[derive(Clone, Debug, Eq, PartialEq, Error)]
-pub enum ConstTypeError {
-    /// This case hasn't been implemented. Possibly because we don't have value
-    /// constructors to check against it
-    #[error("Unimplemented: there are no constants of type {0}")]
-    Unimplemented(ClassicType),
+/// An error in fitting an integer constant into its size
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+pub enum ConstIntError {
     /// The value exceeds the max value of its `I<n>` type
     /// E.g. checking 300 against I8
     #[error("Const int {1} too large for type I{0}")]
@@ -30,6 +26,18 @@ pub enum ConstTypeError {
     /// The width of an integer type wasn't a power of 2
     #[error("The int type I{0} is invalid, because {0} is not a power of 2")]
     IntWidthInvalid(HugrIntWidthStore),
+}
+
+/// Errors that arise from typechecking constants
+#[derive(Clone, Debug, Eq, PartialEq, Error)]
+pub enum ConstTypeError {
+    /// This case hasn't been implemented. Possibly because we don't have value
+    /// constructors to check against it
+    #[error("Unimplemented: there are no constants of type {0}")]
+    Unimplemented(ClassicType),
+    /// There was some problem fitting a const int into its declared size
+    #[error("Error with int constant")]
+    Int(#[from] ConstIntError),
     /// Expected width (packed with const int) doesn't match type
     #[error("Type mismatch for int: expected I{0}, but found I{1}")]
     IntWidthMismatch(HugrIntWidthStore, HugrIntWidthStore),
@@ -57,15 +65,27 @@ lazy_static! {
 }
 
 /// Per the spec, valid widths for integers are 2^n for all n in [0,7]
-fn check_valid_width(width: HugrIntWidthStore) -> Result<(), ConstTypeError> {
+pub(crate) fn check_int_fits_in_width(
+    value: HugrIntValueStore,
+    width: HugrIntWidthStore,
+) -> Result<(), ConstIntError> {
     if width > HUGR_MAX_INT_WIDTH {
-        return Err(ConstTypeError::IntWidthTooLarge(width));
+        return Err(ConstIntError::IntWidthTooLarge(width));
     }
 
     if VALID_WIDTHS.contains(&width) {
-        Ok(())
+        let max_value = if width == HUGR_MAX_INT_WIDTH {
+            HugrIntValueStore::MAX
+        } else {
+            HugrIntValueStore::pow(2, width as u32) - 1
+        };
+        if value <= max_value {
+            Ok(())
+        } else {
+            Err(ConstIntError::IntTooLarge(width, value))
+        }
     } else {
-        Err(ConstTypeError::IntWidthInvalid(width))
+        Err(ConstIntError::IntWidthInvalid(width))
     }
 }
 
@@ -99,21 +119,8 @@ fn map_vals<T: PrimType, T2: PrimType>(
 pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
     match (typ, val) {
         (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int { value, width }) => {
-            // Check that the types make sense
-            check_valid_width(*exp_width)?;
-            check_valid_width(*width)?;
-            // Check that the terms make sense against the types
             if exp_width == width {
-                let max_value = if *width == HUGR_MAX_INT_WIDTH {
-                    HugrIntValueStore::MAX
-                } else {
-                    HugrIntValueStore::pow(2, *width as u32) - 1
-                };
-                if value <= &max_value {
-                    Ok(())
-                } else {
-                    Err(ConstTypeError::IntTooLarge(*width, *value))
-                }
+                check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int)
             } else {
                 Err(ConstTypeError::IntWidthMismatch(*exp_width, *width))
             }
