@@ -15,7 +15,7 @@ use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Const(pub ConstValue);
 impl OpName for Const {
     fn name(&self) -> SmolStr {
@@ -103,8 +103,6 @@ impl PartialEq for ConstValue {
         }
     }
 }
-
-impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
