@@ -9,7 +9,7 @@ use crate::hugr::*;
 
 // For static typechecking
 use crate::ops::ConstValue;
-use crate::types::{ClassicRow, ClassicType, Container, HashableType};
+use crate::types::{ClassicRow, ClassicType, Container, HashableType, PrimType, TypeRow};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
@@ -66,6 +66,32 @@ fn check_valid_width(width: HugrIntWidthStore) -> Result<(), ConstTypeError> {
         Ok(())
     } else {
         Err(ConstTypeError::IntWidthInvalid(width))
+    }
+}
+
+fn map_vals<T: PrimType, T2: PrimType>(
+    container: Container<T>,
+    f: &impl Fn(T) -> T2,
+) -> Container<T2> {
+    fn map_row<T: PrimType, T2: PrimType>(
+        row: TypeRow<T>,
+        f: &impl Fn(T) -> T2,
+    ) -> Box<TypeRow<T2>> {
+        Box::new(TypeRow::from(
+            row.into_owned().into_iter().map(f).collect::<Vec<T2>>(),
+        ))
+    }
+    match container {
+        Container::List(elem) => Container::List(Box::new(f(*elem))),
+        Container::Map(kv) => {
+            let (k, v) = *kv;
+            Container::Map(Box::new((k, f(v))))
+        }
+        Container::Tuple(elems) => Container::Tuple(map_row(*elems, f)),
+        Container::Sum(variants) => Container::Sum(map_row(*variants, f)),
+        Container::Array(elem, sz) => Container::Array(Box::new(f(*elem)), sz),
+        Container::Alias(s) => Container::Alias(s),
+        Container::Opaque(custom) => Container::Opaque(custom),
     }
 }
 
@@ -137,7 +163,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
             // Here we deliberately build malformed Container-of-Hashable types
             // (rather than Hashable-of-Container) in order to reuse logic above
             typecheck_const(
-                &ClassicType::Container(c.clone().map_vals(&ClassicType::Hashable)),
+                &ClassicType::Container(map_vals(c.clone(), &ClassicType::Hashable)),
                 tm,
             )
         }
