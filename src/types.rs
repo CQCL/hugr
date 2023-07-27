@@ -100,6 +100,11 @@ impl AbstractSignature {
             input_resources: rs,
         }
     }
+
+    /// Instantiate a signature with the empty set of resources
+    pub fn pure(self) -> Signature {
+        self.with_input_resources(ResourceSet::new())
+    }
 }
 
 impl From<Signature> for AbstractSignature {
@@ -109,23 +114,6 @@ impl From<Signature> for AbstractSignature {
 }
 
 impl Signature {
-    /// Create a new signature.
-    pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-        static_input: impl Into<ClassicRow>,
-    ) -> Self {
-        Self {
-            signature: AbstractSignature {
-                input: input.into(),
-                output: output.into(),
-                static_input: static_input.into(),
-                resource_reqs: ResourceSet::new(),
-            },
-            input_resources: ResourceSet::new(),
-        }
-    }
-
     /// Calculate the resource requirements of the output wires
     pub fn output_resources(&self) -> ResourceSet {
         self.input_resources
@@ -313,16 +301,6 @@ impl AbstractSignature {
 }
 
 impl Signature {
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
-        AbstractSignature::new_df(input, output).with_input_resources(ResourceSet::new())
-    }
-
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
-        AbstractSignature::new_linear(linear).with_input_resources(ResourceSet::new())
-    }
-
     /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
     pub fn get_resources(&self, dir: &Direction) -> ResourceSet {

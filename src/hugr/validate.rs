@@ -746,7 +746,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, ConstValue, LeafOp, OpType};
-    use crate::types::{AbstractSignature, ClassicType, Signature};
+    use crate::types::{AbstractSignature, ClassicType};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -1180,8 +1180,10 @@ mod test {
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
-        let mut main = module_builder
-            .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+        let mut main = module_builder.define_function(
+            "main",
+            AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+        )?;
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
@@ -1207,7 +1209,7 @@ mod test {
     fn too_many_resources() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let main_sig = Signature::new_df(type_row![NAT], type_row![NAT]);
+        let main_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure();
 
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();

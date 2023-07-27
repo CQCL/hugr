@@ -215,9 +215,7 @@ mod test {
             BuildError,
         },
         resource::ResourceSet,
-        type_row,
-        types::Signature,
-        Wire,
+        type_row, Wire,
     };
 
     use super::*;
@@ -229,15 +227,17 @@ mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
+                    AbstractSignature::new_df(type_row![NAT, QB], type_row![NAT, QB]).pure(),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
 
                 let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb])?;
 
-                let inner_builder = func_builder
-                    .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
+                let inner_builder = func_builder.dfg_builder(
+                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                    [int],
+                )?;
                 let inner_id = n_identity(inner_builder)?;
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
@@ -260,7 +260,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new_df(type_row![BIT], type_row![BIT, BIT]),
+                AbstractSignature::new_df(type_row![BIT], type_row![BIT, BIT]).pure(),
             )?;
 
             f(f_build)?;
@@ -309,8 +309,10 @@ mod test {
         let builder = || {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build = module_builder
-                .define_function("main", Signature::new_df(type_row![QB], type_row![QB, QB]))?;
+            let f_build = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![QB], type_row![QB, QB]).pure(),
+            )?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
@@ -324,15 +326,19 @@ mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build =
-                FunctionBuilder::new("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = FunctionBuilder::new(
+                "main",
+                AbstractSignature::new_df(type_row![BIT], type_row![BIT]).pure(),
+            )?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested =
-                f_build.dfg_builder(Signature::new_df(type_row![], type_row![BIT]), [])?;
+            let mut nested = f_build.dfg_builder(
+                AbstractSignature::new_df(type_row![], type_row![BIT]).pure(),
+                [],
+            )?;
 
             let id = nested.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
 
@@ -346,14 +352,19 @@ mod test {
 
     #[test]
     fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
-        let mut f_build =
-            FunctionBuilder::new("main", Signature::new_df(type_row![QB], type_row![QB]))?;
+        let mut f_build = FunctionBuilder::new(
+            "main",
+            AbstractSignature::new_df(type_row![QB], type_row![QB]).pure(),
+        )?;
 
         let [i1] = f_build.input_wires_arr();
         let noop = f_build.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: QB }), [i1])?;
         let i1 = noop.out_wire(0);
 
-        let mut nested = f_build.dfg_builder(Signature::new_df(type_row![], type_row![QB]), [])?;
+        let mut nested = f_build.dfg_builder(
+            AbstractSignature::new_df(type_row![], type_row![QB]).pure(),
+            [],
+        )?;
 
         let id_res = nested.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: QB }), [i1]);
 
@@ -394,8 +405,10 @@ mod test {
         let mut module_builder = ModuleBuilder::new();
 
         {
-            let mut f_build = module_builder
-                .define_function("main", Signature::new_df(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![BIT], type_row![BIT]).pure(),
+            )?;
 
             let [i1] = f_build.input_wires_arr();
             let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;

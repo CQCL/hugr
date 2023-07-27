@@ -141,13 +141,13 @@ mod test {
         },
         ops::LeafOp,
         type_row,
-        types::Signature,
+        types::AbstractSignature,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
+            AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -174,7 +174,7 @@ mod test {
     #[test]
     fn with_nonlinear_and_outputs() {
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
+            AbstractSignature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

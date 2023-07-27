@@ -263,7 +263,7 @@ pub mod test {
         },
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{AbstractSignature, ClassicType, Signature, SimpleType},
+        types::{AbstractSignature, ClassicType, SimpleType},
         Port,
     };
     use itertools::Itertools;
@@ -322,6 +322,8 @@ pub mod test {
         let mut h = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::new();
 
+        op_types[root] = NodeType::open_resources(gen_optype(&g, root));
+
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
             op_types[n] = NodeType::pure(gen_optype(&g, n));
@@ -349,7 +351,10 @@ pub mod test {
 
             let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", Signature::new_df(t_row.clone(), t_row))
+                .define_function(
+                    "main",
+                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
+                )
                 .unwrap();
 
             let outputs = f_build
@@ -384,7 +389,10 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", Signature::new_df(t_row.clone(), t_row))
+                .define_function(
+                    "main",
+                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
+                )
                 .unwrap();
 
             let outputs = f_build

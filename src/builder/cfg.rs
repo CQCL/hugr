@@ -10,7 +10,7 @@ use super::{
 use crate::hugr::view::HugrView;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
+use crate::types::AbstractSignature;
 
 use crate::Node;
 use crate::{
@@ -268,7 +268,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = Signature::new_df(inputs, SimpleRow::from(node_outputs));
+        let signature = AbstractSignature::new_df(inputs, SimpleRow::from(node_outputs)).pure();
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
@@ -322,7 +322,7 @@ mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::macros::classic_row;
     use crate::types::ClassicType;
-    use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+    use crate::{builder::test::NAT, ops::ConstValue, type_row};
     use cool_asserts::assert_matches;
 
     use super::*;
@@ -330,8 +330,10 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut func_builder = module_builder
-                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+            let mut func_builder = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(vec![NAT], type_row![NAT]).pure(),
+            )?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 

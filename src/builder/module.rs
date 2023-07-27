@@ -182,7 +182,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
-        types::Signature,
+        types::AbstractSignature,
     };
 
     use super::*;
@@ -191,8 +191,10 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_id = module_builder
-                .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let f_id = module_builder.declare(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
             let call = f_build.call(&f_id, f_build.input_wires())?;
@@ -214,10 +216,11 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new_df(
+                AbstractSignature::new_df(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
-                ),
+                )
+                .pure(),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr()
@@ -231,10 +234,14 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;
 

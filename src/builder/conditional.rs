@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{ClassicRow, Signature, SimpleRow};
+use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -14,7 +14,6 @@ use super::{
 };
 
 use crate::resource::ResourceSet;
-use crate::types::AbstractSignature;
 use crate::Node;
 use crate::{
     hugr::{HugrMut, NodeType},
@@ -136,7 +135,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            Signature::new_df(inputs, outputs),
+            AbstractSignature::new_df(inputs, outputs).pure(),
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -245,8 +244,10 @@ mod test {
     fn basic_conditional_module() -> Result<(), BuildError> {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder
-                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let mut fbuild = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
             let tru_const = fbuild.add_constant(ConstValue::true_val())?;
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const)?;

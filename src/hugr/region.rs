@@ -426,7 +426,7 @@ mod test {
         hugr::NodeType,
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{ClassicType, Signature, SimpleType},
+        types::{AbstractSignature, ClassicType, SimpleType},
     };
 
     use super::*;
@@ -443,7 +443,7 @@ mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                Signature::new_df(type_row![NAT, QB], type_row![NAT, QB]),
+                AbstractSignature::new_df(type_row![NAT, QB], type_row![NAT, QB]).pure(),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
@@ -451,8 +451,10 @@ mod test {
             let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb])?;
 
             let inner_id = {
-                let inner_builder = func_builder
-                    .dfg_builder(Signature::new_df(type_row![NAT], type_row![NAT]), [int])?;
+                let inner_builder = func_builder.dfg_builder(
+                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                    [int],
+                )?;
                 let w = inner_builder.input_wires();
                 inner_builder.finish_with_outputs(w)
             }?;

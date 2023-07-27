@@ -215,7 +215,7 @@ mod test {
     use crate::hugr::{Hugr, Node, NodeType};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{ClassicType, Signature, SimpleType};
+    use crate::types::{AbstractSignature, ClassicType, SimpleType};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
@@ -236,7 +236,7 @@ mod test {
         let _f_id = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                Signature::new_df(type_row![QB, QB, QB], type_row![QB, QB, QB]),
+                AbstractSignature::new_df(type_row![QB, QB, QB], type_row![QB, QB, QB]).pure(),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
@@ -244,7 +244,7 @@ mod test {
             let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb2])?;
 
             let mut inner_builder = func_builder.dfg_builder(
-                Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
+                AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
                 [qb0, qb1],
             )?;
             let inner_graph = {
