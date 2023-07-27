@@ -62,7 +62,7 @@ pub enum TypeTag {
 impl TypeTag {
     /// Returns the smallest TypeTag containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
-    fn union(self, other: Self) -> Self {
+    pub fn union(self, other: Self) -> Self {
         if self == Self::Simple || other == Self::Simple {
             Self::Simple
         } else if self == Self::Classic || other == Self::Classic {
