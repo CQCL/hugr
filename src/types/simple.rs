@@ -90,7 +90,7 @@ impl TypeTag {
 }
 
 /// Trait of primitive types (SimpleType or ClassicType).
-pub trait PrimType: std::fmt::Debug + Clone + 'static {
+pub trait PrimType: sealed::Sealed + std::fmt::Debug + Clone + 'static {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
@@ -98,6 +98,14 @@ pub trait PrimType: std::fmt::Debug + Clone + 'static {
     fn tag(&self) -> TypeTag;
 }
 
+// sealed trait pattern to prevent users extending PrimType
+mod sealed {
+    use super::{ClassicType, HashableType, SimpleType};
+    pub trait Sealed {}
+    impl Sealed for SimpleType {}
+    impl Sealed for ClassicType {}
+    impl Sealed for HashableType {}
+}
 /// A type that represents a container of other types.
 ///
 /// For algebraic types Sum, Tuple if one element of type row is linear, the

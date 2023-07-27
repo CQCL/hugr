@@ -65,6 +65,7 @@ pub(crate) enum SerSimpleType {
     },
 }
 
+impl super::sealed::Sealed for SerSimpleType {}
 impl PrimType for SerSimpleType {
     fn tag(&self) -> TypeTag {
         unimplemented!()
