@@ -246,7 +246,6 @@ pub mod test {
         },
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        resource::ResourceSet,
         types::{AbstractSignature, ClassicType, Signature, SimpleType},
         Port,
     };
@@ -308,10 +307,7 @@ pub mod test {
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
-            op_types[n] = NodeType {
-                op: gen_optype(&g, n),
-                input_resources: ResourceSet::new(),
-            };
+            op_types[n] = NodeType::pure(gen_optype(&g, n));
         }
 
         let hg = Hugr {

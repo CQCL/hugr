@@ -256,13 +256,12 @@ pub trait Dataflow: Container {
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let (dfg_n, _) = add_op_with_wires(
             self,
-            NodeType {
-                op: ops::DFG {
+            NodeType::new(
+                ops::DFG {
                     signature: signature.clone().into(),
-                }
-                .into(),
-                input_resources: signature.input_resources.clone(),
-            },
+                },
+                signature.input_resources.clone(),
+            ),
             input_wires.into_iter().collect(),
         )?;
 
@@ -297,7 +296,7 @@ pub trait Dataflow: Container {
                 }
                 .into(),
                 // TODO: CFGs should be allow to specify resources
-                input_resources: ResourceSet::new(),
+                input_resources: Some(ResourceSet::new()),
             },
             input_wires,
         )?;
@@ -366,7 +365,7 @@ pub trait Dataflow: Container {
             NodeType {
                 op: tail_loop.clone().into(),
                 // TODO: Add resoucres as a parameter
-                input_resources: ResourceSet::new(),
+                input_resources: Some(ResourceSet::new()),
             },
             input_wires,
         )?;
@@ -411,7 +410,7 @@ pub trait Dataflow: Container {
                 }
                 .into(),
                 // TODO: Allow specifying resources
-                input_resources: ResourceSet::new(),
+                input_resources: Some(ResourceSet::new()),
             },
             input_wires,
         )?;
@@ -465,7 +464,7 @@ pub trait Dataflow: Container {
             NodeType {
                 op: LeafOp::MakeTuple { tys: types }.into(),
                 // TODO Allow resources to be specified
-                input_resources: ResourceSet::new(),
+                input_resources: Some(ResourceSet::new()),
             },
             values,
         )?;
@@ -575,7 +574,7 @@ pub trait Dataflow: Container {
             NodeType {
                 op: ops::Call { signature }.into(),
                 // TODO: Allow resources to be specified
-                input_resources: ResourceSet::new(),
+                input_resources: Some(ResourceSet::new()),
             },
             input_wires,
         )?;
@@ -602,7 +601,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 
     let op = op.into();
     let op_node = data_builder.add_child_op(op.clone())?;
-    let sig = op.signature();
+    let sig = op.op.signature();
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

@@ -403,7 +403,7 @@ mod test {
     };
 
     use super::*;
-    use crate::resource::ResourceSet;
+    
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
 
@@ -421,14 +421,10 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                NodeType {
-                    op: ops::FuncDefn {
-                        name: "main".into(),
-                        signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
-                    }
-                    .into(),
-                    input_resources: ResourceSet::new(),
-                },
+                NodeType::pure(ops::FuncDefn {
+                    name: "main".into(),
+                    signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                }),
             )
             .expect("Failed to add function definition node");
 

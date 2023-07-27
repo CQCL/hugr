@@ -122,7 +122,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                 name: name.into(),
             }
             .into(),
-            input_resources: signature.input_resources,
+            input_resources: Some(signature.input_resources),
         })?;
 
         Ok(declare_n.into())

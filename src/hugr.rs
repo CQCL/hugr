@@ -52,23 +52,39 @@ pub struct NodeType {
     /// The underlying OpType
     pub op: OpType,
     /// The resources that the signature has been specialised to
-    pub input_resources: ResourceSet,
+    pub input_resources: Option<ResourceSet>,
 }
 
 impl NodeType {
-    /// Instantiate an OpType with no resources
+    /// Create a new optype with some ResourceSet
+    pub fn new(op: impl Into<OpType>, input_resources: ResourceSet) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: Some(input_resources),
+        }
+    }
+
+    /// Instantiate an OpType with no input resources
     pub fn pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: ResourceSet::new(),
+            input_resources: Some(ResourceSet::new()),
+        }
+    }
+
+    /// Instantiate an OpType with an unknown set of input resources
+    pub fn open_resources(op: impl Into<OpType>) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: None,
         }
     }
 
     /// Use the input resources to calculate the concrete signature of the node
-    pub fn signature(&self) -> Signature {
-        self.op
-            .signature()
-            .with_input_resources(self.input_resources.clone())
+    pub fn signature(&self) -> Option<Signature> {
+        self.input_resources
+            .clone()
+            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
     }
 }
 
@@ -77,7 +93,7 @@ impl OpType {
     pub fn with_resources(self, rs: ResourceSet) -> NodeType {
         NodeType {
             op: self,
-            input_resources: rs,
+            input_resources: Some(rs),
         }
     }
 }
@@ -153,10 +169,9 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        op_types[root] = NodeType {
-            op: root_op.into(),
-            input_resources: ResourceSet::new(),
-        };
+        // TODO: These resources should be open in principle, but lets wait
+        // until resources can be inferred for open sets until changing this
+        op_types[root] = NodeType::pure(root_op);
 
         Self {
             graph,

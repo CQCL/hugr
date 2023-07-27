@@ -32,25 +32,20 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         let num_out_wires = signature.output().len();
         base.as_mut().add_op_with_parent(
             parent,
-            NodeType {
-                op: ops::Input {
-                    types: signature.input().clone(),
-                    resources: signature.input_resources.clone(),
-                }
-                .into(),
-                input_resources: ResourceSet::new(),
-            },
+            NodeType::pure(ops::Input {
+                types: signature.input().clone(),
+                resources: signature.input_resources.clone(),
+            }),
         )?;
         base.as_mut().add_op_with_parent(
             parent,
-            NodeType {
-                op: ops::Output {
+            NodeType::new(
+                ops::Output {
                     types: signature.output().clone(),
                     resources: signature.output_resources(),
-                }
-                .into(),
-                input_resources: signature.output_resources(),
-            },
+                },
+                signature.output_resources(),
+            ),
         )?;
 
         Ok(Self {
@@ -453,7 +448,7 @@ mod test {
                     new_resource: "B".into(),
                 }
                 .into(),
-                input_resources: ResourceSet::from_iter(["A".into()]),
+                input_resources: Some(ResourceSet::from_iter(["A".into()])),
             },
             [w],
         )?;
@@ -467,14 +462,13 @@ mod test {
         let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
-            NodeType {
-                op: LeafOp::Lift {
+            NodeType::new(
+                LeafOp::Lift {
                     type_row: type_row![BIT],
                     new_resource: "C".into(),
-                }
-                .into(),
-                input_resources: ab_resources,
-            },
+                },
+                ab_resources,
+            ),
             [w],
         )?;
         let wires: Vec<Wire> = lift_c.outputs().collect();

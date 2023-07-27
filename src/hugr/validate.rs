@@ -76,16 +76,19 @@ impl<'a> ValidationContext<'a> {
     /// resource requirements for all of its input and output edges, then put
     /// those requirements in the ValidationContext
     fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
-        let op = self.hugr.op_types.get(node.index);
-        let sig = op.signature();
+        let node_type = self.hugr.get_nodetype(*node);
 
-        for dir in Direction::BOTH {
-            assert!(self
-                .resources
-                .insert((*node, dir), sig.get_resources(&dir).clone())
-                .is_none());
+        match node_type.signature() {
+            None => return Err(ValidationError::MissingInputResources(node.clone())),
+            Some(sig) => {
+                for dir in Direction::BOTH {
+                    assert!(self
+                        .resources
+                        .insert((*node, dir), sig.get_resources(&dir).clone())
+                        .is_none());
+                }
+            }
         }
-
         Ok(())
     }
 
@@ -670,6 +673,8 @@ pub enum ValidationError {
         to_offset: Port,
         to_resources: ResourceSet,
     },
+    #[error("Missing input resources for node {0:?}")]
+    MissingInputResources(Node),
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -1151,20 +1156,13 @@ mod test {
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(
             h.root(),
-            NodeType {
-                op: ops::Const(ConstValue::Int { width: 1, value: 1 }).into(),
-                input_resources: ResourceSet::new(),
-            },
+            NodeType::pure(ops::Const(ConstValue::Int { width: 1, value: 1 })),
         )?;
         let lcst = h.add_op_with_parent(
             h.root(),
-            NodeType {
-                op: ops::LoadConstant {
-                    datatype: ClassicType::int::<1>(),
-                }
-                .into(),
-                input_resources: ResourceSet::new(),
-            },
+            NodeType::pure(ops::LoadConstant {
+                datatype: ClassicType::int::<1>(),
+            }),
         )?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;
