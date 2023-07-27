@@ -79,6 +79,7 @@ impl<'a> ValidationContext<'a> {
         let node_type = self.hugr.get_nodetype(*node);
 
         match node_type.signature() {
+            // Require that input resources are specified on every node for this check
             None => return Err(ValidationError::MissingInputResources(*node)),
             Some(sig) => {
                 for dir in Direction::BOTH {
