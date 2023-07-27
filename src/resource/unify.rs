@@ -1,4 +1,4 @@
-use crate::{Direction, hugr::Node, Hugr};
+use crate::{Direction, hugr::{Node, HugrView}, ops::OpTrait, Hugr};
 use super::{ResourceId, ResourceSet};
 
 use std::collections::HashMap;
@@ -6,6 +6,7 @@ use thiserror::Error;
 
 type Meta = usize;
 
+#[derive(Clone, Debug)]
 enum Constraint {
     Exactly(ResourceSet),
     Equal(Meta),
@@ -54,96 +55,114 @@ impl<'a> UnificationContext<'a> {
     fn add_constraint(&mut self, m: Meta, c: Constraint) {
         self.constraints
             .entry(m)
-            .and_modify(|&mut cs| cs.push(c))
+            .and_modify(|cs| cs.push(c.clone()))
             .or_insert(vec![c]);
     }
 
-    fn gen_constraints(&mut self, hugr: &Hugr) {
+    fn add_solution(&mut self, m: Meta, rs: ResourceSet) {
+        assert!(self.solved.insert(m, rs).is_none());
+    }
+
+    fn gen_constraints(&mut self, hugr: impl HugrView) {
         let meta = self.fresh_meta();
-        for node in self.hugr.graph.nodes_iter().map_into() {
+        for node in hugr.nodes() {
             let input = self.fresh_meta();
             assert!(self.resources.insert((node, Direction::Incoming), input).is_none());
             let output = self.fresh_meta();
             assert!(self.resources.insert((node, Direction::Outgoing), output).is_none());
 
-            let added_resources = hugr.op_types.get(node.index).unwrap().resource_reqs;
-            self.add_constraint(output, Constraint::Plus(add_resource, input));
-        }
-
-        for (node, rs) in input_resources.iter() {
-            let meta = self.resources.get(node, Direction::Incoming).unwrap();
-            self.add_constraint(meta, Exactly(rs));
+            let node_type = hugr.get_nodetype(node);
+            match node_type.signature() {
+                // Input resources are open
+                None => {
+                    let mut last_meta = input;
+                    for r in node_type.op_signature().resource_reqs.iter() {
+                        let curr_meta = self.fresh_meta();
+                        self.add_constraint(curr_meta, Constraint::Plus(r.clone(), last_meta));
+                        last_meta = curr_meta;
+                    }
+                    self.add_constraint(output, Constraint::Equal(last_meta));
+                },
+                // We're in the money!
+                Some(sig) => {
+                    self.add_solution(input, sig.input_resources.clone());
+                    self.add_solution(output, sig.output_resources());
+                }
+            }
         }
     }
 
     fn solve_meta(&mut self, meta: &Meta) -> Result<(), InferResourceError> {
-        match self.solved.get(meta) {
+        match self.solved.get(meta).cloned() {
             // We know nothing
             None => unimplemented!(),
             Some(rs) => {
-                let mut curr = 0;
-                for c in self.constraints.get(meta).iter() {
+                for (curr, c) in self.constraints.get(meta).unwrap().iter().enumerate() {
                     match c {
                         Constraint::Exactly(rs2) => {
-                            if rs == rs2 {
-                                self.constraints.get(meta).remove(curr);
+                            if rs == *rs2 {
+                                self.constraints.get(meta).unwrap().remove(curr);
                             } else {
-                                return Err(MismatchedConcrete { expected: rs2, actual: rs });
+                                return Err(InferResourceError::MismatchedConcrete { expected: *rs2, actual: rs });
                             }
                         },
                         Constraint::Equal(other_meta) => {
                             match self.solved.get(other_meta) {
                                 Some(rs) => {
-                                    assert!(!self.solved.insert(meta, rs).is_none());
-                                    let remaining_constraints = self.constraints.get(meta);
-                                    // Add remaining constraints to the other meta
-                                    self.constraints
-                                        .entry(other_meta)
-                                        .map(|cs| cs.append(remaining_constraints));
-                                    // and delete this one
-                                    self.constraints.insert(meta, Equal(other_meta));
+                                    self.add_solution(*meta, rs.clone());
+                                    self.constraints.get(meta).map(|remaining_constraints| {
+                                        // Add remaining constraints to the other meta
+                                        self.constraints
+                                            .entry(*other_meta)
+                                            .and_modify(|cs| cs.append(remaining_constraints.as_mut()));
+                                        // and delete this one
+                                        self.add_constraint(*meta, Constraint::Equal(*other_meta));
+                                    });
                                 },
+                                // The trickier case
                                 None => {
-
+                                    todo!()
                                 }
                             }
                         },
                         Constraint::Plus(r, other_meta) => {
                             match self.solved.get(other_meta) {
                                 Some(rs) => {
-                                    assert!(!self.solved.insert(meta, rs.insert(r)).is_none());
-                                    self.constraints.get(meta).remove(curr)
+                                    let rrs = rs.clone();
+                                    rrs.insert(r);
+                                    self.add_solution(*meta, rrs);
+                                    self.constraints.get(meta).unwrap().remove(curr);
                                 },
                                 None => todo!(),
                             }
                         },
                     }
-                    curr += 1;
                 }
+                Ok(())
             }
         }
     }
 
     fn solve(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
-        for m in self.constraints.iter() {
-            self.solve_meta(m)?;
+        for m in self.constraints.keys().cloned() {
+            self.solve_meta(&(m.clone()))?;
         }
-        let mut results = HashMap::new();
+        let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
         for (loc, meta) in self.resources.iter() {
-            let rs = match self.solutions.get(meta) {
-                Some(rs) => Ok(rs),
-                None => Err(InferResourceError::Unsolved(loc)),
+            let rs = match self.solved.get(&meta) {
+                Some(rs) => Ok(rs.clone()),
+                None => Err(InferResourceError::Unsolved { location: *loc }),
             }?;
-            results.insert(loc, rs);
+            results.insert(*loc, rs);
         }
-        results
+        Ok(results)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::{ClassicType, Signature, SimpleType};
+    use crate::types::{AbstractSignature, ClassicType, SimpleType};
 
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
 
