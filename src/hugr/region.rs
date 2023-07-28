@@ -423,7 +423,6 @@ where
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        hugr::NodeType,
         ops::{handle::NodeHandle, LeafOp},
         type_row,
         types::{AbstractSignature, ClassicType, SimpleType},
@@ -448,11 +447,12 @@ mod test {
 
             let [int, qb] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb])?;
+            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(
-                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]),
+                    None,
                     [int],
                 )?;
                 let w = inner_builder.input_wires();

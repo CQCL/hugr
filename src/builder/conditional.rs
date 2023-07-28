@@ -13,7 +13,7 @@ use super::{
     BuildError, ConditionalID,
 };
 
-use crate::resource::ResourceSet;
+
 use crate::Node;
 use crate::{
     hugr::{HugrMut, NodeType},
@@ -124,10 +124,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
                 // TODO: Allow this to be non-pure
-                self.hugr_mut().add_op_before(sibling_node, NodeType::pure(case_op))?
+                self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
                 // TODO: Allow this to be non-pure
-                self.add_child_op(NodeType::pure(case_op))?
+                self.add_child_op(case_op)?
             };
 
         self.case_nodes[case] = Some(case_node);
@@ -135,7 +135,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            AbstractSignature::new_df(inputs, outputs).pure(),
+            AbstractSignature::new_df(inputs, outputs),
+            None,
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -196,12 +197,7 @@ impl CaseBuilder<Hugr> {
         // TODO: Allow input resources to be specified
         let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(
-            base,
-            root,
-            // TODO: Make this a parameter
-            signature.with_input_resources(ResourceSet::new()),
-        )?;
+        let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

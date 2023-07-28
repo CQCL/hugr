@@ -779,7 +779,7 @@ mod test {
         let mut b = Hugr::default();
         let root = b.root();
 
-        let def = b.add_op_with_parent(root, NodeType::pure(def_op)).unwrap();
+        let def = b.add_op_with_parent(root, def_op).unwrap();
         let _ = add_df_children(&mut b, def, copies);
 
         (b, def)
@@ -790,17 +790,17 @@ mod test {
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(parent, NodeType::pure(ops::Input::new(type_row![B])))
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, NodeType::pure(ops::Output::new(vec![B; copies])))
+            .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
             .add_op_with_parent(
                 parent,
-                NodeType::pure(LeafOp::Noop {
+                LeafOp::Noop {
                     ty: ClassicType::bit().into(),
-                }),
+                },
             )
             .unwrap();
 
@@ -826,23 +826,18 @@ mod test {
         let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
-            .add_op_with_parent(parent, NodeType::pure(ops::Input::new(type_row![B])))
+            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
             .unwrap();
         let output = b
-            .add_op_with_parent(
-                parent,
-                NodeType::pure(ops::Output::new(vec![tag_type.clone(), B])),
-            )
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B]))
             .unwrap();
-        let tag_def = b
-            .add_op_with_parent(b.root(), NodeType::pure(const_op))
-            .unwrap();
+        let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
             .add_op_with_parent(
                 parent,
-                NodeType::pure(ops::LoadConstant {
+                ops::LoadConstant {
                     datatype: tag_type.try_into().unwrap(),
-                }),
+                },
             )
             .unwrap();
 
@@ -867,7 +862,7 @@ mod test {
         assert_eq!(b.validate(), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(NodeType::pure(ops::Module));
+        let other = b.add_op(ops::Module);
         assert_matches!(
             b.validate(),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -935,10 +930,10 @@ mod test {
         let new_def = b
             .add_op_with_parent(
                 root,
-                NodeType::pure(ops::FuncDefn {
+                ops::FuncDefn {
                     signature: def_sig,
                     name: "main".into(),
-                }),
+                },
             )
             .unwrap();
         assert_matches!(
@@ -958,7 +953,7 @@ mod test {
         // After moving the previous definition to a valid place,
         // add an input node to the module subgraph
         let new_input = b
-            .add_op_with_parent(root, NodeType::pure(ops::Input::new(type_row![])))
+            .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
             b.validate(),
@@ -1035,20 +1030,20 @@ mod test {
         let block = b
             .add_op_with_parent(
                 cfg,
-                NodeType::pure(ops::BasicBlock::DFB {
+                ops::BasicBlock::DFB {
                     inputs: type_row![B],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![B],
-                }),
+                },
             )
             .unwrap();
         add_block_children(&mut b, block, 1);
         let exit = b
             .add_op_with_parent(
                 cfg,
-                NodeType::pure(ops::BasicBlock::Exit {
+                ops::BasicBlock::Exit {
                     cfg_outputs: type_row![B],
-                }),
+                },
             )
             .unwrap();
         b.add_other_edge(block, exit).unwrap();
@@ -1060,9 +1055,9 @@ mod test {
         let exit2 = b
             .add_op_after(
                 exit,
-                NodeType::pure(ops::BasicBlock::Exit {
+                ops::BasicBlock::Exit {
                     cfg_outputs: type_row![B],
-                }),
+                },
             )
             .unwrap();
         assert_matches!(
@@ -1104,24 +1099,20 @@ mod test {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
         }));
-        let input =
-            h.add_op_with_parent(h.root(), NodeType::pure(ops::Input::new(type_row![B, B])))?;
-        let output =
-            h.add_op_with_parent(h.root(), NodeType::pure(ops::Output::new(type_row![B])))?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
         // Nested DFG B -> B
         let sub_dfg = h.add_op_with_parent(
             h.root(),
-            NodeType::pure(ops::DFG {
+            ops::DFG {
                 signature: AbstractSignature::new_linear(type_row![B]),
-            }),
+            },
         )?;
         // this Xor has its 2nd input unconnected
         let sub_op = {
-            let sub_input =
-                h.add_op_with_parent(sub_dfg, NodeType::pure(ops::Input::new(type_row![B])))?;
-            let sub_output =
-                h.add_op_with_parent(sub_dfg, NodeType::pure(ops::Output::new(type_row![B])))?;
-            let sub_op = h.add_op_with_parent(sub_dfg, NodeType::pure(LeafOp::Xor))?;
+            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![B]))?;
+            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![B]))?;
+            let sub_op = h.add_op_with_parent(sub_dfg, LeafOp::Xor)?;
             h.connect(sub_input, 0, sub_op, 0)?;
             h.connect(sub_op, 0, sub_output, 0)?;
             sub_op
@@ -1150,11 +1141,9 @@ mod test {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: AbstractSignature::new_df(type_row![B], type_row![B]),
         }));
-        let input =
-            h.add_op_with_parent(h.root(), NodeType::pure(ops::Input::new(type_row![B])))?;
-        let output =
-            h.add_op_with_parent(h.root(), NodeType::pure(ops::Output::new(type_row![B])))?;
-        let xor = h.add_op_with_parent(h.root(), NodeType::pure(LeafOp::Xor))?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
+        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
         h.connect(input, 0, xor, 0)?;
         h.connect(xor, 0, output, 0)?;
         assert_eq!(
@@ -1166,15 +1155,13 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(
-            h.root(),
-            NodeType::pure(ops::Const(ConstValue::Int { width: 1, value: 1 })),
-        )?;
+        let cst =
+            h.add_op_with_parent(h.root(), ops::Const(ConstValue::Int { width: 1, value: 1 }))?;
         let lcst = h.add_op_with_parent(
             h.root(),
-            NodeType::pure(ops::LoadConstant {
+            ops::LoadConstant {
                 datatype: ClassicType::int::<1>(),
-            }),
+            },
         )?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;
@@ -1202,7 +1189,11 @@ mod test {
             // Inner DFG has resource requirements that the wire wont satisfy
             .with_input_resources(ResourceSet::from_iter(["A".into(), "B".into()]));
 
-        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_builder = main.dfg_builder(
+            inner_sig.signature,
+            Some(inner_sig.input_resources),
+            [main_input],
+        )?;
         let f_inputs = f_builder.input_wires();
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
@@ -1230,7 +1221,11 @@ mod test {
             .with_resource_delta(&ResourceSet::singleton(&"A".into()))
             .with_input_resources(ResourceSet::new());
 
-        let f_builder = main.dfg_builder(inner_sig, [main_input])?;
+        let f_builder = main.dfg_builder(
+            inner_sig.signature,
+            Some(inner_sig.input_resources),
+            [main_input],
+        )?;
         let f_inputs = f_builder.input_wires();
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
@@ -1266,16 +1261,28 @@ mod test {
             .with_input_resources(all_rs);
 
         let [left_wire] = main
-            .dfg_builder(inner_left_sig, [])?
+            .dfg_builder(
+                inner_left_sig.signature,
+                Some(inner_left_sig.input_resources),
+                [],
+            )?
             .finish_with_outputs([])?
             .outputs_arr();
 
         let [right_wire] = main
-            .dfg_builder(inner_right_sig, [])?
+            .dfg_builder(
+                inner_right_sig.signature,
+                Some(inner_right_sig.input_resources),
+                [],
+            )?
             .finish_with_outputs([])?
             .outputs_arr();
 
-        let builder = main.dfg_builder(inner_mult_sig, [left_wire, right_wire])?;
+        let builder = main.dfg_builder(
+            inner_mult_sig.signature,
+            Some(inner_mult_sig.input_resources),
+            [left_wire, right_wire],
+        )?;
         let [_left, _right] = builder.input_wires_arr();
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 

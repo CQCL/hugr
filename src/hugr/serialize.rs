@@ -210,20 +210,20 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
-            NodeType {
-                op: root_type,
-                input_resources,
+            match input_resources {
+                None => NodeType::open_resources(root_type),
+                Some(rs) => NodeType::new(root_type, rs),
             },
             nodes.len(),
             edges.len() * 2,
         );
 
         for node_ser in nodes {
-            hugr.add_op_with_parent(
+            hugr.add_node_with_parent(
                 node_ser.parent,
-                NodeType {
-                    op: node_ser.op,
-                    input_resources: node_ser.input_resources,
+                match node_ser.input_resources {
+                    None => NodeType::open_resources(node_ser.op),
+                    Some(rs) => NodeType::new(node_ser.op, rs),
                 },
             )?;
         }
@@ -373,9 +373,9 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            NodeType::pure(LeafOp::Noop {
+                            LeafOp::Noop {
                                 ty: f_build.get_wire_type(in_wire).unwrap(),
-                            }),
+                            },
                             [in_wire],
                         )
                         .unwrap()
@@ -411,9 +411,9 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            NodeType::pure(LeafOp::Noop {
+                            LeafOp::Noop {
                                 ty: f_build.get_wire_type(in_wire).unwrap(),
-                            }),
+                            },
                             [in_wire],
                         )
                         .unwrap()
@@ -438,7 +438,7 @@ pub mod test {
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(NodeType::pure(LeafOp::Xor), [*p, *p])
+                .add_dataflow_op(LeafOp::Xor, [*p, *p])
                 .unwrap()
                 .out_wire(0);
         }
@@ -468,7 +468,7 @@ pub mod test {
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(NodeType::pure(Input::new([qb].to_vec())));
+        let new_in = hugr.add_op(Input::new([qb].to_vec()));
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();

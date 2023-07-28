@@ -97,7 +97,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let exit_node = base
             .as_mut()
             // Make the resources a parameter
-            .add_op_with_parent(cfg_node, NodeType::pure(exit_block_type))?;
+            .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
             cfg_node,
@@ -154,11 +154,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let block_n = if entry {
             let exit = self.exit_node;
             // TODO: Make resources a parameter
-            self.hugr_mut().add_op_before(exit, NodeType::pure(op))
+            self.hugr_mut().add_op_before(exit, op)
         } else {
             // TODO: Make resources a parameter
-            self.hugr_mut()
-                .add_op_with_parent(parent, NodeType::pure(op))
+            self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
         BlockBuilder::create(
@@ -264,8 +263,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = AbstractSignature::new_df(inputs, SimpleRow::from(node_outputs)).pure();
-        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
+        let signature = AbstractSignature::new_df(inputs, SimpleRow::from(node_outputs));
+        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 }

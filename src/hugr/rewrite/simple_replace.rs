@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
-    hugr::{Node, NodeType, Rewrite},
+    hugr::{Node, Rewrite},
     ops::{OpTag, OpTrait, OpType},
     Hugr, Port,
 };
@@ -94,9 +94,7 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
-            let new_node = h
-                .add_op_after(self_output_node, NodeType::pure(op.clone()))
-                .unwrap();
+            let new_node = h.add_op_after(self_output_node, op.clone()).unwrap();
             index_map.insert(node, new_node);
 
             // Move the metadata
@@ -212,7 +210,7 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::hugr::view::HugrView;
-    use crate::hugr::{Hugr, Node, NodeType};
+    use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
     use crate::types::{AbstractSignature, ClassicType, SimpleType};
@@ -241,27 +239,22 @@ mod test {
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb2])?;
+            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb2])?;
 
             let mut inner_builder = func_builder.dfg_builder(
-                AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
+                AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]),
+                None,
                 [qb0, qb1],
             )?;
             let inner_graph = {
                 let [wire0, wire1] = inner_builder.input_wires_arr();
-                let wire2 =
-                    inner_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire0])?;
-                let wire3 =
-                    inner_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire1])?;
-                let wire45 = inner_builder.add_dataflow_op(
-                    NodeType::pure(LeafOp::CX),
-                    wire2.outputs().chain(wire3.outputs()),
-                )?;
+                let wire2 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire0])?;
+                let wire3 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
+                let wire45 = inner_builder
+                    .add_dataflow_op(LeafOp::CX, wire2.outputs().chain(wire3.outputs()))?;
                 let [wire4, wire5] = wire45.outputs_arr();
-                let wire6 =
-                    inner_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire4])?;
-                let wire7 =
-                    inner_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire5])?;
+                let wire6 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire4])?;
+                let wire7 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire5])?;
                 inner_builder.finish_with_outputs(wire6.outputs().chain(wire7.outputs()))
             }?;
 
@@ -279,12 +272,10 @@ mod test {
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
         let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
-        let wire2 = dfg_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire0])?;
-        let wire3 = dfg_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire1])?;
-        let wire45 = dfg_builder.add_dataflow_op(
-            NodeType::pure(LeafOp::CX),
-            wire2.outputs().chain(wire3.outputs()),
-        )?;
+        let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire0])?;
+        let wire3 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
+        let wire45 =
+            dfg_builder.add_dataflow_op(LeafOp::CX, wire2.outputs().chain(wire3.outputs()))?;
         dfg_builder.finish_hugr_with_outputs(wire45.outputs())
     }
 
@@ -296,7 +287,7 @@ mod test {
     fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
         let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
-        let wire2 = dfg_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![wire1])?;
+        let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
         dfg_builder.finish_hugr_with_outputs(wireoutvec)
@@ -518,7 +509,7 @@ mod test {
         let mut builder = DFGBuilder::new(one_bit.clone(), one_bit.clone()).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
-            .add_dataflow_op(NodeType::pure(LeafOp::Xor), [inw, inw])
+            .add_dataflow_op(LeafOp::Xor, [inw, inw])
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
@@ -526,10 +517,7 @@ mod test {
 
         let mut builder = DFGBuilder::new(two_bit, one_bit).unwrap();
         let inw = builder.input_wires();
-        let outw = builder
-            .add_dataflow_op(NodeType::pure(LeafOp::Xor), inw)
-            .unwrap()
-            .outputs();
+        let outw = builder.add_dataflow_op(LeafOp::Xor, inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
         let repl = builder.finish_hugr_with_outputs(outw).unwrap();
 

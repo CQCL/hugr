@@ -12,7 +12,7 @@ use crate::{
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::ops::OpType;
-use crate::resource::ResourceSet;
+
 use crate::types::Signature;
 
 use crate::Node;
@@ -95,12 +95,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             }),
         );
 
-        let db = DFGBuilder::create_with_io(
-            self.hugr_mut(),
-            f_node,
-            // TODO: Make this a parameter
-            signature.with_input_resources(ResourceSet::new()),
-        )?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -116,12 +111,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(NodeType::new(
+        let rs = signature.input_resources.clone();
+        let declare_n = self.add_child_node(NodeType::new(
             ops::FuncDecl {
-                signature: signature.signature,
+                signature: signature.into(),
                 name: name.into(),
             },
-            signature.input_resources,
+            rs,
         ))?;
 
         Ok(declare_n.into())
@@ -144,10 +140,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // every 0-input node.
         let name: SmolStr = name.into();
         let tag = typ.tag();
-        let node = self.add_child_op(NodeType::pure(ops::AliasDefn {
+        let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
-        }))?;
+        })?;
 
         Ok(AliasID::new(node, name, tag))
     }
@@ -162,10 +158,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         tag: TypeTag,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(NodeType::pure(ops::AliasDecl {
+        let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
             tag,
-        }))?;
+        })?;
 
         Ok(AliasID::new(node, name, tag))
     }

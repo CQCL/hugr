@@ -6,6 +6,7 @@ use std::ops::Range;
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType};
+use crate::ops::OpType;
 
 use crate::{Hugr, Port};
 
@@ -13,8 +14,11 @@ use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
+    /// Add a node to the graph, with the default conversion from OpType to NodeType
+    fn add_op(&mut self, op: impl Into<OpType>) -> Node;
+
     /// Add a node to the graph.
-    fn add_op(&mut self, op: impl Into<NodeType>) -> Node;
+    fn add_node(&mut self, node: NodeType) -> Node;
 
     /// Remove a node from the graph.
     ///
@@ -96,8 +100,13 @@ pub(crate) trait HugrMut {
     fn add_op_with_parent(
         &mut self,
         parent: Node,
-        op: impl Into<NodeType>,
+        op: impl Into<OpType>,
     ) -> Result<Node, HugrError>;
+
+    /// Add a node to the graph with a parent in the hierarchy.
+    ///
+    /// The node becomes the parent's last child.
+    fn add_node_with_parent(&mut self, parent: Node, op: NodeType) -> Result<Node, HugrError>;
 
     /// Add a node to the graph as the previous sibling of another node.
     ///
@@ -107,7 +116,7 @@ pub(crate) trait HugrMut {
     ///
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError>;
+    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
 
     /// Add a node to the graph as the next sibling of another node.
     ///
@@ -117,13 +126,13 @@ pub(crate) trait HugrMut {
     ///
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError>;
+    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError>;
 
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
     /// TODO: Add a version which ignores input resources
-    fn replace_op(&mut self, node: Node, op: impl Into<NodeType>) -> NodeType;
+    fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType;
 
     /// Insert another hugr into this one, under a given root node.
     ///
@@ -149,14 +158,18 @@ impl<T> HugrMut for T
 where
     T: AsRef<Hugr> + AsMut<Hugr>,
 {
-    fn add_op(&mut self, op: impl Into<NodeType>) -> Node {
-        let op: NodeType = op.into();
+    fn add_node(&mut self, nodetype: NodeType) -> Node {
         let node = self
             .as_mut()
             .graph
-            .add_node(op.op.input_count(), op.op.output_count());
-        self.as_mut().op_types[node] = op;
+            .add_node(nodetype.input_count(), nodetype.output_count());
+        self.as_mut().op_types[node] = nodetype;
         node.into()
+    }
+
+    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        // TODO: Default to `NodeType::open_resources` once we have inference
+        self.add_node(NodeType::pure(op))
     }
 
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
@@ -266,34 +279,39 @@ where
     fn add_op_with_parent(
         &mut self,
         parent: Node,
-        op: impl Into<NodeType>,
+        op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+        // TODO: Default to `NodeType::open_resources` once we have inference
+        self.add_node_with_parent(parent, NodeType::pure(op))
+    }
+
+    fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
+        let node = self.add_node(node);
         self.as_mut()
             .hierarchy
             .push_child(node.index, parent.index)?;
         Ok(node)
     }
 
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+        let node = self.add_op(op);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
         Ok(node)
     }
 
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+        let node = self.add_op(op);
         self.as_mut()
             .hierarchy
             .insert_after(node.index, sibling.index)?;
         Ok(node)
     }
 
-    fn replace_op(&mut self, node: Node, op: impl Into<NodeType>) -> NodeType {
+    fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
         let cur = self.as_mut().op_types.get_mut(node.index);
-        std::mem::replace(cur, op.into())
+        std::mem::replace(cur, op)
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
@@ -420,26 +438,26 @@ mod test {
         let f: Node = builder
             .add_op_with_parent(
                 module,
-                NodeType::pure(ops::FuncDefn {
+                ops::FuncDefn {
                     name: "main".into(),
                     signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
-                }),
+                },
             )
             .expect("Failed to add function definition node");
 
         {
             let f_in = builder
-                .add_op_with_parent(f, NodeType::pure(ops::Input::new(type_row![NAT])))
+                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
                 .unwrap();
             let f_out = builder
-                .add_op_with_parent(f, NodeType::pure(ops::Output::new(type_row![NAT, NAT])))
+                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = builder
                 .add_op_with_parent(
                     f,
-                    NodeType::pure(LeafOp::Noop {
+                    LeafOp::Noop {
                         ty: ClassicType::i64().into(),
-                    }),
+                    },
                 )
                 .unwrap();
 

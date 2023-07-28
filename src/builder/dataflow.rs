@@ -26,26 +26,48 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        signature: Signature,
+        signature: AbstractSignature,
+        input_resources: Option<ResourceSet>,
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input().len();
         let num_out_wires = signature.output().len();
-        base.as_mut().add_op_with_parent(
+        /* For a given dataflow graph with resource requirements IR -> IR + dR,
+         - The output node's resource requirements are IR + dR -> IR + dR
+           (but we expect no output wires)
+
+         - The input node's resource requirements are IR -> IR, though we
+           expect no input wires. We must avoid the case where the difference
+           in resources is an open variable, as it would be if the requirements
+           were 0 -> IR.
+           N.B. This means that for input nodes, we can't infer the resources
+           from the input wires as we normally expect, but have to infer the
+           output wires and make use of the equality between the two.
+
+         - (TODO:) Hence, we should get rid of resource requirements in input and output nodes
+        */
+        let input = ops::Input {
+            types: signature.input().clone(),
+            resources: ResourceSet::new(),
+        };
+        let output = ops::Output {
+            types: signature.output().clone(),
+            resources: ResourceSet::new(),
+        };
+        base.as_mut().add_node_with_parent(
             parent,
-            NodeType::pure(ops::Input {
-                types: signature.input().clone(),
-                resources: signature.input_resources.clone(),
-            }),
+            match &input_resources {
+                // TODO: Make this NodeType::open_resources
+                None => NodeType::pure(input),
+                Some(rs) => NodeType::new(input, rs.clone()),
+            },
         )?;
-        base.as_mut().add_op_with_parent(
+        base.as_mut().add_node_with_parent(
             parent,
-            NodeType::new(
-                ops::Output {
-                    types: signature.output().clone(),
-                    resources: signature.output_resources(),
-                },
-                signature.output_resources(),
-            ),
+            match input_resources.map(|inp| inp.union(&signature.resource_reqs)) {
+                // TODO: Make this NodeType::open_resources
+                None => NodeType::pure(output),
+                Some(rs) => NodeType::new(output, rs),
+            },
         )?;
 
         Ok(Self {
@@ -77,10 +99,8 @@ impl DFGBuilder<Hugr> {
         let base = Hugr::new(NodeType::pure(dfg_op));
         let root = base.root();
         DFGBuilder::create_with_io(
-            base,
-            root,
-            // TODO: Make input resources a parameter
-            signature.with_input_resources(ResourceSet::new()),
+            base, root, signature, // TODO: Make input resources a parameter
+            None,
         )
     }
 }
@@ -152,7 +172,12 @@ impl FunctionBuilder<Hugr> {
         let base = Hugr::new(NodeType::new(op, signature.input_resources.clone()));
         let root = base.root();
 
-        let db = DFGBuilder::create_with_io(base, root, signature)?;
+        let db = DFGBuilder::create_with_io(
+            base,
+            root,
+            signature.signature,
+            Some(signature.input_resources),
+        )?;
         Ok(Self::from_dfg_builder(db))
     }
 }
@@ -229,10 +254,12 @@ mod test {
 
                 let [int, qb] = func_builder.input_wires_arr();
 
-                let q_out = func_builder.add_dataflow_op(NodeType::pure(LeafOp::H), vec![qb])?;
+                let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
 
                 let inner_builder = func_builder.dfg_builder(
-                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]),
+                    // TODO: This should be None
+                    Some(ResourceSet::new()),
                     [int],
                 )?;
                 let inner_id = n_identity(inner_builder)?;
@@ -281,7 +308,7 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor = f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, b1])?;
+                let xor = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
                 f_build.finish_with_outputs([xor.out_wire(0), b1])
             },
             "Copy input and use with binary function",
@@ -290,9 +317,8 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor1 = f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, b1])?;
-                let xor2 =
-                    f_build.add_dataflow_op(NodeType::pure(LeafOp::Xor), [b1, xor1.out_wire(0)])?;
+                let xor1 = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
+                let xor2 = f_build.add_dataflow_op(LeafOp::Xor, [b1, xor1.out_wire(0)])?;
                 f_build.finish_with_outputs([xor2.out_wire(0), b1])
             },
             "Copy multiple times",
@@ -329,15 +355,16 @@ mod test {
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
+            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested = f_build.dfg_builder(
-                AbstractSignature::new_df(type_row![], type_row![BIT]).pure(),
+                AbstractSignature::new_df(type_row![], type_row![BIT]),
+                None,
                 [],
             )?;
 
-            let id = nested.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: BIT }), [i1])?;
+            let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
@@ -355,15 +382,16 @@ mod test {
         )?;
 
         let [i1] = f_build.input_wires_arr();
-        let noop = f_build.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: QB }), [i1])?;
+        let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
         let i1 = noop.out_wire(0);
 
         let mut nested = f_build.dfg_builder(
-            AbstractSignature::new_df(type_row![], type_row![QB]).pure(),
+            AbstractSignature::new_df(type_row![], type_row![QB]),
+            None,
             [],
         )?;
 
-        let id_res = nested.add_dataflow_op(NodeType::pure(LeafOp::Noop { ty: QB }), [i1]);
+        let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier
@@ -442,20 +470,19 @@ mod test {
             .with_resource_delta(&ab_resources);
 
         // A box which adds resources A and B, via child Lift nodes
-        let mut add_ab =
-            parent.dfg_builder(add_ab_sig.with_input_resources(ResourceSet::new()), [w])?;
+        let mut add_ab = parent.dfg_builder(add_ab_sig, Some(ResourceSet::new()), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
-            NodeType::pure(LeafOp::Lift {
+            LeafOp::Lift {
                 type_row: type_row![BIT],
                 new_resource: "A".into(),
-            }),
+            },
             [w],
         )?;
         let [w] = lift_a.outputs_arr();
 
-        let lift_b = add_ab.add_dataflow_op(
+        let lift_b = add_ab.add_dataflow_node(
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],
@@ -472,9 +499,10 @@ mod test {
 
         // Add another node (a sibling to add_ab) which adds resource C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
+        let mut add_c =
+            parent.dfg_builder(add_c_sig.signature, Some(add_c_sig.input_resources), [w])?;
         let [w] = add_c.input_wires_arr();
-        let lift_c = add_c.add_dataflow_op(
+        let lift_c = add_c.add_dataflow_node(
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],

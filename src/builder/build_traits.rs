@@ -17,7 +17,10 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::types::{ClassicRow, ClassicType, PrimType, Signature, SimpleRow, SimpleType};
+use crate::resource::ResourceSet;
+use crate::types::{
+    AbstractSignature, ClassicRow, ClassicType, PrimType, Signature, SimpleRow, SimpleType,
+};
 
 use itertools::Itertools;
 
@@ -42,9 +45,14 @@ pub trait Container {
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
-    fn add_child_op(&mut self, op: impl Into<NodeType>) -> Result<Node, BuildError> {
+    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().add_op_with_parent(parent, op)?)
+    }
+    /// Add an [`OpType`] as the final child of the container.
+    fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
+        let parent = self.container_node();
+        Ok(self.hugr_mut().add_node_with_parent(parent, node)?)
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
@@ -64,7 +72,7 @@ pub trait Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(NodeType::pure(ops::Const(val)))?;
+        let const_n = self.add_child_op(ops::Const(val))?;
         Ok((const_n, typ).into())
     }
 
@@ -80,12 +88,17 @@ pub trait Container {
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let f_node = self.add_child_op(NodeType::pure(ops::FuncDefn {
+        let f_node = self.add_child_op(ops::FuncDefn {
             name: name.into(),
             signature: signature.clone().into(),
-        }))?;
+        })?;
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        let db = DFGBuilder::create_with_io(
+            self.hugr_mut(),
+            f_node,
+            signature.signature,
+            Some(signature.input_resources),
+        )?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -162,10 +175,24 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error when adding the node.
     fn add_dataflow_op(
         &mut self,
-        op: impl Into<NodeType>,
+        op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let outs = add_op_with_wires(self, op, input_wires.into_iter().collect())?;
+        self.add_dataflow_node(NodeType::pure(op), input_wires)
+    }
+
+    /// Add a dataflow op to the sibling graph, wiring up the `input_wires` to the
+    /// incoming ports of the resulting node.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the node.
+    fn add_dataflow_node(
+        &mut self,
+        nodetype: NodeType,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let outs = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
     }
@@ -248,23 +275,24 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the DFG node.
+    // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: Signature,
+        signature: AbstractSignature,
+        input_resources: Option<ResourceSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
-        let (dfg_n, _) = add_op_with_wires(
-            self,
-            NodeType::new(
-                ops::DFG {
-                    signature: signature.clone().into(),
-                },
-                signature.input_resources.clone(),
-            ),
-            input_wires.into_iter().collect(),
-        )?;
+        let op = ops::DFG {
+            signature: signature.clone(),
+        };
+        let nodetype = match &input_resources {
+            // TODO: Make this NodeType::open_resources
+            None => NodeType::pure(op),
+            Some(rs) => NodeType::new(op, rs.clone()),
+        };
+        let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
-        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature)
+        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_resources)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
@@ -286,7 +314,7 @@ pub trait Dataflow: Container {
 
         let inputs: SimpleRow = input_types.into();
 
-        let (cfg_node, _) = add_op_with_wires(
+        let (cfg_node, _) = add_node_with_wires(
             self,
             // TODO: Make input resources a parameter
             NodeType::pure(ops::CFG {
@@ -311,7 +339,7 @@ pub trait Dataflow: Container {
         }
         .into();
         let load_n = self.add_dataflow_op(
-            NodeType::pure(op),
+            op,
             // Constant wire from the constant value node
             vec![Wire::new(const_node, Port::new_outgoing(0))],
         )?;
@@ -355,9 +383,8 @@ pub trait Dataflow: Container {
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        // TODO: Add resources as a parameter
-        let (loop_node, _) =
-            add_op_with_wires(self, NodeType::pure(tail_loop.clone()), input_wires)?;
+        // TODO: Make input resources a parameter
+        let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
     }
@@ -391,12 +418,11 @@ pub trait Dataflow: Container {
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
-            // TODO: Allow specifying resources
-            NodeType::pure(ops::Conditional {
+            ops::Conditional {
                 predicate_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
-            }),
+            },
             input_wires,
         )?;
 
@@ -445,11 +471,7 @@ pub trait Dataflow: Container {
             .map(|&wire| self.get_wire_type(wire))
             .collect();
         let types = types?.into();
-        let make_op = self.add_dataflow_op(
-            // TODO Allow resources to be specified
-            NodeType::pure(LeafOp::MakeTuple { tys: types }),
-            values,
-        )?;
+        let make_op = self.add_dataflow_op(LeafOp::MakeTuple { tys: types }, values)?;
         Ok(make_op.out_wire(0))
     }
 
@@ -469,10 +491,10 @@ pub trait Dataflow: Container {
         value: Wire,
     ) -> Result<Wire, BuildError> {
         let make_op = self.add_dataflow_op(
-            NodeType::pure(LeafOp::Tag {
+            LeafOp::Tag {
                 tag,
                 variants: variants.into(),
-            }),
+            },
             vec![value],
         )?;
         Ok(make_op.out_wire(0))
@@ -488,8 +510,7 @@ pub trait Dataflow: Container {
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
         let variants = ClassicRow::predicate_variants_row(predicate_variants).map_into();
-        let make_op =
-            self.add_dataflow_op(NodeType::pure(LeafOp::Tag { tag, variants }), vec![tuple])?;
+        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
 
@@ -553,11 +574,7 @@ pub trait Dataflow: Container {
             }
         };
         let const_in_port = signature.output.len();
-        let op_id = self.add_dataflow_op(
-            // TODO: Allow resources to be specified
-            NodeType::pure(ops::Call { signature }),
-            input_wires,
-        )?;
+        let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
@@ -574,14 +591,22 @@ pub trait Dataflow: Container {
 
 fn add_op_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    op: impl Into<NodeType>,
+    optype: impl Into<OpType>,
+    inputs: Vec<Wire>,
+) -> Result<(Node, usize), BuildError> {
+    // TODO: Make this NodeType::open_resources
+    add_node_with_wires(data_builder, NodeType::pure(optype), inputs)
+}
+
+fn add_node_with_wires<T: Dataflow + ?Sized>(
+    data_builder: &mut T,
+    nodetype: NodeType,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
     let [inp, _] = data_builder.io();
 
-    let op = op.into();
-    let op_node = data_builder.add_child_op(op.clone())?;
-    let sig = op.op_signature();
+    let op_node = data_builder.add_child_node(nodetype.clone())?;
+    let sig = nodetype.op_signature();
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 
