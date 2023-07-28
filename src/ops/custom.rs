@@ -57,8 +57,10 @@ impl From<ExternalOp> for LeafOp {
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
         let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.resource, &op.op_name),
-            Self::Resource(ResourceOp { def, .. }) => (&def.resource, &def.name),
+            Self::Opaque(op) => (op.resource.clone(), &op.op_name),
+            Self::Resource(ResourceOp { def, .. }) => {
+                (def.resource.clone().unwrap_or_default(), &def.name)
+            }
         };
         qualify_name(res_id, op_name)
     }
@@ -136,7 +138,7 @@ impl From<ResourceOp> for OpaqueOp {
             None
         };
         OpaqueOp {
-            resource: def.resource.clone(),
+            resource: def.resource.clone().unwrap_or_default(),
             op_name: def.name.clone(),
             description: def.description.clone(),
             args,
@@ -163,7 +165,7 @@ pub struct OpaqueOp {
     signature: Option<Signature>,
 }
 
-fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
+fn qualify_name(res_id: ResourceId, op_name: &SmolStr) -> SmolStr {
     format!("{}.{}", res_id, op_name).into()
 }
 
