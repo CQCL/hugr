@@ -1063,10 +1063,6 @@ must have exactly one edge leaving them unless they are `ClassicType`, where
 outgoing ports may have any number of connected edges (0 is equivalent
 to a discard). All incoming ports must have exactly one edge connected to them.
 
-Our linear types behave like other values passed down a wire.
-Quantum gates behave just like other nodes on the graph with
-inputs and outputs, but there is only one edge leaving (or entering) each port.
-
 In fully qubit-counted contexts programs take in a number of qubits
 as input and return the same number, with no discarding. See
 [quantum resource](#quantum-resource) for more.
