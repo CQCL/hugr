@@ -143,8 +143,8 @@ impl Debug for LowerFunc {
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// The unique Resource owning this OpDef (of which this OpDef is a member)
-    pub resource: ResourceId,
+    /// The unique Resource, if any, owning this OpDef (of which this OpDef is a member)
+    pub resource: Option<ResourceId>,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
     pub name: SmolStr,
@@ -232,7 +232,11 @@ impl OpDef {
             }
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
-        assert!(res.contains(&self.resource));
+        let resource = self
+            .resource
+            .as_ref()
+            .expect("OpDef does not belong to a Resource.");
+        assert!(res.contains(resource));
         let mut sig = Signature::new_df(ins, outs);
         sig.input_resources = resources_in.clone();
         sig.output_resources = res.union(resources_in); // Pass input requirements through
@@ -296,8 +300,8 @@ pub struct TypeDef {
     ///
     /// [`TypeArg`]: crate::types::type_param::TypeArg
     pub params: Vec<TypeParam>,
-    /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
-    pub resource: ResourceId,
+    /// The unique Resource, if any, owning this TypeDef (of which this TypeDef is a member)
+    pub resource: Option<ResourceId>,
     /// Human readable description of the type definition.
     pub description: String,
 }
@@ -348,16 +352,17 @@ impl Resource {
     }
 
     /// Add an exported type to the resource.
-    pub fn add_type(&mut self, ty: TypeDef) -> Result<(), String> {
-        if ty.resource != ResourceId::default() {
+    pub fn add_type(&mut self, mut ty: TypeDef) -> Result<(), String> {
+        if let Some(resource) = ty.resource {
             return Err(format!(
                 "TypeDef {} owned by another resource {}",
-                ty.name, ty.resource
+                ty.name, resource
             ));
         }
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has a type called {}", &ty.name),
             Entry::Vacant(ve) => {
+                ty.resource = Some(self.name.clone());
                 ve.insert(ty);
             }
         }
@@ -366,16 +371,16 @@ impl Resource {
 
     /// Add an operation definition to the resource.
     pub fn add_op(&mut self, mut op: OpDef) -> Result<(), String> {
-        if op.resource != ResourceId::default() {
+        if let Some(resource) = op.resource {
             return Err(format!(
                 "OpDef {} owned by another resource {}",
-                op.name, op.resource
+                op.name, resource
             ));
         }
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
             Entry::Vacant(ve) => {
-                op.resource = self.name.clone();
+                op.resource = Some(self.name.clone());
                 ve.insert(Arc::new(op));
             }
         }

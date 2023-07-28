@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::resource::{OpDef, ResourceId, ResourceSet, TypeDef};
+use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomType, SimpleRow, SimpleType};
 use crate::Resource;
@@ -74,7 +74,7 @@ impl Type {
             name: self.name(),
             params: vec![],
             description: self.description().to_string(),
-            resource: ResourceId::default(),
+            resource: None,
         }
     }
 }
