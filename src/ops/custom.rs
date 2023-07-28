@@ -6,7 +6,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, HugrView};
-use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
+use crate::resource::{CustomConcrete, OpDef, ResourceId, ResourceSet, SignatureError};
 use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
 use crate::{Hugr, Node, Resource};
 
@@ -186,10 +186,19 @@ impl OpaqueOp {
             signature,
         }
     }
+}
 
-    /// Return the argument values for this operation.
-    pub fn args(&self) -> &[TypeArg] {
+impl CustomConcrete for OpaqueOp {
+    fn name(&self) -> &SmolStr {
+        &self.op_name
+    }
+
+    fn args(&self) -> &[TypeArg] {
         &self.args
+    }
+
+    fn resource(&self) -> &ResourceId {
+        &self.resource
     }
 }
 

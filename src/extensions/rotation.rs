@@ -291,8 +291,28 @@ impl Neg for &AngleValue {
 
 #[cfg(test)]
 mod test {
+
+    use crate::resource::{CustomConcrete, SignatureError, TypeParametrisedInternal};
+
+    use super::*;
+
     #[test]
     fn test_types() {
-        todo!()
+        let resource = resource();
+
+        let angle = resource.types().get("angle").unwrap();
+
+        let custom = angle.to_custom([]).unwrap();
+
+        angle.check_custom(&custom).unwrap();
+
+        let false_custom = CustomType::new(custom.name().clone(), vec![], "wrong_resource");
+        assert_eq!(
+            angle.check_custom(&false_custom),
+            Err(SignatureError::ResourceMismatch(
+                Some("rotations".into()),
+                Some("wrong_resource".into()),
+            ))
+        );
     }
 }

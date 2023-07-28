@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::resource::ResourceId;
+use crate::resource::{CustomConcrete, ResourceId};
 
 use super::{type_param::TypeArg, ClassicType, Container};
 
@@ -37,28 +37,23 @@ impl CustomType {
         }
     }
 
-    // /// Creates a new opaque type with no parameters
-    // pub const fn new_simple(id: SmolStr) -> Self {
-    //     Self {
-    //         id,
-    //         args: vec![],
-    //         resource: ResourceId::default(),
-    //     }
-    // }
-
-    /// Returns the unique identifier of the opaque type.
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Returns the arguments of the opaque type.
-    pub fn args(&self) -> &[TypeArg] {
-        &self.args
-    }
-
     /// Returns a [`ClassicType`] containing this opaque type.
     pub const fn classic_type(self) -> ClassicType {
         ClassicType::Container(Container::Opaque(self))
+    }
+}
+
+impl CustomConcrete for CustomType {
+    fn name(&self) -> &SmolStr {
+        &self.id
+    }
+
+    fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
+
+    fn resource(&self) -> &ResourceId {
+        &self.resource
     }
 }
 

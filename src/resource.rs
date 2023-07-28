@@ -63,8 +63,14 @@ where
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SignatureError {
+    /// Name mismatch
+    #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
+    NameMismatch(SmolStr, SmolStr),
+    /// Resource mismatch
+    #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
+    ResourceMismatch(Option<ResourceId>, Option<ResourceId>),
     /// When the type arguments of the node did not match the params declared by the OpDef
-    #[error("Type arguments of node did not match params declared by OpDef: {0}")]
+    #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
 }
 
@@ -141,9 +147,9 @@ impl Debug for LowerFunc {
 }
 
 /// Sealed trait for shared type parametrised functionality between [`TypeDef`] and [`OpDef`].
-pub trait TypeParametrisedInternal: sealed::Sealed {
+pub trait TypeParametrisedInternal: sealed::SealedDef {
     /// The concrete object built by binding type arguments to parameters
-    type Concrete;
+    type Concrete: CustomConcrete;
     /// The resource-unique name.
     fn name(&self) -> &SmolStr;
     /// Type parameters.
@@ -165,14 +171,45 @@ pub trait TypeParametrisedInternal: sealed::Sealed {
     /// This function will return an error if the provided arguments are not
     /// valid instances of the TypeDef parameters.
     fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError>;
+
+    /// Check custom instance is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    fn check_custom(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
+        if self.resource() != Some(custom.resource()) {
+            return Err(SignatureError::ResourceMismatch(
+                self.resource().cloned(),
+                Some(custom.resource().clone()),
+            ));
+        }
+        if self.name() != custom.name() {
+            return Err(SignatureError::NameMismatch(
+                self.name().clone(),
+                custom.name().clone(),
+            ));
+        }
+
+        self.check_args(custom.args())?;
+
+        Ok(())
+    }
 }
 
 mod sealed {
+    use crate::{ops::custom::OpaqueOp, types::CustomType};
+
     use super::{OpDef, TypeDef};
 
-    pub trait Sealed {}
-    impl Sealed for OpDef {}
-    impl Sealed for TypeDef {}
+    pub trait SealedDef {}
+    impl SealedDef for OpDef {}
+    impl SealedDef for TypeDef {}
+
+    pub trait SealedConcrete {}
+    impl SealedConcrete for OpaqueOp {}
+    impl SealedConcrete for CustomType {}
 }
 
 /// Serializable definition for dynamically loaded operations.
@@ -382,6 +419,16 @@ pub struct TypeDef {
     pub tag: TypeDefTag,
 }
 
+/// Concrete instantiations of types and operations defined in resources.
+pub trait CustomConcrete: sealed::SealedConcrete {
+    /// Name of the definition.
+    fn name(&self) -> &SmolStr;
+    /// Type arguments.
+    fn args(&self) -> &[TypeArg];
+    /// Parent resource.
+    fn resource(&self) -> &ResourceId;
+}
+
 impl TypeParametrisedInternal for TypeDef {
     type Concrete = CustomType;
 
@@ -470,6 +517,11 @@ impl Resource {
     /// Allows read-only access to the operations in this Resource
     pub fn operations(&self) -> &HashMap<SmolStr, Arc<OpDef>> {
         &self.operations
+    }
+
+    /// Allows read-only access to the types in this Resource
+    pub fn types(&self) -> &HashMap<SmolStr, TypeDef> {
+        &self.types
     }
 
     /// Returns the name of the resource.
