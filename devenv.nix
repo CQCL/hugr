@@ -6,8 +6,7 @@
   # https://devenv.sh/packages/
   # manually set rust packages rather than use devenv language support because
   # it doesn't seem to be up to date for macos yet (link error)
-  packages = with pkgs; [ cargo rustc rust-analyzer rustfmt clippy ];
-  env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+  packages = [ ];
 
   # https://devenv.sh/scripts/
   scripts.hello.exec = "echo Welcome to hugr dev shell!";
@@ -19,7 +18,10 @@
 
   # https://devenv.sh/languages/
   # https://devenv.sh/reference/options/#languagesrustversion
-  # languages.rust.enable = true;
+  languages.rust = {
+    enable = true;
+    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
+  };
 
   # https://devenv.sh/pre-commit-hooks/
   pre-commit.hooks.clippy.enable = true;
