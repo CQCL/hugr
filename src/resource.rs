@@ -296,6 +296,10 @@ pub struct TypeDef {
     ///
     /// [`TypeArg`]: crate::types::type_param::TypeArg
     pub params: Vec<TypeParam>,
+    /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
+    pub resource: ResourceId,
+    /// Human readable description of the type definition.
+    pub description: String,
 }
 
 /// A unique identifier for a resource.
@@ -344,18 +348,24 @@ impl Resource {
     }
 
     /// Add an exported type to the resource.
-    pub fn add_type(&mut self, ty: TypeDef) {
+    pub fn add_type(&mut self, ty: TypeDef) -> Result<(), String> {
+        if ty.resource != ResourceId::default() {
+            return Err(format!(
+                "TypeDef {} owned by another resource {}",
+                ty.name, ty.resource
+            ));
+        }
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has a type called {}", &ty.name),
             Entry::Vacant(ve) => {
                 ve.insert(ty);
             }
         }
+        Ok(())
     }
 
     /// Add an operation definition to the resource.
     pub fn add_op(&mut self, mut op: OpDef) -> Result<(), String> {
-        // if op.resource != self.name {
         if op.resource != ResourceId::default() {
             return Err(format!(
                 "OpDef {} owned by another resource {}",

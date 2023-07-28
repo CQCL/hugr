@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::resource::{OpDef, ResourceSet, TypeDef};
+use crate::resource::{OpDef, ResourceId, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomType, SimpleRow, SimpleType};
 use crate::Resource;
@@ -25,8 +25,8 @@ pub const fn resource_id() -> SmolStr {
 pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
-    resource.add_type(Type::Angle.type_def());
-    resource.add_type(Type::Quaternion.type_def());
+    resource.add_type(Type::Angle.type_def()).unwrap();
+    resource.add_type(Type::Quaternion.type_def()).unwrap();
 
     let op = OpDef::new_with_custom_sig(
         "AngleAdd".into(),
@@ -58,6 +58,13 @@ impl Type {
         }
     }
 
+    pub const fn description(&self) -> &str {
+        match self {
+            Type::Angle => "Floating point angle",
+            Type::Quaternion => "Quaternion specifying rotation.",
+        }
+    }
+
     pub fn custom_type(self) -> CustomType {
         CustomType::new(self.name(), [])
     }
@@ -66,6 +73,8 @@ impl Type {
         TypeDef {
             name: self.name(),
             params: vec![],
+            description: self.description().to_string(),
+            resource: ResourceId::default(),
         }
     }
 }
