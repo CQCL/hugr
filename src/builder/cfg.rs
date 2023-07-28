@@ -15,7 +15,6 @@ use crate::types::AbstractSignature;
 use crate::Node;
 use crate::{
     hugr::{HugrMut, NodeType},
-    resource::ResourceSet,
     type_row,
     types::{ClassicRow, SimpleRow, SimpleType},
     Hugr,
@@ -70,11 +69,8 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        let base = Hugr::new(NodeType {
-            op: cfg_op.into(),
-            // TODO: Allow this to be specified
-            input_resources: Some(ResourceSet::new()),
-        });
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
@@ -304,11 +300,8 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        let base = Hugr::new(NodeType {
-            op: op.into(),
-            // TODO: Allow these to be specified
-            input_resources: Some(ResourceSet::new()),
-        });
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }

@@ -14,7 +14,6 @@ use super::{
 use crate::{
     hugr::NodeType,
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
-    resource::ResourceSet,
     types::EdgeKind,
 };
 
@@ -289,15 +288,11 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_op_with_wires(
             self,
-            NodeType {
-                op: ops::CFG {
-                    inputs: inputs.clone(),
-                    outputs: output_types.clone(),
-                }
-                .into(),
-                // TODO: CFGs should be allow to specify resources
-                input_resources: Some(ResourceSet::new()),
-            },
+            // TODO: Make input resources a parameter
+            NodeType::pure(ops::CFG {
+                inputs: inputs.clone(),
+                outputs: output_types.clone(),
+            }),
             input_wires,
         )?;
         CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)
@@ -360,15 +355,9 @@ pub trait Dataflow: Container {
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        let (loop_node, _) = add_op_with_wires(
-            self,
-            NodeType {
-                op: tail_loop.clone().into(),
-                // TODO: Add resoucres as a parameter
-                input_resources: Some(ResourceSet::new()),
-            },
-            input_wires,
-        )?;
+        // TODO: Add resources as a parameter
+        let (loop_node, _) =
+            add_op_with_wires(self, NodeType::pure(tail_loop.clone()), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
     }
@@ -402,16 +391,12 @@ pub trait Dataflow: Container {
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
-            NodeType {
-                op: ops::Conditional {
-                    predicate_inputs,
-                    other_inputs: inputs,
-                    outputs: output_types,
-                }
-                .into(),
-                // TODO: Allow specifying resources
-                input_resources: Some(ResourceSet::new()),
-            },
+            // TODO: Allow specifying resources
+            NodeType::pure(ops::Conditional {
+                predicate_inputs,
+                other_inputs: inputs,
+                outputs: output_types,
+            }),
             input_wires,
         )?;
 
@@ -461,11 +446,8 @@ pub trait Dataflow: Container {
             .collect();
         let types = types?.into();
         let make_op = self.add_dataflow_op(
-            NodeType {
-                op: LeafOp::MakeTuple { tys: types }.into(),
-                // TODO Allow resources to be specified
-                input_resources: Some(ResourceSet::new()),
-            },
+            // TODO Allow resources to be specified
+            NodeType::pure(LeafOp::MakeTuple { tys: types }),
             values,
         )?;
         Ok(make_op.out_wire(0))
@@ -572,11 +554,8 @@ pub trait Dataflow: Container {
         };
         let const_in_port = signature.output.len();
         let op_id = self.add_dataflow_op(
-            NodeType {
-                op: ops::Call { signature }.into(),
-                // TODO: Allow resources to be specified
-                input_resources: Some(ResourceSet::new()),
-            },
+            // TODO: Allow resources to be specified
+            NodeType::pure(ops::Call { signature }),
             input_wires,
         )?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
@@ -602,7 +581,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
 
     let op = op.into();
     let op_node = data_builder.add_child_op(op.clone())?;
-    let sig = op.op.signature();
+    let sig = op.op_signature();
 
     wire_up_inputs(inputs, op_node, data_builder, inp)?;
 

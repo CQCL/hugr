@@ -1,7 +1,6 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::{view::HugrView, NodeType};
-use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 use crate::{Hugr, Node};
 
@@ -84,11 +83,8 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = Hugr::new(NodeType {
-            op: tail_loop.clone().into(),
-            // TODO: Allow this to be specified
-            input_resources: Some(ResourceSet::new()),
-        });
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(tail_loop.clone()));
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }

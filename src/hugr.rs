@@ -26,9 +26,11 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::view::HugrView;
-use crate::ops::{OpTrait, OpType};
+use crate::ops::{OpTag, OpTrait, OpType};
 use crate::resource::ResourceSet;
-use crate::types::Signature;
+use crate::types::{AbstractSignature, Signature};
+
+use delegate::delegate;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -54,9 +56,9 @@ pub struct Hugr {
 /// The type of a node on a graph
 pub struct NodeType {
     /// The underlying OpType
-    pub op: OpType,
+    op: OpType,
     /// The resources that the signature has been specialised to
-    pub input_resources: Option<ResourceSet>,
+    input_resources: Option<ResourceSet>,
 }
 
 impl NodeType {
@@ -77,6 +79,7 @@ impl NodeType {
     }
 
     /// Instantiate an OpType with an unknown set of input resources
+    /// (to be inferred later)
     pub fn open_resources(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
@@ -89,6 +92,22 @@ impl NodeType {
         self.input_resources
             .clone()
             .map(|rs| self.op.signature().with_input_resources(rs))
+    }
+
+    /// Get the abstract signature from the embedded op
+    pub fn op_signature(&self) -> AbstractSignature {
+        self.op.signature()
+    }
+}
+
+impl NodeType {
+    #![allow(missing_docs)]
+    delegate! {
+        to self.op {
+            pub fn tag(&self) -> OpTag;
+            pub fn input_count(&self) -> usize;
+            pub fn output_count(&self) -> usize;
+        }
     }
 }
 

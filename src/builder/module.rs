@@ -116,14 +116,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(NodeType {
-            op: ops::FuncDecl {
+        let declare_n = self.add_child_op(NodeType::new(
+            ops::FuncDecl {
                 signature: signature.signature,
                 name: name.into(),
-            }
-            .into(),
-            input_resources: Some(signature.input_resources),
-        })?;
+            },
+            signature.input_resources,
+        ))?;
 
         Ok(declare_n.into())
     }

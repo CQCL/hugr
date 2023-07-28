@@ -73,11 +73,8 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(NodeType {
-            op: dfg_op.into(),
-            // TODO: Allow this to be specified
-            input_resources: Some(ResourceSet::new()),
-        });
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(dfg_op));
         let root = base.root();
         DFGBuilder::create_with_io(
             base,
@@ -207,7 +204,7 @@ mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, LeafOp, OpTag, OpTrait};
+    use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
     use crate::types::SimpleType;
     use crate::{
         builder::{
@@ -388,7 +385,7 @@ mod test {
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type().op.tag(), OpTag::Dfg);
+        assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
 
         Ok(())
     }
@@ -459,14 +456,13 @@ mod test {
         let [w] = lift_a.outputs_arr();
 
         let lift_b = add_ab.add_dataflow_op(
-            NodeType {
-                op: LeafOp::Lift {
+            NodeType::new(
+                LeafOp::Lift {
                     type_row: type_row![BIT],
                     new_resource: "B".into(),
-                }
-                .into(),
-                input_resources: Some(ResourceSet::from_iter(["A".into()])),
-            },
+                },
+                ResourceSet::from_iter(["A".into()]),
+            ),
             [w],
         )?;
         let [w] = lift_b.outputs_arr();
