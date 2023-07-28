@@ -66,7 +66,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [])
+        CustomType::new(self.name(), [], resource_id())
     }
 
     pub fn type_def(self) -> TypeDef {
@@ -286,5 +286,13 @@ impl Neg for &AngleValue {
 
     fn neg(self) -> Self::Output {
         self.unary_op(|x| -x, |x| -x)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_types() {
+        todo!()
     }
 }

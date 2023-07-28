@@ -4,11 +4,14 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
+use crate::resource::ResourceId;
+
 use super::{type_param::TypeArg, ClassicType, Container};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
+    resource: ResourceId,
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
@@ -22,17 +25,26 @@ pub struct CustomType {
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: impl Into<SmolStr>, args: impl Into<Vec<TypeArg>>) -> Self {
+    pub fn new(
+        id: impl Into<SmolStr>,
+        args: impl Into<Vec<TypeArg>>,
+        resource: impl Into<ResourceId>,
+    ) -> Self {
         Self {
             id: id.into(),
             args: args.into(),
+            resource: resource.into(),
         }
     }
 
-    /// Creates a new opaque type with no parameters
-    pub const fn new_simple(id: SmolStr) -> Self {
-        Self { id, args: vec![] }
-    }
+    // /// Creates a new opaque type with no parameters
+    // pub const fn new_simple(id: SmolStr) -> Self {
+    //     Self {
+    //         id,
+    //         args: vec![],
+    //         resource: ResourceId::default(),
+    //     }
+    // }
 
     /// Returns the unique identifier of the opaque type.
     pub fn id(&self) -> &str {

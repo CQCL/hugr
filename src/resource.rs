@@ -11,12 +11,13 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
-use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
     Signature, SignatureDescription, SimpleRow,
 };
+use crate::types::{CustomType, TypeTag};
 use crate::Hugr;
 
 /// Trait for resources to provide custom binary code for computing signature.
@@ -139,6 +140,41 @@ impl Debug for LowerFunc {
     }
 }
 
+/// Sealed trait for shared type parametrised functionality between [`TypeDef`] and [`OpDef`].
+pub trait TypeParametrisedInternal: sealed::Sealed {
+    /// The concrete object built by binding type arguments to parameters
+    type Concrete;
+    /// The resource-unique name.
+    fn name(&self) -> &SmolStr;
+    /// Type parameters.
+    fn params(&self) -> &[TypeParam];
+    /// The parent resource. if any.
+    fn resource(&self) -> Option<&ResourceId>;
+    /// Check provided type arguments are valid against parameters.
+    fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        for (a, p) in args.iter().zip(self.params().iter()) {
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        Ok(())
+    }
+
+    /// Instantiate a concrete instance by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the TypeDef parameters.
+    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError>;
+}
+
+mod sealed {
+    use super::{OpDef, TypeDef};
+
+    pub trait Sealed {}
+    impl Sealed for OpDef {}
+    impl Sealed for TypeDef {}
+}
+
 /// Serializable definition for dynamically loaded operations.
 ///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
@@ -163,6 +199,36 @@ pub struct OpDef {
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
+}
+
+impl TypeParametrisedInternal for OpDef {
+    type Concrete = OpaqueOp;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError> {
+        let args = args.into();
+        self.check_args(&args)?;
+
+        Ok(OpaqueOp::new(
+            self.resource().expect("Resource not set.").clone(),
+            self.name().clone(),
+            // TODO add description
+            "".to_string(),
+            args,
+            None,
+        ))
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
 }
 
 impl OpDef {
@@ -244,13 +310,6 @@ impl OpDef {
         Ok(sig)
     }
 
-    fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        for (a, p) in args.iter().zip(self.params.iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
-        Ok(())
-    }
-
     /// Optional description of the ports in the signature.
     pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
         match &self.signature_func {
@@ -321,6 +380,32 @@ pub struct TypeDef {
     pub description: String,
     /// The definition of the type tag of this definition.
     pub tag: TypeDefTag,
+}
+
+impl TypeParametrisedInternal for TypeDef {
+    type Concrete = CustomType;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError> {
+        let args = args.into();
+        self.check_args(&args)?;
+        Ok(CustomType::new(
+            self.name().clone(),
+            args,
+            self.resource().expect("Resource not set.").clone(),
+        ))
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
 }
 
 impl TypeDef {
