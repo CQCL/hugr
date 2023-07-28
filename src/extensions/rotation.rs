@@ -65,7 +65,7 @@ impl Type {
     pub fn type_def(self) -> TypeDef {
         TypeDef {
             name: self.name(),
-            args: vec![],
+            params: vec![],
         }
     }
 }
