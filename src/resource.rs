@@ -169,7 +169,7 @@ impl OpDef {
     pub fn new_with_yaml_types(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         inputs: String, // TODO this is likely the wrong type
         outputs: String, // TODO similarly
@@ -179,7 +179,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            params: args,
+            params,
             misc,
             signature_func: SignatureFunc::FromYAML { inputs, outputs },
             lower_funcs: Vec::new(),
@@ -190,7 +190,7 @@ impl OpDef {
     pub fn new_with_custom_sig(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         sig_func: impl CustomSignatureFunc + 'static,
     ) -> Self {
@@ -198,7 +198,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            params: args,
+            params,
             misc,
             signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
             lower_funcs: Vec::new(),

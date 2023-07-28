@@ -22,10 +22,10 @@ pub struct CustomType {
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: impl Into<SmolStr>, params: impl Into<Vec<TypeArg>>) -> Self {
+    pub fn new(id: impl Into<SmolStr>, args: impl Into<Vec<TypeArg>>) -> Self {
         Self {
             id: id.into(),
-            args: params.into(),
+            args: args.into(),
         }
     }
 
