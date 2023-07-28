@@ -151,7 +151,7 @@ pub struct OpDef {
     /// Human readable description of the operation.
     pub description: String,
     /// Declared type parameters, values must be provided for each operation node
-    pub args: Vec<TypeParam>,
+    pub params: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
@@ -169,7 +169,7 @@ impl OpDef {
     pub fn new_with_yaml_types(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         inputs: String, // TODO this is likely the wrong type
         outputs: String, // TODO similarly
@@ -179,7 +179,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            args,
+            params,
             misc,
             signature_func: SignatureFunc::FromYAML { inputs, outputs },
             lower_funcs: Vec::new(),
@@ -190,7 +190,7 @@ impl OpDef {
     pub fn new_with_custom_sig(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         sig_func: impl CustomSignatureFunc + 'static,
     ) -> Self {
@@ -198,7 +198,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            args,
+            params,
             misc,
             signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
             lower_funcs: Vec::new(),
@@ -218,15 +218,13 @@ impl OpDef {
         args: &[TypeArg],
         resources_in: &ResourceSet,
     ) -> Result<Signature, SignatureError> {
-        if args.len() != self.args.len() {
+        if args.len() != self.params.len() {
             return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
                 args.len(),
-                self.args.len(),
+                self.params.len(),
             )));
         }
-        for (a, p) in args.iter().zip(self.args.iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
+        self.check_args(args)?;
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
                 // Sig should be computed solely from inputs + outputs + args.
@@ -239,6 +237,13 @@ impl OpDef {
         sig.input_resources = resources_in.clone();
         sig.output_resources = res.union(resources_in); // Pass input requirements through
         Ok(sig)
+    }
+
+    fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        for (a, p) in args.iter().zip(self.params.iter()) {
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        Ok(())
     }
 
     /// Optional description of the ports in the signature.
@@ -290,7 +295,7 @@ pub struct TypeDef {
     /// with the same number of [`TypeArg`]'s to make an actual type.
     ///
     /// [`TypeArg`]: crate::types::type_param::TypeArg
-    pub args: Vec<TypeParam>,
+    pub params: Vec<TypeParam>,
 }
 
 /// A unique identifier for a resource.

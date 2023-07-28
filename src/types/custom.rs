@@ -17,21 +17,21 @@ pub struct CustomType {
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
-    params: Vec<TypeArg>,
+    args: Vec<TypeArg>,
 }
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: impl Into<SmolStr>, params: impl Into<Vec<TypeArg>>) -> Self {
+    pub fn new(id: impl Into<SmolStr>, args: impl Into<Vec<TypeArg>>) -> Self {
         Self {
             id: id.into(),
-            params: params.into(),
+            args: args.into(),
         }
     }
 
     /// Creates a new opaque type with no parameters
     pub const fn new_simple(id: SmolStr) -> Self {
-        Self { id, params: vec![] }
+        Self { id, args: vec![] }
     }
 
     /// Returns the unique identifier of the opaque type.
@@ -39,9 +39,9 @@ impl CustomType {
         &self.id
     }
 
-    /// Returns the parameters of the opaque type.
-    pub fn params(&self) -> &[TypeArg] {
-        &self.params
+    /// Returns the arguments of the opaque type.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
     }
 
     /// Returns a [`ClassicType`] containing this opaque type.
@@ -52,7 +52,7 @@ impl CustomType {
 
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({:?})", self.id, self.params)
+        write!(f, "{}({:?})", self.id, self.args)
     }
 }
 
