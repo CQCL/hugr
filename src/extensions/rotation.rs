@@ -292,7 +292,7 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::resource::{CustomConcrete, SignatureError, TypeParametrisedInternal};
+    use crate::resource::SignatureError;
 
     use super::*;
 
@@ -302,7 +302,7 @@ mod test {
 
         let angle = resource.types().get("angle").unwrap();
 
-        let custom = angle.to_custom([]).unwrap();
+        let custom = angle.instantiate_concrete([]).unwrap();
 
         angle.check_custom(&custom).unwrap();
 

@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::resource::{CustomConcrete, ResourceId};
+use crate::resource::ResourceId;
 
 use super::{type_param::TypeArg, ClassicType, Container};
 
@@ -43,16 +43,19 @@ impl CustomType {
     }
 }
 
-impl CustomConcrete for CustomType {
-    fn name(&self) -> &SmolStr {
+impl CustomType {
+    /// unique name of the type.
+    pub fn name(&self) -> &SmolStr {
         &self.id
     }
 
-    fn args(&self) -> &[TypeArg] {
+    /// Type arguments.
+    pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
 
-    fn resource(&self) -> &ResourceId {
+    /// Parent resource.
+    pub fn resource(&self) -> &ResourceId {
         &self.resource
     }
 }

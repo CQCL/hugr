@@ -147,8 +147,43 @@ impl Debug for LowerFunc {
     }
 }
 
-/// Sealed trait for shared type parametrised functionality between [`TypeDef`] and [`OpDef`].
-pub trait TypeParametrisedInternal: sealed::SealedDef {
+/// Concrete instantiations of types and operations defined in resources.
+trait CustomConcrete {
+    fn def_name(&self) -> &SmolStr;
+    fn type_args(&self) -> &[TypeArg];
+    fn parent_resource(&self) -> &ResourceId;
+}
+
+impl CustomConcrete for OpaqueOp {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+impl CustomConcrete for CustomType {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+/// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
+trait TypeParametrised: sealed::SealedDef {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
     /// The resource-unique name.
@@ -158,20 +193,12 @@ pub trait TypeParametrisedInternal: sealed::SealedDef {
     /// The parent resource. if any.
     fn resource(&self) -> Option<&ResourceId>;
     /// Check provided type arguments are valid against parameters.
-    fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+    fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         for (a, p) in args.iter().zip(self.params().iter()) {
             check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
         }
         Ok(())
     }
-
-    /// Instantiate a concrete instance by providing type arguments.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the provided arguments are not
-    /// valid instances of the TypeDef parameters.
-    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError>;
 
     /// Check custom instance is a valid instantiation of this definition.
     ///
@@ -179,21 +206,21 @@ pub trait TypeParametrisedInternal: sealed::SealedDef {
     ///
     /// This function will return an error if the type of the instance does not
     /// match the definition.
-    fn check_custom(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
-        if self.resource() != Some(custom.resource()) {
+    fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
+        if self.resource() != Some(custom.parent_resource()) {
             return Err(SignatureError::ResourceMismatch(
                 self.resource().cloned(),
-                Some(custom.resource().clone()),
+                Some(custom.parent_resource().clone()),
             ));
         }
-        if self.name() != custom.name() {
+        if self.name() != custom.def_name() {
             return Err(SignatureError::NameMismatch(
                 self.name().clone(),
-                custom.name().clone(),
+                custom.def_name().clone(),
             ));
         }
 
-        self.check_args(custom.args())?;
+        self.check_args_impl(custom.type_args())?;
 
         Ok(())
     }
@@ -239,18 +266,32 @@ pub struct OpDef {
     lower_funcs: Vec<LowerFunc>,
 }
 
-impl TypeParametrisedInternal for OpDef {
-    type Concrete = OpaqueOp;
-
-    fn params(&self) -> &[TypeParam] {
-        &self.params
+impl OpDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
     }
 
-    fn name(&self) -> &SmolStr {
-        &self.name
+    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
+        self.check_concrete_impl(opaque)
     }
 
-    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError> {
+    /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_opaque(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<OpaqueOp, SignatureError> {
         let args = args.into();
         self.check_args(&args)?;
 
@@ -262,6 +303,18 @@ impl TypeParametrisedInternal for OpDef {
             args,
             None,
         ))
+    }
+}
+
+impl TypeParametrised for OpDef {
+    type Concrete = OpaqueOp;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
     }
 
     fn resource(&self) -> Option<&ResourceId> {
@@ -420,17 +473,43 @@ pub struct TypeDef {
     pub tag: TypeDefTag,
 }
 
-/// Concrete instantiations of types and operations defined in resources.
-pub trait CustomConcrete: sealed::SealedConcrete {
-    /// Name of the definition.
-    fn name(&self) -> &SmolStr;
-    /// Type arguments.
-    fn args(&self) -> &[TypeArg];
-    /// Parent resource.
-    fn resource(&self) -> &ResourceId;
+impl TypeDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
+    }
+
+    /// Check [`CustomType`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
+        self.check_concrete_impl(custom)
+    }
+
+    /// Instantiate a concrete [`CustomType`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_concrete(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<CustomType, SignatureError> {
+        let args = args.into();
+        self.check_args_impl(&args)?;
+        Ok(CustomType::new(
+            self.name().clone(),
+            args,
+            self.resource().expect("Resource not set.").clone(),
+        ))
+    }
 }
 
-impl TypeParametrisedInternal for TypeDef {
+impl TypeParametrised for TypeDef {
     type Concrete = CustomType;
 
     fn params(&self) -> &[TypeParam] {
@@ -439,16 +518,6 @@ impl TypeParametrisedInternal for TypeDef {
 
     fn name(&self) -> &SmolStr {
         &self.name
-    }
-
-    fn to_custom(&self, args: impl Into<Vec<TypeArg>>) -> Result<Self::Concrete, SignatureError> {
-        let args = args.into();
-        self.check_args(&args)?;
-        Ok(CustomType::new(
-            self.name().clone(),
-            args,
-            self.resource().expect("Resource not set.").clone(),
-        ))
     }
 
     fn resource(&self) -> Option<&ResourceId> {
