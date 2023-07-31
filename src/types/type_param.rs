@@ -57,13 +57,11 @@ pub enum TypeArg {
 }
 
 impl TypeArg {
-    /// Report [`TypeArg`] if param is a type
-    pub fn tag(&self) -> Option<TypeTag> {
+    /// Report [`TypeTag`] if param is a type
+    pub fn tag_of_type(&self) -> Option<TypeTag> {
         match self {
             TypeArg::Type(s) => Some(s.tag()),
             TypeArg::ClassicType(c) => Some(c.tag()),
-            // assume list is well formed - all elements of same type
-            TypeArg::List(t) => t.iter().next().and_then(TypeArg::tag),
             _ => None,
         }
     }

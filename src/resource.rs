@@ -338,7 +338,7 @@ impl TypeDef {
                     .iter()
                     .map(|i| {
                         args.get(*i)
-                            .and_then(|ta| ta.tag())
+                            .and_then(|ta| ta.tag_of_type())
                             .expect("TypeParam index invalid or param does not have a TypeTag.")
                     })
                     .fold(TypeTag::Hashable, TypeTag::union)
