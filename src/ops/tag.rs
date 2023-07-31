@@ -62,6 +62,9 @@ pub enum OpTag {
     BasicBlock,
     /// A control flow exit node.
     BasicBlockExit,
+
+    /// A node with input and output children
+    IOBlock,
 }
 
 impl OpTag {
@@ -103,24 +106,25 @@ impl OpTag {
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ScopedDefn],
-            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn],
-            OpTag::BasicBlock => &[OpTag::ControlFlowChild],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::IOBlock],
+            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::IOBlock],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
-            OpTag::Case => &[OpTag::Any],
+            OpTag::Case => &[OpTag::Any, OpTag::IOBlock],
             OpTag::ModuleRoot => &[OpTag::Any],
             OpTag::Const => &[OpTag::ScopedDefn],
-            OpTag::Dfg => &[OpTag::DataflowChild],
+            OpTag::Dfg => &[OpTag::DataflowChild, OpTag::IOBlock],
             OpTag::Cfg => &[OpTag::DataflowChild],
             OpTag::ScopedDefn => &[
                 OpTag::DataflowChild,
                 OpTag::ControlFlowChild,
                 OpTag::ModuleOp,
             ],
-            OpTag::TailLoop => &[OpTag::DataflowChild],
+            OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::IOBlock],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::FnCall => &[OpTag::DataflowChild],
             OpTag::LoadConst => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
+            OpTag::IOBlock => &[OpTag::Any],
         }
     }
 
@@ -150,6 +154,7 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
+            OpTag::IOBlock => "Operation with input and output children",
         }
     }
 
