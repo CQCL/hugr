@@ -1,7 +1,7 @@
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
-use crate::ops::{self, ConstValue, LeafOp, OpTrait, OpType};
+use crate::ops::{self, LeafOp, OpTrait, OpType};
 
 use std::iter;
 
@@ -61,8 +61,8 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(&mut self, value: ConstValue, typ: ClassicType) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_op(ops::Const::new(value, typ)?)?;
+    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
+        let const_n = self.add_child_op(constant)?;
 
         Ok(const_n.into())
     }
@@ -323,8 +323,8 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(&mut self, val: ConstValue, typ: ClassicType) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(val, typ)?;
+    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
+        let cid = self.add_constant(constant)?;
         self.load_const(&cid)
     }
 

@@ -1144,11 +1144,7 @@ mod test {
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(
             h.root(),
-            ops::Const::new(
-                ConstValue::Int { width: 1, value: 1 },
-                ClassicType::int::<1>(),
-            )
-            .unwrap(),
+            ops::Const::new(ConstValue::Int(1), ClassicType::int::<1>()).unwrap(),
         )?;
         let lcst = h.add_op_with_parent(
             h.root(),

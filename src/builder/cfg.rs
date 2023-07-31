@@ -293,7 +293,7 @@ mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::macros::classic_row;
     use crate::types::ClassicType;
-    use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+    use crate::{builder::test::NAT, type_row, types::Signature};
     use cool_asserts::assert_matches;
 
     use super::*;
@@ -348,10 +348,7 @@ mod test {
         };
         let mut middle_b = cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
         let middle = {
-            let c = middle_b.add_load_const(
-                ConstValue::simple_unary_predicate(),
-                ClassicType::new_simple_predicate(1),
-            )?;
+            let c = middle_b.add_load_const(ops::Const::simple_unary_predicate())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

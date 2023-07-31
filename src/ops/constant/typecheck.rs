@@ -117,12 +117,8 @@ fn map_vals<T: PrimType, T2: PrimType>(
 /// Typecheck a constant value
 pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
     match (typ, val) {
-        (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int { value, width }) => {
-            if exp_width == width {
-                check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int)
-            } else {
-                Err(ConstTypeError::IntWidthMismatch(*exp_width, *width))
-            }
+        (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int(value)) => {
+            check_int_fits_in_width(*value, *exp_width).map_err(ConstTypeError::Int)
         }
         (ClassicType::F64, ConstValue::F64(_)) => Ok(()),
         (ty @ ClassicType::Container(c), tm) => match (c, tm) {
@@ -187,10 +183,6 @@ mod test {
     fn test_typecheck_const() {
         const INT: ClassicType = ClassicType::int::<64>();
         typecheck_const(&INT, &ConstValue::i64(3)).unwrap();
-        assert_eq!(
-            typecheck_const(&HashableType::Int(32).into(), &ConstValue::i64(3)),
-            Err(ConstTypeError::IntWidthMismatch(32, 64))
-        );
         typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();
         assert_eq!(
             typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
