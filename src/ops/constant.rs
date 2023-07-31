@@ -4,7 +4,6 @@ use std::any::Any;
 
 use crate::{
     classic_row,
-    hugr::typecheck::{typecheck_const, ConstTypeError},
     macros::impl_box_clone,
     types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind, HashableType},
 };
@@ -15,6 +14,8 @@ use smol_str::SmolStr;
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
+pub mod typecheck;
+use typecheck::{typecheck_const, ConstTypeError};
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Const(ConstValue);
@@ -220,12 +221,11 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[cfg(test)]
 mod test {
+    use super::typecheck::ConstTypeError;
     use super::ConstValue;
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
-        classic_row,
-        hugr::typecheck::ConstTypeError,
-        type_row,
+        classic_row, type_row,
         types::{ClassicType, SimpleRow, SimpleType},
     };
 

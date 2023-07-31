@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use std::collections::HashSet;
 
-use crate::hugr::*;
+use thiserror::Error;
 
 // For static typechecking
 use crate::ops::ConstValue;
