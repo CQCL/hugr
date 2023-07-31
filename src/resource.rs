@@ -231,9 +231,7 @@ impl OpDef {
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
         assert!(res.contains(&self.resource));
-        let mut sig = AbstractSignature::new_df(ins, outs);
-        sig.resource_reqs = res;
-        Ok(sig)
+        Ok(AbstractSignature::new_df(ins, outs).with_resource_delta(&res))
     }
 
     /// Optional description of the ports in the signature.
