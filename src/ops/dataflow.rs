@@ -32,8 +32,6 @@ pub(super) trait DataflowOpTrait {
 pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
     fn new(types: impl Into<SimpleRow>) -> Self;
-    /// Helper method to add resource requirements to an I/O node
-    fn with_resources(self, rs: ResourceSet) -> Self;
 }
 
 /// An input node.
@@ -42,8 +40,6 @@ pub trait IOTrait {
 pub struct Input {
     /// Input value types
     pub types: SimpleRow,
-    /// Resources attached to output wires
-    pub resources: ResourceSet,
 }
 
 impl_op_name!(Input);
@@ -52,13 +48,7 @@ impl IOTrait for Input {
     fn new(types: impl Into<SimpleRow>) -> Self {
         Input {
             types: types.into(),
-            resources: ResourceSet::new(),
         }
-    }
-
-    fn with_resources(mut self, resources: ResourceSet) -> Self {
-        self.resources = resources;
-        self
     }
 }
 
@@ -67,8 +57,6 @@ impl IOTrait for Input {
 pub struct Output {
     /// Output value types
     pub types: SimpleRow,
-    /// Resources expected from input wires
-    pub resources: ResourceSet,
 }
 
 impl_op_name!(Output);
@@ -77,13 +65,7 @@ impl IOTrait for Output {
     fn new(types: impl Into<SimpleRow>) -> Self {
         Output {
             types: types.into(),
-            resources: ResourceSet::new(),
         }
-    }
-
-    fn with_resources(mut self, resources: ResourceSet) -> Self {
-        self.resources = resources;
-        self
     }
 }
 
@@ -100,7 +82,7 @@ impl DataflowOpTrait for Input {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new_df(SimpleRow::new(), self.types.clone())
-            .with_resource_delta(&self.resources)
+            .with_resource_delta(&ResourceSet::new())
     }
 }
 impl DataflowOpTrait for Output {

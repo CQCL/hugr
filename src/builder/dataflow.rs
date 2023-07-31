@@ -42,16 +42,12 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
            N.B. This means that for input nodes, we can't infer the resources
            from the input wires as we normally expect, but have to infer the
            output wires and make use of the equality between the two.
-
-         - (TODO:) Hence, we should get rid of resource requirements in input and output nodes
         */
         let input = ops::Input {
             types: signature.input().clone(),
-            resources: ResourceSet::new(),
         };
         let output = ops::Output {
             types: signature.output().clone(),
-            resources: ResourceSet::new(),
         };
         base.as_mut().add_node_with_parent(
             parent,
