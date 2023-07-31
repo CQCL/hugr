@@ -6,7 +6,7 @@
 
 use thiserror::Error;
 
-use crate::ops::constant::typecheck::{check_int_fits_in_width, ConstIntError};
+use crate::ops::constant::typecheck::ConstIntError;
 use crate::ops::constant::HugrIntValueStore;
 
 use super::{
@@ -76,6 +76,10 @@ impl TypeArg {
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
+    let _ = arg;
+    let _ = param;
+    todo!();
+    /* Reinstate following checkable consts etc.
     match (arg, param) {
         (TypeArg::Type(_), TypeParam::Type) => Ok(()),
         (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
@@ -115,7 +119,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Container::Alias(n) => Err(TypeArgError::NoAliases(n.to_string())),
         },
         _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
-    }
+    }*/
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
