@@ -5,6 +5,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::hugr::typecheck::ConstTypeError;
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::SimpleType;
@@ -41,6 +42,11 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
+    /// Tried to add a malformed [ConstValue]
+    ///
+    /// [ConstValue]: crate::ops::constant::ConstValue
+    #[error("Constant failed typechecking: {0}")]
+    BadConstant(#[from] ConstTypeError),
     /// HUGR construction error.
     #[error("Error when mutating HUGR: {0}.")]
     ConstructError(#[from] HugrError),

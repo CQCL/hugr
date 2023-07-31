@@ -4,6 +4,7 @@ use std::any::Any;
 
 use crate::{
     classic_row,
+    hugr::typecheck::{typecheck_const, ConstTypeError},
     macros::impl_box_clone,
     types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind, HashableType},
 };
@@ -16,7 +17,16 @@ use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
-pub struct Const(pub ConstValue);
+pub struct Const(ConstValue);
+
+impl Const {
+    /// Creates a new Const, type-checking the value.
+    pub fn new(val: ConstValue) -> Result<Self, ConstTypeError> {
+        typecheck_const(&val.const_type(), &val)?;
+        Ok(Const(val))
+    }
+}
+
 impl OpName for Const {
     fn name(&self) -> SmolStr {
         self.0.name()
@@ -214,7 +224,7 @@ mod test {
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
         classic_row,
-        hugr::{typecheck::ConstTypeError, ValidationError},
+        hugr::typecheck::ConstTypeError,
         type_row,
         types::{ClassicType, SimpleRow, SimpleType},
     };
@@ -257,19 +267,14 @@ mod test {
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty])).unwrap();
-        let c = b
-            .add_constant(ConstValue::predicate(
-                0,
-                ConstValue::Tuple(vec![]),
-                pred_rows,
-            ))
-            .unwrap();
-        let w = b.load_const(&c).unwrap();
+        let res = b.add_constant(ConstValue::predicate(
+            0,
+            ConstValue::Tuple(vec![]),
+            pred_rows,
+        ));
         assert_eq!(
-            b.finish_hugr_with_outputs([w]),
-            Err(BuildError::InvalidHUGR(ValidationError::ConstTypeError(
-                ConstTypeError::TupleWrongLength
-            )))
+            res,
+            Err(BuildError::BadConstant(ConstTypeError::TupleWrongLength))
         );
     }
 }
