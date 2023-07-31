@@ -6,7 +6,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::hugr::{HugrMut, HugrView, NodeType};
-use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
+use crate::resource::{OpDef, ResourceId, SignatureError};
 use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
 use crate::{Hugr, Node, Resource};
 
@@ -104,12 +104,8 @@ pub struct ResourceOp {
 
 impl ResourceOp {
     /// Create a new ResourceOp given the type arguments and specified input resources
-    pub fn new(
-        def: Arc<OpDef>,
-        args: &[TypeArg],
-        resources_in: &ResourceSet,
-    ) -> Result<Self, SignatureError> {
-        let signature = def.compute_signature(args, resources_in)?;
+    pub fn new(def: Arc<OpDef>, args: &[TypeArg]) -> Result<Self, SignatureError> {
+        let signature = def.compute_signature(args)?;
         Ok(Self {
             def,
             args: args.to_vec(),
@@ -206,9 +202,7 @@ pub fn resolve_extension_ops(
                     return Err(CustomOpError::OpNotFoundInResource(opaque.op_name.to_string(), r.name().to_string()));
                 };
                 // TODO input resources. From type checker, or just drop by storing only delta in Signature.
-                let op = ExternalOp::Resource(
-                    ResourceOp::new(def.clone(), &opaque.args, &ResourceSet::default()).unwrap(),
-                );
+                let op = ExternalOp::Resource(ResourceOp::new(def.clone(), &opaque.args).unwrap());
                 if let Some(sig) = &opaque.signature {
                     if sig != &op.signature() {
                         return Err(CustomOpError::SignatureMismatch(

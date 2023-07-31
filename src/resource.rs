@@ -213,11 +213,7 @@ impl OpDef {
 
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(
-        &self,
-        args: &[TypeArg],
-        _resources_in: &ResourceSet,
-    ) -> Result<AbstractSignature, SignatureError> {
+    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
         if args.len() != self.args.len() {
             return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
                 args.len(),
