@@ -168,7 +168,7 @@ where
     }
 
     fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        // TODO: Default to `NodeType::open_resources` once we have inference
+        // TODO: Default to `NodeType::open_resources` once we can infer resources
         self.add_node(NodeType::pure(op))
     }
 
@@ -281,7 +281,7 @@ where
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        // TODO: Default to `NodeType::open_resources` once we have inference
+        // TODO: Default to `NodeType::open_resources` once we can infer resources
         self.add_node_with_parent(parent, NodeType::pure(op))
     }
 
