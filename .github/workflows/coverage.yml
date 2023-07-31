@@ -1,22 +1,30 @@
 name: Coverage
 
 on:
-  pull_request:
-    branches:
-      - main
+  schedule:
+    # 04:00 daily
+    - cron: '0 4 * * *'
 
 jobs:
   check-coverage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: "0" # because we need `main` as well
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install llvm
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "16.0" # should match version used by rustc
-      - name: Compare coverage with main branch
-        run: ./.github/workflows/compare-coverage
+      - name: Generate coverage report
+        env:
+          RUSTFLAGS: "-C instrument-coverage"
+        run: |
+          TGT=`cargo test --tests 2>&1 | grep Running | awk -F'[()]' '{print $2}'`
+          llvm-profdata merge -sparse default_*.profraw -o hugr.profdata
+          llvm-cov show --format=html --ignore-filename-regex='/.cargo/registry' --instr-profile=hugr.profdata --output-dir coverage --object ${TGT}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: coverage/
