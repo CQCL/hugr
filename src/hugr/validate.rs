@@ -808,7 +808,11 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::new(ConstValue::simple_predicate(0, predicate_size)).unwrap();
+        let const_op = ops::Const::new(
+            ConstValue::simple_predicate(0, predicate_size),
+            ClassicType::new_simple_predicate(predicate_size),
+        )
+        .unwrap();
         let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
@@ -1140,7 +1144,11 @@ mod test {
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(
             h.root(),
-            ops::Const::new(ConstValue::Int { width: 1, value: 1 }).unwrap(),
+            ops::Const::new(
+                ConstValue::Int { width: 1, value: 1 },
+                ClassicType::int::<1>(),
+            )
+            .unwrap(),
         )?;
         let lcst = h.add_op_with_parent(
             h.root(),

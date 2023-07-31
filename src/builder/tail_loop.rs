@@ -110,7 +110,7 @@ mod test {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![ClassicType::i64()])?;
             let [i1] = loop_b.input_wires_arr();
-            let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
+            let const_wire = loop_b.add_load_const(ConstValue::i64(1), ClassicType::i64())?;
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
@@ -136,7 +136,10 @@ mod test {
                         classic_row![ClassicType::i64()],
                     )?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_wire = loop_b.add_load_const(ConstValue::true_val())?;
+                    let const_wire = loop_b.add_load_const(
+                        ConstValue::true_val(),
+                        ClassicType::new_simple_predicate(2),
+                    )?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
                         let predicate_inputs = vec![type_row![]; 2];
@@ -156,7 +159,8 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.add_load_const(ConstValue::i64(2))?;
+                        let wire =
+                            branch_1.add_load_const(ConstValue::i64(2), ClassicType::i64())?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

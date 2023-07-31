@@ -428,8 +428,14 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(
+            ConstValue::simple_predicate(0, 2),
+            ClassicType::new_simple_predicate(2),
+        )?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(
+            ConstValue::simple_unary_predicate(),
+            ClassicType::new_simple_predicate(1),
+        )?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
@@ -647,8 +653,14 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(
+            ConstValue::simple_predicate(0, 2),
+            ClassicType::new_simple_predicate(2),
+        )?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(
+            ConstValue::simple_unary_predicate(),
+            ClassicType::new_simple_predicate(1),
+        )?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
@@ -682,8 +694,14 @@ pub(crate) mod test {
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(
+            ConstValue::simple_predicate(0, 2),
+            ClassicType::new_simple_predicate(2),
+        )?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(
+            ConstValue::simple_unary_predicate(),
+            ClassicType::new_simple_predicate(1),
+        )?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,

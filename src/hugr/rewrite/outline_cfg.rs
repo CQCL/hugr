@@ -8,6 +8,7 @@ use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops::{BasicBlock, ConstValue, OpTag, OpTrait, OpType};
+use crate::types::ClassicType;
 use crate::{type_row, Hugr, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -108,7 +109,10 @@ impl Rewrite for OutlineCfg {
             cfg.exit_block(); // Makes inner exit block (but no entry block)
             let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
             let predicate = new_block_bldr
-                .add_constant(ConstValue::simple_predicate(0, 1))
+                .add_constant(
+                    ConstValue::simple_unary_predicate(),
+                    ClassicType::new_simple_predicate(1),
+                )
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
             let new_block_hugr = new_block_bldr

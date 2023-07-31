@@ -348,7 +348,10 @@ mod test {
         };
         let mut middle_b = cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ConstValue::simple_unary_predicate())?;
+            let c = middle_b.add_load_const(
+                ConstValue::simple_unary_predicate(),
+                ClassicType::new_simple_predicate(1),
+            )?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };
