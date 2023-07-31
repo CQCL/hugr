@@ -6,9 +6,10 @@
 
 use thiserror::Error;
 
+use crate::hugr::typecheck::{check_int_fits_in_width, ConstIntError};
 use crate::ops::constant::HugrIntValueStore;
 
-use super::{ClassicType, SimpleType};
+use super::{simple::Container, ClassicType, HashableType, SimpleType};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -19,55 +20,84 @@ use super::{ClassicType, SimpleType};
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type] - classic or linear
     Type,
-    /// Argument is a [TypeArg::ClassicType]
+    /// Argument is a [TypeArg::ClassicType] - hashable or otherwise
     ClassicType,
-    /// Argument is an integer
-    Int,
+    /// Argument is a [TypeArg::HashableType]
+    HashableType,
     /// Node must provide a [TypeArg::List] (of whatever length)
     /// TODO it'd be better to use [`Container`] here.
     ///
     /// [`Container`]: crate::types::simple::Container
     List(Box<TypeParam>),
-    /// Argument is a [TypeArg::Value], containing a yaml-encoded object
-    /// interpretable by the operation.
-    Value,
+    /// Argument is a value of the specified type.
+    Value(HashableType),
 }
 
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum TypeArg {
-    /// Where the TypeDef declares that an argument is a [TypeParam::Type]
+    /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
     Type(SimpleType),
-    /// Where the TypeDef declares that an argument is a [TypeParam::ClassicType],
+    /// Where the (Type/Op)Def declares that an argument is a [TypeParam::ClassicType],
     /// it'll get one of these (rather than embedding inside a Type)
     ClassicType(ClassicType),
-    /// Where the TypeDef declares a [TypeParam::Int]
+    /// Where the (Type/Op)Def declares that an argument is a [TypeParam::HashableType],
+    /// this is the value.
+    HashableType(HashableType),
+    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::Int], a constant value thereof
     Int(HugrIntValueStore),
-    /// Where an argument has type [TypeParam::List]`<T>` - all elements will implicitly
-    /// be of the same variety of TypeArg, representing a `T`.
+    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::String], here it is
+    String(String),
+    /// Where the (Type/Op)Def declares a [TypeParam::List]`<T>` - all elements will implicitly
+    /// be of the same variety of TypeArg, i.e. `T`s.
     List(Vec<TypeArg>),
-    /// Where the TypeDef declares a [TypeParam::Value]
-    Value(serde_yaml::Value),
+    /// Where the TypeDef declares a [TypeParam::Value] of [Container::Opaque]
+    CustomValue(serde_yaml::Value),
 }
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(_), TypeParam::Type) => (),
-        (TypeArg::ClassicType(_), TypeParam::ClassicType) => (),
-        (TypeArg::Int(_), TypeParam::Int) => (),
+        (TypeArg::Type(_), TypeParam::Type) => Ok(()),
+        (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
+        (TypeArg::HashableType(_), TypeParam::HashableType) => Ok(()),
         (TypeArg::List(items), TypeParam::List(ty)) => {
             for item in items {
                 check_type_arg(item, ty.as_ref())?;
             }
+            Ok(())
         }
-        (TypeArg::Value(_), TypeParam::Value) => (),
-        _ => {
-            return Err(TypeArgError::TypeMismatch(arg.clone(), param.clone()));
+        (TypeArg::Int(v), TypeParam::Value(HashableType::Int(width))) => {
+            check_int_fits_in_width(*v, *width).map_err(TypeArgError::Int)
         }
-    };
-    Ok(())
+        (TypeArg::String(_), TypeParam::Value(HashableType::String)) => Ok(()),
+        (arg, TypeParam::Value(HashableType::Container(ctr))) => match ctr {
+            Container::Opaque(_) => match arg {
+                TypeArg::CustomValue(_) => Ok(()), // Are there more checks we should do here?
+                _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
+            },
+            Container::List(elem) => check_type_arg(
+                arg,
+                &TypeParam::List(Box::new(TypeParam::Value((**elem).clone()))),
+            ),
+            Container::Map(_) => unimplemented!(),
+            Container::Tuple(_) => unimplemented!(),
+            Container::Sum(_) => unimplemented!(),
+            Container::Array(elem, sz) => {
+                let TypeArg::List(items) = arg else {return Err(TypeArgError::TypeMismatch(arg.clone(), param.clone()))};
+                if items.len() != *sz {
+                    return Err(TypeArgError::WrongNumber(items.len(), *sz));
+                }
+                check_type_arg(
+                    arg,
+                    &TypeParam::List(Box::new(TypeParam::Value((**elem).clone()))),
+                )
+            }
+            Container::Alias(n) => Err(TypeArgError::NoAliases(n.to_string())),
+        },
+        _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
+    }
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
@@ -83,4 +113,10 @@ pub enum TypeArgError {
     // However in the future it may be applicable to e.g. contents of Tuples too.
     #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
     WrongNumber(usize, usize),
+    /// The type declared for a TypeParam was an alias that was not resolved to an actual type
+    #[error("TypeParam required an unidentified alias type {0}")]
+    NoAliases(String),
+    /// There was some problem fitting a const int into its declared size
+    #[error("Error with int constant")]
+    Int(#[from] ConstIntError),
 }
