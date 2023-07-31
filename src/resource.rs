@@ -11,7 +11,9 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::CustomType;
 use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
@@ -62,8 +64,14 @@ where
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SignatureError {
+    /// Name mismatch
+    #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
+    NameMismatch(SmolStr, SmolStr),
+    /// Resource mismatch
+    #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
+    ResourceMismatch(Option<ResourceId>, Option<ResourceId>),
     /// When the type arguments of the node did not match the params declared by the OpDef
-    #[error("Type arguments of node did not match params declared by OpDef: {0}")]
+    #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
 }
 
@@ -139,6 +147,99 @@ impl Debug for LowerFunc {
     }
 }
 
+/// Concrete instantiations of types and operations defined in resources.
+trait CustomConcrete {
+    fn def_name(&self) -> &SmolStr;
+    fn type_args(&self) -> &[TypeArg];
+    fn parent_resource(&self) -> &ResourceId;
+}
+
+impl CustomConcrete for OpaqueOp {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+impl CustomConcrete for CustomType {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+/// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
+trait TypeParametrised: sealed::SealedDef {
+    /// The concrete object built by binding type arguments to parameters
+    type Concrete: CustomConcrete;
+    /// The resource-unique name.
+    fn name(&self) -> &SmolStr;
+    /// Type parameters.
+    fn params(&self) -> &[TypeParam];
+    /// The parent resource. if any.
+    fn resource(&self) -> Option<&ResourceId>;
+    /// Check provided type arguments are valid against parameters.
+    fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        for (a, p) in args.iter().zip(self.params().iter()) {
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        Ok(())
+    }
+
+    /// Check custom instance is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
+        if self.resource() != Some(custom.parent_resource()) {
+            return Err(SignatureError::ResourceMismatch(
+                self.resource().cloned(),
+                Some(custom.parent_resource().clone()),
+            ));
+        }
+        if self.name() != custom.def_name() {
+            return Err(SignatureError::NameMismatch(
+                self.name().clone(),
+                custom.def_name().clone(),
+            ));
+        }
+
+        self.check_args_impl(custom.type_args())?;
+
+        Ok(())
+    }
+}
+
+mod sealed {
+    use crate::{ops::custom::OpaqueOp, types::CustomType};
+
+    use super::{OpDef, TypeDef};
+
+    pub trait SealedDef {}
+    impl SealedDef for OpDef {}
+    impl SealedDef for TypeDef {}
+
+    pub trait SealedConcrete {}
+    impl SealedConcrete for OpaqueOp {}
+    impl SealedConcrete for CustomType {}
+}
+
 /// Serializable definition for dynamically loaded operations.
 ///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
@@ -163,6 +264,62 @@ pub struct OpDef {
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
+}
+
+impl OpDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
+    }
+
+    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
+        self.check_concrete_impl(opaque)
+    }
+
+    /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_opaque(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<OpaqueOp, SignatureError> {
+        let args = args.into();
+        self.check_args(&args)?;
+
+        Ok(OpaqueOp::new(
+            self.resource().expect("Resource not set.").clone(),
+            self.name().clone(),
+            // TODO add description
+            "".to_string(),
+            args,
+            None,
+        ))
+    }
+}
+
+impl TypeParametrised for OpDef {
+    type Concrete = OpaqueOp;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
 }
 
 impl OpDef {
@@ -244,13 +401,6 @@ impl OpDef {
         Ok(sig)
     }
 
-    fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        for (a, p) in args.iter().zip(self.params.iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
-        Ok(())
-    }
-
     /// Optional description of the ports in the signature.
     pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
         match &self.signature_func {
@@ -324,6 +474,58 @@ pub struct TypeDef {
 }
 
 impl TypeDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
+    }
+
+    /// Check [`CustomType`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
+        self.check_concrete_impl(custom)
+    }
+
+    /// Instantiate a concrete [`CustomType`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_concrete(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<CustomType, SignatureError> {
+        let args = args.into();
+        self.check_args_impl(&args)?;
+        Ok(CustomType::new(
+            self.name().clone(),
+            args,
+            self.resource().expect("Resource not set.").clone(),
+        ))
+    }
+}
+
+impl TypeParametrised for TypeDef {
+    type Concrete = CustomType;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
+}
+
+impl TypeDef {
     /// The [`TypeTag`] of the definition.
     pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
         match &self.tag {
@@ -385,6 +587,11 @@ impl Resource {
     /// Allows read-only access to the operations in this Resource
     pub fn operations(&self) -> &HashMap<SmolStr, Arc<OpDef>> {
         &self.operations
+    }
+
+    /// Allows read-only access to the types in this Resource
+    pub fn types(&self) -> &HashMap<SmolStr, TypeDef> {
+        &self.types
     }
 
     /// Returns the name of the resource.

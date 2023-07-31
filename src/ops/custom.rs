@@ -186,10 +186,22 @@ impl OpaqueOp {
             signature,
         }
     }
+}
 
-    /// Return the argument values for this operation.
+impl OpaqueOp {
+    /// Unique name of the operation.
+    pub fn name(&self) -> &SmolStr {
+        &self.op_name
+    }
+
+    /// Type arguments.
     pub fn args(&self) -> &[TypeArg] {
         &self.args
+    }
+
+    /// Parent resource.
+    pub fn resource(&self) -> &ResourceId {
+        &self.resource
     }
 }
 
