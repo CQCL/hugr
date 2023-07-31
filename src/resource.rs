@@ -13,11 +13,12 @@ use thiserror::Error;
 
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::CustomType;
+use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
     Signature, SignatureDescription, SimpleRow,
 };
-use crate::types::{CustomType, TypeTag};
 use crate::Hugr;
 
 /// Trait for resources to provide custom binary code for computing signature.
@@ -470,7 +471,7 @@ impl TypeDef {
                     .iter()
                     .map(|i| {
                         args.get(*i)
-                            .and_then(|ta| ta.tag())
+                            .and_then(|ta| ta.tag_of_type())
                             .expect("TypeParam index invalid or param does not have a TypeTag.")
                     })
                     .fold(TypeTag::Hashable, TypeTag::union)
