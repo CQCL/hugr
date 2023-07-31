@@ -11,7 +11,6 @@ use pyo3::prelude::*;
 use crate::hugr::{Hugr, HugrMut, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
-use crate::resource::ResourceSet;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -42,8 +41,7 @@ enum Versioned {
 struct NodeSer {
     parent: Node,
     #[serde(flatten)]
-    op: OpType,
-    input_resources: Option<ResourceSet>,
+    nodetype: NodeType,
 }
 
 /// Version 0 of the HUGR serialization format.
@@ -141,8 +139,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.op.clone(),
-                input_resources: opt.input_resources.clone(),
+                nodetype: opt.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
         }
@@ -201,31 +198,17 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
-            op: root_type,
-            input_resources,
+            nodetype: root_nodetype,
         } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(
-            match input_resources {
-                None => NodeType::open_resources(root_type),
-                Some(rs) => NodeType::new(root_type, rs),
-            },
-            nodes.len(),
-            edges.len() * 2,
-        );
+        let mut hugr = Hugr::with_capacity(root_nodetype, nodes.len(), edges.len() * 2);
 
         for node_ser in nodes {
-            hugr.add_node_with_parent(
-                node_ser.parent,
-                match node_ser.input_resources {
-                    None => NodeType::open_resources(node_ser.op),
-                    Some(rs) => NodeType::new(node_ser.op, rs),
-                },
-            )?;
+            hugr.add_node_with_parent(node_ser.parent, node_ser.nodetype)?;
         }
 
         for (node, metadata) in metadata.into_iter().enumerate() {
