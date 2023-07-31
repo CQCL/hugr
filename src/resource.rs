@@ -12,6 +12,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
     Signature, SignatureDescription, SimpleRow,
@@ -288,6 +289,20 @@ impl OpDef {
     }
 }
 
+/// The type tag of a [`TypeDef`]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum TypeDefTag {
+    /// Defined by an explicit tag.
+    Explicit(TypeTag),
+    /// Derived as the tag containing all marked type parameters.
+    FromParams(Vec<usize>),
+}
+
+impl From<TypeTag> for TypeDefTag {
+    fn from(tag: TypeTag) -> Self {
+        Self::Explicit(tag)
+    }
+}
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
 /// - typically these are operations also provided by the Resource.
@@ -304,6 +319,32 @@ pub struct TypeDef {
     pub resource: Option<ResourceId>,
     /// Human readable description of the type definition.
     pub description: String,
+    /// The definition of the type tag of this definition.
+    pub tag: TypeDefTag,
+}
+
+impl TypeDef {
+    /// The [`TypeTag`] of the definition.
+    pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
+        match &self.tag {
+            TypeDefTag::Explicit(tag) => *tag,
+            TypeDefTag::FromParams(indices) => {
+                let args: Vec<_> = args.iter().collect();
+                if indices.is_empty() {
+                    // Assume most general case
+                    return TypeTag::Simple;
+                }
+                indices
+                    .iter()
+                    .map(|i| {
+                        args.get(*i)
+                            .and_then(|ta| ta.tag_of_type())
+                            .expect("TypeParam index invalid or param does not have a TypeTag.")
+                    })
+                    .fold(TypeTag::Hashable, TypeTag::union)
+            }
+        }
+    }
 }
 
 /// A unique identifier for a resource.
