@@ -837,7 +837,7 @@ resources:
   types:
   - name: QubitVector
     # Opaque types can take type arguments, with specified names
-    args: [["size", Int]]
+    params: [["size", Int]]
   operations:
   - name: measure
     description: "measure a qubit"
@@ -857,14 +857,14 @@ resources:
       basis: [Z, Z]
   - name: SU2
     description: "One qubit unitary matrix"
-    args: # per-node values passed to the type-scheme interpreter, but not used in signature
+    params: # per-node values passed to the type-scheme interpreter, but not used in signature
       - matrix: Opaque(complex_matrix,2,2)
     signature:
       inputs: [[null, Q]]
       outputs: [[null, Q]]
   - name: MatMul
     description: "Multiply matrices of statically-known size"
-    args:  # per-node values passed to type-scheme-interpreter and used in signature
+    params:  # per-node values passed to type-scheme-interpreter and used in signature
       - i: Int
       - j: Int
       - k: Int
@@ -875,7 +875,7 @@ resources:
       #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
   - name: max_float
     description: "Variable number of inputs"
-    args:
+    params:
       - n: Int
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
@@ -883,7 +883,7 @@ resources:
       outputs: [[null, F64, 1]]
   - name: ArrayConcat
     description: "Concatenate two arrays. Resource provides a compute_signature implementation."
-    args:
+    params:
       - t: Type  # Classic or Quantum
       - i: Int
       - j: Int
@@ -893,7 +893,7 @@ resources:
     # Hence, no signature block => will look up a compute_signature in registry.
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
-    args:
+    params:
       - r: ResourceSet
     signature:
       inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]]
@@ -901,12 +901,12 @@ resources:
       resources: r # Indicates that running this operation also invokes resources r
     lowering:
       file: "graph_op_hugr.bin"
-      resources: ["arithmetic", r] # r is the ResourceSet in "args"
+      resources: ["arithmetic", r] # r is the ResourceSet in "params"
 ```
 
-The declaration of the `args` uses a language that is a distinct, simplified
+The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
-the value of each member of `args` is given by the following production:
+the value of each member of `params` is given by the following production:
 ```
 TypeParam ::= "Type" | "ClassicType" | Int | "List"(TypeParam)
 ```
@@ -922,8 +922,8 @@ must have children `inputs` and `outputs`, each lists, and may have `resources`.
 The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
  passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
 
-The optional `args` field can be used to specify the types of static+const arguments to each operation
----for example the matrix needed to define an SU2 operation. If `args` are not specified
+The optional `params` field can be used to specify the types of static+const arguments to each operation
+---for example the matrix needed to define an SU2 operation. If `params` are not specified
 then it is assumed empty.
 
 ### Extensible metadata
@@ -1063,9 +1063,6 @@ must have exactly one edge leaving them unless they are `ClassicType`, where
 outgoing ports may have any number of connected edges (0 is equivalent
 to a discard). All incoming ports must have exactly one edge connected to them.
 
-# Our linear types behave like other values passed down a wire.
-# Quantum gates behave just like other nodes on the graph with
-# inputs and outputs, but there is only one edge leaving (or entering) each port.
 In fully qubit-counted contexts programs take in a number of qubits
 as input and return the same number, with no discarding. See
 [quantum resource](#quantum-resource) for more.
@@ -1571,7 +1568,7 @@ The unique root node of the HUGR reports itself as the parent.
 The other required field in a node is `op` which identifies an operation by
 name, and is used as a discriminating tag in validating the remaining fields.
 The other fields are defining data for the particular operation, including
-`args` which specifies the arguments to the `TypeParam`s of the operation.
+`params` which specifies the arguments to the `TypeParam`s of the operation.
 Metadata could also be included as a map keyed by node index.
 
 ```rust

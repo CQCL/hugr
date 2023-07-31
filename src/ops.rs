@@ -25,7 +25,7 @@ pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, OpName, ValidateOp)]
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
 #[non_exhaustive]

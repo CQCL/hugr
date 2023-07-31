@@ -11,7 +11,10 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::CustomType;
+use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
     AbstractSignature, SignatureDescription, SimpleRow,
@@ -61,8 +64,14 @@ where
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SignatureError {
+    /// Name mismatch
+    #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
+    NameMismatch(SmolStr, SmolStr),
+    /// Resource mismatch
+    #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
+    ResourceMismatch(Option<ResourceId>, Option<ResourceId>),
     /// When the type arguments of the node did not match the params declared by the OpDef
-    #[error("Type arguments of node did not match params declared by OpDef: {0}")]
+    #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
 }
 
@@ -138,20 +147,113 @@ impl Debug for LowerFunc {
     }
 }
 
+/// Concrete instantiations of types and operations defined in resources.
+trait CustomConcrete {
+    fn def_name(&self) -> &SmolStr;
+    fn type_args(&self) -> &[TypeArg];
+    fn parent_resource(&self) -> &ResourceId;
+}
+
+impl CustomConcrete for OpaqueOp {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+impl CustomConcrete for CustomType {
+    fn def_name(&self) -> &SmolStr {
+        self.name()
+    }
+
+    fn type_args(&self) -> &[TypeArg] {
+        self.args()
+    }
+
+    fn parent_resource(&self) -> &ResourceId {
+        self.resource()
+    }
+}
+
+/// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
+trait TypeParametrised: sealed::SealedDef {
+    /// The concrete object built by binding type arguments to parameters
+    type Concrete: CustomConcrete;
+    /// The resource-unique name.
+    fn name(&self) -> &SmolStr;
+    /// Type parameters.
+    fn params(&self) -> &[TypeParam];
+    /// The parent resource. if any.
+    fn resource(&self) -> Option<&ResourceId>;
+    /// Check provided type arguments are valid against parameters.
+    fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        for (a, p) in args.iter().zip(self.params().iter()) {
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        Ok(())
+    }
+
+    /// Check custom instance is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
+        if self.resource() != Some(custom.parent_resource()) {
+            return Err(SignatureError::ResourceMismatch(
+                self.resource().cloned(),
+                Some(custom.parent_resource().clone()),
+            ));
+        }
+        if self.name() != custom.def_name() {
+            return Err(SignatureError::NameMismatch(
+                self.name().clone(),
+                custom.def_name().clone(),
+            ));
+        }
+
+        self.check_args_impl(custom.type_args())?;
+
+        Ok(())
+    }
+}
+
+mod sealed {
+    use crate::{ops::custom::OpaqueOp, types::CustomType};
+
+    use super::{OpDef, TypeDef};
+
+    pub trait SealedDef {}
+    impl SealedDef for OpDef {}
+    impl SealedDef for TypeDef {}
+
+    pub trait SealedConcrete {}
+    impl SealedConcrete for OpaqueOp {}
+    impl SealedConcrete for CustomType {}
+}
+
 /// Serializable definition for dynamically loaded operations.
 ///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// The unique Resource owning this OpDef (of which this OpDef is a member)
-    pub resource: ResourceId,
+    /// The unique Resource, if any, owning this OpDef (of which this OpDef is a member)
+    pub resource: Option<ResourceId>,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
     pub name: SmolStr,
     /// Human readable description of the operation.
     pub description: String,
     /// Declared type parameters, values must be provided for each operation node
-    pub args: Vec<TypeParam>,
+    pub params: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub misc: HashMap<String, serde_yaml::Value>,
@@ -165,11 +267,67 @@ pub struct OpDef {
 }
 
 impl OpDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
+    }
+
+    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
+        self.check_concrete_impl(opaque)
+    }
+
+    /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_opaque(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<OpaqueOp, SignatureError> {
+        let args = args.into();
+        self.check_args(&args)?;
+
+        Ok(OpaqueOp::new(
+            self.resource().expect("Resource not set.").clone(),
+            self.name().clone(),
+            // TODO add description
+            "".to_string(),
+            args,
+            None,
+        ))
+    }
+}
+
+impl TypeParametrised for OpDef {
+    type Concrete = OpaqueOp;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
+}
+
+impl OpDef {
     /// Create an OpDef with a signature (inputs+outputs) read from the YAML
     pub fn new_with_yaml_types(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         inputs: String, // TODO this is likely the wrong type
         outputs: String, // TODO similarly
@@ -179,7 +337,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            args,
+            params,
             misc,
             signature_func: SignatureFunc::FromYAML { inputs, outputs },
             lower_funcs: Vec::new(),
@@ -190,7 +348,7 @@ impl OpDef {
     pub fn new_with_custom_sig(
         name: SmolStr,
         description: String,
-        args: Vec<TypeParam>,
+        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         sig_func: impl CustomSignatureFunc + 'static,
     ) -> Self {
@@ -198,7 +356,7 @@ impl OpDef {
             resource: Default::default(), // Currently overwritten when OpDef added to Resource
             name,
             description,
-            args,
+            params,
             misc,
             signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
             lower_funcs: Vec::new(),
@@ -214,15 +372,13 @@ impl OpDef {
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
     pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
-        if args.len() != self.args.len() {
+        if args.len() != self.params.len() {
             return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
                 args.len(),
-                self.args.len(),
+                self.params.len(),
             )));
         }
-        for (a, p) in args.iter().zip(self.args.iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
+        self.check_args(args)?;
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
                 // Sig should be computed solely from inputs + outputs + args.
@@ -230,7 +386,11 @@ impl OpDef {
             }
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
-        assert!(res.contains(&self.resource));
+        let resource = self
+            .resource
+            .as_ref()
+            .expect("OpDef does not belong to a Resource.");
+        assert!(res.contains(resource));
         Ok(AbstractSignature::new_df(ins, outs).with_resource_delta(&res))
     }
 
@@ -272,6 +432,20 @@ impl OpDef {
     }
 }
 
+/// The type tag of a [`TypeDef`]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum TypeDefTag {
+    /// Defined by an explicit tag.
+    Explicit(TypeTag),
+    /// Derived as the tag containing all marked type parameters.
+    FromParams(Vec<usize>),
+}
+
+impl From<TypeTag> for TypeDefTag {
+    fn from(tag: TypeTag) -> Self {
+        Self::Explicit(tag)
+    }
+}
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
 /// - typically these are operations also provided by the Resource.
@@ -283,7 +457,89 @@ pub struct TypeDef {
     /// with the same number of [`TypeArg`]'s to make an actual type.
     ///
     /// [`TypeArg`]: crate::types::type_param::TypeArg
-    pub args: Vec<TypeParam>,
+    pub params: Vec<TypeParam>,
+    /// The unique Resource, if any, owning this TypeDef (of which this TypeDef is a member)
+    pub resource: Option<ResourceId>,
+    /// Human readable description of the type definition.
+    pub description: String,
+    /// The definition of the type tag of this definition.
+    pub tag: TypeDefTag,
+}
+
+impl TypeDef {
+    /// Check provided type arguments are valid against parameters.
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        self.check_args_impl(args)
+    }
+
+    /// Check [`CustomType`] is a valid instantiation of this definition.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type of the instance does not
+    /// match the definition.
+    pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
+        self.check_concrete_impl(custom)
+    }
+
+    /// Instantiate a concrete [`CustomType`] by providing type arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the provided arguments are not
+    /// valid instances of the type parameters.
+    pub fn instantiate_concrete(
+        &self,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<CustomType, SignatureError> {
+        let args = args.into();
+        self.check_args_impl(&args)?;
+        Ok(CustomType::new(
+            self.name().clone(),
+            args,
+            self.resource().expect("Resource not set.").clone(),
+        ))
+    }
+}
+
+impl TypeParametrised for TypeDef {
+    type Concrete = CustomType;
+
+    fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    fn name(&self) -> &SmolStr {
+        &self.name
+    }
+
+    fn resource(&self) -> Option<&ResourceId> {
+        self.resource.as_ref()
+    }
+}
+
+impl TypeDef {
+    /// The [`TypeTag`] of the definition.
+    pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
+        match &self.tag {
+            TypeDefTag::Explicit(tag) => *tag,
+            TypeDefTag::FromParams(indices) => {
+                let args: Vec<_> = args.iter().collect();
+                if indices.is_empty() {
+                    // Assume most general case
+                    return TypeTag::Simple;
+                }
+                indices
+                    .iter()
+                    .map(|i| {
+                        args.get(*i)
+                            .and_then(|ta| ta.tag_of_type())
+                            .expect("TypeParam index invalid or param does not have a TypeTag.")
+                    })
+                    .fold(TypeTag::Hashable, TypeTag::union)
+            }
+        }
+    }
 }
 
 /// A unique identifier for a resource.
@@ -326,34 +582,46 @@ impl Resource {
         &self.operations
     }
 
+    /// Allows read-only access to the types in this Resource
+    pub fn types(&self) -> &HashMap<SmolStr, TypeDef> {
+        &self.types
+    }
+
     /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Add an exported type to the resource.
-    pub fn add_type(&mut self, ty: TypeDef) {
+    pub fn add_type(&mut self, mut ty: TypeDef) -> Result<(), String> {
+        if let Some(resource) = ty.resource {
+            return Err(format!(
+                "TypeDef {} owned by another resource {}",
+                ty.name, resource
+            ));
+        }
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has a type called {}", &ty.name),
             Entry::Vacant(ve) => {
+                ty.resource = Some(self.name.clone());
                 ve.insert(ty);
             }
         }
+        Ok(())
     }
 
     /// Add an operation definition to the resource.
     pub fn add_op(&mut self, mut op: OpDef) -> Result<(), String> {
-        // if op.resource != self.name {
-        if op.resource != ResourceId::default() {
+        if let Some(resource) = op.resource {
             return Err(format!(
                 "OpDef {} owned by another resource {}",
-                op.name, op.resource
+                op.name, resource
             ));
         }
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
             Entry::Vacant(ve) => {
-                op.resource = self.name.clone();
+                op.resource = Some(self.name.clone());
                 ve.insert(Arc::new(op));
             }
         }

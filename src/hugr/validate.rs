@@ -12,10 +12,9 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::hugr::typecheck::{typecheck_const, ConstTypeError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::OpTag;
-use crate::ops::{self, OpTrait, OpType, ValidateOp};
+use crate::ops::{OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
@@ -437,21 +436,16 @@ impl<'a> ValidationContext<'a> {
         let local = Some(from_parent) == to_parent;
 
         let is_static = match from_optype.port_kind(from_offset).unwrap() {
-            // Inter-graph constant wires do not have restrictions
             EdgeKind::Static(typ) => {
-                if let OpType::Const(ops::Const(val)) = &from_optype {
-                    typecheck_const(&typ, val).map_err(ValidationError::from)?;
-                } else {
-                    // If const edges aren't coming from const nodes, they're graph
-                    // edges coming from FuncDecl or FuncDefn
-                    if !OpTag::Function.is_superset(from_optype.tag()) {
-                        return Err(InterGraphEdgeError::InvalidConstSrc {
-                            from,
-                            from_offset,
-                            typ,
-                        }
-                        .into());
-                    };
+                if !(OpTag::Const.is_superset(from_optype.tag())
+                    || OpTag::Function.is_superset(from_optype.tag()))
+                {
+                    return Err(InterGraphEdgeError::InvalidConstSrc {
+                        from,
+                        from_offset,
+                        typ,
+                    }
+                    .into());
                 };
                 true
             }
@@ -556,7 +550,7 @@ impl<'a> ValidationContext<'a> {
 }
 
 /// Errors that can occur while validating a Hugr.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
@@ -654,9 +648,6 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// Type error for constant values
-    #[error("Type error for constant value: {0}.")]
-    ConstTypeError(#[from] ConstTypeError),
     /// Missing lift node
     #[error("Resources at target node {to:?} ({to_offset:?}) ({to_resources}) exceed those at source {from:?} ({from_offset:?}) ({from_resources})")]
     TgtExceedsSrcResources {
@@ -690,7 +681,7 @@ impl From<ValidationError> for PyErr {
 }
 
 /// Errors related to the inter-graph edge validations.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum InterGraphEdgeError {
     /// Inter-Graph edges can only carry classical data.
@@ -822,7 +813,7 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const(ConstValue::simple_predicate(0, predicate_size));
+        let const_op = ops::Const::new(ConstValue::simple_predicate(0, predicate_size)).unwrap();
         let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
 
         let input = b
@@ -1155,8 +1146,10 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst =
-            h.add_op_with_parent(h.root(), ops::Const(ConstValue::Int { width: 1, value: 1 }))?;
+        let cst = h.add_op_with_parent(
+            h.root(),
+            ops::Const::new(ConstValue::Int { width: 1, value: 1 }).unwrap(),
+        )?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {

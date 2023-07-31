@@ -72,7 +72,8 @@ pub trait Container {
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, val: ConstValue) -> Result<ConstID, BuildError> {
         let typ = val.const_type();
-        let const_n = self.add_child_op(ops::Const(val))?;
+        let const_n = self.add_child_op(ops::Const::new(val).map_err(BuildError::BadConstant)?)?;
+
         Ok((const_n, typ).into())
     }
 

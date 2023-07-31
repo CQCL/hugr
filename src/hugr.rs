@@ -52,7 +52,7 @@ pub struct Hugr {
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The type of a node on a graph
 pub struct NodeType {
     /// The underlying OpType

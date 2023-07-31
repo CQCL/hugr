@@ -25,8 +25,8 @@ pub const fn resource_id() -> SmolStr {
 pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
-    resource.add_type(Type::Angle.type_def());
-    resource.add_type(Type::Quaternion.type_def());
+    resource.add_type(Type::Angle.type_def()).unwrap();
+    resource.add_type(Type::Quaternion.type_def()).unwrap();
 
     let op = OpDef::new_with_custom_sig(
         "AngleAdd".into(),
@@ -58,14 +58,24 @@ impl Type {
         }
     }
 
+    pub const fn description(&self) -> &str {
+        match self {
+            Type::Angle => "Floating point angle",
+            Type::Quaternion => "Quaternion specifying rotation.",
+        }
+    }
+
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [])
+        CustomType::new(self.name(), [], resource_id())
     }
 
     pub fn type_def(self) -> TypeDef {
         TypeDef {
             name: self.name(),
-            args: vec![],
+            params: vec![],
+            description: self.description().to_string(),
+            resource: None,
+            tag: crate::types::TypeTag::Classic.into(),
         }
     }
 }
@@ -276,5 +286,33 @@ impl Neg for &AngleValue {
 
     fn neg(self) -> Self::Output {
         self.unary_op(|x| -x, |x| -x)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::resource::SignatureError;
+
+    use super::*;
+
+    #[test]
+    fn test_types() {
+        let resource = resource();
+
+        let angle = resource.types().get("angle").unwrap();
+
+        let custom = angle.instantiate_concrete([]).unwrap();
+
+        angle.check_custom(&custom).unwrap();
+
+        let false_custom = CustomType::new(custom.name().clone(), vec![], "wrong_resource");
+        assert_eq!(
+            angle.check_custom(&false_custom),
+            Err(SignatureError::ResourceMismatch(
+                Some("rotations".into()),
+                Some("wrong_resource".into()),
+            ))
+        );
     }
 }

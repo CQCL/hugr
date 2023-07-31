@@ -225,7 +225,7 @@ impl ValidateOp for super::CFG {
     }
 }
 /// Errors that can occur while checking the children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum ChildrenValidationError {
     /// An CFG graph has an exit operation as a non-second child.
@@ -274,7 +274,7 @@ impl ChildrenValidationError {
 }
 
 /// Errors that can occur while checking the edges between children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
@@ -295,7 +295,7 @@ impl EdgeValidationError {
 }
 
 /// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChildrenEdgeData {
     /// Source child.
     pub source: NodeIndex,
