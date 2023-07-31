@@ -29,8 +29,8 @@ impl DataflowOpTrait for TailLoop {
     }
 
     fn signature(&self) -> AbstractSignature {
-        let [inputs, outputs] = [self.just_inputs.clone(), self.just_outputs.clone()]
-            .map(|row| predicate_first(&row, &self.rest));
+        let [inputs, outputs] =
+            [&self.just_inputs, &self.just_outputs].map(|row| predicate_first(row, &self.rest));
         AbstractSignature::new_df(inputs, outputs)
     }
 }
