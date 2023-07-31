@@ -4,6 +4,7 @@ use std::any::Any;
 
 use crate::{
     classic_row,
+    hugr::typecheck::{typecheck_const, ConstTypeError},
     macros::impl_box_clone,
     types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind, HashableType},
 };
@@ -15,8 +16,17 @@ use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
 /// A constant value definition.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-pub struct Const(pub ConstValue);
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+pub struct Const(ConstValue);
+
+impl Const {
+    /// Creates a new Const, type-checking the value.
+    pub fn new(val: ConstValue) -> Result<Self, ConstTypeError> {
+        typecheck_const(&val.const_type(), &val)?;
+        Ok(Const(val))
+    }
+}
+
 impl OpName for Const {
     fn name(&self) -> SmolStr {
         self.0.name()
@@ -48,7 +58,7 @@ pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
 ///
 /// TODO: Add more constants
 /// TODO: bigger/smaller integers.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum ConstValue {
@@ -69,42 +79,16 @@ pub enum ConstValue {
     },
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
-    /// An opaque constant value, with cached type.
-    Opaque(CustomType, Box<dyn CustomConst>),
+    /// An opaque constant value, with cached type
+    // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
+    Opaque((CustomType, Box<dyn CustomConst>)),
 }
 
-impl PartialEq for ConstValue {
+impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                Self::Int {
-                    value: l0,
-                    width: l_width,
-                },
-                Self::Int {
-                    value: r0,
-                    width: r_width,
-                },
-            ) => l0 == r0 && l_width == r_width,
-            (Self::Opaque(l0, l1), Self::Opaque(r0, r1)) => l0 == r0 && l1.eq(&**r1),
-            (
-                Self::Sum { tag, variants, val },
-                Self::Sum {
-                    tag: t1,
-                    variants: type1,
-                    val: v1,
-                },
-            ) => tag == t1 && variants == type1 && val == v1,
-
-            (Self::Tuple(v1), Self::Tuple(v2)) => v1.eq(v2),
-            (Self::F64(f1), Self::F64(f2)) => f1 == f2,
-
-            _ => false,
-        }
+        (*self).equal_consts(other)
     }
 }
-
-impl Eq for ConstValue {}
 
 impl Default for ConstValue {
     fn default() -> Self {
@@ -120,7 +104,7 @@ impl ConstValue {
     pub fn const_type(&self) -> ClassicType {
         match self {
             Self::Int { value: _, width } => HashableType::Int(*width).into(),
-            Self::Opaque(_, b) => Container::Opaque((*b).custom_type()).into(),
+            Self::Opaque((_, b)) => Container::Opaque((*b).custom_type()).into(),
             Self::Sum { variants, .. } => ClassicType::new_sum(variants.clone()),
             Self::Tuple(vals) => {
                 let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();
@@ -134,7 +118,7 @@ impl ConstValue {
         match self {
             Self::Int { value, width } => format!("const:int<{width}>:{value}"),
             Self::F64(f) => format!("const:float:{f}"),
-            Self::Opaque(_, v) => format!("const:{}", v.name()),
+            Self::Opaque((_, v)) => format!("const:{}", v.name()),
             Self::Sum { tag, val, .. } => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
             }
@@ -205,7 +189,7 @@ impl ConstValue {
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque(v.custom_type(), Box::new(v))
+        Self::Opaque((v.custom_type(), Box::new(v)))
     }
 }
 
@@ -225,7 +209,7 @@ pub trait CustomConst:
     fn custom_type(&self) -> CustomType;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
-    fn eq(&self, other: &dyn CustomConst) -> bool {
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         let _ = other;
         false
     }
@@ -240,7 +224,7 @@ mod test {
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
         classic_row,
-        hugr::{typecheck::ConstTypeError, ValidationError},
+        hugr::typecheck::ConstTypeError,
         type_row,
         types::{ClassicType, SimpleRow, SimpleType},
     };
@@ -283,19 +267,14 @@ mod test {
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty])).unwrap();
-        let c = b
-            .add_constant(ConstValue::predicate(
-                0,
-                ConstValue::Tuple(vec![]),
-                pred_rows,
-            ))
-            .unwrap();
-        let w = b.load_const(&c).unwrap();
+        let res = b.add_constant(ConstValue::predicate(
+            0,
+            ConstValue::Tuple(vec![]),
+            pred_rows,
+        ));
         assert_eq!(
-            b.finish_hugr_with_outputs([w]),
-            Err(BuildError::InvalidHUGR(ValidationError::ConstTypeError(
-                ConstTypeError::TupleWrongLength
-            )))
+            res,
+            Err(BuildError::BadConstant(ConstTypeError::TupleWrongLength))
         );
     }
 }

@@ -66,7 +66,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [])
+        CustomType::new(self.name(), [], resource_id())
     }
 
     pub fn type_def(self) -> TypeDef {
@@ -75,6 +75,7 @@ impl Type {
             params: vec![],
             description: self.description().to_string(),
             resource: None,
+            tag: crate::types::TypeTag::Classic.into(),
         }
     }
 }
@@ -285,5 +286,33 @@ impl Neg for &AngleValue {
 
     fn neg(self) -> Self::Output {
         self.unary_op(|x| -x, |x| -x)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::resource::SignatureError;
+
+    use super::*;
+
+    #[test]
+    fn test_types() {
+        let resource = resource();
+
+        let angle = resource.types().get("angle").unwrap();
+
+        let custom = angle.instantiate_concrete([]).unwrap();
+
+        angle.check_custom(&custom).unwrap();
+
+        let false_custom = CustomType::new(custom.name().clone(), vec![], "wrong_resource");
+        assert_eq!(
+            angle.check_custom(&false_custom),
+            Err(SignatureError::ResourceMismatch(
+                Some("rotations".into()),
+                Some("wrong_resource".into()),
+            ))
+        );
     }
 }

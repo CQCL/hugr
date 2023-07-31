@@ -9,7 +9,7 @@ use crate::{
     resource::{OpDef, ResourceSet},
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        SimpleType,
+        HashableType, SimpleType,
     },
     Resource,
 };
@@ -26,6 +26,7 @@ pub fn bool_type() -> SimpleType {
 
 /// Resource for basic logical operations.
 pub fn resource() -> Resource {
+    const H_INT: TypeParam = TypeParam::Value(HashableType::Int(8));
     let mut resource = Resource::new(resource_id());
 
     let not_op = OpDef::new_with_custom_sig(
@@ -45,14 +46,14 @@ pub fn resource() -> Resource {
     let and_op = OpDef::new_with_custom_sig(
         "And".into(),
         "logical 'and'".into(),
-        vec![TypeParam::Int],
+        vec![H_INT],
         HashMap::default(),
         |arg_values: &[TypeArg]| {
             let a = arg_values.iter().exactly_one().unwrap();
             let n: u128 = match a {
                 TypeArg::Int(n) => *n,
                 _ => {
-                    return Err(TypeArgError::TypeMismatch(a.clone(), TypeParam::Int).into());
+                    return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                 }
             };
             Ok((
@@ -66,14 +67,14 @@ pub fn resource() -> Resource {
     let or_op = OpDef::new_with_custom_sig(
         "Or".into(),
         "logical 'or'".into(),
-        vec![TypeParam::Int],
+        vec![H_INT],
         HashMap::default(),
         |arg_values: &[TypeArg]| {
             let a = arg_values.iter().exactly_one().unwrap();
             let n: u128 = match a {
                 TypeArg::Int(n) => *n,
                 _ => {
-                    return Err(TypeArgError::TypeMismatch(a.clone(), TypeParam::Int).into());
+                    return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                 }
             };
             Ok((
