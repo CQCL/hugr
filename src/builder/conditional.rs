@@ -198,12 +198,13 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
+
     use crate::{
         builder::{
             test::{n_identity, NAT},
             Dataflow,
         },
-        ops::ConstValue,
+        ops::Const,
         type_row,
     };
 
@@ -217,7 +218,6 @@ mod test {
 
         n_identity(conditional_b.case_builder(0)?)?;
         n_identity(conditional_b.case_builder(1)?)?;
-
         Ok(())
     }
 
@@ -227,7 +227,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder
                 .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let tru_const = fbuild.add_constant(ConstValue::true_val())?;
+            let tru_const = fbuild.add_constant(Const::true_val())?;
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
