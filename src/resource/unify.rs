@@ -55,6 +55,7 @@ impl<'a> UnificationContext<'a> {
 
     fn fresh_meta(&mut self) -> Meta {
         let fresh = self.constraints.len();
+        self.constraints.insert(fresh, Vec::new());
         fresh
     }
 
