@@ -49,9 +49,9 @@ jobs:
         run: |
           if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.03" | bc -l) ))
           then
-            echo "msg=Coverage check for hugr shows no regression. :-) ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "msg=Coverage check for hugr shows no regression. ✅ ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
           else
-            echo "msg=Coverage check for hugr shows regression. :-( ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "msg=Coverage check for hugr shows regression. ❌ ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
           fi
   notify-slack:
     needs: check-coverage
