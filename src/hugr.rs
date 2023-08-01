@@ -90,8 +90,8 @@ impl NodeType {
     /// Use the input resources to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
         self.input_resources
-            .clone()
-            .map(|rs| self.op.signature().with_input_resources(rs))
+            .as_ref()
+            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
     }
 
     /// Get the abstract signature from the embedded op
