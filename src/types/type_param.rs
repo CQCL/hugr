@@ -9,13 +9,20 @@ use thiserror::Error;
 use crate::ops::constant::typecheck::{check_int_fits_in_width, ConstIntError};
 use crate::ops::constant::HugrIntValueStore;
 
-use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+use super::{
+    simple::{Container, PrimType, TypeRowElem},
+    ClassicType, HashableType, SimpleType, TypeTag,
+};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
 // TODO any other 'leaf' types? We specifically do not want float.
 // bool should eventually be a Sum type (Container).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(
+    try_from = "super::serialize::SerSimpleType",
+    into = "super::serialize::SerSimpleType"
+)]
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type] - classic or linear
@@ -24,14 +31,14 @@ pub enum TypeParam {
     ClassicType,
     /// Argument is a [TypeArg::HashableType]
     HashableType,
-    /// Node must provide a [TypeArg::List] (of whatever length)
-    /// TODO it'd be better to use [`Container`] here.
-    ///
-    /// [`Container`]: crate::types::simple::Container
-    List(Box<TypeParam>),
+    /// Argument is an instance of a [Container] type (not an alias).
+    /// Values will be of the corresponding variety of TypeArg.
+    Container(Container<TypeParam>),
     /// Argument is a value of the specified type.
     Value(HashableType),
 }
+
+impl TypeRowElem for TypeParam {}
 
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]

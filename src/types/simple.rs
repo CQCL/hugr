@@ -19,7 +19,10 @@ use crate::{classic_row, ops::constant::HugrIntWidthStore, utils::display_list};
 //
 // TODO: Compare performance vs flattening this into a single enum
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
+#[serde(
+    try_from = "super::serialize::SerSimpleType",
+    into = "super::serialize::SerSimpleType"
+)]
 #[non_exhaustive]
 pub enum SimpleType {
     /// A type containing only classical data. Elements of this type can be copied.
@@ -29,8 +32,6 @@ pub enum SimpleType {
     /// A nested definition containing other linear types (possibly as well as classical ones)
     Qontainer(Container<SimpleType>),
 }
-
-mod serialize;
 
 impl Display for SimpleType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -84,8 +85,15 @@ impl TypeTag {
     }
 }
 
-/// Trait of primitive types (SimpleType or ClassicType).
-pub trait PrimType: sealed::Sealed + std::fmt::Debug + Clone + 'static {
+/// Base trait for anything that can be put in a [TypeRow]
+pub trait TypeRowElem: std::fmt::Debug + Clone + 'static {}
+
+impl TypeRowElem for SimpleType {}
+impl TypeRowElem for ClassicType {}
+impl TypeRowElem for HashableType {}
+
+/// Trait of primitive types, i.e. that are uniquely identified by a [TypeTag]
+pub trait PrimType: TypeRowElem + sealed::Sealed {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
@@ -106,7 +114,7 @@ mod sealed {
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Container<T: PrimType> {
+pub enum Container<T: TypeRowElem> {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
@@ -434,7 +442,7 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
 //#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<T: PrimType> {
+pub struct TypeRow<T: TypeRowElem> {
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
@@ -445,7 +453,7 @@ pub type SimpleRow = TypeRow<SimpleType>;
 /// A row of [ClassicType]s
 pub type ClassicRow = TypeRow<ClassicType>;
 
-impl<T: Display + PrimType> Display for TypeRow<T> {
+impl<T: Display + TypeRowElem> Display for TypeRow<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -480,7 +488,7 @@ impl TypeRow<ClassicType> {
 
 // TODO some of these, but not all, will probably want exposing via
 // pyo3 wrappers eventually.
-impl<T: PrimType> TypeRow<T> {
+impl<T: TypeRowElem> TypeRow<T> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -504,24 +512,6 @@ impl<T: PrimType> TypeRow<T> {
     pub fn is_empty(&self) -> bool {
         self.types.len() == 0
     }
-
-    /// Returns whether the row contains only hashable classic data.
-    #[inline(always)]
-    pub fn purely_hashable(&self) -> bool {
-        self.types
-            .iter()
-            .map(PrimType::tag)
-            .all(TypeTag::is_hashable)
-    }
-
-    /// Returns the smallest [TypeTag] that contains all elements of the row
-    pub fn containing_tag(&self) -> TypeTag {
-        self.types
-            .iter()
-            .map(PrimType::tag)
-            .fold(TypeTag::Hashable, TypeTag::union)
-    }
-
     /// Mutable iterator over the types in the row.
     pub fn to_mut(&mut self) -> &mut Vec<T> {
         self.types.to_mut()
@@ -544,7 +534,9 @@ impl<T: PrimType> TypeRow<T> {
         self.types.to_mut().get_mut(offset)
     }
 
-    fn try_convert_elems<D: PrimType + TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> {
+    pub(super) fn try_convert_elems<D: TypeRowElem + TryFrom<T>>(
+        self,
+    ) -> Result<TypeRow<D>, D::Error> {
         let elems: Vec<D> = self
             .into_owned()
             .into_iter()
@@ -554,7 +546,7 @@ impl<T: PrimType> TypeRow<T> {
     }
 
     /// Converts the elements of this TypeRow into some other type that they can `.into()`
-    pub fn map_into<T2: PrimType + From<T>>(self) -> TypeRow<T2> {
+    pub fn map_into<T2: TypeRowElem + From<T>>(self) -> TypeRow<T2> {
         TypeRow::from(
             self.into_owned()
                 .into_iter()
@@ -564,13 +556,32 @@ impl<T: PrimType> TypeRow<T> {
     }
 }
 
-impl<T: PrimType> Default for TypeRow<T> {
+impl<T: PrimType> TypeRow<T> {
+    /// Returns whether the row contains only hashable classic data.
+    #[inline(always)]
+    pub fn purely_hashable(&self) -> bool {
+        self.types
+            .iter()
+            .map(PrimType::tag)
+            .all(TypeTag::is_hashable)
+    }
+
+    /// Returns the smallest [TypeTag] that contains all elements of the row
+    pub fn containing_tag(&self) -> TypeTag {
+        self.types
+            .iter()
+            .map(PrimType::tag)
+            .fold(TypeTag::Hashable, TypeTag::union)
+    }
+}
+
+impl<T: TypeRowElem> Default for TypeRow<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, T: PrimType> From<F> for TypeRow<T>
+impl<F, T: TypeRowElem> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [T]>>,
 {
@@ -581,7 +592,7 @@ where
     }
 }
 
-impl<T: PrimType> Deref for TypeRow<T> {
+impl<T: TypeRowElem> Deref for TypeRow<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -589,7 +600,7 @@ impl<T: PrimType> Deref for TypeRow<T> {
     }
 }
 
-impl<T: PrimType> DerefMut for TypeRow<T> {
+impl<T: TypeRowElem> DerefMut for TypeRow<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

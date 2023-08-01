@@ -23,6 +23,8 @@ use crate::hugr::{Direction, Port};
 use crate::utils::display_list;
 use crate::{resource::ResourceSet, type_row};
 
+mod serialize;
+
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
