@@ -1,7 +1,7 @@
 use crate::{Direction, hugr::{Node, HugrView}, ops::OpTrait, Hugr};
 use super::{ResourceId, ResourceSet};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 /// Metavariables don't need much
@@ -36,7 +36,23 @@ pub enum InferResourceError {
     }
 }
 
-struct UnificationContext<'a> {
+#[derive(Clone)]
+struct Deletion {
+    src: Meta,
+    tgt: Meta,
+}
+
+impl Deletion {
+    #[inline]
+    pub fn shunt(src: Meta, tgt: Meta) -> Self {
+        Self {
+            src,
+            tgt,
+        }
+    }
+}
+
+pub struct UnificationContext<'a> {
     hugr: &'a Hugr,
     pub constraints: HashMap<Meta, Vec<Constraint>>,
     pub resources: HashMap<(Node, Direction), Meta>,
@@ -44,7 +60,7 @@ struct UnificationContext<'a> {
 }
 
 impl<'a> UnificationContext<'a> {
-    fn new(hugr: &'a Hugr) -> Self {
+    pub fn new(hugr: &'a Hugr) -> Self {
         Self {
             hugr,
             constraints: HashMap::new(),
@@ -71,7 +87,6 @@ impl<'a> UnificationContext<'a> {
     }
 
     fn gen_constraints(&mut self, hugr: impl HugrView) {
-        let meta = self.fresh_meta();
         for node in hugr.nodes() {
             let input = self.fresh_meta();
             assert!(self.resources.insert((node, Direction::Incoming), input).is_none());
@@ -99,55 +114,100 @@ impl<'a> UnificationContext<'a> {
         }
     }
 
-    fn solve_meta(&mut self, meta: &Meta) -> Result<(), InferResourceError> {
-        match self.solved.get(meta).cloned() {
-            // We know nothing
-            None => unimplemented!(),
-            Some(rs) => {
-                for (curr, c) in self.constraints.get(meta).unwrap().iter().enumerate() {
-                    match c {
-                        Constraint::Exactly(rs2) => {
-                            if rs == *rs2 {
-                                self.constraints.get(meta).unwrap().remove(curr);
-                            } else {
-                                return Err(InferResourceError::MismatchedConcrete { expected: *rs2, actual: rs });
-                            }
-                        },
-                        Constraint::Equal(other_meta) => {
-                            match self.solved.get(other_meta) {
-                                Some(rs) => {
-                                    self.add_solution(*meta, rs.clone());
-                                    self.constraints.get(meta).map(|remaining_constraints| {
-                                        // Add remaining constraints to the other meta
-                                        self.constraints
-                                            .entry(*other_meta)
-                                            .and_modify(|cs| cs.append(remaining_constraints.as_mut()));
-                                        // and delete this one
-                                        self.add_constraint(*meta, Constraint::Equal(*other_meta));
-                                    });
-                                },
-                                // The trickier case
-                                None => {
-                                    todo!()
-                                }
-                            }
-                        },
-                        Constraint::Plus(r, other_meta) => {
-                            match self.solved.get(other_meta) {
-                                Some(rs) => {
-                                    let rrs = rs.clone();
-                                    rrs.insert(r);
-                                    self.add_solution(*meta, rrs);
-                                    self.constraints.get(meta).unwrap().remove(curr);
-                                },
-                                None => todo!(),
-                            }
-                        },
-                    }
+    // Coalesce
+    fn process_deletions(&mut self, deletions: Vec<Deletion>) {
+        fn sanity_check(cs: &Vec<Constraint>) -> bool {
+            cs.iter().filter(|c| std::matches!(c, Constraint::Equal(_))).count() == 1
+        }
+
+        let mut srcs = Vec::new();
+        let mut tgts = Vec::new();
+        deletions.iter().for_each(|Deletion { src, tgt }| {
+            srcs.push(src);
+            tgts.push(tgt);
+        });
+        assert!(srcs.len() == HashSet::<&usize>::from_iter(srcs.into_iter()).len());
+        assert!(tgts.len() == HashSet::<&usize>::from_iter(tgts.into_iter()).len());
+
+        for Deletion { src, tgt} in deletions.iter() {
+            match self.constraints.get(src) {
+                // She's already deleted!
+                None => (),
+                Some(cs) => {
+                    assert!(sanity_check(cs));
+                    let mut src_constraints: Vec<Constraint> = cs
+                        .iter()
+                        .cloned()
+                        .filter(|c| !matches!(c, Constraint::Equal(_)))
+                        .collect();
+                    self.constraints
+                        .entry(*tgt)
+                        .and_modify(|cs| cs.append(&mut src_constraints))
+                        .or_insert(src_constraints);
+                    self.constraints.remove(src);
                 }
-                Ok(())
             }
         }
+    }
+
+    /// Process the constraints of a given metavariable
+    fn solve_meta(&mut self, meta: Meta) -> Result<bool, InferResourceError> {
+        let mut deleted: Vec<Deletion> = Vec::new();
+        let mut unfinished_business = false;
+        for c in self.constraints.get(&meta).unwrap().clone().iter() {
+            match c {
+                Constraint::Exactly(rs2) => {
+                    match self.solved.get(&meta) {
+                        None => { self.add_solution(meta, rs2.clone()); },
+                        Some(rs) => {
+                            // If they're the same then we're happy
+                            if *rs != *rs2 {
+                                return Err(InferResourceError::MismatchedConcrete { expected: rs2.clone(), actual: rs.clone() });
+                            }
+                        }
+                    };
+                },
+                Constraint::Equal(other_meta) => {
+                    match (self.solved.get(&meta), self.solved.get(other_meta)) {
+                        (None, None) => { unfinished_business = true; },
+                        (None, Some(rs)) => {
+                            self.add_solution(meta, rs.clone());
+                            deleted.push(Deletion::shunt(meta, *other_meta));
+                        },
+                        (Some(rs), None) => {
+                            self.add_solution(*other_meta, rs.clone());
+                            deleted.push(Deletion::shunt(*other_meta, meta));
+                        },
+                        (Some(rs1), Some(rs2)) => {
+                            if rs1 != rs2 {
+                                return Err(InferResourceError::MismatchedConcrete { expected: rs1.clone(), actual: rs2.clone() });
+                            }
+                            deleted.push(Deletion::shunt(meta, *other_meta));
+
+                        }
+                    };
+                },
+                Constraint::Plus(r, other_meta) => {
+                    match self.solved.get(other_meta) {
+                        Some(rs) => {
+                            let mut rrs = rs.clone();
+                            rrs.insert(r);
+                            match self.solved.get(&meta) {
+                                // Let's check that this is right?
+                                Some(rs) => if *rs != rrs {
+                                    return Err(InferResourceError::MismatchedConcrete { expected: rs.clone(), actual: rrs });
+                                },
+                                None => self.add_solution(meta, rrs),
+                            }
+                        },
+                        // Should we do something here?
+                        None => { unfinished_business = true; },
+                    }
+                },
+            }
+        };
+        self.process_deletions(deleted);
+        Ok(unfinished_business)
     }
 
     fn solve(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
