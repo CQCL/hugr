@@ -132,13 +132,12 @@ pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(),
                 Ok(())
             }
             (Container::Tuple(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
-            (Container::Sum(row), ConstValue::Sum { tag, val }) => {
-                if tag > &row.len() {
-                    return Err(ConstTypeError::InvalidSumTag);
+            (Container::Sum(row), ConstValue::Sum(tag, val)) => {
+                if let Some(ty) = row.get(*tag) {
+                    typecheck_const(ty, val.as_ref())
+                } else {
+                    Err(ConstTypeError::InvalidSumTag)
                 }
-
-                let ty = row.get(*tag).unwrap();
-                typecheck_const(ty, val.as_ref())
             }
             (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
             (Container::Opaque(ty), ConstValue::Opaque((ty_act, _val))) => {
@@ -182,25 +181,25 @@ mod test {
     #[test]
     fn test_typecheck_const() {
         const INT: ClassicType = ClassicType::int::<64>();
-        typecheck_const(&INT, &ConstValue::i64(3)).unwrap();
+        typecheck_const(&INT, &ConstValue::Int(3)).unwrap();
         typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();
         assert_eq!(
-            typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
+            typecheck_const(&ClassicType::F64, &ConstValue::Int(5)),
             Err(ConstTypeError::ValueCheckFail(
                 ClassicType::F64,
-                ConstValue::i64(5)
+                ConstValue::Int(5)
             ))
         );
         let tuple_ty = ClassicType::new_tuple(classic_row![INT, ClassicType::F64,]);
         typecheck_const(
             &tuple_ty,
-            &ConstValue::Tuple(vec![ConstValue::i64(7), ConstValue::F64(5.1)]),
+            &ConstValue::Tuple(vec![ConstValue::Int(7), ConstValue::F64(5.1)]),
         )
         .unwrap();
         assert_matches!(
             typecheck_const(
                 &tuple_ty,
-                &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::i64(2)])
+                &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::Int(2)])
             ),
             Err(ConstTypeError::ValueCheckFail(_, _))
         );
@@ -208,9 +207,9 @@ mod test {
             typecheck_const(
                 &tuple_ty,
                 &ConstValue::Tuple(vec![
-                    ConstValue::i64(5),
+                    ConstValue::Int(5),
                     ConstValue::F64(3.3),
-                    ConstValue::i64(2)
+                    ConstValue::Int(2)
                 ])
             ),
             Err(ConstTypeError::TupleWrongLength)

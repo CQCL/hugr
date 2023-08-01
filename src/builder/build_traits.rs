@@ -300,7 +300,7 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let const_node = cid.node();
-        let op @ ops::Const { .. } = self
+        let op: ops::Const = self
             .hugr()
             .get_optype(const_node)
             .clone()
@@ -309,7 +309,7 @@ pub trait Dataflow: Container {
 
         let load_n = self.add_dataflow_op(
             ops::LoadConstant {
-                datatype: op.get_type().clone(),
+                datatype: op.const_type().clone(),
             },
             // Constant wire from the constant value node
             vec![Wire::new(const_node, Port::new_outgoing(0))],

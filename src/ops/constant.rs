@@ -36,7 +36,7 @@ impl Const {
     }
 
     /// Returns a reference to the type of this [`Const`].
-    pub fn get_type(&self) -> &ClassicType {
+    pub fn const_type(&self) -> &ClassicType {
         &self.typ
     }
 
@@ -49,19 +49,13 @@ impl Const {
     ) -> Result<Self, ConstTypeError> {
         let typ = ClassicType::new_predicate(variant_rows);
 
-        Self::new(
-            ConstValue::Sum {
-                tag,
-                val: Box::new(value),
-            },
-            typ,
-        )
+        Self::new(ConstValue::Sum(tag, Box::new(value)), typ)
     }
 
     /// Constant Sum over units, used as predicates.
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
         Self {
-            value: ConstValue::simple_predicate(tag, size),
+            value: ConstValue::simple_predicate(tag),
             typ: ClassicType::new_simple_predicate(size),
         }
     }
@@ -91,7 +85,7 @@ impl Const {
 
     /// 64-bit integer
     pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
-        Self::new(ConstValue::i64(value), ClassicType::i64())
+        Self::int::<64>(value as HugrIntValueStore)
     }
 }
 
@@ -135,7 +129,7 @@ pub enum ConstValue {
     /// Double precision float
     F64(f64),
     /// A constant specifying a variant of a Sum type.
-    Sum { tag: usize, val: Box<ConstValue> },
+    Sum(usize, Box<ConstValue>),
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
     /// An opaque constant value, with cached type
@@ -166,7 +160,7 @@ impl ConstValue {
             Self::Int(value) => format!("const:int{value}"),
             Self::F64(f) => format!("const:float:{f}"),
             Self::Opaque((_, v)) => format!("const:{}", v.name()),
-            Self::Sum { tag, val, .. } => {
+            Self::Sum(tag, val) => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
             }
             Self::Tuple(vals) => {
@@ -189,30 +183,18 @@ impl ConstValue {
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, _size: usize) -> Self {
-        Self::predicate(
-            tag,
-            Self::unit(),
-            // std::iter::repeat(classic_row![]).take(size),
-        )
+    pub fn simple_predicate(tag: usize) -> Self {
+        Self::predicate(tag, Self::unit())
     }
 
     /// Constant Sum over Tuples, used as predicates.
     pub fn predicate(tag: usize, val: ConstValue) -> Self {
-        ConstValue::Sum {
-            tag,
-            val: Box::new(val),
-        }
+        ConstValue::Sum(tag, Box::new(val))
     }
 
     /// Constant Sum over Tuples with just one variant of unit type
     pub fn simple_unary_predicate() -> Self {
-        Self::simple_predicate(0, 1)
-    }
-
-    /// New 64 bit integer constant
-    pub fn i64(value: i64) -> Self {
-        Self::Int(value as HugrIntValueStore)
+        Self::simple_predicate(0)
     }
 }
 
@@ -270,7 +252,7 @@ mod test {
         let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
         let c = b.add_constant(Const::predicate(
             0,
-            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
+            ConstValue::Tuple(vec![ConstValue::Int(3), ConstValue::F64(3.15)]),
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
