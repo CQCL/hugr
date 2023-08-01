@@ -41,9 +41,9 @@ enum Versioned {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
+    input_resources: Option<ResourceSet>,
     #[serde(flatten)]
     op: OpType,
-    input_resources: Option<ResourceSet>,
 }
 
 /// Version 0 of the HUGR serialization format.
@@ -141,8 +141,8 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.op.clone(),
                 input_resources: opt.input_resources.clone(),
+                op: opt.op.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
         }
@@ -201,8 +201,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
-            op: root_type,
             input_resources,
+            op: root_type,
         } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
