@@ -4,17 +4,23 @@ use super::{ResourceId, ResourceSet};
 use std::collections::HashMap;
 use thiserror::Error;
 
+/// Metavariables don't need much
 type Meta = usize;
 
 #[derive(Clone, Debug)]
-enum Constraint {
+/// Things we know about metavariables
+pub enum Constraint {
+    /// Constrain a variable to a specific value
     Exactly(ResourceSet),
+    /// A variable has the same value as another variable
     Equal(Meta),
+    /// Variable extends the value of another by one resource
     Plus(ResourceId, Meta)
 }
 
 #[derive(Debug, Error)]
-enum InferResourceError {
+/// Errors which arise during unification
+pub enum InferResourceError {
     #[error("Mismatched resource sets {expected} and {actual}")]
     MismatchedConcrete {
         //loc: (Node, Direction),
