@@ -99,14 +99,7 @@ impl<const DEF: bool> AliasID<DEF> {
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
 /// Handle to a [Const](crate::ops::OpType::Const) node.
-pub struct ConstID(Node, ClassicType);
-
-impl ConstID {
-    /// Return the type of the constant.
-    pub fn const_type(&self) -> ClassicType {
-        self.1.clone()
-    }
-}
+pub struct ConstID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [BasicBlock](crate::ops::BasicBlock) node.

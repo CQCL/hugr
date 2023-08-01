@@ -3,33 +3,95 @@
 use std::any::Any;
 
 use crate::{
-    classic_row,
-    hugr::typecheck::{typecheck_const, ConstTypeError},
     macros::impl_box_clone,
-    types::{ClassicRow, ClassicType, Container, CustomType, EdgeKind, HashableType},
+    types::{ClassicRow, ClassicType, CustomType, EdgeKind},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+use self::typecheck::{typecheck_const, ConstTypeError};
+
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
+pub mod typecheck;
 /// A constant value definition.
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
-pub struct Const(ConstValue);
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Const {
+    value: ConstValue,
+    typ: ClassicType,
+}
 
 impl Const {
     /// Creates a new Const, type-checking the value.
-    pub fn new(val: ConstValue) -> Result<Self, ConstTypeError> {
-        typecheck_const(&val.const_type(), &val)?;
-        Ok(Const(val))
+    pub fn new(value: ConstValue, typ: ClassicType) -> Result<Self, ConstTypeError> {
+        value.check_type(&typ)?;
+        Ok(Self { value, typ })
+    }
+
+    /// Returns a reference to the value of this [`Const`].
+    pub fn value(&self) -> &ConstValue {
+        &self.value
+    }
+
+    /// Returns a reference to the type of this [`Const`].
+    pub fn const_type(&self) -> &ClassicType {
+        &self.typ
+    }
+
+    /// Sum of Tuples, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn predicate(
+        tag: usize,
+        value: ConstValue,
+        variant_rows: impl IntoIterator<Item = ClassicRow>,
+    ) -> Result<Self, ConstTypeError> {
+        let typ = ClassicType::new_predicate(variant_rows);
+
+        Self::new(ConstValue::Sum(tag, Box::new(value)), typ)
+    }
+
+    /// Constant Sum over units, used as predicates.
+    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+        Self {
+            value: ConstValue::simple_predicate(tag),
+            typ: ClassicType::new_simple_predicate(size),
+        }
+    }
+
+    /// Constant Sum over units, with only one variant.
+    pub fn simple_unary_predicate() -> Self {
+        Self {
+            value: ConstValue::simple_unary_predicate(),
+            typ: ClassicType::new_simple_predicate(1),
+        }
+    }
+
+    /// Constant "true" value, i.e. the second variant of Sum((), ()).
+    pub fn true_val() -> Self {
+        Self::simple_predicate(1, 2)
+    }
+
+    /// Constant "false" value, i.e. the first variant of Sum((), ()).
+    pub fn false_val() -> Self {
+        Self::simple_predicate(0, 2)
+    }
+
+    /// Fixed width integer
+    pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
+        Self::new(ConstValue::Int(value), ClassicType::int::<N>())
+    }
+
+    /// 64-bit integer
+    pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
+        Self::int::<64>(value as HugrIntValueStore)
     }
 }
 
 impl OpName for Const {
     fn name(&self) -> SmolStr {
-        self.0.name()
+        self.value.name()
     }
 }
 impl StaticTag for Const {
@@ -37,7 +99,7 @@ impl StaticTag for Const {
 }
 impl OpTrait for Const {
     fn description(&self) -> &str {
-        self.0.description()
+        self.value.description()
     }
 
     fn tag(&self) -> OpTag {
@@ -45,7 +107,7 @@ impl OpTrait for Const {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(self.0.const_type()))
+        Some(EdgeKind::Static(self.typ.clone()))
     }
 }
 
@@ -63,20 +125,11 @@ pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
 #[allow(missing_docs)]
 pub enum ConstValue {
     /// An arbitrary length integer constant.
-    Int {
-        value: HugrIntValueStore,
-        width: HugrIntWidthStore,
-    },
+    Int(HugrIntValueStore),
     /// Double precision float
     F64(f64),
     /// A constant specifying a variant of a Sum type.
-    Sum {
-        tag: usize,
-        // We require the type to be entirely Classic (i.e. we don't allow
-        // a classic variant of a Sum with other variants that are linear)
-        variants: ClassicRow,
-        val: Box<ConstValue>,
-    },
+    Sum(usize, Box<ConstValue>),
     /// A tuple of constant values.
     Tuple(Vec<ConstValue>),
     /// An opaque constant value, with cached type
@@ -92,34 +145,22 @@ impl PartialEq for dyn CustomConst {
 
 impl Default for ConstValue {
     fn default() -> Self {
-        Self::Int {
-            value: 0,
-            width: 64,
-        }
+        Self::Int(0)
     }
 }
 
 impl ConstValue {
     /// Returns the datatype of the constant.
-    pub fn const_type(&self) -> ClassicType {
-        match self {
-            Self::Int { value: _, width } => HashableType::Int(*width).into(),
-            Self::Opaque((_, b)) => Container::Opaque((*b).custom_type()).into(),
-            Self::Sum { variants, .. } => ClassicType::new_sum(variants.clone()),
-            Self::Tuple(vals) => {
-                let row: Vec<_> = vals.iter().map(|val| val.const_type()).collect();
-                ClassicType::new_tuple(row)
-            }
-            Self::F64(_) => ClassicType::F64,
-        }
+    pub fn check_type(&self, typ: &ClassicType) -> Result<(), ConstTypeError> {
+        typecheck_const(typ, self)
     }
     /// Unique name of the constant.
     pub fn name(&self) -> SmolStr {
         match self {
-            Self::Int { value, width } => format!("const:int<{width}>:{value}"),
+            Self::Int(value) => format!("const:int{value}"),
             Self::F64(f) => format!("const:float:{f}"),
             Self::Opaque((_, v)) => format!("const:{}", v.name()),
-            Self::Sum { tag, val, .. } => {
+            Self::Sum(tag, val) => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
             }
             Self::Tuple(vals) => {
@@ -141,49 +182,19 @@ impl ConstValue {
         ConstValue::Tuple(vec![])
     }
 
-    /// Constant "true" value, i.e. the second variant of Sum((), ()).
-    pub fn true_val() -> Self {
-        Self::simple_predicate(1, 2)
-    }
-
-    /// Constant "false" value, i.e. the first variant of Sum((), ()).
-    pub fn false_val() -> Self {
-        Self::simple_predicate(0, 2)
-    }
-
     /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, size: usize) -> Self {
-        Self::predicate(
-            tag,
-            Self::unit(),
-            std::iter::repeat(classic_row![]).take(size),
-        )
+    pub fn simple_predicate(tag: usize) -> Self {
+        Self::predicate(tag, Self::unit())
     }
 
     /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(
-        tag: usize,
-        val: ConstValue,
-        variant_rows: impl IntoIterator<Item = ClassicRow>,
-    ) -> Self {
-        ConstValue::Sum {
-            tag,
-            variants: ClassicRow::predicate_variants_row(variant_rows),
-            val: Box::new(val),
-        }
+    pub fn predicate(tag: usize, val: ConstValue) -> Self {
+        ConstValue::Sum(tag, Box::new(val))
     }
 
     /// Constant Sum over Tuples with just one variant of unit type
     pub fn simple_unary_predicate() -> Self {
-        Self::simple_predicate(0, 1)
-    }
-
-    /// New 64 bit integer constant
-    pub fn i64(value: i64) -> Self {
-        Self::Int {
-            value: value as HugrIntValueStore,
-            width: 64,
-        }
+        Self::simple_predicate(0)
     }
 }
 
@@ -220,12 +231,13 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
     use super::ConstValue;
+    use super::{typecheck::ConstTypeError, Const};
     use crate::{
         builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
-        classic_row,
-        hugr::typecheck::ConstTypeError,
-        type_row,
+        classic_row, type_row,
         types::{ClassicType, SimpleRow, SimpleType},
     };
 
@@ -238,20 +250,16 @@ mod test {
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
-        let c = b.add_constant(ConstValue::predicate(
+        let c = b.add_constant(Const::predicate(
             0,
-            ConstValue::Tuple(vec![ConstValue::i64(3), ConstValue::F64(3.15)]),
+            ConstValue::Tuple(vec![ConstValue::Int(3), ConstValue::F64(3.15)]),
             pred_rows.clone(),
-        ))?;
+        )?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
         let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty]))?;
-        let c = b.add_constant(ConstValue::predicate(
-            1,
-            ConstValue::Tuple(vec![]),
-            pred_rows,
-        ))?;
+        let c = b.add_constant(Const::predicate(1, ConstValue::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
@@ -264,17 +272,8 @@ mod test {
             classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
         ];
-        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty])).unwrap();
-        let res = b.add_constant(ConstValue::predicate(
-            0,
-            ConstValue::Tuple(vec![]),
-            pred_rows,
-        ));
-        assert_eq!(
-            res,
-            Err(BuildError::BadConstant(ConstTypeError::TupleWrongLength))
-        );
+        let res = Const::predicate(0, ConstValue::Tuple(vec![]), pred_rows);
+        assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
     }
 }

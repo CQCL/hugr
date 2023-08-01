@@ -5,11 +5,11 @@ use lazy_static::lazy_static;
 
 use std::collections::HashSet;
 
-use crate::hugr::*;
+use thiserror::Error;
 
 // For static typechecking
 use crate::ops::ConstValue;
-use crate::types::{ClassicRow, ClassicType, Container, HashableType, PrimType, TypeRow};
+use crate::types::{ClassicType, Container, HashableType, PrimType, TypeRow};
 
 use crate::ops::constant::{HugrIntValueStore, HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
 
@@ -29,7 +29,7 @@ pub enum ConstIntError {
 }
 
 /// Errors that arise from typechecking constants
-#[derive(Clone, Debug, Eq, PartialEq, Error)]
+#[derive(Clone, Debug, PartialEq, Error)]
 pub enum ConstTypeError {
     /// This case hasn't been implemented. Possibly because we don't have value
     /// constructors to check against it
@@ -51,12 +51,11 @@ pub enum ConstTypeError {
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
     /// A mismatch between the type expected and the actual type of the constant
-    #[error("Type mismatch for const - expected {0}, found {1}")]
+    #[error("Type mismatch for const - expected {0}, found {1:?}")]
     TypeMismatch(ClassicType, ClassicType),
-    /// A mismatch between the embedded type and the type we're checking
-    /// against, as above, but for rows instead of simple types
-    #[error("Type mismatch for const - expected {0}, found {1}")]
-    TypeRowMismatch(ClassicRow, ClassicRow),
+    /// A mismatch between the type expected and the value.
+    #[error("Value {1:?} does not match expected type {0}")]
+    ValueCheckFail(ClassicType, ConstValue),
 }
 
 lazy_static! {
@@ -116,14 +115,10 @@ fn map_vals<T: PrimType, T2: PrimType>(
 }
 
 /// Typecheck a constant value
-pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
+pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstTypeError> {
     match (typ, val) {
-        (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int { value, width }) => {
-            if exp_width == width {
-                check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int)
-            } else {
-                Err(ConstTypeError::IntWidthMismatch(*exp_width, *width))
-            }
+        (ClassicType::Hashable(HashableType::Int(exp_width)), ConstValue::Int(value)) => {
+            check_int_fits_in_width(*value, *exp_width).map_err(ConstTypeError::Int)
         }
         (ClassicType::F64, ConstValue::F64(_)) => Ok(()),
         (ty @ ClassicType::Container(c), tm) => match (c, tm) {
@@ -136,25 +131,15 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
                 }
                 Ok(())
             }
-            (Container::Tuple(_), _) => {
-                Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
-            }
-            (Container::Sum(row), ConstValue::Sum { tag, variants, val }) => {
-                if tag > &row.len() {
-                    return Err(ConstTypeError::InvalidSumTag);
+            (Container::Tuple(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
+            (Container::Sum(row), ConstValue::Sum(tag, val)) => {
+                if let Some(ty) = row.get(*tag) {
+                    typecheck_const(ty, val.as_ref())
+                } else {
+                    Err(ConstTypeError::InvalidSumTag)
                 }
-                if **row != *variants {
-                    return Err(ConstTypeError::TypeRowMismatch(
-                        *row.clone(),
-                        variants.clone(),
-                    ));
-                }
-                let ty = variants.get(*tag).unwrap();
-                typecheck_const(ty, val.as_ref())
             }
-            (Container::Sum(_), _) => {
-                Err(ConstTypeError::TypeMismatch(ty.clone(), tm.const_type()))
-            }
+            (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
             (Container::Opaque(ty), ConstValue::Opaque((ty_act, _val))) => {
                 if ty_act != ty {
                     return Err(ConstTypeError::TypeMismatch(
@@ -181,7 +166,7 @@ pub fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(), ConstT
         (ClassicType::Hashable(HashableType::Variable(_)), _) => {
             Err(ConstTypeError::ConstCantBeVar)
         }
-        (ty, _) => Err(ConstTypeError::TypeMismatch(ty.clone(), val.const_type())),
+        (ty, _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), val.clone())),
     }
 }
 
@@ -196,39 +181,35 @@ mod test {
     #[test]
     fn test_typecheck_const() {
         const INT: ClassicType = ClassicType::int::<64>();
-        typecheck_const(&INT, &ConstValue::i64(3)).unwrap();
-        assert_eq!(
-            typecheck_const(&HashableType::Int(32).into(), &ConstValue::i64(3)),
-            Err(ConstTypeError::IntWidthMismatch(32, 64))
-        );
+        typecheck_const(&INT, &ConstValue::Int(3)).unwrap();
         typecheck_const(&ClassicType::F64, &ConstValue::F64(17.4)).unwrap();
         assert_eq!(
-            typecheck_const(&ClassicType::F64, &ConstValue::i64(5)),
-            Err(ConstTypeError::TypeMismatch(
+            typecheck_const(&ClassicType::F64, &ConstValue::Int(5)),
+            Err(ConstTypeError::ValueCheckFail(
                 ClassicType::F64,
-                ClassicType::i64()
+                ConstValue::Int(5)
             ))
         );
         let tuple_ty = ClassicType::new_tuple(classic_row![INT, ClassicType::F64,]);
         typecheck_const(
             &tuple_ty,
-            &ConstValue::Tuple(vec![ConstValue::i64(7), ConstValue::F64(5.1)]),
+            &ConstValue::Tuple(vec![ConstValue::Int(7), ConstValue::F64(5.1)]),
         )
         .unwrap();
         assert_matches!(
             typecheck_const(
                 &tuple_ty,
-                &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::i64(2)])
+                &ConstValue::Tuple(vec![ConstValue::F64(4.8), ConstValue::Int(2)])
             ),
-            Err(ConstTypeError::TypeMismatch(_, _))
+            Err(ConstTypeError::ValueCheckFail(_, _))
         );
         assert_eq!(
             typecheck_const(
                 &tuple_ty,
                 &ConstValue::Tuple(vec![
-                    ConstValue::i64(5),
+                    ConstValue::Int(5),
                     ConstValue::F64(3.3),
-                    ConstValue::i64(2)
+                    ConstValue::Int(2)
                 ])
             ),
             Err(ConstTypeError::TupleWrongLength)

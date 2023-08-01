@@ -5,8 +5,8 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::hugr::typecheck::ConstTypeError;
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::ops::constant::typecheck::ConstTypeError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::SimpleType;
 

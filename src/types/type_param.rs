@@ -6,7 +6,7 @@
 
 use thiserror::Error;
 
-use crate::hugr::typecheck::{check_int_fits_in_width, ConstIntError};
+use crate::ops::constant::typecheck::{check_int_fits_in_width, ConstIntError};
 use crate::ops::constant::HugrIntValueStore;
 
 use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
