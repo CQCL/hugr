@@ -49,7 +49,7 @@ pub trait Container {
         let parent = self.container_node();
         Ok(self.hugr_mut().add_op_with_parent(parent, op)?)
     }
-    /// Add an [`OpType`] as the final child of the container.
+    /// Add a [`NodeType`] as the final child of the container.
     fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().add_node_with_parent(parent, node)?)
