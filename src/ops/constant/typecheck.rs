@@ -56,6 +56,9 @@ pub enum ConstTypeError {
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
+    /// Error when checking a custom value.
+    #[error("Custom value type check error: {0:?}")]
+    CustomCheckFail(String),
 }
 
 lazy_static! {
@@ -140,15 +143,7 @@ pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(),
                 }
             }
             (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
-            (Container::Opaque(ty), ConstValue::Opaque((ty_act, _val))) => {
-                if ty_act != ty {
-                    return Err(ConstTypeError::TypeMismatch(
-                        ty.clone().into(),
-                        ty_act.clone().into(),
-                    ));
-                }
-                Ok(())
-            }
+            (Container::Opaque(ty), ConstValue::Opaque((val,))) => val.check_type(ty),
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ClassicType::Hashable(HashableType::Container(c)), tm) => {

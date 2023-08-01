@@ -11,6 +11,7 @@ use std::collections::HashMap;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::ops::constant::typecheck::ConstTypeError;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
@@ -93,6 +94,15 @@ pub enum Constant {
     Quaternion(cgmath::Quaternion<f64>),
 }
 
+impl Constant {
+    fn rotation_type(&self) -> Type {
+        match self {
+            Constant::Angle(_) => Type::Angle,
+            Constant::Quaternion(_) => Type::Quaternion,
+        }
+    }
+}
+
 #[typetag::serde]
 impl CustomConst for Constant {
     fn name(&self) -> SmolStr {
@@ -103,12 +113,25 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn custom_type(&self) -> CustomType {
-        let t: Type = match self {
-            Constant::Angle(_) => Type::Angle,
-            Constant::Quaternion(_) => Type::Quaternion,
-        };
-        t.custom_type()
+    fn check_type(&self, typ: &CustomType) -> Result<(), ConstTypeError> {
+        let self_typ = self.rotation_type();
+
+        if &self_typ.custom_type() == typ {
+            Ok(())
+        } else {
+            Err(ConstTypeError::ValueCheckFail(
+                typ.clone().into(),
+                self.clone().into(),
+            ))
+        }
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Constant>() {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
@@ -313,6 +336,38 @@ mod test {
                 Some("rotations".into()),
                 Some("wrong_resource".into()),
             ))
+        );
+    }
+
+    #[test]
+    fn test_type_check() {
+        let resource = resource();
+
+        let custom_type = resource
+            .types()
+            .get("angle")
+            .unwrap()
+            .instantiate_concrete([])
+            .unwrap();
+
+        let custom_value = Constant::Angle(AngleValue::F64(0.0));
+
+        // correct type
+        custom_value.check_type(&custom_type).unwrap();
+
+        let wrong_custom_type = resource
+            .types()
+            .get("quat")
+            .unwrap()
+            .instantiate_concrete([])
+            .unwrap();
+        let res = custom_value.check_type(&wrong_custom_type);
+        assert_eq!(
+            res,
+            Err(ConstTypeError::ValueCheckFail(
+                wrong_custom_type.into(),
+                custom_value.into(),
+            )),
         );
     }
 }
