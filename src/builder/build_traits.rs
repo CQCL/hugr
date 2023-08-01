@@ -182,7 +182,7 @@ pub trait Dataflow: Container {
         self.add_dataflow_node(NodeType::pure(op), input_wires)
     }
 
-    /// Add a dataflow op to the sibling graph, wiring up the `input_wires` to the
+    /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
     /// incoming ports of the resulting node.
     ///
     /// # Errors
