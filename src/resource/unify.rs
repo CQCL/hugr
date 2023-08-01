@@ -185,19 +185,19 @@ mod test {
     fn plus() -> Result<(), InferResourceError> {
         let hugr: Hugr = Default::default();
         let mut ctx = UnificationContext::new(&hugr);
+        let m0 = ctx.fresh_meta();
         let m1 = ctx.fresh_meta();
         let m2 = ctx.fresh_meta();
         let m3 = ctx.fresh_meta();
         let m4 = ctx.fresh_meta();
         let m5 = ctx.fresh_meta();
-        let m6 = ctx.fresh_meta();
-        ctx.add_constraint(m3, Constraint::Exactly(ResourceSet::singleton(&"A".into())));
-        ctx.add_constraint(m2, Constraint::Equal(m3));
-        ctx.add_constraint(m1, Constraint::Plus("B".into(), m3));
-        ctx.add_constraint(m5, Constraint::Plus("C".into(), m1));
-        ctx.add_constraint(m4, Constraint::Equal(m5));
-        ctx.add_constraint(m6, Constraint::Equal(m1));
-        ctx.solve()?;
+        ctx.add_constraint(m2, Constraint::Exactly(ResourceSet::singleton(&"A".into())));
+        ctx.add_constraint(m1, Constraint::Equal(m2));
+        ctx.add_constraint(m0, Constraint::Plus("B".into(), m2));
+        ctx.add_constraint(m4, Constraint::Plus("C".into(), m0));
+        ctx.add_constraint(m3, Constraint::Equal(m4));
+        ctx.add_constraint(m5, Constraint::Equal(m0));
+        ctx.solve_constraints()?;
 
         let a = ResourceSet::singleton(&"A".into());
         let mut ab = a.clone();
@@ -205,12 +205,12 @@ mod test {
         let mut abc = ab.clone();
         abc.insert(&"C".into());
 
-        assert_eq!(ctx.solved.get(&m1).unwrap(), &ab);
+        assert_eq!(ctx.solved.get(&m0).unwrap(), &ab);
+        assert_eq!(ctx.solved.get(&m1).unwrap(), &a);
         assert_eq!(ctx.solved.get(&m2).unwrap(), &a);
-        assert_eq!(ctx.solved.get(&m3).unwrap(), &a);
+        assert_eq!(ctx.solved.get(&m3).unwrap(), &abc);
         assert_eq!(ctx.solved.get(&m4).unwrap(), &abc);
-        assert_eq!(ctx.solved.get(&m5).unwrap(), &abc);
-        assert_eq!(ctx.solved.get(&m6).unwrap(), &ab);
+        assert_eq!(ctx.solved.get(&m5).unwrap(), &ab);
 
         Ok(())
     }
