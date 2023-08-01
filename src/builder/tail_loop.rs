@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
-use crate::hugr::view::HugrView;
-use crate::types::{ClassicRow, Signature, SimpleRow};
+use crate::hugr::{view::HugrView, NodeType};
+use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -20,8 +20,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         loop_node: Node,
         tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
-        let signature = Signature::new_df(tail_loop.body_input_row(), tail_loop.body_output_row());
-        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature)?;
+        let signature =
+            AbstractSignature::new_df(tail_loop.body_input_row(), tail_loop.body_output_row());
+        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature, None)?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
@@ -81,7 +82,8 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = Hugr::new(tail_loop.clone());
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(tail_loop.clone()));
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }
@@ -100,7 +102,7 @@ mod test {
         hugr::ValidationError,
         ops::Const,
         type_row,
-        types::{ClassicType, Signature},
+        types::ClassicType,
         Hugr,
     };
 
@@ -125,8 +127,10 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder
-                .define_function("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
+            let mut fbuild = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![BIT], type_row![NAT]).pure(),
+            )?;
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {

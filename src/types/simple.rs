@@ -10,8 +10,7 @@ use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
-use super::{custom::CustomType, Signature};
-use crate::resource::ResourceSet;
+use super::{custom::CustomType, AbstractSignature};
 use crate::{classic_row, ops::constant::HugrIntWidthStore, utils::display_list};
 
 /// A type that represents concrete data. Can include both linear and classical parts.
@@ -179,7 +178,7 @@ pub enum ClassicType {
     F64,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
     /// TODO this can be moved out into an extension/resource
-    Graph(Box<(ResourceSet, Signature)>),
+    Graph(Box<AbstractSignature>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
     /// A type which can be hashed
@@ -211,10 +210,9 @@ impl ClassicType {
     }
 
     /// Create a graph type with the given signature, using default resources.
-    /// TODO in the future we'll probably need versions of this that take resources.
     #[inline]
-    pub fn graph_from_sig(signature: Signature) -> Self {
-        ClassicType::Graph(Box::new((Default::default(), signature)))
+    pub fn graph_from_sig(signature: AbstractSignature) -> Self {
+        ClassicType::Graph(Box::new(signature))
     }
 
     /// Returns a new integer type with the given number of bits.
@@ -281,8 +279,8 @@ impl Display for ClassicType {
         match self {
             ClassicType::F64 => f.write_str("F64"),
             ClassicType::Graph(data) => {
-                let (rs, sig) = data.as_ref();
-                write!(f, "[{:?}]", rs)?;
+                let sig = data.as_ref();
+                write!(f, "[{:?}]", sig.resource_reqs)?;
                 sig.fmt(f)
             }
             ClassicType::Container(c) => c.fmt(f),

@@ -6,11 +6,17 @@ use super::{
 };
 
 use crate::hugr::view::HugrView;
-use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::{ClassicRow, Signature, SimpleRow, SimpleType};
-use crate::{type_row, Hugr, Node};
+use crate::types::AbstractSignature;
+
+use crate::Node;
+use crate::{
+    hugr::{HugrMut, NodeType},
+    type_row,
+    types::{ClassicRow, SimpleRow, SimpleType},
+    Hugr,
+};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
@@ -61,7 +67,8 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        let base = Hugr::new(cfg_op);
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
@@ -87,6 +94,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
+            // Make the resources a parameter
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -128,8 +136,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
+            // TODO: Make resources a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
+            // TODO: Make resources a parameter
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
@@ -236,8 +246,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let predicate_type = SimpleType::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = Signature::new_df(inputs, SimpleRow::from(node_outputs));
-        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
+        let signature = AbstractSignature::new_df(inputs, SimpleRow::from(node_outputs));
+        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 
@@ -271,7 +281,8 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        let base = Hugr::new(op);
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }
@@ -293,7 +304,7 @@ mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::macros::classic_row;
     use crate::types::ClassicType;
-    use crate::{builder::test::NAT, type_row, types::Signature};
+    use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
     use super::*;
@@ -301,8 +312,10 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut func_builder = module_builder
-                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+            let mut func_builder = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(vec![NAT], type_row![NAT]).pure(),
+            )?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 

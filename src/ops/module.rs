@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::types::simple::TypeTag;
-use crate::types::{ClassicType, EdgeKind, Signature, SimpleType};
+use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleType};
 
 use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
@@ -36,7 +36,7 @@ pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 
 impl_op_name!(FuncDefn);
@@ -65,7 +65,7 @@ pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: Signature,
+    pub signature: AbstractSignature,
 }
 
 impl_op_name!(FuncDecl);

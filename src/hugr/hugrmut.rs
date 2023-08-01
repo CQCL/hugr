@@ -5,16 +5,20 @@ use std::ops::Range;
 
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
-use crate::hugr::{Direction, HugrError, HugrView, Node};
+use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType};
 use crate::ops::OpType;
+
 use crate::{Hugr, Port};
 
 use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
 pub(crate) trait HugrMut {
-    /// Add a node to the graph.
+    /// Add a node to the graph, with the default conversion from OpType to NodeType
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
+
+    /// Add a node to the graph.
+    fn add_node(&mut self, node: NodeType) -> Node;
 
     /// Remove a node from the graph.
     ///
@@ -99,6 +103,11 @@ pub(crate) trait HugrMut {
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError>;
 
+    /// Add a node to the graph with a parent in the hierarchy.
+    ///
+    /// The node becomes the parent's last child.
+    fn add_node_with_parent(&mut self, parent: Node, op: NodeType) -> Result<Node, HugrError>;
+
     /// Add a node to the graph as the previous sibling of another node.
     ///
     /// The sibling node's parent becomes the new node's parent.
@@ -122,7 +131,8 @@ pub(crate) trait HugrMut {
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType;
+    /// TODO: Add a version which ignores input resources
+    fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType;
 
     /// Insert another hugr into this one, under a given root node.
     ///
@@ -148,14 +158,18 @@ impl<T> HugrMut for T
 where
     T: AsRef<Hugr> + AsMut<Hugr>,
 {
-    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        let op: OpType = op.into();
+    fn add_node(&mut self, nodetype: NodeType) -> Node {
         let node = self
             .as_mut()
             .graph
-            .add_node(op.input_count(), op.output_count());
-        self.as_mut().op_types[node] = op;
+            .add_node(nodetype.input_count(), nodetype.output_count());
+        self.as_mut().op_types[node] = nodetype;
         node.into()
+    }
+
+    fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        // TODO: Default to `NodeType::open_resources` once we can infer resources
+        self.add_node(NodeType::pure(op))
     }
 
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
@@ -267,7 +281,12 @@ where
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+        // TODO: Default to `NodeType::open_resources` once we can infer resources
+        self.add_node_with_parent(parent, NodeType::pure(op))
+    }
+
+    fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
+        let node = self.add_node(node);
         self.as_mut()
             .hierarchy
             .push_child(node.index, parent.index)?;
@@ -275,7 +294,7 @@ where
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+        let node = self.add_op(op);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
@@ -283,16 +302,16 @@ where
     }
 
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op.into());
+        let node = self.add_op(op);
         self.as_mut()
             .hierarchy
             .insert_after(node.index, sibling.index)?;
         Ok(node)
     }
 
-    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> OpType {
+    fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
         let cur = self.as_mut().op_types.get_mut(node.index);
-        std::mem::replace(cur, op.into())
+        std::mem::replace(cur, op)
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
@@ -311,8 +330,8 @@ where
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let optype = other.get_optype(node.into());
-            self.as_mut().op_types.set(new_node, optype.clone());
+            let nodetype = other.get_nodetype(node.into());
+            self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.get_metadata(node.into());
             self.as_mut().set_metadata(node.into(), meta.clone());
         }
@@ -398,7 +417,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{ClassicType, Signature, SimpleType},
+        types::{AbstractSignature, ClassicType, SimpleType},
     };
 
     use super::*;
@@ -421,7 +440,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: Signature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                    signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
             .expect("Failed to add function definition node");

@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{EdgeKind, Signature, SignatureDescription};
+use crate::types::{AbstractSignature, EdgeKind, SignatureDescription};
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;
@@ -160,7 +160,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         Default::default()
     }
     /// Optional description of the ports in the signature.

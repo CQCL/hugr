@@ -131,15 +131,15 @@ impl CustomConst for Constant {
 //
 // signatures:
 //
-//             LeafOp::AngleAdd | LeafOp::AngleMul => Signature::new_linear([Type::Angle]),
-//             LeafOp::QuatMul => Signature::new_linear([Type::Quat64]),
-//             LeafOp::AngleNeg => Signature::new_linear([Type::Angle]),
+//             LeafOp::AngleAdd | LeafOp::AngleMul => AbstractSignature::new_linear([Type::Angle]),
+//             LeafOp::QuatMul => AbstractSignature::new_linear([Type::Quat64]),
+//             LeafOp::AngleNeg => AbstractSignature::new_linear([Type::Angle]),
 //             LeafOp::RxF64 | LeafOp::RzF64 => {
-//                 Signature::new_df([Type::Qubit], [Type::Angle])
+//                 AbstractSignature::new_df([Type::Qubit], [Type::Angle])
 //             }
-//             LeafOp::TK1 => Signature::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
-//             LeafOp::Rotation => Signature::new_df([Type::Qubit], [Type::Quat64]),
-//             LeafOp::ToRotation => Signature::new_df(
+//             LeafOp::TK1 => AbstractSignature::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
+//             LeafOp::Rotation => AbstractSignature::new_df([Type::Qubit], [Type::Quat64]),
+//             LeafOp::ToRotation => AbstractSignature::new_df(
 //                 [
 //                     Type::Angle,
 //                     Type::F64,

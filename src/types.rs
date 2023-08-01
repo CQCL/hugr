@@ -16,6 +16,7 @@ pub use simple::{
     TypeTag,
 };
 
+use delegate::delegate;
 use smol_str::SmolStr;
 
 use crate::hugr::{Direction, Port};
@@ -47,25 +48,82 @@ impl EdgeKind {
     }
 }
 
+#[cfg_attr(feature = "pyo3", pyclass)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
-#[cfg_attr(feature = "pyo3", pyclass)]
-#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Signature {
+pub struct AbstractSignature {
     /// Value inputs of the function.
     pub input: SimpleRow,
     /// Value outputs of the function.
     pub output: SimpleRow,
     /// Possible static input (for call / load-constant).
     pub static_input: ClassicRow,
-    /// The resource requirements of all the inputs
+    /// The resource requirements which are added by the operation
+    pub resource_reqs: ResourceSet,
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// A concrete signature, which has been instantiated with a set of input resources
+pub struct Signature {
+    /// The underlying signature
+    pub signature: AbstractSignature,
+    /// The resources which are associated with all the inputs and carried through
     pub input_resources: ResourceSet,
-    /// The resource requirements of all the outputs
-    pub output_resources: ResourceSet,
+}
+
+impl AbstractSignature {
+    /// Create a new signature.
+    pub fn new(
+        input: impl Into<SimpleRow>,
+        output: impl Into<SimpleRow>,
+        static_input: impl Into<ClassicRow>,
+    ) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+            static_input: static_input.into(),
+            resource_reqs: ResourceSet::new(),
+        }
+    }
+
+    /// Builder method, add resource_reqs to an AbstractSignature
+    pub fn with_resource_delta(mut self, rs: &ResourceSet) -> Self {
+        self.resource_reqs = self.resource_reqs.union(rs);
+        self
+    }
+
+    /// Instantiate an AbstractSignature, converting it to a concrete one
+    pub fn with_input_resources(self, rs: ResourceSet) -> Signature {
+        Signature {
+            signature: self,
+            input_resources: rs,
+        }
+    }
+
+    /// Instantiate a signature with the empty set of resources
+    pub fn pure(self) -> Signature {
+        self.with_input_resources(ResourceSet::new())
+    }
+}
+
+impl From<Signature> for AbstractSignature {
+    fn from(sig: Signature) -> Self {
+        sig.signature
+    }
+}
+
+impl Signature {
+    /// Calculate the resource requirements of the output wires
+    pub fn output_resources(&self) -> ResourceSet {
+        self.input_resources
+            .clone()
+            .union(&self.signature.resource_reqs)
+    }
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl Signature {
+impl AbstractSignature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -73,7 +131,17 @@ impl Signature {
     }
 }
 
-impl Signature {
+impl AbstractSignature {
+    /// Create a new signature with only dataflow inputs and outputs.
+    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
+        Self::new(input, output, type_row![])
+    }
+    /// Create a new signature with the same input and output types.
+    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
+        let linear = linear.into();
+        Self::new_df(linear.clone(), linear)
+    }
+
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
@@ -137,13 +205,62 @@ impl Signature {
         }
     }
 
-    /// Returns a reference to the resource set for the ports of the
-    /// signature in a given direction
-    pub fn get_resources(&self, dir: &Direction) -> &ResourceSet {
+    /// Returns a slice of the value types for the given direction.
+    #[inline]
+    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
         match dir {
-            Direction::Incoming => &self.input_resources,
-            Direction::Outgoing => &self.output_resources,
+            Direction::Incoming => &self.input,
+            Direction::Outgoing => &self.output,
         }
+    }
+
+    /// Returns a slice of the input value types.
+    #[inline]
+    pub fn input_df_types(&self) -> &[SimpleType] {
+        self.df_types(Direction::Incoming)
+    }
+
+    /// Returns a slice of the output value types.
+    #[inline]
+    pub fn output_df_types(&self) -> &[SimpleType] {
+        self.df_types(Direction::Outgoing)
+    }
+
+    #[inline]
+    /// Returns the input row
+    pub fn input(&self) -> &SimpleRow {
+        &self.input
+    }
+
+    #[inline]
+    /// Returns the output row
+    pub fn output(&self) -> &SimpleRow {
+        &self.output
+    }
+
+    #[inline]
+    /// Returns the row of static inputs
+    pub fn static_input(&self) -> &ClassicRow {
+        &self.static_input
+    }
+}
+
+impl AbstractSignature {
+    /// Returns the linear part of the signature
+    /// TODO: This fails when mixing different linear types.
+    #[inline(always)]
+    pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
+        debug_assert_eq!(
+            self.input
+                .iter()
+                .filter(|t| !t.tag().is_classical())
+                .collect::<Vec<_>>(),
+            self.output
+                .iter()
+                .filter(|t| !t.tag().is_classical())
+                .collect::<Vec<_>>()
+        );
+        self.input.iter().filter(|t| !t.tag().is_classical())
     }
 
     /// Returns the value `Port`s in the signature for a given direction.
@@ -181,58 +298,31 @@ impl Signature {
     pub fn output_ports(&self) -> impl Iterator<Item = Port> {
         self.ports(Direction::Outgoing)
     }
-
-    /// Returns a slice of the value types for the given direction.
-    #[inline]
-    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
-        match dir {
-            Direction::Incoming => &self.input,
-            Direction::Outgoing => &self.output,
-        }
-    }
-
-    /// Returns a slice of the input value types.
-    #[inline]
-    pub fn input_df_types(&self) -> &[SimpleType] {
-        self.df_types(Direction::Incoming)
-    }
-
-    /// Returns a slice of the output value types.
-    #[inline]
-    pub fn output_df_types(&self) -> &[SimpleType] {
-        self.df_types(Direction::Outgoing)
-    }
 }
 
 impl Signature {
-    /// Create a new signature.
-    pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-        static_input: impl Into<ClassicRow>,
-    ) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            static_input: static_input.into(),
-            input_resources: ResourceSet::new(),
-            output_resources: ResourceSet::new(),
+    /// Returns a reference to the resource set for the ports of the
+    /// signature in a given direction
+    pub fn get_resources(&self, dir: &Direction) -> ResourceSet {
+        match dir {
+            Direction::Incoming => self.input_resources.clone(),
+            Direction::Outgoing => self.output_resources(),
         }
     }
 
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
-        let linear = linear.into();
-        Signature::new_df(linear.clone(), linear)
-    }
-
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
-        Signature::new(input, output, type_row![])
+    delegate! {
+        to self.signature {
+            /// Inputs of the abstract signature
+            pub fn input(&self) -> &SimpleRow;
+            /// Outputs of the abstract signature
+            pub fn output(&self) -> &SimpleRow;
+            /// Static inputs of the abstract signature
+            pub fn static_input(&self) -> &ClassicRow;
+        }
     }
 }
 
-impl Display for Signature {
+impl Display for AbstractSignature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let has_inputs = !(self.static_input.is_empty() && self.input.is_empty());
         if has_inputs {
@@ -244,7 +334,18 @@ impl Display for Signature {
             }
             f.write_str(" -> ")?;
         }
+        f.write_char('[')?;
+        self.resource_reqs.fmt(f)?;
+        f.write_char(']')?;
         self.output.fmt(f)
+    }
+}
+
+impl Display for Signature {
+    delegate! {
+        to self.signature {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result;
+        }
     }
 }
 
@@ -319,7 +420,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.input, &self.input)
+        Self::row_zip(signature.input(), &self.input)
     }
 
     /// Iterate over the output wires of the signature and their names.
@@ -329,7 +430,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.output, &self.output)
+        Self::row_zip(signature.output(), &self.output)
     }
 
     /// Iterate over the static input wires of the signature and their names.
@@ -337,7 +438,7 @@ impl SignatureDescription {
         &'a self,
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &ClassicType)> {
-        Self::row_zip(&signature.static_input, &self.static_input)
+        Self::row_zip(signature.static_input(), &self.static_input)
     }
 }
 

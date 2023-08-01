@@ -9,7 +9,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, NodeMetadata};
+use super::{Hugr, NodeMetadata, NodeType};
 use super::{Node, Port};
 use crate::ops::{OpName, OpType};
 use crate::types::EdgeKind;
@@ -47,8 +47,8 @@ pub trait HugrView: sealed::HugrInternals {
     fn root(&self) -> Node;
 
     /// Return the type of the HUGR root node.
-    fn root_type(&self) -> &OpType {
-        self.get_optype(self.root())
+    fn root_type(&self) -> &NodeType {
+        self.get_nodetype(self.root())
     }
 
     /// Returns the parent of a node.
@@ -56,6 +56,9 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the operation type of a node.
     fn get_optype(&self, node: Node) -> &OpType;
+
+    /// Returns the type of a node.
+    fn get_nodetype(&self, node: Node) -> &NodeType;
 
     /// Returns the metadata associated with a node.
     fn get_metadata(&self, node: Node) -> &NodeMetadata;
@@ -221,6 +224,11 @@ where
 
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
+        &self.as_ref().op_types.get(node.index).op
+    }
+
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
         self.as_ref().op_types.get(node.index)
     }
 

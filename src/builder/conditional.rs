@@ -1,5 +1,5 @@
 use crate::hugr::view::HugrView;
-use crate::types::{ClassicRow, Signature, SimpleRow};
+use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -14,7 +14,10 @@ use super::{
 };
 
 use crate::Node;
-use crate::{hugr::HugrMut, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    Hugr,
+};
 
 use std::collections::HashSet;
 
@@ -114,13 +117,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: Signature::new_df(inputs.clone(), outputs.clone()),
+            signature: AbstractSignature::new_df(inputs.clone(), outputs.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
+                // TODO: Allow this to be non-pure
                 self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
+                // TODO: Allow this to be non-pure
                 self.add_child_op(case_op)?
             };
 
@@ -129,7 +134,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            Signature::new_df(inputs, outputs),
+            AbstractSignature::new_df(inputs, outputs),
+            None,
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -162,7 +168,8 @@ impl ConditionalBuilder<Hugr> {
             other_inputs,
             outputs,
         };
-        let base = Hugr::new(op);
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(op));
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -182,13 +189,14 @@ impl CaseBuilder<Hugr> {
     ) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = Signature::new_df(input, output);
+        let signature = AbstractSignature::new_df(input, output);
         let op = ops::Case {
             signature: signature.clone(),
         };
-        let base = Hugr::new(op);
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
+        let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }
@@ -225,8 +233,10 @@ mod test {
     fn basic_conditional_module() -> Result<(), BuildError> {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder
-                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let mut fbuild = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
             let tru_const = fbuild.add_constant(Const::true_val())?;
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const)?;
