@@ -210,10 +210,22 @@ impl<'a> UnificationContext<'a> {
         Ok(unfinished_business)
     }
 
-    fn solve(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
-        for m in self.constraints.keys().cloned() {
-            self.solve_meta(&(m.clone()))?;
+    fn solve_constraints(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+        let mut remaining: Vec<Meta> = self.constraints.keys().clone().cloned().collect();
+        let mut prev_len = remaining.len() + 1;
+        while prev_len > remaining.len() {
+            let mut new_remaining: Vec<Meta> = Vec::new();
+	    for m in remaining.iter() {
+	        let unfinished = self.solve_meta(*m)?;
+	        if unfinished {
+                    new_remaining.push(*m);
+                }
+	    }
+            // Set up next step
+            prev_len = remaining.len();
+            remaining = new_remaining;
         }
+
         let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
         for (loc, meta) in self.resources.iter() {
             let rs = match self.solved.get(&meta) {
@@ -229,24 +241,9 @@ impl<'a> UnificationContext<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::{AbstractSignature, ClassicType, SimpleType};
+    use crate::types::{ClassicType, SimpleType};
 
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
-
-/*
-    #[test]
-    fn from_graph() {
-        let sig = Signature::new_df([BIT], [BIT]);
-        let mut parent = DFGBuilder::new(sig);
-    }
-
-    #[test]
-    fn coalesce() {
-        let hugr: Hugr = Default::default();
-        let mut ctx = UnificationContext::new(&hugr);
-        ctx.constraints;
-    }
-*/
 
     #[test]
     fn plus() -> Result<(), InferResourceError> {
