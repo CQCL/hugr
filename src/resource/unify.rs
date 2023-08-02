@@ -25,6 +25,8 @@ pub enum Constraint {
 /// Errors which arise during unification
 pub enum InferResourceError {
     #[error("Mismatched resource sets {expected} and {actual}")]
+    /// We've solved a metavariable, then encountered a constraint
+    /// that says it should be something other than our solution
     MismatchedConcrete {
         //loc: (Node, Direction),
         expected: ResourceSet,
@@ -50,9 +52,13 @@ impl Deletion {
     }
 }
 
+/// The context for inferring resources
 pub struct UnificationContext {
+    /// A list of constraints for each metavariable
     pub constraints: HashMap<Meta, Vec<Constraint>>,
+    /// A map which says which nodes correspond to which metavariables
     pub resources: HashMap<(Node, Direction), Meta>,
+    /// Solutions to metavariables
     solved: HashMap<Meta, ResourceSet>,
 }
 
