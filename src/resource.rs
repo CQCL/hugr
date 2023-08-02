@@ -494,10 +494,12 @@ impl TypeDef {
     ) -> Result<CustomType, SignatureError> {
         let args = args.into();
         self.check_args_impl(&args)?;
+        let tag = self.tag(&args);
         Ok(CustomType::new(
             self.name().clone(),
             args,
             self.resource().expect("Resource not set.").clone(),
+            tag,
         ))
     }
 }

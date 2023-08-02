@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, SimpleType};
+use crate::types::{CustomType, SimpleRow, TypeTag};
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -34,7 +34,7 @@ pub fn resource() -> Resource {
         vec![],
         HashMap::default(),
         |_arg_values: &[TypeArg]| {
-            let t: SimpleRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
             Ok((t.clone(), t, ResourceSet::default()))
         },
     );
@@ -66,7 +66,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], resource_id())
+        CustomType::new(self.name(), [], resource_id(), TypeTag::Classic)
     }
 
     pub fn type_def(self) -> TypeDef {
@@ -75,7 +75,7 @@ impl Type {
             params: vec![],
             description: self.description().to_string(),
             resource: None,
-            tag: crate::types::TypeTag::Classic.into(),
+            tag: TypeTag::Classic.into(),
         }
     }
 }
@@ -292,7 +292,7 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::resource::SignatureError;
+    use crate::{resource::SignatureError, types::TypeTag};
 
     use super::*;
 
@@ -306,7 +306,12 @@ mod test {
 
         angle.check_custom(&custom).unwrap();
 
-        let false_custom = CustomType::new(custom.name().clone(), vec![], "wrong_resource");
+        let false_custom = CustomType::new(
+            custom.name().clone(),
+            vec![],
+            "wrong_resource",
+            TypeTag::Classic,
+        );
         assert_eq!(
             angle.check_custom(&false_custom),
             Err(SignatureError::ResourceMismatch(
