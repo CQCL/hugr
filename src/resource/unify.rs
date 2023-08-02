@@ -53,17 +53,15 @@ impl Deletion {
     }
 }
 
-pub struct UnificationContext<'a> {
-    hugr: &'a Hugr,
+pub struct UnificationContext {
     pub constraints: HashMap<Meta, Vec<Constraint>>,
     pub resources: HashMap<(Node, Direction), Meta>,
     solved: HashMap<Meta, ResourceSet>,
 }
 
-impl<'a> UnificationContext<'a> {
-    pub fn new(hugr: &'a Hugr) -> Self {
+impl UnificationContext {
+    pub fn new() -> Self {
         Self {
-            hugr,
             constraints: HashMap::new(),
             resources: HashMap::new(),
             solved: HashMap::new(),
@@ -275,8 +273,7 @@ mod test {
 
     #[test]
     fn plus() -> Result<(), InferResourceError> {
-        let hugr: Hugr = Default::default();
-        let mut ctx = UnificationContext::new(&hugr);
+        let mut ctx = UnificationContext::new();
         let m0 = ctx.fresh_meta();
         let m1 = ctx.fresh_meta();
         let m2 = ctx.fresh_meta();
