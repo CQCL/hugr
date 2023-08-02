@@ -1,5 +1,6 @@
 //! Implementation of the `SimpleReplace` operation.
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
@@ -58,7 +59,7 @@ impl Rewrite for SimpleReplacement {
 
     fn apply(self, h: &mut Hugr) -> Result<(), SimpleReplacementError> {
         // 1. Check the parent node exists and is a DFG node.
-        if h.get_optype(self.parent).tag() != OpTag::Dfg {
+        if h.get_optype(self.parent).tag().partial_cmp(&OpTag::IOBlock) != Some(Ordering::Less) {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.

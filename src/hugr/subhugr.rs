@@ -1,12 +1,28 @@
+//! Views into subgraphs of HUGRs.
+//!
+//! Subgraphs are a generalisation of a [`Region`], in which there can be
+//! more than one root node. However, all root nodes must belong to the same
+//! sibling graph.
+//!
+//! TODO:
+//! Subgraphs implement [`HugrView`] as well as petgraph's _visit_ traits.
+
+use std::cell::OnceCell;
+
 use derive_more::Into;
 use itertools::Itertools;
+use portgraph::{view::Subgraph, LinkView, PortIndex, PortView};
 
 use crate::{
     ops::{OpTag, OpTrait},
     Direction, Hugr, Node, Port, SimpleReplacement,
 };
 
-use super::{region::RegionView, HugrView};
+use super::{
+    region::{Region, RegionView},
+    view::sealed::HugrInternals,
+    HugrView,
+};
 
 /// A boundary edge of a subhugr.
 ///
@@ -17,13 +33,24 @@ use super::{region::RegionView, HugrView};
 struct BoundaryEdge(Node, Port);
 
 impl BoundaryEdge {
+    fn target_port_index<G: PortView>(&self, g: &G) -> PortIndex {
+        let Node { index: node } = self.0;
+        let Port { offset: port } = self.1;
+        g.port_index(node, port).unwrap()
+    }
+
+    fn source_port_index<G: LinkView>(&self, g: &G) -> PortIndex {
+        let tgt = self.target_port_index(g);
+        g.port_link(tgt).unwrap().into()
+    }
+
     fn get_boundary_edges<H: HugrView>(
         node: Node,
         port: Port,
         hugr: &H,
     ) -> impl Iterator<Item = Self> {
         if port.direction() == Direction::Incoming {
-            [BoundaryEdge(node, port)].to_vec().into_iter()
+            vec![BoundaryEdge(node, port)].into_iter()
         } else {
             hugr.linked_ports(node, port)
                 .map(|(n, p)| BoundaryEdge(n, p))
@@ -80,40 +107,40 @@ impl BoundaryEdge {
 /// descendant of a node in the subhugr is itself also in the subhugr.
 /// If both incoming and outgoing ports are empty, the subhugr is taken to be
 /// all children of the root.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubHugr<Base> {
-    hugr: Base,
+///
+/// This does not implement Sync as we use a `OnceCell` to cache the sibling
+/// graph.
+#[derive(Clone, Debug)]
+pub struct SubHugr<'g, Base: HugrInternals> {
+    hugr: &'g Base,
     root: Node,
     incoming: Vec<BoundaryEdge>,
     outgoing: Vec<BoundaryEdge>,
+    sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
 }
 
-impl<'g, Base: HugrView> SubHugr<RegionView<'g, Base>> {
+impl<'g, Base: HugrView> SubHugr<'g, RegionView<'g, Base>> {
     /// Creates a new subhugr from a region.
-    pub fn from_region(region: RegionView<'g, Base>) -> Self {
+    pub fn from_region(region: &'g RegionView<'g, Base>) -> Self {
         let root = region.root();
-        Self {
-            hugr: region,
-            root,
-            incoming: Vec::new(),
-            outgoing: Vec::new(),
-        }
+        Self::new(region, root, [], [])
     }
 }
 
-impl<Base> SubHugr<Base> {
+impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
     /// Creates a new subhugr from a root node
-    pub fn from_root(hugr: Base, root: Node) -> Self {
+    pub fn from_root(hugr: &'g Base, root: Node) -> Self {
         Self {
             hugr,
             root,
             incoming: Vec::new(),
             outgoing: Vec::new(),
+            sibling_graph: OnceCell::new(),
         }
     }
 
     /// Create a new subhugr from a DFG-rooted hugr
-    pub fn from_dfg(hugr: Base) -> Self
+    pub fn from_dfg(hugr: &'g Base) -> Self
     where
         Base: HugrView,
     {
@@ -122,23 +149,24 @@ impl<Base> SubHugr<Base> {
     }
 
     /// Create a new subhugr from a DFG node in a Hugr
-    /// 
+    ///
     /// This also works for e.g. FuncDefn nodes, i.e. roots where the first
     /// two children correspond to inputs and outputs.
-    /// 
+    ///
     /// Panics if it could not find an input and an output node.
-    pub fn from_dfg_root(hugr: Base, root: Node) -> Self
+    pub fn from_dfg_root(hugr: &'g Base, root: Node) -> Self
     where
         Base: HugrView,
     {
         let (inp, out) = hugr.children(root).take(2).collect_tuple().unwrap();
-        let incoming = BoundaryEdge::get_boundary_outgoing(inp, &hugr).collect();
-        let outgoing = BoundaryEdge::get_boundary_incoming(out, &hugr).collect();
+        let incoming = BoundaryEdge::get_boundary_outgoing(inp, hugr).collect();
+        let outgoing = BoundaryEdge::get_boundary_incoming(out, hugr).collect();
         Self {
             hugr,
             root,
             incoming,
             outgoing,
+            sibling_graph: OnceCell::new(),
         }
     }
 
@@ -149,7 +177,7 @@ impl<Base> SubHugr<Base> {
     /// target ports, and, in the presence of copies, the signature will be
     /// expanded accordingly.
     pub fn new(
-        hugr: Base,
+        hugr: &'g Base,
         root: Node,
         incoming: impl IntoIterator<Item = (Node, Port)>,
         outgoing: impl IntoIterator<Item = (Node, Port)>,
@@ -159,23 +187,47 @@ impl<Base> SubHugr<Base> {
     {
         let incoming = incoming
             .into_iter()
-            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, &hugr))
+            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, hugr))
             .collect();
         let outgoing = outgoing
             .into_iter()
-            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, &hugr))
+            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, hugr))
             .collect();
         Self {
             hugr,
             root,
             incoming,
             outgoing,
+            sibling_graph: OnceCell::new(),
         }
     }
 
+    fn get_sibling_graph(&self) -> &Subgraph<'g, Base::Portgraph> {
+        self.sibling_graph.get_or_init(|| {
+            let graph = self.hugr.portgraph();
+            let incoming = self
+                .incoming
+                .iter()
+                .copied()
+                .map(|e| e.target_port_index(graph));
+            let outgoing = self
+                .outgoing
+                .iter()
+                .copied()
+                .map(|e| e.source_port_index(graph));
+            Subgraph::new_subgraph(graph, incoming.chain(outgoing))
+        })
+    }
+
     /// An iterator over the nodes in the subhugr.
-    pub fn nodes(&self) -> impl Iterator<Item = Node> {
-        [].into_iter()
+    pub fn nodes(&self) -> impl Iterator<Item = Node> + '_
+    where
+        Base: HugrView,
+    {
+        self.get_sibling_graph().nodes_iter().flat_map(|index| {
+            let region = RegionView::new(self.hugr, Node { index });
+            region.nodes().collect_vec()
+        })
     }
 
     /// The number of incoming and outgoing wires of the subhugr.
@@ -230,8 +282,8 @@ impl<Base> SubHugr<Base> {
     }
 
     /// Whether the subhugr is convex.
-    pub fn is_convex(&self) {
-        todo!()
+    pub fn is_convex(&self) -> bool {
+        self.get_sibling_graph().is_convex()
     }
 }
 
@@ -271,7 +323,7 @@ mod tests {
         let (hugr, func_root) = build_hugr().unwrap();
         let from_root = SubHugr::from_root(&hugr, func_root);
         let region = RegionView::new(&hugr, func_root);
-        let from_region = SubHugr::from_region(region);
+        let from_region = SubHugr::from_region(&region);
         assert_eq!(from_root.root, from_region.root);
         assert_eq!(from_root.incoming, from_region.incoming);
         assert_eq!(from_root.outgoing, from_region.outgoing);
@@ -290,9 +342,11 @@ mod tests {
 
         let rep = sub.create_simple_replacement(empty_dfg);
 
+        assert_eq!(rep.removal.len(), 1);
+
         hugr.apply_rewrite(rep).unwrap();
 
-        assert_eq!(hugr.node_count(), 5); // Module + Def + DFG + In + Out
+        assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
     }
 
     #[test]
@@ -308,5 +362,25 @@ mod tests {
         };
 
         sub.create_simple_replacement(empty_dfg);
+    }
+
+    #[test]
+    fn convex_subhugr() {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let sub = SubHugr::from_dfg_root(&hugr, func_root);
+        assert!(sub.is_convex());
+    }
+
+    #[test]
+    fn non_convex_subhugr() {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let sub = SubHugr::new(
+            &hugr,
+            func_root,
+            hugr.node_outputs(inp).map(|p| (inp, p)),
+            hugr.node_inputs(out).map(|p| (out, p)),
+        );
+        assert!(!sub.is_convex());
     }
 }
