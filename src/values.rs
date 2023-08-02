@@ -5,7 +5,7 @@
 
 use thiserror::Error;
 
-use crate::types::{ClassicType, Container, HashableType, PrimType};
+use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
 use crate::{
     ops::constant::{
         typecheck::{check_int_fits_in_width, ConstIntError},
@@ -213,14 +213,13 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Error)]
-#[error("Error when checking custom type.")]
-pub struct CustomCheckFail(String);
-
-impl CustomCheckFail {
-    /// Creates a new [`CustomCheckFail`].
-    pub fn new(message: String) -> Self {
-        Self(message)
-    }
+pub enum CustomCheckFail {
+    /// The value had a specific type that was not what was expected
+    #[error("Expected type: {0} but value was of type: {1}")]
+    TypeMismatch(CustomType, CustomType),
+    /// Any other message
+    #[error("{0}")]
+    Message(String),
 }
 
 /// Errors that arise from typechecking constants
@@ -246,6 +245,6 @@ pub enum ConstTypeError {
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
     /// Error when checking a custom value.
-    #[error("Custom value type check error: {0:?}")]
+    #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),
 }

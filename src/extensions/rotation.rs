@@ -119,7 +119,7 @@ impl CustomConst for Constant {
         if &self_typ.custom_type() == typ {
             Ok(())
         } else {
-            Err(CustomCheckFail::new(
+            Err(CustomCheckFail::Message(
                 "Rotation constant type mismatch.".into(),
             ))
         }
