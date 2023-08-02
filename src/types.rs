@@ -3,6 +3,7 @@
 pub mod custom;
 pub mod simple;
 pub mod type_param;
+pub mod type_row;
 
 use std::fmt::{self, Display, Write};
 use std::ops::Index;
@@ -12,9 +13,9 @@ use pyo3::prelude::*;
 
 pub use custom::CustomType;
 pub use simple::{
-    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType, TypeRow,
-    TypeTag,
+    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType, TypeTag,
 };
+pub use type_row::TypeRow;
 
 use delegate::delegate;
 use smol_str::SmolStr;

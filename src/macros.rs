@@ -58,7 +58,7 @@ pub(crate) use impl_box_clone;
 macro_rules! type_row {
     () => {
         {
-            $crate::types::simple::TypeRow::new()
+            $crate::types::TypeRow::new()
         }
     };
     ($($t:expr),+ $(,)?) => {
