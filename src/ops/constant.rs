@@ -305,6 +305,27 @@ pub trait CustomConst:
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct CustomSerialized {
+    typ: CustomType,
+    value: serde_yaml::Value,
+}
+
+#[typetag::serde]
+impl CustomConst for CustomSerialized {
+    fn name(&self) -> SmolStr {
+        format!("yaml:{:?}", self.value).into()
+    }
+
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+        if &self.typ == typ {
+            Ok(())
+        } else {
+            Err(CustomCheckFail::TypeMismatch(typ.clone(), self.typ.clone()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
