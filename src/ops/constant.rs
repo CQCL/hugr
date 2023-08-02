@@ -139,7 +139,10 @@ pub enum ConstValue {
     Container(ContainerValue<ConstValue>),
     /// Double precision float
     F64(f64),
-    /// An opaque constant value, with cached type. TODO put this into ContainerValue.
+    /// An opaque constant value, that can check it is of a given [CustomType].
+    /// This may include values that are [hashable]
+    ///
+    /// [hashable]: crate::types::simple::TypeTag::Hashable
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Opaque((Box<dyn CustomConst>,)),
 }
@@ -176,8 +179,6 @@ impl ValueOfType for ConstValue {
                         // A "hashable" value might be an instance of a non-hashable type:
                         // e.g. an empty list is hashable, yet can be checked against a classic element type!
                         if let HashableValue::Container(ctr) = hv {
-                            // Note if ctr is a ContainerValue<HashableValue>::Opaque, this means we can check that
-                            // against a Container<ClassicType>::Opaque, which is perhaps unnecessary, but harmless.
                             return ctr.map_vals(&ConstValue::Hashable).check_container(cty);
                         }
                     }
@@ -305,20 +306,45 @@ pub trait CustomConst:
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct CustomSerialized {
+    typ: CustomType,
+    value: serde_yaml::Value,
+}
+
+#[typetag::serde]
+impl CustomConst for CustomSerialized {
+    fn name(&self) -> SmolStr {
+        format!("yaml:{:?}", self.value).into()
+    }
+
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+        if &self.typ == typ {
+            Ok(())
+        } else {
+            Err(CustomCheckFail::TypeMismatch(typ.clone(), self.typ.clone()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
+    use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue};
+    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
     use crate::{
-        builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
-        types::{ClassicType, SimpleRow, SimpleType},
-        values::{ConstTypeError, HashableValue, ValueOfType},
+        types::simple::Container,
+        types::type_param::TypeArg,
+        types::{ClassicType, CustomType, HashableType, SimpleRow, SimpleType, TypeTag},
+        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
+        use crate::builder::Container;
         let pred_rows = vec![
             classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
@@ -378,11 +404,45 @@ mod test {
             tuple_val2.check_type(&tuple_ty),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
-        let tuple_val3 =
-            ConstValue::sequence(&vec![V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
+        let tuple_val3 = ConstValue::sequence(&[V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
         assert_eq!(
             tuple_val3.check_type(&tuple_ty),
             Err(ConstTypeError::TupleWrongLength)
         );
+    }
+
+    #[test]
+    fn test_yaml_const() {
+        let typ_int = CustomType::new(
+            "mytype",
+            vec![TypeArg::ClassicType(ClassicType::Hashable(
+                HashableType::Int(8),
+            ))],
+            "myrsrc",
+            TypeTag::Hashable,
+        );
+        let val = ConstValue::Opaque((Box::new(CustomSerialized {
+            typ: typ_int.clone(),
+            value: Value::Number(6.into()),
+        }),));
+        let SimpleType::Classic(classic_t) = typ_int.clone().into()
+            else {panic!("Hashable CustomType returned as non-Classic");};
+        assert_matches!(classic_t, ClassicType::Hashable(_));
+        val.check_type(&classic_t).unwrap();
+
+        // This misrepresents the CustomType, so doesn't really "have to work".
+        // But just as documentation of current behaviour:
+        val.check_type(&ClassicType::Container(Container::Opaque(typ_int.clone())))
+            .unwrap();
+
+        let typ_float = CustomType::new(
+            "mytype",
+            vec![TypeArg::ClassicType(ClassicType::F64)],
+            "myrsrc",
+            TypeTag::Hashable,
+        );
+        let t: SimpleType = typ_float.clone().into();
+        assert_matches!(val.check_type(&t.try_into().unwrap()),
+            Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_float);
     }
 }

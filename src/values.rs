@@ -5,7 +5,7 @@
 
 use thiserror::Error;
 
-use crate::types::{ClassicType, Container, HashableType, PrimType};
+use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
 use crate::{
     ops::constant::{
         typecheck::{check_int_fits_in_width, ConstIntError},
@@ -94,7 +94,9 @@ impl ValueOfType for HashableValue {
 /// A value that is a container of other values, e.g. a tuple or sum;
 /// thus, corresponding to [Container]. Note there is no member
 /// corresponding to [Container::Alias]; such types must have been
-/// resolved to concrete types in order to create instances (values).
+/// resolved to concrete types in order to create instances (values),
+/// nor to [Container::Opaque], which is left to classes for broader
+/// sets of values (see e.g. [ConstValue::Opaque])
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ContainerValue<T> {
     /// A [Container::Array] or [Container::Tuple] or [Container::List]
@@ -104,11 +106,6 @@ pub enum ContainerValue<T> {
     /// A [Container::Sum] - for any Sum type where this value meets
     /// the type of the variant indicated by the tag
     Sum(usize, Box<T>), // Tag and value
-    /// A value of a custom type defined by an extension/[Resource].
-    ///
-    /// [Resource]: crate::resource::Resource
-    // TODO replace this with CustomConst
-    Opaque(serde_yaml::Value),
 }
 
 impl<Elem: ValueOfType> ContainerValue<Elem> {
@@ -120,7 +117,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             }
             ContainerValue::Map(_) => "a map".to_string(),
             ContainerValue::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
-            ContainerValue::Opaque(c) => format!("const:yaml:{:?}", c),
         }
     }
     pub(crate) fn check_container(&self, ty: &Container<Elem::T>) -> Result<(), ConstTypeError> {
@@ -160,7 +156,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             (ContainerValue::Sum(tag, value), Container::Sum(variants)) => {
                 value.check_type(variants.get(*tag).ok_or(ConstTypeError::InvalidSumTag)?)
             }
-            (ContainerValue::Opaque(_), Container::Opaque(_)) => Ok(()), // TODO
             (_, Container::Alias(s)) => Err(ConstTypeError::NoAliases(s.to_string())),
             (_, _) => Err(ValueOfType::container_error(ty.clone(), self.clone())),
         }
@@ -175,7 +170,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             ContainerValue::Sum(tag, value) => {
                 ContainerValue::Sum(*tag, Box::new(f((**value).clone())))
             }
-            ContainerValue::Opaque(v) => ContainerValue::Opaque(v.clone()),
         }
     }
 }
@@ -213,14 +207,13 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Error)]
-#[error("Error when checking custom type.")]
-pub struct CustomCheckFail(String);
-
-impl CustomCheckFail {
-    /// Creates a new [`CustomCheckFail`].
-    pub fn new(message: String) -> Self {
-        Self(message)
-    }
+pub enum CustomCheckFail {
+    /// The value had a specific type that was not what was expected
+    #[error("Expected type: {0} but value was of type: {1}")]
+    TypeMismatch(CustomType, CustomType),
+    /// Any other message
+    #[error("{0}")]
+    Message(String),
 }
 
 /// Errors that arise from typechecking constants
@@ -246,6 +239,6 @@ pub enum ConstTypeError {
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
     /// Error when checking a custom value.
-    #[error("Custom value type check error: {0:?}")]
+    #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),
 }
