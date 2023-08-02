@@ -139,7 +139,10 @@ pub enum ConstValue {
     Container(ContainerValue<ConstValue>),
     /// Double precision float
     F64(f64),
-    /// An opaque constant value, with cached type. TODO put this into ContainerValue.
+    /// An opaque constant value, that can check it is of a given [CustomType].
+    /// This may include values that are [hashable]
+    ///
+    /// [hashable]: crate::types::simple::TypeTag::Hashable
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Opaque((Box<dyn CustomConst>,)),
 }
