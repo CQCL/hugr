@@ -30,8 +30,6 @@ pub enum InferResourceError {
         expected: ResourceSet,
         actual: ResourceSet,
     },
-    #[error("It's bad.")]
-    Bad,
     #[error("Unsolved variable at location {:?}", location)]
     Unsolved {
         location: (Node, Direction),
