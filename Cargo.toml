@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [dependencies]
 thiserror = "1.0.28"
-portgraph = { version = "0.7.1", features = ["serde", "petgraph"] }
+portgraph = { version = "0.7.2", features = ["serde", "petgraph"] }
 pyo3 = { version = "0.19.0", optional = true, features = [
     "multiple-pymethods",
 ] }
