@@ -176,8 +176,6 @@ impl ValueOfType for ConstValue {
                         // A "hashable" value might be an instance of a non-hashable type:
                         // e.g. an empty list is hashable, yet can be checked against a classic element type!
                         if let HashableValue::Container(ctr) = hv {
-                            // Note if ctr is a ContainerValue<HashableValue>::Opaque, this means we can check that
-                            // against a Container<ClassicType>::Opaque, which is perhaps unnecessary, but harmless.
                             return ctr.map_vals(&ConstValue::Hashable).check_container(cty);
                         }
                     }
