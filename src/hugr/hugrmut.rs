@@ -13,7 +13,7 @@ use crate::{Hugr, Port};
 use super::NodeMetadata;
 
 /// Functions for low-level building of a HUGR. (Or, in the future, a subregion thereof)
-pub(crate) trait HugrMut {
+pub trait HugrMut: HugrView {
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     fn add_op(&mut self, op: impl Into<OpType>) -> Node;
 
