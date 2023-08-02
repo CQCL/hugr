@@ -9,7 +9,7 @@ use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
-use crate::{type_row, Hugr, Node};
+use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
@@ -25,7 +25,10 @@ impl OutlineCfg {
         }
     }
 
-    fn compute_entry_exit_outside(&self, h: &Hugr) -> Result<(Node, Node, Node), OutlineCfgError> {
+    fn compute_entry_exit_outside(
+        &self,
+        h: &impl HugrView,
+    ) -> Result<(Node, Node, Node), OutlineCfgError> {
         let cfg_n = match self
             .blocks
             .iter()
@@ -82,11 +85,11 @@ impl OutlineCfg {
 impl Rewrite for OutlineCfg {
     type Error = OutlineCfgError;
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, h: &Hugr) -> Result<(), OutlineCfgError> {
+    fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut Hugr) -> Result<(), OutlineCfgError> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<(), OutlineCfgError> {
         let (entry, exit, outside) = self.compute_entry_exit_outside(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
@@ -123,12 +126,13 @@ impl Rewrite for OutlineCfg {
             .children(new_block)
             .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
             .exactly_one()
+            .ok() // HugrMut::Children is not Debug
             .unwrap();
-        let inner_exit = h.children(cfg_node).exactly_one().unwrap();
+        let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
-            .linked_ports(entry, h.node_inputs(entry).exactly_one().unwrap())
+            .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
@@ -163,6 +167,7 @@ impl Rewrite for OutlineCfg {
                 t == outside
             })
             .exactly_one()
+            .ok() // NodePorts does not implement Debug
             .unwrap();
         h.disconnect(exit, exit_port).unwrap();
         h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
