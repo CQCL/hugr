@@ -330,17 +330,21 @@ impl CustomConst for CustomSerialized {
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
+    use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue};
+    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
     use crate::{
-        builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
-        types::{ClassicType, SimpleRow, SimpleType},
-        values::{ConstTypeError, HashableValue, ValueOfType},
+        types::simple::Container,
+        types::type_param::TypeArg,
+        types::{ClassicType, CustomType, HashableType, SimpleRow, SimpleType, TypeTag},
+        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
+        use crate::builder::Container;
         let pred_rows = vec![
             classic_row![ClassicType::i64(), ClassicType::F64],
             type_row![],
@@ -405,5 +409,40 @@ mod test {
             tuple_val3.check_type(&tuple_ty),
             Err(ConstTypeError::TupleWrongLength)
         );
+    }
+
+    #[test]
+    fn test_yaml_const() {
+        let typ_int = CustomType::new(
+            "mytype",
+            vec![TypeArg::ClassicType(ClassicType::Hashable(
+                HashableType::Int(8),
+            ))],
+            "myrsrc",
+            TypeTag::Hashable,
+        );
+        let val = ConstValue::Opaque((Box::new(CustomSerialized {
+            typ: typ_int.clone(),
+            value: Value::Number(6.into()),
+        }),));
+        let SimpleType::Classic(classic_t) = typ_int.clone().into()
+            else {panic!("Hashable CustomType returned as non-Classic");};
+        assert_matches!(classic_t, ClassicType::Hashable(_));
+        val.check_type(&classic_t).unwrap();
+
+        // This misrepresents the CustomType, so doesn't really "have to work".
+        // But just as documentation of current behaviour:
+        val.check_type(&ClassicType::Container(Container::Opaque(typ_int.clone())))
+            .unwrap();
+
+        let typ_float = CustomType::new(
+            "mytype",
+            vec![TypeArg::ClassicType(ClassicType::F64)],
+            "myrsrc",
+            TypeTag::Hashable,
+        );
+        let t: SimpleType = typ_float.clone().into();
+        assert_matches!(val.check_type(&t.try_into().unwrap()),
+            Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_float);
     }
 }
