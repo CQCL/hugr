@@ -62,9 +62,6 @@ pub enum ConstTypeError {
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
-    /// A mismatch between the type expected and the actual type of the constant
-    #[error("Type mismatch for const - expected {0}, found {1:?}")]
-    TypeMismatch(ClassicType, ClassicType),
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
