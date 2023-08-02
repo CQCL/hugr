@@ -142,10 +142,7 @@ pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(),
             (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
             (Container::Opaque(ty), ConstValue::Opaque((ty_act, _val))) => {
                 if ty_act != ty {
-                    return Err(ConstTypeError::TypeMismatch(
-                        ty.clone().into(),
-                        ty_act.clone().into(),
-                    ));
+                    return Err(ConstTypeError::ValueCheckFail(typ.clone(), val.clone()));
                 }
                 Ok(())
             }
