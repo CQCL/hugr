@@ -400,8 +400,7 @@ mod test {
             tuple_val2.check_type(&tuple_ty),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
-        let tuple_val3 =
-            ConstValue::sequence(&vec![V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
+        let tuple_val3 = ConstValue::sequence(&[V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
         assert_eq!(
             tuple_val3.check_type(&tuple_ty),
             Err(ConstTypeError::TupleWrongLength)
