@@ -183,7 +183,7 @@ impl CustomConcrete for CustomType {
 }
 
 /// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
-trait TypeParametrised: sealed::SealedDef {
+trait TypeParametrised {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
     /// The resource-unique name.
@@ -224,20 +224,6 @@ trait TypeParametrised: sealed::SealedDef {
 
         Ok(())
     }
-}
-
-mod sealed {
-    use crate::{ops::custom::OpaqueOp, types::CustomType};
-
-    use super::{OpDef, TypeDef};
-
-    pub trait SealedDef {}
-    impl SealedDef for OpDef {}
-    impl SealedDef for TypeDef {}
-
-    pub trait SealedConcrete {}
-    impl SealedConcrete for OpaqueOp {}
-    impl SealedConcrete for CustomType {}
 }
 
 /// Serializable definition for dynamically loaded operations.
