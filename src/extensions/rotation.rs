@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::ops::constant::CustomConst;
-use crate::resource::{OpDef, ResourceSet, TypeDef};
+use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomType, SimpleRow, TypeTag};
 use crate::values::CustomCheckFail;
@@ -26,21 +26,22 @@ pub const fn resource_id() -> SmolStr {
 pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
-    resource.add_type(Type::Angle.type_def()).unwrap();
-    resource.add_type(Type::Quaternion.type_def()).unwrap();
+    Type::Angle.add_to_resource(&mut resource);
+    Type::Quaternion.add_to_resource(&mut resource);
 
-    let op = OpDef::new_with_custom_sig(
-        "AngleAdd".into(),
-        "".into(),
-        vec![],
-        HashMap::default(),
-        |_arg_values: &[TypeArg]| {
-            let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
-            Ok((t.clone(), t, ResourceSet::default()))
-        },
-    );
+    resource
+        .add_op_custom_sig(
+            "AngleAdd".into(),
+            "".into(),
+            vec![],
+            HashMap::default(),
+            |_arg_values: &[TypeArg]| {
+                let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
+                Ok((t.clone(), t, ResourceSet::default()))
+            },
+        )
+        .unwrap();
 
-    resource.add_op(op).unwrap();
     resource
 }
 
@@ -70,14 +71,15 @@ impl Type {
         CustomType::new(self.name(), [], resource_id(), TypeTag::Classic)
     }
 
-    pub fn type_def(self) -> TypeDef {
-        TypeDef {
-            name: self.name(),
-            params: vec![],
-            description: self.description().to_string(),
-            resource: None,
-            tag: TypeTag::Classic.into(),
-        }
+    fn add_to_resource(self, resource: &mut Resource) {
+        resource
+            .add_type(
+                self.name(),
+                vec![],
+                self.description().to_string(),
+                TypeTag::Classic.into(),
+            )
+            .unwrap();
     }
 }
 
@@ -322,7 +324,7 @@ mod test {
     fn test_types() {
         let resource = resource();
 
-        let angle = resource.types().get("angle").unwrap();
+        let angle = resource.get_type("angle").unwrap();
 
         let custom = angle.instantiate_concrete([]).unwrap();
 
@@ -337,8 +339,8 @@ mod test {
         assert_eq!(
             angle.check_custom(&false_custom),
             Err(SignatureError::ResourceMismatch(
-                Some("rotations".into()),
-                Some("wrong_resource".into()),
+                "rotations".into(),
+                "wrong_resource".into(),
             ))
         );
     }
@@ -348,8 +350,7 @@ mod test {
         let resource = resource();
 
         let custom_type = resource
-            .types()
-            .get("angle")
+            .get_type("angle")
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
@@ -360,8 +361,7 @@ mod test {
         custom_value.check_custom_type(&custom_type).unwrap();
 
         let wrong_custom_type = resource
-            .types()
-            .get("quat")
+            .get_type("quat")
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
