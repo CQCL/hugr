@@ -28,6 +28,18 @@ pub enum ConstIntError {
     IntWidthInvalid(HugrIntWidthStore),
 }
 
+/// Struct for custom type check fails.
+#[derive(Clone, Debug, PartialEq, Error)]
+#[error("Error when checking custom type.")]
+pub struct CustomCheckFail(String);
+
+impl CustomCheckFail {
+    /// Creates a new [`CustomCheckFail`].
+    pub fn new(message: String) -> Self {
+        Self(message)
+    }
+}
+
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
 pub enum ConstTypeError {
@@ -58,7 +70,7 @@ pub enum ConstTypeError {
     ValueCheckFail(ClassicType, ConstValue),
     /// Error when checking a custom value.
     #[error("Custom value type check error: {0:?}")]
-    CustomCheckFail(String),
+    CustomCheckFail(#[from] CustomCheckFail),
 }
 
 lazy_static! {
@@ -143,7 +155,9 @@ pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(),
                 }
             }
             (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
-            (Container::Opaque(ty), ConstValue::Opaque((val,))) => val.check_type(ty),
+            (Container::Opaque(ty), ConstValue::Opaque((val,))) => {
+                val.check_custom_type(ty).map_err(ConstTypeError::from)
+            }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },
         (ClassicType::Hashable(HashableType::Container(c)), tm) => {

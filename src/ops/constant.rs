@@ -10,7 +10,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-use self::typecheck::{typecheck_const, ConstTypeError};
+use self::typecheck::{typecheck_const, ConstTypeError, CustomCheckFail};
 
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
@@ -216,7 +216,7 @@ pub trait CustomConst:
     fn name(&self) -> SmolStr;
 
     /// Check the value is a valid instance of the provided type.
-    fn check_type(&self, typ: &CustomType) -> Result<(), ConstTypeError>;
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail>;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {

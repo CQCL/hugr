@@ -11,7 +11,7 @@ use std::collections::HashMap;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::typecheck::ConstTypeError;
+use crate::ops::constant::typecheck::CustomCheckFail;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
@@ -113,15 +113,14 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn check_type(&self, typ: &CustomType) -> Result<(), ConstTypeError> {
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
         let self_typ = self.rotation_type();
 
         if &self_typ.custom_type() == typ {
             Ok(())
         } else {
-            Err(ConstTypeError::ValueCheckFail(
-                typ.clone().into(),
-                self.clone().into(),
+            Err(CustomCheckFail::new(
+                "Rotation constant type mismatch.".into(),
             ))
         }
     }
@@ -353,7 +352,7 @@ mod test {
         let custom_value = Constant::Angle(AngleValue::F64(0.0));
 
         // correct type
-        custom_value.check_type(&custom_type).unwrap();
+        custom_value.check_custom_type(&custom_type).unwrap();
 
         let wrong_custom_type = resource
             .types()
@@ -361,13 +360,7 @@ mod test {
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
-        let res = custom_value.check_type(&wrong_custom_type);
-        assert_eq!(
-            res,
-            Err(ConstTypeError::ValueCheckFail(
-                wrong_custom_type.into(),
-                custom_value.into(),
-            )),
-        );
+        let res = custom_value.check_custom_type(&wrong_custom_type);
+        assert!(res.is_err());
     }
 }
