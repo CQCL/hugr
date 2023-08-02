@@ -28,6 +28,18 @@ pub enum ConstIntError {
     IntWidthInvalid(HugrIntWidthStore),
 }
 
+/// Struct for custom type check fails.
+#[derive(Clone, Debug, PartialEq, Error)]
+#[error("Error when checking custom type.")]
+pub struct CustomCheckFail(String);
+
+impl CustomCheckFail {
+    /// Creates a new [`CustomCheckFail`].
+    pub fn new(message: String) -> Self {
+        Self(message)
+    }
+}
+
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
 pub enum ConstTypeError {
@@ -50,12 +62,12 @@ pub enum ConstTypeError {
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
-    /// A mismatch between the type expected and the actual type of the constant
-    #[error("Type mismatch for const - expected {0}, found {1:?}")]
-    TypeMismatch(ClassicType, ClassicType),
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
+    /// Error when checking a custom value.
+    #[error("Custom value type check error: {0:?}")]
+    CustomCheckFail(#[from] CustomCheckFail),
 }
 
 lazy_static! {
@@ -140,11 +152,8 @@ pub(super) fn typecheck_const(typ: &ClassicType, val: &ConstValue) -> Result<(),
                 }
             }
             (Container::Sum(_), _) => Err(ConstTypeError::ValueCheckFail(ty.clone(), tm.clone())),
-            (Container::Opaque(ty), ConstValue::Opaque((ty_act, _val))) => {
-                if ty_act != ty {
-                    return Err(ConstTypeError::ValueCheckFail(typ.clone(), val.clone()));
-                }
-                Ok(())
+            (Container::Opaque(ty), ConstValue::Opaque((val,))) => {
+                val.check_custom_type(ty).map_err(ConstTypeError::from)
             }
             _ => Err(ConstTypeError::Unimplemented(ty.clone())),
         },

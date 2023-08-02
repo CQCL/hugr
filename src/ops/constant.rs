@@ -10,7 +10,7 @@ use crate::{
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
-use self::typecheck::{typecheck_const, ConstTypeError};
+use self::typecheck::{typecheck_const, ConstTypeError, CustomCheckFail};
 
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
@@ -134,7 +134,7 @@ pub enum ConstValue {
     Tuple(Vec<ConstValue>),
     /// An opaque constant value, with cached type
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
-    Opaque((CustomType, Box<dyn CustomConst>)),
+    Opaque((Box<dyn CustomConst>,)),
 }
 
 impl PartialEq for dyn CustomConst {
@@ -159,7 +159,7 @@ impl ConstValue {
         match self {
             Self::Int(value) => format!("const:int{value}"),
             Self::F64(f) => format!("const:float:{f}"),
-            Self::Opaque((_, v)) => format!("const:{}", v.name()),
+            Self::Opaque((v,)) => format!("const:{}", v.name()),
             Self::Sum(tag, val) => {
                 format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
             }
@@ -200,7 +200,7 @@ impl ConstValue {
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque((v.custom_type(), Box::new(v)))
+        Self::Opaque((Box::new(v),))
     }
 }
 
@@ -215,9 +215,8 @@ pub trait CustomConst:
     /// An identifier for the constant.
     fn name(&self) -> SmolStr;
 
-    /// Returns the type of the constant.
-    // TODO it would be good to ensure that this is a *classic* CustomType not a linear one!
-    fn custom_type(&self) -> CustomType;
+    /// Check the value is a valid instance of the provided type.
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail>;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
