@@ -13,8 +13,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::OpTag;
-use crate::ops::{OpTrait, OpType, ValidateOp};
+use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
@@ -748,7 +747,7 @@ mod test {
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder};
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
-    use crate::ops::{self, ConstValue, LeafOp, OpType};
+    use crate::ops::{self, LeafOp, OpType};
     use crate::types::{AbstractSignature, ClassicType};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -1146,10 +1145,7 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(
-            h.root(),
-            ops::Const::new(ConstValue::Int(1), ClassicType::int::<1>()).unwrap(),
-        )?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::int::<1>(1).unwrap())?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {

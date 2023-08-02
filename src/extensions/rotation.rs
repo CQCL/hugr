@@ -11,11 +11,11 @@ use std::collections::HashMap;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::typecheck::CustomCheckFail;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomType, SimpleRow, TypeTag};
+use crate::values::CustomCheckFail;
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
