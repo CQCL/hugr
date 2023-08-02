@@ -1,8 +1,7 @@
 use super::{ResourceId, ResourceSet};
 use crate::{
     hugr::{HugrView, Node},
-    ops::OpTrait,
-    Direction, Hugr,
+    Direction,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -121,7 +120,7 @@ impl UnificationContext {
 
     // Coalesce
     fn process_deletions(&mut self, deletions: Vec<Deletion>) {
-        fn sanity_check(cs: &Vec<Constraint>) -> bool {
+        fn sanity_check(cs: &[Constraint]) -> bool {
             cs.iter()
                 .filter(|c| std::matches!(c, Constraint::Equal(_)))
                 .count()
@@ -254,7 +253,7 @@ impl UnificationContext {
 
         let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
         for (loc, meta) in self.resources.iter() {
-            let rs = match self.solved.get(&meta) {
+            let rs = match self.solved.get(meta) {
                 Some(rs) => Ok(rs.clone()),
                 None => Err(InferResourceError::Unsolved { location: *loc }),
             }?;
