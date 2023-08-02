@@ -1,5 +1,9 @@
-use crate::{Direction, hugr::{Node, HugrView}, ops::OpTrait, Hugr};
 use super::{ResourceId, ResourceSet};
+use crate::{
+    hugr::{HugrView, Node},
+    ops::OpTrait,
+    Direction, Hugr,
+};
 
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -15,7 +19,7 @@ pub enum Constraint {
     /// A variable has the same value as another variable
     Equal(Meta),
     /// Variable extends the value of another by one resource
-    Plus(ResourceId, Meta)
+    Plus(ResourceId, Meta),
 }
 
 #[derive(Debug, Error)]
@@ -25,7 +29,7 @@ pub enum InferResourceError {
     MismatchedConcrete {
         //loc: (Node, Direction),
         expected: ResourceSet,
-        actual: ResourceSet
+        actual: ResourceSet,
     },
     #[error("It's bad.")]
     Bad,
@@ -33,7 +37,7 @@ pub enum InferResourceError {
     Unsolved {
         location: (Node, Direction),
         //constraints: Vec<Constraint>,
-    }
+    },
 }
 
 #[derive(Clone)]
@@ -45,10 +49,7 @@ struct Deletion {
 impl Deletion {
     #[inline]
     pub fn shunt(src: Meta, tgt: Meta) -> Self {
-        Self {
-            src,
-            tgt,
-        }
+        Self { src, tgt }
     }
 }
 
@@ -89,9 +90,15 @@ impl<'a> UnificationContext<'a> {
     fn gen_constraints(&mut self, hugr: impl HugrView) {
         for node in hugr.nodes() {
             let input = self.fresh_meta();
-            assert!(self.resources.insert((node, Direction::Incoming), input).is_none());
+            assert!(self
+                .resources
+                .insert((node, Direction::Incoming), input)
+                .is_none());
             let output = self.fresh_meta();
-            assert!(self.resources.insert((node, Direction::Outgoing), output).is_none());
+            assert!(self
+                .resources
+                .insert((node, Direction::Outgoing), output)
+                .is_none());
 
             let node_type = hugr.get_nodetype(node);
             match node_type.signature() {
@@ -104,7 +111,7 @@ impl<'a> UnificationContext<'a> {
                         last_meta = curr_meta;
                     }
                     self.add_constraint(output, Constraint::Equal(last_meta));
-                },
+                }
                 // We're in the money!
                 Some(sig) => {
                     self.add_solution(input, sig.input_resources.clone());
@@ -117,7 +124,10 @@ impl<'a> UnificationContext<'a> {
     // Coalesce
     fn process_deletions(&mut self, deletions: Vec<Deletion>) {
         fn sanity_check(cs: &Vec<Constraint>) -> bool {
-            cs.iter().filter(|c| std::matches!(c, Constraint::Equal(_))).count() == 1
+            cs.iter()
+                .filter(|c| std::matches!(c, Constraint::Equal(_)))
+                .count()
+                == 1
         }
 
         let mut srcs = Vec::new();
@@ -129,7 +139,7 @@ impl<'a> UnificationContext<'a> {
         assert!(srcs.len() == HashSet::<&usize>::from_iter(srcs.into_iter()).len());
         assert!(tgts.len() == HashSet::<&usize>::from_iter(tgts.into_iter()).len());
 
-        for Deletion { src, tgt} in deletions.iter() {
+        for Deletion { src, tgt } in deletions.iter() {
             match self.constraints.get(src) {
                 // She's already deleted!
                 None => (),
@@ -158,35 +168,44 @@ impl<'a> UnificationContext<'a> {
             match c {
                 Constraint::Exactly(rs2) => {
                     match self.solved.get(&meta) {
-                        None => { self.add_solution(meta, rs2.clone()); },
+                        None => {
+                            self.add_solution(meta, rs2.clone());
+                        }
                         Some(rs) => {
                             // If they're the same then we're happy
                             if *rs != *rs2 {
-                                return Err(InferResourceError::MismatchedConcrete { expected: rs2.clone(), actual: rs.clone() });
+                                return Err(InferResourceError::MismatchedConcrete {
+                                    expected: rs2.clone(),
+                                    actual: rs.clone(),
+                                });
                             }
                         }
                     };
-                },
+                }
                 Constraint::Equal(other_meta) => {
                     match (self.solved.get(&meta), self.solved.get(other_meta)) {
-                        (None, None) => { unfinished_business = true; },
+                        (None, None) => {
+                            unfinished_business = true;
+                        }
                         (None, Some(rs)) => {
                             self.add_solution(meta, rs.clone());
                             deleted.push(Deletion::shunt(meta, *other_meta));
-                        },
+                        }
                         (Some(rs), None) => {
                             self.add_solution(*other_meta, rs.clone());
                             deleted.push(Deletion::shunt(*other_meta, meta));
-                        },
+                        }
                         (Some(rs1), Some(rs2)) => {
                             if rs1 != rs2 {
-                                return Err(InferResourceError::MismatchedConcrete { expected: rs1.clone(), actual: rs2.clone() });
+                                return Err(InferResourceError::MismatchedConcrete {
+                                    expected: rs1.clone(),
+                                    actual: rs2.clone(),
+                                });
                             }
                             deleted.push(Deletion::shunt(meta, *other_meta));
-
                         }
                     };
-                },
+                }
                 Constraint::Plus(r, other_meta) => {
                     match self.solved.get(other_meta) {
                         Some(rs) => {
@@ -194,33 +213,42 @@ impl<'a> UnificationContext<'a> {
                             rrs.insert(r);
                             match self.solved.get(&meta) {
                                 // Let's check that this is right?
-                                Some(rs) => if *rs != rrs {
-                                    return Err(InferResourceError::MismatchedConcrete { expected: rs.clone(), actual: rrs });
-                                },
+                                Some(rs) => {
+                                    if *rs != rrs {
+                                        return Err(InferResourceError::MismatchedConcrete {
+                                            expected: rs.clone(),
+                                            actual: rrs,
+                                        });
+                                    }
+                                }
                                 None => self.add_solution(meta, rrs),
                             }
-                        },
+                        }
                         // Should we do something here?
-                        None => { unfinished_business = true; },
+                        None => {
+                            unfinished_business = true;
+                        }
                     }
-                },
+                }
             }
-        };
+        }
         self.process_deletions(deleted);
         Ok(unfinished_business)
     }
 
-    fn solve_constraints(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+    fn solve_constraints(
+        &mut self,
+    ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
         let mut remaining: Vec<Meta> = self.constraints.keys().clone().cloned().collect();
         let mut prev_len = remaining.len() + 1;
         while prev_len > remaining.len() {
             let mut new_remaining: Vec<Meta> = Vec::new();
-	    for m in remaining.iter() {
-	        let unfinished = self.solve_meta(*m)?;
-	        if unfinished {
+            for m in remaining.iter() {
+                let unfinished = self.solve_meta(*m)?;
+                if unfinished {
                     new_remaining.push(*m);
                 }
-	    }
+            }
             // Set up next step
             prev_len = remaining.len();
             remaining = new_remaining;
