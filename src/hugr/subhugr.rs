@@ -38,9 +38,9 @@ impl BoundaryEdge {
         g.port_index(node, port).unwrap()
     }
 
-    fn source_port_index<G: LinkView>(&self, g: &G) -> PortIndex {
+    fn source_port_index<G: LinkView>(&self, g: &G) -> Option<PortIndex> {
         let tgt = self.target_port_index(g);
-        g.port_link(tgt).unwrap().into()
+        g.port_link(tgt).map(Into::into)
     }
 
     fn get_boundary_edges<H: HugrView>(
@@ -213,7 +213,7 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
                 .outgoing
                 .iter()
                 .copied()
-                .map(|e| e.source_port_index(graph));
+                .filter_map(|e| e.source_port_index(graph));
             Subgraph::new_subgraph(graph, incoming.chain(outgoing))
         })
     }
@@ -374,14 +374,30 @@ mod tests {
     }
 
     #[test]
-    fn non_convex_subhugr() {
+    fn convex_subhugr_2() {
         let (hugr, func_root) = build_hugr().unwrap();
         let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        // All graph except input/output nodes
         let sub = SubHugr::new(
             &hugr,
             func_root,
             hugr.node_outputs(inp).map(|p| (inp, p)),
             hugr.node_inputs(out).map(|p| (out, p)),
+        );
+        assert!(sub.is_convex());
+    }
+
+    #[test]
+    fn non_convex_subhugr() {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let (inp, _) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
+        // All graph but one edge
+        let sub = SubHugr::new(
+            &hugr,
+            func_root,
+            [(inp, first_cx_edge)],
+            [(inp, first_cx_edge)],
         );
         assert!(!sub.is_convex());
     }
