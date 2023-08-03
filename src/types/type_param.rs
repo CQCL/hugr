@@ -99,58 +99,29 @@ impl ValueOfType for TypeArg {
     type T = TypeParam;
 
     fn check_type(&self, ty: &TypeParam) -> Result<(), ConstTypeError> {
-        match self {
-            TypeArg::Type(_) => {
-                if ty == &TypeParam::Type {
-                    return Ok(());
-                }
+        match (self, ty) {
+            (TypeArg::Type(_), TypeParam::Type) => Ok(()),
+            (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
+            (TypeArg::HashableType(_), TypeParam::HashableType) => Ok(()),
+            (TypeArg::Container(vals), TypeParam::Container(c_ty)) => vals.check_container(c_ty),
+            // We might have an argument *value* that is a TypeArg (but not a HashableValue)
+            // that fits a Hashable type because the argument contains an [TypeArg::Opaque]:
+            (TypeArg::Container(vals), TypeParam::Value(HashableType::Container(c_ty))) => {
+                vals.check_container(&map_container_type(c_ty, &TypeParam::Value))
             }
-            TypeArg::ClassicType(_) => {
-                if ty == &TypeParam::ClassicType {
-                    return Ok(());
-                }
+            (TypeArg::Value(hv), TypeParam::Value(ht)) => hv.check_type(ht),
+            // A "hashable" value might be argument to a non-hashable TypeParam:
+            // e.g. an empty list is hashable, yet can be checked against a List<SimpleType>.
+            (TypeArg::Value(HashableValue::Container(vals)), TypeParam::Container(c_ty)) => {
+                vals.map_vals(&TypeArg::Value).check_container(c_ty)
             }
-            TypeArg::HashableType(_) => {
-                if ty == &TypeParam::HashableType {
-                    return Ok(());
-                }
-            }
-            TypeArg::Container(vals) => {
-                match ty {
-                    TypeParam::Container(c_ty) => return vals.check_container(c_ty),
-                    // We might have an argument *value* that is a TypeArg (but not a HashableValue)
-                    // that fits a Hashable type because the argument contains an [TypeArg::Opaque].
-                    TypeParam::Value(HashableType::Container(c_ty)) => {
-                        return vals.check_container(&map_container_type(c_ty, &TypeParam::Value))
-                    }
-                    _ => (),
-                };
-            }
-            TypeArg::Value(hv) => match ty {
-                TypeParam::Value(ht) => return hv.check_type(ht),
-                TypeParam::Container(c_ty) => {
-                    // A "hashable" value might be argument to a non-hashable TypeParam:
-                    // e.g. an empty list is hashable, yet can be checked against a List<SimpleType>.
-                    if let HashableValue::Container(vals) = hv {
-                        return vals.map_vals(&TypeArg::Value).check_container(c_ty);
-                    }
-                }
-                _ => (),
-            },
-            TypeArg::CustomValue(cv) => {
-                let maybe_ct = match ty {
-                    TypeParam::Container(Container::Opaque(c)) => Some(c),
-                    TypeParam::Value(HashableType::Container(Container::Opaque(c))) => Some(c),
-                    _ => None,
-                };
-                if let Some(ct) = maybe_ct {
-                    if &cv.typ == ct {
-                        return Ok(());
-                    }
-                }
-            }
-        };
-        Err(ConstTypeError::TypeArgCheckFail(ty.clone(), self.clone()))
+            (TypeArg::CustomValue(cv), TypeParam::Container(Container::Opaque(ct)))
+            | (
+                TypeArg::CustomValue(cv),
+                TypeParam::Value(HashableType::Container(Container::Opaque(ct))),
+            ) if &cv.typ == ct => Ok(()),
+            _ => Err(ConstTypeError::TypeArgCheckFail(ty.clone(), self.clone())),
+        }
     }
 
     fn name(&self) -> String {
