@@ -149,8 +149,9 @@ impl Resource {
 #[cfg(test)]
 mod test {
     use crate::resource::SignatureError;
-    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::type_param::{TypeArg, TypeParam};
     use crate::types::{ClassicType, HashableType, TypeTag};
+    use crate::values::ConstTypeError;
 
     use super::{TypeDef, TypeDefTag};
 
@@ -177,15 +178,17 @@ mod test {
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
             def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
-            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::HashableType(HashableType::String),
-                TypeParam::ClassicType
-            )))
+            Err(SignatureError::TypeArgMismatch(
+                ConstTypeError::TypeArgCheckFail(
+                    TypeParam::ClassicType,
+                    TypeArg::HashableType(HashableType::String)
+                )
+            ))
         );
         // Too few arguments:
         assert_eq!(
             def.instantiate_concrete([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(0, 1))
+            SignatureError::WrongNumberTypeArgs(0, 1)
         );
         // Too many arguments:
         assert_eq!(
@@ -194,7 +197,7 @@ mod test {
                 TypeArg::ClassicType(ClassicType::F64),
             ])
             .unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(2, 1))
+            SignatureError::WrongNumberTypeArgs(2, 1)
         );
     }
 }

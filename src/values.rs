@@ -5,7 +5,9 @@
 
 use thiserror::Error;
 
-use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
+use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_row::TypeRowElem;
+use crate::types::{ClassicType, Container, CustomType, HashableType};
 use crate::{
     ops::constant::{
         typecheck::{check_int_fits_in_width, ConstIntError},
@@ -26,10 +28,13 @@ pub enum HashableValue {
     Container(ContainerValue<HashableValue>),
 }
 
-/// Trait for classes which represent values of some kind of [PrimType]
+/// Trait for classes which represent values of some kind of type
+/// - either [TypeParam] or an impl of [PrimType].
+///
+/// [PrimType]: crate::types::PrimType
 pub trait ValueOfType: Clone {
     /// The exact type whose values the type implementing [ValueOfType] represents
-    type T: PrimType;
+    type T: TypeRowElem;
 
     /// Checks that a value can be an instance of the specified type.
     fn check_type(&self, ty: &Self::T) -> Result<(), ConstTypeError>;
@@ -174,11 +179,11 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
     }
 }
 
-pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
+pub(crate) fn map_container_type<T: TypeRowElem, T2: TypeRowElem>(
     container: &Container<T>,
     f: &impl Fn(T) -> T2,
 ) -> Container<T2> {
-    fn map_row<T: PrimType, T2: PrimType>(
+    fn map_row<T: TypeRowElem, T2: TypeRowElem>(
         row: &TypeRow<T>,
         f: &impl Fn(T) -> T2,
     ) -> Box<TypeRow<T2>> {
@@ -238,6 +243,9 @@ pub enum ConstTypeError {
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
     ValueCheckFail(ClassicType, ConstValue),
+    /// A mismatch between an expected TypeParam and an actual TypeArg
+    #[error("TypeArg {1:?} does not match expected TypeParam {0:?}")]
+    TypeArgCheckFail(TypeParam, TypeArg),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),

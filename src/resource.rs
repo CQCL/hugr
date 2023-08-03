@@ -11,9 +11,9 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::ops::custom::OpaqueOp;
-use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
+use crate::values::{ConstTypeError, ValueOfType};
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
@@ -22,7 +22,7 @@ pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -30,9 +30,12 @@ pub enum SignatureError {
     /// Resource mismatch
     #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
     ResourceMismatch(ResourceId, ResourceId),
+    /// When the wrong number of type arguments were supplied
+    #[error("Received {0} type arguments but expected {1}")]
+    WrongNumberTypeArgs(usize, usize),
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
-    TypeArgMismatch(#[from] TypeArgError),
+    TypeArgMismatch(#[from] ConstTypeError),
 }
 
 /// Concrete instantiations of types and operations defined in resources.
@@ -83,13 +86,13 @@ trait TypeParametrised {
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         if args.len() != self.params().len() {
-            return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
+            return Err(SignatureError::WrongNumberTypeArgs(
                 args.len(),
                 self.params().len(),
-            )));
+            ));
         }
         for (a, p) in args.iter().zip(self.params().iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+            a.check_type(p).map_err(SignatureError::TypeArgMismatch)?;
         }
         Ok(())
     }
