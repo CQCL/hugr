@@ -154,7 +154,7 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
-            OpTag::DataflowParent => "Operation with input and output children",
+            OpTag::DataflowParent => "Operation whose children form a Dataflow Sibling Graph",
         }
     }
 
