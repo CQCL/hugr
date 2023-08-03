@@ -64,7 +64,7 @@ pub enum OpTag {
     BasicBlockExit,
 
     /// A node with input and output children
-    IOBlock,
+    DataflowParent,
 }
 
 impl OpTag {
@@ -106,25 +106,25 @@ impl OpTag {
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ScopedDefn],
-            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::IOBlock],
-            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::IOBlock],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
+            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
-            OpTag::Case => &[OpTag::Any, OpTag::IOBlock],
+            OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
             OpTag::Const => &[OpTag::ScopedDefn],
-            OpTag::Dfg => &[OpTag::DataflowChild, OpTag::IOBlock],
+            OpTag::Dfg => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Cfg => &[OpTag::DataflowChild],
             OpTag::ScopedDefn => &[
                 OpTag::DataflowChild,
                 OpTag::ControlFlowChild,
                 OpTag::ModuleOp,
             ],
-            OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::IOBlock],
+            OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::FnCall => &[OpTag::DataflowChild],
             OpTag::LoadConst => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
-            OpTag::IOBlock => &[OpTag::Any],
+            OpTag::DataflowParent => &[OpTag::Any],
         }
     }
 
@@ -154,7 +154,7 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
-            OpTag::IOBlock => "Operation with input and output children",
+            OpTag::DataflowParent => "Operation with input and output children",
         }
     }
 
