@@ -270,7 +270,10 @@ mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
+        let mut dfg_builder = DFGBuilder::new(AbstractSignature::new_df(
+            type_row![QB, QB],
+            type_row![QB, QB],
+        ))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
@@ -285,7 +288,10 @@ mod test {
     /// ┤ H ├
     /// └───┘
     fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB])?;
+        let mut dfg_builder = DFGBuilder::new(AbstractSignature::new_df(
+            type_row![QB, QB],
+            type_row![QB, QB],
+        ))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
@@ -460,7 +466,7 @@ mod test {
     #[test]
     fn test_replace_cx_cross() {
         let q_row: Vec<SimpleType> = vec![SimpleType::Qubit, SimpleType::Qubit];
-        let mut builder = DFGBuilder::new(q_row.clone(), q_row).unwrap();
+        let mut builder = DFGBuilder::new(AbstractSignature::new_df(q_row.clone(), q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(LeafOp::CX, [0, 1]).unwrap();
         circ.append(LeafOp::CX, [1, 0]).unwrap();
@@ -506,7 +512,8 @@ mod test {
         let one_bit: Vec<SimpleType> = vec![ClassicType::bit().into()];
         let two_bit: Vec<SimpleType> = vec![ClassicType::bit().into(), ClassicType::bit().into()];
 
-        let mut builder = DFGBuilder::new(one_bit.clone(), one_bit.clone()).unwrap();
+        let mut builder =
+            DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
             .add_dataflow_op(LeafOp::Xor, [inw, inw])
@@ -515,7 +522,7 @@ mod test {
         let [input, _] = builder.io();
         let mut h = builder.finish_hugr_with_outputs(outw).unwrap();
 
-        let mut builder = DFGBuilder::new(two_bit, one_bit).unwrap();
+        let mut builder = DFGBuilder::new(AbstractSignature::new_df(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(LeafOp::Xor, inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
