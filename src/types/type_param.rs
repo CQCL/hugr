@@ -34,12 +34,23 @@ pub enum TypeParam {
     HashableType,
     /// A nested definition containing other TypeParams (possibly including other [HashableType]s).
     /// Note that if all components are [TypeParam::Value]s, then the entire [Container] should be stored
-    /// inside a [TypeParam::Value] instead.
+    /// inside a [TypeParam::Value] instead; so there will never be a [Container::Opaque] here,
+    /// as there are no [CustomType]s corresponding to TypeParam's except Hashable [TypeParam::Value]s.
     Container(Container<TypeParam>),
     /// Argument is a value of the specified type.
     Value(HashableType),
 }
 
+impl TypeParam {
+    /// Creates a new TypeParam accepting values of a specified CustomType, which must be hashable.
+    pub fn new_opaque(ct: CustomType) -> Result<Self, &'static str> {
+        if ct.tag() == TypeTag::Hashable {
+            Ok(Self::Value(HashableType::Container(Container::Opaque(ct))))
+        } else {
+            Err("CustomType not hashable")
+        }
+    }
+}
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
@@ -115,8 +126,7 @@ impl ValueOfType for TypeArg {
             (TypeArg::Value(HashableValue::Container(vals)), TypeParam::Container(c_ty)) => {
                 vals.map_vals(&TypeArg::Value).check_container(c_ty)
             }
-            (TypeArg::CustomValue(cv), TypeParam::Container(Container::Opaque(ct)))
-            | (
+            (
                 TypeArg::CustomValue(cv),
                 TypeParam::Value(HashableType::Container(Container::Opaque(ct))),
             ) if &cv.typ == ct => Ok(()),
@@ -137,5 +147,34 @@ impl ValueOfType for TypeArg {
 
     fn container_error(typ: Container<Self::T>, vals: ContainerValue<Self>) -> ConstTypeError {
         ConstTypeError::TypeArgCheckFail(TypeParam::Container(typ), TypeArg::Container(vals))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        types::{CustomType, TypeTag},
+        values::{ConstTypeError, ValueOfType},
+    };
+    use cool_asserts::assert_matches;
+
+    use super::{CustomTypeArg, TypeArg, TypeParam};
+
+    #[test]
+    fn test_check_custom_type_arg() {
+        let ct = CustomType::new("MyType", [], "MyRsrc", TypeTag::Hashable);
+        let c_arg =
+            CustomTypeArg::new(ct.clone(), serde_yaml::Value::String("foo".into())).unwrap();
+        let c_param = TypeParam::new_opaque(ct).unwrap();
+        TypeArg::CustomValue(c_arg).check_type(&c_param).unwrap();
+        let c_arg2 = CustomTypeArg::new(
+            CustomType::new("MyType2", [], "MyRsrc", TypeTag::Hashable),
+            serde_yaml::Value::Number(5.into()),
+        )
+        .unwrap();
+        assert_matches!(
+            TypeArg::CustomValue(c_arg2).check_type(&c_param),
+            Err(ConstTypeError::TypeArgCheckFail(_, _))
+        );
     }
 }
