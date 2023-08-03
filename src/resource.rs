@@ -688,3 +688,58 @@ impl FromIterator<ResourceId> for ResourceSet {
         Self(HashSet::from_iter(iter))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::resource::SignatureError;
+    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::{ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+
+    use super::{TypeDef, TypeDefTag};
+
+    #[test]
+    fn test_instantiate_typedef() {
+        let def = TypeDef {
+            name: "MyType".into(),
+            params: vec![TypeParam::ClassicType],
+            resource: Some("MyRsrc".into()),
+            description: "Some parameterised type".into(),
+            tag: TypeDefTag::FromParams(vec![0]),
+        };
+        let typ: SimpleType = def
+            .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
+            .unwrap()
+            .into();
+        assert_eq!(typ.tag(), TypeTag::Classic);
+        let typ2: SimpleType = def
+            .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
+                HashableType::String,
+            ))])
+            .unwrap()
+            .into();
+        assert_eq!(typ2.tag(), TypeTag::Hashable);
+
+        // And some bad arguments...firstly, wrong kind of TypeArg:
+        assert_eq!(
+            def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
+            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
+                TypeArg::HashableType(HashableType::String),
+                TypeParam::ClassicType
+            )))
+        );
+        // Too few arguments:
+        assert_eq!(
+            def.instantiate_concrete([]).unwrap_err(),
+            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(0, 1))
+        );
+        // Too many arguments:
+        assert_eq!(
+            def.instantiate_concrete([
+                TypeArg::ClassicType(ClassicType::F64),
+                TypeArg::ClassicType(ClassicType::F64),
+            ])
+            .unwrap_err(),
+            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(2, 1))
+        );
+    }
+}
