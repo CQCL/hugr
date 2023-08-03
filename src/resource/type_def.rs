@@ -131,7 +131,7 @@ impl Resource {
         params: Vec<TypeParam>,
         description: String,
         tag: TypeDefTag,
-    ) -> Result<&mut TypeDef, ResourceBuildError> {
+    ) -> Result<&TypeDef, ResourceBuildError> {
         let ty = TypeDef {
             resource: self.name().into(),
             name,
