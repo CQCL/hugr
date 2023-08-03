@@ -155,15 +155,6 @@ impl Resource {
         }
     }
 
-    /// Returns the number of operations of this [`Resource`].
-    pub fn num_operations(&self) -> usize {
-        self.operations.len()
-    }
-
-    /// Returns the number of types of this [`Resource`].
-    pub fn num_types(&self) -> usize {
-        self.types.len()
-    }
     /// Allows read-only access to the operations in this Resource
     pub fn get_op(&self, op_name: &str) -> Option<&Arc<opdef::OpDef>> {
         self.operations.get(op_name)
@@ -182,6 +173,16 @@ impl Resource {
     /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Iterator over the operations of this [`Resource`].
+    pub fn operations(&self) -> impl Iterator<Item = (&SmolStr, &Arc<OpDef>)> {
+        self.operations.iter()
+    }
+
+    /// Iterator over the types of this [`Resource`].
+    pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
+        self.types.iter()
     }
 }
 

@@ -104,6 +104,6 @@ mod test {
     fn test_logic_resource() {
         let r: Resource = resource();
         assert_eq!(r.name(), "Logic");
-        assert_eq!(r.num_operations(), 3);
+        assert_eq!(r.operations().count(), 3);
     }
 }
