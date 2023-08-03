@@ -20,10 +20,6 @@ use super::{CustomType, TypeRow};
 /// [OpDef]: crate::resource::OpDef
 /// [TypeDef]: crate::resource::TypeDef
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[serde(
-    try_from = "super::serialize::SerSimpleType",
-    into = "super::serialize::SerSimpleType"
-)]
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type] - classic or linear
@@ -40,6 +36,11 @@ pub enum TypeParam {
     /// Argument is a value of the specified type.
     Value(HashableType),
 }
+
+/// A trait just to restrict serde's (de)serialization of [Container].
+pub(super) trait TypeParamMarker: serde::Serialize + for<'a> serde::Deserialize<'a> {}
+
+impl TypeParamMarker for TypeParam {}
 
 impl TypeParam {
     fn value_types(

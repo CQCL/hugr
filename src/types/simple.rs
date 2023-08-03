@@ -15,10 +15,7 @@ use smol_str::SmolStr;
 //
 // TODO: Compare performance vs flattening this into a single enum
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(
-    try_from = "super::serialize::SerSimpleType",
-    into = "super::serialize::SerSimpleType"
-)]
+#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
 #[non_exhaustive]
 pub enum SimpleType {
     /// A type containing only classical data. Elements of this type can be copied.
@@ -28,6 +25,8 @@ pub enum SimpleType {
     /// A nested definition containing other linear types (possibly as well as classical ones)
     Qontainer(Container<SimpleType>),
 }
+
+mod serialize;
 
 impl Display for SimpleType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -102,7 +101,9 @@ mod sealed {
 ///
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// This just to prevent accidential serialization of Containers of e.g. SimpleTypes
+#[serde(bound = "T: crate::types::type_param::TypeParamMarker")]
 pub enum Container<T: TypeRowElem> {
     /// Variable sized list of T.
     List(Box<T>),
