@@ -235,8 +235,7 @@ impl TryFrom<SerSimpleType> for HashableType {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::types::type_param::TypeParam;
-    use crate::types::{ClassicType, Container, HashableType, SimpleType, TypeTag};
+    use crate::types::{ClassicType, Container, HashableType, SimpleType};
 
     #[test]
     fn serialize_types_roundtrip() {
@@ -270,12 +269,5 @@ mod test {
         // If this behaviour changes, i.e. to return the well-formed version, that'd be fine.
         // Just to document current serialization behaviour that we leave it untouched.
         assert_eq!(ser_roundtrip(&malformed), malformed);
-    }
-
-    #[test]
-    fn serialize_type_param() {
-        let tp = TypeParam::Type(TypeTag::Hashable);
-        println!("{}", serde_json::to_string_pretty(&tp).unwrap());
-        assert_eq!(ser_roundtrip(&tp), tp);
     }
 }

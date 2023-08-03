@@ -16,7 +16,7 @@ use smol_str::SmolStr;
 // TODO: Compare performance vs flattening this into a single enum
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(
-    try_from = "super::serialize::SerSimpleType",
+    from = "super::serialize::SerSimpleType",
     into = "super::serialize::SerSimpleType"
 )]
 #[non_exhaustive]
