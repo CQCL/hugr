@@ -137,7 +137,7 @@ impl Debug for LowerFunc {
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// The unique Resource, if any, owning this OpDef (of which this OpDef is a member)
+    /// The unique Resource owning this OpDef (of which this OpDef is a member)
     resource: ResourceId,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
