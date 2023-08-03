@@ -6,12 +6,13 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
+    ops::constant::HugrIntValueStore,
     resource::ResourceSet,
     types::{
-        type_param::{TypeArg, TypeParam},
+        type_param::{ArgValue, TypeArg, TypeParam},
         HashableType, SimpleType,
     },
-    values::{ConstTypeError, HashableValue},
+    values::HashableValue,
     Resource,
 };
 
@@ -56,12 +57,7 @@ pub fn resource() -> Resource {
             Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
-                let n: u128 = match a {
-                    TypeArg::Value(HashableValue::Int(n)) => *n,
-                    _ => {
-                        return Err(ConstTypeError::TypeArgCheckFail(H_INT, a.clone()).into());
-                    }
-                };
+                let n = get_n(a);
                 Ok((
                     vec![bool_type(); n as usize].into(),
                     vec![bool_type()].into(),
@@ -80,12 +76,7 @@ pub fn resource() -> Resource {
             Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
-                let n: u128 = match a {
-                    TypeArg::Value(HashableValue::Int(n)) => *n,
-                    _ => {
-                        return Err(ConstTypeError::TypeArgCheckFail(H_INT, a.clone()).into());
-                    }
-                };
+                let n = get_n(a);
                 Ok((
                     vec![bool_type(); n as usize].into(),
                     vec![bool_type()].into(),
@@ -96,6 +87,13 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
+}
+
+fn get_n(a: &TypeArg) -> HugrIntValueStore {
+    match a {
+        TypeArg::Value(ArgValue::Hashable(HashableValue::Int(n))) => *n,
+        _ => panic!("Type arg should be checked before this.,"),
+    }
 }
 
 #[cfg(test)]

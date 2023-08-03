@@ -274,7 +274,7 @@ mod test {
 
     #[test]
     fn serialize_type_param() {
-        let tp = TypeParam::ParamTuple(vec![TypeParam::Type(TypeTag::Hashable)]);
+        let tp = TypeParam::Type(TypeTag::Hashable);
         println!("{}", serde_json::to_string_pretty(&tp).unwrap());
         assert_eq!(ser_roundtrip(&tp), tp);
     }
