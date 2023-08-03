@@ -224,8 +224,8 @@ mod test {
         let mut conditional_b =
             ConditionalBuilder::new(predicate_inputs, type_row![NAT], type_row![NAT])?;
 
-        n_identity(conditional_b.case_builder(0)?)?;
         n_identity(conditional_b.case_builder(1)?)?;
+        n_identity(conditional_b.case_builder(0)?)?;
         Ok(())
     }
 
