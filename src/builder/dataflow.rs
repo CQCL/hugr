@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{AbstractSignature, Signature, SimpleRow};
+use crate::types::{AbstractSignature, Signature};
 
 use crate::resource::ResourceSet;
 use crate::Node;
@@ -81,13 +81,7 @@ impl DFGBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-    ) -> Result<DFGBuilder<Hugr>, BuildError> {
-        let input = input.into();
-        let output = output.into();
-        let signature = AbstractSignature::new_df(input, output);
+    pub fn new(signature: AbstractSignature) -> Result<DFGBuilder<Hugr>, BuildError> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
@@ -403,7 +397,8 @@ mod test {
 
     #[test]
     fn dfg_hugr() -> Result<(), BuildError> {
-        let dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let dfg_builder =
+            DFGBuilder::new(AbstractSignature::new_df(type_row![BIT], type_row![BIT]))?;
 
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
@@ -417,7 +412,8 @@ mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let mut dfg_builder = DFGBuilder::new(type_row![BIT], type_row![BIT])?;
+        let mut dfg_builder =
+            DFGBuilder::new(AbstractSignature::new_df(type_row![BIT], type_row![BIT]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata(json!(42));
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
