@@ -1,18 +1,20 @@
-use super::AbstractSignature;
 use super::ClassicType;
 
 use super::Container;
 
-use super::CustomType;
 use super::HashableType;
 use super::PrimType;
 use super::TypeTag;
 
 use smol_str::SmolStr;
 
+use super::super::custom::CustomType;
+
 use super::TypeRow;
 
 use super::SimpleType;
+
+use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
 
