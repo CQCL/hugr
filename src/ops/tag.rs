@@ -31,10 +31,13 @@ pub enum OpTag {
     /// A function definition.
     FuncDefn,
 
-    /// Node in a Control-flow Sibling Graph
+    /// Node in a Control-flow Sibling Graph.
     ControlFlowChild,
     /// Node in a Dataflow Sibling Graph.
     DataflowChild,
+    /// Parent node of a Dataflow Sibling Graph.
+    DataflowParent,
+
     /// A nested data-flow operation.
     Dfg,
     /// A nested control-flow operation.
@@ -62,9 +65,6 @@ pub enum OpTag {
     BasicBlock,
     /// A control flow exit node.
     BasicBlockExit,
-
-    /// A node with input and output children
-    DataflowParent,
 }
 
 impl OpTag {
