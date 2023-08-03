@@ -3,6 +3,7 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+use crate::ops;
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
@@ -126,6 +128,32 @@ trait TypeParametrised {
     }
 }
 
+/// A constant value provided by a resource.
+/// Must be an instance of a type available to the resource.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ResourceValue {
+    resource: ResourceId,
+    name: SmolStr,
+    typed_value: ops::Const,
+}
+
+impl ResourceValue {
+    /// Returns a reference to the typed value of this [`ResourceValue`].
+    pub fn typed_value(&self) -> &ops::Const {
+        &self.typed_value
+    }
+
+    /// Returns a reference to the name of this [`ResourceValue`].
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+
+    /// Returns a reference to the resource this [`ResourceValue`] belongs to.
+    pub fn resource(&self) -> &ResourceId {
+        &self.resource
+    }
+}
+
 /// A unique identifier for a resource.
 ///
 /// The actual [`Resource`] is stored externally.
@@ -142,7 +170,9 @@ pub struct Resource {
     /// for any possible [TypeArg].
     pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
-    types: HashMap<SmolStr, type_def::TypeDef>,
+    types: HashMap<SmolStr, TypeDef>,
+    /// Static values defined by this resource.
+    values: HashMap<SmolStr, ResourceValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -180,6 +210,11 @@ impl Resource {
         self.types.get(type_name)
     }
 
+    /// Allows read-only access to the values in this Resource
+    pub fn get_value(&self, type_name: &str) -> Option<&ResourceValue> {
+        self.values.get(type_name)
+    }
+
     /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name
@@ -193,6 +228,23 @@ impl Resource {
     /// Iterator over the types of this [`Resource`].
     pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
         self.types.iter()
+    }
+
+    /// Add a named static value to the resource.
+    pub fn add_value(
+        &mut self,
+        name: impl Into<SmolStr>,
+        typed_value: ops::Const,
+    ) -> Result<&mut ResourceValue, ResourceBuildError> {
+        let resource_value = ResourceValue {
+            resource: self.name().into(),
+            name: name.into(),
+            typed_value,
+        };
+        match self.values.entry(resource_value.name.clone()) {
+            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(resource_value.name)),
+            Entry::Vacant(ve) => Ok(ve.insert(resource_value)),
+        }
     }
 }
 
