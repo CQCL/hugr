@@ -57,3 +57,39 @@ pub(crate) fn check_int_fits_in_width(
         Err(ConstIntError::IntWidthInvalid(width))
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use cool_asserts::assert_matches;
+
+    #[test]
+    fn test_biggest_int() {
+        assert_matches!(check_int_fits_in_width(u128::MAX, 128), Ok(_))
+    }
+
+    #[test]
+    fn test_odd_widths_invalid() {
+        assert_matches!(
+            check_int_fits_in_width(0, 3),
+            Err(ConstIntError::IntWidthInvalid(_))
+        );
+    }
+
+    #[test]
+    fn test_zero_width_invalid() {
+        assert_matches!(
+            check_int_fits_in_width(0, 0),
+            Err(ConstIntError::IntWidthInvalid(_))
+        );
+    }
+
+    #[test]
+    fn test_width_too_large() {
+        assert_matches!(
+            check_int_fits_in_width(0, 130),
+            Err(ConstIntError::IntWidthTooLarge(_))
+        );
+    }
+}
