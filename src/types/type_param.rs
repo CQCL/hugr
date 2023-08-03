@@ -151,8 +151,7 @@ impl ValueOfType for TypeArg {
             (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
             (TypeArg::HashableType(_), TypeParam::HashableType) => Ok(()),
             (TypeArg::Container(vals), TypeParam::Container(c_ty)) => vals.check_container(c_ty),
-            // We might have an argument *value* that is a TypeArg (but not a HashableValue)
-            // that fits a Hashable type because the argument contains an [TypeArg::Opaque]:
+            // The argument might not be a HashableValue because it contains [TypeArg::Opaque]:
             (TypeArg::Container(vals), TypeParam::Value(HashableType::Container(c_ty))) => {
                 vals.check_container(&map_container_type(c_ty, &TypeParam::Value))
             }
