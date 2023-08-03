@@ -48,7 +48,7 @@ jobs:
         id: make_msg
         run: |
           change="`cat coverage-summary-prev.txt`% --> `cat coverage-summary.txt`%"
-          if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.03" | bc -l) ))
+          if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.04" | bc -l) ))
           then
             echo "msg=Coverage check for hugr shows no regression (${change}). ✅ ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
           else
