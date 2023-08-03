@@ -157,7 +157,7 @@ impl ValueOfType for TypeArg {
             }
             (TypeArg::Value(hv), TypeParam::Value(ht)) => hv.check_type(ht),
             // A "hashable" value might be argument to a non-hashable TypeParam:
-            // e.g. an empty list is hashable, yet can be checked against a List<SimpleType>.
+            // e.g. an empty list is a HashableValue, yet can be checked against a List<TypeParam::Type>.
             (TypeArg::Value(HashableValue::Container(vals)), TypeParam::Container(c_ty)) => {
                 vals.map_vals(&TypeArg::Value).check_container(c_ty)
             }
