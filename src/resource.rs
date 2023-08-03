@@ -194,6 +194,12 @@ trait TypeParametrised {
     fn resource(&self) -> Option<&ResourceId>;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        if args.len() != self.params().len() {
+            return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
+                args.len(),
+                self.params().len(),
+            )));
+        }
         for (a, p) in args.iter().zip(self.params().iter()) {
             check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
         }
@@ -358,12 +364,6 @@ impl OpDef {
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
     pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
-        if args.len() != self.params.len() {
-            return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
-                args.len(),
-                self.params.len(),
-            )));
-        }
         self.check_args(args)?;
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromYAML { .. } => {
