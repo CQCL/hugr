@@ -1,6 +1,5 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
@@ -16,7 +15,7 @@ use thiserror::Error;
 /// Specification of a simple replacement operation.
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
-    /// The common DFG parent of all nodes to be replaced.
+    /// The common DataflowParent of all nodes to be replaced.
     pub parent: Node,
     /// The set of nodes to remove (a convex set of leaf children of `parent`).
     pub removal: HashSet<Node>,
@@ -58,8 +57,8 @@ impl Rewrite for SimpleReplacement {
     }
 
     fn apply(self, h: &mut Hugr) -> Result<(), SimpleReplacementError> {
-        // 1. Check the parent node exists and is a DFG node.
-        if h.get_optype(self.parent).tag().partial_cmp(&OpTag::IOBlock) != Some(Ordering::Less) {
+        // 1. Check the parent node exists and is a DataflowParent.
+        if !OpTag::DataflowParent.is_superset(h.get_optype(self.parent).tag()) {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
