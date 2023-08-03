@@ -16,7 +16,7 @@ use crate::{
 
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum HashableValue {
     /// A string, i.e. corresponding to [HashableType::String]
     String(String),
@@ -97,7 +97,7 @@ impl ValueOfType for HashableValue {
 /// resolved to concrete types in order to create instances (values),
 /// nor to [Container::Opaque], which is left to classes for broader
 /// sets of values (see e.g. [ConstValue::Opaque])
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ContainerValue<T> {
     /// A [Container::Array] or [Container::Tuple] or [Container::List]
     Sequence(Vec<T>),
