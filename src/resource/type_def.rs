@@ -33,7 +33,7 @@ impl From<TypeTag> for TypeDefTag {
 /// - typically these are operations also provided by the Resource.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
-    /// The unique Resource, if any, owning this TypeDef (of which this TypeDef is a member)
+    /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
     resource: ResourceId,
     /// The unique name of the type
     name: SmolStr,
