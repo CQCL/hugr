@@ -266,4 +266,28 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn test_not_all_cases() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
+        n_identity(builder.case_builder(0)?)?;
+        match builder.finish_sub_container() {
+            Err(BuildError::ConditionalError(ConditionalBuildError::NotAllCasesBuilt {
+                ..
+            })) => Ok(()),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn test_case_already_built() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
+        n_identity(builder.case_builder(0)?)?;
+        match builder.case_builder(0) {
+            Err(BuildError::ConditionalError(ConditionalBuildError::CaseBuilt { .. })) => Ok(()),
+            _ => panic!(),
+        }
+    }
 }
