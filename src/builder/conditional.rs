@@ -224,8 +224,8 @@ mod test {
         let mut conditional_b =
             ConditionalBuilder::new(predicate_inputs, type_row![NAT], type_row![NAT])?;
 
-        n_identity(conditional_b.case_builder(0)?)?;
         n_identity(conditional_b.case_builder(1)?)?;
+        n_identity(conditional_b.case_builder(0)?)?;
         Ok(())
     }
 
@@ -264,6 +264,34 @@ mod test {
 
         assert_matches!(build_result, Ok(_));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_not_all_cases() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
+        n_identity(builder.case_builder(0)?)?;
+        assert_matches!(
+            builder.finish_sub_container().map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::NotAllCasesBuilt { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_case_already_built() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
+        n_identity(builder.case_builder(0)?)?;
+        assert_matches!(
+            builder.case_builder(0).map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::CaseBuilt { .. }
+            ))
+        );
         Ok(())
     }
 }

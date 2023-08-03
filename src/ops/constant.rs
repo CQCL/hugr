@@ -306,7 +306,9 @@ pub trait CustomConst:
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// Don't derive Eq here - the yaml could contain floats etc.
+// (Perhaps we could derive Eq if-and-only-if "typ.tag() == TypeTag::Hashable"!)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
@@ -324,6 +326,10 @@ impl CustomConst for CustomSerialized {
         } else {
             Err(CustomCheckFail::TypeMismatch(typ.clone(), self.typ.clone()))
         }
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        Some(self) == other.downcast_ref()
     }
 }
 
@@ -444,5 +450,7 @@ mod test {
         let t: SimpleType = typ_float.clone().into();
         assert_matches!(val.check_type(&t.try_into().unwrap()),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_float);
+
+        assert_eq!(val, val);
     }
 }
