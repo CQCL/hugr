@@ -558,7 +558,7 @@ impl Resource {
         self.types.get(type_name)
     }
 
-    /// Allows read-only access to the operations in this Resource
+    /// Allows access to the operations in this Resource
     pub fn get_op_mut(&mut self, op_name: &str) -> Option<&mut Arc<OpDef>> {
         self.operations.get_mut(op_name)
     }
@@ -631,7 +631,7 @@ impl Resource {
     }
 
     /// Create an OpDef with a signature (inputs+outputs) read from the
-    /// declarative TAML
+    /// declarative YAML
     pub fn add_op_decl_sig(
         &mut self,
         name: SmolStr,
