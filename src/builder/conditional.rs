@@ -272,12 +272,13 @@ mod test {
         let predicate_inputs = vec![type_row![]; 2];
         let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
         n_identity(builder.case_builder(0)?)?;
-        match builder.finish_sub_container() {
-            Err(BuildError::ConditionalError(ConditionalBuildError::NotAllCasesBuilt {
-                ..
-            })) => Ok(()),
-            _ => panic!(),
-        }
+        assert_matches!(
+            builder.finish_sub_container().map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::NotAllCasesBuilt { .. }
+            ))
+        );
+        Ok(())
     }
 
     #[test]
@@ -285,9 +286,12 @@ mod test {
         let predicate_inputs = vec![type_row![]; 2];
         let mut builder = ConditionalBuilder::new(predicate_inputs, type_row![], type_row![])?;
         n_identity(builder.case_builder(0)?)?;
-        match builder.case_builder(0) {
-            Err(BuildError::ConditionalError(ConditionalBuildError::CaseBuilt { .. })) => Ok(()),
-            _ => panic!(),
-        }
+        assert_matches!(
+            builder.case_builder(0).map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::CaseBuilt { .. }
+            ))
+        );
+        Ok(())
     }
 }
