@@ -1,18 +1,13 @@
 //! Dataflow types
 
-use std::{
-    borrow::Cow,
-    fmt::{self, Display, Formatter, Write},
-    ops::{Deref, DerefMut},
-};
+use std::fmt::{self, Display, Formatter, Write};
 
+use super::type_row::{TypeRow, TypeRowElem};
+use super::{custom::CustomType, AbstractSignature};
+use crate::{classic_row, ops::constant::HugrIntWidthStore};
 use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
-
-use super::{custom::CustomType, Signature};
-use crate::resource::ResourceSet;
-use crate::{classic_row, ops::constant::HugrIntWidthStore, utils::display_list};
 
 /// A type that represents concrete data. Can include both linear and classical parts.
 ///
@@ -85,8 +80,8 @@ impl TypeTag {
     }
 }
 
-/// Trait of primitive types (SimpleType or ClassicType).
-pub trait PrimType: sealed::Sealed + std::fmt::Debug + Clone + 'static {
+/// Trait of primitive types, i.e. that are uniquely identified by a [TypeTag]
+pub trait PrimType: TypeRowElem + std::fmt::Debug + sealed::Sealed {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
@@ -107,7 +102,7 @@ mod sealed {
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Container<T: PrimType> {
+pub enum Container<T: TypeRowElem> {
     /// Variable sized list of T.
     List(Box<T>),
     /// Hash map from hashable key type to value T.
@@ -179,7 +174,7 @@ pub enum ClassicType {
     F64,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
     /// TODO this can be moved out into an extension/resource
-    Graph(Box<(ResourceSet, Signature)>),
+    Graph(Box<AbstractSignature>),
     /// A nested definition containing other classic types.
     Container(Container<ClassicType>),
     /// A type which can be hashed
@@ -211,10 +206,9 @@ impl ClassicType {
     }
 
     /// Create a graph type with the given signature, using default resources.
-    /// TODO in the future we'll probably need versions of this that take resources.
     #[inline]
-    pub fn graph_from_sig(signature: Signature) -> Self {
-        ClassicType::Graph(Box::new((Default::default(), signature)))
+    pub fn graph_from_sig(signature: AbstractSignature) -> Self {
+        ClassicType::Graph(Box::new(signature))
     }
 
     /// Returns a new integer type with the given number of bits.
@@ -281,8 +275,8 @@ impl Display for ClassicType {
         match self {
             ClassicType::F64 => f.write_str("F64"),
             ClassicType::Graph(data) => {
-                let (rs, sig) = data.as_ref();
-                write!(f, "[{:?}]", rs)?;
+                let sig = data.as_ref();
+                write!(f, "[{:?}]", sig.resource_reqs)?;
                 sig.fmt(f)
             }
             ClassicType::Container(c) => c.fmt(f),
@@ -431,29 +425,11 @@ impl<'a> TryFrom<&'a SimpleType> for &'a ClassicType {
     }
 }
 
-/// List of types, used for function signatures.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-//#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions
-#[non_exhaustive]
-#[serde(transparent)]
-pub struct TypeRow<T: PrimType> {
-    /// The datatypes in the row.
-    types: Cow<'static, [T]>,
-}
-
 /// A row of [SimpleType]s
 pub type SimpleRow = TypeRow<SimpleType>;
 
 /// A row of [ClassicType]s
 pub type ClassicRow = TypeRow<ClassicType>;
-
-impl<T: Display + PrimType> Display for TypeRow<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_char('[')?;
-        display_list(self.types.as_ref(), f)?;
-        f.write_char(']')
-    }
-}
 
 impl TypeRow<SimpleType> {
     /// Returns whether the row contains only classic data.
@@ -461,10 +437,7 @@ impl TypeRow<SimpleType> {
     /// it is guaranteed true for any other TypeRow)
     #[inline]
     pub fn purely_classical(&self) -> bool {
-        self.types
-            .iter()
-            .map(PrimType::tag)
-            .all(TypeTag::is_classical)
+        self.iter().map(PrimType::tag).all(TypeTag::is_classical)
     }
 }
 
@@ -480,120 +453,18 @@ impl TypeRow<ClassicType> {
     }
 }
 
-// TODO some of these, but not all, will probably want exposing via
-// pyo3 wrappers eventually.
 impl<T: PrimType> TypeRow<T> {
-    /// Create a new empty row.
-    pub const fn new() -> Self {
-        Self {
-            types: Cow::Owned(Vec::new()),
-        }
-    }
-
-    /// Iterator over the types in the row.
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.types.iter()
-    }
-
-    /// Returns the number of types in the row.
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.types.len()
-    }
-
-    /// Returns `true` if the row contains no types.
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.types.len() == 0
-    }
-
     /// Returns whether the row contains only hashable classic data.
     #[inline(always)]
     pub fn purely_hashable(&self) -> bool {
-        self.types
-            .iter()
-            .map(PrimType::tag)
-            .all(TypeTag::is_hashable)
+        self.iter().map(PrimType::tag).all(TypeTag::is_hashable)
     }
 
     /// Returns the smallest [TypeTag] that contains all elements of the row
     pub fn containing_tag(&self) -> TypeTag {
-        self.types
-            .iter()
+        self.iter()
             .map(PrimType::tag)
             .fold(TypeTag::Hashable, TypeTag::union)
-    }
-
-    /// Mutable iterator over the types in the row.
-    pub fn to_mut(&mut self) -> &mut Vec<T> {
-        self.types.to_mut()
-    }
-
-    /// Allow access (consumption) of the contained elements
-    pub fn into_owned(self) -> Vec<T> {
-        self.types.into_owned()
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: usize) -> Option<&T> {
-        self.types.get(offset)
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: usize) -> Option<&mut T> {
-        self.types.to_mut().get_mut(offset)
-    }
-
-    fn try_convert_elems<D: PrimType + TryFrom<T>>(self) -> Result<TypeRow<D>, D::Error> {
-        let elems: Vec<D> = self
-            .into_owned()
-            .into_iter()
-            .map(D::try_from)
-            .collect::<Result<_, _>>()?;
-        Ok(TypeRow::from(elems))
-    }
-
-    /// Converts the elements of this TypeRow into some other type that they can `.into()`
-    pub fn map_into<T2: PrimType + From<T>>(self) -> TypeRow<T2> {
-        TypeRow::from(
-            self.into_owned()
-                .into_iter()
-                .map(T2::from)
-                .collect::<Vec<T2>>(),
-        )
-    }
-}
-
-impl<T: PrimType> Default for TypeRow<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<F, T: PrimType> From<F> for TypeRow<T>
-where
-    F: Into<Cow<'static, [T]>>,
-{
-    fn from(types: F) -> Self {
-        Self {
-            types: types.into(),
-        }
-    }
-}
-
-impl<T: PrimType> Deref for TypeRow<T> {
-    type Target = [T];
-
-    fn deref(&self) -> &Self::Target {
-        &self.types
-    }
-}
-
-impl<T: PrimType> DerefMut for TypeRow<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.types.to_mut()
     }
 }
 

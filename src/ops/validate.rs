@@ -123,8 +123,8 @@ impl ValidateOp for super::DFG {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         validate_io_nodes(
-            &self.signature.input,
-            &self.signature.output,
+            &self.signature().input,
+            &self.signature().output,
             "nested graph",
             children,
         )

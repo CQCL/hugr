@@ -18,7 +18,10 @@ use crate::types::Signature;
 use crate::Node;
 use smol_str::SmolStr;
 
-use crate::{hugr::HugrMut, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    Hugr,
+};
 
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
@@ -86,13 +89,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            ops::FuncDefn {
+            NodeType::pure(ops::FuncDefn {
                 name,
                 signature: signature.clone(),
-            },
+            }),
         );
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -108,10 +111,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(ops::FuncDecl {
-            signature,
-            name: name.into(),
-        })?;
+        let rs = signature.input_resources.clone();
+        let declare_n = self.add_child_node(NodeType::new(
+            ops::FuncDecl {
+                signature: signature.into(),
+                name: name.into(),
+            },
+            rs,
+        ))?;
 
         Ok(declare_n.into())
     }
@@ -170,6 +177,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
+        types::AbstractSignature,
     };
 
     use super::*;
@@ -178,8 +186,10 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_id = module_builder
-                .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let f_id = module_builder.declare(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
             let call = f_build.call(&f_id, f_build.input_wires())?;
@@ -201,10 +211,11 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new_df(
+                AbstractSignature::new_df(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
-                ),
+                )
+                .pure(),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr()
@@ -218,10 +229,14 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;
 

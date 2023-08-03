@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::hugr::{HugrMut, HugrView};
-use crate::resource::{OpDef, ResourceId, ResourceSet, SignatureError};
-use crate::types::{type_param::TypeArg, Signature, SignatureDescription};
+use crate::hugr::{HugrMut, HugrView, NodeType};
+use crate::resource::{OpDef, ResourceId, SignatureError};
+use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
 use crate::{Hugr, Node, Resource};
 
 use super::tag::OpTag;
@@ -87,7 +87,7 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> AbstractSignature {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
             Self::Resource(ResourceOp { signature, .. }) => signature.clone(),
@@ -101,17 +101,13 @@ impl OpTrait for ExternalOp {
 pub struct ResourceOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: Signature, // Cache
+    signature: AbstractSignature, // Cache
 }
 
 impl ResourceOp {
     /// Create a new ResourceOp given the type arguments and specified input resources
-    pub fn new(
-        def: Arc<OpDef>,
-        args: &[TypeArg],
-        resources_in: &ResourceSet,
-    ) -> Result<Self, SignatureError> {
-        let signature = def.compute_signature(args, resources_in)?;
+    pub fn new(def: Arc<OpDef>, args: &[TypeArg]) -> Result<Self, SignatureError> {
+        let signature = def.compute_signature(args)?;
         Ok(Self {
             def,
             args: args.to_vec(),
@@ -162,7 +158,7 @@ pub struct OpaqueOp {
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Option<Signature>,
+    signature: Option<AbstractSignature>,
 }
 
 fn qualify_name(res_id: ResourceId, op_name: &SmolStr) -> SmolStr {
@@ -176,7 +172,7 @@ impl OpaqueOp {
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Option<Signature>,
+        signature: Option<AbstractSignature>,
     ) -> Self {
         Self {
             resource,
@@ -220,9 +216,7 @@ pub fn resolve_extension_ops(
                     return Err(CustomOpError::OpNotFoundInResource(opaque.op_name.to_string(), r.name().to_string()));
                 };
                 // TODO input resources. From type checker, or just drop by storing only delta in Signature.
-                let op = ExternalOp::Resource(
-                    ResourceOp::new(def.clone(), &opaque.args, &ResourceSet::default()).unwrap(),
-                );
+                let op = ExternalOp::Resource(ResourceOp::new(def.clone(), &opaque.args).unwrap());
                 if let Some(sig) = &opaque.signature {
                     if sig != &op.signature() {
                         return Err(CustomOpError::SignatureMismatch(
@@ -240,7 +234,8 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        h.replace_op(n, Into::<LeafOp>::into(op));
+        let node_type = NodeType::pure(Into::<LeafOp>::into(op));
+        h.replace_op(n, node_type);
     }
     Ok(())
 }
@@ -257,7 +252,7 @@ pub enum CustomOpError {
     OpNotFoundInResource(String, String),
     /// Resource and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, Signature, Signature),
+    SignatureMismatch(String, AbstractSignature, AbstractSignature),
 }
 
 #[cfg(test)]

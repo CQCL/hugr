@@ -1580,6 +1580,8 @@ struct HUGR {
 struct Node{
   // parent node index
   parent: Int,
+  // The input resources to the node
+  input_resources: Option<ResourceSet>
   // name of operation
   op: String
   //other op-specific fields

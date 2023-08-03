@@ -14,10 +14,9 @@ use super::TypeRow;
 
 use super::SimpleType;
 
-use super::super::Signature;
+use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
-use crate::resource::ResourceSet;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -29,8 +28,7 @@ pub(crate) enum SerSimpleType {
     F,
     S,
     G {
-        resources: Box<ResourceSet>,
-        signature: Box<Signature>,
+        signature: Box<AbstractSignature>,
     },
     List {
         inner: Box<SimpleType>,
@@ -65,13 +63,6 @@ pub(crate) enum SerSimpleType {
     Var {
         name: SmolStr,
     },
-}
-
-impl super::sealed::Sealed for SerSimpleType {}
-impl PrimType for SerSimpleType {
-    fn tag(&self) -> TypeTag {
-        unimplemented!()
-    }
 }
 
 trait SerializableType: PrimType {
@@ -141,8 +132,7 @@ impl From<ClassicType> for SerSimpleType {
         match value {
             ClassicType::F64 => SerSimpleType::F,
             ClassicType::Graph(inner) => SerSimpleType::G {
-                resources: Box::new(inner.0),
-                signature: Box::new(inner.1),
+                signature: Box::new(*inner),
             },
             ClassicType::Container(c) => c.into(),
             ClassicType::Hashable(h) => h.into(),
@@ -192,10 +182,7 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::I { width } => HashableType::Int(width).into(),
             SerSimpleType::F => ClassicType::F64.into(),
             SerSimpleType::S => HashableType::String.into(),
-            SerSimpleType::G {
-                resources,
-                signature,
-            } => ClassicType::Graph(Box::new((*resources, *signature))).into(),
+            SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
                 handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
             }

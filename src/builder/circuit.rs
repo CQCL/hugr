@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::hugr::CircuitUnit;
+
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
@@ -97,7 +98,13 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         let input_wires = input_wires.ok_or(CircuitBuildError::InvalidWireIndex)?;
 
-        let output_wires = self.builder.add_dataflow_op(op, input_wires)?.outputs();
+        let output_wires = self
+            .builder
+            .add_dataflow_op(
+                op, // TODO: Add resource param
+                input_wires,
+            )?
+            .outputs();
         let nonlinear_outputs: Vec<Wire> = output_wires
             .enumerate()
             .filter_map(|(output_port, wire)| {
@@ -134,13 +141,13 @@ mod test {
         },
         ops::LeafOp,
         type_row,
-        types::Signature,
+        types::AbstractSignature,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
+            AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -167,7 +174,7 @@ mod test {
     #[test]
     fn with_nonlinear_and_outputs() {
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
+            AbstractSignature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

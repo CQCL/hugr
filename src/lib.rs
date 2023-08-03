@@ -18,6 +18,7 @@ pub mod ops;
 pub mod resource;
 pub mod types;
 mod utils;
+pub mod values;
 
 pub use crate::hugr::{Direction, Hugr, HugrView, Node, Port, SimpleReplacement, Wire};
 pub use crate::resource::Resource;

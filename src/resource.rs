@@ -17,7 +17,7 @@ use crate::types::CustomType;
 use crate::types::TypeTag;
 use crate::types::{
     type_param::{TypeArg, TypeParam},
-    Signature, SignatureDescription, SimpleRow,
+    AbstractSignature, SignatureDescription, SimpleRow,
 };
 use crate::Hugr;
 
@@ -31,8 +31,8 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
+        // TODO: Make return type an AbstractSignature
     ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError>;
-
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the resource definition YAML.
@@ -183,7 +183,7 @@ impl CustomConcrete for CustomType {
 }
 
 /// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
-trait TypeParametrised: sealed::SealedDef {
+trait TypeParametrised {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
     /// The resource-unique name.
@@ -224,20 +224,6 @@ trait TypeParametrised: sealed::SealedDef {
 
         Ok(())
     }
-}
-
-mod sealed {
-    use crate::{ops::custom::OpaqueOp, types::CustomType};
-
-    use super::{OpDef, TypeDef};
-
-    pub trait SealedDef {}
-    impl SealedDef for OpDef {}
-    impl SealedDef for TypeDef {}
-
-    pub trait SealedConcrete {}
-    impl SealedConcrete for OpaqueOp {}
-    impl SealedConcrete for CustomType {}
 }
 
 /// Serializable definition for dynamically loaded operations.
@@ -371,11 +357,7 @@ impl OpDef {
 
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(
-        &self,
-        args: &[TypeArg],
-        resources_in: &ResourceSet,
-    ) -> Result<Signature, SignatureError> {
+    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
         if args.len() != self.params.len() {
             return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
                 args.len(),
@@ -395,10 +377,7 @@ impl OpDef {
             .as_ref()
             .expect("OpDef does not belong to a Resource.");
         assert!(res.contains(resource));
-        let mut sig = Signature::new_df(ins, outs);
-        sig.input_resources = resources_in.clone();
-        sig.output_resources = res.union(resources_in); // Pass input requirements through
-        Ok(sig)
+        Ok(AbstractSignature::new_df(ins, outs).with_resource_delta(&res))
     }
 
     /// Optional description of the ports in the signature.
@@ -501,10 +480,12 @@ impl TypeDef {
     ) -> Result<CustomType, SignatureError> {
         let args = args.into();
         self.check_args_impl(&args)?;
+        let tag = self.tag(&args);
         Ok(CustomType::new(
             self.name().clone(),
             args,
             self.resource().expect("Resource not set.").clone(),
+            tag,
         ))
     }
 }
@@ -688,6 +669,11 @@ impl ResourceSet {
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
         ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+    }
+
+    /// Iterate over the contained ResourceIds
+    pub fn iter(&self) -> impl Iterator<Item = &ResourceId> {
+        self.0.iter()
     }
 }
 

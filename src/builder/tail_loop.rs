@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
-use crate::hugr::view::HugrView;
-use crate::types::{ClassicRow, Signature, SimpleRow};
+use crate::hugr::{view::HugrView, NodeType};
+use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -20,8 +20,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         loop_node: Node,
         tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
-        let signature = Signature::new_df(tail_loop.body_input_row(), tail_loop.body_output_row());
-        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature)?;
+        let signature =
+            AbstractSignature::new_df(tail_loop.body_input_row(), tail_loop.body_output_row());
+        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature, None)?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
@@ -81,7 +82,8 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        let base = Hugr::new(tail_loop.clone());
+        // TODO: Allow input resources to be specified
+        let base = Hugr::new(NodeType::pure(tail_loop.clone()));
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }
@@ -98,9 +100,9 @@ mod test {
         },
         classic_row,
         hugr::ValidationError,
-        ops::ConstValue,
+        ops::Const,
         type_row,
-        types::{ClassicType, Signature},
+        types::ClassicType,
         Hugr,
     };
 
@@ -110,7 +112,7 @@ mod test {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![ClassicType::i64()])?;
             let [i1] = loop_b.input_wires_arr();
-            let const_wire = loop_b.add_load_const(ConstValue::i64(1))?;
+            let const_wire = loop_b.add_load_const(Const::i64(1)?)?;
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
@@ -125,8 +127,10 @@ mod test {
     fn loop_with_conditional() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder
-                .define_function("main", Signature::new_df(type_row![BIT], type_row![NAT]))?;
+            let mut fbuild = module_builder.define_function(
+                "main",
+                AbstractSignature::new_df(type_row![BIT], type_row![NAT]).pure(),
+            )?;
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
@@ -136,7 +140,7 @@ mod test {
                         classic_row![ClassicType::i64()],
                     )?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_wire = loop_b.add_load_const(ConstValue::true_val())?;
+                    let const_wire = loop_b.add_load_const(Const::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
                         let predicate_inputs = vec![type_row![]; 2];
@@ -156,7 +160,7 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.add_load_const(ConstValue::i64(2))?;
+                        let wire = branch_1.add_load_const(Const::i64(2)?)?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

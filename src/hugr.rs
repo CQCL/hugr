@@ -5,7 +5,6 @@ mod hugrmut;
 pub mod region;
 pub mod rewrite;
 pub mod serialize;
-pub mod typecheck;
 pub mod validate;
 pub mod view;
 
@@ -26,7 +25,11 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::view::HugrView;
-use crate::ops::OpType;
+use crate::ops::{OpTag, OpTrait, OpType};
+use crate::resource::ResourceSet;
+use crate::types::{AbstractSignature, Signature};
+
+use delegate::delegate;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -42,15 +45,84 @@ pub struct Hugr {
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    op_types: UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Node metadata
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The type of a node on a graph
+pub struct NodeType {
+    /// The underlying OpType
+    op: OpType,
+    /// The resources that the signature has been specialised to
+    input_resources: Option<ResourceSet>,
+}
+
+impl NodeType {
+    /// Create a new optype with some ResourceSet
+    pub fn new(op: impl Into<OpType>, input_resources: ResourceSet) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: Some(input_resources),
+        }
+    }
+
+    /// Instantiate an OpType with no input resources
+    pub fn pure(op: impl Into<OpType>) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: Some(ResourceSet::new()),
+        }
+    }
+
+    /// Instantiate an OpType with an unknown set of input resources
+    /// (to be inferred later)
+    pub fn open_resources(op: impl Into<OpType>) -> Self {
+        NodeType {
+            op: op.into(),
+            input_resources: None,
+        }
+    }
+
+    /// Use the input resources to calculate the concrete signature of the node
+    pub fn signature(&self) -> Option<Signature> {
+        self.input_resources
+            .as_ref()
+            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
+    }
+
+    /// Get the abstract signature from the embedded op
+    pub fn op_signature(&self) -> AbstractSignature {
+        self.op.signature()
+    }
+}
+
+impl NodeType {
+    #![allow(missing_docs)]
+    delegate! {
+        to self.op {
+            pub fn tag(&self) -> OpTag;
+            pub fn input_count(&self) -> usize;
+            pub fn output_count(&self) -> usize;
+        }
+    }
+}
+
+impl OpType {
+    /// Convert an OpType to a NodeType by giving it some input resources
+    pub fn with_resources(self, rs: ResourceSet) -> NodeType {
+        NodeType {
+            op: self,
+            input_resources: Some(rs),
+        }
+    }
+}
+
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module)
+        Self::new(NodeType::pure(crate::ops::Module))
     }
 }
 
@@ -110,17 +182,20 @@ pub type NodeMetadata = serde_json::Value;
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
     /// Create a new Hugr, with a single root node.
-    pub(crate) fn new(root_op: impl Into<OpType>) -> Self {
-        Self::with_capacity(root_op, 0, 0)
+    pub(crate) fn new(root_node: NodeType) -> Self {
+        Self::with_capacity(root_node, 0, 0)
     }
 
     /// Create a new Hugr, with a single root node and preallocated capacity.
-    pub(crate) fn with_capacity(root_op: impl Into<OpType>, nodes: usize, ports: usize) -> Self {
+    // TODO: Make this take a NodeType
+    pub(crate) fn with_capacity(root_node: NodeType, nodes: usize, ports: usize) -> Self {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        op_types[root] = root_op.into();
+        // TODO: These resources should be open in principle, but lets wait
+        // until resources can be inferred for open sets until changing this
+        op_types[root] = root_node;
 
         Self {
             graph,

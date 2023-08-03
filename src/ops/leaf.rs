@@ -7,7 +7,9 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
-    types::{ClassicType, EdgeKind, Signature, SignatureDescription, SimpleRow, SimpleType},
+    types::{
+        AbstractSignature, ClassicType, EdgeKind, SignatureDescription, SimpleRow, SimpleType,
+    },
 };
 
 /// Dataflow operations with no children.
@@ -73,8 +75,6 @@ pub enum LeafOp {
     Lift {
         /// The types of the edges
         type_row: SimpleRow,
-        /// The resources which are present in both the inputs and outputs
-        input_resources: ResourceSet,
         /// The resources which we're adding to the inputs
         new_resource: ResourceId,
     },
@@ -152,15 +152,17 @@ impl OpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        // Static signatures. The `TypeRow`s in the `Signature` use a
+    fn signature(&self) -> AbstractSignature {
+        // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Qubit;
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
         const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
         match self {
-            LeafOp::Noop { ty: typ } => Signature::new_df(vec![typ.clone()], vec![typ.clone()]),
+            LeafOp::Noop { ty: typ } => {
+                AbstractSignature::new_df(vec![typ.clone()], vec![typ.clone()])
+            }
             LeafOp::H
             | LeafOp::Reset
             | LeafOp::T
@@ -169,32 +171,27 @@ impl OpTrait for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => Signature::new_linear(type_row![Q]),
-            LeafOp::CX | LeafOp::ZZMax => Signature::new_linear(type_row![Q, Q]),
-            LeafOp::Measure => Signature::new_df(type_row![Q], type_row![Q, B]),
-            LeafOp::Xor => Signature::new_df(type_row![B, B], type_row![B]),
+            | LeafOp::Z => AbstractSignature::new_linear(type_row![Q]),
+            LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![Q, Q]),
+            LeafOp::Measure => AbstractSignature::new_df(type_row![Q], type_row![Q, B]),
+            LeafOp::Xor => AbstractSignature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
-                Signature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
+                AbstractSignature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                Signature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
+                AbstractSignature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
             }
-            LeafOp::Tag { tag, variants } => Signature::new_df(
+            LeafOp::Tag { tag, variants } => AbstractSignature::new_df(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![SimpleType::new_sum(variants.clone())],
             ),
-            LeafOp::RzF64 => Signature::new_df(type_row![Q, F], type_row![Q]),
+            LeafOp::RzF64 => AbstractSignature::new_df(type_row![Q, F], type_row![Q]),
             LeafOp::Lift {
                 type_row,
-                input_resources,
                 new_resource,
-            } => {
-                let mut sig = Signature::new_df(type_row.clone(), type_row.clone());
-                sig.output_resources = ResourceSet::singleton(new_resource).union(input_resources);
-                sig.input_resources = input_resources.clone();
-                sig
-            }
+            } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
+                .with_resource_delta(&ResourceSet::singleton(new_resource)),
         }
     }
 

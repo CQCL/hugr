@@ -14,7 +14,8 @@ use pyo3::prelude::*;
 use crate::ops::constant::CustomConst;
 use crate::resource::{OpDef, ResourceSet, TypeDef};
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, SimpleType};
+use crate::types::{CustomType, SimpleRow, TypeTag};
+use crate::values::CustomCheckFail;
 use crate::Resource;
 
 pub const fn resource_id() -> SmolStr {
@@ -34,7 +35,7 @@ pub fn resource() -> Resource {
         vec![],
         HashMap::default(),
         |_arg_values: &[TypeArg]| {
-            let t: SimpleRow = vec![SimpleType::Classic(Type::Angle.custom_type().into())].into();
+            let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
             Ok((t.clone(), t, ResourceSet::default()))
         },
     );
@@ -66,7 +67,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], resource_id())
+        CustomType::new(self.name(), [], resource_id(), TypeTag::Classic)
     }
 
     pub fn type_def(self) -> TypeDef {
@@ -75,7 +76,7 @@ impl Type {
             params: vec![],
             description: self.description().to_string(),
             resource: None,
-            tag: crate::types::TypeTag::Classic.into(),
+            tag: TypeTag::Classic.into(),
         }
     }
 }
@@ -93,6 +94,15 @@ pub enum Constant {
     Quaternion(cgmath::Quaternion<f64>),
 }
 
+impl Constant {
+    fn rotation_type(&self) -> Type {
+        match self {
+            Constant::Angle(_) => Type::Angle,
+            Constant::Quaternion(_) => Type::Quaternion,
+        }
+    }
+}
+
 #[typetag::serde]
 impl CustomConst for Constant {
     fn name(&self) -> SmolStr {
@@ -103,12 +113,24 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn custom_type(&self) -> CustomType {
-        let t: Type = match self {
-            Constant::Angle(_) => Type::Angle,
-            Constant::Quaternion(_) => Type::Quaternion,
-        };
-        t.custom_type()
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+        let self_typ = self.rotation_type();
+
+        if &self_typ.custom_type() == typ {
+            Ok(())
+        } else {
+            Err(CustomCheckFail::Message(
+                "Rotation constant type mismatch.".into(),
+            ))
+        }
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Constant>() {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
@@ -131,15 +153,15 @@ impl CustomConst for Constant {
 //
 // signatures:
 //
-//             LeafOp::AngleAdd | LeafOp::AngleMul => Signature::new_linear([Type::Angle]),
-//             LeafOp::QuatMul => Signature::new_linear([Type::Quat64]),
-//             LeafOp::AngleNeg => Signature::new_linear([Type::Angle]),
+//             LeafOp::AngleAdd | LeafOp::AngleMul => AbstractSignature::new_linear([Type::Angle]),
+//             LeafOp::QuatMul => AbstractSignature::new_linear([Type::Quat64]),
+//             LeafOp::AngleNeg => AbstractSignature::new_linear([Type::Angle]),
 //             LeafOp::RxF64 | LeafOp::RzF64 => {
-//                 Signature::new_df([Type::Qubit], [Type::Angle])
+//                 AbstractSignature::new_df([Type::Qubit], [Type::Angle])
 //             }
-//             LeafOp::TK1 => Signature::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
-//             LeafOp::Rotation => Signature::new_df([Type::Qubit], [Type::Quat64]),
-//             LeafOp::ToRotation => Signature::new_df(
+//             LeafOp::TK1 => AbstractSignature::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
+//             LeafOp::Rotation => AbstractSignature::new_df([Type::Qubit], [Type::Quat64]),
+//             LeafOp::ToRotation => AbstractSignature::new_df(
 //                 [
 //                     Type::Angle,
 //                     Type::F64,
@@ -292,7 +314,7 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::resource::SignatureError;
+    use crate::{resource::SignatureError, types::TypeTag};
 
     use super::*;
 
@@ -306,7 +328,12 @@ mod test {
 
         angle.check_custom(&custom).unwrap();
 
-        let false_custom = CustomType::new(custom.name().clone(), vec![], "wrong_resource");
+        let false_custom = CustomType::new(
+            custom.name().clone(),
+            vec![],
+            "wrong_resource",
+            TypeTag::Classic,
+        );
         assert_eq!(
             angle.check_custom(&false_custom),
             Err(SignatureError::ResourceMismatch(
@@ -314,5 +341,31 @@ mod test {
                 Some("wrong_resource".into()),
             ))
         );
+    }
+
+    #[test]
+    fn test_type_check() {
+        let resource = resource();
+
+        let custom_type = resource
+            .types()
+            .get("angle")
+            .unwrap()
+            .instantiate_concrete([])
+            .unwrap();
+
+        let custom_value = Constant::Angle(AngleValue::F64(0.0));
+
+        // correct type
+        custom_value.check_custom_type(&custom_type).unwrap();
+
+        let wrong_custom_type = resource
+            .types()
+            .get("quat")
+            .unwrap()
+            .instantiate_concrete([])
+            .unwrap();
+        let res = custom_value.check_custom_type(&wrong_custom_type);
+        assert!(res.is_err());
     }
 }
