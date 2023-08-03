@@ -1,6 +1,6 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
-use super::{FlatRegionView, RegionView};
+use super::{DescendantsGraph, SiblingGraph};
 use crate::hugr::view::sealed::HugrInternals;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
@@ -167,8 +167,8 @@ macro_rules! impl_region_petgraph_traits {
     };
 }
 
-impl_region_petgraph_traits!(FlatRegionView);
-impl_region_petgraph_traits!(RegionView);
+impl_region_petgraph_traits!(SiblingGraph);
+impl_region_petgraph_traits!(DescendantsGraph);
 
 /// Reference to a Hugr node and its associated OpType.
 #[derive(Debug, Clone, Copy)]

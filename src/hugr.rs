@@ -2,7 +2,7 @@
 
 mod hugrmut;
 
-pub mod region;
+pub mod hierarchy;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
