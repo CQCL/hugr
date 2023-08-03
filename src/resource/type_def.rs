@@ -150,7 +150,7 @@ impl Resource {
 mod test {
     use crate::resource::SignatureError;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+    use crate::types::{ClassicType, HashableType, TypeTag};
 
     use super::{TypeDef, TypeDefTag};
 
@@ -163,17 +163,15 @@ mod test {
             description: "Some parameterised type".into(),
             tag: TypeDefTag::FromParams(vec![0]),
         };
-        let typ: SimpleType = def
+        let typ = def
             .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
-            .unwrap()
-            .into();
+            .unwrap();
         assert_eq!(typ.tag(), TypeTag::Classic);
-        let typ2: SimpleType = def
+        let typ2 = def
             .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
                 HashableType::String,
             ))])
-            .unwrap()
-            .into();
+            .unwrap();
         assert_eq!(typ2.tag(), TypeTag::Hashable);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
