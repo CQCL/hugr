@@ -7,11 +7,11 @@
 use crate::values::{map_container_type, ConstTypeError};
 use crate::values::{ContainerValue, HashableValue, ValueOfType};
 
-use super::CustomType;
 use super::{
     simple::{Container, HashableType, PrimType},
     ClassicType, SimpleType, TypeTag,
 };
+use super::{CustomType, TypeRow};
 
 /// A parameter declared by an [OpDef] - specifying an argument
 /// that must be provided by each operation node - or by a [TypeDef]
@@ -42,6 +42,42 @@ pub enum TypeParam {
 }
 
 impl TypeParam {
+    fn value_types(
+        typarams: TypeRow<TypeParam>,
+    ) -> Result<TypeRow<HashableType>, TypeRow<TypeParam>> {
+        if typarams.iter().all(|e| matches!(e, TypeParam::Value(_))) {
+            Ok(typarams
+                .into_owned()
+                .into_iter()
+                .map(|e| match e {
+                    TypeParam::Value(ht) => ht,
+                    _ => panic!(), // We checked all matched above
+                })
+                .collect::<Vec<_>>()
+                .into())
+        } else {
+            Err(typarams)
+        }
+    }
+
+    /// New Tuple TypeParam, elements defined by TypeRow
+    pub fn new_tuple(elems: impl Into<TypeRow<TypeParam>>) -> Self {
+        match TypeParam::value_types(elems.into()) {
+            Ok(h_tys) => {
+                TypeParam::Value(HashableType::Container(Container::Tuple(Box::new(h_tys))))
+            }
+            Err(ty_params) => Self::Container(Container::Tuple(Box::new(ty_params))),
+        }
+    }
+
+    /// New Tuple typeparam, elements defined by TypeRow
+    pub fn new_sum(elems: impl Into<TypeRow<TypeParam>>) -> Self {
+        match TypeParam::value_types(elems.into()) {
+            Ok(h_tys) => TypeParam::Value(HashableType::Container(Container::Sum(Box::new(h_tys)))),
+            Err(ty_params) => Self::Container(Container::Sum(Box::new(ty_params))),
+        }
+    }
+
     /// Creates a new TypeParam accepting values of a specified CustomType, which must be hashable.
     pub fn new_opaque(ct: CustomType) -> Result<Self, &'static str> {
         if ct.tag() == TypeTag::Hashable {
