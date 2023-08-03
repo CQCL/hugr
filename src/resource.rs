@@ -17,8 +17,8 @@ use crate::types::CustomType;
 
 mod opdef;
 pub use opdef::{CustomSignatureFunc, OpDef};
-mod typedef;
-pub use typedef::{TypeDef, TypeDefTag};
+mod type_def;
+pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
@@ -136,7 +136,7 @@ pub struct Resource {
     /// for any possible [TypeArg].
     pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
-    types: HashMap<SmolStr, typedef::TypeDef>,
+    types: HashMap<SmolStr, type_def::TypeDef>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -161,7 +161,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the types in this Resource
-    pub fn get_type(&self, type_name: &str) -> Option<&typedef::TypeDef> {
+    pub fn get_type(&self, type_name: &str) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
