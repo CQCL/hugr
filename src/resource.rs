@@ -3,7 +3,6 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -15,10 +14,11 @@ use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
-use crate::types::TypeTag;
 
 mod opdef;
 pub use opdef::{CustomSignatureFunc, OpDef};
+mod type_def;
+pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
@@ -120,118 +120,6 @@ trait TypeParametrised {
     }
 }
 
-/// The type tag of a [`TypeDef`]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum TypeDefTag {
-    /// Defined by an explicit tag.
-    Explicit(TypeTag),
-    /// Derived as the tag containing all marked type parameters.
-    FromParams(Vec<usize>),
-}
-
-impl From<TypeTag> for TypeDefTag {
-    fn from(tag: TypeTag) -> Self {
-        Self::Explicit(tag)
-    }
-}
-/// A declaration of an opaque type.
-/// Note this does not provide any way to create instances
-/// - typically these are operations also provided by the Resource.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct TypeDef {
-    /// The unique Resource, if any, owning this TypeDef (of which this TypeDef is a member)
-    resource: ResourceId,
-    /// The unique name of the type
-    name: SmolStr,
-    /// Declaration of type parameters. The TypeDef must be instantiated
-    /// with the same number of [`TypeArg`]'s to make an actual type.
-    ///
-    /// [`TypeArg`]: crate::types::type_param::TypeArg
-    params: Vec<TypeParam>,
-    /// Human readable description of the type definition.
-    description: String,
-    /// The definition of the type tag of this definition.
-    tag: TypeDefTag,
-}
-
-impl TypeDef {
-    /// Check provided type arguments are valid against parameters.
-    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        self.check_args_impl(args)
-    }
-
-    /// Check [`CustomType`] is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        self.check_concrete_impl(custom)
-    }
-
-    /// Instantiate a concrete [`CustomType`] by providing type arguments.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the provided arguments are not
-    /// valid instances of the type parameters.
-    pub fn instantiate_concrete(
-        &self,
-        args: impl Into<Vec<TypeArg>>,
-    ) -> Result<CustomType, SignatureError> {
-        let args = args.into();
-        self.check_args_impl(&args)?;
-        let tag = self.tag(&args);
-        Ok(CustomType::new(
-            self.name().clone(),
-            args,
-            self.resource().clone(),
-            tag,
-        ))
-    }
-}
-
-impl TypeParametrised for TypeDef {
-    type Concrete = CustomType;
-
-    fn params(&self) -> &[TypeParam] {
-        &self.params
-    }
-
-    fn name(&self) -> &SmolStr {
-        &self.name
-    }
-
-    fn resource(&self) -> &ResourceId {
-        &self.resource
-    }
-}
-
-impl TypeDef {
-    /// The [`TypeTag`] of the definition.
-    pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
-        match &self.tag {
-            TypeDefTag::Explicit(tag) => *tag,
-            TypeDefTag::FromParams(indices) => {
-                let args: Vec<_> = args.iter().collect();
-                if indices.is_empty() {
-                    // Assume most general case
-                    return TypeTag::Simple;
-                }
-                indices
-                    .iter()
-                    .map(|i| {
-                        args.get(*i)
-                            .and_then(|ta| ta.tag_of_type())
-                            .expect("TypeParam index invalid or param does not have a TypeTag.")
-                    })
-                    .fold(TypeTag::Hashable, TypeTag::union)
-            }
-        }
-    }
-}
-
 /// A unique identifier for a resource.
 ///
 /// The actual [`Resource`] is stored externally.
@@ -248,7 +136,7 @@ pub struct Resource {
     /// for any possible [TypeArg].
     pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
-    types: HashMap<SmolStr, TypeDef>,
+    types: HashMap<SmolStr, type_def::TypeDef>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -282,7 +170,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the types in this Resource
-    pub fn get_type(&self, type_name: &str) -> Option<&TypeDef> {
+    pub fn get_type(&self, type_name: &str) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
@@ -294,27 +182,6 @@ impl Resource {
     /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    /// Add an exported type to the resource.
-    pub fn add_type(
-        &mut self,
-        name: SmolStr,
-        params: Vec<TypeParam>,
-        description: String,
-        tag: TypeDefTag,
-    ) -> Result<&mut TypeDef, ResourceBuildError> {
-        let ty = TypeDef {
-            resource: self.name().into(),
-            name,
-            params,
-            description,
-            tag,
-        };
-        match self.types.entry(ty.name.clone()) {
-            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(ty.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(ty)),
-        }
     }
 }
 
@@ -399,60 +266,5 @@ impl Display for ResourceSet {
 impl FromIterator<ResourceId> for ResourceSet {
     fn from_iter<I: IntoIterator<Item = ResourceId>>(iter: I) -> Self {
         Self(HashSet::from_iter(iter))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::resource::SignatureError;
-    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{ClassicType, HashableType, PrimType, SimpleType, TypeTag};
-
-    use super::{TypeDef, TypeDefTag};
-
-    #[test]
-    fn test_instantiate_typedef() {
-        let def = TypeDef {
-            name: "MyType".into(),
-            params: vec![TypeParam::ClassicType],
-            resource: "MyRsrc".into(),
-            description: "Some parameterised type".into(),
-            tag: TypeDefTag::FromParams(vec![0]),
-        };
-        let typ: SimpleType = def
-            .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
-            .unwrap()
-            .into();
-        assert_eq!(typ.tag(), TypeTag::Classic);
-        let typ2: SimpleType = def
-            .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::String,
-            ))])
-            .unwrap()
-            .into();
-        assert_eq!(typ2.tag(), TypeTag::Hashable);
-
-        // And some bad arguments...firstly, wrong kind of TypeArg:
-        assert_eq!(
-            def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
-            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::HashableType(HashableType::String),
-                TypeParam::ClassicType
-            )))
-        );
-        // Too few arguments:
-        assert_eq!(
-            def.instantiate_concrete([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(0, 1))
-        );
-        // Too many arguments:
-        assert_eq!(
-            def.instantiate_concrete([
-                TypeArg::ClassicType(ClassicType::F64),
-                TypeArg::ClassicType(ClassicType::F64),
-            ])
-            .unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(2, 1))
-        );
     }
 }
