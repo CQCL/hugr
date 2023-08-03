@@ -40,9 +40,7 @@ impl CustomType {
             tag,
         }
     }
-}
 
-impl CustomType {
     /// unique name of the type.
     pub fn name(&self) -> &SmolStr {
         &self.id
@@ -56,6 +54,11 @@ impl CustomType {
     /// Parent resource.
     pub fn resource(&self) -> &ResourceId {
         &self.resource
+    }
+
+    /// Classifies what operations are supported by instances
+    pub fn tag(&self) -> TypeTag {
+        self.tag
     }
 }
 
