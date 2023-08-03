@@ -4,8 +4,7 @@
 //! more than one root node. However, all root nodes must belong to the same
 //! sibling graph.
 //!
-//! TODO:
-//! Subgraphs implement [`HugrView`] as well as petgraph's _visit_ traits.
+//! TODO: Subgraphs implement [`HugrView`] as well as petgraph's _visit_ traits.
 
 use std::cell::OnceCell;
 
@@ -297,7 +296,7 @@ mod tests {
         hugr::region::Region,
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{Signature, SimpleType},
+        types::{AbstractSignature, SimpleType},
     };
 
     use super::*;
@@ -306,7 +305,10 @@ mod tests {
 
     fn build_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_linear(type_row![QB, QB]))?;
+        let func = mod_builder.declare(
+            "test",
+            AbstractSignature::new_linear(type_row![QB, QB]).pure(),
+        )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs = dfg.add_dataflow_op(LeafOp::CX, dfg.input_wires())?;
