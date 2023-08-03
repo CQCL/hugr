@@ -1,22 +1,24 @@
-use super::ClassicType;
-
-use super::Container;
-
-use super::HashableType;
-use super::PrimType;
-use super::TypeTag;
-
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
-use super::super::custom::CustomType;
+use super::custom::CustomType;
 
-use super::TypeRow;
-
-use super::SimpleType;
-
-use super::super::AbstractSignature;
+use super::type_param::TypeParam;
+use super::type_row::TypeRowElem;
+use super::{
+    AbstractSignature, ClassicType, Container, HashableType, SimpleType, TypeRow, TypeTag,
+};
 
 use crate::ops::constant::HugrIntWidthStore;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub(crate) enum SerializableTag {
+    Simple = 0,
+    Classic = 1,
+    Hashable = 2,
+    TypeParam = 3,
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -31,60 +33,76 @@ pub(crate) enum SerSimpleType {
         signature: Box<AbstractSignature>,
     },
     List {
-        inner: Box<SimpleType>,
-        c: TypeTag,
+        inner: Box<SerSimpleType>,
+        c: SerializableTag,
     },
     Map {
         k: Box<SerSimpleType>,
         v: Box<SerSimpleType>,
-        c: TypeTag,
+        c: SerializableTag,
     },
     Tuple {
         row: Box<TypeRow<SerSimpleType>>,
-        c: TypeTag,
+        c: SerializableTag,
     },
     Sum {
         row: Box<TypeRow<SerSimpleType>>,
-        c: TypeTag,
+        c: SerializableTag,
     },
     Array {
         inner: Box<SerSimpleType>,
         len: usize,
-        c: TypeTag,
+        c: SerializableTag,
     },
     Opaque {
         custom: CustomType,
-        c: TypeTag,
+        c: SerializableTag,
     },
     Alias {
         name: SmolStr,
-        c: TypeTag,
+        c: TypeTag, // not a SerializableTag - there are no TypeParam aliases
     },
     Var {
         name: SmolStr,
     },
+    /// For TypeParams only - corresponds to [TypeParam::SimpleType]
+    ST,
+    /// For TypeParams only - corresponds to [TypeParam::ClassicType]
+    CT,
+    /// For TypeParams only - corresponds to [TypeParam::HashableType]
+    HT,
 }
 
-trait SerializableType: PrimType {
-    const TAG: TypeTag;
+trait SerializableType: TypeRowElem {
+    const TAG: SerializableTag;
 }
 
 impl SerializableType for ClassicType {
-    const TAG: TypeTag = TypeTag::Classic;
+    const TAG: SerializableTag = SerializableTag::Classic;
 }
 
 impl SerializableType for SimpleType {
-    const TAG: TypeTag = TypeTag::Simple;
+    const TAG: SerializableTag = SerializableTag::Simple;
 }
 
 impl SerializableType for HashableType {
-    const TAG: TypeTag = TypeTag::Hashable;
+    const TAG: SerializableTag = SerializableTag::Hashable;
+}
+
+impl SerializableType for TypeParam {
+    const TAG: SerializableTag = SerializableTag::TypeParam;
+}
+
+enum Deserialized {
+    Simple(SimpleType),
+    Classic(ClassicType),
+    Hashable(HashableType),
+    TypeParam(TypeParam),
 }
 
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
 where
     SerSimpleType: From<T>,
-    SimpleType: From<T>,
 {
     fn from(value: Container<T>) -> Self {
         match value {
@@ -110,7 +128,15 @@ where
                 len,
                 c: T::TAG,
             },
-            Container::Alias(name) => SerSimpleType::Alias { name, c: T::TAG },
+            Container::Alias(name) => {
+                let c = match T::TAG {
+                    SerializableTag::Simple => TypeTag::Simple,
+                    SerializableTag::Classic => TypeTag::Classic,
+                    SerializableTag::Hashable => TypeTag::Hashable,
+                    SerializableTag::TypeParam => panic!("No TypeParam aliases"),
+                };
+                SerSimpleType::Alias { name, c }
+            }
             Container::Opaque(custom) => SerSimpleType::Opaque { custom, c: T::TAG },
         }
     }
@@ -150,6 +176,18 @@ impl From<SimpleType> for SerSimpleType {
     }
 }
 
+impl From<TypeParam> for SerSimpleType {
+    fn from(value: TypeParam) -> Self {
+        match value {
+            TypeParam::Type => Self::ST,
+            TypeParam::ClassicType => Self::CT,
+            TypeParam::HashableType => Self::HT,
+            TypeParam::Container(c) => c.into(),
+            TypeParam::Value(h) => h.into(),
+        }
+    }
+}
+
 pub(crate) fn box_convert_try<T, F>(value: T) -> Box<F>
 where
     T: TryInto<F>,
@@ -168,21 +206,24 @@ where
 macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
-            TypeTag::Simple => (Container::<SimpleType>::$variant($($r),*)).into(),
-            TypeTag::Classic => (Container::<ClassicType>::$variant($($r),*)).into(),
-            TypeTag::Hashable => (Container::<HashableType>::$variant($($r),*)).into()
+            SerializableTag::Simple => Deserialized::Simple(Container::<SimpleType>::$variant($($r),*).into()),
+            SerializableTag::Classic => Deserialized::Classic(ClassicType::Container(Container::<ClassicType>::$variant($($r),*))),
+            SerializableTag::Hashable => Deserialized::Hashable(HashableType::Container(Container::<HashableType>::$variant($($r),*))),
+            SerializableTag::TypeParam => Deserialized::TypeParam(TypeParam::Container(Container::<TypeParam>::$variant($($r),*)))
         }
     }
 }
 
-impl From<SerSimpleType> for SimpleType {
+impl From<SerSimpleType> for Deserialized {
     fn from(value: SerSimpleType) -> Self {
         match value {
-            SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => HashableType::Int(width).into(),
-            SerSimpleType::F => ClassicType::F64.into(),
-            SerSimpleType::S => HashableType::String.into(),
-            SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
+            SerSimpleType::Q => Deserialized::Simple(SimpleType::Qubit),
+            SerSimpleType::I { width } => Deserialized::Hashable(HashableType::Int(width)),
+            SerSimpleType::F => Deserialized::Classic(ClassicType::F64),
+            SerSimpleType::S => Deserialized::Hashable(HashableType::String),
+            SerSimpleType::G { signature } => {
+                Deserialized::Classic(ClassicType::Graph(Box::new(*signature)))
+            }
             SerSimpleType::Tuple { row: inner, c } => {
                 handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
             }
@@ -200,14 +241,52 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Array { inner, len, c } => {
                 handle_container!(c, Array(box_convert_try(*inner), len))
             }
-            SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
+            SerSimpleType::Alias { name, c } => match c {
+                TypeTag::Simple => {
+                    Deserialized::Simple(SimpleType::Qontainer(Container::Alias(name)))
+                }
+                TypeTag::Classic => {
+                    Deserialized::Classic(ClassicType::Container(Container::Alias(name)))
+                }
+                TypeTag::Hashable => {
+                    Deserialized::Hashable(HashableType::Container(Container::Alias(name)))
+                }
+            },
             SerSimpleType::Opaque { custom, c } => {
                 handle_container!(c, Opaque(custom))
             }
-            SerSimpleType::Var { name: s } => {
-                ClassicType::Hashable(HashableType::Variable(s)).into()
-            }
+            SerSimpleType::Var { name: s } => Deserialized::Hashable(HashableType::Variable(s)),
+            SerSimpleType::ST => Deserialized::TypeParam(TypeParam::Type),
+            SerSimpleType::CT => Deserialized::TypeParam(TypeParam::ClassicType),
+            SerSimpleType::HT => Deserialized::TypeParam(TypeParam::HashableType),
         }
+    }
+}
+
+impl TryFrom<SerSimpleType> for SimpleType {
+    type Error = String;
+
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        let d: Deserialized = value.into();
+        Ok(match d {
+            Deserialized::Simple(s) => s,
+            Deserialized::Classic(c) => c.into(),
+            Deserialized::Hashable(h) => h.into(),
+            Deserialized::TypeParam(p) => return Err(format!("Not a SimpleType: {:?}", p)),
+        })
+    }
+}
+
+impl TryFrom<SerSimpleType> for TypeParam {
+    type Error = String;
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        let d: Deserialized = value.into();
+        Ok(match d {
+            Deserialized::Hashable(h) => TypeParam::Value(h),
+            Deserialized::TypeParam(p) => p,
+            Deserialized::Classic(c) => return Err(format!("Not a valid TypeParam: {:?}", c)),
+            Deserialized::Simple(s) => return Err(format!("Not a valid TypeParam: {:?}", s)),
+        })
     }
 }
 
@@ -215,7 +294,7 @@ impl TryFrom<SerSimpleType> for ClassicType {
     type Error = String;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
-        let s: SimpleType = value.into();
+        let s: SimpleType = value.try_into()?;
         if let SimpleType::Classic(c) = s {
             Ok(c)
         } else {

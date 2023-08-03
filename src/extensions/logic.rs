@@ -8,9 +8,10 @@ use smol_str::SmolStr;
 use crate::{
     resource::ResourceSet,
     types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
+        type_param::{TypeArg, TypeParam},
         HashableType, SimpleType,
     },
+    values::{ConstTypeError, HashableValue},
     Resource,
 };
 
@@ -56,9 +57,9 @@ pub fn resource() -> Resource {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {
-                    TypeArg::Int(n) => *n,
+                    TypeArg::Value(HashableValue::Int(n)) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(ConstTypeError::TypeArgCheckFail(H_INT, a.clone()).into());
                     }
                 };
                 Ok((
@@ -80,9 +81,9 @@ pub fn resource() -> Resource {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {
-                    TypeArg::Int(n) => *n,
+                    TypeArg::Value(HashableValue::Int(n)) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(ConstTypeError::TypeArgCheckFail(H_INT, a.clone()).into());
                     }
                 };
                 Ok((
