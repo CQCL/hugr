@@ -450,5 +450,7 @@ mod test {
         let t: SimpleType = typ_float.clone().into();
         assert_matches!(val.check_type(&t.try_into().unwrap()),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_float);
+
+        assert_eq!(val, val);
     }
 }
