@@ -165,11 +165,6 @@ impl Resource {
         self.types.get(type_name)
     }
 
-    /// Allows access to the operations in this Resource
-    pub fn get_op_mut(&mut self, op_name: &str) -> Option<&mut Arc<opdef::OpDef>> {
-        self.operations.get_mut(op_name)
-    }
-
     /// Returns the name of the resource.
     pub fn name(&self) -> &str {
         &self.name

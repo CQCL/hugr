@@ -35,6 +35,7 @@ pub fn resource() -> Resource {
             "".into(),
             vec![],
             HashMap::default(),
+            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
                 Ok((t.clone(), t, ResourceSet::default()))

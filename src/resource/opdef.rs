@@ -213,12 +213,6 @@ impl OpDef {
         ))
     }
 
-    /// Provides a (new) way for the OpDef to fallibly lower operations. Each
-    /// LowerFunc will be attempted in [Self::try_lower] only if previous methods failed.
-    pub fn add_lowering(&mut self, func: LowerFunc) {
-        self.lower_funcs.push(func);
-    }
-
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
     pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
@@ -300,8 +294,9 @@ impl Resource {
         description: String,
         params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
+        lower_funcs: Vec<LowerFunc>,
         signature_func: SignatureFunc,
-    ) -> Result<&mut Arc<OpDef>, ResourceBuildError> {
+    ) -> Result<&OpDef, ResourceBuildError> {
         let op = OpDef {
             resource: self.name.clone(),
             name,
@@ -309,7 +304,7 @@ impl Resource {
             params,
             misc,
             signature_func,
-            lower_funcs: Vec::new(),
+            lower_funcs,
         };
 
         match self.operations.entry(op.name.clone()) {
@@ -324,13 +319,15 @@ impl Resource {
         description: String,
         params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
+        lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
-    ) -> Result<&mut Arc<OpDef>, ResourceBuildError> {
+    ) -> Result<&OpDef, ResourceBuildError> {
         self.add_op(
             name,
             description,
             params,
             misc,
+            lower_funcs,
             SignatureFunc::CustomFunc(Box::new(signature_func)),
         )
     }
@@ -343,14 +340,15 @@ impl Resource {
         description: String,
         params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
-        inputs: String,
-        outputs: String,
-    ) -> Result<&mut Arc<OpDef>, ResourceBuildError> {
+        lower_funcs: Vec<LowerFunc>,
+        (inputs, outputs): (String, String), // separating these makes clippy complain about too many args
+    ) -> Result<&OpDef, ResourceBuildError> {
         self.add_op(
             name,
             description,
             params,
             misc,
+            lower_funcs,
             SignatureFunc::FromDecl { inputs, outputs },
         )
     }

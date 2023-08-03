@@ -35,6 +35,7 @@ pub fn resource() -> Resource {
             "logical 'not'".into(),
             vec![],
             HashMap::default(),
+            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 Ok((
                     vec![bool_type()].into(),
@@ -51,6 +52,7 @@ pub fn resource() -> Resource {
             "logical 'and'".into(),
             vec![H_INT],
             HashMap::default(),
+            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {
@@ -74,6 +76,7 @@ pub fn resource() -> Resource {
             "logical 'or'".into(),
             vec![H_INT],
             HashMap::default(),
+            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {
