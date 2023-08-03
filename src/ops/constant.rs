@@ -430,9 +430,9 @@ mod test {
     fn test_yaml_const() {
         let typ_int = CustomType::new(
             "mytype",
-            vec![TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::Int(8),
-            ))],
+            vec![TypeArg::Type(
+                ClassicType::Hashable(HashableType::Int(8)).into(),
+            )],
             "myrsrc",
             TypeTag::Hashable,
         );
@@ -452,7 +452,7 @@ mod test {
 
         let typ_float = CustomType::new(
             "mytype",
-            vec![TypeArg::ClassicType(ClassicType::F64)],
+            vec![TypeArg::Type(ClassicType::F64.into())],
             "myrsrc",
             TypeTag::Hashable,
         );

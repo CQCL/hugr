@@ -265,12 +265,12 @@ mod test {
             "res".into(),
             "op",
             "desc".into(),
-            vec![TypeArg::ClassicType(ClassicType::F64)],
+            vec![TypeArg::Type(ClassicType::F64.into())],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::ClassicType(ClassicType::F64)]);
+        assert_eq!(op.args(), &[TypeArg::Type(ClassicType::F64.into())]);
     }
 }

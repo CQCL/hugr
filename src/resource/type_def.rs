@@ -159,29 +159,29 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::ClassicType],
+            params: vec![TypeParam::Type(TypeTag::Hashable)],
             resource: "MyRsrc".into(),
             description: "Some parameterised type".into(),
             tag: TypeDefTag::FromParams(vec![0]),
         };
         let typ = def
-            .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
+            .instantiate_concrete(vec![TypeArg::Type(HashableType::String.into())])
             .unwrap();
-        assert_eq!(typ.tag(), TypeTag::Classic);
+        assert_eq!(typ.tag(), TypeTag::Hashable);
         let typ2 = def
-            .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::String,
-            ))])
+            .instantiate_concrete([TypeArg::Type(
+                ClassicType::Hashable(HashableType::String).into(),
+            )])
             .unwrap();
         assert_eq!(typ2.tag(), TypeTag::Hashable);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
+            def.instantiate_concrete([TypeArg::Type(ClassicType::F64.into())]),
             Err(SignatureError::TypeArgMismatch(
                 ConstTypeError::TypeArgCheckFail(
-                    TypeParam::ClassicType,
-                    TypeArg::HashableType(HashableType::String)
+                    TypeParam::Type(TypeTag::Hashable),
+                    TypeArg::Type(ClassicType::F64.into())
                 )
             ))
         );
@@ -193,8 +193,8 @@ mod test {
         // Too many arguments:
         assert_eq!(
             def.instantiate_concrete([
-                TypeArg::ClassicType(ClassicType::F64),
-                TypeArg::ClassicType(ClassicType::F64),
+                TypeArg::Type(ClassicType::F64.into()),
+                TypeArg::Type(ClassicType::F64.into()),
             ])
             .unwrap_err(),
             SignatureError::WrongNumberTypeArgs(2, 1)
