@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, config, ... }:
 
 {
   # https://devenv.sh/basics/
@@ -29,7 +29,9 @@
 
   # https://devenv.sh/pre-commit-hooks/
   pre-commit.hooks.clippy.enable = true;
+  pre-commit.tools.clippy = lib.mkForce config.languages.rust.toolchain.clippy;
   pre-commit.hooks.rustfmt.enable = true;
+  pre-commit.tools.rustfmt = lib.mkForce config.languages.rust.toolchain.rustfmt;
 
   # https://devenv.sh/processes/
   # processes.ping.exec = "ping example.com";
