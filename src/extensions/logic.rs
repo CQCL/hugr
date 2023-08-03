@@ -6,7 +6,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::{OpDef, ResourceSet},
+    resource::ResourceSet,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         HashableType, SimpleType,
@@ -29,65 +29,70 @@ pub fn resource() -> Resource {
     const H_INT: TypeParam = TypeParam::Value(HashableType::Int(8));
     let mut resource = Resource::new(resource_id());
 
-    let not_op = OpDef::new_with_custom_sig(
-        "Not".into(),
-        "logical 'not'".into(),
-        vec![],
-        HashMap::default(),
-        |_arg_values: &[TypeArg]| {
-            Ok((
-                vec![bool_type()].into(),
-                vec![bool_type()].into(),
-                ResourceSet::default(),
-            ))
-        },
-    );
+    resource
+        .add_op_custom_sig(
+            "Not".into(),
+            "logical 'not'".into(),
+            vec![],
+            HashMap::default(),
+            Vec::new(),
+            |_arg_values: &[TypeArg]| {
+                Ok((
+                    vec![bool_type()].into(),
+                    vec![bool_type()].into(),
+                    ResourceSet::default(),
+                ))
+            },
+        )
+        .unwrap();
 
-    let and_op = OpDef::new_with_custom_sig(
-        "And".into(),
-        "logical 'and'".into(),
-        vec![H_INT],
-        HashMap::default(),
-        |arg_values: &[TypeArg]| {
-            let a = arg_values.iter().exactly_one().unwrap();
-            let n: u128 = match a {
-                TypeArg::Int(n) => *n,
-                _ => {
-                    return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
-                }
-            };
-            Ok((
-                vec![bool_type(); n as usize].into(),
-                vec![bool_type()].into(),
-                ResourceSet::default(),
-            ))
-        },
-    );
+    resource
+        .add_op_custom_sig(
+            "And".into(),
+            "logical 'and'".into(),
+            vec![H_INT],
+            HashMap::default(),
+            Vec::new(),
+            |arg_values: &[TypeArg]| {
+                let a = arg_values.iter().exactly_one().unwrap();
+                let n: u128 = match a {
+                    TypeArg::Int(n) => *n,
+                    _ => {
+                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                    }
+                };
+                Ok((
+                    vec![bool_type(); n as usize].into(),
+                    vec![bool_type()].into(),
+                    ResourceSet::default(),
+                ))
+            },
+        )
+        .unwrap();
 
-    let or_op = OpDef::new_with_custom_sig(
-        "Or".into(),
-        "logical 'or'".into(),
-        vec![H_INT],
-        HashMap::default(),
-        |arg_values: &[TypeArg]| {
-            let a = arg_values.iter().exactly_one().unwrap();
-            let n: u128 = match a {
-                TypeArg::Int(n) => *n,
-                _ => {
-                    return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
-                }
-            };
-            Ok((
-                vec![bool_type(); n as usize].into(),
-                vec![bool_type()].into(),
-                ResourceSet::default(),
-            ))
-        },
-    );
-
-    resource.add_op(not_op).unwrap();
-    resource.add_op(and_op).unwrap();
-    resource.add_op(or_op).unwrap();
+    resource
+        .add_op_custom_sig(
+            "Or".into(),
+            "logical 'or'".into(),
+            vec![H_INT],
+            HashMap::default(),
+            Vec::new(),
+            |arg_values: &[TypeArg]| {
+                let a = arg_values.iter().exactly_one().unwrap();
+                let n: u128 = match a {
+                    TypeArg::Int(n) => *n,
+                    _ => {
+                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                    }
+                };
+                Ok((
+                    vec![bool_type(); n as usize].into(),
+                    vec![bool_type()].into(),
+                    ResourceSet::default(),
+                ))
+            },
+        )
+        .unwrap();
 
     resource
 }
@@ -102,7 +107,6 @@ mod test {
     fn test_logic_resource() {
         let r: Resource = resource();
         assert_eq!(r.name(), "Logic");
-        let ops = r.operations();
-        assert_eq!(ops.len(), 3);
+        assert_eq!(r.operations().count(), 3);
     }
 }

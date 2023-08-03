@@ -3,7 +3,6 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -13,52 +12,13 @@ use thiserror::Error;
 
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
-use crate::types::TypeTag;
-use crate::types::{
-    type_param::{TypeArg, TypeParam},
-    AbstractSignature, SignatureDescription, SimpleRow,
-};
-use crate::Hugr;
 
-/// Trait for resources to provide custom binary code for computing signature.
-pub trait CustomSignatureFunc: Send + Sync {
-    /// Compute signature of node given the operation name,
-    /// values for the type parameters,
-    /// and 'misc' data from the resource definition YAML
-    fn compute_signature(
-        &self,
-        name: &SmolStr,
-        arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
-        // TODO: Make return type an AbstractSignature
-    ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError>;
-    /// Describe the signature of a node, given the operation name,
-    /// values for the type parameters,
-    /// and 'misc' data from the resource definition YAML.
-    fn describe_signature(
-        &self,
-        _name: &SmolStr,
-        _arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> SignatureDescription {
-        SignatureDescription::default()
-    }
-}
-
-impl<F> CustomSignatureFunc for F
-where
-    F: Fn(&[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> + Send + Sync,
-{
-    fn compute_signature(
-        &self,
-        _name: &SmolStr,
-        arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-        self(arg_values)
-    }
-}
+mod opdef;
+pub use opdef::{CustomSignatureFunc, OpDef};
+mod type_def;
+pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
@@ -69,82 +29,10 @@ pub enum SignatureError {
     NameMismatch(SmolStr, SmolStr),
     /// Resource mismatch
     #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
-    ResourceMismatch(Option<ResourceId>, Option<ResourceId>),
+    ResourceMismatch(ResourceId, ResourceId),
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
-}
-
-/// Trait for Resources to provide custom binary code that can lower an operation to
-/// a Hugr using only a limited set of other resources. That is, trait
-/// implementations can return a Hugr that implements the operation using only
-/// those resources and that can be used to replace the operation node. This may be
-/// useful for third-party Resources or as a fallback for tools that do not support
-/// the operation natively.
-///
-/// This trait allows the Hugr to be varied according to the operation's [TypeArg]s;
-/// if this is not necessary then a single Hugr can be provided instead via
-/// [LowerFunc::FixedHugr].
-pub trait CustomLowerFunc: Send + Sync {
-    /// Return a Hugr that implements the node using only the specified available resources;
-    /// may fail.
-    /// TODO: some error type to indicate Resources required?
-    fn try_lower(
-        &self,
-        name: &SmolStr,
-        arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
-        available_resources: &ResourceSet,
-    ) -> Option<Hugr>;
-}
-
-/// The two ways in which an OpDef may compute the Signature of each operation node.
-#[derive(serde::Deserialize, serde::Serialize)]
-enum SignatureFunc {
-    // Note: I'd prefer to make the YAML version just implement the same CustomSignatureFunc trait,
-    // and then just have a Box<dyn CustomSignatureFunc> instead of this enum, but that seems less likely
-    // to serialize well.
-    /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
-    #[serde(rename = "signature")]
-    FromYAML { inputs: String, outputs: String },
-    #[serde(skip)]
-    CustomFunc(Box<dyn CustomSignatureFunc>),
-}
-
-impl Debug for SignatureFunc {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FromYAML { inputs, outputs } => f
-                .debug_struct("signature")
-                .field("inputs", inputs)
-                .field("outputs", outputs)
-                .finish(),
-            Self::CustomFunc(_) => f.write_str("<custom sig>"),
-        }
-    }
-}
-
-/// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
-/// that implements the operation using a set of other resources.
-#[derive(serde::Deserialize, serde::Serialize)]
-pub enum LowerFunc {
-    /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
-    /// this will generally only be applicable if the [OpDef] has no [TypeParam]s.
-    #[serde(rename = "hugr")]
-    FixedHugr(ResourceSet, Hugr),
-    /// Custom binary function that can (fallibly) compute a Hugr
-    /// for the particular instance and set of available resources.
-    #[serde(skip)]
-    CustomFunc(Box<dyn CustomLowerFunc>),
-}
-
-impl Debug for LowerFunc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FixedHugr(_, _) => write!(f, "FixedHugr"),
-            Self::CustomFunc(_) => write!(f, "<custom lower>"),
-        }
-    }
 }
 
 /// Concrete instantiations of types and operations defined in resources.
@@ -190,8 +78,8 @@ trait TypeParametrised {
     fn name(&self) -> &SmolStr;
     /// Type parameters.
     fn params(&self) -> &[TypeParam];
-    /// The parent resource. if any.
-    fn resource(&self) -> Option<&ResourceId>;
+    /// The parent resource.
+    fn resource(&self) -> &ResourceId;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         if args.len() != self.params().len() {
@@ -213,10 +101,10 @@ trait TypeParametrised {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
-        if self.resource() != Some(custom.parent_resource()) {
+        if self.resource() != custom.parent_resource() {
             return Err(SignatureError::ResourceMismatch(
-                self.resource().cloned(),
-                Some(custom.parent_resource().clone()),
+                self.resource().clone(),
+                custom.parent_resource().clone(),
             ));
         }
         if self.name() != custom.def_name() {
@@ -229,304 +117,6 @@ trait TypeParametrised {
         self.check_args_impl(custom.type_args())?;
 
         Ok(())
-    }
-}
-
-/// Serializable definition for dynamically loaded operations.
-///
-/// TODO: Define a way to construct new OpDef's from a serialized definition.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct OpDef {
-    /// The unique Resource, if any, owning this OpDef (of which this OpDef is a member)
-    pub resource: Option<ResourceId>,
-    /// Unique identifier of the operation. Used to look up OpDefs in the registry
-    /// when deserializing nodes (which store only the name).
-    pub name: SmolStr,
-    /// Human readable description of the operation.
-    pub description: String,
-    /// Declared type parameters, values must be provided for each operation node
-    pub params: Vec<TypeParam>,
-    /// Miscellaneous data associated with the operation.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub misc: HashMap<String, serde_yaml::Value>,
-
-    #[serde(flatten)]
-    signature_func: SignatureFunc,
-    // Some operations cannot lower themselves and tools that do not understand them
-    // can only treat them as opaque/black-box ops.
-    #[serde(flatten)]
-    lower_funcs: Vec<LowerFunc>,
-}
-
-impl OpDef {
-    /// Check provided type arguments are valid against parameters.
-    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        self.check_args_impl(args)
-    }
-
-    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
-        self.check_concrete_impl(opaque)
-    }
-
-    /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the provided arguments are not
-    /// valid instances of the type parameters.
-    pub fn instantiate_opaque(
-        &self,
-        args: impl Into<Vec<TypeArg>>,
-    ) -> Result<OpaqueOp, SignatureError> {
-        let args = args.into();
-        self.check_args(&args)?;
-
-        Ok(OpaqueOp::new(
-            self.resource().expect("Resource not set.").clone(),
-            self.name().clone(),
-            // TODO add description
-            "".to_string(),
-            args,
-            None,
-        ))
-    }
-}
-
-impl TypeParametrised for OpDef {
-    type Concrete = OpaqueOp;
-
-    fn params(&self) -> &[TypeParam] {
-        &self.params
-    }
-
-    fn name(&self) -> &SmolStr {
-        &self.name
-    }
-
-    fn resource(&self) -> Option<&ResourceId> {
-        self.resource.as_ref()
-    }
-}
-
-impl OpDef {
-    /// Create an OpDef with a signature (inputs+outputs) read from the YAML
-    pub fn new_with_yaml_types(
-        name: SmolStr,
-        description: String,
-        params: Vec<TypeParam>,
-        misc: HashMap<String, serde_yaml::Value>,
-        inputs: String, // TODO this is likely the wrong type
-        outputs: String, // TODO similarly
-                        // resources: Option<String> -- if mentioned in YAML?
-    ) -> Self {
-        Self {
-            resource: Default::default(), // Currently overwritten when OpDef added to Resource
-            name,
-            description,
-            params,
-            misc,
-            signature_func: SignatureFunc::FromYAML { inputs, outputs },
-            lower_funcs: Vec::new(),
-        }
-    }
-
-    /// Create an OpDef with custom binary code to compute the signature
-    pub fn new_with_custom_sig(
-        name: SmolStr,
-        description: String,
-        params: Vec<TypeParam>,
-        misc: HashMap<String, serde_yaml::Value>,
-        sig_func: impl CustomSignatureFunc + 'static,
-    ) -> Self {
-        Self {
-            resource: Default::default(), // Currently overwritten when OpDef added to Resource
-            name,
-            description,
-            params,
-            misc,
-            signature_func: SignatureFunc::CustomFunc(Box::new(sig_func)),
-            lower_funcs: Vec::new(),
-        }
-    }
-
-    /// Provides a (new) way for the OpDef to fallibly lower operations. Each
-    /// LowerFunc will be attempted in [Self::try_lower] only if previous methods failed.
-    pub fn with_lowering(mut self, func: LowerFunc) {
-        self.lower_funcs.push(func);
-    }
-
-    /// Computes the signature of a node, i.e. an instantiation of this
-    /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
-        self.check_args(args)?;
-        let (ins, outs, res) = match &self.signature_func {
-            SignatureFunc::FromYAML { .. } => {
-                // Sig should be computed solely from inputs + outputs + args.
-                todo!()
-            }
-            SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
-        };
-        let resource = self
-            .resource
-            .as_ref()
-            .expect("OpDef does not belong to a Resource.");
-        assert!(res.contains(resource));
-        Ok(AbstractSignature::new_df(ins, outs).with_resource_delta(&res))
-    }
-
-    /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
-        match &self.signature_func {
-            SignatureFunc::FromYAML { .. } => {
-                todo!()
-            }
-            SignatureFunc::CustomFunc(bf) => bf.describe_signature(&self.name, args, &self.misc),
-        }
-    }
-
-    pub(crate) fn should_serialize_signature(&self) -> bool {
-        match self.signature_func {
-            SignatureFunc::CustomFunc(_) => true,
-            SignatureFunc::FromYAML { .. } => false,
-        }
-    }
-
-    /// Fallibly returns a Hugr that may replace an instance of this OpDef
-    /// given a set of available resources that may be used in the Hugr.
-    pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
-        self.lower_funcs
-            .iter()
-            .flat_map(|f| match f {
-                LowerFunc::FixedHugr(req_res, h) => {
-                    if available_resources.is_superset(req_res) {
-                        Some(h.clone())
-                    } else {
-                        None
-                    }
-                }
-                LowerFunc::CustomFunc(f) => {
-                    f.try_lower(&self.name, args, &self.misc, available_resources)
-                }
-            })
-            .next()
-    }
-}
-
-/// The type tag of a [`TypeDef`]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum TypeDefTag {
-    /// Defined by an explicit tag.
-    Explicit(TypeTag),
-    /// Derived as the tag containing all marked type parameters.
-    FromParams(Vec<usize>),
-}
-
-impl From<TypeTag> for TypeDefTag {
-    fn from(tag: TypeTag) -> Self {
-        Self::Explicit(tag)
-    }
-}
-/// A declaration of an opaque type.
-/// Note this does not provide any way to create instances
-/// - typically these are operations also provided by the Resource.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct TypeDef {
-    /// The unique name of the type
-    pub name: SmolStr,
-    /// Declaration of type parameters. The TypeDef must be instantiated
-    /// with the same number of [`TypeArg`]'s to make an actual type.
-    ///
-    /// [`TypeArg`]: crate::types::type_param::TypeArg
-    pub params: Vec<TypeParam>,
-    /// The unique Resource, if any, owning this TypeDef (of which this TypeDef is a member)
-    pub resource: Option<ResourceId>,
-    /// Human readable description of the type definition.
-    pub description: String,
-    /// The definition of the type tag of this definition.
-    pub tag: TypeDefTag,
-}
-
-impl TypeDef {
-    /// Check provided type arguments are valid against parameters.
-    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        self.check_args_impl(args)
-    }
-
-    /// Check [`CustomType`] is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        self.check_concrete_impl(custom)
-    }
-
-    /// Instantiate a concrete [`CustomType`] by providing type arguments.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the provided arguments are not
-    /// valid instances of the type parameters.
-    pub fn instantiate_concrete(
-        &self,
-        args: impl Into<Vec<TypeArg>>,
-    ) -> Result<CustomType, SignatureError> {
-        let args = args.into();
-        self.check_args_impl(&args)?;
-        let tag = self.tag(&args);
-        Ok(CustomType::new(
-            self.name().clone(),
-            args,
-            self.resource().expect("Resource not set.").clone(),
-            tag,
-        ))
-    }
-}
-
-impl TypeParametrised for TypeDef {
-    type Concrete = CustomType;
-
-    fn params(&self) -> &[TypeParam] {
-        &self.params
-    }
-
-    fn name(&self) -> &SmolStr {
-        &self.name
-    }
-
-    fn resource(&self) -> Option<&ResourceId> {
-        self.resource.as_ref()
-    }
-}
-
-impl TypeDef {
-    /// The [`TypeTag`] of the definition.
-    pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
-        match &self.tag {
-            TypeDefTag::Explicit(tag) => *tag,
-            TypeDefTag::FromParams(indices) => {
-                let args: Vec<_> = args.iter().collect();
-                if indices.is_empty() {
-                    // Assume most general case
-                    return TypeTag::Simple;
-                }
-                indices
-                    .iter()
-                    .map(|i| {
-                        args.get(*i)
-                            .and_then(|ta| ta.tag_of_type())
-                            .expect("TypeParam index invalid or param does not have a TypeTag.")
-                    })
-                    .fold(TypeTag::Hashable, TypeTag::union)
-            }
-        }
     }
 }
 
@@ -546,14 +136,14 @@ pub struct Resource {
     /// for any possible [TypeArg].
     pub resource_reqs: ResourceSet,
     /// Types defined by this resource.
-    types: HashMap<SmolStr, TypeDef>,
+    types: HashMap<SmolStr, type_def::TypeDef>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
     // OpDef should appear exactly once in this map (keyed by its name),
     // and the other references to the OpDef are from ExternalOp's in the Hugr
     // (which are serialized as OpaqueOp's i.e. Strings).
-    operations: HashMap<SmolStr, Arc<OpDef>>,
+    operations: HashMap<SmolStr, Arc<opdef::OpDef>>,
 }
 
 impl Resource {
@@ -566,13 +156,13 @@ impl Resource {
     }
 
     /// Allows read-only access to the operations in this Resource
-    pub fn operations(&self) -> &HashMap<SmolStr, Arc<OpDef>> {
-        &self.operations
+    pub fn get_op(&self, op_name: &str) -> Option<&Arc<opdef::OpDef>> {
+        self.operations.get(op_name)
     }
 
     /// Allows read-only access to the types in this Resource
-    pub fn types(&self) -> &HashMap<SmolStr, TypeDef> {
-        &self.types
+    pub fn get_type(&self, type_name: &str) -> Option<&type_def::TypeDef> {
+        self.types.get(type_name)
     }
 
     /// Returns the name of the resource.
@@ -580,40 +170,14 @@ impl Resource {
         &self.name
     }
 
-    /// Add an exported type to the resource.
-    pub fn add_type(&mut self, mut ty: TypeDef) -> Result<(), String> {
-        if let Some(resource) = ty.resource {
-            return Err(format!(
-                "TypeDef {} owned by another resource {}",
-                ty.name, resource
-            ));
-        }
-        match self.types.entry(ty.name.clone()) {
-            Entry::Occupied(_) => panic!("Resource already has a type called {}", &ty.name),
-            Entry::Vacant(ve) => {
-                ty.resource = Some(self.name.clone());
-                ve.insert(ty);
-            }
-        }
-        Ok(())
+    /// Iterator over the operations of this [`Resource`].
+    pub fn operations(&self) -> impl Iterator<Item = (&SmolStr, &Arc<OpDef>)> {
+        self.operations.iter()
     }
 
-    /// Add an operation definition to the resource.
-    pub fn add_op(&mut self, mut op: OpDef) -> Result<(), String> {
-        if let Some(resource) = op.resource {
-            return Err(format!(
-                "OpDef {} owned by another resource {}",
-                op.name, resource
-            ));
-        }
-        match self.operations.entry(op.name.clone()) {
-            Entry::Occupied(_) => panic!("Resource already has an op called {}", &op.name),
-            Entry::Vacant(ve) => {
-                op.resource = Some(self.name.clone());
-                ve.insert(Arc::new(op));
-            }
-        }
-        Ok(())
+    /// Iterator over the types of this [`Resource`].
+    pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
+        self.types.iter()
     }
 }
 
@@ -621,6 +185,18 @@ impl PartialEq for Resource {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
+}
+
+/// An error that can occur in computing the signature of a node.
+/// TODO: decide on failure modes
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum ResourceBuildError {
+    /// Existing [`OpDef`]
+    #[error("Resource already has an op called {0}.")]
+    OpDefExists(SmolStr),
+    /// Existing [`TypeDef`]
+    #[error("Resource already has an type called {0}.")]
+    TypeDefExists(SmolStr),
 }
 
 /// A set of resources identified by their unique [`ResourceId`].
@@ -686,60 +262,5 @@ impl Display for ResourceSet {
 impl FromIterator<ResourceId> for ResourceSet {
     fn from_iter<I: IntoIterator<Item = ResourceId>>(iter: I) -> Self {
         Self(HashSet::from_iter(iter))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::resource::SignatureError;
-    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{ClassicType, HashableType, PrimType, SimpleType, TypeTag};
-
-    use super::{TypeDef, TypeDefTag};
-
-    #[test]
-    fn test_instantiate_typedef() {
-        let def = TypeDef {
-            name: "MyType".into(),
-            params: vec![TypeParam::ClassicType],
-            resource: Some("MyRsrc".into()),
-            description: "Some parameterised type".into(),
-            tag: TypeDefTag::FromParams(vec![0]),
-        };
-        let typ: SimpleType = def
-            .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
-            .unwrap()
-            .into();
-        assert_eq!(typ.tag(), TypeTag::Classic);
-        let typ2: SimpleType = def
-            .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::String,
-            ))])
-            .unwrap()
-            .into();
-        assert_eq!(typ2.tag(), TypeTag::Hashable);
-
-        // And some bad arguments...firstly, wrong kind of TypeArg:
-        assert_eq!(
-            def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
-            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::HashableType(HashableType::String),
-                TypeParam::ClassicType
-            )))
-        );
-        // Too few arguments:
-        assert_eq!(
-            def.instantiate_concrete([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(0, 1))
-        );
-        // Too many arguments:
-        assert_eq!(
-            def.instantiate_concrete([
-                TypeArg::ClassicType(ClassicType::F64),
-                TypeArg::ClassicType(ClassicType::F64),
-            ])
-            .unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(2, 1))
-        );
     }
 }
