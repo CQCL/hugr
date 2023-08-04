@@ -16,7 +16,7 @@ use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValida
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::{ResourceSet, unify::InferResourceError};
 use crate::resource::validate::{ResourceError, ResourceValidator};
-use crate::types::{EdgeKind, Type};
+use crate::types::{ClassicType, EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};

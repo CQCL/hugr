@@ -94,29 +94,33 @@ impl UnificationContext {
     /// Add constraints for the inputs and outputs of dataflow nodes according
     /// to the signature of the parent node
     fn gen_io_constraints(&mut self, hugr: &impl HugrView, node: Node) {
-        hugr.get_io(node)
-            .map(|[input, output]| {
-                let nodetype = hugr.get_nodetype(node);
-                // Resource requirements for input and output nodes are the same
-                // on both sides, so we should add our solution to both sides
-                for dir in Direction::BOTH {
-                    let m_input = self.resources.get(&(input, dir)).unwrap().clone();
-                    assert!(self.solved.get(&m_input).is_none());
+        hugr.get_io(node).map(|[input, output]| {
+            let nodetype = hugr.get_nodetype(node);
+            // Resource requirements for input and output nodes are the same
+            // on both sides, so we should add our solution to both sides
+            for dir in Direction::BOTH {
+                let m_input = self.resources.get(&(input, dir)).unwrap().clone();
+                assert!(self.solved.get(&m_input).is_none());
 
-                    let m_output = self.resources.get(&(output, dir)).unwrap().clone();
-                    assert!(self.solved.get(&m_output).is_none());
+                let m_output = self.resources.get(&(output, dir)).unwrap().clone();
+                assert!(self.solved.get(&m_output).is_none());
 
-                    match nodetype.signature() {
-                        None => self.gen_union_constraint(m_input, m_output, nodetype.op_signature().resource_reqs),
-                        Some(sig) => {
-                            self.add_solution(m_input, sig.input_resources.clone());
-                            self.add_solution(m_output, sig.output_resources());
-                        }
+                match nodetype.signature() {
+                    None => self.gen_union_constraint(
+                        m_input,
+                        m_output,
+                        nodetype.op_signature().resource_reqs,
+                    ),
+                    Some(sig) => {
+                        self.add_solution(m_input, sig.input_resources.clone());
+                        self.add_solution(m_output, sig.output_resources());
                     }
                 }
-            });
+            }
+        });
         // Do the same for any dataflow children
-        hugr.children(node).for_each(|n| self.gen_io_constraints(hugr, n));
+        hugr.children(node)
+            .for_each(|n| self.gen_io_constraints(hugr, n));
     }
 
     fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ResourceSet) {
@@ -155,7 +159,11 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input resources are open
                 None => {
-                    self.gen_union_constraint(input, output, node_type.op_signature().resource_reqs);
+                    self.gen_union_constraint(
+                        input,
+                        output,
+                        node_type.op_signature().resource_reqs,
+                    );
                 }
                 // We're in the money!
                 Some(sig) => {
@@ -232,7 +240,15 @@ impl UnificationContext {
                     // If the other meta has been shunted, use the meta it's been shunted to
                     let other_meta = deleted
                         .iter()
-                        .find_map(|Deletion { src, tgt }| if src == other_meta { Some(tgt) } else {None})
+                        .find_map(
+                            |Deletion { src, tgt }| {
+                                if src == other_meta {
+                                    Some(tgt)
+                                } else {
+                                    None
+                                }
+                            },
+                        )
                         .unwrap_or(other_meta);
                     match (self.solved.get(&meta), self.solved.get(other_meta)) {
                         (None, None) => {
@@ -287,7 +303,9 @@ impl UnificationContext {
         Ok(unfinished_business)
     }
 
-    pub fn results(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+    pub fn results(
+        &mut self,
+    ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
         let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
@@ -298,7 +316,7 @@ impl UnificationContext {
                     println!("{:?}", self.resources);
                     println!("{:?}", self.constraints);
                     Err(InferResourceError::Unsolved { location: *loc })
-                },
+                }
             }?;
             results.insert(*loc, rs);
         }
@@ -307,7 +325,8 @@ impl UnificationContext {
 
     /// Once the unification context is set up, attempt to infer resources for all of the nodes
     // TODO: This should not be the main API
-    pub fn solve_constraints(&mut self,
+    pub fn solve_constraints(
+        &mut self,
     ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
         let mut remaining: Vec<Meta> = self.constraints.keys().clone().cloned().collect();
         let mut prev_len = remaining.len() + 1;
@@ -333,12 +352,15 @@ mod test {
     use std::error::Error;
 
     use super::*;
-    use crate::builder::{BuildError, Container, DataflowHugr, DataflowSubContainer, DFGBuilder, ModuleBuilder, Dataflow};
-    use crate::hugr::{Hugr, HugrMut, HugrView, NodeType, validate::ValidationError};
+    use crate::builder::{
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        ModuleBuilder,
+    };
+    use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
     use crate::resource::ResourceSet;
-    use crate::types::{AbstractSignature, ClassicType, SimpleType};
     use crate::type_row;
+    use crate::types::{AbstractSignature, ClassicType, SimpleType};
 
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
 
