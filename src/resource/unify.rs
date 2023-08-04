@@ -91,6 +91,34 @@ impl UnificationContext {
         assert!(self.solved.insert(m, rs).is_none());
     }
 
+    /// Add constraints for the inputs and outputs of dataflow nodes according
+    /// to the signature of the parent node
+    fn gen_io_constraints(&mut self, hugr: &impl HugrView, node: Node) {
+        hugr.get_io(node)
+            .map(|[input, output]| {
+                let nodetype = hugr.get_nodetype(node);
+                // Resource requirements for input and output nodes are the same
+                // on both sides, so we should add our solution to both sides
+                for dir in Direction::BOTH {
+                    let m_input = self.resources.get(&(input, dir)).unwrap().clone();
+                    assert!(self.solved.get(&m_input).is_none());
+
+                    let m_output = self.resources.get(&(output, dir)).unwrap().clone();
+                    assert!(self.solved.get(&m_output).is_none());
+
+                    match nodetype.signature() {
+                        None => self.gen_union_constraint(m_input, m_output, nodetype.op_signature().resource_reqs),
+                        Some(sig) => {
+                            self.add_solution(m_input, sig.input_resources.clone());
+                            self.add_solution(m_output, sig.output_resources());
+                        }
+                    }
+                }
+            });
+        // Do the same for any dataflow children
+        hugr.children(node).for_each(|n| self.gen_io_constraints(hugr, n));
+    }
+
     fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ResourceSet) {
         let mut last_meta = input;
         // Create fresh metavariables with `Plus` constraints for
@@ -136,6 +164,7 @@ impl UnificationContext {
                 }
             }
         }
+        self.gen_io_constraints(hugr, hugr.root());
     }
 
     // Coalesce
