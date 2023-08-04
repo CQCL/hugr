@@ -498,14 +498,14 @@ has no parent).
 | **Hierarchy**             | **Edge kind**                  | **Node Operation** | **Parent**    | **Children (\>=1)**      | **Child Constraints**                    |
 | ------------------------- | ------------------------------ | ------------------ | ------------- | ------------------------ | ---------------------------------------- |
 | Leaf                      | **D:** Value (Data dependency) | O, `Input/Output`  | **C**         | \-                       |                                          |
-| CFG container             | "                              | CFG                | **C**         | `BasicBlock`             | First(second) is entry(exit)             |
-| Conditional               | "                              | `Conditional`      | **C**         | `Case`                   | No edges                                 |
-| **C:** Dataflow container | "                              | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| "                         | "                              | `DFG`              | **C**         |  "                       | "                                        |
-| "                         | Static                         | `FuncDefn`              | **C**         |  "                       | "                                        |
-| "                         | ControlFlow                    | `DFB`              | CFG           |  "                       | "                                        |
-| "                         | \-                             | `Case`             | `Conditional` |  "                       | "                                        |
-| Root                      | \-                             | `Module`           | none          |  "                       | Contains main `FuncDefn` for executable HUGR. |
+| CFG container             | **D**                          | CFG                | **C**         | `BasicBlock`             | First(second) is entry(exit)             |
+| Conditional               | **D**                          | `Conditional`      | **C**         | `Case`                   | No edges                                 |
+| **C:** Dataflow container | **D**                          | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | **D**                          | `DFG`              | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | Static                         | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | ControlFlow                    | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | \-                             | `Case`             | `Conditional` |  **D**                   | First(second) is `Input`(`Output`)       |
+| Root                      | \-                             | `Module`           | none          |  **D**                   | Contains main `FuncDefn` for executable HUGR. |
 
 These relationships allow to define two common varieties of sibling
 graph:
