@@ -21,7 +21,7 @@ pub enum Constraint {
     Plus(ResourceId, Meta),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 /// Errors which arise during unification
 pub enum InferResourceError {
     #[error("Mismatched resource sets {expected} and {actual}")]
@@ -63,12 +63,14 @@ pub struct UnificationContext {
 }
 
 impl UnificationContext {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(hugr: &impl HugrView) -> Self {
+        let mut ctx = Self {
             constraints: HashMap::new(),
             resources: HashMap::new(),
             solved: HashMap::new(),
-        }
+        };
+        ctx.gen_constraints(hugr);
+        ctx
     }
 
     fn fresh_meta(&mut self) -> Meta {
@@ -88,7 +90,7 @@ impl UnificationContext {
         assert!(self.solved.insert(m, rs).is_none());
     }
 
-    fn gen_constraints(&mut self, hugr: impl HugrView) {
+    fn gen_constraints(&mut self, hugr: &impl HugrView) {
         for node in hugr.nodes() {
             let input = self.fresh_meta();
             assert!(self
@@ -237,8 +239,9 @@ impl UnificationContext {
         Ok(unfinished_business)
     }
 
-    fn solve_constraints(
-        &mut self,
+    /// Once the unification context is set up, attempt to infer resources for all of the nodes
+    // TODO: This should not be the main API
+    pub fn solve_constraints(&mut self,
     ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
         let mut remaining: Vec<Meta> = self.constraints.keys().clone().cloned().collect();
         let mut prev_len = remaining.len() + 1;
@@ -269,14 +272,23 @@ impl UnificationContext {
 
 #[cfg(test)]
 mod test {
+    use std::error::Error;
+
     use super::*;
-    use crate::types::{ClassicType, SimpleType};
+    use crate::builder::{BuildError, Container, DataflowHugr, DataflowSubContainer, DFGBuilder, ModuleBuilder, Dataflow};
+    use crate::hugr::{Hugr, HugrMut, HugrView, NodeType, validate::ValidationError};
+    use crate::ops::{self, dataflow::IOTrait};
+    use crate::resource::ResourceSet;
+    use crate::types::{AbstractSignature, ClassicType, SimpleType};
+    use crate::type_row;
 
     pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
 
     #[test]
     fn plus() -> Result<(), InferResourceError> {
-        let mut ctx = UnificationContext::new();
+        let hugr = Hugr::default();
+        let mut ctx = UnificationContext::new(&hugr);
+
         let m0 = ctx.fresh_meta();
         let m1 = ctx.fresh_meta();
         let m2 = ctx.fresh_meta();

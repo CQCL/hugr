@@ -25,7 +25,7 @@ use pyo3::prelude::*;
 
 pub use self::views::HugrView;
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::resource::ResourceSet;
+use crate::resource::{ResourceSet,unify::{UnificationContext, InferResourceError}};
 use crate::types::{AbstractSignature, Signature};
 
 use delegate::delegate;
@@ -191,6 +191,13 @@ impl Hugr {
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
         rw.apply(self)
+    }
+
+    /// Infer resources
+    pub fn infer_resources(&self) -> Result<(), InferResourceError> {
+        let mut ctx = UnificationContext::new(self);
+        ctx.solve_constraints()?;
+        Ok(())
     }
 }
 
