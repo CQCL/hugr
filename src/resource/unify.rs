@@ -52,7 +52,7 @@ impl Deletion {
     }
 }
 
-/// The context for inferring resources
+/// Our current knowledge about the resources of the graph
 pub struct UnificationContext {
     /// A list of constraints for each metavariable
     pub constraints: HashMap<Meta, Vec<Constraint>>,
@@ -62,6 +62,7 @@ pub struct UnificationContext {
     solved: HashMap<Meta, ResourceSet>,
 }
 
+/// Invariant: Constraint::Plus always points to a fresh metavariable
 impl UnificationContext {
     pub fn new(hugr: &impl HugrView) -> Self {
         let mut ctx = Self {
