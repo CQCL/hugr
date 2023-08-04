@@ -180,6 +180,15 @@ where
     }
 
     #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        if node == self.root() {
+            self.base_hugr().get_io(node)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
         self.graph.neighbours(node.index, dir).map_into()
     }
@@ -342,6 +351,11 @@ where
             true => self.base_hugr().hierarchy.children(node.index).map_into(),
             false => portgraph::hierarchy::Children::default().map_into(),
         }
+    }
+
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        self.base_hugr().get_io(node)
     }
 
     #[inline]
