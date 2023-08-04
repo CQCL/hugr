@@ -229,6 +229,11 @@ impl UnificationContext {
                     };
                 }
                 Constraint::Equal(other_meta) => {
+                    // If the other meta has been shunted, use the meta it's been shunted to
+                    let other_meta = deleted
+                        .iter()
+                        .find_map(|Deletion { src, tgt }| if src == other_meta { Some(tgt) } else {None})
+                        .unwrap_or(other_meta);
                     match (self.solved.get(&meta), self.solved.get(other_meta)) {
                         (None, None) => {
                             unfinished_business = true;
