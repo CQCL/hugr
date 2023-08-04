@@ -287,6 +287,24 @@ impl UnificationContext {
         Ok(unfinished_business)
     }
 
+    pub fn results(&mut self) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+        // Check that all of the metavariables associated with nodes of the
+        // graph are solved
+        let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
+        for (loc, meta) in self.resources.iter() {
+            let rs = match self.solved.get(meta) {
+                Some(rs) => Ok(rs.clone()),
+                None => {
+                    println!("{:?}", self.resources);
+                    println!("{:?}", self.constraints);
+                    Err(InferResourceError::Unsolved { location: *loc })
+                },
+            }?;
+            results.insert(*loc, rs);
+        }
+        Ok(results)
+    }
+
     /// Once the unification context is set up, attempt to infer resources for all of the nodes
     // TODO: This should not be the main API
     pub fn solve_constraints(&mut self,
@@ -306,15 +324,7 @@ impl UnificationContext {
             remaining = new_remaining;
         }
 
-        let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
-        for (loc, meta) in self.resources.iter() {
-            let rs = match self.solved.get(meta) {
-                Some(rs) => Ok(rs.clone()),
-                None => Err(InferResourceError::Unsolved { location: *loc }),
-            }?;
-            results.insert(*loc, rs);
-        }
-        Ok(results)
+        self.results()
     }
 }
 
