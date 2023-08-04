@@ -91,6 +91,24 @@ impl UnificationContext {
         assert!(self.solved.insert(m, rs).is_none());
     }
 
+    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ResourceSet) {
+        let mut last_meta = input;
+        // Create fresh metavariables with `Plus` constraints for
+        // each resource that should be added by the node
+        // Hence a resource delta [A, B] would lead to
+        // > ma = fresh_meta()
+        // > add_constraint(ma, Plus(a, input)
+        // > mb = fresh_meta()
+        // > add_constraint(mb, Plus(b, ma)
+        // > add_constraint(output, Equal(mb))
+        for r in delta.iter() {
+            let curr_meta = self.fresh_meta();
+            self.add_constraint(curr_meta, Constraint::Plus(r.clone(), last_meta));
+            last_meta = curr_meta;
+        }
+        self.add_constraint(output, Constraint::Equal(last_meta));
+    }
+
     fn gen_constraints(&mut self, hugr: &impl HugrView) {
         for node in hugr.nodes() {
             let input = self.fresh_meta();
@@ -105,16 +123,11 @@ impl UnificationContext {
                 .is_none());
 
             let node_type = hugr.get_nodetype(node);
+
             match node_type.signature() {
                 // Input resources are open
                 None => {
-                    let mut last_meta = input;
-                    for r in node_type.op_signature().resource_reqs.iter() {
-                        let curr_meta = self.fresh_meta();
-                        self.add_constraint(curr_meta, Constraint::Plus(r.clone(), last_meta));
-                        last_meta = curr_meta;
-                    }
-                    self.add_constraint(output, Constraint::Equal(last_meta));
+                    self.gen_union_constraint(input, output, node_type.op_signature().resource_reqs);
                 }
                 // We're in the money!
                 Some(sig) => {
