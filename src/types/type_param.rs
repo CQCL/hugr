@@ -8,7 +8,8 @@ use crate::ops::constant::typecheck::check_int_fits_in_width;
 use crate::ops::constant::HugrIntValueStore;
 use crate::values::{HashableLeaf, ValueError, ValueOfType};
 
-use super::simple::HashableElem;
+use super::CustomType;
+use super::simple::{HashableElem, Tagged};
 use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
@@ -37,6 +38,12 @@ pub enum TypeParam {
     Value(HashableElem),
 }
 
+impl From<HashableElem> for TypeParam {
+    fn from(value: HashableElem) -> Self {
+        Self::Value(value)
+    }
+}
+
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
@@ -56,6 +63,12 @@ pub enum TypeArg {
     List(Vec<TypeArg>),
     /// Where the TypeDef declares a [TypeParam::CustomValue]
     CustomValue(serde_yaml::Value),
+}
+
+impl From<HashableLeaf> for TypeArg {
+    fn from(value: HashableLeaf) -> Self {
+        Self::Value(value)
+    }
 }
 
 pub type TypeArgError = ValueError<TypeArg>;
@@ -91,8 +104,8 @@ impl ValueOfType for TypeArg {
                 Ok(())
             }
             (TypeArg::CustomValue(v), TypeParam::CustomValue(ct)) => Ok(()), // TODO more checks here, e.g. storing CustomType in the value
-            (TypeArg::Value(h_v), TypeParam::Value(h_t)) => h_v.check_type(h_t),
-            (_, _) => TypeArgError::ValueCheckFail(param.clone(), self.clone()),
+            (TypeArg::Value(h_v), TypeParam::Value(h_t)) => h_v.check_type(h_t).map_err(|e|e.map_into()),
+            (_, _) => Err(TypeArgError::ValueCheckFail(param.clone(), self.clone())),
         }
     }
 }
