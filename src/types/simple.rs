@@ -59,7 +59,7 @@ trait Tagged {
 }
 
 /// Trait of primitive types, i.e. that are uniquely identified by a [TypeTag]
-pub trait PrimType: std::fmt::Debug + Clone + 'static + sealed::Sealed + Tagged {
+pub trait PrimType: std::fmt::Debug + Display + Clone + 'static + sealed::Sealed + Tagged {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
@@ -133,7 +133,7 @@ impl<T: PrimType> Container<T> {
 }
 
 impl<T: PrimType> TypeRow<Container<T>> {
-    fn map_map_into<T2: PrimType>(self) -> TypeRow<Container<T2>>
+    pub(crate) fn map_map_into<T2: PrimType>(self) -> TypeRow<Container<T2>>
     where
         T2: From<T>,
     {
@@ -146,7 +146,7 @@ impl<T: PrimType> TypeRow<Container<T>> {
     }
 }
 
-impl<T: Display + PrimType> Display for Container<T> {
+impl<T: PrimType> Display for Container<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Container::Single(elem) => Display::fmt(elem, f),
@@ -227,14 +227,13 @@ pub type ClassicType = Container<ClassicElem>;
 impl Display for ClassicElem {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ClassicType::F64 => f.write_str("F64"),
-            ClassicType::Variable(x) => f.write_str(x),
-            ClassicType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
+            ClassicElem::F64 => f.write_str("F64"),
+            ClassicElem::Graph(data) => {
+                let sig = data.as_ref();
+                write!(f, "[{:?}]", sig.resource_reqs)?;
+                sig.fmt(f)
             }
-            ClassicType::String => f.write_str("String"),
-            ClassicElem::Opaque(custom) => custom.fmt(f),
+            ClassicElem::Hashable(h) => h.fmt(f)
         }
     }
 }
@@ -267,7 +266,7 @@ impl ClassicElem {
 /// A type that represents concrete classical data that supports hashing
 /// and a strong notion of equality. (So, e.g., no floating-point.)
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "ClassicType", into = "ClassicType")]
+#[serde(try_from = "ClassicElem", into = "ClassicElem")]
 #[non_exhaustive]
 pub enum HashableElem {
     /// A type variable identified by a name.
@@ -281,6 +280,19 @@ pub enum HashableElem {
 }
 
 pub type HashableType = Container<HashableElem>;
+
+impl Display for HashableElem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            HashableElem::Variable(x) => f.write_str(x),
+            HashableElem::Int(i) => {
+                f.write_char('I')?;
+                f.write_str(&i.to_string())
+            }
+            HashableElem::String => f.write_str("String"),
+        }
+    }
+}
 
 impl Tagged for HashableElem {
     fn tag(&self) -> TypeTag {
@@ -448,15 +460,15 @@ impl TypeRow<ClassicType> {
 
     #[inline(always)]
     pub fn purely_hashable(&self) -> bool {
-        self.tag() == TypeTag::is_hashable
+        self.tag() == TypeTag::Hashable
     }
 }
 
 impl<T: Tagged + TypeRowElem> Tagged for TypeRow<T> {
     /// Returns the smallest [TypeTag] that contains all elements of the row
-    pub fn tag(&self) -> TypeTag {
+    fn tag(&self) -> TypeTag {
         self.iter()
-            .map(PrimType::tag)
+            .map(T::tag)
             .fold(TypeTag::Hashable, TypeTag::union)
     }
 }
