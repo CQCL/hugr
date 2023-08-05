@@ -84,7 +84,8 @@ impl<Leaf: ValueOfType> ValueOfType for ContainerValue<Leaf>
 where
     Leaf::T: PrimType, // possibly also some other trait (ElemValue?) - check opaque
     HashableLeaf: Into<Leaf>,
-    HashableElem: Into<Leaf::T>,
+    //HashableElem: Into<Leaf::T>,
+    Leaf::T: From<HashableElem>,
 {
     type T = Container<Leaf::T>;
 
@@ -140,6 +141,24 @@ where
             }
             (_, Container::Alias(s)) => Err(ValueError::NoAliases(s.to_string())),
             (_, _) => Err(ValueError::ValueCheckFail(ty.clone(), self.clone())),
+        }
+    }
+}
+
+impl<T> ContainerValue<T> {
+    pub(crate) fn map_into<T2>(self) -> ContainerValue<T2>
+    where
+        T: Into<T2>,
+    {
+        match self {
+            ContainerValue::Single(e) => ContainerValue::Single(e.into()),
+            ContainerValue::Sequence(vals) => {
+                ContainerValue::Sequence(vals.iter().map(|v| v.map_into()).collect())
+            }
+            ContainerValue::Map(kvs) => {
+                ContainerValue::Map(kvs.iter().map(|(k, v)| (k.clone(), v.map_into())).collect())
+            }
+            ContainerValue::Sum(tag, val) => ContainerValue::Sum(tag, Box::new(val.map_into())),
         }
     }
 
