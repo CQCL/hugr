@@ -31,8 +31,8 @@ mod serialize;
 impl Display for SimpleElem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SimpleType::Classic(ty) => ty.fmt(f),
-            SimpleType::Qubit => f.write_str("Qubit"),
+            SimpleElem::Classic(ty) => ty.fmt(f),
+            SimpleElem::Qubit => f.write_str("Qubit"),
         }
     }
 }
@@ -186,6 +186,12 @@ pub enum ClassicElem {
     Graph(Box<AbstractSignature>),
     /// A type which can be hashed
     Hashable(HashableElem),
+}
+
+impl From<HashableElem> for ClassicElem {
+    fn from(value: HashableElem) -> Self {
+        Self::Hashable(value)
+    }
 }
 
 /// A type that represents concrete classical data that supports hashing

@@ -4,10 +4,9 @@
 //!
 //! [`TypeDef`]: crate::resource::TypeDef
 
-use thiserror::Error;
-
-use crate::ops::constant::typecheck::{check_int_fits_in_width, ConstIntError};
+use crate::ops::constant::typecheck::check_int_fits_in_width;
 use crate::ops::constant::HugrIntValueStore;
+use crate::values::{ValueError, ValueOfType};
 
 use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
 
@@ -56,6 +55,8 @@ pub enum TypeArg {
     CustomValue(serde_yaml::Value),
 }
 
+pub type TypeArgError = ValueError<TypeArg>;
+
 impl TypeArg {
     /// Report [`TypeTag`] if param is a type
     pub fn tag_of_type(&self) -> Option<TypeTag> {
@@ -67,67 +68,47 @@ impl TypeArg {
     }
 }
 
-/// Checks a [TypeArg] is as expected for a [TypeParam]
-pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
-    match (arg, param) {
-        (TypeArg::Type(_), TypeParam::Type) => Ok(()),
-        (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
-        (TypeArg::HashableType(_), TypeParam::HashableType) => Ok(()),
-        (TypeArg::List(items), TypeParam::List(ty)) => {
-            for item in items {
-                check_type_arg(item, ty.as_ref())?;
-            }
-            Ok(())
-        }
-        (TypeArg::Int(v), TypeParam::Value(HashableType::Int(width))) => {
-            check_int_fits_in_width(*v, *width).map_err(TypeArgError::Int)
-        }
-        (TypeArg::String(_), TypeParam::Value(HashableType::String)) => Ok(()),
-        (arg, TypeParam::Value(HashableType::Container(ctr))) => match ctr {
-            Container::Opaque(_) => match arg {
-                TypeArg::CustomValue(_) => Ok(()), // Are there more checks we should do here?
-                _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
-            },
-            Container::List(elem) => check_type_arg(
-                arg,
-                &TypeParam::List(Box::new(TypeParam::Value((**elem).clone()))),
-            ),
-            Container::Map(_) => unimplemented!(),
-            Container::Tuple(_) => unimplemented!(),
-            Container::Sum(_) => unimplemented!(),
-            Container::Array(elem, sz) => {
-                let TypeArg::List(items) = arg else {return Err(TypeArgError::TypeMismatch(arg.clone(), param.clone()))};
-                if items.len() != *sz {
-                    return Err(TypeArgError::WrongNumber(items.len(), *sz));
-                }
-                check_type_arg(
-                    arg,
-                    &TypeParam::List(Box::new(TypeParam::Value((**elem).clone()))),
-                )
-            }
-            Container::Alias(n) => Err(TypeArgError::NoAliases(n.to_string())),
-        },
-        _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
-    }
-}
+impl ValueOfType for TypeArg {
+    type T = TypeParam;
 
-/// Errors that can occur fitting a [TypeArg] into a [TypeParam]
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
-pub enum TypeArgError {
-    /// For now, general case of a type arg not fitting a param.
-    /// We'll have more cases when we allow general Containers.
-    // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Type argument {0:?} does not fit declared parameter {1:?}")]
-    TypeMismatch(TypeArg, TypeParam),
-    /// Wrong number of type arguments (actual vs expected).
-    // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
-    // However in the future it may be applicable to e.g. contents of Tuples too.
-    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
-    WrongNumber(usize, usize),
-    /// The type declared for a TypeParam was an alias that was not resolved to an actual type
-    #[error("TypeParam required an unidentified alias type {0}")]
-    NoAliases(String),
-    /// There was some problem fitting a const int into its declared size
-    #[error("Error with int constant")]
-    Int(#[from] ConstIntError),
+    /// Checks a [TypeArg] is as expected for a [TypeParam]
+    fn check_type(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
+        match (arg, param) {
+            (TypeArg::Type(_), TypeParam::Type) => Ok(()),
+            (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
+            (TypeArg::HashableType(_), TypeParam::HashableType) => Ok(()),
+            (TypeArg::List(items), TypeParam::List(ty)) => {
+                for item in items {
+                    item.check_type(ty.as_ref())?;
+                }
+                Ok(())
+            }
+            (TypeArg::Int(v), TypeParam::Value(HashableType::Int(width))) => {
+                check_int_fits_in_width(*v, *width).map_err(ValueError::Int)
+            }
+            (TypeArg::String(_), TypeParam::Value(HashableType::String)) => Ok(()),
+            (TypeArg::CustomValue(_), TypeParam::Value(Container::Opaque(_))) => Ok(()), // TODO more checks here, e.g. storing CustomType in the value
+            (arg, TypeParam::Value(Container::List(elem))) => {
+                // Do we just fail here, as the LHS value must include types, and the RHS clearly does not?
+                // (This is because we have not yet properly separated TypeArg into Leaf and container-varant,
+                //  and are still *stealing* HashableType = Container<HashableElem>)
+                arg.check_type(&TypeParam::List(Box::new(TypeParam::Value(**elem))))
+            }
+            (_, TypeParam::Value(Container::Map(_))) => unimplemented!(),
+            (_, TypeParam::Value(Container::Tuple(_))) => unimplemented!(),
+            (_, TypeParam::Value(Container::Sum(_))) => unimplemented!(),
+            (TypeArg::List(items), TypeParam::Value(Container::Array(elem, sz))) => {
+                if items.len() != *sz {
+                    return Err(ValueError::WrongNumber(items.len(), *sz));
+                }
+                let elem_ty = TypeParam::Value(elem);
+                for item in items {
+                    item.check_type(&elem_ty)?;
+                }
+                Ok(())
+            }
+            (_, TypeParam::Value(Container::Alias(n))) => Err(ValueError::NoAliases(n.to_string())),
+            _ => Err(ValueError::ValueCheckFail(arg.clone(), param.clone())),
+        }
+    }
 }

@@ -6,9 +6,9 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::ops::constant::ConstTypeError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::SimpleType;
-use crate::values::ConstTypeError;
 
 pub mod handle;
 pub use handle::BuildHandle;

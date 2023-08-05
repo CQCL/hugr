@@ -4,10 +4,12 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
-    types::{simple::Container, ClassicRow, ClassicType, CustomType, EdgeKind, HashableType},
+    types::{
+        simple::{ClassicElem, Container},
+        ClassicRow, ClassicType, CustomType, EdgeKind, HashableType,
+    },
     values::{
-        map_container_type, ConstTypeError, ContainerValue, CustomCheckFail, HashableValue,
-        ValueOfType,
+        ContainerValue, CustomCheckFail, HashableLeaf, HashableValue, ValueError, ValueOfType,
     },
 };
 
@@ -24,6 +26,8 @@ pub struct Const {
     value: ConstValue,
     typ: ClassicType,
 }
+
+pub type ConstTypeError = ValueError<ConstValue>;
 
 impl Const {
     /// Creates a new Const, type-checking the value.
@@ -82,7 +86,7 @@ impl Const {
     /// Fixed width integer
     pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
         Self::new(
-            ConstValue::Hashable(HashableValue::Int(value)),
+            ConstValue::Single(ConstLeaf::Hashable(HashableLeaf::Int(value))),
             ClassicType::int::<N>(),
         )
     }
@@ -133,10 +137,8 @@ pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[allow(missing_docs)]
-pub enum ConstValue {
-    Hashable(HashableValue),
-    /// A collection of constant values (at least some of which are not [ConstValue::Hashable])
-    Container(ContainerValue<ConstValue>),
+pub enum ConstLeaf {
+    Hashable(HashableLeaf), // ALAN TODO need to standardize naming
     /// Double precision float
     F64(f64),
     /// An opaque constant value, that can check it is of a given [CustomType].
@@ -146,6 +148,13 @@ pub enum ConstValue {
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Opaque((Box<dyn CustomConst>,)),
 }
+impl From<HashableLeaf> for ConstLeaf {
+    fn from(value: HashableLeaf) -> Self {
+        Self::Hashable(value)
+    }
+}
+
+pub type ConstValue = ContainerValue<ConstLeaf>;
 
 impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
@@ -153,69 +162,43 @@ impl PartialEq for dyn CustomConst {
     }
 }
 
-impl ValueOfType for ConstValue {
-    type T = ClassicType;
+impl ValueOfType for ConstLeaf {
+    type T = ClassicElem;
 
     fn name(&self) -> String {
         match self {
-            ConstValue::F64(f) => format!("const:float:{}", f),
-            ConstValue::Hashable(hv) => hv.name(),
-            ConstValue::Container(ctr) => ctr.desc(),
-            ConstValue::Opaque((v,)) => format!("const:custom:{}", v.name()),
+            ConstLeaf::F64(f) => format!("const:float:{}", f),
+            ConstLeaf::Hashable(hv) => hv.name(),
+            ConstLeaf::Opaque((v,)) => format!("const:custom:{}", v.name()),
         }
     }
 
-    fn check_type(&self, ty: &ClassicType) -> Result<(), ConstTypeError> {
+    fn check_type(&self, ty: &ClassicElem) -> Result<(), ValueError<ConstLeaf>> {
         match self {
-            ConstValue::F64(_) => {
-                if let ClassicType::F64 = ty {
+            ConstLeaf::F64(_) => {
+                if let ClassicElem::F64 = ty {
                     return Ok(());
                 }
             }
-            ConstValue::Hashable(hv) => {
-                match ty {
-                    ClassicType::Hashable(exp) => return hv.check_type(exp),
-                    ClassicType::Container(cty) => {
-                        // A "hashable" value might be an instance of a non-hashable type:
-                        // e.g. an empty list is hashable, yet can be checked against a classic element type!
-                        if let HashableValue::Container(ctr) = hv {
-                            return ctr.map_vals(&ConstValue::Hashable).check_container(cty);
-                        }
-                    }
-                    _ => (),
+            ConstLeaf::Hashable(hv) => {
+                if let ClassicElem::Hashable(ht) = ty {
+                    return hv.check_type(ht).map_err(|e|e.map_into());
                 }
             }
-            ConstValue::Container(vals) => {
-                match ty {
-                    ClassicType::Container(cty) => return vals.check_container(cty),
-                    // We might also fail to deduce a container *value* was hashable,
-                    // because it contains opaque values whose tag is unknown.
-                    ClassicType::Hashable(HashableType::Container(cty)) => {
-                        return vals
-                            .check_container(&map_container_type(cty, &ClassicType::Hashable))
-                    }
-                    _ => (),
-                };
-            }
-            ConstValue::Opaque((val,)) => {
+            ConstLeaf::Opaque((val,)) => {
+                // ALAN TODO should probably just fail here.
+                // Do we need a separate method in ValueOfType to check the value is an instance of a CustomType?
                 let maybe_cty = match ty {
                     ClassicType::Container(Container::Opaque(t)) => Some(t),
                     ClassicType::Hashable(HashableType::Container(Container::Opaque(t))) => Some(t),
                     _ => None,
                 };
                 if let Some(cu_ty) = maybe_cty {
-                    return val.check_custom_type(cu_ty).map_err(ConstTypeError::from);
+                    return val.check_custom_type(cu_ty).map_err(ValueError::from);
                 }
             }
         };
-        Err(ConstTypeError::ValueCheckFail(ty.clone(), self.clone()))
-    }
-
-    fn container_error(
-        typ: Container<ClassicType>,
-        vals: ContainerValue<ConstValue>,
-    ) -> ConstTypeError {
-        ConstTypeError::ValueCheckFail(ClassicType::Container(typ), ConstValue::Container(vals))
+        Err(ValueError::ValueCheckFail(ty.clone(), self.clone()))
     }
 }
 
@@ -270,15 +253,15 @@ impl ConstValue {
     }
 }
 
-impl From<HashableValue> for ConstValue {
+/*impl From<HashableValue> for ConstValue {
     fn from(hv: HashableValue) -> Self {
         Self::Hashable(hv)
     }
-}
+}*/
 
 impl<T: CustomConst> From<T> for ConstValue {
     fn from(v: T) -> Self {
-        Self::Opaque((Box::new(v),))
+        Self::Single(ConstLeaf::Opaque((Box::new(v),)))
     }
 }
 
@@ -338,14 +321,14 @@ mod test {
     use cool_asserts::assert_matches;
     use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
+    use super::{typecheck::ConstIntError, Const, ConstTypeError, ConstValue, CustomSerialized};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
         types::simple::Container,
         types::type_param::TypeArg,
         types::{ClassicType, CustomType, HashableType, SimpleRow, SimpleType, TypeTag},
-        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
+        values::{CustomCheckFail, HashableValue, ValueOfType},
     };
 
     #[test]

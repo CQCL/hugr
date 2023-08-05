@@ -5,89 +5,60 @@
 
 use thiserror::Error;
 
-use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
-use crate::{
-    ops::constant::{
-        typecheck::{check_int_fits_in_width, ConstIntError},
-        ConstValue, HugrIntValueStore,
-    },
-    types::TypeRow,
+use crate::ops::constant::{
+    typecheck::{check_int_fits_in_width, ConstIntError},
+    HugrIntValueStore,
 };
+use crate::types::simple::HashableElem;
+use crate::types::{Container, CustomType, PrimType};
 
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum HashableValue {
+pub enum HashableLeaf {
     /// A string, i.e. corresponding to [HashableType::String]
     String(String),
     /// An integer, i.e. an instance of all [HashableType::Int]s of sufficient width
     Int(HugrIntValueStore),
-    /// A container of other hashable values
-    Container(ContainerValue<HashableValue>),
 }
+pub type HashableValue = ContainerValue<HashableLeaf>;
 
 /// Trait for classes which represent values of some kind of [PrimType]
 pub trait ValueOfType: Clone {
     /// The exact type whose values the type implementing [ValueOfType] represents
-    type T: PrimType;
+    type T: std::fmt::Debug; // TODO: unclear what the bound here should be
 
     /// Checks that a value can be an instance of the specified type.
-    fn check_type(&self, ty: &Self::T) -> Result<(), ConstTypeError>;
+    fn check_type(&self, ty: &Self::T) -> Result<(), ValueError<Self>>;
 
     /// Unique name of the constant/value.
     fn name(&self) -> String;
-
-    /// When there is an error fitting a [ContainerValue] of these values
-    /// into a [Container] (type), produce a [ConstTypeError::ValueCheckFail] for that.
-    fn container_error(typ: Container<Self::T>, vals: ContainerValue<Self>) -> ConstTypeError;
 }
 
-impl ValueOfType for HashableValue {
-    type T = HashableType;
+impl ValueOfType for HashableLeaf {
+    type T = HashableElem;
 
     fn name(&self) -> String {
         match self {
-            HashableValue::String(s) => format!("const:string:\"{}\"", s),
-            HashableValue::Int(v) => format!("const:int:{}", v),
-            HashableValue::Container(c) => c.desc(),
+            HashableLeaf::String(s) => format!("const:string:\"{}\"", s),
+            HashableLeaf::Int(v) => format!("const:int:{}", v),
         }
     }
 
-    fn check_type(&self, ty: &HashableType) -> Result<(), ConstTypeError> {
-        if let HashableType::Container(Container::Alias(s)) = ty {
-            return Err(ConstTypeError::NoAliases(s.to_string()));
-        };
+    fn check_type(&self, ty: &HashableElem) -> Result<(), ValueError<HashableLeaf>> {
         match self {
-            HashableValue::String(_) => {
-                if let HashableType::String = ty {
+            HashableLeaf::String(_) => {
+                if let HashableElem::String = ty {
                     return Ok(());
                 };
             }
-            HashableValue::Int(value) => {
-                if let HashableType::Int(width) = ty {
-                    return check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int);
-                };
-            }
-            HashableValue::Container(vals) => {
-                if let HashableType::Container(c_ty) = ty {
-                    return vals.check_container(c_ty);
+            HashableLeaf::Int(value) => {
+                if let HashableElem::Int(width) = ty {
+                    return check_int_fits_in_width(*value, *width).map_err(ValueError::Int);
                 };
             }
         }
-        Err(ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(ty.clone()),
-            ConstValue::Hashable(self.clone()),
-        ))
-    }
-
-    fn container_error(
-        typ: Container<HashableType>,
-        vals: ContainerValue<HashableValue>,
-    ) -> ConstTypeError {
-        ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(HashableType::Container(typ)),
-            ConstValue::Hashable(HashableValue::Container(vals)),
-        )
+        Err(ValueError::ValueCheckFail(ty.clone(), self.clone()))
     }
 }
 
@@ -99,18 +70,27 @@ impl ValueOfType for HashableValue {
 /// sets of values (see e.g. [ConstValue::Opaque])
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ContainerValue<T> {
+    Single(T),
     /// A [Container::Array] or [Container::Tuple] or [Container::List]
-    Sequence(Vec<T>),
+    Sequence(Vec<ContainerValue<T>>),
     /// A [Container::Map]
-    Map(Vec<(HashableValue, T)>), // TODO try to make this an actual map?
+    Map(Vec<(HashableValue, ContainerValue<T>)>), // TODO try to make this an actual map?
     /// A [Container::Sum] - for any Sum type where this value meets
     /// the type of the variant indicated by the tag
-    Sum(usize, Box<T>), // Tag and value
+    Sum(usize, Box<ContainerValue<T>>), // Tag and value
 }
 
-impl<Elem: ValueOfType> ContainerValue<Elem> {
-    pub(crate) fn desc(&self) -> String {
+impl<Leaf: ValueOfType> ValueOfType for ContainerValue<Leaf>
+where
+    Leaf::T: PrimType, // possibly also some other trait (ElemValue?) - check opaque
+    HashableLeaf: Into<Leaf>,
+    HashableElem: Into<Leaf::T>,
+{
+    type T = Container<Leaf::T>;
+
+    fn name(&self) -> String {
         match self {
+            ContainerValue::Single(e) => e.name(),
             ContainerValue::Sequence(vals) => {
                 let names: Vec<_> = vals.iter().map(ValueOfType::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
@@ -119,17 +99,18 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             ContainerValue::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
         }
     }
-    pub(crate) fn check_container(&self, ty: &Container<Elem::T>) -> Result<(), ConstTypeError> {
+
+    fn check_type(&self, ty: &Container<Leaf::T>) -> Result<(), ValueError<Self>> {
         match (self, ty) {
             (ContainerValue::Sequence(elems), Container::List(elem_ty)) => {
                 for elem in elems {
-                    elem.check_type(elem_ty)?;
+                    elem.check_type(&**elem_ty)?;
                 }
                 Ok(())
             }
             (ContainerValue::Sequence(elems), Container::Tuple(tup_tys)) => {
                 if elems.len() != tup_tys.len() {
-                    return Err(ConstTypeError::TupleWrongLength);
+                    return Err(ValueError::TupleWrongLength);
                 }
                 for (elem, ty) in elems.iter().zip(tup_tys.iter()) {
                     elem.check_type(ty)?;
@@ -138,7 +119,7 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             }
             (ContainerValue::Sequence(elems), Container::Array(elem_ty, sz)) => {
                 if elems.len() != *sz {
-                    return Err(ConstTypeError::TupleWrongLength);
+                    return Err(ValueError::TupleWrongLength);
                 }
                 for elem in elems {
                     elem.check_type(elem_ty)?;
@@ -154,14 +135,14 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 Ok(())
             }
             (ContainerValue::Sum(tag, value), Container::Sum(variants)) => {
-                value.check_type(variants.get(*tag).ok_or(ConstTypeError::InvalidSumTag)?)
+                value.check_type(variants.get(*tag).ok_or(ValueError::InvalidSumTag)?)
             }
-            (_, Container::Alias(s)) => Err(ConstTypeError::NoAliases(s.to_string())),
-            (_, _) => Err(ValueOfType::container_error(ty.clone(), self.clone())),
+            (_, Container::Alias(s)) => Err(ValueError::NoAliases(s.to_string())),
+            (_, _) => Err(ValueError::ValueCheckFail(ty.clone(), self.clone())),
         }
     }
 
-    pub(crate) fn map_vals<T2: ValueOfType>(&self, f: &impl Fn(Elem) -> T2) -> ContainerValue<T2> {
+    /*pub(crate) fn map_vals<T2: ValueOfType>(&self, f: &impl Fn(Elem) -> T2) -> ContainerValue<T2> {
         match self {
             ContainerValue::Sequence(vals) => {
                 ContainerValue::Sequence(vals.iter().cloned().map(f).collect())
@@ -171,10 +152,10 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 ContainerValue::Sum(*tag, Box::new(f((**value).clone())))
             }
         }
-    }
+    }*/
 }
 
-pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
+/*pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
     container: &Container<T>,
     f: &impl Fn(T) -> T2,
 ) -> Container<T2> {
@@ -203,7 +184,7 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
         Container::Alias(s) => Container::Alias(s.clone()),
         Container::Opaque(custom) => Container::Opaque(custom.clone()),
     }
-}
+}*/
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Error)]
@@ -216,9 +197,9 @@ pub enum CustomCheckFail {
     Message(String),
 }
 
-/// Errors that arise from typechecking constants
+/// Errors that arise from typechecking values against types
 #[derive(Clone, Debug, PartialEq, Error)]
-pub enum ConstTypeError {
+pub enum ValueError<V: ValueOfType> {
     /// There was some problem fitting a const int into its declared size
     #[error("Error with int constant")]
     Int(#[from] ConstIntError),
@@ -236,9 +217,29 @@ pub enum ConstTypeError {
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
     /// A mismatch between the type expected and the value.
-    #[error("Value {1:?} does not match expected type {0}")]
-    ValueCheckFail(ClassicType, ConstValue),
+    #[error("Value {1:?} does not match expected type {0:?}")]
+    ValueCheckFail(V::T, V),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),
+}
+
+impl<V: ValueOfType> ValueError<V> {
+    pub(crate) fn map_into<V2: ValueOfType>(self) -> ValueError<V2>
+    where
+        V: Into<V2>,
+        V::T: Into<V2::T>,
+    {
+        match self {
+            ValueError::Int(i) => ValueError::Int(i),
+            ValueError::ConstCantBeVar => ValueError::ConstCantBeVar,
+            ValueError::NoAliases(s) => ValueError::NoAliases(s),
+            ValueError::TupleWrongLength => ValueError::TupleWrongLength,
+            ValueError::InvalidSumTag => ValueError::InvalidSumTag,
+            ValueError::ValueCheckFail(ty, val) => {
+                ValueError::ValueCheckFail(ty.into(), val.into())
+            }
+            ValueError::CustomCheckFail(c) => ValueError::CustomCheckFail(c),
+        }
+    }
 }

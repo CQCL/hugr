@@ -11,8 +11,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::ops::custom::OpaqueOp;
-use crate::types::type_param::{check_type_arg, TypeArgError};
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::CustomType;
 
 mod opdef;
@@ -89,7 +88,7 @@ trait TypeParametrised {
             )));
         }
         for (a, p) in args.iter().zip(self.params().iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+            a.check_type(p).map_err(SignatureError::TypeArgMismatch)?;
         }
         Ok(())
     }
