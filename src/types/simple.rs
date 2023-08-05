@@ -53,7 +53,7 @@ impl TypeTag {
     }
 }
 
-trait Tagged {
+pub trait Tagged {
     /// Tells us the [TypeTag] of the type represented by the receiver.
     fn tag(&self) -> TypeTag;
 }
@@ -115,7 +115,8 @@ impl<T: PrimType> Container<T> {
         }
     }
 
-    fn map_into<T2: PrimType>(self) -> Container<T2>
+    // TODO there must be a good way to publish this. 'impl From` seems conflicting :-(
+    pub(crate) fn map_into<T2: PrimType>(self) -> Container<T2>
     where
         T2: From<T>,
     {

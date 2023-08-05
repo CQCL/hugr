@@ -5,7 +5,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::hugr::view::HugrView;
+use crate::{hugr::view::HugrView, types::ClassicType};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
 use crate::types::AbstractSignature;
@@ -243,7 +243,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         inputs: SimpleRow,
     ) -> Result<Self, BuildError> {
         // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = SimpleType::new_predicate(predicate_variants);
+        let predicate_type = ClassicType::new_predicate(predicate_variants).map_into();
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
         let signature = AbstractSignature::new_df(inputs, SimpleRow::from(node_outputs));

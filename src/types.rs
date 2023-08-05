@@ -21,6 +21,7 @@ use delegate::delegate;
 use smol_str::SmolStr;
 
 use crate::hugr::{Direction, Port};
+use crate::types::simple::Tagged;
 use crate::utils::display_list;
 use crate::{resource::ResourceSet, type_row};
 

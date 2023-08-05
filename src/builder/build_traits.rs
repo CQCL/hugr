@@ -2,6 +2,7 @@ use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::view::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
+use crate::types::simple::Tagged;
 
 use std::iter;
 
@@ -513,7 +514,7 @@ pub trait Dataflow: Container {
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
-        let variants = ClassicRow::predicate_variants_row(predicate_variants).map_into();
+        let variants = ClassicRow::predicate_variants_row(predicate_variants).map_map_into();
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
