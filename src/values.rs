@@ -129,7 +129,8 @@ where
             (ContainerValue::Map(mappings), Container::Map(kv)) => {
                 let (key_ty, val_ty) = &**kv;
                 for (key, val) in mappings {
-                    key.check_type(key_ty)?;
+                    key.check_type(key_ty)
+                        .map_err(|e| e.map(|ty| ty.map_into(), |val| val.map_into()))?;
                     val.check_type(val_ty)?;
                 }
                 Ok(())
@@ -230,6 +231,14 @@ impl<V: ValueOfType> ValueError<V> {
         V: Into<V2>,
         V::T: Into<V2::T>,
     {
+        self.map(V::T::into, V::into)
+    }
+
+    pub(crate) fn map<V2: ValueOfType>(
+        self,
+        ty_fn: impl Fn(V::T) -> V2::T,
+        val_fn: impl Fn(V) -> V2,
+    ) -> ValueError<V2> {
         match self {
             ValueError::Int(i) => ValueError::Int(i),
             ValueError::ConstCantBeVar => ValueError::ConstCantBeVar,
@@ -237,7 +246,7 @@ impl<V: ValueOfType> ValueError<V> {
             ValueError::TupleWrongLength => ValueError::TupleWrongLength,
             ValueError::InvalidSumTag => ValueError::InvalidSumTag,
             ValueError::ValueCheckFail(ty, val) => {
-                ValueError::ValueCheckFail(ty.into(), val.into())
+                ValueError::ValueCheckFail(ty_fn(ty), val_fn(val))
             }
             ValueError::CustomCheckFail(c) => ValueError::CustomCheckFail(c),
         }

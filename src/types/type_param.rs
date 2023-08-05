@@ -103,7 +103,9 @@ impl ValueOfType for TypeArg {
                 Ok(())
             }
             (TypeArg::CustomValue(v), TypeParam::CustomValue(ct)) => Ok(()), // TODO more checks here, e.g. storing CustomType in the value
-            (TypeArg::Value(h_v), TypeParam::Value(h_t)) => h_v.check_type(h_t).map_err(|e|e.map_into()),
+            (TypeArg::Value(h_v), TypeParam::Value(h_t)) => {
+                h_v.check_type(h_t).map_err(|e| e.map_into())
+            }
             (_, _) => Err(TypeArgError::ValueCheckFail(param.clone(), self.clone())),
         }
     }
