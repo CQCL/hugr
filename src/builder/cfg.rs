@@ -5,10 +5,10 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, types::ClassicType};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
 use crate::types::AbstractSignature;
+use crate::{hugr::view::HugrView, types::ClassicType};
 
 use crate::Node;
 use crate::{

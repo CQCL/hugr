@@ -4,13 +4,11 @@
 //!
 //! [`TypeDef`]: crate::resource::TypeDef
 
-use crate::ops::constant::typecheck::check_int_fits_in_width;
-use crate::ops::constant::HugrIntValueStore;
 use crate::values::{HashableLeaf, ValueError, ValueOfType};
 
-use super::CustomType;
 use super::simple::{HashableElem, Tagged};
-use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+use super::CustomType;
+use super::{ClassicType, HashableType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -28,6 +26,7 @@ pub enum TypeParam {
     /// Node must provide a [TypeArg::List] (of whatever length)
     /// TODO it'd be better to use [`Container`] here, or a variant thereof
     /// (plus List minus Array).
+    ///
     /// [`Container`]: crate::types::simple::Container
     List(Box<TypeParam>),
     /// Equivalent to [Container::Custom] (since we are not using [Container] here)

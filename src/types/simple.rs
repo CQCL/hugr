@@ -102,19 +102,6 @@ pub enum Container<T: PrimType> {
 impl<T: PrimType> TypeRowElem for Container<T> {}
 
 impl<T: PrimType> Container<T> {
-    fn all(&self, f: impl Fn(&T) -> bool) -> bool {
-        match self {
-            Container::Single(e) => f(&*e),
-            Container::List(e) => e.all(f),
-            Container::Map(kv) => kv.1.all(f),
-            Container::Tuple(r) => (*r).iter().all(|c| c.all(f)),
-            Container::Sum(r) => (*r).iter().all(|c| c.all(f)),
-            Container::Array(e, _) => e.all(f),
-            Container::Alias(_) => todo!(),
-            Container::Opaque(_) => todo!(),
-        }
-    }
-
     // TODO there must be a good way to publish this. 'impl From` seems conflicting :-(
     pub(crate) fn map_into<T2: PrimType>(self) -> Container<T2>
     where
@@ -234,7 +221,7 @@ impl Display for ClassicElem {
                 write!(f, "[{:?}]", sig.resource_reqs)?;
                 sig.fmt(f)
             }
-            ClassicElem::Hashable(h) => h.fmt(f)
+            ClassicElem::Hashable(h) => h.fmt(f),
         }
     }
 }
@@ -347,7 +334,7 @@ impl SimpleElem {
 impl SimpleType {
     /// Returns whether the type contains only classic data.
     pub fn is_classical(&self) -> bool {
-        self.all(|e| e.is_classical())
+        self.tag().is_classical()
     }
 }
 

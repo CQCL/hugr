@@ -13,6 +13,7 @@ use thiserror::Error;
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::CustomType;
+use crate::values::ValueOfType;
 
 mod opdef;
 pub use opdef::{CustomSignatureFunc, OpDef};
@@ -21,7 +22,7 @@ pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
