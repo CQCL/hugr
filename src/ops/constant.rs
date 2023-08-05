@@ -182,7 +182,7 @@ impl ValueOfType for ConstLeaf {
             }
             ConstLeaf::Hashable(hv) => {
                 if let ClassicElem::Hashable(ht) = ty {
-                    return hv.check_type(ht).map_err(|e|e.map_into());
+                    return hv.check_type(ht).map_err(|e| e.map_into());
                 }
             }
             ConstLeaf::Opaque((val,)) => {

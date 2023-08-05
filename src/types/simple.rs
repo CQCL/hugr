@@ -9,33 +9,7 @@ use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
 
-/// A type that represents concrete data. Can include both linear and classical parts.
-///
-// TODO: Derive pyclass
-//
-// TODO: Compare performance vs flattening this into a single enum
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
-#[non_exhaustive]
-pub enum SimpleElem {
-    /// A type containing only classical data. Elements of this type can be copied.
-    Classic(ClassicElem),
-    /// A qubit.
-    Qubit,
-}
-
-pub type SimpleType = Container<SimpleElem>;
-
 mod serialize;
-
-impl Display for SimpleElem {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            SimpleElem::Classic(ty) => ty.fmt(f),
-            SimpleElem::Qubit => f.write_str("Qubit"),
-        }
-    }
-}
 
 /// Categorizes types into three classes according to basic operations supported.
 #[derive(
@@ -79,13 +53,16 @@ impl TypeTag {
     }
 }
 
+trait Tagged {
+    /// Tells us the [TypeTag] of the type represented by the receiver.
+    fn tag(&self) -> TypeTag;
+}
+
 /// Trait of primitive types, i.e. that are uniquely identified by a [TypeTag]
-pub trait PrimType: std::fmt::Debug + Clone + 'static + sealed::Sealed {
+pub trait PrimType: std::fmt::Debug + Clone + 'static + sealed::Sealed + Tagged {
     // may be updated with functions in future for necessary shared functionality
     // across ClassicType, SimpleType and HashableType.
     // Currently used to constrain Container<T>
-    /// Tells us the [TypeTag] of the type represented by the receiver.
-    fn tag(&self) -> TypeTag;
 }
 
 // sealed trait pattern to prevent users extending PrimType
@@ -146,12 +123,26 @@ impl<T: PrimType> Container<T> {
             Container::Single(e) => Container::Single(e.into()),
             Container::List(e) => Container::List(Box::new(e.map_into())),
             Container::Map(kv) => Container::Map(Box::new((kv.0, kv.1.map_into()))),
-            Container::Tuple(r) => Container::Tuple(Box::new(r.map_into())),
-            Container::Sum(r) => Container::Tuple(Box::new(r.map_into())),
+            Container::Tuple(r) => Container::Tuple(Box::new(r.map_map_into())),
+            Container::Sum(r) => Container::Tuple(Box::new(r.map_map_into())),
             Container::Array(e, sz) => Container::Array(Box::new(e.map_into()), sz),
             Container::Alias(n) => Container::Alias(n),
             Container::Opaque(t) => Container::Opaque(t),
         }
+    }
+}
+
+impl<T: PrimType> TypeRow<Container<T>> {
+    fn map_map_into<T2: PrimType>(self) -> TypeRow<Container<T2>>
+    where
+        T2: From<T>,
+    {
+        TypeRow::from(
+            self.into_owned()
+                .into_iter()
+                .map(|e| e.map_into())
+                .collect::<Vec<Container<T2>>>(),
+        )
     }
 }
 
@@ -169,6 +160,43 @@ impl<T: Display + PrimType> Display for Container<T> {
         }
     }
 }
+
+/// A type that represents concrete data. Can include both linear and classical parts.
+///
+// TODO: Derive pyclass
+//
+// TODO: Compare performance vs flattening this into a single enum
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
+#[non_exhaustive]
+pub enum SimpleElem {
+    /// A type containing only classical data. Elements of this type can be copied.
+    Classic(ClassicElem),
+    /// A qubit.
+    Qubit,
+}
+
+pub type SimpleType = Container<SimpleElem>;
+
+impl Display for SimpleElem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SimpleElem::Classic(ty) => ty.fmt(f),
+            SimpleElem::Qubit => f.write_str("Qubit"),
+        }
+    }
+}
+
+impl Tagged for SimpleElem {
+    fn tag(&self) -> TypeTag {
+        match self {
+            Self::Classic(c) => c.tag(),
+            _ => TypeTag::Simple,
+        }
+    }
+}
+
+impl PrimType for SimpleElem {}
 
 /// A type that represents concrete classical data.
 ///
@@ -194,6 +222,48 @@ impl From<HashableElem> for ClassicElem {
     }
 }
 
+pub type ClassicType = Container<ClassicElem>;
+
+impl Display for ClassicElem {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ClassicType::F64 => f.write_str("F64"),
+            ClassicType::Variable(x) => f.write_str(x),
+            ClassicType::Int(i) => {
+                f.write_char('I')?;
+                f.write_str(&i.to_string())
+            }
+            ClassicType::String => f.write_str("String"),
+            ClassicElem::Opaque(custom) => custom.fmt(f),
+        }
+    }
+}
+
+impl Tagged for ClassicElem {
+    fn tag(&self) -> TypeTag {
+        if self.is_hashable() {
+            TypeTag::Hashable
+        } else {
+            TypeTag::Classic
+        }
+    }
+}
+
+impl PrimType for ClassicElem {}
+
+impl ClassicElem {
+    /// Returns whether the type contains only hashable data.
+    pub fn is_hashable(&self) -> bool {
+        matches!(self, Self::Hashable(_))
+    }
+
+    /// Create a graph type with the given signature, using default resources.
+    #[inline]
+    pub fn graph_from_sig(signature: AbstractSignature) -> Self {
+        ClassicElem::Graph(Box::new(signature))
+    }
+}
+
 /// A type that represents concrete classical data that supports hashing
 /// and a strong notion of equality. (So, e.g., no floating-point.)
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -212,20 +282,13 @@ pub enum HashableElem {
 
 pub type HashableType = Container<HashableElem>;
 
-pub type ClassicType = Container<ClassicElem>;
-
-impl ClassicElem {
-    /// Returns whether the type contains only hashable data.
-    pub fn is_hashable(&self) -> bool {
-        matches!(self, Self::Hashable(_))
-    }
-
-    /// Create a graph type with the given signature, using default resources.
-    #[inline]
-    pub fn graph_from_sig(signature: AbstractSignature) -> Self {
-        ClassicElem::Graph(Box::new(signature))
+impl Tagged for HashableElem {
+    fn tag(&self) -> TypeTag {
+        TypeTag::Hashable
     }
 }
+
+impl PrimType for HashableElem {}
 
 impl ClassicType {
     /// Returns a new integer type with the given number of bits.
@@ -262,46 +325,6 @@ impl ClassicType {
     }
 }
 
-impl Display for ClassicElem {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            ClassicType::F64 => f.write_str("F64"),
-            ClassicType::Variable(x) => f.write_str(x),
-            ClassicType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
-            }
-            ClassicType::String => f.write_str("String"),
-            ClassicElem::Opaque(custom) => custom.fmt(f),
-        }
-    }
-}
-
-impl PrimType for ClassicElem {
-    fn tag(&self) -> TypeTag {
-        if self.is_hashable() {
-            TypeTag::Hashable
-        } else {
-            TypeTag::Classic
-        }
-    }
-}
-
-impl PrimType for SimpleElem {
-    fn tag(&self) -> TypeTag {
-        match self {
-            Self::Classic(c) => c.tag(),
-            _ => TypeTag::Simple,
-        }
-    }
-}
-
-impl PrimType for HashableElem {
-    fn tag(&self) -> TypeTag {
-        TypeTag::Hashable
-    }
-}
-
 impl SimpleElem {
     pub fn is_classical(&self) -> bool {
         matches!(self, SimpleElem::Classic(_))
@@ -329,6 +352,22 @@ impl TryFrom<SimpleElem> for ClassicElem {
         match value {
             SimpleElem::Classic(e) => Ok(e),
             _ => Err(format!("Not classic: {:?}", value)),
+        }
+    }
+}
+
+// TODO better to cache this?
+impl<T: PrimType> Tagged for Container<T> {
+    fn tag(&self) -> TypeTag {
+        match self {
+            Container::Single(t) => t.tag(),
+            Container::List(t) => t.tag(),
+            Container::Map(kv) => kv.1.tag(),
+            Container::Tuple(row) => row.tag(),
+            Container::Sum(row) => row.tag(),
+            Container::Array(t, _) => t.tag(),
+            Container::Alias(n) => todo!(),   // Hmmm, best to store?
+            Container::Opaque(ct) => todo!(), // It's stored there, so add accessor
         }
     }
 }
@@ -391,7 +430,7 @@ impl TypeRow<SimpleType> {
     /// it is guaranteed true for any other TypeRow)
     #[inline]
     pub fn purely_classical(&self) -> bool {
-        self.iter().map(PrimType::tag).all(TypeTag::is_classical)
+        self.tag().is_classical()
     }
 }
 
@@ -409,13 +448,13 @@ impl TypeRow<ClassicType> {
 
     #[inline(always)]
     pub fn purely_hashable(&self) -> bool {
-        self.iter().map(PrimType::tag).all(TypeTag::is_hashable)
+        self.tag() == TypeTag::is_hashable
     }
 }
 
-impl<T: PrimType> TypeRow<Container<T>> {
+impl<T: Tagged + TypeRowElem> Tagged for TypeRow<T> {
     /// Returns the smallest [TypeTag] that contains all elements of the row
-    pub fn containing_tag(&self) -> TypeTag {
+    pub fn tag(&self) -> TypeTag {
         self.iter()
             .map(PrimType::tag)
             .fold(TypeTag::Hashable, TypeTag::union)
