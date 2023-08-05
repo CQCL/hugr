@@ -1,8 +1,7 @@
-use super::ClassicType;
+use super::{ClassicElem, ClassicType, HashableElem, HashableType, SimpleElem, SimpleType};
 
 use super::Container;
 
-use super::HashableType;
 use super::PrimType;
 use super::TypeTag;
 
@@ -12,11 +11,10 @@ use super::super::custom::CustomType;
 
 use super::TypeRow;
 
-use super::SimpleType;
-
 use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
+use crate::types::type_row::TypeRowElem;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -64,20 +62,21 @@ pub(crate) enum SerSimpleType {
         name: SmolStr,
     },
 }
+impl TypeRowElem for SerSimpleType {}
 
 trait SerializableType: PrimType {
     const TAG: TypeTag;
 }
 
-impl SerializableType for ClassicType {
+impl SerializableType for ClassicElem {
     const TAG: TypeTag = TypeTag::Classic;
 }
 
-impl SerializableType for SimpleType {
+impl SerializableType for SimpleElem {
     const TAG: TypeTag = TypeTag::Simple;
 }
 
-impl SerializableType for HashableType {
+impl SerializableType for HashableElem {
     const TAG: TypeTag = TypeTag::Hashable;
 }
 
@@ -88,6 +87,7 @@ where
 {
     fn from(value: Container<T>) -> Self {
         match value {
+            Container::Single(elem) => elem.into(),
             Container::Sum(inner) => SerSimpleType::Sum {
                 row: Box::new(inner.map_into()),
                 c: T::TAG, // We could inspect inner.containing_tag(), but this should have been done already
@@ -116,36 +116,34 @@ where
     }
 }
 
-impl From<HashableType> for SerSimpleType {
-    fn from(value: HashableType) -> Self {
+impl From<HashableElem> for SerSimpleType {
+    fn from(value: HashableElem) -> Self {
         match value {
-            HashableType::Variable(s) => SerSimpleType::Var { name: s },
-            HashableType::Int(w) => SerSimpleType::I { width: w },
-            HashableType::String => SerSimpleType::S,
-            HashableType::Container(c) => c.into(),
+            HashableElem::Variable(s) => SerSimpleType::Var { name: s },
+            HashableElem::Int(w) => SerSimpleType::I { width: w },
+            HashableElem::String => SerSimpleType::S,
         }
     }
 }
 
-impl From<ClassicType> for SerSimpleType {
-    fn from(value: ClassicType) -> Self {
+impl From<ClassicElem> for SerSimpleType {
+    fn from(value: ClassicElem) -> Self {
         match value {
-            ClassicType::F64 => SerSimpleType::F,
-            ClassicType::Graph(inner) => SerSimpleType::G {
+            ClassicElem::F64 => SerSimpleType::F,
+            ClassicElem::Graph(inner) => SerSimpleType::G {
                 signature: Box::new(*inner),
             },
-            ClassicType::Container(c) => c.into(),
-            ClassicType::Hashable(h) => h.into(),
+            ClassicElem::String => SerSimpleType::S,
+            ClassicElem::Variable(s) => SerSimpleType::Var { name: s },
         }
     }
 }
 
-impl From<SimpleType> for SerSimpleType {
-    fn from(value: SimpleType) -> Self {
+impl From<SimpleElem> for SerSimpleType {
+    fn from(value: SimpleElem) -> Self {
         match value {
             SimpleType::Classic(c) => c.into(),
             SimpleType::Qubit => SerSimpleType::Q,
-            SimpleType::Qontainer(c) => c.into(),
         }
     }
 }
@@ -168,9 +166,9 @@ where
 macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
-            TypeTag::Simple => (Container::<SimpleType>::$variant($($r),*)).into(),
-            TypeTag::Classic => (Container::<ClassicType>::$variant($($r),*)).into(),
-            TypeTag::Hashable => (Container::<HashableType>::$variant($($r),*)).into()
+            TypeTag::Simple => (Container::<SimpleElem>::$variant($($r),*)).into(),
+            TypeTag::Classic => (Container::<ClassicElem>::$variant($($r),*)).into(),
+            TypeTag::Hashable => (Container::<HashableElem>::$variant($($r),*)).into()
         }
     }
 }
@@ -179,9 +177,9 @@ impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => HashableType::Int(width).into(),
+            SerSimpleType::I { width } => HashableElem::Int(width).into(),
             SerSimpleType::F => ClassicType::F64.into(),
-            SerSimpleType::S => HashableType::String.into(),
+            SerSimpleType::S => ClassicElem::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
                 handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
@@ -204,9 +202,9 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Opaque { custom, c } => {
                 handle_container!(c, Opaque(custom))
             }
-            SerSimpleType::Var { name: s } => {
-                ClassicType::Hashable(HashableType::Variable(s)).into()
-            }
+            SerSimpleType::Var { name: s } => Container::Single(SimpleElem::Classic(
+                ClassicElem::Hashable(HashableElem::Variable(s)),
+            )),
         }
     }
 }
@@ -216,21 +214,21 @@ impl TryFrom<SerSimpleType> for ClassicType {
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         let s: SimpleType = value.into();
-        if let SimpleType::Classic(c) = s {
-            Ok(c)
-        } else {
-            Err(format!("Not a ClassicType: {}", s))
-        }
+        s.try_convert_elems(|e| match e {
+            SimpleElem::Classic(c) => Ok(c),
+            _ => Err(format!("Not classic: {}", e)),
+        })
     }
 }
 
 impl TryFrom<SerSimpleType> for HashableType {
     type Error = String;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
-        match value.try_into()? {
-            ClassicType::Hashable(h) => Ok(h),
-            ty => Err(format!("Classic type is not hashable: {}", ty)),
-        }
+        let c: ClassicType = value.try_into()?;
+        c.try_convert_elems(|c| match c {
+            ClassicElem::Hashable(h) => Ok(h),
+            _ => Err(format!("Not hashable: {}", c)),
+        })
     }
 }
 
