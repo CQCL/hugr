@@ -130,7 +130,7 @@ pub(crate) type HugrIntWidthStore = u8;
 pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
     HugrIntValueStore::BITS as HugrIntWidthStore;
 
-/// Value constants. (This could be "ClassicValue" to parallel [HashableValue])
+/// Value constants. (This could be "ClassicLeaf" to parallel [HashableLeaf])
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[allow(missing_docs)]

@@ -25,9 +25,8 @@ pub enum TypeParam {
     /// Argument is a [TypeArg::HashableType]
     HashableType,
     /// Node must provide a [TypeArg::List] (of whatever length)
-    /// TODO it'd be better to use [`Container`] here.
-    ///
-    /// [`Container`]: crate::types::simple::Container
+    /// TODO add missing [Container]-equivalents: Tuple+Sum (no Array,
+    /// but keep List even when that's dropped from Container)
     List(Box<TypeParam>),
     /// Argument is a value of the specified type.
     /// TODO It'd be better to use HashableLeaf with a better notion of Container.
