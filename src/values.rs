@@ -162,9 +162,16 @@ where
             }
             (_, Container::Alias(s)) => Err(ValueError::NoAliases(s.to_string())),
             (ContainerValue::Single(leaf), Container::Opaque(cus_ty)) => {
-                leaf.check_custom_type(cus_ty)
+                leaf.check_custom_type(cus_ty).map_err(|m_cc| {
+                    m_cc.map_or_else(
+                        || ValueError::ValueCheckFail(ty.clone(), self.clone()),
+                        ValueError::CustomCheckFail,
+                    )
+                })
             }
-            (ContainerValue::Single(leaf), Container::Single(ty)) => leaf.check_type(ty),
+            (ContainerValue::Single(leaf), Container::Single(ty)) => leaf
+                .check_type(ty)
+                .map_err(|ve| ve.map(Container::Single, ContainerValue::Single)),
             (_, _) => Err(ValueError::ValueCheckFail(ty.clone(), self.clone())),
         }
     }

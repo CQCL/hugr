@@ -9,7 +9,7 @@ use crate::ops::constant::HugrIntValueStore;
 use crate::values::{ValueError, ValueOfType};
 
 use super::simple::{HashableElem, Tagged};
-use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+use super::{simple::Container, ClassicType, HashableType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -105,7 +105,7 @@ impl ValueOfType for TypeArg {
                 if items.len() != *sz {
                     return Err(ValueError::WrongNumber("array elements", items.len(), *sz));
                 }
-                let elem_ty = TypeParam::Value((**elem));
+                let elem_ty = TypeParam::Value(**elem);
                 for item in items {
                     item.check_type(&elem_ty)?;
                 }
@@ -119,8 +119,8 @@ impl ValueOfType for TypeArg {
                         tys.len(),
                     ));
                 }
-                for (i, t) in items.iter().zip(tys) {
-                    i.check_type(&TypeParam::Value(t))?;
+                for (i, t) in items.iter().zip(tys.iter()) {
+                    i.check_type(&TypeParam::Value(*t))?;
                 }
                 Ok(())
             }
