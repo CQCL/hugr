@@ -158,6 +158,15 @@ impl Resource {
         }
     }
 
+    /// Creates a new resource with the given name and requirements.
+    pub fn new_with_reqs(name: ResourceId, resource_reqs: ResourceSet) -> Self {
+        Self {
+            name,
+            resource_reqs,
+            ..Default::default()
+        }
+    }
+
     /// Allows read-only access to the operations in this Resource
     pub fn get_op(&self, op_name: &str) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
