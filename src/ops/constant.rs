@@ -4,7 +4,9 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
-    types::{simple::Container, ClassicRow, ClassicType, CustomType, EdgeKind, HashableType},
+    types::{
+        simple::Container, ClassicRow, ClassicType, CustomType, EdgeKind, HashableType, SimpleType,
+    },
     values::{
         map_container_type, ConstTypeError, ContainerValue, CustomCheckFail, HashableValue,
         ValueOfType,
@@ -21,12 +23,12 @@ use super::{OpName, OpTrait, StaticTag};
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Const {
     value: ConstValue,
-    typ: ClassicType,
+    typ: SimpleType,
 }
 
 impl Const {
     /// Creates a new Const, type-checking the value.
-    pub fn new(value: ConstValue, typ: ClassicType) -> Result<Self, ConstTypeError> {
+    pub fn new(value: ConstValue, typ: SimpleType) -> Result<Self, ConstTypeError> {
         value.check_type(&typ)?;
         Ok(Self { value, typ })
     }
@@ -37,7 +39,7 @@ impl Const {
     }
 
     /// Returns a reference to the type of this [`Const`].
-    pub fn const_type(&self) -> &ClassicType {
+    pub fn const_type(&self) -> &SimpleType {
         &self.typ
     }
 
@@ -48,7 +50,7 @@ impl Const {
         value: ConstValue,
         variant_rows: impl IntoIterator<Item = ClassicRow>,
     ) -> Result<Self, ConstTypeError> {
-        let typ = ClassicType::new_predicate(variant_rows);
+        let typ = SimpleType::new_predicate(variant_rows);
         Self::new(ConstValue::sum(tag, value), typ)
     }
 
@@ -56,7 +58,7 @@ impl Const {
     pub fn simple_predicate(tag: usize, size: usize) -> Self {
         Self {
             value: ConstValue::simple_predicate(tag),
-            typ: ClassicType::new_simple_predicate(size),
+            typ: SimpleType::new_simple_predicate(size),
         }
     }
 
@@ -64,7 +66,7 @@ impl Const {
     pub fn simple_unary_predicate() -> Self {
         Self {
             value: ConstValue::simple_unary_predicate(),
-            typ: ClassicType::new_simple_predicate(1),
+            typ: SimpleType::new_simple_predicate(1),
         }
     }
 
@@ -82,7 +84,7 @@ impl Const {
     pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
         Self::new(
             ConstValue::Hashable(HashableValue::Int(value)),
-            ClassicType::int::<N>(),
+            SimpleType::int::<N>(),
         )
     }
 
@@ -93,11 +95,11 @@ impl Const {
 
     /// Tuple of values
     pub fn new_tuple(items: impl IntoIterator<Item = Const>) -> Self {
-        let (values, types): (Vec<ConstValue>, Vec<ClassicType>) = items
+        let (values, types): (Vec<ConstValue>, Vec<SimpleType>) = items
             .into_iter()
             .map(|Const { value, typ }| (value, typ))
             .unzip();
-        Self::new(ConstValue::sequence(&values), ClassicType::new_tuple(types)).unwrap()
+        Self::new(ConstValue::sequence(&values), SimpleType::new_tuple(types)).unwrap()
     }
 }
 
@@ -153,7 +155,7 @@ impl PartialEq for dyn CustomConst {
 }
 
 impl ValueOfType for ConstValue {
-    type T = ClassicType;
+    type T = SimpleType;
 
     fn name(&self) -> String {
         match self {
@@ -164,42 +166,54 @@ impl ValueOfType for ConstValue {
         }
     }
 
-    fn check_type(&self, ty: &ClassicType) -> Result<(), ConstTypeError> {
+    fn check_type(&self, ty: &SimpleType) -> Result<(), ConstTypeError> {
         match self {
             ConstValue::F64(_) => {
-                if let ClassicType::F64 = ty {
+                if ty == &SimpleType::Classic(ClassicType::F64) {
                     return Ok(());
                 }
             }
             ConstValue::Hashable(hv) => {
-                match ty {
-                    ClassicType::Hashable(exp) => return hv.check_type(exp),
-                    ClassicType::Container(cty) => {
-                        // A "hashable" value might be an instance of a non-hashable type:
-                        // e.g. an empty list is hashable, yet can be checked against a classic element type!
-                        if let HashableValue::Container(ctr) = hv {
-                            return ctr.map_vals(&ConstValue::Hashable).check_container(cty);
+                if let SimpleType::Classic(ClassicType::Hashable(typ)) = ty {
+                    return hv.check_type(typ);
+                }
+                if let HashableValue::Container(ctr) = hv {
+                    // An empty list is a hashable value, but could be an instance of a non-hashable list type
+                    // such as List<F64> or even List<Qubit> !
+                    let mapped_cty = || ctr.map_vals(&ConstValue::Hashable);
+                    match ty {
+                        SimpleType::Qontainer(cty) => return mapped_cty().check_container(cty),
+                        SimpleType::Classic(ClassicType::Container(cty)) => {
+                            return mapped_cty()
+                                .check_container(&map_container_type(cty, &SimpleType::Classic))
                         }
-                    }
-                    _ => (),
+                        _ => (),
+                    };
                 }
             }
             ConstValue::Container(vals) => {
                 match ty {
-                    ClassicType::Container(cty) => return vals.check_container(cty),
-                    // We might also fail to deduce a container *value* was hashable,
+                    SimpleType::Qontainer(cty) => return vals.check_container(cty),
+                    SimpleType::Classic(ClassicType::Container(cty)) => {
+                        return vals.check_container(&map_container_type(cty, &SimpleType::Classic))
+                    }
+                    // We might also fail to deduce/represent a container *value* was hashable,
                     // because it contains opaque values whose tag is unknown.
-                    ClassicType::Hashable(HashableType::Container(cty)) => {
-                        return vals
-                            .check_container(&map_container_type(cty, &ClassicType::Hashable))
+                    SimpleType::Classic(ClassicType::Hashable(HashableType::Container(cty))) => {
+                        return vals.check_container(&map_container_type(cty, &|elemty| {
+                            SimpleType::Classic(ClassicType::Hashable(elemty))
+                        }))
                     }
                     _ => (),
                 };
             }
             ConstValue::Opaque((val,)) => {
                 let maybe_cty = match ty {
-                    ClassicType::Container(Container::Opaque(t)) => Some(t),
-                    ClassicType::Hashable(HashableType::Container(Container::Opaque(t))) => Some(t),
+                    SimpleType::Qontainer(Container::Opaque(t)) => Some(t),
+                    SimpleType::Classic(ClassicType::Container(Container::Opaque(t))) => Some(t),
+                    SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+                        Container::Opaque(t),
+                    ))) => Some(t),
                     _ => None,
                 };
                 if let Some(cu_ty) = maybe_cty {
@@ -211,10 +225,10 @@ impl ValueOfType for ConstValue {
     }
 
     fn container_error(
-        typ: Container<ClassicType>,
+        typ: Container<SimpleType>,
         vals: ContainerValue<ConstValue>,
     ) -> ConstTypeError {
-        ConstTypeError::ValueCheckFail(ClassicType::Container(typ), ConstValue::Container(vals))
+        ConstTypeError::ValueCheckFail(SimpleType::Qontainer(typ), ConstValue::Container(vals))
     }
 }
 
@@ -394,19 +408,20 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: ClassicType = ClassicType::int::<64>();
+        const T_INT: SimpleType = SimpleType::int::<64>();
         const V_INT: ConstValue = ConstValue::Hashable(HashableValue::Int(257));
+        const T_F64: SimpleType = SimpleType::Classic(ClassicType::F64);
         V_INT.check_type(&T_INT).unwrap();
         assert_eq!(
-            V_INT.check_type(&ClassicType::int::<8>()),
+            V_INT.check_type(&SimpleType::int::<8>()),
             Err(ConstTypeError::Int(ConstIntError::IntTooLarge(8, 257)))
         );
-        ConstValue::F64(17.4).check_type(&ClassicType::F64).unwrap();
+        ConstValue::F64(17.4).check_type(&T_F64).unwrap();
         assert_matches!(
-            V_INT.check_type(&ClassicType::F64),
-            Err(ConstTypeError::ValueCheckFail(ClassicType::F64, v)) => v == V_INT
+            V_INT.check_type(&T_F64),
+            Err(ConstTypeError::ValueCheckFail(T_F64, v)) => v == V_INT
         );
-        let tuple_ty = ClassicType::new_tuple(classic_row![T_INT, ClassicType::F64]);
+        let tuple_ty = SimpleType::new_tuple(type_row![T_INT, T_F64]);
         let tuple_val = ConstValue::sequence(&[V_INT, ConstValue::F64(5.1)]);
         tuple_val.check_type(&tuple_ty).unwrap();
         let tuple_val2 = ConstValue::sequence(&[ConstValue::F64(5.1), V_INT]);
@@ -433,14 +448,13 @@ mod test {
             typ: typ_int.clone(),
             value: Value::Number(6.into()),
         }),));
-        let SimpleType::Classic(classic_t) = typ_int.clone().into()
-            else {panic!("Hashable CustomType returned as non-Classic");};
-        assert_matches!(classic_t, ClassicType::Hashable(_));
-        val.check_type(&classic_t).unwrap();
+        let simp_t: SimpleType = typ_int.clone().into();
+        assert_matches!(simp_t, SimpleType::Classic(ClassicType::Hashable(_)));
+        val.check_type(&simp_t).unwrap();
 
         // This misrepresents the CustomType, so doesn't really "have to work".
         // But just as documentation of current behaviour:
-        val.check_type(&ClassicType::Container(Container::Opaque(typ_int.clone())))
+        val.check_type(&SimpleType::Qontainer(Container::Opaque(typ_int.clone())))
             .unwrap();
 
         let typ_qb = CustomType::new(

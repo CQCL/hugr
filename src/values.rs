@@ -6,7 +6,7 @@
 use thiserror::Error;
 
 use crate::ops::constant::{HugrIntWidthStore, HUGR_MAX_INT_WIDTH};
-use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
+use crate::types::{Container, CustomType, HashableType, PrimType, SimpleType};
 use crate::{
     ops::constant::{ConstValue, HugrIntValueStore},
     types::TypeRow,
@@ -73,7 +73,7 @@ impl ValueOfType for HashableValue {
             }
         }
         Err(ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(ty.clone()),
+            ty.clone().into(),
             ConstValue::Hashable(self.clone()),
         ))
     }
@@ -83,7 +83,7 @@ impl ValueOfType for HashableValue {
         vals: ContainerValue<HashableValue>,
     ) -> ConstTypeError {
         ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(HashableType::Container(typ)),
+            HashableType::Container(typ).into(),
             ConstValue::Hashable(HashableValue::Container(vals)),
         )
     }
@@ -284,7 +284,7 @@ pub enum ConstTypeError {
     InvalidSumTag,
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
-    ValueCheckFail(ClassicType, ConstValue),
+    ValueCheckFail(SimpleType, ConstValue),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),

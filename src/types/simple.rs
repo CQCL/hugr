@@ -367,6 +367,12 @@ impl SimpleType {
     pub fn new_simple_predicate(size: usize) -> Self {
         Self::Classic(ClassicType::new_simple_predicate(size))
     }
+
+    /// Returns a new integer type with the given number of bits.
+    #[inline]
+    pub const fn int<const N: HugrIntWidthStore>() -> Self {
+        Self::Classic(ClassicType::int::<N>())
+    }
 }
 
 impl From<ClassicType> for SimpleType {

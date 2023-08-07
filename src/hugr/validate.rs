@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::ResourceSet;
-use crate::types::{ClassicType, EdgeKind, SimpleType};
+use crate::types::{EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::hierarchical_views::{HierarchyView, SiblingGraph};
@@ -734,7 +734,7 @@ pub enum InterGraphEdgeError {
     InvalidConstSrc {
         from: Node,
         from_offset: Port,
-        typ: ClassicType,
+        typ: SimpleType,
     },
 }
 
@@ -1149,7 +1149,7 @@ mod test {
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::int::<1>(),
+                datatype: SimpleType::int::<1>(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;

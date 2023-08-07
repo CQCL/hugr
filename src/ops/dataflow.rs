@@ -146,7 +146,7 @@ impl DataflowOpTrait for Call {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature {
-            static_input: vec![ClassicType::graph_from_sig(self.signature.clone())].into(),
+            static_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
             ..self.signature.clone()
         }
     }
@@ -181,7 +181,7 @@ impl DataflowOpTrait for CallIndirect {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoadConstant {
     /// Constant type
-    pub datatype: ClassicType,
+    pub datatype: SimpleType,
 }
 impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
@@ -194,7 +194,7 @@ impl DataflowOpTrait for LoadConstant {
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new(
             SimpleRow::new(),
-            vec![SimpleType::Classic(self.datatype.clone())],
+            vec![self.datatype.clone()],
             vec![self.datatype.clone()],
         )
     }

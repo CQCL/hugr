@@ -34,7 +34,7 @@ pub enum EdgeKind {
     /// Data edges of a DDG region, also known as "wires".
     Value(SimpleType),
     /// A reference to a static value definition.
-    Static(ClassicType),
+    Static(SimpleType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }
@@ -59,7 +59,7 @@ pub struct AbstractSignature {
     /// Value outputs of the function.
     pub output: SimpleRow,
     /// Possible static input (for call / load-constant).
-    pub static_input: ClassicRow,
+    pub static_input: SimpleRow,
     /// The resource requirements which are added by the operation
     pub resource_reqs: ResourceSet,
 }
@@ -78,7 +78,7 @@ impl AbstractSignature {
     pub fn new(
         input: impl Into<SimpleRow>,
         output: impl Into<SimpleRow>,
-        static_input: impl Into<ClassicRow>,
+        static_input: impl Into<SimpleRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -241,7 +241,7 @@ impl AbstractSignature {
 
     #[inline]
     /// Returns the row of static inputs
-    pub fn static_input(&self) -> &ClassicRow {
+    pub fn static_input(&self) -> &SimpleRow {
         &self.static_input
     }
 }
@@ -318,7 +318,7 @@ impl Signature {
             /// Outputs of the abstract signature
             pub fn output(&self) -> &SimpleRow;
             /// Static inputs of the abstract signature
-            pub fn static_input(&self) -> &ClassicRow;
+            pub fn static_input(&self) -> &SimpleRow;
         }
     }
 }
@@ -438,7 +438,7 @@ impl SignatureDescription {
     pub fn static_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &ClassicType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
         Self::row_zip(signature.static_input(), &self.static_input)
     }
 }
