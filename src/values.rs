@@ -35,6 +35,12 @@ pub trait ValueOfType: Clone {
     fn name(&self) -> String;
 }
 
+pub trait OpaqueValueOfType: ValueOfType {
+    /// Check a value against a custom type.
+    /// Error can be None to indicate the value is not opaque (i.e. standard [ValueError::ValueCheckFail] should result)
+    fn check_custom_type(&self, ty: &CustomType) -> Result<(), Option<CustomCheckFail>>;
+}
+
 impl ValueOfType for HashableLeaf {
     type T = HashableElem;
 
@@ -62,6 +68,13 @@ impl ValueOfType for HashableLeaf {
     }
 }
 
+impl OpaqueValueOfType for HashableLeaf {
+    fn check_custom_type(&self, ty: &CustomType) -> Result<(), Option<CustomCheckFail>> {
+        // HashableLeaf is never an instance of CustomType
+        Err(None)
+    }
+}
+
 /// A value that is a container of other values, e.g. a tuple or sum;
 /// thus, corresponding to [Container]. Note there is no member
 /// corresponding to [Container::Alias]; such types must have been
@@ -74,13 +87,17 @@ pub enum ContainerValue<T> {
     /// A [Container::Array] or [Container::Tuple] or [Container::List]
     Sequence(Vec<ContainerValue<T>>),
     /// A [Container::Map]
-    Map(Vec<(HashableValue, ContainerValue<T>)>), // TODO try to make this an actual map?
+    // TODO try to make this an actual map? No - remove it when Map moves into extension :)
+    // HashableValue (ContainerValue<HashableLeaf>) only exists for this, and is a bit broken
+    // as HashableLeaf has no way to represent opaque values (only ConstLeaf and TypeArg do).
+    // Note if we remove HashableValue then we don't need 'impl OpaqueValue for HashableLeaf' either :)
+    Map(Vec<(HashableValue, ContainerValue<T>)>),
     /// A [Container::Sum] - for any Sum type where this value meets
     /// the type of the variant indicated by the tag
     Sum(usize, Box<ContainerValue<T>>), // Tag and value
 }
 
-impl<Leaf: ValueOfType> ValueOfType for ContainerValue<Leaf>
+impl<Leaf: OpaqueValueOfType> ValueOfType for ContainerValue<Leaf>
 where
     Leaf::T: PrimType, // possibly also some other trait (ElemValue?) - check opaque
     HashableLeaf: Into<Leaf>,
@@ -140,6 +157,10 @@ where
                 value.check_type(variants.get(*tag).ok_or(ValueError::InvalidSumTag)?)
             }
             (_, Container::Alias(s)) => Err(ValueError::NoAliases(s.to_string())),
+            (ContainerValue::Single(leaf), Container::Opaque(cus_ty)) => {
+                leaf.check_custom_type(cus_ty)
+            }
+            (ContainerValue::Single(leaf), Container::Single(ty)) => leaf.check_type(ty),
             (_, _) => Err(ValueError::ValueCheckFail(ty.clone(), self.clone())),
         }
     }

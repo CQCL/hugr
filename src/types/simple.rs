@@ -124,11 +124,11 @@ impl<T: PrimType> Container<T> {
         }
     }
 
-    fn new_tuple(elems: impl Into<TypeRow<Container<T>>>) -> Self {
+    pub fn new_tuple(elems: impl Into<TypeRow<Container<T>>>) -> Self {
         Self::Tuple(Box::new(elems.into()))
     }
 
-    fn new_sum(elems: impl Into<TypeRow<Container<T>>>) -> Self {
+    pub fn new_sum(elems: impl Into<TypeRow<Container<T>>>) -> Self {
         Self::Sum(Box::new(elems.into()))
     }
 }

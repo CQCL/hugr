@@ -4,12 +4,9 @@ use std::any::Any;
 
 use crate::{
     macros::impl_box_clone,
-    types::{
-        simple::{ClassicElem, Container},
-        ClassicRow, ClassicType, CustomType, EdgeKind, HashableType,
-    },
+    types::{simple::ClassicElem, ClassicRow, ClassicType, CustomType, EdgeKind},
     values::{
-        ContainerValue, CustomCheckFail, HashableLeaf, HashableValue, ValueError, ValueOfType,
+        ContainerValue, CustomCheckFail, HashableLeaf, OpaqueValueOfType, ValueError, ValueOfType,
     },
 };
 
@@ -156,12 +153,6 @@ impl From<HashableLeaf> for ConstLeaf {
 
 pub type ConstValue = ContainerValue<ConstLeaf>;
 
-impl PartialEq for dyn CustomConst {
-    fn eq(&self, other: &Self) -> bool {
-        (*self).equal_consts(other)
-    }
-}
-
 impl ValueOfType for ConstLeaf {
     type T = ClassicElem;
 
@@ -185,20 +176,18 @@ impl ValueOfType for ConstLeaf {
                     return hv.check_type(ht).map_err(|e| e.map_into());
                 }
             }
-            ConstLeaf::Opaque((val,)) => {
-                // ALAN TODO should probably just fail here.
-                // Do we need a separate method in ValueOfType to check the value is an instance of a CustomType?
-                let maybe_cty = match ty {
-                    ClassicType::Container(Container::Opaque(t)) => Some(t),
-                    ClassicType::Hashable(HashableType::Container(Container::Opaque(t))) => Some(t),
-                    _ => None,
-                };
-                if let Some(cu_ty) = maybe_cty {
-                    return val.check_custom_type(cu_ty).map_err(ValueError::from);
-                }
-            }
+            ConstLeaf::Opaque((val,)) => {}
         };
         Err(ValueError::ValueCheckFail(ty.clone(), self.clone()))
+    }
+}
+
+impl OpaqueValueOfType for ConstLeaf {
+    fn check_custom_type(&self, ty: &CustomType) -> Result<(), Option<CustomCheckFail>> {
+        match self {
+            ConstLeaf::Opaque((v,)) => v.check_custom_type(ty).map_err(Option::Some),
+            _ => Err(None),
+        }
     }
 }
 
@@ -210,7 +199,7 @@ impl ConstValue {
 
     /// Constant unit type (empty Tuple).
     pub const fn unit() -> Self {
-        Self::Hashable(HashableValue::Container(ContainerValue::Sequence(vec![])))
+        Self::sequence(&[])
     }
 
     /// Constant Sum over units, used as predicates.
@@ -225,31 +214,12 @@ impl ConstValue {
 
     /// Sequence of values (could be a tuple, list or array)
     pub fn sequence(items: &[ConstValue]) -> Self {
-        // Keep Hashable at the outside (if all values are)
-        match items
-            .iter()
-            .map(|item| match item {
-                ConstValue::Hashable(h) => Some(h),
-                _ => None,
-            })
-            .collect::<Option<Vec<&HashableValue>>>()
-        {
-            Some(hashables) => ConstValue::Hashable(HashableValue::Container(
-                ContainerValue::Sequence(hashables.into_iter().cloned().collect()),
-            )),
-            None => ConstValue::Container(ContainerValue::Sequence(items.to_vec())),
-        }
+        Self::Sequence(items.to_vec())
     }
 
     /// Sum value (could be of any compatible type, e.g. a predicate)
     pub fn sum(tag: usize, value: ConstValue) -> Self {
-        // Keep Hashable as outermost constructor
-        match value {
-            ConstValue::Hashable(hv) => {
-                HashableValue::Container(ContainerValue::Sum(tag, Box::new(hv))).into()
-            }
-            _ => ConstValue::Container(ContainerValue::Sum(tag, Box::new(value))),
-        }
+        Self::Sum(tag, Box::new(value))
     }
 }
 
@@ -283,6 +253,12 @@ pub trait CustomConst:
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         let _ = other;
         false
+    }
+}
+
+impl PartialEq for dyn CustomConst {
+    fn eq(&self, other: &Self) -> bool {
+        (*self).equal_consts(other)
     }
 }
 

@@ -4,11 +4,12 @@
 //!
 //! [`TypeDef`]: crate::resource::TypeDef
 
-use crate::values::{HashableLeaf, ValueError, ValueOfType};
+use crate::ops::constant::typecheck::check_int_fits_in_width;
+use crate::ops::constant::HugrIntValueStore;
+use crate::values::{ValueError, ValueOfType};
 
 use super::simple::{HashableElem, Tagged};
-use super::CustomType;
-use super::{ClassicType, HashableType, SimpleType, TypeTag};
+use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -24,23 +25,13 @@ pub enum TypeParam {
     /// Argument is a [TypeArg::HashableType]
     HashableType,
     /// Node must provide a [TypeArg::List] (of whatever length)
-    /// TODO it'd be better to use [`Container`] here, or a variant thereof
-    /// (plus List minus Array).
+    /// TODO it'd be better to use [`Container`] here.
     ///
     /// [`Container`]: crate::types::simple::Container
     List(Box<TypeParam>),
-    /// Equivalent to [Container::Custom] (since we are not using [Container] here)
-    CustomValue(CustomType),
-    /// Argument is a value of the specified type. Note we do not use
-    /// HashableValue here, so this loses some expressivity, especially
-    /// until we have more containers above.
-    Value(HashableElem),
-}
-
-impl From<HashableElem> for TypeParam {
-    fn from(value: HashableElem) -> Self {
-        Self::Value(value)
-    }
+    /// Argument is a value of the specified type.
+    /// TODO It'd be better to use HashableLeaf with a better notion of Container.
+    Value(HashableType),
 }
 
 /// A statically-known argument value to an operation.
@@ -55,19 +46,15 @@ pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::HashableType],
     /// this is the value.
     HashableType(HashableType),
-    /// Where the (Type/Op)Def declares a [TypeParam::Value], an appropriate constant
-    Value(HashableLeaf),
+    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::Int], a constant value thereof
+    Int(HugrIntValueStore),
+    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::String], here it is
+    String(String),
     /// Where the (Type/Op)Def declares a [TypeParam::List]`<T>` - all elements will implicitly
     /// be of the same variety of TypeArg, i.e. `T`s.
     List(Vec<TypeArg>),
-    /// Where the TypeDef declares a [TypeParam::CustomValue]
+    /// Where the TypeDef declares a [TypeParam::Value] of [Container::Opaque]
     CustomValue(serde_yaml::Value),
-}
-
-impl From<HashableLeaf> for TypeArg {
-    fn from(value: HashableLeaf) -> Self {
-        Self::Value(value)
-    }
 }
 
 pub type TypeArgError = ValueError<TypeArg>;
@@ -89,9 +76,8 @@ impl ValueOfType for TypeArg {
     fn name(&self) -> String {
         todo!()
     }
-
     /// Checks a [TypeArg] is as expected for a [TypeParam]
-    fn check_type(&self, param: &TypeParam) -> Result<(), TypeArgError> {
+    fn check_type(self: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
         match (self, param) {
             (TypeArg::Type(_), TypeParam::Type) => Ok(()),
             (TypeArg::ClassicType(_), TypeParam::ClassicType) => Ok(()),
@@ -102,11 +88,40 @@ impl ValueOfType for TypeArg {
                 }
                 Ok(())
             }
-            (TypeArg::CustomValue(v), TypeParam::CustomValue(ct)) => Ok(()), // TODO more checks here, e.g. storing CustomType in the value
-            (TypeArg::Value(h_v), TypeParam::Value(h_t)) => {
-                h_v.check_type(h_t).map_err(|e| e.map_into())
+            (TypeArg::Int(v), TypeParam::Value(HashableType::Single(HashableElem::Int(width)))) => {
+                check_int_fits_in_width(*v, *width).map_err(ValueError::Int)
             }
-            (_, _) => Err(TypeArgError::ValueCheckFail(param.clone(), self.clone())),
+            (TypeArg::String(_), TypeParam::Value(HashableType::Single(HashableElem::String))) => {
+                Ok(())
+            }
+            (TypeArg::CustomValue(_), TypeParam::Value(HashableType::Opaque(_))) => Ok(()), // TODO more checks here, e.g. storing CustomType in the value
+            (arg, TypeParam::Value(Container::List(elem))) => {
+                // Do we just fail here, as the LHS value must include types, and the RHS clearly does not?
+                // (This is because we have not yet properly separated TypeArg into Leaf and container-varant,
+                //  and are still *stealing* HashableType = Container<HashableElem>)
+                arg.check_type(&TypeParam::List(Box::new(TypeParam::Value(**elem))))
+            }
+            (TypeArg::List(items), TypeParam::Value(Container::Array(elem, sz))) => {
+                if items.len() != *sz {
+                    return Err(ValueError::WrongNumber(items.len(), *sz));
+                }
+                let elem_ty = TypeParam::Value((**elem));
+                for item in items {
+                    item.check_type(&elem_ty)?;
+                }
+                Ok(())
+            }
+            (TypeArg::List(items), TypeParam::Value(Container::Tuple(tys))) => {
+                if items.len() != tys.len() {
+                    return Err(ValueError::WrongNumber(items.len(), tys.len()));
+                }
+                for (i, t) in items.iter().zip(tys) {
+                    i.check_type(&TypeParam::Value(t))?;
+                }
+                Ok(())
+            }
+            (_, TypeParam::Value(Container::Alias(n))) => Err(ValueError::NoAliases(n.to_string())),
+            _ => Err(ValueError::ValueCheckFail(param.clone(), self.clone())),
         }
     }
 }
