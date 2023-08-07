@@ -6,7 +6,7 @@ use crate::{
     resource::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        CustomType, HashableType, SimpleType, TypeTag,
+        CustomType, SimpleType, TypeTag,
     },
     Resource,
 };
@@ -18,7 +18,7 @@ pub const fn resource_id() -> SmolStr {
 
 /// Parameter for an integer type or operation representing the bit width.
 /// Allowed values are: 1, 2, 4, 8, 16, 32, 64, 128.
-pub const INT_PARAM: TypeParam = TypeParam::Value(HashableType::Int(8));
+pub const INT_PARAM: TypeParam = TypeParam::USize;
 
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
@@ -29,7 +29,7 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 pub fn int_type(n: u8) -> SimpleType {
     CustomType::new(
         INT_TYPE_ID,
-        [TypeArg::Int(n as u128)],
+        [TypeArg::USize(n as u64)],
         resource_id(),
         TypeTag::Classic,
     )
@@ -39,7 +39,7 @@ pub fn int_type(n: u8) -> SimpleType {
 /// Get the bit width of the specified integer type, or error if the width is not supported.
 pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
     let n: u8 = match arg {
-        TypeArg::Int(n) => *n as u8,
+        TypeArg::USize(n) => *n as u8,
         _ => {
             return Err(TypeArgError::TypeMismatch(arg.clone(), INT_PARAM).into());
         }
