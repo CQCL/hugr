@@ -2,7 +2,7 @@
 
 mod hugrmut;
 
-pub mod hierarchy;
+pub mod hierarchical_views;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
