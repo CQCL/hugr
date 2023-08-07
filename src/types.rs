@@ -1,5 +1,6 @@
 //! General wire types used in the compiler
 
+pub mod basic;
 pub mod custom;
 pub mod simple;
 pub mod type_param;
