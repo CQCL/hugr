@@ -4,16 +4,19 @@
 //! more than one root node. However, all root nodes must belong to the same
 //! sibling graph.
 //!
-//! TODO: Subgraphs implement [`HugrView`] as well as petgraph's _visit_ traits.
+//! Subgraphs implement [`HugrView`].
+//! TODO:  as well as petgraph's _visit_ traits.
 
 use std::cell::OnceCell;
 
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use derive_more::Into;
-use itertools::Itertools;
+use itertools::{Itertools, MapInto};
 use portgraph::{view::Subgraph, LinkView, PortIndex, PortView};
 
 use crate::{
-    ops::{OpTag, OpTrait},
+    hugr::{NodeMetadata, NodeType},
+    ops::{OpTag, OpTrait, OpType},
     Direction, Hugr, Node, Port, SimpleReplacement,
 };
 
@@ -283,6 +286,129 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
     /// Whether the subhugr is convex.
     pub fn is_convex(&self) -> bool {
         self.get_sibling_graph().is_convex()
+    }
+}
+
+impl<'g, Base: HugrInternals> HugrInternals for SubHugr<'g, Base> {
+    type Portgraph = Subgraph<'g, Base::Portgraph>;
+
+    fn portgraph(&self) -> &Self::Portgraph {
+        self.get_sibling_graph()
+    }
+
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr.base_hugr()
+    }
+}
+
+impl<'g, Base: HugrInternals> HugrView for SubHugr<'g, Base> {
+    type Nodes<'a> = MapInto<<Subgraph<'g, Base::Portgraph> as PortView>::Nodes<'a>, Node>
+        where Self: 'a;
+
+    type NodePorts<'a> = MapInto<<Subgraph<'g, Base::Portgraph> as PortView>::NodePortOffsets<'a>, Port>
+        where Self: 'a;
+
+    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
+        where Self: 'a;
+
+    type Neighbours<'a> = MapInto<<Subgraph<'g, Base::Portgraph> as LinkView>::Neighbours<'a>, Node>
+        where Self: 'a;
+
+    type PortLinks<'a> = MapWithCtx<
+        <Subgraph<'g, Base::Portgraph> as LinkView>::PortLinks<'a>,
+        &'a Self,
+        (Node, Port),
+    > where
+        Self: 'a;
+
+    fn root(&self) -> Node {
+        self.root
+    }
+
+    fn get_parent(&self, node: Node) -> Option<Node> {
+        self.base_hugr()
+            .get_parent(node)
+            .filter(|&parent| self.portgraph().contains_node(parent.index))
+            .map(Into::into)
+    }
+
+    #[inline]
+    fn get_optype(&self, node: Node) -> &OpType {
+        self.base_hugr().get_optype(node)
+    }
+
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
+        self.base_hugr().get_nodetype(node)
+    }
+
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        self.base_hugr().get_metadata(node)
+    }
+
+    #[inline]
+    fn node_count(&self) -> usize {
+        self.portgraph().node_count()
+    }
+
+    #[inline]
+    fn edge_count(&self) -> usize {
+        self.portgraph().link_count()
+    }
+
+    #[inline]
+    fn nodes(&self) -> Self::Nodes<'_> {
+        self.portgraph().nodes_iter().map_into()
+    }
+
+    #[inline]
+    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
+        self.portgraph().port_offsets(node.index, dir).map_into()
+    }
+
+    #[inline]
+    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
+        self.portgraph().all_port_offsets(node.index).map_into()
+    }
+
+    #[inline]
+    fn num_ports(&self, node: Node, dir: Direction) -> usize {
+        self.portgraph().num_ports(node.index, dir)
+    }
+
+    #[inline]
+    fn children(&self, node: Node) -> Self::Children<'_> {
+        match self.portgraph().contains_node(node.index) {
+            true => self.base_hugr().hierarchy.children(node.index).map_into(),
+            false => portgraph::hierarchy::Children::default().map_into(),
+        }
+    }
+
+    #[inline]
+    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
+        self.portgraph().neighbours(node.index, dir).map_into()
+    }
+
+    #[inline]
+    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+        self.portgraph().all_neighbours(node.index).map_into()
+    }
+
+    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+        let port = self
+            .portgraph()
+            .port_index(node.index, port.offset)
+            .unwrap();
+        self.portgraph()
+            .port_links(port)
+            .with_context(self)
+            .map_with_context(|(_, link), subgraph| {
+                let port: PortIndex = link.into();
+                let node = subgraph.portgraph().port_node(port).unwrap();
+                let offset = subgraph.portgraph().port_offset(port).unwrap();
+                (node.into(), offset.into())
+            })
     }
 }
 
