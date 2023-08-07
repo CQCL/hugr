@@ -17,7 +17,6 @@ use smol_str::SmolStr;
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
-pub mod typecheck;
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Const {
@@ -339,14 +338,14 @@ mod test {
     use cool_asserts::assert_matches;
     use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
+    use super::{Const, ConstValue, CustomSerialized};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
         types::simple::Container,
         types::type_param::TypeArg,
         types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeTag},
-        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
+        values::{ConstIntError, ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
     #[test]
