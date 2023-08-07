@@ -26,7 +26,7 @@ pub fn bool_type() -> SimpleType {
 
 /// Resource for basic logical operations.
 pub fn resource() -> Resource {
-    const H_INT: TypeParam = TypeParam::Usize;
+    const H_INT: TypeParam = TypeParam::USize;
     let mut resource = Resource::new(resource_id());
 
     resource
@@ -56,7 +56,7 @@ pub fn resource() -> Resource {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::Usize(n) => *n,
+                    TypeArg::USize(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                     }
@@ -80,7 +80,7 @@ pub fn resource() -> Resource {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::Usize(n) => *n,
+                    TypeArg::USize(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                     }

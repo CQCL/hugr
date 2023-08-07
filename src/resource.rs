@@ -22,7 +22,7 @@ pub use type_def::{TypeDef, TypeDefTag};
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
-#[derive(Debug, Clone, Error, PartialEq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -83,10 +83,9 @@ trait TypeParametrised {
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         if args.len() != self.params().len() {
-            return Err(SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(
-                args.len(),
-                self.params().len(),
-            )));
+            return Err(SignatureError::TypeArgMismatch(
+                TypeArgError::WrongNumberArgs(args.len(), self.params().len()),
+            ));
         }
         for (a, p) in args.iter().zip(self.params().iter()) {
             check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;

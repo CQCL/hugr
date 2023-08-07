@@ -206,7 +206,7 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
 }
 
 /// Struct for custom type check fails.
-#[derive(Clone, Debug, PartialEq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum CustomCheckFail {
     /// The value had a specific type that was not what was expected
     #[error("Expected type: {0} but value was of type: {1}")]

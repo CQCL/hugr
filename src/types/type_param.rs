@@ -16,15 +16,15 @@ use super::{ClassicType, PrimType, SimpleType, TypeTag};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub enum TypeParam {
-    /// A type as parameter, with given type tag.
+    /// Argument is a [TypeArg::Type].
     Type(TypeTag),
-    /// 64-bit unsigned integer
-    Usize,
-    /// An opaque value.
+    /// Argument is a [TypeArg::USize].
+    USize,
+    /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
     Opaque(CustomType),
-    /// A list of indeterminate size containing parameters.
+    /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
     List(Box<TypeParam>),
-    /// A tuple of parameters.
+    /// /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
     Tuple(Vec<TypeParam>),
 }
 
@@ -34,14 +34,12 @@ pub enum TypeParam {
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
     Type(SimpleType),
-    /// 64-bit unsigned integer
-    Usize(u64),
-    /// An opaque value, stored as serialized blob.
+    /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
+    USize(u64),
+    ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque(CustomSerialized),
-    /// List of arguments
-    List(Vec<TypeArg>),
-    /// Tuple of arguments
-    Tuple(Vec<TypeArg>),
+    /// Instance of [TypeParam::List] or [TypeParam::Tuple] List of arguments
+    Sequence(Vec<TypeArg>),
 }
 
 impl TypeArg {
@@ -63,14 +61,12 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         ) => Ok(()),
         (TypeArg::Type(SimpleType::Classic(_)), TypeParam::Type(TypeTag::Classic)) => Ok(()),
         (TypeArg::Type(_), TypeParam::Type(TypeTag::Simple)) => Ok(()),
-        (TypeArg::List(items), TypeParam::List(param)) => {
+        (TypeArg::Sequence(items), TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Tuple(items), TypeParam::Tuple(types)) => {
-            let items_len = items.len();
-            let types_len = types.len();
+        (TypeArg::Sequence(items), TypeParam::Tuple(types)) => {
             if items.len() != types.len() {
-                Err(TypeArgError::WrongNumberTuple(items_len, types_len))
+                Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
                 items
                     .iter()
@@ -78,7 +74,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::Usize(_), TypeParam::Usize) => Ok(()),
+        (TypeArg::USize(_), TypeParam::USize) => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param)) => {
             arg.check_custom_type(param)?;
             Ok(())
@@ -88,7 +84,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
-#[derive(Clone, Debug, PartialEq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum TypeArgError {
     /// For now, general case of a type arg not fitting a param.
     /// We'll have more cases when we allow general Containers.
@@ -99,7 +95,7 @@ pub enum TypeArgError {
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
     #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
-    WrongNumber(usize, usize),
+    WrongNumberArgs(usize, usize),
 
     /// Wrong number of type arguments in tuple (actual vs expected).
     #[error("Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters")]

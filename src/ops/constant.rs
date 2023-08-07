@@ -428,7 +428,7 @@ mod test {
     fn test_yaml_const() {
         let typ_int = CustomType::new(
             "mytype",
-            vec![TypeArg::Usize(8)],
+            vec![TypeArg::USize(8)],
             "myrsrc",
             TypeTag::Hashable,
         );
