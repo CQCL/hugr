@@ -103,7 +103,7 @@ impl ValueOfType for TypeArg {
             }
             (TypeArg::List(items), TypeParam::Value(Container::Array(elem, sz))) => {
                 if items.len() != *sz {
-                    return Err(ValueError::WrongNumber(items.len(), *sz));
+                    return Err(ValueError::WrongNumber("array elements", items.len(), *sz));
                 }
                 let elem_ty = TypeParam::Value((**elem));
                 for item in items {
@@ -113,7 +113,11 @@ impl ValueOfType for TypeArg {
             }
             (TypeArg::List(items), TypeParam::Value(Container::Tuple(tys))) => {
                 if items.len() != tys.len() {
-                    return Err(ValueError::WrongNumber(items.len(), tys.len()));
+                    return Err(ValueError::WrongNumber(
+                        "tuple elements",
+                        items.len(),
+                        tys.len(),
+                    ));
                 }
                 for (i, t) in items.iter().zip(tys) {
                     i.check_type(&TypeParam::Value(t))?;

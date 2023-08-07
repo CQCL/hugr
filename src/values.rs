@@ -128,7 +128,11 @@ where
             }
             (ContainerValue::Sequence(elems), Container::Tuple(tup_tys)) => {
                 if elems.len() != tup_tys.len() {
-                    return Err(ValueError::TupleWrongLength);
+                    return Err(ValueError::WrongNumber(
+                        "tuple elements",
+                        elems.len(),
+                        tup_tys.len(),
+                    ));
                 }
                 for (elem, ty) in elems.iter().zip(tup_tys.iter()) {
                     elem.check_type(ty)?;
@@ -137,7 +141,7 @@ where
             }
             (ContainerValue::Sequence(elems), Container::Array(elem_ty, sz)) => {
                 if elems.len() != *sz {
-                    return Err(ValueError::TupleWrongLength);
+                    return Err(ValueError::WrongNumber("array elements", elems.len(), *sz));
                 }
                 for elem in elems {
                     elem.check_type(elem_ty)?;
@@ -252,8 +256,8 @@ pub enum ValueError<V: ValueOfType> {
     #[error("Type of a const value can't be an Alias {0}")]
     NoAliases(String),
     /// The length of the tuple value doesn't match the length of the tuple type
-    #[error("Tuple of wrong length")]
-    TupleWrongLength,
+    #[error("Wrong number of {0}: found {1} but expected {2}")]
+    WrongNumber(&'static str, usize, usize),
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
@@ -283,7 +287,7 @@ impl<V: ValueOfType> ValueError<V> {
             ValueError::Int(i) => ValueError::Int(i),
             ValueError::ConstCantBeVar => ValueError::ConstCantBeVar,
             ValueError::NoAliases(s) => ValueError::NoAliases(s),
-            ValueError::TupleWrongLength => ValueError::TupleWrongLength,
+            ValueError::WrongNumber(s, i, j) => ValueError::WrongNumber(s, i, j),
             ValueError::InvalidSumTag => ValueError::InvalidSumTag,
             ValueError::ValueCheckFail(ty, val) => {
                 ValueError::ValueCheckFail(ty_fn(ty), val_fn(val))

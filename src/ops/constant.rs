@@ -344,7 +344,7 @@ mod test {
         ];
 
         let res = Const::predicate(0, ConstValue::sequence(&[]), pred_rows);
-        assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
+        assert_matches!(res, Err(ConstTypeError::WrongNumber(_, _, _)));
     }
 
     #[test]
@@ -372,7 +372,7 @@ mod test {
         let tuple_val3 = ConstValue::sequence(&[V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
         assert_eq!(
             tuple_val3.check_type(&tuple_ty),
-            Err(ConstTypeError::TupleWrongLength)
+            Err(ConstTypeError::WrongNumber(_, _, _))
         );
     }
 
