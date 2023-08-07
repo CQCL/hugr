@@ -142,6 +142,7 @@ impl UnificationContext {
     }
 
     fn gen_constraints(&mut self, hugr: &impl HugrView) {
+        self.gen_io_constraints(hugr, hugr.root());
         for node in hugr.nodes() {
             let input = self.fresh_meta();
             assert!(self
@@ -172,7 +173,6 @@ impl UnificationContext {
                 }
             }
         }
-        self.gen_io_constraints(hugr, hugr.root());
     }
 
     // Coalesce
