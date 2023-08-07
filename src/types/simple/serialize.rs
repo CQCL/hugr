@@ -123,6 +123,7 @@ impl From<HashableType> for SerSimpleType {
             HashableType::Int(w) => SerSimpleType::I { width: w },
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
+            HashableType::OpError => SerSimpleType::S,
         }
     }
 }

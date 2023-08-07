@@ -197,6 +197,8 @@ pub enum HashableType {
     String,
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
+    /// An error from an operation.
+    OpError,
 }
 
 impl ClassicType {
@@ -295,6 +297,7 @@ impl Display for HashableType {
             }
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
+            HashableType::OpError => f.write_str("Error"),
         }
     }
 }
