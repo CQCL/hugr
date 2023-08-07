@@ -344,7 +344,10 @@ mod test {
         classic_row, type_row,
         types::simple::Container,
         types::type_param::TypeArg,
-        types::{ClassicType, CustomType, HashableType, SimpleRow, SimpleType, TypeTag},
+        types::{
+            AbstractSignature, ClassicType, CustomType, HashableType, SimpleRow, SimpleType,
+            TypeTag,
+        },
         values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
@@ -357,7 +360,10 @@ mod test {
         ];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
+        let mut b = DFGBuilder::new(AbstractSignature::new_df(
+            type_row![],
+            SimpleRow::from(vec![pred_ty.clone()]),
+        ))?;
         let c = b.add_constant(Const::predicate(
             0,
             ConstValue::sequence(&[
@@ -369,7 +375,10 @@ mod test {
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty]))?;
+        let mut b = DFGBuilder::new(AbstractSignature::new_df(
+            type_row![],
+            SimpleRow::from(vec![pred_ty]),
+        ))?;
         let c = b.add_constant(Const::predicate(1, ConstValue::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();

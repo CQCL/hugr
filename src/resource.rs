@@ -15,8 +15,8 @@ use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
 
-mod opdef;
-pub use opdef::{CustomSignatureFunc, OpDef};
+mod op_def;
+pub use op_def::{CustomSignatureFunc, OpDef};
 mod type_def;
 pub use type_def::{TypeDef, TypeDefTag};
 
@@ -143,7 +143,7 @@ pub struct Resource {
     // OpDef should appear exactly once in this map (keyed by its name),
     // and the other references to the OpDef are from ExternalOp's in the Hugr
     // (which are serialized as OpaqueOp's i.e. Strings).
-    operations: HashMap<SmolStr, Arc<opdef::OpDef>>,
+    operations: HashMap<SmolStr, Arc<op_def::OpDef>>,
 }
 
 impl Resource {
@@ -156,7 +156,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the operations in this Resource
-    pub fn get_op(&self, op_name: &str) -> Option<&Arc<opdef::OpDef>> {
+    pub fn get_op(&self, op_name: &str) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
     }
 
