@@ -1,7 +1,5 @@
 //! Basic logical operations.
 
-use std::collections::HashMap;
-
 use itertools::Itertools;
 use smol_str::SmolStr;
 
@@ -30,12 +28,10 @@ pub fn resource() -> Resource {
     let mut resource = Resource::new(resource_id());
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "Not".into(),
             "logical 'not'".into(),
             vec![],
-            HashMap::default(),
-            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 Ok((
                     vec![bool_type()].into(),
@@ -47,12 +43,10 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "And".into(),
             "logical 'and'".into(),
             vec![H_INT],
-            HashMap::default(),
-            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {
@@ -71,12 +65,10 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "Or".into(),
             "logical 'or'".into(),
             vec![H_INT],
-            HashMap::default(),
-            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u128 = match a {

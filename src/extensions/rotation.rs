@@ -6,7 +6,6 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use cgmath::num_traits::ToPrimitive;
 use num_rational::Rational64;
 use smol_str::SmolStr;
-use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
@@ -30,12 +29,10 @@ pub fn resource() -> Resource {
     Type::Quaternion.add_to_resource(&mut resource);
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "AngleAdd".into(),
             "".into(),
             vec![],
-            HashMap::default(),
-            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
                 Ok((t.clone(), t, ResourceSet::default()))
