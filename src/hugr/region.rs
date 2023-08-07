@@ -176,6 +176,15 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
+
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        if node == self.root() {
+            self.base_hugr().get_io(node)
+        } else {
+            None
+        }
+    }
 }
 
 type RegionGraph<'g, Base> = portgraph::view::Region<'g, <Base as HugrInternals>::Portgraph>;
@@ -323,6 +332,11 @@ where
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
+    }
+
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        self.base_hugr().get_io(node)
     }
 }
 
