@@ -150,7 +150,9 @@ impl Resource {
 mod test {
     use crate::resource::SignatureError;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{ClassicType, HashableType, PrimType, SimpleType, TypeTag};
+    use crate::types::{
+        AbstractSignature, ClassicType, HashableType, PrimType, SimpleType, TypeTag,
+    };
 
     use super::{TypeDef, TypeDefTag};
 
@@ -158,30 +160,32 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::ClassicType],
+            params: vec![TypeParam::Type(TypeTag::Classic)],
             resource: "MyRsrc".into(),
             description: "Some parameterised type".into(),
             tag: TypeDefTag::FromParams(vec![0]),
         };
         let typ: SimpleType = def
-            .instantiate_concrete(vec![TypeArg::ClassicType(ClassicType::F64)])
+            .instantiate_concrete(vec![TypeArg::Type(
+                ClassicType::Graph(Box::new(AbstractSignature::new_df(vec![], vec![]))).into(),
+            )])
             .unwrap()
             .into();
         assert_eq!(typ.tag(), TypeTag::Classic);
         let typ2: SimpleType = def
-            .instantiate_concrete([TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::String,
-            ))])
+            .instantiate_concrete([TypeArg::Type(
+                ClassicType::Hashable(HashableType::String).into(),
+            )])
             .unwrap()
             .into();
         assert_eq!(typ2.tag(), TypeTag::Hashable);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::HashableType(HashableType::String)]),
+            def.instantiate_concrete([TypeArg::Type(SimpleType::Qubit)]),
             Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::HashableType(HashableType::String),
-                TypeParam::ClassicType
+                TypeArg::Type(SimpleType::Qubit),
+                TypeParam::Type(TypeTag::Classic)
             )))
         );
         // Too few arguments:
@@ -192,8 +196,8 @@ mod test {
         // Too many arguments:
         assert_eq!(
             def.instantiate_concrete([
-                TypeArg::ClassicType(ClassicType::F64),
-                TypeArg::ClassicType(ClassicType::F64),
+                TypeArg::Type(ClassicType::F64.into()),
+                TypeArg::Type(ClassicType::F64.into()),
             ])
             .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumber(2, 1))
