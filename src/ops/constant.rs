@@ -17,7 +17,6 @@ use smol_str::SmolStr;
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
-pub mod typecheck;
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Const {
@@ -79,17 +78,20 @@ impl Const {
         Self::simple_predicate(0, 2)
     }
 
-    /// Fixed width integer
-    pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
+    /// Bit
+    pub fn bit(value: bool) -> Result<Self, ConstTypeError> {
         Self::new(
-            ConstValue::Hashable(HashableValue::Int(value)),
-            ClassicType::int::<N>(),
+            ConstValue::Hashable(HashableValue::Bit(value)),
+            ClassicType::bit(),
         )
     }
 
-    /// 64-bit integer
-    pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
-        Self::int::<64>(value as HugrIntValueStore)
+    /// Integer
+    pub fn int(value: u64) -> Result<Self, ConstTypeError> {
+        Self::new(
+            ConstValue::Hashable(HashableValue::Int(value)),
+            ClassicType::int(),
+        )
     }
 
     /// Tuple of values
@@ -123,11 +125,6 @@ impl OpTrait for Const {
         Some(EdgeKind::Static(self.typ.clone()))
     }
 }
-
-pub(crate) type HugrIntValueStore = u128;
-pub(crate) type HugrIntWidthStore = u8;
-pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
-    HugrIntValueStore::BITS as HugrIntWidthStore;
 
 /// Value constants. (This could be "ClassicValue" to parallel [HashableValue])
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -338,7 +335,7 @@ mod test {
     use cool_asserts::assert_matches;
     use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
+    use super::{Const, ConstValue, CustomSerialized};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
@@ -399,13 +396,9 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: ClassicType = ClassicType::int::<64>();
+        const T_INT: ClassicType = ClassicType::int();
         const V_INT: ConstValue = ConstValue::Hashable(HashableValue::Int(257));
         V_INT.check_type(&T_INT).unwrap();
-        assert_eq!(
-            V_INT.check_type(&ClassicType::int::<8>()),
-            Err(ConstTypeError::Int(ConstIntError::IntTooLarge(8, 257)))
-        );
         ConstValue::F64(17.4).check_type(&ClassicType::F64).unwrap();
         assert_matches!(
             V_INT.check_type(&ClassicType::F64),
@@ -431,7 +424,7 @@ mod test {
         let typ_int = CustomType::new(
             "mytype",
             vec![TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::Int(8),
+                HashableType::U64,
             ))],
             "myrsrc",
             TypeTag::Hashable,

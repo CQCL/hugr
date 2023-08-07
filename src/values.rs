@@ -6,13 +6,7 @@
 use thiserror::Error;
 
 use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
-use crate::{
-    ops::constant::{
-        typecheck::{check_int_fits_in_width, ConstIntError},
-        ConstValue, HugrIntValueStore,
-    },
-    types::TypeRow,
-};
+use crate::{ops::constant::ConstValue, types::TypeRow};
 
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
@@ -20,8 +14,10 @@ use crate::{
 pub enum HashableValue {
     /// A string, i.e. corresponding to [HashableType::String]
     String(String),
-    /// An integer, i.e. an instance of all [HashableType::Int]s of sufficient width
-    Int(HugrIntValueStore),
+    /// A bit
+    Bit(bool),
+    /// A 64-bit integer
+    Int(u64),
     /// A container of other hashable values
     Container(ContainerValue<HashableValue>),
 }
@@ -50,6 +46,7 @@ impl ValueOfType for HashableValue {
             HashableValue::String(s) => format!("const:string:\"{}\"", s),
             HashableValue::Int(v) => format!("const:int:{}", v),
             HashableValue::Container(c) => c.desc(),
+            HashableValue::Bit(v) => format!("const:bit:{}", *v as i32),
         }
     }
 
@@ -63,14 +60,19 @@ impl ValueOfType for HashableValue {
                     return Ok(());
                 };
             }
-            HashableValue::Int(value) => {
-                if let HashableType::Int(width) = ty {
-                    return check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int);
+            HashableValue::Int(_) => {
+                if let HashableType::U64 = ty {
+                    return Ok(());
                 };
             }
             HashableValue::Container(vals) => {
                 if let HashableType::Container(c_ty) = ty {
                     return vals.check_container(c_ty);
+                };
+            }
+            HashableValue::Bit(_) => {
+                if let HashableType::Bit = ty {
+                    return Ok(());
                 };
             }
         }
@@ -219,9 +221,6 @@ pub enum CustomCheckFail {
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
 pub enum ConstTypeError {
-    /// There was some problem fitting a const int into its declared size
-    #[error("Error with int constant")]
-    Int(#[from] ConstIntError),
     /// Found a Var type constructor when we're checking a const val
     #[error("Type of a const value can't be Var")]
     ConstCantBeVar,

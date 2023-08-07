@@ -1145,11 +1145,11 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::int::<1>(1).unwrap())?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::bit(true).unwrap())?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::int::<1>(),
+                datatype: ClassicType::bit(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;

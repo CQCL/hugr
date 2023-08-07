@@ -16,15 +16,12 @@ use super::SimpleType;
 
 use super::super::AbstractSignature;
 
-use crate::ops::constant::HugrIntWidthStore;
-
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
 pub(crate) enum SerSimpleType {
     Q,
-    I {
-        width: HugrIntWidthStore,
-    },
+    B,
+    I,
     F,
     S,
     G {
@@ -120,9 +117,10 @@ impl From<HashableType> for SerSimpleType {
     fn from(value: HashableType) -> Self {
         match value {
             HashableType::Variable(s) => SerSimpleType::Var { name: s },
-            HashableType::Int(w) => SerSimpleType::I { width: w },
+            HashableType::U64 => SerSimpleType::I,
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
+            HashableType::Bit => SerSimpleType::B,
         }
     }
 }
@@ -179,7 +177,7 @@ impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => HashableType::Int(width).into(),
+            SerSimpleType::I => HashableType::U64.into(),
             SerSimpleType::F => ClassicType::F64.into(),
             SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
@@ -207,6 +205,7 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Var { name: s } => {
                 ClassicType::Hashable(HashableType::Variable(s)).into()
             }
+            SerSimpleType::B => HashableType::Bit.into(),
         }
     }
 }
@@ -250,14 +249,14 @@ mod test {
 
         // A Classic sum
         let t = SimpleType::new_sum(vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::U64)),
             SimpleType::Classic(ClassicType::F64),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable list
         let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
-            Container::List(Box::new(HashableType::Int(8))),
+            Container::List(Box::new(HashableType::U64)),
         )));
         assert_eq!(ser_roundtrip(&t), t);
     }
@@ -266,7 +265,7 @@ mod test {
     fn serialize_types_current_behaviour() {
         // This list should be represented as a HashableType::Container.
         let malformed = SimpleType::Qontainer(Container::List(Box::new(SimpleType::Classic(
-            ClassicType::Hashable(HashableType::Int(8)),
+            ClassicType::Hashable(HashableType::U64),
         ))));
         // If this behaviour changes, i.e. to return the well-formed version, that'd be fine.
         // Just to document current serialization behaviour that we leave it untouched.

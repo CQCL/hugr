@@ -6,9 +6,6 @@
 
 use thiserror::Error;
 
-use crate::ops::constant::typecheck::{check_int_fits_in_width, ConstIntError};
-use crate::ops::constant::HugrIntValueStore;
-
 use super::{simple::Container, ClassicType, HashableType, PrimType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
@@ -45,8 +42,8 @@ pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::HashableType],
     /// this is the value.
     HashableType(HashableType),
-    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::Int], a constant value thereof
-    Int(HugrIntValueStore),
+    /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::U64], a constant value thereof
+    Int(u64),
     /// Where the (Type/Op)Def declares a [TypeParam::Value] of type [HashableType::String], here it is
     String(String),
     /// Where the (Type/Op)Def declares a [TypeParam::List]`<T>` - all elements will implicitly
@@ -79,9 +76,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             }
             Ok(())
         }
-        (TypeArg::Int(v), TypeParam::Value(HashableType::Int(width))) => {
-            check_int_fits_in_width(*v, *width).map_err(TypeArgError::Int)
-        }
+        (TypeArg::Int(_), TypeParam::Value(HashableType::U64)) => Ok(()),
         (TypeArg::String(_), TypeParam::Value(HashableType::String)) => Ok(()),
         (arg, TypeParam::Value(HashableType::Container(ctr))) => match ctr {
             Container::Opaque(_) => match arg {
@@ -127,7 +122,4 @@ pub enum TypeArgError {
     /// The type declared for a TypeParam was an alias that was not resolved to an actual type
     #[error("TypeParam required an unidentified alias type {0}")]
     NoAliases(String),
-    /// There was some problem fitting a const int into its declared size
-    #[error("Error with int constant")]
-    Int(#[from] ConstIntError),
 }
