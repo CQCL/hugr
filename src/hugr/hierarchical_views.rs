@@ -1,14 +1,16 @@
-//! Region-level views of a HUGR.
+//! Hierarchical views for HUGR.
 //!
-//! A region is a subgraph of a HUGR that includes a root node and some of its
-//! descendants. The root node is the only node in the region that has no parent
-//! in the region. Non-local edges between nodes inside and outside the region
-//! are ignored.
+//! Views into subgraphs of HUGRs that are based on the hierarchical relationship
+//! of the HUGR nodes. Such a subgraph includes a root node and some of its
+//! descendants. The root node is the only node in the view that has no parent.
 //!
-//! [`FlatRegionView`] includes only the root node and its direct children,
-//! while [`RegionView`] includes all the descendants of the root.
+//! There are currently 2 hierarchical views:
+//!  - [`SiblingGraph`]: A view of the subgraph induced by the children
+//!   of the root node.
+//! - [`DescendantsGraph`]: A view of the subgraph induced by all the
+//!   descendants of the root node.
 //!
-//! Both views implement the [`Region`] trait, so they can be used
+//! Both views implement the [`HierarchyView`] trait, so they can be used
 //! interchangeably. They implement [`HugrView`] as well as petgraph's _visit_
 //! traits.
 
@@ -29,10 +31,12 @@ use super::{HugrView, NodeMetadata};
 type FlatRegionGraph<'g, Base> =
     portgraph::view::FlatRegion<'g, <Base as HugrInternals>::Portgraph>;
 
-/// Single region view of a HUGR. Includes only the root node and its direct children.
+/// View of a HUGR sibling graph.
 ///
-/// For a view that includes all the descendants of the root, see [`RegionView`].
-pub struct FlatRegionView<'g, Base = Hugr>
+/// Includes only the root node and its direct children.
+///
+/// For a view that includes all the descendants of the root, see [`DescendantsGraph`].
+pub struct SiblingGraph<'g, Base = Hugr>
 where
     Base: HugrInternals,
 {
@@ -46,16 +50,16 @@ where
     hugr: &'g Base,
 }
 
-impl<'g, Base> Clone for FlatRegionView<'g, Base>
+impl<'g, Base> Clone for SiblingGraph<'g, Base>
 where
     Base: HugrInternals + HugrView + Clone,
 {
     fn clone(&self) -> Self {
-        FlatRegionView::new(self.hugr, self.root)
+        SiblingGraph::new(self.hugr, self.root)
     }
 }
 
-impl<'g, Base> HugrView for FlatRegionView<'g, Base>
+impl<'g, Base> HugrView for SiblingGraph<'g, Base>
 where
     Base: HugrInternals + HugrView,
 {
@@ -189,13 +193,14 @@ where
 
 type RegionGraph<'g, Base> = portgraph::view::Region<'g, <Base as HugrInternals>::Portgraph>;
 
-/// Single region view of a HUGR. Includes only the root node and its
-/// descendants.
+/// View of a HUGR descendants graph.
+///
+/// Includes the root node and all its descendants nodes at any depth.
 ///
 /// For a view that includes only the direct children of the root, see
-/// [`FlatRegionView`]. Prefer using [`FlatRegionView`] over this type when
+/// [`SiblingGraph`]. Prefer using [`SiblingGraph`] over this type when
 /// possible, as it is more efficient.
-pub struct RegionView<'g, Base>
+pub struct DescendantsGraph<'g, Base>
 where
     Base: HugrInternals,
 {
@@ -209,16 +214,16 @@ where
     hugr: &'g Base,
 }
 
-impl<'g, Base: Clone> Clone for RegionView<'g, Base>
+impl<'g, Base: Clone> Clone for DescendantsGraph<'g, Base>
 where
     Base: HugrInternals + HugrView,
 {
     fn clone(&self) -> Self {
-        RegionView::new(self.hugr, self.root)
+        DescendantsGraph::new(self.hugr, self.root)
     }
 }
 
-impl<'g, Base> HugrView for RegionView<'g, Base>
+impl<'g, Base> HugrView for DescendantsGraph<'g, Base>
 where
     Base: HugrInternals + HugrView,
 {
@@ -341,7 +346,7 @@ where
 }
 
 /// A common trait for views of a hugr region.
-pub trait Region<'a>:
+pub trait HierarchyView<'a>:
     HugrView
     + pv::GraphBase<NodeId = Node>
     + pv::GraphProp
@@ -361,7 +366,7 @@ where
     fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
-impl<'a, Base> Region<'a> for FlatRegionView<'a, Base>
+impl<'a, Base> HierarchyView<'a> for SiblingGraph<'a, Base>
 where
     Base: HugrInternals + HugrView,
 {
@@ -380,7 +385,7 @@ where
     }
 }
 
-impl<'a, Base> Region<'a> for RegionView<'a, Base>
+impl<'a, Base> HierarchyView<'a> for DescendantsGraph<'a, Base>
 where
     Base: HugrInternals + HugrView,
 {
@@ -399,7 +404,7 @@ where
     }
 }
 
-impl<'g, Base> super::view::sealed::HugrInternals for FlatRegionView<'g, Base>
+impl<'g, Base> super::view::sealed::HugrInternals for SiblingGraph<'g, Base>
 where
     Base: HugrInternals,
 {
@@ -416,7 +421,7 @@ where
     }
 }
 
-impl<'g, Base> super::view::sealed::HugrInternals for RegionView<'g, Base>
+impl<'g, Base> super::view::sealed::HugrInternals for DescendantsGraph<'g, Base>
 where
     Base: HugrInternals,
 {
@@ -485,7 +490,7 @@ mod test {
     fn flat_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region = FlatRegionView::new(&hugr, def);
+        let region = SiblingGraph::new(&hugr, def);
 
         assert_eq!(region.node_count(), 5);
         assert!(region
@@ -500,7 +505,7 @@ mod test {
     fn full_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region = RegionView::new(&hugr, def);
+        let region = DescendantsGraph::new(&hugr, def);
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
