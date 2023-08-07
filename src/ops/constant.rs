@@ -464,7 +464,7 @@ mod test {
             TypeTag::Hashable,
         );
         let t: SimpleType = typ_qb.clone().into();
-        assert_matches!(val.check_type(&t.try_into().unwrap()),
+        assert_matches!(val.check_type(&t),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);
 
         assert_eq!(val, val);

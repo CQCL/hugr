@@ -823,12 +823,7 @@ mod test {
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
-            .add_op_with_parent(
-                parent,
-                ops::LoadConstant {
-                    datatype: tag_type.try_into().unwrap(),
-                },
-            )
+            .add_op_with_parent(parent, ops::LoadConstant { datatype: tag_type })
             .unwrap();
 
         b.connect(tag_def, 0, tag, 0).unwrap();
