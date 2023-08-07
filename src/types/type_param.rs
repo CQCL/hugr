@@ -130,4 +130,7 @@ pub enum TypeArgError {
     /// There was some problem fitting a const int into its declared size
     #[error("Error with int constant")]
     Int(#[from] ConstIntError),
+    /// Invalid value
+    #[error("Invalid value of type argument")]
+    InvalidValue(TypeArg),
 }
