@@ -1,11 +1,11 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
-mod hierarchy;
-mod hugr;
-mod sibling;
+pub mod hierarchy;
+pub mod hugr;
+pub mod sibling;
 
+pub use self::hugr::HugrView;
 pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
-pub use hugr::HugrView;
 pub use sibling::SiblingSubgraph;
 
-pub(crate) use hugr::sealed;
+pub(crate) use self::hugr::sealed;
