@@ -21,17 +21,12 @@ pub const fn resource_id() -> SmolStr {
 
 const INT_PARAM: TypeParam = TypeParam::Value(HashableType::Int(8));
 
-fn int_type_id() -> SmolStr {
-    SmolStr::new_inline("int")
-}
-
-fn float64_type_id() -> SmolStr {
-    SmolStr::new_inline("float64")
-}
+const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
+const FLOAT64_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 fn int_type(n: u8) -> SimpleType {
     CustomType::new(
-        int_type_id(),
+        INT_TYPE_ID,
         [TypeArg::Int(n as u128)],
         resource_id(),
         TypeTag::Classic,
@@ -40,7 +35,7 @@ fn int_type(n: u8) -> SimpleType {
 }
 
 fn float64_type() -> SimpleType {
-    CustomType::new(float64_type_id(), [], resource_id(), TypeTag::Classic).into()
+    CustomType::new(FLOAT64_TYPE_ID, [], resource_id(), TypeTag::Classic).into()
 }
 
 fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
