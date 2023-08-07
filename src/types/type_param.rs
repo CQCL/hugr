@@ -6,8 +6,6 @@
 
 use thiserror::Error;
 
-use crate::ops::constant::{CustomConst, CustomSerialized};
-
 use super::CustomType;
 use super::{ClassicType, PrimType, SimpleType, TypeTag};
 
@@ -37,10 +35,32 @@ pub enum TypeArg {
     /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
     USize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
-    Opaque(CustomSerialized),
+    Opaque(CustomTypeArg),
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of arguments.
     Sequence(Vec<TypeArg>),
+}
+
+/// A serialized representation of a value of a [CustomType]
+/// restricted to Hashable types.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CustomTypeArg {
+    /// The type of the constant.
+    /// (Exact matches only - the constant is exactly this type.)
+    typ: CustomType,
+    /// Serialized representation.
+    pub value: serde_yaml::Value,
+}
+
+impl CustomTypeArg {
+    /// Create a new CustomTypeArg. Enforces that the type must be Hashable.
+    pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
+        if typ.tag() == TypeTag::Hashable {
+            Ok(Self { typ, value })
+        } else {
+            Err("Only Hashable CustomTypes can be used as TypeArgs")
+        }
+    }
 }
 
 impl TypeArg {
@@ -76,10 +96,12 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             }
         }
         (TypeArg::USize(_), TypeParam::USize) => Ok(()),
-        (TypeArg::Opaque(arg), TypeParam::Opaque(param)) => {
-            arg.check_custom_type(param)?;
+        (TypeArg::Opaque(arg), TypeParam::Opaque(param))
+            if param.tag() == TypeTag::Hashable && &arg.typ == param =>
+        {
             Ok(())
         }
+
         _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
     }
 }

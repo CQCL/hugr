@@ -305,11 +305,9 @@ pub trait CustomConst:
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
-// Don't derive Eq here - the yaml could contain floats etc.
-// (Perhaps we could derive Eq if-and-only-if "typ.tag() == TypeTag::Hashable"!)
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A value stored as a serialized blob that can report its own type.
-pub struct CustomSerialized {
+struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
 }
