@@ -40,6 +40,11 @@ impl CustomType {
             tag,
         }
     }
+
+    /// Returns the tag of this [`CustomType`].
+    pub fn tag(&self) -> TypeTag {
+        self.tag
+    }
 }
 
 impl CustomType {
