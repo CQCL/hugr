@@ -17,7 +17,6 @@ use smol_str::SmolStr;
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
-pub mod typecheck;
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Const {
@@ -306,9 +305,8 @@ pub trait CustomConst:
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
-// Don't derive Eq here - the yaml could contain floats etc.
-// (Perhaps we could derive Eq if-and-only-if "typ.tag() == TypeTag::Hashable"!)
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// A value stored as a serialized blob that can report its own type.
 struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
@@ -338,17 +336,14 @@ mod test {
     use cool_asserts::assert_matches;
     use serde_yaml::Value;
 
-    use super::{typecheck::ConstIntError, Const, ConstValue, CustomSerialized};
+    use super::{Const, ConstValue, CustomSerialized};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
         types::simple::Container,
         types::type_param::TypeArg,
-        types::{
-            AbstractSignature, ClassicType, CustomType, HashableType, SimpleRow, SimpleType,
-            TypeTag,
-        },
-        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
+        types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeTag},
+        values::{ConstIntError, ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
     #[test]
@@ -430,9 +425,7 @@ mod test {
     fn test_yaml_const() {
         let typ_int = CustomType::new(
             "mytype",
-            vec![TypeArg::ClassicType(ClassicType::Hashable(
-                HashableType::Int(8),
-            ))],
+            vec![TypeArg::USize(8)],
             "myrsrc",
             TypeTag::Hashable,
         );
@@ -450,15 +443,15 @@ mod test {
         val.check_type(&ClassicType::Container(Container::Opaque(typ_int.clone())))
             .unwrap();
 
-        let typ_float = CustomType::new(
+        let typ_qb = CustomType::new(
             "mytype",
-            vec![TypeArg::ClassicType(ClassicType::F64)],
+            vec![TypeArg::Type(SimpleType::Qubit)],
             "myrsrc",
             TypeTag::Hashable,
         );
-        let t: SimpleType = typ_float.clone().into();
+        let t: SimpleType = typ_qb.clone().into();
         assert_matches!(val.check_type(&t.try_into().unwrap()),
-            Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_float);
+            Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);
 
         assert_eq!(val, val);
     }
