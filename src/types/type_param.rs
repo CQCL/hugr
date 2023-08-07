@@ -24,7 +24,7 @@ pub enum TypeParam {
     Opaque(CustomType),
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
     List(Box<TypeParam>),
-    /// /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
+    /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
     Tuple(Vec<TypeParam>),
 }
 
@@ -38,7 +38,8 @@ pub enum TypeArg {
     USize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque(CustomSerialized),
-    /// Instance of [TypeParam::List] or [TypeParam::Tuple] List of arguments
+    /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
+    /// sequence of arguments.
     Sequence(Vec<TypeArg>),
 }
 
