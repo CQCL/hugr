@@ -58,12 +58,11 @@ impl TypeTag {
     /// Returns the smallest TypeTag containing both the receiver and argument.
     /// (This will be one of the receiver or the argument.)
     pub fn union(self, other: Self) -> Self {
-        if self == Self::Simple || other == Self::Simple {
-            Self::Simple
-        } else if self == Self::Classic || other == Self::Classic {
-            Self::Classic
+        if self.contains(other) {
+            self
         } else {
-            Self::Hashable
+            debug_assert!(other.contains(self));
+            other
         }
     }
 
@@ -77,6 +76,15 @@ impl TypeTag {
     /// (with a strong notion of equality, i.e. [HashableType]s)
     pub fn is_hashable(self) -> bool {
         self == Self::Hashable
+    }
+
+    /// Report if this tag contains another.
+    pub fn contains(&self, other: TypeTag) -> bool {
+        use TypeTag::*;
+        matches!(
+            (self, other),
+            (Simple, _) | (_, Hashable) | (Classic, Classic)
+        )
     }
 }
 

@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 use super::CustomType;
-use super::{ClassicType, PrimType, SimpleType, TypeTag};
+use super::{PrimType, SimpleType, TypeTag};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -76,12 +76,7 @@ impl TypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (
-            TypeArg::Type(SimpleType::Classic(ClassicType::Hashable(_))),
-            TypeParam::Type(TypeTag::Hashable),
-        ) => Ok(()),
-        (TypeArg::Type(SimpleType::Classic(_)), TypeParam::Type(TypeTag::Classic)) => Ok(()),
-        (TypeArg::Type(_), TypeParam::Type(TypeTag::Simple)) => Ok(()),
+        (TypeArg::Type(t), TypeParam::Type(tag)) if tag.contains(t.tag()) => Ok(()),
         (TypeArg::Sequence(items), TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
