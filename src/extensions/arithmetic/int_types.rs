@@ -16,10 +16,6 @@ pub const fn resource_id() -> SmolStr {
     SmolStr::new_inline("arithmetic.int.types")
 }
 
-/// Parameter for an integer type or operation representing the bit width.
-/// Allowed values are: 1, 2, 4, 8, 16, 32, 64, 128.
-pub const INT_PARAM: TypeParam = TypeParam::USize;
-
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
@@ -41,7 +37,7 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
     let n: u8 = match arg {
         TypeArg::USize(n) => *n as u8,
         _ => {
-            return Err(TypeArgError::TypeMismatch(arg.clone(), INT_PARAM).into());
+            return Err(TypeArgError::TypeMismatch(arg.clone(), TypeParam::USize).into());
         }
     };
     if (n != 1)
@@ -65,7 +61,7 @@ pub fn resource() -> Resource {
     resource
         .add_type(
             INT_TYPE_ID,
-            vec![INT_PARAM],
+            vec![TypeParam::USize],
             "integral value of a given bit width".to_owned(),
             TypeTag::Classic.into(),
         )

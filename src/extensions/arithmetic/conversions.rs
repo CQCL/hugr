@@ -7,12 +7,15 @@ use smol_str::SmolStr;
 
 use crate::{
     resource::{ResourceSet, SignatureError},
-    types::{type_param::TypeArg, HashableType, SimpleRow, SimpleType},
+    types::{
+        type_param::{TypeArg, TypeParam},
+        HashableType, SimpleRow, SimpleType,
+    },
     Resource,
 };
 
 use super::float_types::float64_type;
-use super::int_types::{get_width, int_type, INT_PARAM};
+use super::int_types::{get_width, int_type};
 
 /// The resource identifier.
 pub const fn resource_id() -> SmolStr {
@@ -57,7 +60,7 @@ pub fn resource() -> Resource {
         .add_op_custom_sig_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
-            vec![INT_PARAM],
+            vec![TypeParam::USize],
             ftoi_sig,
         )
         .unwrap();
@@ -65,7 +68,7 @@ pub fn resource() -> Resource {
         .add_op_custom_sig_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
-            vec![INT_PARAM],
+            vec![TypeParam::USize],
             ftoi_sig,
         )
         .unwrap();
@@ -73,7 +76,7 @@ pub fn resource() -> Resource {
         .add_op_custom_sig_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
-            vec![INT_PARAM],
+            vec![TypeParam::USize],
             itof_sig,
         )
         .unwrap();
@@ -81,7 +84,7 @@ pub fn resource() -> Resource {
         .add_op_custom_sig_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
-            vec![INT_PARAM],
+            vec![TypeParam::USize],
             itof_sig,
         )
         .unwrap();
