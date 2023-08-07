@@ -1003,7 +1003,6 @@ Container(T) ::= List(T)
               | NewType(Name, T)
               | Sum (#(T))
 ClassicType ::= int<N>
-              | float64
               | Var(X)
               | String
               | Graph[R](#, #)
@@ -1022,8 +1021,8 @@ sent down Static edges.
 Function signatures are made up of *rows* (\#), which consist of an
 arbitrary number of SimpleTypes, plus a resource spec.
 
-ClassicTypes such as `int<N>` (where `N` is the bit-width) and `float64` are both fixed-size,
-as is Qubit.
+ClassicTypes such as `int<N>` (where `N` is the bit-width) are fixed-size, as is
+Qubit.
 `Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
 statically-known number and type of elements, as does `Array<N>` (where
 N is a static constant). These types are also fixed-size if their

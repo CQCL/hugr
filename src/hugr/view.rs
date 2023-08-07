@@ -11,7 +11,7 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, NodeMetadata, NodeType};
 use super::{Node, Port};
-use crate::ops::{OpName, OpType};
+use crate::ops::{OpName, OpTag, OpType};
 use crate::types::EdgeKind;
 use crate::Direction;
 
@@ -140,6 +140,10 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
+
+    /// Get the input and output child nodes of a dataflow parent.
+    /// If the node isn't a dataflow parent, then return None
+    fn get_io(&self, node: Node) -> Option<[Node; 2]>;
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
@@ -290,6 +294,17 @@ where
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.as_ref().graph.all_neighbours(node.index).map_into()
+    }
+
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        let op = self.get_nodetype(node);
+        let dfp = OpTag::DataflowParent;
+        if op.tag().is_superset(OpTag::DataflowParent) {
+            self.children(node).take(2).collect_vec().try_into().ok()
+        } else {
+            None
+        }
     }
 
     #[inline]
