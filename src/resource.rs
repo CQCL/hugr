@@ -221,6 +221,11 @@ impl ResourceSet {
         Self(HashSet::new())
     }
 
+    /// Creates a new resource set from some resources.
+    pub fn new_from_resources(resources: impl Into<HashSet<ResourceId>>) -> Self {
+        Self(resources.into())
+    }
+
     /// Adds a resource to the set.
     pub fn insert(&mut self, resource: &ResourceId) {
         self.0.insert(resource.clone());
