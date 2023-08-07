@@ -1,4 +1,6 @@
-use super::{ClassicElem, ClassicType, HashableElem, HashableType, SimpleElem, SimpleType};
+use std::convert::Infallible;
+
+use super::{ClassicElem, HashableElem, SimpleElem, SimpleType};
 
 use super::Container;
 
@@ -29,7 +31,7 @@ pub(crate) enum SerSimpleType {
         signature: Box<AbstractSignature>,
     },
     List {
-        inner: Box<SimpleType>,
+        inner: Box<SerSimpleType>,
         c: TypeTag,
     },
     Map {
@@ -64,27 +66,47 @@ pub(crate) enum SerSimpleType {
 }
 impl TypeRowElem for SerSimpleType {}
 
-trait SerializableType: PrimType {
+pub(super) trait SerializableType:
+    PrimType + Into<SerSimpleType> + TryFrom<SimpleElem>
+{
+    // ALAN Note that we write the tag out quite a bit (in every container-y SerSimpleType),
+    // but we never read it in. Now the tag we write will always be that of the declared
+    // primitive/leaf type (of the outermost Container). Previous behaviour would have
+    // written out the smallest tag containing all the leaves within this sub-Container
+    // - which we would get by dynamic inspection of Tagged:tag(), without needing this. ???
     const TAG: TypeTag;
+    fn from_ser(val: SerSimpleType) -> Result<Self, <Self as TryFrom<SimpleElem>>::Error> {
+        let v: SimpleType = val.try_into().unwrap(); // Cannot fail for SimpleElem
+                                                     // Believe we should only call this from above for single values. So make a separate trait??
+        let SimpleType::Single(e) = v else {panic!("Found container {:?}", v)};
+        e.try_into()
+    }
+
+    fn err_to_string(err: <Self as TryFrom<SimpleElem>>::Error) -> String;
 }
 
 impl SerializableType for ClassicElem {
     const TAG: TypeTag = TypeTag::Classic;
+    fn err_to_string(err: String) -> String {
+        err
+    }
 }
 
 impl SerializableType for SimpleElem {
     const TAG: TypeTag = TypeTag::Simple;
+    fn err_to_string(err: Infallible) -> String {
+        panic!("Infallible!")
+    }
 }
 
 impl SerializableType for HashableElem {
     const TAG: TypeTag = TypeTag::Hashable;
+    fn err_to_string(err: String) -> String {
+        err
+    }
 }
 
-impl<T: SerializableType> From<Container<T>> for SerSimpleType
-where
-    SerSimpleType: From<T>,
-    SimpleType: From<T>,
-{
+impl<T: SerializableType> From<Container<T>> for SerSimpleType {
     fn from(value: Container<T>) -> Self {
         match value {
             Container::Single(elem) => elem.into(),
@@ -101,7 +123,11 @@ where
                 c: T::TAG,
             },
             Container::Map(inner) => SerSimpleType::Map {
-                k: Box::new(inner.0.into()),
+                k: {
+                    let h: Container<HashableElem> = inner.0;
+                    let k: SerSimpleType = h.into();
+                    Box::new(k)
+                },
                 v: Box::new(inner.1.into()),
                 c: T::TAG,
             },
@@ -133,8 +159,7 @@ impl From<ClassicElem> for SerSimpleType {
             ClassicElem::Graph(inner) => SerSimpleType::G {
                 signature: Box::new(*inner),
             },
-            ClassicElem::String => SerSimpleType::S,
-            ClassicElem::Variable(s) => SerSimpleType::Var { name: s },
+            ClassicElem::Hashable(h) => h.into(),
         }
     }
 }
@@ -142,18 +167,17 @@ impl From<ClassicElem> for SerSimpleType {
 impl From<SimpleElem> for SerSimpleType {
     fn from(value: SimpleElem) -> Self {
         match value {
-            SimpleType::Classic(c) => c.into(),
-            SimpleType::Qubit => SerSimpleType::Q,
+            SimpleElem::Classic(c) => c.into(),
+            SimpleElem::Qubit => SerSimpleType::Q,
         }
     }
 }
 
-pub(crate) fn box_convert_try<T, F>(value: T) -> Box<F>
+pub(crate) fn box_convert_try<T, F>(value: T) -> Result<Box<F>, <T as TryInto<F>>::Error>
 where
     T: TryInto<F>,
-    <T as TryInto<F>>::Error: std::fmt::Debug,
 {
-    Box::new((value).try_into().unwrap())
+    Ok(Box::new((value).try_into()?))
 }
 
 pub(crate) fn box_convert<T, F>(value: T) -> Box<F>
@@ -163,53 +187,57 @@ where
     Box::new((value).into())
 }
 
-macro_rules! handle_container {
-   ($tag:ident, $variant:ident($($r:expr),*)) => {
-        match $tag {
-            TypeTag::Simple => (Container::<SimpleElem>::$variant($($r),*)).into(),
-            TypeTag::Classic => (Container::<ClassicElem>::$variant($($r),*)).into(),
-            TypeTag::Hashable => (Container::<HashableElem>::$variant($($r),*)).into()
-        }
-    }
-}
-
-impl From<SerSimpleType> for SimpleType {
-    fn from(value: SerSimpleType) -> Self {
-        match value {
-            SerSimpleType::Q => SimpleType::Qubit,
+impl<T: SerializableType> TryFrom<SerSimpleType> for Container<T> {
+    type Error = String;
+    fn try_from(value: SerSimpleType) -> Result<Self, String> {
+        let elem: SimpleElem = match value {
+            SerSimpleType::Q => SimpleElem::Qubit,
             SerSimpleType::I { width } => HashableElem::Int(width).into(),
-            SerSimpleType::F => ClassicType::F64.into(),
-            SerSimpleType::S => ClassicElem::String.into(),
-            SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
+            SerSimpleType::F => ClassicElem::F64.into(),
+            SerSimpleType::S => HashableElem::String.into(),
+            SerSimpleType::G { signature } => ClassicElem::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
-                handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
+                return Ok(Container::Tuple(Box::new(inner.try_convert_elems()?)))
             }
             SerSimpleType::Sum { row: inner, c } => {
-                handle_container!(c, Sum(Box::new(inner.try_convert_elems().unwrap())))
+                return Ok(Container::Sum(Box::new(inner.try_convert_elems()?)))
             }
-            SerSimpleType::List { inner, c } => handle_container!(c, List(box_convert_try(*inner))),
-            SerSimpleType::Map { k, v, c } => handle_container!(
-                c,
-                Map(Box::new((
-                    (*k).try_into().unwrap(),
-                    (*v).try_into().unwrap(),
-                )))
-            ),
+            SerSimpleType::List { inner, c } => {
+                return Ok(Container::List(box_convert_try(*inner)?))
+            }
+            SerSimpleType::Map { k, v, c } => {
+                return Ok(Container::Map(Box::new((
+                    (*k).try_into()?,
+                    (*v).try_into()?,
+                ))))
+            }
             SerSimpleType::Array { inner, len, c } => {
-                handle_container!(c, Array(box_convert_try(*inner), len))
+                return Ok(Container::Array(box_convert_try(*inner)?, len))
             }
-            SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
+
+            SerSimpleType::Alias { name: s, c } => {
+                return if T::TAG.union(c) == T::TAG {
+                    Ok(Container::Alias(s))
+                } else {
+                    Err(format!("Alias of too-broad tag {} expected {}", c, T::TAG))
+                }
+            }
             SerSimpleType::Opaque { custom, c } => {
-                handle_container!(c, Opaque(custom))
+                return if T::TAG.union(c) == T::TAG {
+                    Ok(Container::Opaque(custom))
+                } else {
+                    Err(format!("Opaque of too-broad tag {} expected {}", c, T::TAG))
+                }
             }
-            SerSimpleType::Var { name: s } => Container::Single(SimpleElem::Classic(
-                ClassicElem::Hashable(HashableElem::Variable(s)),
-            )),
-        }
+            SerSimpleType::Var { name: s } => HashableElem::Variable(s).into(),
+        };
+        Ok(Container::Single(
+            elem.try_into().map_err(T::err_to_string)?,
+        ))
     }
 }
 
-impl TryFrom<SerSimpleType> for ClassicType {
+/*impl TryFrom<SerSimpleType> for ClassicElem {
     type Error = String;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
@@ -230,44 +258,32 @@ impl TryFrom<SerSimpleType> for HashableType {
             _ => Err(format!("Not hashable: {}", c)),
         })
     }
-}
+}*/
 
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::types::{ClassicType, Container, HashableType, SimpleType};
+    use crate::types::simple::{ClassicElem, HashableElem, SimpleElem};
+    use crate::types::SimpleType;
 
     #[test]
     fn serialize_types_roundtrip() {
         // A Simple tuple
         let t = SimpleType::new_tuple(vec![
-            SimpleType::Qubit,
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::Single(SimpleElem::Qubit),
+            SimpleType::Single(ClassicElem::F64.into()),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
         let t = SimpleType::new_sum(vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::Single(HashableElem::Int(4).into()),
+            SimpleType::Single(ClassicElem::F64.into()),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable list
-        let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
-            Container::List(Box::new(HashableType::Int(8))),
-        )));
+        let t = SimpleType::List(Box::new(SimpleType::Single(HashableElem::Int(8).into())));
         assert_eq!(ser_roundtrip(&t), t);
-    }
-
-    #[test]
-    fn serialize_types_current_behaviour() {
-        // This list should be represented as a HashableType::Container.
-        let malformed = SimpleType::Qontainer(Container::List(Box::new(SimpleType::Classic(
-            ClassicType::Hashable(HashableType::Int(8)),
-        ))));
-        // If this behaviour changes, i.e. to return the well-formed version, that'd be fine.
-        // Just to document current serialization behaviour that we leave it untouched.
-        assert_eq!(ser_roundtrip(&malformed), malformed);
     }
 }

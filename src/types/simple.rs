@@ -79,6 +79,11 @@ mod sealed {
 /// For algebraic types Sum, Tuple if one element of type row is linear, the
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(
+    try_from = "serialize::SerSimpleType",
+    into = "serialize::SerSimpleType",
+    bound = "T:serialize::SerializableType"
+)]
 pub enum Container<T: PrimType> {
     /// A single element
     Single(T),
@@ -118,6 +123,14 @@ impl<T: PrimType> Container<T> {
             Container::Opaque(t) => Container::Opaque(t),
         }
     }
+
+    fn new_tuple(elems: impl Into<TypeRow<Container<T>>>) -> Self {
+        Self::Tuple(Box::new(elems.into()))
+    }
+
+    fn new_sum(elems: impl Into<TypeRow<Container<T>>>) -> Self {
+        Self::Sum(Box::new(elems.into()))
+    }
 }
 
 impl<T: PrimType> TypeRow<Container<T>> {
@@ -154,8 +167,7 @@ impl<T: PrimType> Display for Container<T> {
 // TODO: Derive pyclass
 //
 // TODO: Compare performance vs flattening this into a single enum
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "serialize::SerSimpleType", into = "serialize::SerSimpleType")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SimpleElem {
     /// A type containing only classical data. Elements of this type can be copied.
@@ -191,8 +203,7 @@ impl PrimType for SimpleElem {}
 /// Uses `Box`es on most variants to reduce the memory footprint.
 ///
 /// TODO: Derive pyclass.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "SimpleElem", into = "SimpleElem")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ClassicElem {
     /// A 64-bit floating point number.
@@ -253,8 +264,7 @@ impl ClassicElem {
 
 /// A type that represents concrete classical data that supports hashing
 /// and a strong notion of equality. (So, e.g., no floating-point.)
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "ClassicElem", into = "ClassicElem")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum HashableElem {
     /// A type variable identified by a name.
@@ -344,6 +354,12 @@ impl From<ClassicElem> for SimpleElem {
     }
 }
 
+impl From<HashableElem> for SimpleElem {
+    fn from(value: HashableElem) -> Self {
+        SimpleElem::Classic(value.into())
+    }
+}
+
 // for deserialization
 impl TryFrom<SimpleElem> for ClassicElem {
     type Error = String;
@@ -352,6 +368,17 @@ impl TryFrom<SimpleElem> for ClassicElem {
         match value {
             SimpleElem::Classic(e) => Ok(e),
             _ => Err(format!("Not classic: {:?}", value)),
+        }
+    }
+}
+
+impl TryFrom<SimpleElem> for HashableElem {
+    type Error = String;
+    fn try_from(value: SimpleElem) -> Result<Self, Self::Error> {
+        let value: ClassicElem = value.try_into()?;
+        match value {
+            ClassicElem::Hashable(v) => Ok(v),
+            _ => Err(format!("Not hashable: {:?}", value)),
         }
     }
 }
