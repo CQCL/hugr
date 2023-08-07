@@ -9,11 +9,11 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, NodeMetadata, NodeType};
-use super::{Node, Port};
+use crate::hugr::{Hugr, NodeMetadata, NodeType};
 use crate::ops::{OpName, OpTag, OpType};
 use crate::types::EdgeKind;
 use crate::Direction;
+use crate::{Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.

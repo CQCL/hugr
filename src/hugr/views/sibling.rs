@@ -1,10 +1,22 @@
-//! Views into subgraphs of HUGRs.
+//! Views for HUGR sibling subgraphs.
 //!
-//! Subgraphs are a generalisation of a [`Region`], in which there can be
-//! more than one root node. However, all root nodes must belong to the same
+//! Views into subgraphs of HUGRs within a single level of the
+//! hierarchy, i.e. within a sibling graph. Such a subgraph is
+//! given by a root node, of which all nodes in the sibling subgraph are
+//! children, as well as a subgraph boundary, defining the separation between
+//! inside and outside the subgraph. The boundary is fully contained within the
 //! sibling graph.
 //!
-//! TODO: Subgraphs implement [`HugrView`] as well as petgraph's _visit_ traits.
+//! Sibling subgraphs complement [`super::HierarchyView`]s in the sense that the
+//! latter provide views for subgraphs defined by hierarchical relationships,
+//! while the former provide views for subgraphs within a single level of the
+//! hierarchy.
+//!
+
+// TODO:
+// //! This module exposes the [`SiblingView`] trait, which is currently
+// //! implemented by the [`SiblingSubgraph`] struct in this module, as well as
+// //! the [`SiblingGraph`] hierarchical view.
 
 use std::cell::OnceCell;
 
@@ -17,13 +29,9 @@ use crate::{
     Direction, Hugr, Node, Port, SimpleReplacement,
 };
 
-use super::{
-    region::{Region, RegionView},
-    view::sealed::HugrInternals,
-    HugrView,
-};
+use super::{sealed::HugrInternals, HierarchyView, HugrView, SiblingGraph};
 
-/// A boundary edge of a subhugr.
+/// A boundary edge of a sibling subgraph.
 ///
 /// It is always uniquely identified (any Hugr edge is) by the node and port
 /// of the target of the edge. Source edges are not unique as they can involve
@@ -77,19 +85,20 @@ impl BoundaryEdge {
     }
 }
 
-/// A subgraph of a HUGR.
+/// A subgraph of a HUGR sibling graph.
 ///
 /// The subgraph is described by the following data:
 ///  - a HugrView to the underlying HUGR,
-///  - a root node, of which all nodes in the [`SubHugr`] must be descendants,
+///  - a root node, of which all nodes in the [`SiblingSubgraph`] must be
+///    children,
 ///  - incoming/outgoing boundary edges, pointing into/out of the subgraph.
-/// The incoming/outgoing edges must link direct children of the
-/// root node. Their ordering matters when using the [`SubHugr`] for replacements,
-/// as it will match the ordering of the ports in the replacement.
+/// The incoming/outgoing edges must be contained within the sibling graph of the
+/// root node. Their ordering matters when using the [`SiblingSubgraph`] for
+/// replacements, as it will match the ordering of the ports in the replacement.
 /// The list of incoming and/or outgoing ports may be empty.
 ///
-/// A subhugr is well-defined if the incoming/outgoing edges partition the
-/// edges between the children of the root node into three sets:
+/// A subgraph is well-defined if the incoming/outgoing edges partition the
+/// edges of the sibling graph into three sets:
 ///  - boundary edges: either incoming boundary or outgoing boundary edges,
 ///  - interior edges: edges such that all the successor edges are either
 ///    outgoing boundary edges or interior edges AND all the predecessor edges
@@ -98,19 +107,20 @@ impl BoundaryEdge {
 ///    incoming boundary edges or exterior edges AND all the predecessor edges
 ///    are either outgoing boundary edges or exterior edges.
 ///
-/// Then the subhugr contains all children nodes of the root that are
+/// Then the subgraph contains all nodes of the sibling graph of the root that
+/// are
 ///  - adjacent to an interior edge, or
-///  - in-adjacent to an incoming edge and out-adjacent to an outgoing edge.
+///  - the target of an incoming boundary edge and the source of an outgoing
+///    boundary edge.
 ///
-/// The root node itself is not included in the subhugr. Any node that is a
-/// descendant of a node in the subhugr is itself also in the subhugr.
-/// If both incoming and outgoing ports are empty, the subhugr is taken to be
-/// all children of the root.
+/// The root node itself is not included in the subgraph. If both incoming and
+/// outgoing ports are empty, the subgraph is taken to be all children of the
+/// root and is equivalent to a [`SiblingGraph`].
 ///
 /// This does not implement Sync as we use a `OnceCell` to cache the sibling
 /// graph.
 #[derive(Clone, Debug)]
-pub struct SubHugr<'g, Base: HugrInternals> {
+pub struct SiblingSubgraph<'g, Base: HugrInternals> {
     hugr: &'g Base,
     root: Node,
     incoming: Vec<BoundaryEdge>,
@@ -118,16 +128,21 @@ pub struct SubHugr<'g, Base: HugrInternals> {
     sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
 }
 
-impl<'g, Base: HugrView> SubHugr<'g, RegionView<'g, Base>> {
-    /// Creates a new subhugr from a region.
-    pub fn from_region(region: &'g RegionView<'g, Base>) -> Self {
+impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+    /// A sibling subgraph from a [`SiblingGraph`] object.
+    ///
+    /// The subgraph is given by the entire sibling graph.
+    pub fn from_sibling_graph(region: &'g SiblingGraph<'g, Base>) -> Self
+    where
+        Base: HugrView,
+    {
         let root = region.root();
-        Self::new(region, root, [], [])
+        Self::new(region.base(), root, [], [])
     }
-}
 
-impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
-    /// Creates a new subhugr from a root node
+    /// A sibling subgraph given by a HUGR and a `root` node.
+    ///
+    /// The subgraph is given by the entire sibling graph.
     pub fn from_root(hugr: &'g Base, root: Node) -> Self {
         Self {
             hugr,
@@ -138,7 +153,10 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
         }
     }
 
-    /// Create a new subhugr from a DFG-rooted hugr
+    /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted HUGR.
+    ///
+    /// The subgraph is given by the nodes between the input and output
+    /// children nodes of the `root` node.
     pub fn from_dfg(hugr: &'g Base) -> Self
     where
         Base: HugrView,
@@ -147,10 +165,10 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
         Self::from_dfg_root(hugr, root)
     }
 
-    /// Create a new subhugr from a DFG node in a Hugr
+    /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`] node in a HUGR.
     ///
-    /// This also works for e.g. FuncDefn nodes, i.e. roots where the first
-    /// two children correspond to inputs and outputs.
+    /// The subgraph is given by the nodes between the input and output
+    /// children nodes of the `root` node.
     ///
     /// Panics if it could not find an input and an output node.
     pub fn from_dfg_root(hugr: &'g Base, root: Node) -> Self
@@ -169,7 +187,7 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
         }
     }
 
-    /// Creates a new subhugr.
+    /// Creates a new sibling subgraph.
     ///
     /// The incoming and outgoing edges can be expressed as either source or
     /// target ports. If source ports are given, they will be converted to
@@ -218,18 +236,18 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
         })
     }
 
-    /// An iterator over the nodes in the subhugr.
+    /// An iterator over the nodes in the subgraph.
     pub fn nodes(&self) -> impl Iterator<Item = Node> + '_
     where
         Base: HugrView,
     {
         self.get_sibling_graph().nodes_iter().flat_map(|index| {
-            let region = RegionView::new(self.hugr, Node { index });
+            let region = SiblingGraph::new(self.hugr, Node { index });
             region.nodes().collect_vec()
         })
     }
 
-    /// The number of incoming and outgoing wires of the subhugr.
+    /// The number of incoming and outgoing wires of the subgraph.
     pub fn boundary_signature(&self) -> (usize, usize)
     where
         Base: HugrView,
@@ -242,13 +260,13 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
     /// Construct a [`SimpleReplacement`] to replace `self` with `replacement`.
     ///
     /// `replacement` must be a hugr with DFG root and its signature must
-    /// match the signature of the subhugr.
+    /// match the signature of the subgraph.
     ///
     /// Panics if
     ///  - `replacement` is not a hugr with DFG root, or
     ///  - the DFG root does not have an input and output node, or
     ///  - the number of incoming and outgoing ports in replacement does not
-    ///    match the subhugr boundary signature.
+    ///    match the subgraph boundary signature.
     pub fn create_simple_replacement(&self, replacement: Hugr) -> SimpleReplacement
     where
         Base: AsRef<Hugr>,
@@ -280,11 +298,16 @@ impl<'g, Base: HugrInternals> SubHugr<'g, Base> {
         SimpleReplacement::new(self.root, removal, replacement, nu_inp, nu_out)
     }
 
-    /// Whether the subhugr is convex.
+    /// Whether the sibling subgraph is convex.
     pub fn is_convex(&self) -> bool {
         self.get_sibling_graph().is_convex()
     }
 }
+
+// /// A common trait for views of a HUGR sibling subgraph.
+// pub trait SiblingView: HugrView {}
+
+// impl<'g, Base: HugrView> SiblingView for SiblingSubgraph<'g, Base> {}
 
 #[cfg(test)]
 mod tests {
@@ -293,7 +316,6 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        hugr::region::Region,
         ops::{handle::NodeHandle, LeafOp},
         type_row,
         types::{AbstractSignature, SimpleType},
@@ -321,11 +343,11 @@ mod tests {
     }
 
     #[test]
-    fn construct_subhugr() {
+    fn construct_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let from_root = SubHugr::from_root(&hugr, func_root);
-        let region = RegionView::new(&hugr, func_root);
-        let from_region = SubHugr::from_region(&region);
+        let from_root = SiblingSubgraph::from_root(&hugr, func_root);
+        let region = SiblingGraph::new(&hugr, func_root);
+        let from_region = SiblingSubgraph::from_sibling_graph(&region);
         assert_eq!(from_root.root, from_region.root);
         assert_eq!(from_root.incoming, from_region.incoming);
         assert_eq!(from_root.outgoing, from_region.outgoing);
@@ -334,10 +356,11 @@ mod tests {
     #[test]
     fn construct_simple_replacement() {
         let (mut hugr, func_root) = build_hugr().unwrap();
-        let sub = SubHugr::from_dfg_root(&hugr, func_root);
+        let sub = SiblingSubgraph::from_dfg_root(&hugr, func_root);
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(type_row![QB, QB], type_row![QB, QB]).unwrap();
+            let builder =
+                DFGBuilder::new(AbstractSignature::new_linear(type_row![QB, QB])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -355,10 +378,10 @@ mod tests {
     #[should_panic(expected = "zip_eq")]
     fn construct_simple_replacement_signature_panics() {
         let (hugr, dfg) = build_hugr().unwrap();
-        let sub = SubHugr::from_dfg_root(&hugr, dfg);
+        let sub = SiblingSubgraph::from_dfg_root(&hugr, dfg);
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(type_row![QB], type_row![QB]).unwrap();
+            let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -367,18 +390,18 @@ mod tests {
     }
 
     #[test]
-    fn convex_subhugr() {
+    fn convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let sub = SubHugr::from_dfg_root(&hugr, func_root);
+        let sub = SiblingSubgraph::from_dfg_root(&hugr, func_root);
         assert!(sub.is_convex());
     }
 
     #[test]
-    fn convex_subhugr_2() {
+    fn convex_subgraph_2() {
         let (hugr, func_root) = build_hugr().unwrap();
         let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
         // All graph except input/output nodes
-        let sub = SubHugr::new(
+        let sub = SiblingSubgraph::new(
             &hugr,
             func_root,
             hugr.node_outputs(inp).map(|p| (inp, p)),
@@ -388,12 +411,12 @@ mod tests {
     }
 
     #[test]
-    fn non_convex_subhugr() {
+    fn non_convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
         let (inp, _) = hugr.children(func_root).take(2).collect_tuple().unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         // All graph but one edge
-        let sub = SubHugr::new(
+        let sub = SiblingSubgraph::new(
             &hugr,
             func_root,
             [(inp, first_cx_edge)],

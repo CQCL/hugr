@@ -18,8 +18,7 @@ use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::hierarchical_views::{HierarchyView, SiblingGraph};
-use super::view::HugrView;
+use super::views::{HierarchyView, HugrView, SiblingGraph};
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.

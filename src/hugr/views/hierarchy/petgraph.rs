@@ -1,7 +1,7 @@
 //! Implementations of petgraph's traits for Hugr Region views.
 
 use super::{DescendantsGraph, SiblingGraph};
-use crate::hugr::view::sealed::HugrInternals;
+use crate::hugr::views::sealed::HugrInternals;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;

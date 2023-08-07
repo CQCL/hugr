@@ -209,7 +209,7 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::hugr::view::HugrView;
+    use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
