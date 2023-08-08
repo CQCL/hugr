@@ -205,9 +205,10 @@ pub enum HashableType {
     String,
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
-    /// An error from an operation.
-    OpError,
 }
+
+/// An error from an operation.
+pub const ERROR_TYPE: SimpleType = SimpleType::Classic(ClassicType::Hashable(HashableType::String));
 
 impl ClassicType {
     /// Returns whether the type contains only hashable data.
@@ -305,7 +306,6 @@ impl Display for HashableType {
             }
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
-            HashableType::OpError => f.write_str("Error"),
         }
     }
 }

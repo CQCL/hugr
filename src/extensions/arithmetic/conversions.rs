@@ -8,8 +8,9 @@ use smol_str::SmolStr;
 use crate::{
     resource::{ResourceSet, SignatureError},
     types::{
+        simple::ERROR_TYPE,
         type_param::{TypeArg, TypeParam},
-        HashableType, SimpleRow, SimpleType,
+        SimpleRow, SimpleType,
     },
     Resource,
 };
@@ -25,11 +26,7 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
     let n: u8 = get_width(arg)?;
     Ok((
         vec![float64_type()].into(),
-        vec![SimpleType::new_sum(vec![
-            int_type(n),
-            HashableType::OpError.into(),
-        ])]
-        .into(),
+        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }

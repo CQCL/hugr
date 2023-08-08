@@ -5,10 +5,11 @@ use smol_str::SmolStr;
 
 use super::super::logic::bool_type;
 use super::int_types::{get_width, int_type};
+use crate::types::simple::ERROR_TYPE;
 use crate::types::type_param::TypeParam;
 use crate::{
     resource::{ResourceSet, SignatureError},
-    types::{type_param::TypeArg, HashableType, SimpleRow, SimpleType, TypeRow},
+    types::{type_param::TypeArg, SimpleRow, SimpleType, TypeRow},
     Resource,
 };
 
@@ -42,11 +43,7 @@ fn inarrow_sig(
     }
     Ok((
         vec![int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![
-            int_type(n),
-            HashableType::OpError.into(),
-        ])]
-        .into(),
+        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
@@ -116,7 +113,7 @@ fn idivmod_sig(
         intpair.clone(),
         vec![SimpleType::new_sum(vec![
             SimpleType::new_tuple(intpair),
-            HashableType::OpError.into(),
+            ERROR_TYPE,
         ])]
         .into(),
         ResourceSet::default(),
@@ -129,11 +126,7 @@ fn idiv_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
     let m: u8 = get_width(arg1)?;
     Ok((
         vec![int_type(n), int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![
-            int_type(n),
-            HashableType::OpError.into(),
-        ])]
-        .into(),
+        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
@@ -144,11 +137,7 @@ fn imod_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
     let m: u8 = get_width(arg1)?;
     Ok((
         vec![int_type(n), int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![
-            int_type(m),
-            HashableType::OpError.into(),
-        ])]
-        .into(),
+        vec![SimpleType::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
