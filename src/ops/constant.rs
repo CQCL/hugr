@@ -379,10 +379,7 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = vec![
-            classic_row![ClassicType::i64(), ClassicType::F64],
-            type_row![],
-        ];
+        let pred_rows = vec![classic_row![ClassicType::i64(), CLASSIC_T], type_row![]];
 
         let res = Const::predicate(0, ConstValue::sequence(&[]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
@@ -399,8 +396,8 @@ mod test {
         );
         custom_value(17.4).check_type(&CLASSIC_T).unwrap();
         assert_matches!(
-            V_INT.check_type(&ClassicType::F64),
-            Err(ConstTypeError::ValueCheckFail(ClassicType::F64, v)) => v == V_INT
+            V_INT.check_type(&CLASSIC_T),
+            Err(ConstTypeError::ValueCheckFail(t, v)) => t == CLASSIC_T && v == V_INT
         );
         let tuple_ty = ClassicType::new_tuple(classic_row![T_INT, CLASSIC_T]);
         let tuple_val = ConstValue::sequence(&[V_INT, custom_value(5.1)]);

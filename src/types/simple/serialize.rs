@@ -25,7 +25,7 @@ pub(crate) enum SerSimpleType {
     I {
         width: HugrIntWidthStore,
     },
-    F,
+    //F, // Or preserve??
     S,
     G {
         signature: Box<AbstractSignature>,
@@ -130,7 +130,6 @@ impl From<HashableType> for SerSimpleType {
 impl From<ClassicType> for SerSimpleType {
     fn from(value: ClassicType) -> Self {
         match value {
-            ClassicType::F64 => SerSimpleType::F,
             ClassicType::Graph(inner) => SerSimpleType::G {
                 signature: Box::new(*inner),
             },
@@ -180,7 +179,6 @@ impl From<SerSimpleType> for SimpleType {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
             SerSimpleType::I { width } => HashableType::Int(width).into(),
-            SerSimpleType::F => ClassicType::F64.into(),
             SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
@@ -237,6 +235,7 @@ impl TryFrom<SerSimpleType> for HashableType {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
+    use crate::types::custom::test::CLASSIC_T;
     use crate::types::{ClassicType, Container, HashableType, SimpleType};
 
     #[test]
@@ -244,14 +243,14 @@ mod test {
         // A Simple tuple
         let t = SimpleType::new_tuple(vec![
             SimpleType::Qubit,
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::from(HashableType::Int(64)),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
         let t = SimpleType::new_sum(vec![
             SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::Classic(CLASSIC_T),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 

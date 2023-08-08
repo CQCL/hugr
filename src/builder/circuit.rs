@@ -136,7 +136,7 @@ mod test {
 
     use crate::{
         builder::{
-            test::{build_main, BIT, F64, QB},
+            test::{build_main, BIT, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
         ops::{custom::OpaqueOp, LeafOp},
@@ -178,10 +178,10 @@ mod test {
             "MyOp",
             "unknown op".to_string(),
             vec![],
-            Some(AbstractSignature::new(vec![QB, F64], vec![QB], vec![])),
+            Some(AbstractSignature::new(vec![QB, NAT], vec![QB], vec![])),
         )));
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]).pure(),
+            AbstractSignature::new_df(type_row![QB, QB, NAT], type_row![QB, QB, BIT]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

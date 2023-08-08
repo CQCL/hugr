@@ -748,7 +748,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
-    use crate::types::{AbstractSignature, ClassicType};
+    use crate::types::{AbstractSignature, ClassicType, HashableType};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -876,7 +876,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: ClassicType::F64.into(),
+            ty: HashableType::Int(32).into(),
         }
         .into();
 
