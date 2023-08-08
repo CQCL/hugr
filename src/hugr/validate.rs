@@ -743,8 +743,10 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
-    use crate::builder::{BuildError, ModuleBuilder};
-    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use crate::builder::{
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder,
+    };
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
@@ -1278,6 +1280,24 @@ mod test {
         main.finish_with_outputs([output])?;
         let handle = module_builder.finish_hugr();
         assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn parent_signature_mismatch() -> Result<(), BuildError> {
+        let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+            .with_resource_delta(&ResourceSet::singleton(&"R".into()));
+
+        let builder = DFGBuilder::new(main_signature)?;
+        let [w] = builder.input_wires_arr();
+        let hugr = builder.finish_hugr_with_outputs([w]);
+
+        assert_matches!(
+            hugr,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::TgtExceedsSrcResources { .. }
+            ))
+        );
         Ok(())
     }
 }
