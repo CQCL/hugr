@@ -207,6 +207,9 @@ pub enum HashableType {
     Container(Container<HashableType>),
 }
 
+/// An error from an operation.
+pub const ERROR_TYPE: SimpleType = SimpleType::Classic(ClassicType::Hashable(HashableType::String));
+
 impl ClassicType {
     /// Returns whether the type contains only hashable data.
     pub fn is_hashable(&self) -> bool {

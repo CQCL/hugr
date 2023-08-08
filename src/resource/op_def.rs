@@ -312,6 +312,7 @@ impl Resource {
             Entry::Vacant(ve) => Ok(ve.insert(Arc::new(op))),
         }
     }
+
     /// Create an OpDef with custom binary code to compute the signature
     pub fn add_op_custom_sig(
         &mut self,
@@ -329,6 +330,25 @@ impl Resource {
             misc,
             lower_funcs,
             SignatureFunc::CustomFunc(Box::new(signature_func)),
+        )
+    }
+
+    /// Create an OpDef with custom binary code to compute the signature, and no "misc" or "lowering
+    /// functions" defined.
+    pub fn add_op_custom_sig_simple(
+        &mut self,
+        name: SmolStr,
+        description: String,
+        params: Vec<TypeParam>,
+        signature_func: impl CustomSignatureFunc + 'static,
+    ) -> Result<&OpDef, ResourceBuildError> {
+        self.add_op_custom_sig(
+            name,
+            description,
+            params,
+            HashMap::default(),
+            Vec::new(),
+            signature_func,
         )
     }
 

@@ -6,7 +6,6 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 use cgmath::num_traits::ToPrimitive;
 use num_rational::Rational64;
 use smol_str::SmolStr;
-use std::collections::HashMap;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
@@ -18,24 +17,20 @@ use crate::types::{CustomType, SimpleRow, TypeTag};
 use crate::values::CustomCheckFail;
 use crate::Resource;
 
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("rotations")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
 
 /// The resource with all the operations and types defined in this extension.
 pub fn resource() -> Resource {
-    let mut resource = Resource::new(resource_id());
+    let mut resource = Resource::new(RESOURCE_ID);
 
     Type::Angle.add_to_resource(&mut resource);
     Type::Quaternion.add_to_resource(&mut resource);
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "AngleAdd".into(),
             "".into(),
             vec![],
-            HashMap::default(),
-            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
                 Ok((t.clone(), t, ResourceSet::default()))
@@ -69,7 +64,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], resource_id(), TypeTag::Classic)
+        CustomType::new(self.name(), [], RESOURCE_ID, TypeTag::Classic)
     }
 
     fn add_to_resource(self, resource: &mut Resource) {
