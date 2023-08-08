@@ -109,12 +109,6 @@ pub enum TypeArgError {
     // TODO It may become possible to combine this with ConstTypeError.
     #[error("Type argument {0:?} does not fit declared parameter {1:?}")]
     TypeMismatch(TypeArg, TypeParam),
-    /// Wrong number of type arguments (actual vs expected).
-    // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
-    // However in the future it may be applicable to e.g. contents of Tuples too.
-    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
-    WrongNumberArgs(usize, usize),
-
     /// Wrong number of type arguments in tuple (actual vs expected).
     #[error("Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters")]
     WrongNumberTuple(usize, usize),

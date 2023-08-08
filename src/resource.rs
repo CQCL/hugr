@@ -33,9 +33,9 @@ pub enum SignatureError {
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
-    /// Invalid type arguments
-    #[error("Invalid type arguments for operation")]
-    InvalidTypeArgs,
+    /// Wrong number of type arguments (actual vs expected).
+    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
+    WrongNumberTypeArgs(usize, usize),
 }
 
 /// Concrete instantiations of types and operations defined in resources.
@@ -86,8 +86,9 @@ trait TypeParametrised {
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         if args.len() != self.params().len() {
-            return Err(SignatureError::TypeArgMismatch(
-                TypeArgError::WrongNumberArgs(args.len(), self.params().len()),
+            return Err(SignatureError::WrongNumberTypeArgs(
+                args.len(),
+                self.params().len(),
             ));
         }
         for (a, p) in args.iter().zip(self.params().iter()) {

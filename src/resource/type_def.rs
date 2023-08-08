@@ -189,7 +189,7 @@ mod test {
         // Too few arguments:
         assert_eq!(
             def.instantiate_concrete([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(0, 1))
+            SignatureError::WrongNumberTypeArgs(0, 1)
         );
         // Too many arguments:
         assert_eq!(
@@ -198,7 +198,7 @@ mod test {
                 TypeArg::Type(ClassicType::F64.into()),
             ])
             .unwrap_err(),
-            SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
+            SignatureError::WrongNumberTypeArgs(2, 1)
         );
     }
 }
