@@ -72,37 +72,15 @@ impl<T: TypeClass> Type<T> {
     }
 }
 
-/*
-Public traits for construction
-*/
-pub trait NewEq {
-    const USIZE: Self;
-}
-
-pub trait NewClassic: NewEq {
-    fn graph(signature: AbstractSignature) -> Self;
-}
-
-impl NewEq for Type<EqLeaf> {
-    const USIZE: Self = Self::Prim(EqLeaf::USize);
-}
-
-impl NewEq for Type<ClassicLeaf> {
-    const USIZE: Self = Self::Prim(ClassicLeaf::E(EqLeaf::USize));
-}
-
-impl NewClassic for Type<ClassicLeaf> {
-    fn graph(signature: AbstractSignature) -> Self {
-        Self::Prim(ClassicLeaf::Graph(Box::new(signature)))
+impl<T: From<EqLeaf>> Type<T> {
+    pub fn usize() -> Self {
+        Self::Prim(EqLeaf::USize.into())
     }
 }
 
-impl NewEq for Type<AnyLeaf> {
-    const USIZE: Self = Self::Prim(AnyLeaf::C(ClassicLeaf::E(EqLeaf::USize)));
-}
-impl NewClassic for Type<AnyLeaf> {
-    fn graph(signature: AbstractSignature) -> Self {
-        Type::<ClassicLeaf>::graph(signature).upcast()
+impl<T: From<ClassicLeaf>> Type<T> {
+    pub fn graph(signature: AbstractSignature) -> Self {
+        Self::Prim(ClassicLeaf::Graph(Box::new(signature)).into())
     }
 }
 
@@ -153,7 +131,7 @@ mod test {
     #[test]
     fn construct() {
         let t: Type<ClassicLeaf> = Type::new_tuple([
-            Type::USIZE,
+            Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_opaque(CustomType::new(
                 "my_custom",
@@ -166,5 +144,14 @@ mod test {
         let t_any: Type<AnyLeaf> = t.upcast();
 
         assert_eq!(t_any.tag(), TypeTag::Simple);
+    }
+
+    #[test]
+    fn all_constructors() {
+        Type::<EqLeaf>::usize();
+        Type::<ClassicLeaf>::usize();
+        Type::<AnyLeaf>::usize();
+        Type::<ClassicLeaf>::graph(AbstractSignature::new_linear(vec![]));
+        Type::<AnyLeaf>::graph(AbstractSignature::new_linear(vec![]));
     }
 }
