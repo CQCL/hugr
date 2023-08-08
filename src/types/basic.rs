@@ -110,10 +110,10 @@ pub trait UpCastTo<T2>: Sized {
     fn upcast(self) -> T2;
 }
 
-impl UpCastTo<Type<AnyLeaf>> for Type<ClassicLeaf> {
-    fn upcast(self: Type<ClassicLeaf>) -> Type<AnyLeaf> {
+impl<T: UpCastTo<T2>, T2> UpCastTo<Type<T2>> for Type<T> {
+    fn upcast(self) -> Type<T2> {
         match self {
-            Type::Prim(t) => Type::Prim(AnyLeaf::C(t)),
+            Type::Prim(t) => Type::Prim(t.upcast()),
             Type::Extension(t) => Type::Extension(t),
             Type::Alias(_) => todo!(),
             Type::Array(_, _) => todo!(),
@@ -123,16 +123,27 @@ impl UpCastTo<Type<AnyLeaf>> for Type<ClassicLeaf> {
     }
 }
 
-impl UpCastTo<Type<ClassicLeaf>> for Type<EqLeaf> {
-    fn upcast(self) -> Type<ClassicLeaf> {
-        todo!()
+impl UpCastTo<ClassicLeaf> for EqLeaf {
+    fn upcast(self) -> ClassicLeaf {
+        ClassicLeaf::E(self)
     }
 }
 
-impl UpCastTo<Type<AnyLeaf>> for Type<EqLeaf> {
-    fn upcast(self) -> Type<AnyLeaf> {
-        let cl: Type<ClassicLeaf> = self.upcast();
-        cl.upcast()
+impl From<EqLeaf> for ClassicLeaf {
+    fn from(value: EqLeaf) -> Self {
+        ClassicLeaf::E(value)
+    }
+}
+
+impl<T: Into<ClassicLeaf>> UpCastTo<AnyLeaf> for T {
+    fn upcast(self) -> AnyLeaf {
+        AnyLeaf::C(self.into())
+    }
+}
+
+impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
+    fn from(value: T) -> Self {
+        value.upcast()
     }
 }
 
