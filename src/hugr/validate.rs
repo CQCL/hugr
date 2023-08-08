@@ -70,6 +70,48 @@ impl<'a> ValidationContext<'a> {
             self.validate_node(node)?;
         }
 
+        // Check that io nodes match their parents' signatures
+        self.validate_io_resources(self.hugr, self.hugr.root())?;
+
+        Ok(())
+    }
+
+    /// Check that input and output nodes match up with the signature of their parents
+    /// This must be done after the `gather_resources` step
+    fn validate_io_resources(
+        &self,
+        hugr: &impl HugrView,
+        parent: Node,
+    ) -> Result<(), ValidationError> {
+        if let Some([input, output]) = hugr.get_io(parent) {
+            let parent_input_resources =
+                self.resources.get(&(parent, Direction::Incoming)).unwrap();
+            let parent_output_resources =
+                self.resources.get(&(parent, Direction::Outgoing)).unwrap();
+            for dir in Direction::BOTH {
+                let input_resources = self.resources.get(&(input, dir)).unwrap();
+                let output_resources = self.resources.get(&(output, dir)).unwrap();
+                if parent_input_resources != input_resources {
+                    return Err(ValidationError::ParentIOResourceMismatch {
+                        parent,
+                        parent_resources: parent_input_resources.clone(),
+                        child: input,
+                        child_resources: input_resources.clone(),
+                    });
+                };
+                if parent_output_resources != output_resources {
+                    return Err(ValidationError::ParentIOResourceMismatch {
+                        parent,
+                        parent_resources: parent_output_resources.clone(),
+                        child: output,
+                        child_resources: output_resources.clone(),
+                    });
+                };
+            }
+        };
+        for node in hugr.children(parent) {
+            self.validate_io_resources(hugr, node)?;
+        }
         Ok(())
     }
 
@@ -669,6 +711,13 @@ pub enum ValidationError {
     },
     #[error("Missing input resources for node {0:?}")]
     MissingInputResources(Node),
+    #[error("IO nodes don't match parent signature")]
+    ParentIOResourceMismatch {
+        parent: Node,
+        parent_resources: ResourceSet,
+        child: Node,
+        child_resources: ResourceSet,
+    },
 }
 
 #[cfg(feature = "pyo3")]
