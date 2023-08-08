@@ -35,7 +35,7 @@ pub enum SignatureError {
     TypeArgMismatch(#[from] TypeArgError),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
-    InvalidTypeArgs(),
+    InvalidTypeArgs,
 }
 
 /// Concrete instantiations of types and operations defined in resources.

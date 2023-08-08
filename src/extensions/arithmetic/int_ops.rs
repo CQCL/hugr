@@ -23,7 +23,7 @@ fn iwiden_sig(
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m > n {
-        return Err(SignatureError::InvalidTypeArgs());
+        return Err(SignatureError::InvalidTypeArgs);
     }
     Ok((
         vec![int_type(m)].into(),
@@ -39,7 +39,7 @@ fn inarrow_sig(
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m < n {
-        return Err(SignatureError::InvalidTypeArgs());
+        return Err(SignatureError::InvalidTypeArgs);
     }
     Ok((
         vec![int_type(m)].into(),
