@@ -139,7 +139,7 @@ mod test {
             test::{build_main, BIT, F64, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
-        ops::LeafOp,
+        ops::{custom::OpaqueOp, LeafOp},
         type_row,
         types::AbstractSignature,
     };
@@ -173,6 +173,13 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
+        let my_custom_op = LeafOp::CustomOp(crate::ops::custom::ExternalOp::Opaque(OpaqueOp::new(
+            "MissingRsrc".into(),
+            "MyOp",
+            "unknown op".to_string(),
+            vec![],
+            Some(AbstractSignature::new(vec![QB, F64], vec![QB], vec![])),
+        )));
         let build_res = build_main(
             AbstractSignature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]).pure(),
             |mut f_build| {
@@ -183,7 +190,7 @@ mod test {
                 let measure_out = linear
                     .append(LeafOp::CX, [0, 1])?
                     .append_and_consume(
-                        LeafOp::RzF64,
+                        my_custom_op,
                         [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
                     )?
                     .append_with_outputs(LeafOp::Measure, [0])?;
