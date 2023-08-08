@@ -90,7 +90,7 @@ where
                 c: T::TAG,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
-                inner: box_convert(*inner),
+                inner: Box::new((*inner).into()),
                 len,
                 c: T::TAG,
             },
@@ -134,21 +134,6 @@ impl From<SimpleType> for SerSimpleType {
     }
 }
 
-pub(crate) fn box_convert_try<T, F>(value: T) -> Box<F>
-where
-    T: TryInto<F>,
-    <T as TryInto<F>>::Error: std::fmt::Debug,
-{
-    Box::new((value).try_into().unwrap())
-}
-
-pub(crate) fn box_convert<T, F>(value: T) -> Box<F>
-where
-    T: Into<F>,
-{
-    Box::new((value).into())
-}
-
 fn try_convert_list<T: TryInto<T2>, T2: TypeRowElem>(
     values: Vec<T>,
 ) -> Result<TypeRow<T2>, T::Error> {
@@ -184,7 +169,7 @@ impl From<SerSimpleType> for SimpleType {
                 handle_container!(c, Sum(Box::new(try_convert_list(inner).unwrap())))
             }
             SerSimpleType::Array { inner, len, c } => {
-                handle_container!(c, Array(box_convert_try(*inner), len))
+                handle_container!(c, Array(Box::new((*inner).try_into().unwrap()), len))
             }
             SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
             SerSimpleType::Opaque { custom, c } => {
