@@ -111,10 +111,6 @@ mod sealed {
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Container<T: TypeRowElem> {
-    /// Variable sized list of T.
-    List(Box<T>),
-    /// Hash map from hashable key type to value T.
-    Map(Box<(HashableType, T)>),
     /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
@@ -131,8 +127,6 @@ pub enum Container<T: TypeRowElem> {
 impl<T: Display + PrimType> Display for Container<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Container::List(ty) => write!(f, "List({})", ty.as_ref()),
-            Container::Map(tys) => write!(f, "Map({}, {})", tys.as_ref().0, tys.as_ref().1),
             Container::Tuple(row) => write!(f, "Tuple({})", row.as_ref()),
             Container::Sum(row) => write!(f, "Sum({})", row.as_ref()),
             Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
@@ -501,7 +495,7 @@ mod test {
 
         let clas: ClassicRow = vec![
             graph_type(),
-            ClassicType::Container(Container::List(Box::new(graph_type()))),
+            ClassicType::Container(Container::Array(Box::new(graph_type()), 2)),
         ]
         .into();
         let ty = SimpleType::new_tuple(clas.map_into());
@@ -527,7 +521,7 @@ mod test {
     fn new_sum() {
         let clas = vec![
             SimpleType::Classic(graph_type()),
-            Container::<ClassicType>::List(Box::new(graph_type())).into(),
+            Container::<ClassicType>::Array(Box::new(graph_type()), 2).into(),
         ];
         let ty = SimpleType::new_sum(clas);
         assert_matches!(

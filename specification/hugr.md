@@ -996,10 +996,8 @@ Type ::= [Resources]SimpleType
 
 Resources ::= (Resource)* -- set not list
 
-Container(T) ::= List(T)
-              | Tuple(#(T))
+Container(T) ::= Tuple(#(T))
               | Array<u64>(T)
-              | Map<ClassicType, T>
               | NewType(Name, T)
               | Sum (#(T))
 ClassicType ::= int<N>
@@ -1031,9 +1029,8 @@ components are.
 For integer types, the width is provided in the type, and signedness is left unspecified to be interpreted by operations. The width is allowed to be 2^i for i in the range [0,7], so the allowed integer types are [I1, I2, I4, ... , I128].
 
 Container types are defined in terms of statically-known element types.
-Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
-types: `Graph`, `Map` and
-`List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
+Besides `Array<N>`, `Sum` and `Tuple`, these also include the variable-sized
+types: `Graph`. `NewType`
 allows named newtypes to be used. Containers are classic (copyable) only
 if all of their components are classic.
 
@@ -1093,13 +1090,10 @@ resource requirements.
 
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
-example, the `Map` type can only be constructed when the type that we
+example, a potential `HashMap` type can only be constructed when the type that we
 map from is `Hashable`. For the Hugr, we will need this `Hashable`
 constraint, as well as a `Classic` constraint.
 
-**TODO**: fix this set of constraints (classic/copyable, hashable);
-extensions/resources *cannot* add new constraints. Use hashable for
-static type parameters, put Map in Tierkreis resource not core spec.
 
 ### Resources
 
