@@ -97,10 +97,8 @@ impl ValueOfType for HashableValue {
 /// sets of values (see e.g. [ConstValue::Opaque])
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ContainerValue<T> {
-    /// A [Container::Array] or [Container::Tuple] or [Container::List]
+    /// A [Container::Array] or [Container::Tuple]
     Sequence(Vec<T>),
-    /// A [Container::Map]
-    Map(Vec<(HashableValue, T)>), // TODO try to make this an actual map?
     /// A [Container::Sum] - for any Sum type where this value meets
     /// the type of the variant indicated by the tag
     Sum(usize, Box<T>), // Tag and value
@@ -113,18 +111,11 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 let names: Vec<_> = vals.iter().map(ValueOfType::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
-            ContainerValue::Map(_) => "a map".to_string(),
             ContainerValue::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
         }
     }
     pub(crate) fn check_container(&self, ty: &Container<Elem::T>) -> Result<(), ConstTypeError> {
         match (self, ty) {
-            (ContainerValue::Sequence(elems), Container::List(elem_ty)) => {
-                for elem in elems {
-                    elem.check_type(elem_ty)?;
-                }
-                Ok(())
-            }
             (ContainerValue::Sequence(elems), Container::Tuple(tup_tys)) => {
                 if elems.len() != tup_tys.len() {
                     return Err(ConstTypeError::TupleWrongLength);
@@ -143,14 +134,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 }
                 Ok(())
             }
-            (ContainerValue::Map(mappings), Container::Map(kv)) => {
-                let (key_ty, val_ty) = &**kv;
-                for (key, val) in mappings {
-                    key.check_type(key_ty)?;
-                    val.check_type(val_ty)?;
-                }
-                Ok(())
-            }
             (ContainerValue::Sum(tag, value), Container::Sum(variants)) => {
                 value.check_type(variants.get(*tag).ok_or(ConstTypeError::InvalidSumTag)?)
             }
@@ -164,7 +147,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             ContainerValue::Sequence(vals) => {
                 ContainerValue::Sequence(vals.iter().cloned().map(f).collect())
             }
-            ContainerValue::Map(_) => todo!(),
             ContainerValue::Sum(tag, value) => {
                 ContainerValue::Sum(*tag, Box::new(f((**value).clone())))
             }
@@ -190,11 +172,6 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
         ))
     }
     match container {
-        Container::List(elem) => Container::List(Box::new(f(*(elem).clone()))),
-        Container::Map(kv) => {
-            let (k, v) = (**kv).clone();
-            Container::Map(Box::new((k, f(v))))
-        }
         Container::Tuple(elems) => Container::Tuple(map_row(elems, f)),
         Container::Sum(variants) => Container::Sum(map_row(variants, f)),
         Container::Array(elem, sz) => Container::Array(Box::new(f((**elem).clone())), *sz),
