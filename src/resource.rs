@@ -33,6 +33,9 @@ pub enum SignatureError {
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
+    /// Invalid type arguments
+    #[error("Invalid type arguments for operation")]
+    InvalidTypeArgs,
 }
 
 /// Concrete instantiations of types and operations defined in resources.
@@ -154,6 +157,15 @@ impl Resource {
         }
     }
 
+    /// Creates a new resource with the given name and requirements.
+    pub fn new_with_reqs(name: ResourceId, resource_reqs: ResourceSet) -> Self {
+        Self {
+            name,
+            resource_reqs,
+            ..Default::default()
+        }
+    }
+
     /// Allows read-only access to the operations in this Resource
     pub fn get_op(&self, op_name: &str) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
@@ -206,6 +218,11 @@ impl ResourceSet {
     /// Creates a new empty resource set.
     pub fn new() -> Self {
         Self(HashSet::new())
+    }
+
+    /// Creates a new resource set from some resources.
+    pub fn new_from_resources(resources: impl Into<HashSet<ResourceId>>) -> Self {
+        Self(resources.into())
     }
 
     /// Adds a resource to the set.

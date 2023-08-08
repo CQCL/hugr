@@ -30,15 +30,6 @@ pub(crate) enum SerSimpleType {
     G {
         signature: Box<AbstractSignature>,
     },
-    List {
-        inner: Box<SimpleType>,
-        c: TypeTag,
-    },
-    Map {
-        k: Box<SerSimpleType>,
-        v: Box<SerSimpleType>,
-        c: TypeTag,
-    },
     Tuple {
         row: Box<TypeRow<SerSimpleType>>,
         c: TypeTag,
@@ -92,17 +83,8 @@ where
                 row: Box::new(inner.map_into()),
                 c: T::TAG, // We could inspect inner.containing_tag(), but this should have been done already
             },
-            Container::List(inner) => SerSimpleType::List {
-                inner: Box::new((*inner).into()),
-                c: T::TAG, // We could inspect inner.tag(), but this should have been done already
-            },
             Container::Tuple(inner) => SerSimpleType::Tuple {
                 row: Box::new(inner.map_into()),
-                c: T::TAG,
-            },
-            Container::Map(inner) => SerSimpleType::Map {
-                k: Box::new(inner.0.into()),
-                v: Box::new(inner.1.into()),
                 c: T::TAG,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
@@ -189,14 +171,6 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::Sum { row: inner, c } => {
                 handle_container!(c, Sum(Box::new(inner.try_convert_elems().unwrap())))
             }
-            SerSimpleType::List { inner, c } => handle_container!(c, List(box_convert_try(*inner))),
-            SerSimpleType::Map { k, v, c } => handle_container!(
-                c,
-                Map(Box::new((
-                    (*k).try_into().unwrap(),
-                    (*v).try_into().unwrap(),
-                )))
-            ),
             SerSimpleType::Array { inner, len, c } => {
                 handle_container!(c, Array(box_convert_try(*inner), len))
             }
@@ -257,7 +231,7 @@ mod test {
 
         // A Hashable list
         let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
-            Container::List(Box::new(HashableType::Int(8))),
+            Container::Array(Box::new(HashableType::Int(8)), 3),
         )));
         assert_eq!(ser_roundtrip(&t), t);
     }
@@ -265,9 +239,12 @@ mod test {
     #[test]
     fn serialize_types_current_behaviour() {
         // This list should be represented as a HashableType::Container.
-        let malformed = SimpleType::Qontainer(Container::List(Box::new(SimpleType::Classic(
-            ClassicType::Hashable(HashableType::Int(8)),
-        ))));
+        let malformed = SimpleType::Qontainer(Container::Array(
+            Box::new(SimpleType::Classic(ClassicType::Hashable(
+                HashableType::Int(8),
+            ))),
+            6,
+        ));
         // If this behaviour changes, i.e. to return the well-formed version, that'd be fine.
         // Just to document current serialization behaviour that we leave it untouched.
         assert_eq!(ser_roundtrip(&malformed), malformed);

@@ -111,10 +111,6 @@ mod sealed {
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Container<T: TypeRowElem> {
-    /// Variable sized list of T.
-    List(Box<T>),
-    /// Hash map from hashable key type to value T.
-    Map(Box<(HashableType, T)>),
     /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
@@ -131,8 +127,6 @@ pub enum Container<T: TypeRowElem> {
 impl<T: Display + PrimType> Display for Container<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Container::List(ty) => write!(f, "List({})", ty.as_ref()),
-            Container::Map(tys) => write!(f, "Map({}, {})", tys.as_ref().0, tys.as_ref().1),
             Container::Tuple(row) => write!(f, "Tuple({})", row.as_ref()),
             Container::Sum(row) => write!(f, "Sum({})", row.as_ref()),
             Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
@@ -206,6 +200,9 @@ pub enum HashableType {
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
 }
+
+/// An error from an operation.
+pub const ERROR_TYPE: SimpleType = SimpleType::Classic(ClassicType::Hashable(HashableType::String));
 
 impl ClassicType {
     /// Returns whether the type contains only hashable data.
@@ -489,7 +486,7 @@ mod test {
 
         let clas: ClassicRow = vec![
             ClassicType::F64,
-            ClassicType::Container(Container::List(Box::new(ClassicType::F64))),
+            ClassicType::Container(Container::Array(Box::new(ClassicType::F64), 2)),
         ]
         .into();
         let ty = SimpleType::new_tuple(clas.map_into());
@@ -515,9 +512,10 @@ mod test {
     fn new_sum() {
         let clas = vec![
             SimpleType::Classic(ClassicType::F64),
-            SimpleType::Classic(ClassicType::Container(Container::List(Box::new(
-                ClassicType::F64,
-            )))),
+            SimpleType::Classic(ClassicType::Container(Container::Array(
+                Box::new(ClassicType::F64),
+                2,
+            ))),
         ];
         let ty = SimpleType::new_sum(clas);
         assert_matches!(
