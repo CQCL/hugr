@@ -12,9 +12,7 @@ use crate::{
 };
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("arithmetic.int.types")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
@@ -26,7 +24,7 @@ pub fn int_type(n: u8) -> SimpleType {
     CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
-        resource_id(),
+        RESOURCE_ID,
         TypeTag::Classic,
     )
     .into()
@@ -56,7 +54,7 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
 
 /// Resource for basic integer types.
 pub fn resource() -> Resource {
-    let mut resource = Resource::new(resource_id());
+    let mut resource = Resource::new(RESOURCE_ID);
 
     resource
         .add_type(

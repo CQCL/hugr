@@ -12,9 +12,7 @@ use super::super::logic::bool_type;
 use super::float_types::float64_type;
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("arithmetic.float")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 
 fn fcmp_sig(
     _arg_values: &[TypeArg],
@@ -49,8 +47,8 @@ fn funop_sig(
 /// Resource for basic arithmetic operations.
 pub fn resource() -> Resource {
     let mut resource = Resource::new_with_reqs(
-        resource_id(),
-        ResourceSet::singleton(&super::float_types::resource_id()),
+        RESOURCE_ID,
+        ResourceSet::singleton(&super::float_types::RESOURCE_ID),
     );
 
     resource

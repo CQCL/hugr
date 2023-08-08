@@ -13,9 +13,7 @@ use crate::{
 };
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("arithmetic.int")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
 fn iwiden_sig(
     arg_values: &[TypeArg],
@@ -169,8 +167,8 @@ fn ish_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet)
 /// Resource for basic integer operations.
 pub fn resource() -> Resource {
     let mut resource = Resource::new_with_reqs(
-        resource_id(),
-        ResourceSet::singleton(&super::int_types::resource_id()),
+        RESOURCE_ID,
+        ResourceSet::singleton(&super::int_types::RESOURCE_ID),
     );
 
     resource

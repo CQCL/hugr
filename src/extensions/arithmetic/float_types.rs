@@ -8,21 +8,19 @@ use crate::{
 };
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("arithmetic.float.types")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type
 pub fn float64_type() -> SimpleType {
-    CustomType::new(FLOAT_TYPE_ID, [], resource_id(), TypeTag::Classic).into()
+    CustomType::new(FLOAT_TYPE_ID, [], RESOURCE_ID, TypeTag::Classic).into()
 }
 
 /// Resource for basic floating-point types.
 pub fn resource() -> Resource {
-    let mut resource = Resource::new(resource_id());
+    let mut resource = Resource::new(RESOURCE_ID);
 
     resource
         .add_type(

@@ -17,13 +17,11 @@ use crate::types::{CustomType, SimpleRow, TypeTag};
 use crate::values::CustomCheckFail;
 use crate::Resource;
 
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("rotations")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
 
 /// The resource with all the operations and types defined in this extension.
 pub fn resource() -> Resource {
-    let mut resource = Resource::new(resource_id());
+    let mut resource = Resource::new(RESOURCE_ID);
 
     Type::Angle.add_to_resource(&mut resource);
     Type::Quaternion.add_to_resource(&mut resource);
@@ -66,7 +64,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], resource_id(), TypeTag::Classic)
+        CustomType::new(self.name(), [], RESOURCE_ID, TypeTag::Classic)
     }
 
     fn add_to_resource(self, resource: &mut Resource) {

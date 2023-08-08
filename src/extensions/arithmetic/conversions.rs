@@ -18,9 +18,7 @@ use super::float_types::float64_type;
 use super::int_types::{get_width, int_type};
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("arithmetic.conversions")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
     let arg = arg_values.iter().exactly_one().unwrap();
@@ -49,10 +47,10 @@ fn itof_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
 /// Resource for basic arithmetic operations.
 pub fn resource() -> Resource {
     let mut resource = Resource::new_with_reqs(
-        resource_id(),
+        RESOURCE_ID,
         ResourceSet::new_from_resources(HashSet::from_iter(vec![
-            super::int_types::resource_id(),
-            super::float_types::resource_id(),
+            super::int_types::RESOURCE_ID,
+            super::float_types::RESOURCE_ID,
         ])),
     );
 
