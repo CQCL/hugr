@@ -6,6 +6,7 @@ use super::HashableType;
 use super::PrimType;
 use super::TypeTag;
 
+use itertools::Itertools;
 use smol_str::SmolStr;
 
 use super::super::custom::CustomType;
@@ -17,6 +18,7 @@ use super::SimpleType;
 use super::super::AbstractSignature;
 
 use crate::ops::constant::HugrIntWidthStore;
+use crate::types::type_row::TypeRowElem;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -31,11 +33,11 @@ pub(crate) enum SerSimpleType {
         signature: Box<AbstractSignature>,
     },
     Tuple {
-        row: Box<TypeRow<SerSimpleType>>,
+        row: Vec<SerSimpleType>,
         c: TypeTag,
     },
     Sum {
-        row: Box<TypeRow<SerSimpleType>>,
+        row: Vec<SerSimpleType>,
         c: TypeTag,
     },
     Array {
@@ -80,11 +82,11 @@ where
     fn from(value: Container<T>) -> Self {
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
-                row: Box::new(inner.map_into()),
+                row: inner.into_owned().into_iter().map_into().collect(),
                 c: T::TAG, // We could inspect inner.containing_tag(), but this should have been done already
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
-                row: Box::new(inner.map_into()),
+                row: inner.into_owned().into_iter().map_into().collect(),
                 c: T::TAG,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
@@ -147,6 +149,16 @@ where
     Box::new((value).into())
 }
 
+fn try_convert_list<T: TryInto<T2>, T2: TypeRowElem>(
+    values: Vec<T>,
+) -> Result<TypeRow<T2>, T::Error> {
+    let vals = values
+        .into_iter()
+        .map(T::try_into)
+        .collect::<Result<Vec<T2>, T::Error>>()?;
+    Ok(TypeRow::from(vals))
+}
+
 macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
@@ -166,10 +178,10 @@ impl From<SerSimpleType> for SimpleType {
             SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
-                handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
+                handle_container!(c, Tuple(Box::new(try_convert_list(inner).unwrap())))
             }
             SerSimpleType::Sum { row: inner, c } => {
-                handle_container!(c, Sum(Box::new(inner.try_convert_elems().unwrap())))
+                handle_container!(c, Sum(Box::new(try_convert_list(inner).unwrap())))
             }
             SerSimpleType::Array { inner, len, c } => {
                 handle_container!(c, Array(box_convert_try(*inner), len))
