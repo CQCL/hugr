@@ -70,9 +70,6 @@ impl<'a> ValidationContext<'a> {
             self.validate_node(node)?;
         }
 
-        // Check that io nodes match their parents' signatures
-        self.validate_io_resources(self.hugr, self.hugr.root())?;
-
         Ok(())
     }
 
@@ -109,9 +106,6 @@ impl<'a> ValidationContext<'a> {
                 };
             }
         };
-        for node in hugr.children(parent) {
-            self.validate_io_resources(hugr, node)?;
-        }
         Ok(())
     }
 
@@ -202,6 +196,10 @@ impl<'a> ValidationContext<'a> {
 
         // Check operation-specific constraints
         self.validate_operation(node, op_type)?;
+
+        // If this is a DataflowParent, check that the I/O nodes
+        // match the parent's signature
+        self.validate_io_resources(&self.hugr, node)?;
 
         Ok(())
     }
