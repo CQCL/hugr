@@ -25,7 +25,6 @@ pub(crate) enum SerSimpleType {
     I {
         width: HugrIntWidthStore,
     },
-    //F, // Or preserve??
     S,
     G {
         signature: Box<AbstractSignature>,
