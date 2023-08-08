@@ -121,7 +121,7 @@ pub enum TypeArgError {
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0:?}")]
     OpaqueTypeMismatch(#[from] crate::values::CustomCheckFail),
-    /// Invalid value
-    #[error("Invalid value of type argument")]
-    InvalidValue(TypeArg),
+    /// Invalid value (bit of a catch-all)
+    #[error("Invalid value {0:?} for type argument: {1}")]
+    InvalidValue(TypeArg, String),
 }

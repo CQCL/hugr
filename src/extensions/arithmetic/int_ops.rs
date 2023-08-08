@@ -5,7 +5,7 @@ use smol_str::SmolStr;
 use super::super::logic::bool_type;
 use super::int_types::{get_width, int_type};
 use crate::types::simple::ERROR_TYPE;
-use crate::types::type_param::TypeParam;
+use crate::types::type_param::{TypeArgError, TypeParam};
 use crate::utils::collect_array;
 use crate::{
     resource::{ResourceSet, SignatureError},
@@ -23,7 +23,11 @@ fn iwiden_sig(
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m > n {
-        return Err(SignatureError::InvalidTypeArgs);
+        return Err(TypeArgError::InvalidValue(
+            arg1.clone(),
+            format!("second arg must be >= first arg {}", m),
+        )
+        .into());
     }
     Ok((
         vec![int_type(m)].into(),
@@ -39,7 +43,11 @@ fn inarrow_sig(
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m < n {
-        return Err(SignatureError::InvalidTypeArgs);
+        return Err(TypeArgError::InvalidValue(
+            arg1.clone(),
+            format!("second arg must be <= first arg {}", m),
+        )
+        .into());
     }
     Ok((
         vec![int_type(m)].into(),

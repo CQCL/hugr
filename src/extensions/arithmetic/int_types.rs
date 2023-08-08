@@ -47,7 +47,7 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
         && (n != 64)
         && (n != 128)
     {
-        return Err(TypeArgError::InvalidValue(arg.clone()).into());
+        return Err(TypeArgError::InvalidValue(arg.clone(), "not a power of 2".into()).into());
     }
     Ok(n)
 }
