@@ -97,6 +97,10 @@ pub trait PrimType: TypeRowElem + std::fmt::Debug + sealed::Sealed {
     fn tag(&self) -> TypeTag;
 }
 
+impl TypeRowElem for SimpleType {}
+impl TypeRowElem for ClassicType {}
+impl TypeRowElem for HashableType {}
+
 // sealed trait pattern to prevent users extending PrimType
 mod sealed {
     use super::{ClassicType, HashableType, SimpleType};
