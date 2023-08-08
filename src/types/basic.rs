@@ -106,32 +106,37 @@ impl NewEq for Type<Any> {
 }
 impl NewClassic for Type<Any> {
     fn graph(signature: AbstractSignature) -> Self {
-        Type::<Classic>::graph(signature).into()
+        Type::<Classic>::graph(signature).upcast()
     }
 }
 
-impl From<Type<Eq>> for Type<Classic> {
-    fn from(_value: Type<Eq>) -> Self {
-        todo!()
-    }
+pub trait UpCastTo<T2>: Sized {
+    fn upcast(self) -> T2;
 }
 
-impl From<Type<Eq>> for Type<Any> {
-    fn from(_value: Type<Eq>) -> Self {
-        todo!()
-    }
-}
-
-impl From<Type<Classic>> for Type<Any> {
-    fn from(cl: Type<Classic>) -> Self {
-        match cl {
+impl UpCastTo<Type<Any>> for Type<Classic> {
+    fn upcast(self: Type<Classic>) -> Type<Any> {
+        match self {
             Type::Prim(t) => Type::Prim(Any(AnyTypeImpl::C(t.0))),
             Type::Extension(t) => Type::Extension(t),
             Type::Alias(_) => todo!(),
             Type::Array(_, _) => todo!(),
-            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Into::into).collect()),
+            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(UpCastTo::upcast).collect()),
             Type::Sum(_) => todo!(),
         }
+    }
+}
+
+impl UpCastTo<Type<Classic>> for Type<Eq> {
+    fn upcast(self) -> Type<Classic> {
+        todo!()
+    }
+}
+
+impl UpCastTo<Type<Any>> for Type<Eq> {
+    fn upcast(self) -> Type<Any> {
+        let cl: Type<Classic> = self.upcast();
+        cl.upcast()
     }
 }
 
@@ -151,7 +156,7 @@ mod test {
             )),
         ]);
         assert_eq!(t.tag(), TypeTag::Classic);
-        let t_any: Type<Any> = t.into();
+        let t_any: Type<Any> = t.upcast();
 
         assert_eq!(t_any.tag(), TypeTag::Simple);
     }
