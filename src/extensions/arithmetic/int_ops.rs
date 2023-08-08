@@ -1,12 +1,12 @@
 //! Basic integer operations.
 
-use itertools::Itertools;
 use smol_str::SmolStr;
 
 use super::super::logic::bool_type;
 use super::int_types::{get_width, int_type};
 use crate::types::simple::ERROR_TYPE;
 use crate::types::type_param::TypeParam;
+use crate::utils::collect_array;
 use crate::{
     resource::{ResourceSet, SignatureError},
     types::{type_param::TypeArg, SimpleRow, SimpleType, TypeRow},
@@ -19,7 +19,7 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 fn iwiden_sig(
     arg_values: &[TypeArg],
 ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m > n {
@@ -35,7 +35,7 @@ fn iwiden_sig(
 fn inarrow_sig(
     arg_values: &[TypeArg],
 ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m < n {
@@ -69,7 +69,7 @@ fn btoi_sig(
 }
 
 fn icmp_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let arg = arg_values.iter().exactly_one().unwrap();
+    let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n); 2].into(),
@@ -81,7 +81,7 @@ fn icmp_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
 fn ibinop_sig(
     arg_values: &[TypeArg],
 ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let arg = arg_values.iter().exactly_one().unwrap();
+    let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n); 2].into(),
@@ -93,7 +93,7 @@ fn ibinop_sig(
 fn iunop_sig(
     arg_values: &[TypeArg],
 ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let arg = arg_values.iter().exactly_one().unwrap();
+    let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n)].into(),
@@ -105,7 +105,7 @@ fn iunop_sig(
 fn idivmod_sig(
     arg_values: &[TypeArg],
 ) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     let intpair: TypeRow<SimpleType> = vec![int_type(n), int_type(m)].into();
@@ -121,7 +121,7 @@ fn idivmod_sig(
 }
 
 fn idiv_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     Ok((
@@ -132,7 +132,7 @@ fn idiv_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
 }
 
 fn imod_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     Ok((
@@ -143,7 +143,7 @@ fn imod_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
 }
 
 fn ish_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let (arg0, arg1) = arg_values.iter().collect_tuple().unwrap();
+    let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     Ok((

@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 
-use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
@@ -12,6 +11,7 @@ use crate::{
         type_param::{TypeArg, TypeParam},
         SimpleRow, SimpleType,
     },
+    utils::collect_array,
     Resource,
 };
 
@@ -22,7 +22,7 @@ use super::int_types::{get_width, int_type};
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let arg = arg_values.iter().exactly_one().unwrap();
+    let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![float64_type()].into(),
@@ -32,7 +32,7 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
 }
 
 fn itof_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
-    let arg = arg_values.iter().exactly_one().unwrap();
+    let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n)].into(),
