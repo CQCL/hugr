@@ -2,40 +2,36 @@
 
 use super::{AbstractSignature, CustomType, TypeTag};
 
-enum EqTypeImpl {
+pub enum EqLeaf {
     USize,
 }
-enum ClassicTypeImpl {
-    E(EqTypeImpl),
+pub enum ClassicLeaf {
+    E(EqLeaf),
     Graph(Box<AbstractSignature>),
 }
-enum AnyTypeImpl {
-    C(ClassicTypeImpl),
+pub enum AnyLeaf {
+    C(ClassicLeaf),
 }
 
-pub struct Eq(EqTypeImpl);
-pub struct Classic(ClassicTypeImpl);
-pub struct Any(AnyTypeImpl);
-
 mod sealed {
-    use super::{Any, Classic, Eq};
+    use super::{AnyLeaf, ClassicLeaf, EqLeaf};
     pub trait Sealed {}
-    impl Sealed for Any {}
-    impl Sealed for Classic {}
-    impl Sealed for Eq {}
+    impl Sealed for AnyLeaf {}
+    impl Sealed for ClassicLeaf {}
+    impl Sealed for EqLeaf {}
 }
 pub trait TypeClass: sealed::Sealed {
     const TAG: TypeTag;
 }
 
-impl TypeClass for Eq {
+impl TypeClass for EqLeaf {
     const TAG: TypeTag = TypeTag::Hashable;
 }
 
-impl TypeClass for Classic {
+impl TypeClass for ClassicLeaf {
     const TAG: TypeTag = TypeTag::Classic;
 }
-impl TypeClass for Any {
+impl TypeClass for AnyLeaf {
     const TAG: TypeTag = TypeTag::Simple;
 }
 pub struct TaggedWrapper<T>(TypeTag, T);
@@ -87,26 +83,26 @@ pub trait NewClassic: NewEq {
     fn graph(signature: AbstractSignature) -> Self;
 }
 
-impl NewEq for Type<Eq> {
-    const USIZE: Self = Self::Prim(Eq(EqTypeImpl::USize));
+impl NewEq for Type<EqLeaf> {
+    const USIZE: Self = Self::Prim(EqLeaf::USize);
 }
 
-impl NewEq for Type<Classic> {
-    const USIZE: Self = Self::Prim(Classic(ClassicTypeImpl::E(EqTypeImpl::USize)));
+impl NewEq for Type<ClassicLeaf> {
+    const USIZE: Self = Self::Prim(ClassicLeaf::E(EqLeaf::USize));
 }
 
-impl NewClassic for Type<Classic> {
+impl NewClassic for Type<ClassicLeaf> {
     fn graph(signature: AbstractSignature) -> Self {
-        Self::Prim(Classic(ClassicTypeImpl::Graph(Box::new(signature))))
+        Self::Prim(ClassicLeaf::Graph(Box::new(signature)))
     }
 }
 
-impl NewEq for Type<Any> {
-    const USIZE: Self = Self::Prim(Any(AnyTypeImpl::C(ClassicTypeImpl::E(EqTypeImpl::USize))));
+impl NewEq for Type<AnyLeaf> {
+    const USIZE: Self = Self::Prim(AnyLeaf::C(ClassicLeaf::E(EqLeaf::USize)));
 }
-impl NewClassic for Type<Any> {
+impl NewClassic for Type<AnyLeaf> {
     fn graph(signature: AbstractSignature) -> Self {
-        Type::<Classic>::graph(signature).upcast()
+        Type::<ClassicLeaf>::graph(signature).upcast()
     }
 }
 
@@ -114,10 +110,10 @@ pub trait UpCastTo<T2>: Sized {
     fn upcast(self) -> T2;
 }
 
-impl UpCastTo<Type<Any>> for Type<Classic> {
-    fn upcast(self: Type<Classic>) -> Type<Any> {
+impl UpCastTo<Type<AnyLeaf>> for Type<ClassicLeaf> {
+    fn upcast(self: Type<ClassicLeaf>) -> Type<AnyLeaf> {
         match self {
-            Type::Prim(t) => Type::Prim(Any(AnyTypeImpl::C(t.0))),
+            Type::Prim(t) => Type::Prim(AnyLeaf::C(t)),
             Type::Extension(t) => Type::Extension(t),
             Type::Alias(_) => todo!(),
             Type::Array(_, _) => todo!(),
@@ -127,15 +123,15 @@ impl UpCastTo<Type<Any>> for Type<Classic> {
     }
 }
 
-impl UpCastTo<Type<Classic>> for Type<Eq> {
-    fn upcast(self) -> Type<Classic> {
+impl UpCastTo<Type<ClassicLeaf>> for Type<EqLeaf> {
+    fn upcast(self) -> Type<ClassicLeaf> {
         todo!()
     }
 }
 
-impl UpCastTo<Type<Any>> for Type<Eq> {
-    fn upcast(self) -> Type<Any> {
-        let cl: Type<Classic> = self.upcast();
+impl UpCastTo<Type<AnyLeaf>> for Type<EqLeaf> {
+    fn upcast(self) -> Type<AnyLeaf> {
+        let cl: Type<ClassicLeaf> = self.upcast();
         cl.upcast()
     }
 }
@@ -145,7 +141,7 @@ mod test {
     use super::*;
     #[test]
     fn construct() {
-        let t: Type<Classic> = Type::new_tuple([
+        let t: Type<ClassicLeaf> = Type::new_tuple([
             Type::USIZE,
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_opaque(CustomType::new(
@@ -156,7 +152,7 @@ mod test {
             )),
         ]);
         assert_eq!(t.tag(), TypeTag::Classic);
-        let t_any: Type<Any> = t.upcast();
+        let t_any: Type<AnyLeaf> = t.upcast();
 
         assert_eq!(t_any.tag(), TypeTag::Simple);
     }
