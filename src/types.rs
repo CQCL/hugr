@@ -1,9 +1,9 @@
 //! General wire types used in the compiler
 
-pub mod basic;
 pub mod custom;
 pub mod leaf;
 pub mod simple;
+pub mod type_enum;
 pub mod type_param;
 pub mod type_row;
 
@@ -14,14 +14,14 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
+use delegate::delegate;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use simple::{
     ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType,
 };
-pub use type_row::TypeRow;
-
-use delegate::delegate;
 use smol_str::SmolStr;
+pub use type_enum::Type;
+pub use type_row::TypeRow;
 
 use crate::hugr::{Direction, Port};
 use crate::utils::display_list;
@@ -523,15 +523,10 @@ impl TypeTag {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        ops::AliasDecl,
-        types::{
-            basic::Type,
-            leaf::{AnyLeaf, ClassicLeaf, InvalidBound},
-        },
-    };
+    use crate::ops::AliasDecl;
 
-    use super::{leaf::EqLeaf, *};
+    use super::leaf::{AnyLeaf, ClassicLeaf, EqLeaf, InvalidBound};
+    use super::*;
     #[test]
     fn construct() {
         let t: Type<ClassicLeaf> = Type::new_tuple([
