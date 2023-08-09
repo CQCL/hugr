@@ -119,6 +119,21 @@ pub struct AliasDecl {
     pub tag: TypeTag,
 }
 
+impl AliasDecl {
+    /// Construct a new Alias declaration.
+    pub fn new(name: impl Into<SmolStr>, tag: TypeTag) -> Self {
+        Self {
+            name: name.into(),
+            tag,
+        }
+    }
+
+    /// Returns a reference to the name of this [`AliasDecl`].
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+}
+
 impl_op_name!(AliasDecl);
 impl StaticTag for AliasDecl {
     const TAG: OpTag = OpTag::Alias;
