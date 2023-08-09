@@ -289,7 +289,7 @@ impl Display for HashableType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             HashableType::Variable(x) => f.write_str(x),
-            HashableType::USize => f.write_str("I64"),
+            HashableType::USize => f.write_str("USize"),
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
         }
