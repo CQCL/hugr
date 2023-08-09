@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use crate::ops::AliasDecl;
 
-use super::{AbstractSignature, CustomType, TypeTag};
+use super::{new_type_row::TypeRowElem, AbstractSignature, CustomType, TypeTag};
 use derive_more::Display;
 use thiserror::Error;
 
@@ -36,6 +36,9 @@ impl<T: Into<CopyableLeaf>> From<T> for AnyLeaf {
         AnyLeaf::C(value.into())
     }
 }
+impl TypeRowElem for EqLeaf {}
+impl TypeRowElem for CopyableLeaf {}
+impl TypeRowElem for AnyLeaf {}
 
 pub(crate) mod sealed {
     use super::{AnyLeaf, CopyableLeaf, EqLeaf};
@@ -45,7 +48,7 @@ pub(crate) mod sealed {
     impl Sealed for EqLeaf {}
 }
 
-pub trait TypeClass: sealed::Sealed {
+pub trait TypeClass: sealed::Sealed + TypeRowElem {
     const BOUND_TAG: TypeTag;
 }
 
@@ -61,7 +64,8 @@ impl TypeClass for AnyLeaf {
     const BOUND_TAG: TypeTag = TypeTag::Simple;
 }
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, PartialEq, Debug, Eq, Display)]
+#[display(fmt = "{}", "_0")]
 pub struct Tagged<I, T>(pub(super) I, pub(super) PhantomData<T>);
 
 pub trait ActualTag {

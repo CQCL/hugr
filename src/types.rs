@@ -2,6 +2,7 @@
 
 pub mod custom;
 pub mod leaf;
+mod new_type_row;
 pub mod simple;
 pub mod type_enum;
 pub mod type_param;
@@ -541,6 +542,7 @@ mod test {
             .unwrap(),
             Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
         ]);
+        // dbg!(t.to_string());
         assert_eq!(t.bounding_tag(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
 
