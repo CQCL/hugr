@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
@@ -103,13 +103,17 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
+    ///
+    /// Automatically adds the OpDef's extensions to the signature.
     pub fn new(
         def: Arc<OpDef>,
         args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let args = args.into();
-        let signature = def.compute_signature(&args, exts)?;
+        let signature = def
+            .compute_signature(&args, exts)?
+            .with_extension_delta(&ExtensionSet::singleton(def.extension()));
         Ok(Self {
             def,
             args,
@@ -180,6 +184,8 @@ fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
 
 impl OpaqueOp {
     /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
+    ///
+    /// Automatically includes `extension` in the signature if `signature` is provided.
     pub fn new(
         extension: ExtensionId,
         op_name: impl Into<SmolStr>,
@@ -187,6 +193,8 @@ impl OpaqueOp {
         args: impl Into<Vec<TypeArg>>,
         signature: Option<FunctionType>,
     ) -> Self {
+        let signature =
+            signature.map(|s| s.with_extension_delta(&ExtensionSet::singleton(&extension)));
         Self {
             extension,
             op_name: op_name.into(),
@@ -326,5 +334,21 @@ mod test {
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
+    }
+
+    #[test]
+    fn new_opaque_op_with_signature() {
+        let op = OpaqueOp::new(
+            "res".try_into().unwrap(),
+            "op",
+            "desc".into(),
+            vec![TypeArg::Type { ty: USIZE_T }],
+            Some(FunctionType::new_linear(vec![])),
+        );
+        let op: ExternalOp = op.into();
+        assert_eq!(
+            op.signature().extension_reqs,
+            ExtensionSet::singleton(&"res".try_into().unwrap())
+        );
     }
 }
