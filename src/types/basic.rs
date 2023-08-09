@@ -139,7 +139,7 @@ impl<T: TypeClass> Type<T> {
         Self::Tuple(types.into_iter().collect())
     }
 
-    pub fn new_opaque(opaque: CustomType) -> Result<Self, InvalidBound> {
+    pub fn new_extension(opaque: CustomType) -> Result<Self, InvalidBound> {
         Ok(Self::Extension(Tagged::new(opaque)?))
     }
     pub fn new_alias(alias: Alias) -> Result<Self, InvalidBound> {
@@ -199,7 +199,7 @@ mod test {
         let t: Type<ClassicLeaf> = Type::new_tuple([
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
-            Type::new_opaque(CustomType::new(
+            Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
                 "my_resource",
