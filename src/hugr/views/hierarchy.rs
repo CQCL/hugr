@@ -25,8 +25,7 @@ use portgraph::{LinkView, PortIndex, PortView};
 
 use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
-use super::view::sealed::HugrInternals;
-use super::{HugrView, NodeMetadata};
+use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
 type FlatRegionGraph<'g, Base> =
     portgraph::view::FlatRegion<'g, <Base as HugrInternals>::Portgraph>;
@@ -345,7 +344,7 @@ where
     }
 }
 
-/// A common trait for views of a hugr region.
+/// A common trait for views of a HUGR hierarchical subgraph.
 pub trait HierarchyView<'a>:
     HugrView
     + pv::GraphBase<NodeId = Node>
@@ -359,10 +358,10 @@ pub trait HierarchyView<'a>:
 where
     for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
 {
-    /// The base from which the region is derived.
+    /// The base from which the subgraph is derived.
     type Base;
 
-    /// Create a region view of a HUGR given a root node.
+    /// Create a hierarchical view of a HUGR given a root node.
     fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
@@ -404,7 +403,7 @@ where
     }
 }
 
-impl<'g, Base> super::view::sealed::HugrInternals for SiblingGraph<'g, Base>
+impl<'g, Base> super::sealed::HugrInternals for SiblingGraph<'g, Base>
 where
     Base: HugrInternals,
 {
@@ -421,7 +420,7 @@ where
     }
 }
 
-impl<'g, Base> super::view::sealed::HugrInternals for DescendantsGraph<'g, Base>
+impl<'g, Base> super::sealed::HugrInternals for DescendantsGraph<'g, Base>
 where
     Base: HugrInternals,
 {

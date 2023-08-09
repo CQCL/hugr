@@ -1,5 +1,5 @@
 use crate::hugr::validate::InterGraphEdgeError;
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
 

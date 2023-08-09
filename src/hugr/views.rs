@@ -1,10 +1,10 @@
-#![allow(unused)]
-//! A Trait for "read-only" HUGRs.
+//! Read-only access into HUGR graphs and subgraphs.
 
-use std::iter::FusedIterator;
-use std::ops::Deref;
+pub mod hierarchy;
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
+pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
+
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
@@ -299,7 +299,6 @@ where
     #[inline]
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         let op = self.get_nodetype(node);
-        let dfp = OpTag::DataflowParent;
         if op.tag().is_superset(OpTag::DataflowParent) {
             self.children(node).take(2).collect_vec().try_into().ok()
         } else {
