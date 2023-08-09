@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use super::{AbstractSignature, CustomType, TypeTag};
-
+use thiserror::Error;
 pub enum EqLeaf {
     USize,
 }
@@ -63,10 +63,17 @@ impl GetTag for CustomType {
     }
 }
 
+#[derive(Debug, Clone, Error)]
+#[error("The tag reported by the object is not contained by the tag of the Type.")]
+pub struct InvalidBound;
+
 impl<T: GetTag, C: TypeClass> Tagged<T, C> {
-    pub fn new(inner: T) -> Self {
-        assert!(C::TAG.contains(inner.tag()), "tag ");
-        Self(inner, PhantomData)
+    pub fn new(inner: T) -> Result<Self, InvalidBound> {
+        if C::TAG.contains(inner.tag()) {
+            Ok(Self(inner, PhantomData))
+        } else {
+            Err(InvalidBound)
+        }
     }
     pub fn inner(&self) -> &T {
         &self.0
@@ -92,8 +99,8 @@ impl<T: TypeClass> Type<T> {
         Self::Tuple(types.into_iter().collect())
     }
 
-    pub fn new_opaque(opaque: CustomType) -> Self {
-        Self::Extension(Tagged::new(opaque))
+    pub fn new_opaque(opaque: CustomType) -> Result<Self, InvalidBound> {
+        Ok(Self::Extension(Tagged::new(opaque)?))
     }
 }
 
@@ -153,7 +160,8 @@ mod test {
                 [],
                 "my_resource",
                 TypeTag::Classic,
-            )),
+            ))
+            .unwrap(),
         ]);
         assert_eq!(t.tag(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
