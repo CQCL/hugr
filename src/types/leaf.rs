@@ -6,20 +6,21 @@ use std::marker::PhantomData;
 use crate::ops::AliasDecl;
 
 use super::{AbstractSignature, CustomType, TypeTag};
+use derive_more::Display;
 use thiserror::Error;
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, PartialEq, Debug, Eq, Display)]
 pub enum EqLeaf {
     USize,
 }
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, PartialEq, Debug, Eq, Display)]
 pub enum ClassicLeaf {
     E(EqLeaf),
     Graph(Box<AbstractSignature>),
 }
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, PartialEq, Debug, Eq, Display)]
 pub enum AnyLeaf {
     C(ClassicLeaf),
 }
