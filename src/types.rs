@@ -520,3 +520,56 @@ impl TypeTag {
         )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        ops::AliasDecl,
+        types::{
+            basic::Type,
+            leaf::{AnyLeaf, ClassicLeaf, InvalidBound},
+        },
+    };
+
+    use super::{leaf::EqLeaf, *};
+    #[test]
+    fn construct() {
+        let t: Type<ClassicLeaf> = Type::new_tuple([
+            Type::usize(),
+            Type::graph(AbstractSignature::new_linear(vec![])),
+            Type::new_extension(CustomType::new(
+                "my_custom",
+                [],
+                "my_resource",
+                TypeTag::Classic,
+            ))
+            .unwrap(),
+            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
+        ]);
+        assert_eq!(t.bounding_tag(), TypeTag::Classic);
+        let t_any: Type<AnyLeaf> = t.into();
+
+        assert_eq!(t_any.bounding_tag(), TypeTag::Simple);
+    }
+
+    #[test]
+    fn test_bad_dynamic() {
+        let res: Result<Type<ClassicLeaf>, _> =
+            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Simple));
+        assert_eq!(
+            res,
+            Err(InvalidBound {
+                bound: TypeTag::Classic,
+                found: TypeTag::Simple
+            })
+        );
+    }
+    #[test]
+    fn all_constructors() {
+        Type::<EqLeaf>::usize();
+        Type::<ClassicLeaf>::usize();
+        Type::<AnyLeaf>::usize();
+        Type::<ClassicLeaf>::graph(AbstractSignature::new_linear(vec![]));
+        Type::<AnyLeaf>::graph(AbstractSignature::new_linear(vec![]));
+    }
+}
