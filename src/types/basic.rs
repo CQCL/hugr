@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::marker::PhantomData;
+
 use super::{AbstractSignature, CustomType, TypeTag};
 
 pub enum EqLeaf {
@@ -49,23 +51,32 @@ impl TypeClass for ClassicLeaf {
 impl TypeClass for AnyLeaf {
     const TAG: TypeTag = TypeTag::Simple;
 }
-pub struct TaggedWrapper<T>(TypeTag, T);
+pub struct Tagged<I, T>(I, PhantomData<T>);
 
-impl<T> TaggedWrapper<T> {
-    pub fn tag(&self) -> TypeTag {
-        self.0
+pub trait GetTag {
+    fn tag(&self) -> TypeTag;
+}
+
+impl GetTag for CustomType {
+    fn tag(&self) -> TypeTag {
+        self.tag()
     }
+}
 
+impl<T: GetTag, C: TypeClass> Tagged<T, C> {
+    pub fn new(inner: T) -> Self {
+        assert!(C::TAG.contains(inner.tag()), "tag ");
+        Self(inner, PhantomData)
+    }
     pub fn inner(&self) -> &T {
-        &self.1
+        &self.0
     }
 }
 
 pub struct OpaqueType(CustomType);
 pub enum Type<T> {
     Prim(T),
-    Extension(OpaqueType),
-    Alias(TaggedWrapper<String>),
+    Extension(Tagged<CustomType, T>),
     Array(Box<Type<T>>, usize),
     Tuple(Vec<Type<T>>),
     Sum(Vec<Type<T>>),
@@ -82,8 +93,7 @@ impl<T: TypeClass> Type<T> {
     }
 
     pub fn new_opaque(opaque: CustomType) -> Self {
-        assert!(T::TAG.contains(opaque.tag()), "tag ");
-        Self::Extension(OpaqueType(opaque))
+        Self::Extension(Tagged::new(opaque))
     }
 }
 
@@ -104,8 +114,7 @@ impl<T> Type<T> {
     fn upcast<T2: From<T>>(self) -> Type<T2> {
         match self {
             Type::Prim(t) => Type::Prim(t.into()),
-            Type::Extension(t) => Type::Extension(t),
-            Type::Alias(_) => todo!(),
+            Type::Extension(Tagged(t, _)) => Type::Extension(Tagged(t, PhantomData)),
             Type::Array(_, _) => todo!(),
             Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Type::<T>::upcast).collect()),
             Type::Sum(_) => todo!(),
