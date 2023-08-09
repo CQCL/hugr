@@ -10,6 +10,8 @@ use super::{
     AbstractSignature, CustomType, TypeTag,
 };
 
+mod serialize;
+
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 #[display(bound = "T: Display")]
 #[display(fmt = "{}")]
