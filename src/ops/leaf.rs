@@ -49,8 +49,6 @@ pub enum LeafOp {
     },
     /// A qubit measurement operation.
     Measure,
-    /// A rotation of a qubit about the Pauli Z axis by an input float angle.
-    RzF64,
     /// A bitwise XOR operation.
     Xor,
     /// An operation that packs all its inputs into a tuple.
@@ -109,7 +107,6 @@ impl OpName for LeafOp {
             LeafOp::MakeTuple { tys: _ } => "MakeTuple",
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
-            LeafOp::RzF64 => "RzF64",
             LeafOp::Lift { .. } => "Lift",
         }
         .into()
@@ -142,7 +139,6 @@ impl OpTrait for LeafOp {
             LeafOp::MakeTuple { tys: _ } => "MakeTuple operation",
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
-            LeafOp::RzF64 => "Rz rotation.",
             LeafOp::Lift { .. } => "Add a resource requirement to an edge",
         }
     }
@@ -157,7 +153,6 @@ impl OpTrait for LeafOp {
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Qubit;
         const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-        const F: SimpleType = SimpleType::Classic(ClassicType::F64);
 
         match self {
             LeafOp::Noop { ty: typ } => {
@@ -186,7 +181,6 @@ impl OpTrait for LeafOp {
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![SimpleType::new_sum(variants.clone())],
             ),
-            LeafOp::RzF64 => AbstractSignature::new_df(type_row![Q, F], type_row![Q]),
             LeafOp::Lift {
                 type_row,
                 new_resource,

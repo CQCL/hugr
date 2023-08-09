@@ -97,6 +97,10 @@ pub trait PrimType: TypeRowElem + std::fmt::Debug + sealed::Sealed {
     fn tag(&self) -> TypeTag;
 }
 
+impl TypeRowElem for SimpleType {}
+impl TypeRowElem for ClassicType {}
+impl TypeRowElem for HashableType {}
+
 // sealed trait pattern to prevent users extending PrimType
 mod sealed {
     use super::{ClassicType, HashableType, SimpleType};
@@ -172,8 +176,6 @@ impl From<Container<SimpleType>> for SimpleType {
 #[serde(try_from = "SimpleType", into = "SimpleType")]
 #[non_exhaustive]
 pub enum ClassicType {
-    /// A 64-bit floating point number.
-    F64,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
     /// TODO this can be moved out into an extension/resource
     Graph(Box<AbstractSignature>),
@@ -278,7 +280,6 @@ impl ClassicType {
 impl Display for ClassicType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ClassicType::F64 => f.write_str("F64"),
             ClassicType::Graph(data) => {
                 let sig = data.as_ref();
                 write!(f, "[{:?}]", sig.resource_reqs)?;
@@ -472,18 +473,30 @@ impl<T: PrimType> TypeRow<T> {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use cool_asserts::assert_matches;
 
+    /// Alternatively we could use [CLASSIC_T]
+    ///
+    /// [CLASSIC_T]: crate::types::custom::test::CLASSIC_T
+    fn graph_type() -> ClassicType {
+        ClassicType::Graph(Box::new(AbstractSignature::new(
+            vec![HashableType::USize.into()],
+            vec![HashableType::USize.into()],
+            vec![],
+        )))
+    }
+
     #[test]
     fn new_tuple() {
-        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::F64)];
+        let simp = vec![SimpleType::Qubit, SimpleType::Classic(graph_type())];
         let ty = SimpleType::new_tuple(simp);
         assert_matches!(ty, SimpleType::Qontainer(Container::Tuple(_)));
 
         let clas: ClassicRow = vec![
-            ClassicType::F64,
-            ClassicType::Container(Container::Array(Box::new(ClassicType::F64), 2)),
+            graph_type(),
+            ClassicType::Container(Container::Array(Box::new(graph_type()), 2)),
         ]
         .into();
         let ty = SimpleType::new_tuple(clas.map_into());
@@ -508,11 +521,8 @@ mod test {
     #[test]
     fn new_sum() {
         let clas = vec![
-            SimpleType::Classic(ClassicType::F64),
-            SimpleType::Classic(ClassicType::Container(Container::Array(
-                Box::new(ClassicType::F64),
-                2,
-            ))),
+            SimpleType::Classic(graph_type()),
+            Container::<ClassicType>::Array(Box::new(graph_type()), 2).into(),
         ];
         let ty = SimpleType::new_sum(clas);
         assert_matches!(
