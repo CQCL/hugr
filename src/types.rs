@@ -2,7 +2,6 @@
 
 pub mod custom;
 pub mod leaf;
-mod new_type_row;
 pub mod simple;
 pub mod type_enum;
 pub mod type_param;
