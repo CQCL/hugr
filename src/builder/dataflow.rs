@@ -61,7 +61,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             parent,
             match input_resources.map(|inp| inp.union(&signature.resource_reqs)) {
                 // TODO: Make this NodeType::open_resources
-                None => NodeType::pure(output),
+                None => NodeType::new(output, signature.resource_reqs),
                 Some(rs) => NodeType::new(output, rs),
             },
         )?;

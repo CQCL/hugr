@@ -265,12 +265,12 @@ mod test {
             "res".into(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type(HashableType::Int(1).into())],
+            vec![TypeArg::Type(HashableType::USize.into())],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type(HashableType::Int(1).into())]);
+        assert_eq!(op.args(), &[TypeArg::Type(HashableType::USize.into())]);
     }
 }

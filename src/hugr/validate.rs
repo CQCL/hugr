@@ -18,8 +18,7 @@ use crate::resource::ResourceSet;
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::hierarchical_views::{HierarchyView, SiblingGraph};
-use super::view::HugrView;
+use super::views::{HierarchyView, HugrView, SiblingGraph};
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -70,6 +69,42 @@ impl<'a> ValidationContext<'a> {
             self.validate_node(node)?;
         }
 
+        Ok(())
+    }
+
+    /// Check that input and output nodes match up with the signature of their parents
+    /// This must be done after the `gather_resources` step
+    fn validate_io_resources(
+        &self,
+        hugr: &impl HugrView,
+        parent: Node,
+    ) -> Result<(), ValidationError> {
+        if let Some([input, output]) = hugr.get_io(parent) {
+            let parent_input_resources =
+                self.resources.get(&(parent, Direction::Incoming)).unwrap();
+            let parent_output_resources =
+                self.resources.get(&(parent, Direction::Outgoing)).unwrap();
+            for dir in Direction::BOTH {
+                let input_resources = self.resources.get(&(input, dir)).unwrap();
+                let output_resources = self.resources.get(&(output, dir)).unwrap();
+                if parent_input_resources != input_resources {
+                    return Err(ValidationError::ParentIOResourceMismatch {
+                        parent,
+                        parent_resources: parent_input_resources.clone(),
+                        child: input,
+                        child_resources: input_resources.clone(),
+                    });
+                };
+                if parent_output_resources != output_resources {
+                    return Err(ValidationError::ParentIOResourceMismatch {
+                        parent,
+                        parent_resources: parent_output_resources.clone(),
+                        child: output,
+                        child_resources: output_resources.clone(),
+                    });
+                };
+            }
+        };
         Ok(())
     }
 
@@ -160,6 +195,10 @@ impl<'a> ValidationContext<'a> {
 
         // Check operation-specific constraints
         self.validate_operation(node, op_type)?;
+
+        // If this is a DataflowParent, check that the I/O nodes
+        // match the parent's signature
+        self.validate_io_resources(&self.hugr, node)?;
 
         Ok(())
     }
@@ -669,6 +708,13 @@ pub enum ValidationError {
     },
     #[error("Missing input resources for node {0:?}")]
     MissingInputResources(Node),
+    #[error("Resources of I/O node ({child:?}) {child_resources:?} don't match those expected by parent node ({parent:?}): {parent_resources:?}")]
+    ParentIOResourceMismatch {
+        parent: Node,
+        parent_resources: ResourceSet,
+        child: Node,
+        child_resources: ResourceSet,
+    },
 }
 
 #[cfg(feature = "pyo3")]
@@ -743,17 +789,19 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
-    use crate::builder::{BuildError, ModuleBuilder};
-    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder};
+    use crate::builder::{
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder,
+    };
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
-    use crate::types::{AbstractSignature, ClassicType};
+    use crate::types::{AbstractSignature, ClassicType, HashableType};
     use crate::Direction;
     use crate::{type_row, Node};
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+    const B: SimpleType = SimpleType::Classic(ClassicType::usize());
     const Q: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -789,7 +837,7 @@ mod test {
             .add_op_with_parent(
                 parent,
                 LeafOp::Noop {
-                    ty: ClassicType::bit().into(),
+                    ty: ClassicType::usize().into(),
                 },
             )
             .unwrap();
@@ -876,7 +924,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: ClassicType::F64.into(),
+            ty: HashableType::USize.into(),
         }
         .into();
 
@@ -966,7 +1014,7 @@ mod test {
         b.replace_op(
             output,
             NodeType::pure(LeafOp::Noop {
-                ty: ClassicType::bit().into(),
+                ty: ClassicType::usize().into(),
             }),
         );
         assert_matches!(
@@ -1145,11 +1193,11 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::int::<1>(1).unwrap())?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1).unwrap())?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::int::<1>(),
+                datatype: ClassicType::usize(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;
@@ -1278,6 +1326,24 @@ mod test {
         main.finish_with_outputs([output])?;
         let handle = module_builder.finish_hugr();
         assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn parent_signature_mismatch() -> Result<(), BuildError> {
+        let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+            .with_resource_delta(&ResourceSet::singleton(&"R".into()));
+
+        let builder = DFGBuilder::new(main_signature)?;
+        let [w] = builder.input_wires_arr();
+        let hugr = builder.finish_hugr_with_outputs([w]);
+
+        assert_matches!(
+            hugr,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::TgtExceedsSrcResources { .. }
+            ))
+        );
         Ok(())
     }
 }

@@ -544,7 +544,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 #### `ErrorType`
 
   - There is some type of errors, perhaps just a string, or
-    `Tuple(Int,String)` with some errorcode, that is returned along with
+    `Tuple(USize,String)` with some errorcode, that is returned along with
     the fact that the graph/program panicked.
 
 #### Catch
@@ -837,7 +837,7 @@ resources:
   types:
   - name: QubitVector
     # Opaque types can take type arguments, with specified names
-    params: [["size", Int]]
+    params: [["size", USize]]
   operations:
   - name: measure
     description: "measure a qubit"
@@ -865,9 +865,9 @@ resources:
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     params:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: Int
-      - j: Int
-      - k: Int
+      - i: USize
+      - j: USize
+      - k: USize
     signature:
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
@@ -876,7 +876,7 @@ resources:
   - name: max_float
     description: "Variable number of inputs"
     params:
-      - n: Int
+      - n: USize
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
@@ -885,8 +885,8 @@ resources:
     description: "Concatenate two arrays. Resource provides a compute_signature implementation."
     params:
       - t: Type  # Classic or Quantum
-      - i: Int
-      - j: Int
+      - i: USize
+      - j: USize
     # inputs could be: Array<i>(t), Array<j>(t)
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
@@ -896,8 +896,8 @@ resources:
     params:
       - r: ResourceSet
     signature:
-      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]]
-      outputs: [[null, Int]]
+      inputs: [[null, Graph[r](USize -> USize)], ["arg", USize]]
+      outputs: [[null, USize]]
       resources: r # Indicates that running this operation also invokes resources r
     lowering:
       file: "graph_op_hugr.bin"
@@ -908,7 +908,7 @@ The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type" | "ClassicType" | Int | "List"(TypeParam)
+TypeParam ::= "Type" | "ClassicType" | USize | "List"(TypeParam)
 ```
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
@@ -996,13 +996,11 @@ Type ::= [Resources]SimpleType
 
 Resources ::= (Resource)* -- set not list
 
-Container(T) ::= List(T)
-              | Tuple(#(T))
+Container(T) ::= Tuple(#(T))
               | Array<u64>(T)
-              | Map<ClassicType, T>
               | NewType(Name, T)
               | Sum (#(T))
-ClassicType ::= int<N>
+ClassicType ::= USize
               | Var(X)
               | String
               | Graph[R](#, #)
@@ -1021,19 +1019,17 @@ sent down Static edges.
 Function signatures are made up of *rows* (\#), which consist of an
 arbitrary number of SimpleTypes, plus a resource spec.
 
-ClassicTypes such as `int<N>` (where `N` is the bit-width) are fixed-size, as is
-Qubit.
+The `USize` type represents 64-bit unsigned integers.
+
+ClassicTypes such as `USize` are fixed-size, as is Qubit.
 `Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
 statically-known number and type of elements, as does `Array<N>` (where
 N is a static constant). These types are also fixed-size if their
 components are.
 
-For integer types, the width is provided in the type, and signedness is left unspecified to be interpreted by operations. The width is allowed to be 2^i for i in the range [0,7], so the allowed integer types are [I1, I2, I4, ... , I128].
-
 Container types are defined in terms of statically-known element types.
-Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
-types: `Graph`, `Map` and
-`List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
+Besides `Array<N>`, `Sum` and `Tuple`, these also include the variable-sized
+types: `Graph`. `NewType`
 allows named newtypes to be used. Containers are classic (copyable) only
 if all of their components are classic.
 
@@ -1093,13 +1089,10 @@ resource requirements.
 
 We will likely also want to add a fixed set of attributes to certain
 subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
-example, the `Map` type can only be constructed when the type that we
+example, a potential `HashMap` type can only be constructed when the type that we
 map from is `Hashable`. For the Hugr, we will need this `Hashable`
 constraint, as well as a `Classic` constraint.
 
-**TODO**: fix this set of constraints (classic/copyable, hashable);
-extensions/resources *cannot* add new constraints. Use hashable for
-static type parameters, put Map in Tierkreis resource not core spec.
 
 ### Resources
 
@@ -1713,7 +1706,7 @@ Other operations:
 | `imin_s<N>`            | `int<N>`, `int<N>` | `int<N>`                           | minimum of signed integers                                                                                                                               |
 | `iadd<N>`              | `int<N>`, `int<N>` | `int<N>`                           | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `isub<N>`              | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                    |
-| `ineg<N>`              | `int<M>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
+| `ineg<N>`              | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `imul<N>`              | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                 |
 | `idivmod_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
 | `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |

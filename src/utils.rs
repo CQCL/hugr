@@ -1,4 +1,6 @@
-use std::fmt::{self, Display};
+use std::fmt::{self, Debug, Display};
+
+use itertools::Itertools;
 
 /// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
@@ -18,6 +20,11 @@ where
         }
     }
     Ok(())
+}
+
+/// Collect a vector into an array.
+pub fn collect_array<const N: usize, T: Debug>(arr: &[T]) -> [&T; N] {
+    arr.iter().collect_vec().try_into().unwrap()
 }
 
 #[allow(dead_code)]

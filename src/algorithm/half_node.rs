@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use super::nest_cfgs::CfgView;
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};

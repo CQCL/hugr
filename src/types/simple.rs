@@ -1,10 +1,10 @@
 //! Dataflow types
 
-use std::fmt::{self, Display, Formatter, Write};
+use std::fmt::{self, Display, Formatter};
 
 use super::type_row::{TypeRow, TypeRowElem};
 use super::{custom::CustomType, AbstractSignature};
-use crate::{classic_row, ops::constant::HugrIntWidthStore};
+use crate::classic_row;
 use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
@@ -97,6 +97,10 @@ pub trait PrimType: TypeRowElem + std::fmt::Debug + sealed::Sealed {
     fn tag(&self) -> TypeTag;
 }
 
+impl TypeRowElem for SimpleType {}
+impl TypeRowElem for ClassicType {}
+impl TypeRowElem for HashableType {}
+
 // sealed trait pattern to prevent users extending PrimType
 mod sealed {
     use super::{ClassicType, HashableType, SimpleType};
@@ -111,10 +115,6 @@ mod sealed {
 /// overall type is too.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Container<T: TypeRowElem> {
-    /// Variable sized list of T.
-    List(Box<T>),
-    /// Hash map from hashable key type to value T.
-    Map(Box<(HashableType, T)>),
     /// Product type, known-size tuple over elements of type row.
     Tuple(Box<TypeRow<T>>),
     /// Product type, variants are tagged by their position in the type row.
@@ -131,8 +131,6 @@ pub enum Container<T: TypeRowElem> {
 impl<T: Display + PrimType> Display for Container<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Container::List(ty) => write!(f, "List({})", ty.as_ref()),
-            Container::Map(tys) => write!(f, "Map({}, {})", tys.as_ref().0, tys.as_ref().1),
             Container::Tuple(row) => write!(f, "Tuple({})", row.as_ref()),
             Container::Sum(row) => write!(f, "Sum({})", row.as_ref()),
             Container::Array(t, size) => write!(f, "Array({}, {})", t, size),
@@ -178,8 +176,6 @@ impl From<Container<SimpleType>> for SimpleType {
 #[serde(try_from = "SimpleType", into = "SimpleType")]
 #[non_exhaustive]
 pub enum ClassicType {
-    /// A 64-bit floating point number.
-    F64,
     /// A graph encoded as a value. It contains a concrete signature and a set of required resources.
     /// TODO this can be moved out into an extension/resource
     Graph(Box<AbstractSignature>),
@@ -199,13 +195,16 @@ pub enum HashableType {
     /// TODO of course this is not necessarily hashable, or even classic,
     /// depending on how it is instantiated...
     Variable(SmolStr),
-    /// An arbitrary size integer.
-    Int(HugrIntWidthStore),
+    /// A 64-bit unsigned integer.
+    USize,
     /// An arbitrary length string.
     String,
     /// A container (all of whose elements can be hashed)
     Container(Container<HashableType>),
 }
+
+/// An error from an operation.
+pub const ERROR_TYPE: SimpleType = SimpleType::Classic(ClassicType::Hashable(HashableType::String));
 
 impl ClassicType {
     /// Returns whether the type contains only hashable data.
@@ -219,22 +218,16 @@ impl ClassicType {
         ClassicType::Graph(Box::new(signature))
     }
 
-    /// Returns a new integer type with the given number of bits.
+    /// Returns a new 64-bit size type.
     #[inline]
-    pub const fn int<const N: HugrIntWidthStore>() -> Self {
-        Self::Hashable(HashableType::Int(N))
+    pub const fn usize() -> Self {
+        Self::Hashable(HashableType::USize)
     }
 
     /// Returns a new 64-bit integer type.
     #[inline]
     pub const fn i64() -> Self {
-        Self::int::<64>()
-    }
-
-    /// Returns a new 1-bit integer type.
-    #[inline]
-    pub const fn bit() -> Self {
-        Self::int::<1>()
+        Self::usize()
     }
 
     /// New unit type, defined as an empty Tuple.
@@ -281,7 +274,6 @@ impl ClassicType {
 impl Display for ClassicType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ClassicType::F64 => f.write_str("F64"),
             ClassicType::Graph(data) => {
                 let sig = data.as_ref();
                 write!(f, "[{:?}]", sig.resource_reqs)?;
@@ -297,10 +289,7 @@ impl Display for HashableType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             HashableType::Variable(x) => f.write_str(x),
-            HashableType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
-            }
+            HashableType::USize => f.write_str("USize"),
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
         }
@@ -478,18 +467,30 @@ impl<T: PrimType> TypeRow<T> {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use cool_asserts::assert_matches;
 
+    /// Alternatively we could use [CLASSIC_T]
+    ///
+    /// [CLASSIC_T]: crate::types::custom::test::CLASSIC_T
+    fn graph_type() -> ClassicType {
+        ClassicType::Graph(Box::new(AbstractSignature::new(
+            vec![HashableType::USize.into()],
+            vec![HashableType::USize.into()],
+            vec![],
+        )))
+    }
+
     #[test]
     fn new_tuple() {
-        let simp = vec![SimpleType::Qubit, SimpleType::Classic(ClassicType::F64)];
+        let simp = vec![SimpleType::Qubit, SimpleType::Classic(graph_type())];
         let ty = SimpleType::new_tuple(simp);
         assert_matches!(ty, SimpleType::Qontainer(Container::Tuple(_)));
 
         let clas: ClassicRow = vec![
-            ClassicType::F64,
-            ClassicType::Container(Container::List(Box::new(ClassicType::F64))),
+            graph_type(),
+            ClassicType::Container(Container::Array(Box::new(graph_type()), 2)),
         ]
         .into();
         let ty = SimpleType::new_tuple(clas.map_into());
@@ -499,7 +500,7 @@ mod test {
         );
 
         let hash = vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(8))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::USize)),
             SimpleType::Classic(ClassicType::Hashable(HashableType::String)),
         ];
         let ty = SimpleType::new_tuple(hash);
@@ -514,10 +515,8 @@ mod test {
     #[test]
     fn new_sum() {
         let clas = vec![
-            SimpleType::Classic(ClassicType::F64),
-            SimpleType::Classic(ClassicType::Container(Container::List(Box::new(
-                ClassicType::F64,
-            )))),
+            SimpleType::Classic(graph_type()),
+            Container::<ClassicType>::Array(Box::new(graph_type()), 2).into(),
         ];
         let ty = SimpleType::new_sum(clas);
         assert_matches!(
@@ -525,7 +524,7 @@ mod test {
             SimpleType::Classic(ClassicType::Container(Container::Sum(_)))
         );
 
-        let hash: TypeRow<HashableType> = vec![HashableType::Int(4), HashableType::String].into();
+        let hash: TypeRow<HashableType> = vec![HashableType::USize, HashableType::String].into();
         let ty = SimpleType::new_sum(hash.map_into());
         assert_matches!(
             ty,

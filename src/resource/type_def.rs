@@ -149,6 +149,7 @@ impl Resource {
 #[cfg(test)]
 mod test {
     use crate::resource::SignatureError;
+    use crate::types::custom::test::CLASSIC_T;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{
         AbstractSignature, ClassicType, HashableType, PrimType, SimpleType, TypeTag,
@@ -194,8 +195,8 @@ mod test {
         // Too many arguments:
         assert_eq!(
             def.instantiate_concrete([
-                TypeArg::Type(ClassicType::F64.into()),
-                TypeArg::Type(ClassicType::F64.into()),
+                TypeArg::Type(CLASSIC_T.into()),
+                TypeArg::Type(CLASSIC_T.into()),
             ])
             .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))

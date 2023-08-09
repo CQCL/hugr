@@ -2,11 +2,10 @@
 
 mod hugrmut;
 
-pub mod hierarchical_views;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
-pub mod view;
+pub mod views;
 
 use std::collections::VecDeque;
 use std::iter;
@@ -24,7 +23,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-pub use self::view::HugrView;
+pub use self::views::HugrView;
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, Signature};
