@@ -11,7 +11,10 @@ use itertools::Itertools;
 
 use crate::utils::display_list;
 
-use super::{leaf::TypeClass, Type, TypeTag};
+use super::{
+    leaf::{AnyLeaf, TypeClass},
+    Type, TypeTag,
+};
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -91,21 +94,25 @@ impl<T: TypeClass> TypeRow<T> {
         )
     }
 
-    /// Return the type row of variants required to define a Sum of Tuples type
-    /// given the rows of each tuple
-    pub fn predicate_variants_row(variant_rows: impl IntoIterator<Item = TypeRow<T>>) -> Self {
-        variant_rows
-            .into_iter()
-            .map(Type::new_tuple)
-            .collect_vec()
-            .into()
-    }
-
     /// Returns the smallest [TypeTag] that contains all elements of the row
     pub fn containing_tag(&self) -> TypeTag {
         self.iter()
             .map(Type::bounding_tag)
             .fold(TypeTag::Hashable, TypeTag::union)
+    }
+}
+
+impl TypeRow<AnyLeaf> {
+    /// Return the type row of variants required to define a Sum of Tuples type
+    /// given the rows of each tuple
+    pub fn predicate_variants_row(
+        variant_rows: impl IntoIterator<Item = TypeRow<AnyLeaf>>,
+    ) -> Self {
+        variant_rows
+            .into_iter()
+            .map(Type::new_tuple)
+            .collect_vec()
+            .into()
     }
 }
 

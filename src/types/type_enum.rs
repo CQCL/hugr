@@ -51,18 +51,21 @@ impl<T: TypeClass> Type<T> {
     pub fn new_extension(opaque: CustomType) -> Result<Self, InvalidBound> {
         Ok(Self::Extension(Tagged::new(opaque)?))
     }
+    pub fn new_alias(alias: AliasDecl) -> Result<Self, InvalidBound> {
+        Ok(Self::Alias(Tagged::new(alias)?))
+    }
+}
+
+impl Type<AnyLeaf> {
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<T>>) -> Self {
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<AnyLeaf>>) -> Self {
         Self::new_sum(TypeRow::predicate_variants_row(variant_rows))
     }
     /// New simple predicate with empty Tuple variants
 
     pub fn new_simple_predicate(size: usize) -> Self {
         Self::new_predicate(std::iter::repeat(vec![]).map_into().take(size))
-    }
-    pub fn new_alias(alias: AliasDecl) -> Result<Self, InvalidBound> {
-        Ok(Self::Alias(Tagged::new(alias)?))
     }
 }
 
