@@ -42,35 +42,35 @@ mod sealed {
     impl Sealed for EqLeaf {}
 }
 pub trait TypeClass: sealed::Sealed {
-    const TAG: TypeTag;
+    const BOUND_TAG: TypeTag;
 }
 
 impl TypeClass for EqLeaf {
-    const TAG: TypeTag = TypeTag::Hashable;
+    const BOUND_TAG: TypeTag = TypeTag::Hashable;
 }
 
 impl TypeClass for ClassicLeaf {
-    const TAG: TypeTag = TypeTag::Classic;
+    const BOUND_TAG: TypeTag = TypeTag::Classic;
 }
 impl TypeClass for AnyLeaf {
-    const TAG: TypeTag = TypeTag::Simple;
+    const BOUND_TAG: TypeTag = TypeTag::Simple;
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct Tagged<I, T>(I, PhantomData<T>);
 
-pub trait GetTag {
-    fn tag(&self) -> TypeTag;
+pub trait ReportTag {
+    fn self_report_tag(&self) -> TypeTag;
 }
 
-impl GetTag for CustomType {
-    fn tag(&self) -> TypeTag {
+impl ReportTag for CustomType {
+    fn self_report_tag(&self) -> TypeTag {
         self.tag()
     }
 }
 
-impl GetTag for AliasDecl {
-    fn tag(&self) -> TypeTag {
+impl ReportTag for AliasDecl {
+    fn self_report_tag(&self) -> TypeTag {
         self.tag
     }
 }
@@ -82,14 +82,14 @@ pub struct InvalidBound {
     found: TypeTag,
 }
 
-impl<T: GetTag, C: TypeClass> Tagged<T, C> {
+impl<T: ReportTag, C: TypeClass> Tagged<T, C> {
     pub fn new(inner: T) -> Result<Self, InvalidBound> {
-        if C::TAG.contains(inner.tag()) {
+        if C::BOUND_TAG.contains(inner.self_report_tag()) {
             Ok(Self(inner, PhantomData))
         } else {
             Err(InvalidBound {
-                bound: C::TAG,
-                found: inner.tag(),
+                bound: C::BOUND_TAG,
+                found: inner.self_report_tag(),
             })
         }
     }
@@ -109,9 +109,9 @@ pub enum Type<T> {
 }
 
 impl<T: TypeClass> Type<T> {
-    pub const TAG: TypeTag = T::TAG;
+    pub const BOUND_TAG: TypeTag = T::BOUND_TAG;
     pub const fn type_tag_bound(&self) -> TypeTag {
-        T::TAG
+        T::BOUND_TAG
     }
 
     pub fn new_tuple(types: impl IntoIterator<Item = Type<T>>) -> Self {
