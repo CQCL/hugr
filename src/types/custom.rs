@@ -41,6 +41,21 @@ impl CustomType {
         }
     }
 
+    /// Creates a new opaque type (constant version, no conversions of arguments)
+    pub const fn new_const(
+        id: SmolStr,
+        args: Vec<TypeArg>,
+        resource: ResourceId,
+        tag: TypeTag,
+    ) -> Self {
+        Self {
+            id,
+            args,
+            resource,
+            tag,
+        }
+    }
+
     /// Returns the tag of this [`CustomType`].
     pub fn tag(&self) -> TypeTag {
         self.tag
@@ -91,10 +106,10 @@ pub(crate) mod test {
     pub(crate) const CLASSIC_T: ClassicType =
         ClassicType::Container(Container::Opaque(CLASSIC_CUST));
 
-    pub(crate) const CLASSIC_CUST: CustomType = CustomType {
-        resource: SmolStr::new_inline("MyRsrc"),
-        id: SmolStr::new_inline("MyType"),
-        args: vec![],
-        tag: TypeTag::Classic,
-    };
+    pub(crate) const CLASSIC_CUST: CustomType = CustomType::new_const(
+        SmolStr::new_inline("MyType"),
+        vec![],
+        SmolStr::new_inline("MyRsrc"),
+        TypeTag::Classic,
+    );
 }
