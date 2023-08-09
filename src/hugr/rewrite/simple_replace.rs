@@ -509,8 +509,9 @@ mod test {
 
     #[test]
     fn test_replace_after_copy() {
-        let one_bit: Vec<SimpleType> = vec![ClassicType::bit().into()];
-        let two_bit: Vec<SimpleType> = vec![ClassicType::bit().into(), ClassicType::bit().into()];
+        let one_bit: Vec<SimpleType> = vec![ClassicType::usize().into()];
+        let two_bit: Vec<SimpleType> =
+            vec![ClassicType::usize().into(), ClassicType::usize().into()];
 
         let mut builder =
             DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();

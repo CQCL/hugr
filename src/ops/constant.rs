@@ -78,17 +78,12 @@ impl Const {
         Self::simple_predicate(0, 2)
     }
 
-    /// Fixed width integer
-    pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
+    /// Size
+    pub fn usize(value: u64) -> Result<Self, ConstTypeError> {
         Self::new(
             ConstValue::Hashable(HashableValue::Int(value)),
-            ClassicType::int::<N>(),
+            ClassicType::usize(),
         )
-    }
-
-    /// 64-bit integer
-    pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
-        Self::int::<64>(value as HugrIntValueStore)
     }
 
     /// Tuple of values
@@ -123,11 +118,6 @@ impl OpTrait for Const {
     }
 }
 
-pub(crate) type HugrIntValueStore = u128;
-pub(crate) type HugrIntWidthStore = u8;
-pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
-    HugrIntValueStore::BITS as HugrIntWidthStore;
-
 /// Value constants. (This could be "ClassicValue" to parallel [HashableValue])
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -136,8 +126,6 @@ pub enum ConstValue {
     Hashable(HashableValue),
     /// A collection of constant values (at least some of which are not [ConstValue::Hashable])
     Container(ContainerValue<ConstValue>),
-    /// Double precision float
-    F64(f64),
     /// An opaque constant value, that can check it is of a given [CustomType].
     /// This may include values that are [hashable]
     ///
@@ -157,7 +145,6 @@ impl ValueOfType for ConstValue {
 
     fn name(&self) -> String {
         match self {
-            ConstValue::F64(f) => format!("const:float:{}", f),
             ConstValue::Hashable(hv) => hv.name(),
             ConstValue::Container(ctr) => ctr.desc(),
             ConstValue::Opaque((v,)) => format!("const:custom:{}", v.name()),
@@ -166,11 +153,6 @@ impl ValueOfType for ConstValue {
 
     fn check_type(&self, ty: &ClassicType) -> Result<(), ConstTypeError> {
         match self {
-            ConstValue::F64(_) => {
-                if let ClassicType::F64 = ty {
-                    return Ok(());
-                }
-            }
             ConstValue::Hashable(hv) => {
                 match ty {
                     ClassicType::Hashable(exp) => return hv.check_type(exp),
@@ -340,19 +322,23 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         classic_row, type_row,
-        types::simple::Container,
-        types::type_param::TypeArg,
+        types::custom::test::{CLASSIC_CUST, CLASSIC_T},
+        types::{simple::Container, type_param::TypeArg},
         types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeTag},
-        values::{ConstIntError, ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
+        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
+
+    fn custom_value(f: f64) -> ConstValue {
+        ConstValue::Opaque((Box::new(CustomSerialized {
+            typ: CLASSIC_CUST,
+            value: serde_yaml::Value::Number(f.into()),
+        }),))
+    }
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![
-            classic_row![ClassicType::i64(), ClassicType::F64],
-            type_row![],
-        ];
+        let pred_rows = vec![classic_row![ClassicType::i64(), CLASSIC_T], type_row![]];
         let pred_ty = SimpleType::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(AbstractSignature::new_df(
@@ -363,7 +349,7 @@ mod test {
             0,
             ConstValue::sequence(&[
                 ConstValue::Hashable(HashableValue::Int(3)),
-                ConstValue::F64(3.15),
+                custom_value(5.1),
             ]),
             pred_rows.clone(),
         )?)?;
@@ -383,10 +369,7 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = vec![
-            classic_row![ClassicType::i64(), ClassicType::F64],
-            type_row![],
-        ];
+        let pred_rows = vec![classic_row![ClassicType::i64(), CLASSIC_T], type_row![]];
 
         let res = Const::predicate(0, ConstValue::sequence(&[]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
@@ -394,27 +377,23 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: ClassicType = ClassicType::int::<64>();
+        const T_INT: ClassicType = ClassicType::usize();
         const V_INT: ConstValue = ConstValue::Hashable(HashableValue::Int(257));
         V_INT.check_type(&T_INT).unwrap();
-        assert_eq!(
-            V_INT.check_type(&ClassicType::int::<8>()),
-            Err(ConstTypeError::Int(ConstIntError::IntTooLarge(8, 257)))
-        );
-        ConstValue::F64(17.4).check_type(&ClassicType::F64).unwrap();
+        custom_value(17.4).check_type(&CLASSIC_T).unwrap();
         assert_matches!(
-            V_INT.check_type(&ClassicType::F64),
-            Err(ConstTypeError::ValueCheckFail(ClassicType::F64, v)) => v == V_INT
+            V_INT.check_type(&CLASSIC_T),
+            Err(ConstTypeError::ValueCheckFail(t, v)) => t == CLASSIC_T && v == V_INT
         );
-        let tuple_ty = ClassicType::new_tuple(classic_row![T_INT, ClassicType::F64]);
-        let tuple_val = ConstValue::sequence(&[V_INT, ConstValue::F64(5.1)]);
+        let tuple_ty = ClassicType::new_tuple(classic_row![T_INT, CLASSIC_T]);
+        let tuple_val = ConstValue::sequence(&[V_INT, custom_value(5.1)]);
         tuple_val.check_type(&tuple_ty).unwrap();
-        let tuple_val2 = ConstValue::sequence(&[ConstValue::F64(5.1), V_INT]);
+        let tuple_val2 = ConstValue::sequence(&[custom_value(6.1), V_INT]);
         assert_matches!(
             tuple_val2.check_type(&tuple_ty),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
-        let tuple_val3 = ConstValue::sequence(&[V_INT, ConstValue::F64(3.3), ConstValue::F64(2.0)]);
+        let tuple_val3 = ConstValue::sequence(&[V_INT, custom_value(3.3), custom_value(2.0)]);
         assert_eq!(
             tuple_val3.check_type(&tuple_ty),
             Err(ConstTypeError::TupleWrongLength)

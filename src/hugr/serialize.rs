@@ -303,13 +303,13 @@ pub mod test {
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
                 signature: AbstractSignature::new_df(
-                    vec![ClassicType::bit().into(); inputs - 1],
-                    vec![ClassicType::bit().into(); outputs - 1],
+                    vec![ClassicType::usize().into(); inputs - 1],
+                    vec![ClassicType::usize().into(); outputs - 1],
                 ),
             }
             .into(),
-            (true, false) => Input::new(vec![ClassicType::bit().into(); outputs - 1]).into(),
-            (false, true) => Output::new(vec![ClassicType::bit().into(); inputs - 1]).into(),
+            (true, false) => Input::new(vec![ClassicType::usize().into(); outputs - 1]).into(),
+            (false, true) => Output::new(vec![ClassicType::usize().into(); inputs - 1]).into(),
             (true, true) => Module.into(),
         }
     }
@@ -433,7 +433,7 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
+        let tp: Vec<SimpleType> = vec![ClassicType::usize().into(); 2];
         let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {

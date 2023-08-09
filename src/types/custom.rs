@@ -80,3 +80,21 @@ impl From<CustomType> for SimpleType {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod test {
+    use smol_str::SmolStr;
+
+    use super::CustomType;
+    use crate::types::{ClassicType, Container, TypeTag};
+
+    pub(crate) const CLASSIC_T: ClassicType =
+        ClassicType::Container(Container::Opaque(CLASSIC_CUST));
+
+    pub(crate) const CLASSIC_CUST: CustomType = CustomType {
+        resource: SmolStr::new_inline("MyRsrc"),
+        id: SmolStr::new_inline("MyType"),
+        args: vec![],
+        tag: TypeTag::Classic,
+    };
+}

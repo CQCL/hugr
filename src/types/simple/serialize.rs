@@ -6,6 +6,7 @@ use super::HashableType;
 use super::PrimType;
 use super::TypeTag;
 
+use itertools::Itertools;
 use smol_str::SmolStr;
 
 use super::super::custom::CustomType;
@@ -16,26 +17,23 @@ use super::SimpleType;
 
 use super::super::AbstractSignature;
 
-use crate::ops::constant::HugrIntWidthStore;
+use crate::types::type_row::TypeRowElem;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
 pub(crate) enum SerSimpleType {
     Q,
-    I {
-        width: HugrIntWidthStore,
-    },
-    F,
+    I,
     S,
     G {
         signature: Box<AbstractSignature>,
     },
     Tuple {
-        row: Box<TypeRow<SerSimpleType>>,
+        row: Vec<SerSimpleType>,
         c: TypeTag,
     },
     Sum {
-        row: Box<TypeRow<SerSimpleType>>,
+        row: Vec<SerSimpleType>,
         c: TypeTag,
     },
     Array {
@@ -80,15 +78,15 @@ where
     fn from(value: Container<T>) -> Self {
         match value {
             Container::Sum(inner) => SerSimpleType::Sum {
-                row: Box::new(inner.map_into()),
+                row: inner.into_owned().into_iter().map_into().collect(),
                 c: T::TAG, // We could inspect inner.containing_tag(), but this should have been done already
             },
             Container::Tuple(inner) => SerSimpleType::Tuple {
-                row: Box::new(inner.map_into()),
+                row: inner.into_owned().into_iter().map_into().collect(),
                 c: T::TAG,
             },
             Container::Array(inner, len) => SerSimpleType::Array {
-                inner: box_convert(*inner),
+                inner: Box::new((*inner).into()),
                 len,
                 c: T::TAG,
             },
@@ -102,7 +100,7 @@ impl From<HashableType> for SerSimpleType {
     fn from(value: HashableType) -> Self {
         match value {
             HashableType::Variable(s) => SerSimpleType::Var { name: s },
-            HashableType::Int(w) => SerSimpleType::I { width: w },
+            HashableType::USize => SerSimpleType::I,
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
         }
@@ -112,7 +110,6 @@ impl From<HashableType> for SerSimpleType {
 impl From<ClassicType> for SerSimpleType {
     fn from(value: ClassicType) -> Self {
         match value {
-            ClassicType::F64 => SerSimpleType::F,
             ClassicType::Graph(inner) => SerSimpleType::G {
                 signature: Box::new(*inner),
             },
@@ -132,19 +129,14 @@ impl From<SimpleType> for SerSimpleType {
     }
 }
 
-pub(crate) fn box_convert_try<T, F>(value: T) -> Box<F>
-where
-    T: TryInto<F>,
-    <T as TryInto<F>>::Error: std::fmt::Debug,
-{
-    Box::new((value).try_into().unwrap())
-}
-
-pub(crate) fn box_convert<T, F>(value: T) -> Box<F>
-where
-    T: Into<F>,
-{
-    Box::new((value).into())
+fn try_convert_list<T: TryInto<T2>, T2: TypeRowElem>(
+    values: Vec<T>,
+) -> Result<TypeRow<T2>, T::Error> {
+    let vals = values
+        .into_iter()
+        .map(T::try_into)
+        .collect::<Result<Vec<T2>, T::Error>>()?;
+    Ok(TypeRow::from(vals))
 }
 
 macro_rules! handle_container {
@@ -161,18 +153,17 @@ impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => HashableType::Int(width).into(),
-            SerSimpleType::F => ClassicType::F64.into(),
+            SerSimpleType::I => HashableType::USize.into(),
             SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
-                handle_container!(c, Tuple(Box::new(inner.try_convert_elems().unwrap())))
+                handle_container!(c, Tuple(Box::new(try_convert_list(inner).unwrap())))
             }
             SerSimpleType::Sum { row: inner, c } => {
-                handle_container!(c, Sum(Box::new(inner.try_convert_elems().unwrap())))
+                handle_container!(c, Sum(Box::new(try_convert_list(inner).unwrap())))
             }
             SerSimpleType::Array { inner, len, c } => {
-                handle_container!(c, Array(box_convert_try(*inner), len))
+                handle_container!(c, Array(Box::new((*inner).try_into().unwrap()), len))
             }
             SerSimpleType::Alias { name: s, c } => handle_container!(c, Alias(s)),
             SerSimpleType::Opaque { custom, c } => {
@@ -211,6 +202,7 @@ impl TryFrom<SerSimpleType> for HashableType {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
+    use crate::types::custom::test::CLASSIC_T;
     use crate::types::{ClassicType, Container, HashableType, SimpleType};
 
     #[test]
@@ -218,20 +210,20 @@ mod test {
         // A Simple tuple
         let t = SimpleType::new_tuple(vec![
             SimpleType::Qubit,
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::from(HashableType::USize),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
         let t = SimpleType::new_sum(vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
-            SimpleType::Classic(ClassicType::F64),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::USize)),
+            SimpleType::Classic(CLASSIC_T),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable list
         let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
-            Container::Array(Box::new(HashableType::Int(8)), 3),
+            Container::Array(Box::new(HashableType::USize), 3),
         )));
         assert_eq!(ser_roundtrip(&t), t);
     }
@@ -241,7 +233,7 @@ mod test {
         // This list should be represented as a HashableType::Container.
         let malformed = SimpleType::Qontainer(Container::Array(
             Box::new(SimpleType::Classic(ClassicType::Hashable(
-                HashableType::Int(8),
+                HashableType::USize,
             ))),
             6,
         ));
