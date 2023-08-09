@@ -525,11 +525,11 @@ impl TypeTag {
 mod test {
     use crate::ops::AliasDecl;
 
-    use super::leaf::{AnyLeaf, ClassicLeaf, EqLeaf, InvalidBound};
+    use super::leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound};
     use super::*;
     #[test]
     fn construct() {
-        let t: Type<ClassicLeaf> = Type::new_tuple([
+        let t: Type<CopyableLeaf> = Type::new_tuple([
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(
@@ -549,7 +549,7 @@ mod test {
 
     #[test]
     fn test_bad_dynamic() {
-        let res: Result<Type<ClassicLeaf>, _> =
+        let res: Result<Type<CopyableLeaf>, _> =
             Type::new_alias(AliasDecl::new("my_alias", TypeTag::Simple));
         assert_eq!(
             res,
@@ -562,9 +562,9 @@ mod test {
     #[test]
     fn all_constructors() {
         Type::<EqLeaf>::usize();
-        Type::<ClassicLeaf>::usize();
+        Type::<CopyableLeaf>::usize();
         Type::<AnyLeaf>::usize();
-        Type::<ClassicLeaf>::graph(AbstractSignature::new_linear(vec![]));
+        Type::<CopyableLeaf>::graph(AbstractSignature::new_linear(vec![]));
         Type::<AnyLeaf>::graph(AbstractSignature::new_linear(vec![]));
     }
 }

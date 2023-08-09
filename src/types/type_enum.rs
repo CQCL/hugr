@@ -5,7 +5,7 @@ use std::{fmt::Display, marker::PhantomData};
 use crate::ops::AliasDecl;
 
 use super::{
-    leaf::{AnyLeaf, ClassicLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
+    leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
     AbstractSignature, CustomType, TypeTag,
 };
 
@@ -43,9 +43,9 @@ impl<T: From<EqLeaf>> Type<T> {
     }
 }
 
-impl<T: From<ClassicLeaf>> Type<T> {
+impl<T: From<CopyableLeaf>> Type<T> {
     pub fn graph(signature: AbstractSignature) -> Self {
-        Self::Prim(ClassicLeaf::Graph(Box::new(signature)).into())
+        Self::Prim(CopyableLeaf::Graph(Box::new(signature)).into())
     }
 }
 
@@ -63,7 +63,7 @@ impl<T> Type<T> {
     }
 }
 
-impl From<Type<EqLeaf>> for Type<ClassicLeaf> {
+impl From<Type<EqLeaf>> for Type<CopyableLeaf> {
     fn from(value: Type<EqLeaf>) -> Self {
         value.upcast()
     }
@@ -75,8 +75,8 @@ impl From<Type<EqLeaf>> for Type<AnyLeaf> {
     }
 }
 
-impl From<Type<ClassicLeaf>> for Type<AnyLeaf> {
-    fn from(value: Type<ClassicLeaf>) -> Self {
+impl From<Type<CopyableLeaf>> for Type<AnyLeaf> {
+    fn from(value: Type<CopyableLeaf>) -> Self {
         value.upcast()
     }
 }

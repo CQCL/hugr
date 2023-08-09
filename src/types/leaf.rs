@@ -15,33 +15,33 @@ pub enum EqLeaf {
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, Display)]
-pub enum ClassicLeaf {
+pub enum CopyableLeaf {
     E(EqLeaf),
     Graph(Box<AbstractSignature>),
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, Display)]
 pub enum AnyLeaf {
-    C(ClassicLeaf),
+    C(CopyableLeaf),
 }
 
-impl From<EqLeaf> for ClassicLeaf {
+impl From<EqLeaf> for CopyableLeaf {
     fn from(value: EqLeaf) -> Self {
-        ClassicLeaf::E(value)
+        CopyableLeaf::E(value)
     }
 }
 
-impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
+impl<T: Into<CopyableLeaf>> From<T> for AnyLeaf {
     fn from(value: T) -> Self {
         AnyLeaf::C(value.into())
     }
 }
 
 pub(crate) mod sealed {
-    use super::{AnyLeaf, ClassicLeaf, EqLeaf};
+    use super::{AnyLeaf, CopyableLeaf, EqLeaf};
     pub trait Sealed {}
     impl Sealed for AnyLeaf {}
-    impl Sealed for ClassicLeaf {}
+    impl Sealed for CopyableLeaf {}
     impl Sealed for EqLeaf {}
 }
 
@@ -53,7 +53,7 @@ impl TypeClass for EqLeaf {
     const BOUND_TAG: TypeTag = TypeTag::Hashable;
 }
 
-impl TypeClass for ClassicLeaf {
+impl TypeClass for CopyableLeaf {
     const BOUND_TAG: TypeTag = TypeTag::Classic;
 }
 
