@@ -35,16 +35,31 @@ impl<T: TypeClass> Type<T> {
         T::BOUND_TAG
     }
 
-    pub fn new_tuple(types: impl IntoIterator<Item = Type<T>>) -> Self {
-        Self::Tuple(Box::new(types.into_iter().collect_vec().into()))
+    pub fn new_tuple(types: impl Into<TypeRow<T>>) -> Self {
+        Self::Tuple(Box::new(types.into()))
     }
 
-    pub fn new_sum(types: impl IntoIterator<Item = Type<T>>) -> Self {
-        Self::Sum(Box::new(types.into_iter().collect_vec().into()))
+    /// New unit type, defined as an empty Tuple.
+    pub fn new_unit() -> Self {
+        Self::new_tuple(vec![])
+    }
+
+    pub fn new_sum(types: impl Into<TypeRow<T>>) -> Self {
+        Self::Sum(Box::new(types.into()))
     }
 
     pub fn new_extension(opaque: CustomType) -> Result<Self, InvalidBound> {
         Ok(Self::Extension(Tagged::new(opaque)?))
+    }
+    /// New Sum of Tuple types, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn new_predicate(variant_rows: impl IntoIterator<Item = TypeRow<T>>) -> Self {
+        Self::new_sum(TypeRow::predicate_variants_row(variant_rows))
+    }
+    /// New simple predicate with empty Tuple variants
+
+    pub fn new_simple_predicate(size: usize) -> Self {
+        Self::new_predicate(std::iter::repeat(vec![]).map_into().take(size))
     }
     pub fn new_alias(alias: AliasDecl) -> Result<Self, InvalidBound> {
         Ok(Self::Alias(Tagged::new(alias)?))
