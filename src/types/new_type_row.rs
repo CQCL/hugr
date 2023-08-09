@@ -11,30 +11,26 @@ use crate::utils::display_list;
 
 use super::{leaf::TypeClass, Type};
 
-/// Base trait for anything that can be put in a [TypeRow]
-pub trait TypeRowElem: Clone + 'static {}
-
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug)]
 //#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions
 #[non_exhaustive]
-pub struct TypeRow<T: TypeRowElem> {
+pub struct TypeRow<T: TypeClass> {
     /// The datatypes in the row.
     types: Cow<'static, [Type<T>]>,
 }
 
-impl<T: Display + TypeRowElem> Display for TypeRow<T> {
+impl<T: Display + TypeClass> Display for TypeRow<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        todo!()
-        // f.write_char('[')?;
-        // display_list(self.types.as_ref(), f)?;
-        // f.write_char(']')
+        f.write_char('[')?;
+        display_list(self.types.as_ref(), f)?;
+        f.write_char(']')
     }
 }
 
 // TODO some of these, but not all, will probably want exposing via
 // pyo3 wrappers eventually.
-impl<T: TypeRowElem> TypeRow<T> {
+impl<T: TypeClass> TypeRow<T> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -80,7 +76,7 @@ impl<T: TypeRowElem> TypeRow<T> {
         self.types.to_mut().get_mut(offset)
     }
 
-    pub(super) fn try_convert_elems<D: TypeRowElem>(
+    pub(super) fn try_convert_elems<D: TypeClass>(
         self,
     ) -> Result<TypeRow<D>, <Type<D> as TryFrom<Type<T>>>::Error>
     where
@@ -95,7 +91,7 @@ impl<T: TypeRowElem> TypeRow<T> {
     }
 
     /// Converts the elements of this TypeRow into some other type that they can `.into()`
-    pub fn map_into<T2: TypeRowElem>(self) -> TypeRow<T2>
+    pub fn map_into<T2: TypeClass>(self) -> TypeRow<T2>
     where
         Type<T2>: From<Type<T>>,
     {
@@ -108,13 +104,13 @@ impl<T: TypeRowElem> TypeRow<T> {
     }
 }
 
-impl<T: TypeRowElem> Default for TypeRow<T> {
+impl<T: TypeClass> Default for TypeRow<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, T: TypeRowElem> From<F> for TypeRow<T>
+impl<F, T: TypeClass> From<F> for TypeRow<T>
 where
     F: Into<Cow<'static, [Type<T>]>>,
 {
@@ -125,7 +121,7 @@ where
     }
 }
 
-impl<T: TypeRowElem> Deref for TypeRow<T> {
+impl<T: TypeClass> Deref for TypeRow<T> {
     type Target = [Type<T>];
 
     fn deref(&self) -> &Self::Target {
@@ -133,7 +129,7 @@ impl<T: TypeRowElem> Deref for TypeRow<T> {
     }
 }
 
-impl<T: TypeRowElem> DerefMut for TypeRow<T> {
+impl<T: TypeClass> DerefMut for TypeRow<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

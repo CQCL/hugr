@@ -2,29 +2,30 @@
 
 use std::marker::PhantomData;
 
-use itertools::Itertools;
-
 use crate::ops::AliasDecl;
+use itertools::Itertools;
+use std::fmt::Display;
 
 use super::{
     leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
-    new_type_row::TypeRowElem,
     AbstractSignature, CustomType, TypeTag,
 };
 
 use super::new_type_row::TypeRow;
 
-#[derive(Clone, PartialEq, Debug, Eq)]
-// #[display(fmt = "{}")]
-pub enum Type<T: TypeRowElem> {
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+#[display(bound = "T: Display")]
+#[display(fmt = "{}")]
+pub enum Type<T: TypeClass> {
     Prim(T),
     Extension(Tagged<CustomType, T>),
+    #[display(fmt = "Alias({})", "_0.inner().name()")]
     Alias(Tagged<AliasDecl, T>),
-    // #[display(fmt = "Array[{};{}]", "_0", "_1")]
+    #[display(fmt = "Array[{};{}]", "_0", "_1")]
     Array(Box<Type<T>>, usize),
-    // #[display(fmt = "Tuple({})", "_0")]
+    #[display(fmt = "Tuple({})", "_0")]
     Tuple(Box<TypeRow<T>>),
-    // #[display(fmt = "Sum({})", "_0")]
+    #[display(fmt = "Sum({})", "_0")]
     Sum(Box<TypeRow<T>>),
 }
 

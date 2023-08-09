@@ -542,7 +542,10 @@ mod test {
             .unwrap(),
             Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
         ]);
-        // dbg!(t.to_string());
+        assert_eq!(
+            t.to_string(),
+            "Tuple([USize, Graph, my_custom([]), Alias(my_alias)])".to_string()
+        );
         assert_eq!(t.bounding_tag(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
 

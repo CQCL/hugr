@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use crate::ops::AliasDecl;
 
-use super::{new_type_row::TypeRowElem, AbstractSignature, CustomType, TypeTag};
+use super::{AbstractSignature, CustomType, TypeTag};
 use derive_more::Display;
 use thiserror::Error;
 
@@ -17,6 +17,7 @@ pub enum EqLeaf {
 #[derive(Clone, PartialEq, Debug, Eq, Display)]
 pub enum CopyableLeaf {
     E(EqLeaf),
+    #[display(fmt = "Graph")]
     Graph(Box<AbstractSignature>),
 }
 
@@ -36,9 +37,6 @@ impl<T: Into<CopyableLeaf>> From<T> for AnyLeaf {
         AnyLeaf::C(value.into())
     }
 }
-impl TypeRowElem for EqLeaf {}
-impl TypeRowElem for CopyableLeaf {}
-impl TypeRowElem for AnyLeaf {}
 
 pub(crate) mod sealed {
     use super::{AnyLeaf, CopyableLeaf, EqLeaf};
@@ -48,7 +46,7 @@ pub(crate) mod sealed {
     impl Sealed for EqLeaf {}
 }
 
-pub trait TypeClass: sealed::Sealed + TypeRowElem {
+pub trait TypeClass: sealed::Sealed + Clone + 'static {
     const BOUND_TAG: TypeTag;
 }
 
