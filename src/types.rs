@@ -2,6 +2,7 @@
 
 pub mod basic;
 pub mod custom;
+pub mod leaf;
 pub mod simple;
 pub mod type_param;
 pub mod type_row;
