@@ -19,6 +19,7 @@ mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
 mod type_def;
 pub use type_def::{TypeDef, TypeDefTag};
+pub mod validate;
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
