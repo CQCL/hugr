@@ -87,7 +87,7 @@ impl<T: From<ClassicLeaf>> Type<T> {
     }
 }
 
-impl<T: sealed::SealedLeaf> Type<T> {
+impl<T> Type<T> {
     pub fn upcast<T2: From<T>>(self) -> Type<T2> {
         match self {
             Type::Prim(t) => Type::Prim(t.into()),
