@@ -70,6 +70,8 @@ pub fn resource() -> Resource {
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
     use super::*;
 
     #[test]
@@ -78,5 +80,26 @@ mod test {
         assert_eq!(r.name(), "arithmetic.int.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
+    }
+
+    #[test]
+    fn test_int_widths() {
+        let type_arg_32 = TypeArg::USize(32);
+        assert_matches!(get_width(&type_arg_32), Ok(32));
+
+        let type_arg_33 = TypeArg::USize(33);
+        assert_matches!(
+            get_width(&type_arg_33),
+            Err(SignatureError::TypeArgMismatch(_))
+        );
+
+        let type_arg_128 = TypeArg::USize(128);
+        assert_matches!(get_width(&type_arg_128), Ok(128));
+
+        let type_arg_256 = TypeArg::USize(256);
+        assert_matches!(
+            get_width(&type_arg_256),
+            Err(SignatureError::TypeArgMismatch(_))
+        );
     }
 }
