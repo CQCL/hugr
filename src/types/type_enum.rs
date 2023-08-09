@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use std::marker::PhantomData;
+use std::{fmt::Display, marker::PhantomData};
 
 use crate::ops::AliasDecl;
 
@@ -56,9 +56,9 @@ impl<T> Type<T> {
             Type::Prim(t) => Type::Prim(t.into()),
             Type::Extension(Tagged(t, _)) => Type::Extension(Tagged(t, PhantomData)),
             Type::Alias(Tagged(t, _)) => Type::Alias(Tagged(t, PhantomData)),
-            Type::Array(_, _) => todo!(),
+            Type::Array(t, l) => Type::Array(Box::new(t.upcast()), l),
             Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Type::<T>::upcast).collect()),
-            Type::Sum(_) => todo!(),
+            Type::Sum(vec) => Type::Sum(vec.into_iter().map(Type::<T>::upcast).collect()),
         }
     }
 }
