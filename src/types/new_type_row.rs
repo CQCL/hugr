@@ -76,20 +76,6 @@ impl<T: TypeClass> TypeRow<T> {
         self.types.to_mut().get_mut(offset)
     }
 
-    pub(super) fn try_convert_elems<D: TypeClass>(
-        self,
-    ) -> Result<TypeRow<D>, <Type<D> as TryFrom<Type<T>>>::Error>
-    where
-        Type<D>: TryFrom<Type<T>>,
-    {
-        let elems: Vec<Type<D>> = self
-            .into_owned()
-            .into_iter()
-            .map(Type::<D>::try_from)
-            .collect::<Result<_, _>>()?;
-        Ok(TypeRow::from(elems))
-    }
-
     /// Converts the elements of this TypeRow into some other type that they can `.into()`
     pub fn map_into<T2: TypeClass>(self) -> TypeRow<T2>
     where
