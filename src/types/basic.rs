@@ -59,18 +59,18 @@ impl TypeClass for AnyLeaf {
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub struct Tagged<I, T>(I, PhantomData<T>);
 
-pub trait ReportTag {
-    fn self_report_tag(&self) -> TypeTag;
+pub trait ActualTag {
+    fn actual_tag(&self) -> TypeTag;
 }
 
-impl ReportTag for CustomType {
-    fn self_report_tag(&self) -> TypeTag {
+impl ActualTag for CustomType {
+    fn actual_tag(&self) -> TypeTag {
         self.tag()
     }
 }
 
-impl ReportTag for AliasDecl {
-    fn self_report_tag(&self) -> TypeTag {
+impl ActualTag for AliasDecl {
+    fn actual_tag(&self) -> TypeTag {
         self.tag
     }
 }
@@ -82,14 +82,14 @@ pub struct InvalidBound {
     found: TypeTag,
 }
 
-impl<T: ReportTag, C: TypeClass> Tagged<T, C> {
+impl<T: ActualTag, C: TypeClass> Tagged<T, C> {
     pub fn new(inner: T) -> Result<Self, InvalidBound> {
-        if C::BOUND_TAG.contains(inner.self_report_tag()) {
+        if C::BOUND_TAG.contains(inner.actual_tag()) {
             Ok(Self(inner, PhantomData))
         } else {
             Err(InvalidBound {
                 bound: C::BOUND_TAG,
-                found: inner.self_report_tag(),
+                found: inner.actual_tag(),
             })
         }
     }
@@ -110,7 +110,7 @@ pub enum Type<T> {
 
 impl<T: TypeClass> Type<T> {
     pub const BOUND_TAG: TypeTag = T::BOUND_TAG;
-    pub const fn type_tag_bound(&self) -> TypeTag {
+    pub const fn bounding_tag(&self) -> TypeTag {
         T::BOUND_TAG
     }
 
@@ -187,10 +187,10 @@ mod test {
             .unwrap(),
             Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
         ]);
-        assert_eq!(t.type_tag_bound(), TypeTag::Classic);
+        assert_eq!(t.bounding_tag(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
 
-        assert_eq!(t_any.type_tag_bound(), TypeTag::Simple);
+        assert_eq!(t_any.bounding_tag(), TypeTag::Simple);
     }
 
     #[test]
