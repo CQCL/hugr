@@ -2,8 +2,9 @@
 
 use std::marker::PhantomData;
 
+use crate::ops::AliasDecl;
+
 use super::{AbstractSignature, CustomType, TypeTag};
-use smol_str::SmolStr;
 use thiserror::Error;
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -68,26 +69,7 @@ impl GetTag for CustomType {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Eq)]
-pub struct Alias {
-    name: SmolStr,
-    tag: TypeTag,
-}
-
-impl Alias {
-    pub fn new(name: impl Into<SmolStr>, tag: TypeTag) -> Self {
-        Self {
-            name: name.into(),
-            tag,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        self.name.as_ref()
-    }
-}
-
-impl GetTag for Alias {
+impl GetTag for AliasDecl {
     fn tag(&self) -> TypeTag {
         self.tag
     }
@@ -120,7 +102,7 @@ impl<T: GetTag, C: TypeClass> Tagged<T, C> {
 pub enum Type<T> {
     Prim(T),
     Extension(Tagged<CustomType, T>),
-    Alias(Tagged<Alias, T>),
+    Alias(Tagged<AliasDecl, T>),
     Array(Box<Type<T>>, usize),
     Tuple(Vec<Type<T>>),
     Sum(Vec<Type<T>>),
@@ -139,7 +121,7 @@ impl<T: TypeClass> Type<T> {
     pub fn new_extension(opaque: CustomType) -> Result<Self, InvalidBound> {
         Ok(Self::Extension(Tagged::new(opaque)?))
     }
-    pub fn new_alias(alias: Alias) -> Result<Self, InvalidBound> {
+    pub fn new_alias(alias: AliasDecl) -> Result<Self, InvalidBound> {
         Ok(Self::Alias(Tagged::new(alias)?))
     }
 }
@@ -203,7 +185,7 @@ mod test {
                 TypeTag::Classic,
             ))
             .unwrap(),
-            Type::new_alias(Alias::new("my_alias", TypeTag::Hashable)).unwrap(),
+            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
         ]);
         assert_eq!(t.type_tag_bound(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
@@ -214,7 +196,7 @@ mod test {
     #[test]
     fn test_bad_dynamic() {
         let res: Result<Type<ClassicLeaf>, _> =
-            Type::new_alias(Alias::new("my_alias", TypeTag::Simple));
+            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Simple));
         assert_eq!(
             res,
             Err(InvalidBound {
