@@ -13,6 +13,18 @@ pub enum AnyLeaf {
     C(ClassicLeaf),
 }
 
+impl From<EqLeaf> for ClassicLeaf {
+    fn from(value: EqLeaf) -> Self {
+        ClassicLeaf::E(value)
+    }
+}
+
+impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
+    fn from(value: T) -> Self {
+        AnyLeaf::C(value.into())
+    }
+}
+
 mod sealed {
     use super::{AnyLeaf, ClassicLeaf, EqLeaf, Type};
     pub trait SealedLeaf {}
@@ -116,18 +128,6 @@ impl From<Type<EqLeaf>> for Type<AnyLeaf> {
 impl From<Type<ClassicLeaf>> for Type<AnyLeaf> {
     fn from(value: Type<ClassicLeaf>) -> Self {
         value.upcast()
-    }
-}
-
-impl From<EqLeaf> for ClassicLeaf {
-    fn from(value: EqLeaf) -> Self {
-        ClassicLeaf::E(value)
-    }
-}
-
-impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
-    fn from(value: T) -> Self {
-        AnyLeaf::C(value.into())
     }
 }
 
