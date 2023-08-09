@@ -131,7 +131,7 @@ pub enum Type<T> {
 
 impl<T: TypeClass> Type<T> {
     pub const TAG: TypeTag = T::TAG;
-    pub const fn tag(&self) -> TypeTag {
+    pub const fn type_tag_bound(&self) -> TypeTag {
         T::TAG
     }
 
@@ -208,10 +208,10 @@ mod test {
             .unwrap(),
             Type::new_alias(Alias::new("my_alias", TypeTag::Hashable)).unwrap(),
         ]);
-        assert_eq!(t.tag(), TypeTag::Classic);
+        assert_eq!(t.type_tag_bound(), TypeTag::Classic);
         let t_any: Type<AnyLeaf> = t.into();
 
-        assert_eq!(t_any.tag(), TypeTag::Simple);
+        assert_eq!(t_any.type_tag_bound(), TypeTag::Simple);
     }
 
     #[test]
