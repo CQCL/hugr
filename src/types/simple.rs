@@ -218,22 +218,22 @@ impl ClassicType {
         ClassicType::Graph(Box::new(signature))
     }
 
-    /// Returns a new integer type.
+    /// Returns a new 64-bit size type.
     #[inline]
-    pub const fn int() -> Self {
+    pub const fn usize() -> Self {
         Self::Hashable(HashableType::USize)
     }
 
     /// Returns a new 64-bit integer type.
     #[inline]
     pub const fn i64() -> Self {
-        Self::int()
+        Self::usize()
     }
 
     /// Returns a new 1-bit integer type.
     #[inline]
     pub const fn bit() -> Self {
-        Self::int()
+        Self::usize()
     }
 
     /// New unit type, defined as an empty Tuple.

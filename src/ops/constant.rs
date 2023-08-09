@@ -78,11 +78,11 @@ impl Const {
         Self::simple_predicate(0, 2)
     }
 
-    /// Integer
-    pub fn int(value: u64) -> Result<Self, ConstTypeError> {
+    /// Size
+    pub fn usize(value: u64) -> Result<Self, ConstTypeError> {
         Self::new(
             ConstValue::Hashable(HashableValue::Int(value)),
-            ClassicType::int(),
+            ClassicType::usize(),
         )
     }
 
@@ -377,7 +377,7 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: ClassicType = ClassicType::int();
+        const T_INT: ClassicType = ClassicType::usize();
         const V_INT: ConstValue = ConstValue::Hashable(HashableValue::Int(257));
         V_INT.check_type(&T_INT).unwrap();
         custom_value(17.4).check_type(&CLASSIC_T).unwrap();

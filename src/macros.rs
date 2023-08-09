@@ -94,7 +94,7 @@ macro_rules! type_row {
 /// # use hugr::macros::classic_row;
 /// # use hugr::types::{ClassicType, Signature, ClassicRow};
 /// const B: ClassicType = ClassicType::bit();
-/// const I: ClassicType = ClassicType::int();
+/// const I: ClassicType = ClassicType::usize();
 /// let static_row: ClassicRow = classic_row![B, B];
 /// let dynamic_row: ClassicRow = vec![B, B, I].into();
 ///
