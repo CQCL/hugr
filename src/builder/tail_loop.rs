@@ -135,7 +135,7 @@ mod test {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(
-                        vec![(ClassicType::bit(), b1)],
+                        vec![(ClassicType::usize(), b1)],
                         vec![],
                         classic_row![ClassicType::i64()],
                     )?;

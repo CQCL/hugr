@@ -230,12 +230,6 @@ impl ClassicType {
         Self::usize()
     }
 
-    /// Returns a new 1-bit integer type.
-    #[inline]
-    pub const fn bit() -> Self {
-        Self::usize()
-    }
-
     /// New unit type, defined as an empty Tuple.
     pub fn new_unit() -> Self {
         Self::Container(Container::Tuple(Box::new(classic_row![])))

@@ -152,7 +152,7 @@ impl OpTrait for LeafOp {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
         const Q: SimpleType = SimpleType::Qubit;
-        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+        const B: SimpleType = SimpleType::Classic(ClassicType::usize());
 
         match self {
             LeafOp::Noop { ty: typ } => {

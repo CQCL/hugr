@@ -464,7 +464,7 @@ mod test {
 
     #[test]
     fn test_validate_io_nodes() {
-        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+        const B: SimpleType = SimpleType::Classic(ClassicType::usize());
 
         let in_types = type_row![B];
         let out_types = type_row![B, B];
@@ -472,7 +472,7 @@ mod test {
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
         let leaf_node = LeafOp::Noop {
-            ty: ClassicType::bit().into(),
+            ty: ClassicType::usize().into(),
         }
         .into();
 

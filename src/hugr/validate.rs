@@ -755,7 +755,7 @@ mod test {
     use crate::{type_row, Node};
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+    const B: SimpleType = SimpleType::Classic(ClassicType::usize());
     const Q: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -791,7 +791,7 @@ mod test {
             .add_op_with_parent(
                 parent,
                 LeafOp::Noop {
-                    ty: ClassicType::bit().into(),
+                    ty: ClassicType::usize().into(),
                 },
             )
             .unwrap();
@@ -968,7 +968,7 @@ mod test {
         b.replace_op(
             output,
             NodeType::pure(LeafOp::Noop {
-                ty: ClassicType::bit().into(),
+                ty: ClassicType::usize().into(),
             }),
         );
         assert_matches!(
