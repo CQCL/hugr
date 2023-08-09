@@ -709,7 +709,7 @@ pub enum ValidationError {
     },
     #[error("Missing input resources for node {0:?}")]
     MissingInputResources(Node),
-    #[error("IO nodes don't match parent signature")]
+    #[error("Resources of I/O node ({child:?}) {child_resources:?} don't match those expected by parent node ({parent:?}): {parent_resources:?}")]
     ParentIOResourceMismatch {
         parent: Node,
         parent_resources: ResourceSet,
