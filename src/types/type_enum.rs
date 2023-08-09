@@ -12,9 +12,16 @@ use super::{
 
 mod serialize;
 
-#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+#[derive(
+    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+)]
 #[display(bound = "T: Display")]
 #[display(fmt = "{}")]
+#[serde(
+    into = "serialize::SerSimpleType",
+    try_from = "serialize::SerSimpleType",
+    bound = "T:serialize::SerLeaf"
+)]
 pub enum Type<T: TypeClass> {
     Prim(T),
     Extension(Tagged<CustomType, T>),
