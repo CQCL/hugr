@@ -18,8 +18,7 @@ use crate::resource::validate::{ResourceError, ResourceValidator};
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::hierarchical_views::{HierarchyView, SiblingGraph};
-use super::view::HugrView;
+use super::views::{HierarchyView, HugrView, SiblingGraph};
 use super::NodeType;
 
 /// Structure keeping track of pre-computed information used in the validation
@@ -76,7 +75,7 @@ impl<'a> ValidationContext<'a> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region, entry_node)
     }
@@ -336,7 +335,7 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
 
         let postorder = DfsPostOrder::new(&region, entry_node);

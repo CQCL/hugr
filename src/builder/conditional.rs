@@ -1,4 +1,4 @@
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 
 use crate::ops;

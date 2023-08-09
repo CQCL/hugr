@@ -5,7 +5,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
 use crate::types::AbstractSignature;

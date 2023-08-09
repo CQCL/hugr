@@ -1,6 +1,6 @@
 use crate::ops::{self, OpType};
 
-use crate::hugr::{view::HugrView, NodeType};
+use crate::hugr::{views::HugrView, NodeType};
 use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
 use crate::{Hugr, Node};
 
