@@ -34,16 +34,13 @@ impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
 }
 
 mod sealed {
-    use super::{AnyLeaf, ClassicLeaf, EqLeaf, Type};
-    pub trait SealedLeaf {}
-    impl SealedLeaf for AnyLeaf {}
-    impl SealedLeaf for ClassicLeaf {}
-    impl SealedLeaf for EqLeaf {}
-
-    pub trait SealedType {}
-    impl<T: SealedLeaf> SealedType for Type<T> {}
+    use super::{AnyLeaf, ClassicLeaf, EqLeaf};
+    pub trait Sealed {}
+    impl Sealed for AnyLeaf {}
+    impl Sealed for ClassicLeaf {}
+    impl Sealed for EqLeaf {}
 }
-pub trait TypeClass: sealed::SealedLeaf {
+pub trait TypeClass: sealed::Sealed {
     const TAG: TypeTag;
 }
 
