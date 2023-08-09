@@ -529,7 +529,7 @@ mod test {
     use super::*;
     #[test]
     fn construct() {
-        let t: Type<CopyableLeaf> = Type::new_tuple(vec![
+        let t: Type<CopyableLeaf> = Type::new_tuple([
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(

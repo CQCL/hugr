@@ -71,8 +71,8 @@ impl Type<AnyLeaf> {
     {
         Self::new_sum(predicate_variants_row(variant_rows))
     }
-    /// New simple predicate with empty Tuple variants
 
+    /// New simple predicate with empty Tuple variants
     pub fn new_simple_predicate(size: usize) -> Self {
         Self::new_predicate(std::iter::repeat(vec![]).take(size))
     }
