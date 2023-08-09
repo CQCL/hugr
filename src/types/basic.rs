@@ -14,13 +14,16 @@ pub enum AnyLeaf {
 }
 
 mod sealed {
-    use super::{AnyLeaf, ClassicLeaf, EqLeaf};
-    pub trait Sealed {}
-    impl Sealed for AnyLeaf {}
-    impl Sealed for ClassicLeaf {}
-    impl Sealed for EqLeaf {}
+    use super::{AnyLeaf, ClassicLeaf, EqLeaf, Type};
+    pub trait SealedLeaf {}
+    impl SealedLeaf for AnyLeaf {}
+    impl SealedLeaf for ClassicLeaf {}
+    impl SealedLeaf for EqLeaf {}
+
+    pub trait SealedType {}
+    impl<T: SealedLeaf> SealedType for Type<T> {}
 }
-pub trait TypeClass: sealed::Sealed {
+pub trait TypeClass: sealed::SealedLeaf {
     const TAG: TypeTag;
 }
 
@@ -84,26 +87,16 @@ impl<T: From<ClassicLeaf>> Type<T> {
     }
 }
 
-pub trait UpCastTo<T2>: Sized {
-    fn upcast(self) -> T2;
-}
-
-impl<T: UpCastTo<T2>, T2> UpCastTo<Type<T2>> for Type<T> {
-    fn upcast(self) -> Type<T2> {
+impl<T: sealed::SealedLeaf> Type<T> {
+    pub fn upcast<T2: From<T>>(self) -> Type<T2> {
         match self {
-            Type::Prim(t) => Type::Prim(t.upcast()),
+            Type::Prim(t) => Type::Prim(t.into()),
             Type::Extension(t) => Type::Extension(t),
             Type::Alias(_) => todo!(),
             Type::Array(_, _) => todo!(),
-            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(UpCastTo::upcast).collect()),
+            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Type::<T>::upcast).collect()),
             Type::Sum(_) => todo!(),
         }
-    }
-}
-
-impl UpCastTo<ClassicLeaf> for EqLeaf {
-    fn upcast(self) -> ClassicLeaf {
-        ClassicLeaf::E(self)
     }
 }
 
@@ -113,15 +106,9 @@ impl From<EqLeaf> for ClassicLeaf {
     }
 }
 
-impl<T: Into<ClassicLeaf>> UpCastTo<AnyLeaf> for T {
-    fn upcast(self) -> AnyLeaf {
-        AnyLeaf::C(self.into())
-    }
-}
-
 impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
     fn from(value: T) -> Self {
-        value.upcast()
+        AnyLeaf::C(value.into())
     }
 }
 
