@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::simple::TypeTag;
+use crate::types::TypeTag;
 use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleType};
 
 use super::StaticTag;

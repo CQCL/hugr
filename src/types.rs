@@ -13,8 +13,9 @@ use std::ops::Index;
 use pyo3::prelude::*;
 
 pub use custom::CustomType;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use simple::{
-    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType, TypeTag,
+    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType,
 };
 pub use type_row::TypeRow;
 
@@ -466,5 +467,55 @@ impl<'a> Iterator for &'a EmptyStringIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(EMPTY_STRING_REF)
+    }
+}
+
+/// Categorizes types into three classes according to basic operations supported.
+#[derive(
+    Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize_repr, Deserialize_repr,
+)]
+#[repr(u8)]
+pub enum TypeTag {
+    /// Any [SimpleType], including linear and quantum types;
+    /// cannot necessarily be copied or discarded.
+    Simple = 0,
+    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [ClassicType]
+    Classic = 1,
+    /// Subset of [TypeTag::Classic]: types that can also be hashed and support
+    /// a strong notion of equality. See [HashableType]
+    Hashable = 2,
+}
+
+impl TypeTag {
+    /// Returns the smallest TypeTag containing both the receiver and argument.
+    /// (This will be one of the receiver or the argument.)
+    pub fn union(self, other: Self) -> Self {
+        if self.contains(other) {
+            self
+        } else {
+            debug_assert!(other.contains(self));
+            other
+        }
+    }
+
+    /// Do types in this tag contain only classic data
+    /// (which can be copied and discarded, i.e. [ClassicType]s)
+    pub fn is_classical(self) -> bool {
+        self != Self::Simple
+    }
+
+    /// Do types in this tag contain only hashable classic data
+    /// (with a strong notion of equality, i.e. [HashableType]s)
+    pub fn is_hashable(self) -> bool {
+        self == Self::Hashable
+    }
+
+    /// Report if this tag contains another.
+    pub fn contains(&self, other: TypeTag) -> bool {
+        use TypeTag::*;
+        matches!(
+            (self, other),
+            (Simple, _) | (_, Hashable) | (Classic, Classic)
+        )
     }
 }
