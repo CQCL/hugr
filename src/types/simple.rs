@@ -1,10 +1,10 @@
 //! Dataflow types
 
-use std::fmt::{self, Display, Formatter, Write};
+use std::fmt::{self, Display, Formatter};
 
 use super::type_row::{TypeRow, TypeRowElem};
 use super::{custom::CustomType, AbstractSignature};
-use crate::{classic_row, ops::constant::HugrIntWidthStore};
+use crate::classic_row;
 use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use smol_str::SmolStr;
@@ -195,8 +195,8 @@ pub enum HashableType {
     /// TODO of course this is not necessarily hashable, or even classic,
     /// depending on how it is instantiated...
     Variable(SmolStr),
-    /// An arbitrary size integer.
-    Int(HugrIntWidthStore),
+    /// A 64-bit unsigned integer.
+    USize,
     /// An arbitrary length string.
     String,
     /// A container (all of whose elements can be hashed)
@@ -218,22 +218,16 @@ impl ClassicType {
         ClassicType::Graph(Box::new(signature))
     }
 
-    /// Returns a new integer type with the given number of bits.
+    /// Returns a new 64-bit size type.
     #[inline]
-    pub const fn int<const N: HugrIntWidthStore>() -> Self {
-        Self::Hashable(HashableType::Int(N))
+    pub const fn usize() -> Self {
+        Self::Hashable(HashableType::USize)
     }
 
     /// Returns a new 64-bit integer type.
     #[inline]
     pub const fn i64() -> Self {
-        Self::int::<64>()
-    }
-
-    /// Returns a new 1-bit integer type.
-    #[inline]
-    pub const fn bit() -> Self {
-        Self::int::<1>()
+        Self::usize()
     }
 
     /// New unit type, defined as an empty Tuple.
@@ -295,10 +289,7 @@ impl Display for HashableType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             HashableType::Variable(x) => f.write_str(x),
-            HashableType::Int(i) => {
-                f.write_char('I')?;
-                f.write_str(&i.to_string())
-            }
+            HashableType::USize => f.write_str("USize"),
             HashableType::String => f.write_str("String"),
             HashableType::Container(c) => c.fmt(f),
         }
@@ -485,8 +476,8 @@ mod test {
     /// [CLASSIC_T]: crate::types::custom::test::CLASSIC_T
     fn graph_type() -> ClassicType {
         ClassicType::Graph(Box::new(AbstractSignature::new(
-            vec![HashableType::Int(64).into()],
-            vec![HashableType::Int(64).into()],
+            vec![HashableType::USize.into()],
+            vec![HashableType::USize.into()],
             vec![],
         )))
     }
@@ -509,7 +500,7 @@ mod test {
         );
 
         let hash = vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(8))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::USize)),
             SimpleType::Classic(ClassicType::Hashable(HashableType::String)),
         ];
         let ty = SimpleType::new_tuple(hash);
@@ -533,7 +524,7 @@ mod test {
             SimpleType::Classic(ClassicType::Container(Container::Sum(_)))
         );
 
-        let hash: TypeRow<HashableType> = vec![HashableType::Int(4), HashableType::String].into();
+        let hash: TypeRow<HashableType> = vec![HashableType::USize, HashableType::String].into();
         let ty = SimpleType::new_sum(hash.map_into());
         assert_matches!(
             ty,

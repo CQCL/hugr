@@ -755,7 +755,7 @@ mod test {
     use crate::{type_row, Node};
 
     const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+    const B: SimpleType = SimpleType::Classic(ClassicType::usize());
     const Q: SimpleType = SimpleType::Qubit;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -791,7 +791,7 @@ mod test {
             .add_op_with_parent(
                 parent,
                 LeafOp::Noop {
-                    ty: ClassicType::bit().into(),
+                    ty: ClassicType::usize().into(),
                 },
             )
             .unwrap();
@@ -878,7 +878,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: HashableType::Int(32).into(),
+            ty: HashableType::USize.into(),
         }
         .into();
 
@@ -968,7 +968,7 @@ mod test {
         b.replace_op(
             output,
             NodeType::pure(LeafOp::Noop {
-                ty: ClassicType::bit().into(),
+                ty: ClassicType::usize().into(),
             }),
         );
         assert_matches!(
@@ -1147,11 +1147,11 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::int::<1>(1).unwrap())?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1).unwrap())?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::int::<1>(),
+                datatype: ClassicType::usize(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;

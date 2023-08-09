@@ -78,17 +78,12 @@ impl Const {
         Self::simple_predicate(0, 2)
     }
 
-    /// Fixed width integer
-    pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
+    /// Size
+    pub fn usize(value: u64) -> Result<Self, ConstTypeError> {
         Self::new(
             ConstValue::Hashable(HashableValue::Int(value)),
-            ClassicType::int::<N>(),
+            ClassicType::usize(),
         )
-    }
-
-    /// 64-bit integer
-    pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
-        Self::int::<64>(value as HugrIntValueStore)
     }
 
     /// Tuple of values
@@ -122,11 +117,6 @@ impl OpTrait for Const {
         Some(EdgeKind::Static(self.typ.clone()))
     }
 }
-
-pub(crate) type HugrIntValueStore = u128;
-pub(crate) type HugrIntWidthStore = u8;
-pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
-    HugrIntValueStore::BITS as HugrIntWidthStore;
 
 /// Value constants. (This could be "ClassicValue" to parallel [HashableValue])
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -335,7 +325,7 @@ mod test {
         types::custom::test::{CLASSIC_CUST, CLASSIC_T},
         types::{simple::Container, type_param::TypeArg},
         types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeTag},
-        values::{ConstIntError, ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
+        values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
     fn custom_value(f: f64) -> ConstValue {
@@ -387,13 +377,9 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: ClassicType = ClassicType::int::<64>();
+        const T_INT: ClassicType = ClassicType::usize();
         const V_INT: ConstValue = ConstValue::Hashable(HashableValue::Int(257));
         V_INT.check_type(&T_INT).unwrap();
-        assert_eq!(
-            V_INT.check_type(&ClassicType::int::<8>()),
-            Err(ConstTypeError::Int(ConstIntError::IntTooLarge(8, 257)))
-        );
         custom_value(17.4).check_type(&CLASSIC_T).unwrap();
         assert_matches!(
             V_INT.check_type(&CLASSIC_T),

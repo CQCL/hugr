@@ -44,7 +44,7 @@ pub(crate) use impl_box_clone;
 /// ```
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{AbstractSignature, ClassicType, SimpleType, SimpleRow};
-/// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
+/// const B: SimpleType = SimpleType::Classic(ClassicType::usize());
 /// const QB: SimpleType = SimpleType::Qubit;
 /// let static_row: SimpleRow = type_row![B, QB];
 /// let dynamic_row: SimpleRow = vec![B, B, B].into();
@@ -93,8 +93,8 @@ macro_rules! type_row {
 /// ```
 /// # use hugr::macros::classic_row;
 /// # use hugr::types::{ClassicType, Signature, ClassicRow};
-/// const B: ClassicType = ClassicType::bit();
-/// const I: ClassicType = ClassicType::int::<2>();
+/// const B: ClassicType = ClassicType::usize();
+/// const I: ClassicType = ClassicType::usize();
 /// let static_row: ClassicRow = classic_row![B, B];
 /// let dynamic_row: ClassicRow = vec![B, B, I].into();
 ///

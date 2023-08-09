@@ -96,7 +96,7 @@ mod test {
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
+    pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::usize());
     pub(super) const QB: SimpleType = SimpleType::Qubit;
 
     /// Wire up inputs of a Dataflow container to the outputs.

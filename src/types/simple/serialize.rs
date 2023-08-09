@@ -17,16 +17,13 @@ use super::SimpleType;
 
 use super::super::AbstractSignature;
 
-use crate::ops::constant::HugrIntWidthStore;
 use crate::types::type_row::TypeRowElem;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
 pub(crate) enum SerSimpleType {
     Q,
-    I {
-        width: HugrIntWidthStore,
-    },
+    I,
     S,
     G {
         signature: Box<AbstractSignature>,
@@ -103,7 +100,7 @@ impl From<HashableType> for SerSimpleType {
     fn from(value: HashableType) -> Self {
         match value {
             HashableType::Variable(s) => SerSimpleType::Var { name: s },
-            HashableType::Int(w) => SerSimpleType::I { width: w },
+            HashableType::USize => SerSimpleType::I,
             HashableType::String => SerSimpleType::S,
             HashableType::Container(c) => c.into(),
         }
@@ -156,7 +153,7 @@ impl From<SerSimpleType> for SimpleType {
     fn from(value: SerSimpleType) -> Self {
         match value {
             SerSimpleType::Q => SimpleType::Qubit,
-            SerSimpleType::I { width } => HashableType::Int(width).into(),
+            SerSimpleType::I => HashableType::USize.into(),
             SerSimpleType::S => HashableType::String.into(),
             SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
@@ -213,20 +210,20 @@ mod test {
         // A Simple tuple
         let t = SimpleType::new_tuple(vec![
             SimpleType::Qubit,
-            SimpleType::from(HashableType::Int(64)),
+            SimpleType::from(HashableType::USize),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
         let t = SimpleType::new_sum(vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::Int(4))),
+            SimpleType::Classic(ClassicType::Hashable(HashableType::USize)),
             SimpleType::Classic(CLASSIC_T),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable list
         let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
-            Container::Array(Box::new(HashableType::Int(8)), 3),
+            Container::Array(Box::new(HashableType::USize), 3),
         )));
         assert_eq!(ser_roundtrip(&t), t);
     }
@@ -236,7 +233,7 @@ mod test {
         // This list should be represented as a HashableType::Container.
         let malformed = SimpleType::Qontainer(Container::Array(
             Box::new(SimpleType::Classic(ClassicType::Hashable(
-                HashableType::Int(8),
+                HashableType::USize,
             ))),
             6,
         ));
