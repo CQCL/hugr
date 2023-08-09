@@ -13,14 +13,29 @@ pub enum AnyLeaf {
     C(ClassicLeaf),
 }
 
-mod sealed {
-    use super::{AnyLeaf, ClassicLeaf, EqLeaf};
-    pub trait Sealed {}
-    impl Sealed for AnyLeaf {}
-    impl Sealed for ClassicLeaf {}
-    impl Sealed for EqLeaf {}
+impl From<EqLeaf> for ClassicLeaf {
+    fn from(value: EqLeaf) -> Self {
+        ClassicLeaf::E(value)
+    }
 }
-pub trait TypeClass: sealed::Sealed {
+
+impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
+    fn from(value: T) -> Self {
+        AnyLeaf::C(value.into())
+    }
+}
+
+mod sealed {
+    use super::{AnyLeaf, ClassicLeaf, EqLeaf, Type};
+    pub trait SealedLeaf {}
+    impl SealedLeaf for AnyLeaf {}
+    impl SealedLeaf for ClassicLeaf {}
+    impl SealedLeaf for EqLeaf {}
+
+    pub trait SealedType {}
+    impl<T: SealedLeaf> SealedType for Type<T> {}
+}
+pub trait TypeClass: sealed::SealedLeaf {
     const TAG: TypeTag;
 }
 
@@ -84,43 +99,34 @@ impl<T: From<ClassicLeaf>> Type<T> {
     }
 }
 
-pub trait UpCastTo<T2>: Sized {
-    fn upcast(self) -> T2;
-}
-
-impl<T: UpCastTo<T2>, T2> UpCastTo<Type<T2>> for Type<T> {
-    fn upcast(self) -> Type<T2> {
+impl<T> Type<T> {
+    #[inline]
+    fn upcast<T2: From<T>>(self) -> Type<T2> {
         match self {
-            Type::Prim(t) => Type::Prim(t.upcast()),
+            Type::Prim(t) => Type::Prim(t.into()),
             Type::Extension(t) => Type::Extension(t),
             Type::Alias(_) => todo!(),
             Type::Array(_, _) => todo!(),
-            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(UpCastTo::upcast).collect()),
+            Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Type::<T>::upcast).collect()),
             Type::Sum(_) => todo!(),
         }
     }
 }
 
-impl UpCastTo<ClassicLeaf> for EqLeaf {
-    fn upcast(self) -> ClassicLeaf {
-        ClassicLeaf::E(self)
+impl From<Type<EqLeaf>> for Type<ClassicLeaf> {
+    fn from(value: Type<EqLeaf>) -> Self {
+        value.upcast()
     }
 }
 
-impl From<EqLeaf> for ClassicLeaf {
-    fn from(value: EqLeaf) -> Self {
-        ClassicLeaf::E(value)
+impl From<Type<EqLeaf>> for Type<AnyLeaf> {
+    fn from(value: Type<EqLeaf>) -> Self {
+        value.upcast()
     }
 }
 
-impl<T: Into<ClassicLeaf>> UpCastTo<AnyLeaf> for T {
-    fn upcast(self) -> AnyLeaf {
-        AnyLeaf::C(self.into())
-    }
-}
-
-impl<T: Into<ClassicLeaf>> From<T> for AnyLeaf {
-    fn from(value: T) -> Self {
+impl From<Type<ClassicLeaf>> for Type<AnyLeaf> {
+    fn from(value: Type<ClassicLeaf>) -> Self {
         value.upcast()
     }
 }
@@ -141,7 +147,7 @@ mod test {
             )),
         ]);
         assert_eq!(t.tag(), TypeTag::Classic);
-        let t_any: Type<AnyLeaf> = t.upcast();
+        let t_any: Type<AnyLeaf> = t.into();
 
         assert_eq!(t_any.tag(), TypeTag::Simple);
     }
