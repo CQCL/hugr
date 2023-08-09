@@ -88,7 +88,8 @@ impl<T: From<ClassicLeaf>> Type<T> {
 }
 
 impl<T> Type<T> {
-    pub fn upcast<T2: From<T>>(self) -> Type<T2> {
+    #[inline]
+    fn upcast<T2: From<T>>(self) -> Type<T2> {
         match self {
             Type::Prim(t) => Type::Prim(t.into()),
             Type::Extension(t) => Type::Extension(t),
@@ -97,6 +98,24 @@ impl<T> Type<T> {
             Type::Tuple(vec) => Type::Tuple(vec.into_iter().map(Type::<T>::upcast).collect()),
             Type::Sum(_) => todo!(),
         }
+    }
+}
+
+impl From<Type<EqLeaf>> for Type<ClassicLeaf> {
+    fn from(value: Type<EqLeaf>) -> Self {
+        value.upcast()
+    }
+}
+
+impl From<Type<EqLeaf>> for Type<AnyLeaf> {
+    fn from(value: Type<EqLeaf>) -> Self {
+        value.upcast()
+    }
+}
+
+impl From<Type<ClassicLeaf>> for Type<AnyLeaf> {
+    fn from(value: Type<ClassicLeaf>) -> Self {
+        value.upcast()
     }
 }
 
@@ -128,7 +147,7 @@ mod test {
             )),
         ]);
         assert_eq!(t.tag(), TypeTag::Classic);
-        let t_any: Type<AnyLeaf> = t.upcast();
+        let t_any: Type<AnyLeaf> = t.into();
 
         assert_eq!(t_any.tag(), TypeTag::Simple);
     }
