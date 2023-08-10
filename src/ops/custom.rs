@@ -50,7 +50,7 @@ impl From<OpaqueOp> for ExternalOp {
 
 impl From<ExternalOp> for LeafOp {
     fn from(value: ExternalOp) -> Self {
-        LeafOp::CustomOp(value)
+        LeafOp::CustomOp(Box::new(value))
     }
 }
 
@@ -207,26 +207,29 @@ pub fn resolve_extension_ops(
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::CustomOp(op @ ExternalOp::Opaque(opaque))) = h.get_optype(n) {
-            if let Some(r) = resource_registry.get(&opaque.resource) {
-                // Fail if the Resource was found but did not have the expected operation
-                let Some(def) = r.get_op(&opaque.op_name) else {
+        if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
+            if let ExternalOp::Opaque(opaque) = op.as_ref() {
+                if let Some(r) = resource_registry.get(&opaque.resource) {
+                    // Fail if the Resource was found but did not have the expected operation
+                    let Some(def) = r.get_op(&opaque.op_name) else {
                     return Err(CustomOpError::OpNotFoundInResource(opaque.op_name.to_string(), r.name().to_string()));
                 };
-                // TODO input resources. From type checker, or just drop by storing only delta in Signature.
-                let op = ExternalOp::Resource(ResourceOp::new(def.clone(), &opaque.args).unwrap());
-                if let Some(sig) = &opaque.signature {
-                    if sig != &op.signature() {
-                        return Err(CustomOpError::SignatureMismatch(
-                            def.name().to_string(),
-                            op.signature(),
-                            sig.clone(),
-                        ));
+                    // TODO input resources. From type checker, or just drop by storing only delta in Signature.
+                    let op =
+                        ExternalOp::Resource(ResourceOp::new(def.clone(), &opaque.args).unwrap());
+                    if let Some(sig) = &opaque.signature {
+                        if sig != &op.signature() {
+                            return Err(CustomOpError::SignatureMismatch(
+                                def.name().to_string(),
+                                op.signature(),
+                                sig.clone(),
+                            ));
+                        };
                     };
-                };
-                replacements.push((n, op));
-            } else if opaque.signature.is_none() {
-                return Err(CustomOpError::NoStoredSignature(op.name(), n));
+                    replacements.push((n, op));
+                } else if opaque.signature.is_none() {
+                    return Err(CustomOpError::NoStoredSignature(op.name(), n));
+                }
             }
         }
     }
