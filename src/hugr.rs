@@ -199,7 +199,7 @@ impl Hugr {
     /// Infer resources
     pub fn infer_resources(&self) -> Result<(), InferResourceError> {
         let mut ctx = UnificationContext::new(self);
-        ctx.solve_constraints()?;
+        ctx.main_loop()?;
         Ok(())
     }
 }
