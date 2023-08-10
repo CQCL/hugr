@@ -14,8 +14,12 @@ use crate::ops::AliasDecl;
 pub(crate) enum SerSimpleType {
     I,
     G(AbstractSignature),
-    Tuple(Vec<SerSimpleType>),
-    Sum(Vec<SerSimpleType>),
+    Tuple {
+        r: Vec<SerSimpleType>,
+    },
+    Sum {
+        r: Vec<SerSimpleType>,
+    },
     Array {
         inner: Box<SerSimpleType>,
         len: usize,
@@ -31,8 +35,12 @@ impl<T: SerLeaf> From<Type<T>> for SerSimpleType {
     fn from(value: Type<T>) -> Self {
         match value {
             Type::Prim(t) => t.ser(),
-            Type::Sum(inner) => SerSimpleType::Sum(inner.into_iter().map_into().collect()),
-            Type::Tuple(inner) => SerSimpleType::Tuple(inner.into_iter().map_into().collect()),
+            Type::Sum(inner) => SerSimpleType::Sum {
+                r: inner.into_iter().map_into().collect(),
+            },
+            Type::Tuple(inner) => SerSimpleType::Tuple {
+                r: inner.into_iter().map_into().collect(),
+            },
             Type::Array(inner, len) => SerSimpleType::Array {
                 inner: Box::new((*inner).into()),
                 len,
@@ -105,13 +113,13 @@ impl<T: TypeClass + SerLeaf> TryFrom<SerSimpleType> for Type<T> {
         match value {
             SerSimpleType::I => Ok(T::usize()),
             SerSimpleType::G(sig) => T::graph(sig),
-            SerSimpleType::Tuple(elems) => Ok(Type::new_tuple(
+            SerSimpleType::Tuple { r: elems } => Ok(Type::new_tuple(
                 elems
                     .into_iter()
                     .map(Type::<T>::try_from)
                     .collect::<Result<Vec<_>, _>>()?,
             )),
-            SerSimpleType::Sum(elems) => Ok(Type::new_sum(
+            SerSimpleType::Sum { r: elems } => Ok(Type::new_sum(
                 elems
                     .into_iter()
                     .map(Type::<T>::try_from)
@@ -138,6 +146,8 @@ mod test {
         let g: Type<CopyableLeaf> = Type::graph(AbstractSignature::new_linear(vec![
             crate::types::SimpleType::Qubit,
         ]));
+
+        assert_eq!(ser_roundtrip(&g), g);
 
         // A Simple tuple
         let t = Type::<AnyLeaf>::new_tuple([Type::usize(), g.into()]);
