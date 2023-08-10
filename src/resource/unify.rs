@@ -60,6 +60,7 @@ pub struct UnificationContext {
     pub resources: HashMap<(Node, Direction), Meta>,
     /// Solutions to metavariables
     solved: HashMap<Meta, ResourceSet>,
+    fresh_name: usize,
 }
 
 /// Invariant: Constraint::Plus always points to a fresh metavariable
@@ -69,13 +70,15 @@ impl UnificationContext {
             constraints: HashMap::new(),
             resources: HashMap::new(),
             solved: HashMap::new(),
+            fresh_name: 0,
         };
         ctx.gen_constraints(hugr);
         ctx
     }
 
     fn fresh_meta(&mut self) -> Meta {
-        let fresh = self.constraints.len();
+        let fresh = self.fresh_name;
+        self.fresh_name += 1;
         self.constraints.insert(fresh, Vec::new());
         fresh
     }
