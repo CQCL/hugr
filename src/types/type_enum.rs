@@ -1,42 +1,53 @@
 #![allow(missing_docs)]
 
-use std::{fmt::Write, marker::PhantomData};
+use std::fmt::Write;
+
+use smol_str::SmolStr;
 
 use crate::{ops::AliasDecl, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
-    leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
-    AbstractSignature, CustomType, TypeTag,
+    // leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
+    leaf::{containing_tag, PrimType, TypeTag},
+    AbstractSignature,
+    CustomType,
+    // TypeTag,
 };
 
 mod serialize;
+pub const USIZE: Type = Type::Prim(PrimType::E(CustomType::new_simple(
+    SmolStr::new_inline("prelude"),
+    SmolStr::new_inline("usize"),
+    super::TypeTag::Hashable,
+)));
+
+pub const F64: Type = Type::Prim(PrimType::E(CustomType::new_simple(
+    SmolStr::new_inline("prelude"),
+    SmolStr::new_inline("f64"),
+    super::TypeTag::Classic,
+)));
 
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-#[display(bound = "T: Display")]
 #[display(fmt = "{}")]
 #[serde(
     into = "serialize::SerSimpleType",
-    try_from = "serialize::SerSimpleType",
-    bound = "T:serialize::SerLeaf"
+    try_from = "serialize::SerSimpleType"
 )]
-pub enum Type<T: TypeClass> {
-    Prim(T),
-    Extension(Tagged<CustomType, T>),
-    #[display(fmt = "Alias({})", "_0.inner().name()")]
-    Alias(Tagged<AliasDecl, T>),
+pub enum Type {
+    Prim(PrimType),
     #[display(fmt = "Array[{};{}]", "_0", "_1")]
-    Array(Box<Type<T>>, usize),
+    Array(Box<Type>, usize),
     #[display(fmt = "Tuple({})", "DisplayRow(_0)")]
-    Tuple(Vec<Type<T>>),
+    Tuple(Vec<Type>),
     #[display(fmt = "Sum({})", "DisplayRow(_0)")]
-    Sum(Vec<Type<T>>),
+    Sum(Vec<Type>),
 }
 
-struct DisplayRow<'a, T: TypeClass>(&'a Vec<Type<T>>);
-impl<'a, T: Display + TypeClass> Display for DisplayRow<'a, T> {
+struct DisplayRow<'a>(&'a Vec<Type>);
+impl<'a> Display for DisplayRow<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.0, f)?;
@@ -44,13 +55,14 @@ impl<'a, T: Display + TypeClass> Display for DisplayRow<'a, T> {
     }
 }
 
-impl<T: TypeClass> Type<T> {
-    pub const BOUND_TAG: TypeTag = T::BOUND_TAG;
-    pub const fn bounding_tag(&self) -> TypeTag {
-        T::BOUND_TAG
+impl Type {
+    pub fn graph(_signature: AbstractSignature) -> Self {
+        todo!()
     }
-
-    pub fn new_tuple(types: impl IntoIterator<Item = Type<T>>) -> Self {
+    pub const fn usize() -> Self {
+        USIZE
+    }
+    pub fn new_tuple(types: impl IntoIterator<Item = Type>) -> Self {
         Self::Tuple(types.into_iter().collect())
     }
 
@@ -59,24 +71,22 @@ impl<T: TypeClass> Type<T> {
         Self::new_tuple(vec![])
     }
 
-    pub fn new_sum(types: impl IntoIterator<Item = Type<T>>) -> Self {
+    pub fn new_sum(types: impl IntoIterator<Item = Type>) -> Self {
         Self::Sum(types.into_iter().collect())
     }
 
-    pub fn new_extension(opaque: CustomType) -> Result<Self, InvalidBound> {
-        Ok(Self::Extension(Tagged::new(opaque)?))
+    pub fn new_extension(opaque: CustomType) -> Self {
+        Self::Prim(PrimType::E(opaque))
     }
-    pub fn new_alias(alias: AliasDecl) -> Result<Self, InvalidBound> {
-        Ok(Self::Alias(Tagged::new(alias)?))
+    pub fn new_alias(alias: AliasDecl) -> Self {
+        Self::Prim(PrimType::A(alias))
     }
-}
 
-impl Type<AnyLeaf> {
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
     where
-        V: IntoIterator<Item = Type<AnyLeaf>>,
+        V: IntoIterator<Item = Type>,
     {
         Self::new_sum(predicate_variants_row(variant_rows))
     }
@@ -85,59 +95,22 @@ impl Type<AnyLeaf> {
     pub fn new_simple_predicate(size: usize) -> Self {
         Self::new_predicate(std::iter::repeat(vec![]).take(size))
     }
-}
 
-impl<T: From<EqLeaf> + TypeClass> Type<T> {
-    pub fn usize() -> Self {
-        Self::Prim(EqLeaf::USize.into())
-    }
-}
-
-impl<T: From<CopyableLeaf> + TypeClass> Type<T> {
-    pub fn graph(signature: AbstractSignature) -> Self {
-        Self::Prim(CopyableLeaf::Graph(Box::new(signature)).into())
-    }
-}
-
-impl<T: TypeClass> Type<T> {
-    #[inline]
-    fn upcast<T2: From<T> + TypeClass>(self) -> Type<T2> {
+    pub fn tag(&self) -> Option<TypeTag> {
         match self {
-            Type::Prim(t) => Type::Prim(t.into()),
-            Type::Extension(Tagged(t, _)) => Type::Extension(Tagged(t, PhantomData)),
-            Type::Alias(Tagged(t, _)) => Type::Alias(Tagged(t, PhantomData)),
-            Type::Array(t, l) => Type::Array(Box::new(t.upcast()), l),
-            Type::Tuple(row) => Type::Tuple(row.into_iter().map(Type::<T>::upcast).collect()),
-            Type::Sum(row) => Type::Sum(row.into_iter().map(Type::<T>::upcast).collect()),
+            Type::Prim(p) => p.tag(),
+            Type::Array(t, _) => t.tag(),
+            Type::Tuple(ts) => containing_tag(ts.iter().map(Type::tag)),
+            Type::Sum(ts) => containing_tag(ts.iter().map(Type::tag)),
         }
     }
 }
 
 /// Return the type row of variants required to define a Sum of Tuples type
 /// given the rows of each tuple
-pub(crate) fn predicate_variants_row<V>(
-    variant_rows: impl IntoIterator<Item = V>,
-) -> Vec<Type<AnyLeaf>>
+pub(crate) fn predicate_variants_row<V>(variant_rows: impl IntoIterator<Item = V>) -> Vec<Type>
 where
-    V: IntoIterator<Item = Type<AnyLeaf>>,
+    V: IntoIterator<Item = Type>,
 {
     variant_rows.into_iter().map(Type::new_tuple).collect()
-}
-
-impl From<Type<EqLeaf>> for Type<CopyableLeaf> {
-    fn from(value: Type<EqLeaf>) -> Self {
-        value.upcast()
-    }
-}
-
-impl From<Type<EqLeaf>> for Type<AnyLeaf> {
-    fn from(value: Type<EqLeaf>) -> Self {
-        value.upcast()
-    }
-}
-
-impl From<Type<CopyableLeaf>> for Type<AnyLeaf> {
-    fn from(value: Type<CopyableLeaf>) -> Self {
-        value.upcast()
-    }
 }

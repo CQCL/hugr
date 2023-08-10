@@ -1,13 +1,13 @@
-use super::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Type, TypeClass, TypeTag};
+use super::Type;
 
 use itertools::Itertools;
-use smol_str::SmolStr;
 
 use super::super::custom::CustomType;
 
 use super::super::AbstractSignature;
 
 use crate::ops::AliasDecl;
+use crate::types::leaf::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -25,16 +25,16 @@ pub(crate) enum SerSimpleType {
         len: usize,
     },
     Opaque(CustomType),
-    Alias {
-        name: SmolStr,
-        c: TypeTag,
-    },
+    Alias(AliasDecl),
 }
 
-impl<T: SerLeaf> From<Type<T>> for SerSimpleType {
-    fn from(value: Type<T>) -> Self {
+impl From<Type> for SerSimpleType {
+    fn from(value: Type) -> Self {
         match value {
-            Type::Prim(t) => t.ser(),
+            Type::Prim(t) => match t {
+                PrimType::E(c) => SerSimpleType::Opaque(c),
+                PrimType::A(a) => SerSimpleType::Alias(a),
+            },
             Type::Sum(inner) => SerSimpleType::Sum {
                 inner: inner.into_iter().map_into().collect(),
             },
@@ -45,91 +45,20 @@ impl<T: SerLeaf> From<Type<T>> for SerSimpleType {
                 inner: Box::new((*inner).into()),
                 len,
             },
-            Type::Alias(decl) => SerSimpleType::Alias {
-                name: decl.inner().name.clone(),
-                c: decl.inner().tag,
-            },
-            Type::Extension(custom) => SerSimpleType::Opaque(custom.inner().clone()),
         }
     }
 }
 
-pub(super) trait SerLeaf: TypeClass {
-    fn usize() -> Type<Self>;
-    fn graph(sig: AbstractSignature) -> Result<Type<Self>, InvalidBound>;
-    fn ser(&self) -> SerSimpleType;
-}
-
-impl SerLeaf for EqLeaf {
-    fn usize() -> Type<EqLeaf> {
-        Type::usize()
-    }
-    fn graph(_sig: AbstractSignature) -> Result<Type<EqLeaf>, InvalidBound> {
-        Err(InvalidBound {
-            bound: TypeTag::Hashable,
-            found: TypeTag::Classic,
-        })
-    }
-    fn ser(&self) -> SerSimpleType {
-        match self {
-            EqLeaf::USize => SerSimpleType::I,
-        }
-    }
-}
-
-impl SerLeaf for CopyableLeaf {
-    fn usize() -> Type<CopyableLeaf> {
-        Type::usize()
-    }
-    fn graph(sig: AbstractSignature) -> Result<Type<CopyableLeaf>, InvalidBound> {
-        Ok(Type::graph(sig))
-    }
-    fn ser(&self) -> SerSimpleType {
-        match self {
-            CopyableLeaf::E(e) => e.ser(),
-            CopyableLeaf::Graph(sig) => SerSimpleType::G((**sig).clone()),
-        }
-    }
-}
-
-impl SerLeaf for AnyLeaf {
-    fn usize() -> Type<AnyLeaf> {
-        Type::usize()
-    }
-    fn graph(sig: AbstractSignature) -> Result<Type<AnyLeaf>, InvalidBound> {
-        Ok(Type::graph(sig))
-    }
-    fn ser(&self) -> SerSimpleType {
-        match self {
-            AnyLeaf::C(c) => c.ser(),
-        }
-    }
-}
-
-impl<T: TypeClass + SerLeaf> TryFrom<SerSimpleType> for Type<T> {
-    type Error = InvalidBound;
-
-    fn try_from(value: SerSimpleType) -> Result<Self, InvalidBound> {
+impl From<SerSimpleType> for Type {
+    fn from(value: SerSimpleType) -> Type {
         match value {
-            SerSimpleType::I => Ok(T::usize()),
-            SerSimpleType::G(sig) => T::graph(sig),
-            SerSimpleType::Tuple { inner: elems } => Ok(Type::new_tuple(
-                elems
-                    .into_iter()
-                    .map(Type::<T>::try_from)
-                    .collect::<Result<Vec<_>, _>>()?,
-            )),
-            SerSimpleType::Sum { inner: elems } => Ok(Type::new_sum(
-                elems
-                    .into_iter()
-                    .map(Type::<T>::try_from)
-                    .collect::<Result<Vec<_>, _>>()?,
-            )),
-            SerSimpleType::Array { inner, len } => {
-                Ok(Type::Array(Box::new((*inner).try_into()?), len))
-            }
+            SerSimpleType::I => Type::usize(),
+            SerSimpleType::G(sig) => Type::graph(sig),
+            SerSimpleType::Tuple { inner } => Type::new_tuple(inner.into_iter().map_into()),
+            SerSimpleType::Sum { inner } => Type::new_sum(inner.into_iter().map_into()),
+            SerSimpleType::Array { inner, len } => Type::Array(Box::new((*inner).into()), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
-            SerSimpleType::Alias { name, c } => Type::new_alias(AliasDecl::new(name, c)),
+            SerSimpleType::Alias(a) => Type::new_alias(a),
         }
     }
 }
@@ -138,30 +67,27 @@ impl<T: TypeClass + SerLeaf> TryFrom<SerSimpleType> for Type<T> {
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::types::custom::test::CLASSIC_CUST;
-    use crate::types::type_enum::{AnyLeaf, CopyableLeaf, EqLeaf, Type};
+    use crate::types::type_enum::Type;
     use crate::types::AbstractSignature;
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type<CopyableLeaf> = Type::graph(AbstractSignature::new_linear(vec![
+        let g: Type = Type::graph(AbstractSignature::new_linear(vec![
             crate::types::SimpleType::Qubit,
         ]));
 
         assert_eq!(ser_roundtrip(&g), g);
 
-        // A Simple tuple (that actually happens to be Classic)
-        let t = Type::<AnyLeaf>::new_tuple([Type::usize(), g.into()]);
+        // A Simple tuple
+        let t = Type::new_tuple([Type::usize(), g]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::<CopyableLeaf>::new_sum([
-            Type::usize(),
-            Type::new_extension(CLASSIC_CUST).unwrap(),
-        ]);
+        let t = Type::new_sum([Type::usize(), Type::new_extension(CLASSIC_CUST)]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable array
-        let t: Type<EqLeaf> = Type::Array(Box::new(Type::usize()), 3);
+        let t: Type = Type::Array(Box::new(Type::usize()), 3);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

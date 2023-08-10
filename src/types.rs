@@ -525,11 +525,10 @@ impl TypeTag {
 mod test {
     use crate::ops::AliasDecl;
 
-    use super::leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound};
     use super::*;
     #[test]
     fn construct() {
-        let t: Type<CopyableLeaf> = Type::new_tuple([
+        let t: Type = Type::new_tuple([
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(
@@ -537,38 +536,12 @@ mod test {
                 [],
                 "my_resource",
                 TypeTag::Classic,
-            ))
-            .unwrap(),
-            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)).unwrap(),
+            )),
+            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)),
         ]);
         assert_eq!(
             t.to_string(),
             "Tuple([USize, Graph, my_custom([]), Alias(my_alias)])".to_string()
         );
-        assert_eq!(t.bounding_tag(), TypeTag::Classic);
-        let t_any: Type<AnyLeaf> = t.into();
-
-        assert_eq!(t_any.bounding_tag(), TypeTag::Simple);
-    }
-
-    #[test]
-    fn test_bad_dynamic() {
-        let res: Result<Type<CopyableLeaf>, _> =
-            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Simple));
-        assert_eq!(
-            res,
-            Err(InvalidBound {
-                bound: TypeTag::Classic,
-                found: TypeTag::Simple
-            })
-        );
-    }
-    #[test]
-    fn all_constructors() {
-        Type::<EqLeaf>::usize();
-        Type::<CopyableLeaf>::usize();
-        Type::<AnyLeaf>::usize();
-        Type::<CopyableLeaf>::graph(AbstractSignature::new_linear(vec![]));
-        Type::<AnyLeaf>::graph(AbstractSignature::new_linear(vec![]));
     }
 }
