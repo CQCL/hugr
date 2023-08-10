@@ -1,4 +1,4 @@
-use super::Type;
+use super::{Type, TypeEnum};
 
 use itertools::Itertools;
 
@@ -30,18 +30,19 @@ pub(crate) enum SerSimpleType {
 
 impl From<Type> for SerSimpleType {
     fn from(value: Type) -> Self {
+        let Type(value, _) = value;
         match value {
-            Type::Prim(t) => match t {
+            TypeEnum::Prim(t) => match t {
                 PrimType::E(c) => SerSimpleType::Opaque(c),
                 PrimType::A(a) => SerSimpleType::Alias(a),
             },
-            Type::Sum(inner) => SerSimpleType::Sum {
+            TypeEnum::Sum(inner) => SerSimpleType::Sum {
                 inner: inner.into_iter().map_into().collect(),
             },
-            Type::Tuple(inner) => SerSimpleType::Tuple {
+            TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
                 inner: inner.into_iter().map_into().collect(),
             },
-            Type::Array(inner, len) => SerSimpleType::Array {
+            TypeEnum::Array(inner, len) => SerSimpleType::Array {
                 inner: Box::new((*inner).into()),
                 len,
             },
@@ -56,7 +57,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::G(sig) => Type::graph(sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner.into_iter().map_into()),
             SerSimpleType::Sum { inner } => Type::new_sum(inner.into_iter().map_into()),
-            SerSimpleType::Array { inner, len } => Type::Array(Box::new((*inner).into()), len),
+            SerSimpleType::Array { inner, len } => Type::new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
         }
@@ -87,7 +88,7 @@ mod test {
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable array
-        let t: Type = Type::Array(Box::new(Type::usize()), 3);
+        let t: Type = Type::new_array(Type::usize(), 3);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

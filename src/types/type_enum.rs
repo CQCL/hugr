@@ -16,15 +16,8 @@ use super::{
 
 mod serialize;
 
-#[derive(
-    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-#[display(fmt = "{}")]
-#[serde(
-    into = "serialize::SerSimpleType",
-    try_from = "serialize::SerSimpleType"
-)]
-pub enum Type {
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+enum TypeEnum {
     Prim(PrimType),
     #[display(fmt = "Array[{};{}]", "_0", "_1")]
     Array(Box<Type>, usize),
@@ -33,6 +26,23 @@ pub enum Type {
     #[display(fmt = "Sum({})", "DisplayRow(_0)")]
     Sum(Vec<Type>),
 }
+impl TypeEnum {
+    fn smallest_tag(&self) -> Option<TypeTag> {
+        match self {
+            TypeEnum::Prim(p) => p.tag(),
+            TypeEnum::Array(t, _) => t.tag(),
+            TypeEnum::Tuple(ts) => containing_tag(ts.iter().map(Type::tag)),
+            TypeEnum::Sum(ts) => containing_tag(ts.iter().map(Type::tag)),
+        }
+    }
+}
+
+#[derive(
+    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+)]
+#[display(fmt = "{}", "_0")]
+#[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+pub struct Type(TypeEnum, Option<TypeTag>);
 
 struct DisplayRow<'a>(&'a Vec<Type>);
 impl<'a> Display for DisplayRow<'a> {
@@ -81,7 +91,7 @@ impl Type {
         )
     }
     pub fn new_tuple(types: impl IntoIterator<Item = Type>) -> Self {
-        Self::Tuple(types.into_iter().collect())
+        Self::new(TypeEnum::Tuple(types.into_iter().collect()))
     }
 
     /// New unit type, defined as an empty Tuple.
@@ -90,16 +100,24 @@ impl Type {
     }
 
     pub fn new_sum(types: impl IntoIterator<Item = Type>) -> Self {
-        Self::Sum(types.into_iter().collect())
+        Self::new(TypeEnum::Sum(types.into_iter().collect()))
     }
 
     pub fn new_extension(opaque: CustomType) -> Self {
-        Self::Prim(PrimType::E(opaque))
+        Self::new(TypeEnum::Prim(PrimType::E(opaque)))
     }
     pub fn new_alias(alias: AliasDecl) -> Self {
-        Self::Prim(PrimType::A(alias))
+        Self::new(TypeEnum::Prim(PrimType::A(alias)))
     }
 
+    fn new(type_e: TypeEnum) -> Self {
+        let tag = type_e.smallest_tag();
+        Self(type_e, tag)
+    }
+
+    pub fn new_array(typ: Type, size: usize) -> Self {
+        Self::new(TypeEnum::Array(Box::new(typ), size))
+    }
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
@@ -115,12 +133,7 @@ impl Type {
     }
 
     pub fn tag(&self) -> Option<TypeTag> {
-        match self {
-            Type::Prim(p) => p.tag(),
-            Type::Array(t, _) => t.tag(),
-            Type::Tuple(ts) => containing_tag(ts.iter().map(Type::tag)),
-            Type::Sum(ts) => containing_tag(ts.iter().map(Type::tag)),
-        }
+        self.1
     }
 }
 
