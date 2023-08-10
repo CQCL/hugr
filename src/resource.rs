@@ -281,3 +281,43 @@ impl FromIterator<ResourceId> for ResourceSet {
         Self(HashSet::from_iter(iter))
     }
 }
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    /// Prelude resource
+    pub static ref PRELUDE: Resource = {
+        let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
+
+        prelude
+            .add_type(
+                SmolStr::new_inline("graph"),
+                vec![
+                    TypeParam::List(Box::new(TypeParam::Type(crate::types::TypeTag::Simple))),
+                    TypeParam::List(Box::new(TypeParam::Type(crate::types::TypeTag::Simple))),
+                ],
+                "graph".into(),
+                TypeDefTag::Explicit(crate::types::TypeTag::Classic),
+            )
+            .unwrap();
+
+        prelude
+            .add_type(
+                SmolStr::new_inline("float64"),
+                vec![],
+                "float64".into(),
+                TypeDefTag::Explicit(crate::types::TypeTag::Classic),
+            )
+            .unwrap();
+
+            prelude
+            .add_type(
+                SmolStr::new_inline("usize"),
+                vec![],
+                "usize".into(),
+                TypeDefTag::Explicit(crate::types::TypeTag::Hashable),
+            )
+            .unwrap();
+        prelude
+    };
+}

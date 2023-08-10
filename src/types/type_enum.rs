@@ -2,31 +2,19 @@
 
 use std::fmt::Write;
 
-use smol_str::SmolStr;
-
 use crate::{ops::AliasDecl, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
     // leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
     leaf::{containing_tag, PrimType, TypeTag},
+    type_param::TypeArg,
+    // TypeTag,
     AbstractSignature,
     CustomType,
-    // TypeTag,
 };
 
 mod serialize;
-pub const USIZE: Type = Type::Prim(PrimType::E(CustomType::new_simple(
-    SmolStr::new_inline("prelude"),
-    SmolStr::new_inline("usize"),
-    super::TypeTag::Hashable,
-)));
-
-pub const F64: Type = Type::Prim(PrimType::E(CustomType::new_simple(
-    SmolStr::new_inline("prelude"),
-    SmolStr::new_inline("f64"),
-    super::TypeTag::Classic,
-)));
 
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
@@ -57,10 +45,40 @@ impl<'a> Display for DisplayRow<'a> {
 
 impl Type {
     pub fn graph(_signature: AbstractSignature) -> Self {
-        todo!()
+        Self::new_extension(
+            crate::resource::PRELUDE
+                .get_type("graph")
+                .unwrap()
+                .instantiate_concrete(vec![
+                    TypeArg::Sequence(
+                        _signature
+                            .input
+                            .iter()
+                            .cloned()
+                            .map(TypeArg::Type)
+                            .collect(),
+                    ),
+                    TypeArg::Sequence(
+                        _signature
+                            .output
+                            .iter()
+                            .cloned()
+                            .map(TypeArg::Type)
+                            .collect(),
+                    ),
+                ])
+                .unwrap(),
+        )
     }
-    pub const fn usize() -> Self {
-        USIZE
+
+    pub fn usize() -> Self {
+        Self::new_extension(
+            crate::resource::PRELUDE
+                .get_type("usize")
+                .unwrap()
+                .instantiate_concrete(vec![])
+                .unwrap(),
+        )
     }
     pub fn new_tuple(types: impl IntoIterator<Item = Type>) -> Self {
         Self::Tuple(types.into_iter().collect())
