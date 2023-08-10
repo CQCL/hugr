@@ -5,21 +5,14 @@ use crate::ops::AliasDecl;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
 use super::CustomType;
-#[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Debug,
-    derive_more::Display,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
 pub enum TypeTag {
+    #[serde(rename = "e")]
     Eq,
+    #[serde(rename = "c")]
     Copyable,
 }
 
