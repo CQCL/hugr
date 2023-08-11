@@ -22,7 +22,7 @@ pub trait HugrView: sealed::HugrInternals {
     /// The kind of handle that can be used to refer to the root node.
     ///
     /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`root_type`].
+    /// [`HugrView::root_type`].
     type RootHandle: NodeHandle;
 
     /// An Iterator over the nodes in a Hugr(View)
