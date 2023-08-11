@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use super::CustomType;
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
 pub enum TypeBound {
-    #[serde(rename = "e")]
+    #[serde(rename = "E")]
     Eq,
-    #[serde(rename = "c")]
+    #[serde(rename = "C")]
     Copyable,
 }
 
