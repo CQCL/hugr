@@ -6,9 +6,8 @@ use crate::{ops::AliasDecl, resource::PRELUDE, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
-    primitive::{least_upper_bound, PrimType, TypeBound},
-    type_param::TypeArg,
-    AbstractSignature, CustomType,
+    least_upper_bound, primitive::PrimType, type_param::TypeArg, AbstractSignature, CustomType,
+    TypeBound,
 };
 
 mod serialize;
