@@ -6,7 +6,7 @@ use crate::{ops::AliasDecl, resource::PRELUDE, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
-    leaf::{least_upper_bound, PrimType, TypeBound},
+    primitive::{least_upper_bound, PrimType, TypeBound},
     type_param::TypeArg,
     AbstractSignature, CustomType,
 };

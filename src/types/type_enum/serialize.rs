@@ -7,7 +7,7 @@ use super::super::custom::CustomType;
 use super::super::AbstractSignature;
 
 use crate::ops::AliasDecl;
-use crate::types::leaf::PrimType;
+use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
