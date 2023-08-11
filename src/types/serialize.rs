@@ -2,12 +2,12 @@ use super::{Type, TypeEnum};
 
 use itertools::Itertools;
 
-use super::super::custom::CustomType;
+use super::custom::CustomType;
 
-use super::super::AbstractSignature;
+use super::AbstractSignature;
 
 use crate::ops::AliasDecl;
-use crate::types::leaf::PrimType;
+use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -58,8 +58,8 @@ impl From<SerSimpleType> for Type {
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::types::custom::test::CLASSIC_CUST;
-    use crate::types::type_enum::Type;
     use crate::types::AbstractSignature;
+    use crate::types::Type;
 
     #[test]
     fn serialize_types_roundtrip() {
