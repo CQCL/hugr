@@ -69,6 +69,8 @@ where
     Root: NodeHandle,
     Base: HugrInternals + HugrView,
 {
+    type RootHandle = Root;
+
     type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
     where
         Self: 'a;
@@ -238,6 +240,8 @@ where
     Root: NodeHandle,
     Base: HugrInternals + HugrView,
 {
+    type RootHandle = Root;
+
     type Nodes<'a> = MapInto<<RegionGraph<'g, Base> as PortView>::Nodes<'a>, Node>
     where
         Self: 'a;
