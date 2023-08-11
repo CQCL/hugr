@@ -3,7 +3,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use super::type_row::{TypeRow, TypeRowElem};
-use super::{custom::CustomType, signature::AbstractSignature};
+use super::{custom::CustomType, AbstractSignature};
 use crate::classic_row;
 use itertools::Itertools;
 use serde_repr::{Deserialize_repr, Serialize_repr};

@@ -15,7 +15,7 @@ use super::TypeRow;
 
 use super::SimpleType;
 
-use super::super::signature::AbstractSignature;
+use super::super::AbstractSignature;
 
 use crate::types::type_row::TypeRowElem;
 
