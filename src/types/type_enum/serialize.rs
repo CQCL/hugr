@@ -15,10 +15,10 @@ pub(crate) enum SerSimpleType {
     I,
     G(AbstractSignature),
     Tuple {
-        r: Vec<SerSimpleType>,
+        inner: Vec<SerSimpleType>,
     },
     Sum {
-        r: Vec<SerSimpleType>,
+        inner: Vec<SerSimpleType>,
     },
     Array {
         inner: Box<SerSimpleType>,
@@ -36,10 +36,10 @@ impl<T: SerLeaf> From<Type<T>> for SerSimpleType {
         match value {
             Type::Prim(t) => t.ser(),
             Type::Sum(inner) => SerSimpleType::Sum {
-                r: inner.into_iter().map_into().collect(),
+                inner: inner.into_iter().map_into().collect(),
             },
             Type::Tuple(inner) => SerSimpleType::Tuple {
-                r: inner.into_iter().map_into().collect(),
+                inner: inner.into_iter().map_into().collect(),
             },
             Type::Array(inner, len) => SerSimpleType::Array {
                 inner: Box::new((*inner).into()),
@@ -113,13 +113,13 @@ impl<T: TypeClass + SerLeaf> TryFrom<SerSimpleType> for Type<T> {
         match value {
             SerSimpleType::I => Ok(T::usize()),
             SerSimpleType::G(sig) => T::graph(sig),
-            SerSimpleType::Tuple { r: elems } => Ok(Type::new_tuple(
+            SerSimpleType::Tuple { inner: elems } => Ok(Type::new_tuple(
                 elems
                     .into_iter()
                     .map(Type::<T>::try_from)
                     .collect::<Result<Vec<_>, _>>()?,
             )),
-            SerSimpleType::Sum { r: elems } => Ok(Type::new_sum(
+            SerSimpleType::Sum { inner: elems } => Ok(Type::new_sum(
                 elems
                     .into_iter()
                     .map(Type::<T>::try_from)
@@ -149,7 +149,7 @@ mod test {
 
         assert_eq!(ser_roundtrip(&g), g);
 
-        // A Simple tuple
+        // A Simple tuple (that actually happens to be Classic)
         let t = Type::<AnyLeaf>::new_tuple([Type::usize(), g.into()]);
         assert_eq!(ser_roundtrip(&t), t);
 
