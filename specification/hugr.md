@@ -1014,6 +1014,8 @@ Type ::= Tuple(#) -- fixed-arity, heterogenous components
        | Graph[Resources](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
 ```
+<!--      Graph(TypeParams, #, #, Resources) -- polymorphic, so move TypeParams section here
+#       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
 ** the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; and the empty Graph (void -> void), are the only "leaf" types here.
 
