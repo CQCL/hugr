@@ -12,7 +12,7 @@ use crate::types::AbstractSignature;
 
 use crate::Node;
 use crate::{
-    hugr::{HugrMut, NodeType},
+    hugr::{HugrInternalsMut, NodeType},
     type_row,
     types::{ClassicRow, SimpleRow, SimpleType},
     Hugr,
