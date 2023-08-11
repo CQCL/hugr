@@ -7,7 +7,7 @@ use std::fmt::{self, Debug, Display};
 
 use super::{
     // leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
-    leaf::{containing_tag, PrimType, TypeTag},
+    leaf::{least_upper_bound, PrimType, TypeBound},
     type_param::TypeArg,
     // TypeTag,
     AbstractSignature,
@@ -27,12 +27,12 @@ enum TypeEnum {
     Sum(Vec<Type>),
 }
 impl TypeEnum {
-    fn smallest_tag(&self) -> Option<TypeTag> {
+    fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
-            TypeEnum::Prim(p) => p.tag(),
-            TypeEnum::Array(t, _) => t.tag(),
-            TypeEnum::Tuple(ts) => containing_tag(ts.iter().map(Type::tag)),
-            TypeEnum::Sum(ts) => containing_tag(ts.iter().map(Type::tag)),
+            TypeEnum::Prim(p) => p.bound(),
+            TypeEnum::Array(t, _) => t.least_upper_bound(),
+            TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
+            TypeEnum::Sum(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
     }
 }
@@ -42,7 +42,7 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
-pub struct Type(TypeEnum, Option<TypeTag>);
+pub struct Type(TypeEnum, Option<TypeBound>);
 
 struct DisplayRow<'a>(&'a Vec<Type>);
 impl<'a> Display for DisplayRow<'a> {
@@ -111,8 +111,8 @@ impl Type {
     }
 
     fn new(type_e: TypeEnum) -> Self {
-        let tag = type_e.smallest_tag();
-        Self(type_e, tag)
+        let bound = type_e.least_upper_bound();
+        Self(type_e, bound)
     }
 
     pub fn new_array(typ: Type, size: usize) -> Self {
@@ -132,7 +132,7 @@ impl Type {
         Self::new_predicate(std::iter::repeat(vec![]).take(size))
     }
 
-    pub fn tag(&self) -> Option<TypeTag> {
+    pub fn least_upper_bound(&self) -> Option<TypeBound> {
         self.1
     }
 }
