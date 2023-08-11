@@ -989,8 +989,8 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type, distinguished by the operations possible on (runtime) values of that type. (These loosely correspond to Tierkreis' notion of "constraints".)
-  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Resource Tracking](#resource-tracking) below). Specifically, these values cannot necessarily be copied or discarded, hence the linearity requirement that outports of these types must have exactly one edge. (All incoming ports must have exactly one edge connected to them.)
+There are three classes of type: Any $\supset$ Copyable $\supset$ Equatable. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
+  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Resource Tracking](#resource-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum resource](#quantum-resource) for more.
 
@@ -998,12 +998,12 @@ There are three classes of type, distinguished by the operations possible on (ru
 
   - The final class are "Equatable" types: these are Copyable types where additionally there is a well-defined notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
-  
-For example, a `float` type would be Copyable, but not Equatable.
+
+For example, a `float` type (defined in an extension) would be Copyable, but not Equatable. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
 
 **Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
-The core does not define any types** , only type constructors (that must be instantiated into types by providing some collection of types as arguments). These are given in the following grammar:
+The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
 
 ```haskell
 
@@ -1017,13 +1017,11 @@ Type ::= Tuple(#) -- fixed-arity, heterogenous components
 <!--      Graph(TypeParams, #, #, Resources) -- polymorphic, so move TypeParams section here
 #       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
-** the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; and the empty Graph (void -> void), are the only "leaf" types here.
+The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Graph type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Graphs are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graphs can be rewritten into another by semantic-preserving rewrites).
+Graphs are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
 Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
-
-The majority of types will be defined by extensions including the [standard library](#standard-library).
 
 ### Resource Tracking
 
@@ -1044,23 +1042,8 @@ running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
 
-<!--### Resources
-
-On top of the Tierkreis type system, will be a system of Resources. A
-resource is a collection of operations which are available to use in
-certain graphs. The operations must be callable at the point of
-execution, but otherwise only signatures need to be known. Edges contain
-information on the resources that were needed to produce them, and
-Functions note their resource requirements in their `Graph` type. All
-operations declared as part of a resource interface implicitly have the
-resource they pertain to as a requirement.
-
-Resources can be added and used by plugin writers. We will also have
-some built in resources, see
-[standard library](#standard-library)-->
-
 To allow resource annotations on nodes to be made equal, we will have operations
- **lift** and **liftGraph** which can add a resource constraints to values.
+ **lift** and **liftGraph** which can add resource constraints to values.
 
 $\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
 
