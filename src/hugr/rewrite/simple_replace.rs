@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
-use crate::hugr::{HugrMut, HugrView, NodeMetadata};
+use crate::hugr::{HugrInternalsMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
     ops::{OpTag, OpTrait, OpType},
