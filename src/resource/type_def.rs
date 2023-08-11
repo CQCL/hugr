@@ -147,11 +147,9 @@ impl Resource {
 #[cfg(test)]
 mod test {
     use crate::resource::SignatureError;
-    use crate::types::custom::test::CLASSIC_T;
+    use crate::types::test::{ANY_T, CLASSIC_T, EQ_T};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{
-        AbstractSignature, ClassicType, HashableType, PrimType, SimpleType, Type, TypeBound,
-    };
+    use crate::types::{AbstractSignature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
 
@@ -165,23 +163,21 @@ mod test {
             tag: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type(
-                ClassicType::Graph(Box::new(AbstractSignature::new_df(vec![], vec![]))).into(),
-            )])
+            def.instantiate_concrete(vec![TypeArg::Type(Type::graph(AbstractSignature::new_df(
+                vec![],
+                vec![],
+            )))])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), Some(TypeBound::Copyable));
-        let typ2 = Type::new_extension(
-            def.instantiate_concrete([TypeArg::Type(HashableType::String.into())])
-                .unwrap(),
-        );
+        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(EQ_T)]).unwrap());
         assert_eq!(typ2.least_upper_bound(), Some(TypeBound::Eq));
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(SimpleType::Qubit)]),
+            def.instantiate_concrete([TypeArg::Type(ANY_T)]),
             Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::Type(SimpleType::Qubit),
+                TypeArg::Type(ANY_T),
                 TypeParam::Type(Some(TypeBound::Copyable))
             )))
         );
@@ -192,11 +188,8 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([
-                TypeArg::Type(CLASSIC_T.into()),
-                TypeArg::Type(CLASSIC_T.into()),
-            ])
-            .unwrap_err(),
+            def.instantiate_concrete([TypeArg::Type(CLASSIC_T), TypeArg::Type(CLASSIC_T),])
+                .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );
     }

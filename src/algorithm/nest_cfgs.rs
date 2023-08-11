@@ -401,9 +401,10 @@ pub(crate) mod test {
     use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
-    use crate::types::{ClassicType, SimpleType};
+    use crate::types::test::EQ_T;
+    use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = EQ_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -676,7 +677,7 @@ pub(crate) mod test {
     pub fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        //let sum2_type = SimpleType::new_predicate(2);
+        //let sum2_type = Type::new_predicate(2);
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 

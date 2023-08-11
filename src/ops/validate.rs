@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{ClassicRow, SimpleRow, SimpleType};
+use crate::types::{Type, TypeRow, TypeRow};
 use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -242,8 +242,8 @@ pub enum ChildrenValidationError {
     #[error("The {node_desc} node of a {container_desc} has a signature of {actual:?}, which differs from the expected type row {expected:?}")]
     IOSignatureMismatch {
         child: NodeIndex,
-        actual: SimpleRow,
-        expected: SimpleRow,
+        actual: TypeRow,
+        expected: TypeRow,
         node_desc: &'static str,
         container_desc: &'static str,
     },
@@ -256,7 +256,7 @@ pub enum ChildrenValidationError {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate_rows: Vec<ClassicRow>,
+        actual_predicate_rows: Vec<TypeRow>,
     },
 }
 
@@ -342,8 +342,8 @@ impl ValidateOp for BasicBlock {
                 predicate_variants,
                 other_outputs: outputs,
             } => {
-                let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
-                let node_outputs: SimpleRow = [&[predicate_type], outputs.as_ref()].concat().into();
+                let predicate_type = Type::new_predicate(predicate_variants.clone());
+                let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children
@@ -383,8 +383,8 @@ impl ValidateOp for super::Case {
 /// nodes outside of the first and second elements respectively, and that those
 /// have the correct signature.
 fn validate_io_nodes<'a>(
-    expected_input: &SimpleRow,
-    expected_output: &SimpleRow,
+    expected_input: &TypeRow,
+    expected_output: &TypeRow,
     container_desc: &'static str,
     mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
 ) -> Result<(), ChildrenValidationError> {
@@ -456,7 +456,7 @@ mod test {
         ops::dataflow::IOTrait,
         ops::LeafOp,
         type_row,
-        types::{ClassicType, SimpleType},
+        types::{Type, Type},
     };
     use cool_asserts::assert_matches;
 
@@ -464,7 +464,7 @@ mod test {
 
     #[test]
     fn test_validate_io_nodes() {
-        const B: SimpleType = SimpleType::Classic(ClassicType::usize());
+        const B: Type = Type::Classic(Type::usize());
 
         let in_types = type_row![B];
         let out_types = type_row![B, B];
@@ -472,7 +472,7 @@ mod test {
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
         let leaf_node = LeafOp::Noop {
-            ty: ClassicType::usize().into(),
+            ty: Type::usize().into(),
         }
         .into();
 

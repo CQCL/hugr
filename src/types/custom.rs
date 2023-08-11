@@ -1,12 +1,12 @@
-//! Opaque types, used to represent a user-defined [`SimpleType`].
+//! Opaque types, used to represent a user-defined [`Type`].
 //!
-//! [`SimpleType`]: super::SimpleType
+//! [`Type`]: super::Type
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
 use crate::resource::ResourceId;
 
-use super::{type_param::TypeArg, ClassicType, Container, HashableType, SimpleType, TypeBound};
+use super::{type_param::TypeArg, TypeBound};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -84,15 +84,25 @@ impl Display for CustomType {
 pub(crate) mod test {
     use smol_str::SmolStr;
 
+    use crate::types::TypeBound;
+
     use super::CustomType;
-    use crate::types::{ClassicType, Container, TypeBound};
 
-    pub(crate) const CLASSIC_T: ClassicType =
-        ClassicType::Container(Container::Opaque(CLASSIC_CUST));
+    pub(crate) const EQ_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyEqType"),
+        SmolStr::new_inline("MyRsrc"),
+        Some(TypeBound::Eq),
+    );
 
-    pub(crate) const CLASSIC_CUST: CustomType = CustomType::new_simple(
-        SmolStr::new_inline("MyType"),
+    pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyCopyableType"),
         SmolStr::new_inline("MyRsrc"),
         Some(TypeBound::Copyable),
+    );
+
+    pub(crate) const ANY_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyAnyType"),
+        SmolStr::new_inline("MyRsrc"),
+        None,
     );
 }

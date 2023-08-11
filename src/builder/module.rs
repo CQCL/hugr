@@ -7,7 +7,7 @@ use super::{
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
-    types::{PrimType, SimpleType, TypeBound},
+    types::{Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -131,7 +131,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
-        typ: SimpleType,
+        typ: Type,
     ) -> Result<AliasID<true>, BuildError> {
         // TODO: add AliasDefn in other containers
         // This is currently tricky as they are not connected to anything so do
@@ -155,15 +155,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        tag: TypeBound,
+        bound: Option<TypeBound>,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
-            tag,
+            bound,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 }
 

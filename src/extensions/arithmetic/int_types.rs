@@ -6,7 +6,7 @@ use crate::{
     resource::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        CustomType, SimpleType, TypeBound,
+        CustomType, Type, TypeBound,
     },
     Resource,
 };
@@ -20,15 +20,13 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 /// Integer type of a given bit width.
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub fn int_type(n: u8) -> SimpleType {
-    todo!();
-    CustomType::new(
+pub fn int_type(n: u8) -> Type {
+    Type::new_extension(CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
         RESOURCE_ID,
         Some(TypeBound::Copyable),
-    )
-    .into()
+    ))
 }
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.

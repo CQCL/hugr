@@ -5,7 +5,7 @@
 
 use thiserror::Error;
 
-use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
+use crate::types::{Container, CustomType, HashableType, PrimType, Type};
 use crate::{ops::constant::ConstValue, types::TypeRow};
 
 /// A constant value/instance of a [HashableType]. Note there is no
@@ -69,7 +69,7 @@ impl ValueOfType for HashableValue {
             }
         }
         Err(ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(ty.clone()),
+            Type::Hashable(ty.clone()),
             ConstValue::Hashable(self.clone()),
         ))
     }
@@ -79,7 +79,7 @@ impl ValueOfType for HashableValue {
         vals: ContainerValue<HashableValue>,
     ) -> ConstTypeError {
         ConstTypeError::ValueCheckFail(
-            ClassicType::Hashable(HashableType::Container(typ)),
+            Type::Hashable(HashableType::Container(typ)),
             ConstValue::Hashable(HashableValue::Container(vals)),
         )
     }
@@ -205,7 +205,7 @@ pub enum ConstTypeError {
     InvalidSumTag,
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
-    ValueCheckFail(ClassicType, ConstValue),
+    ValueCheckFail(Type, ConstValue),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),

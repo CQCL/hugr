@@ -477,13 +477,13 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{AbstractSignature, Type, Type},
     };
 
     use super::sealed::HugrInternalsMut;
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = Type::Classic(Type::i64());
 
     #[test]
     fn simple_function() {
@@ -517,7 +517,7 @@ mod test {
                 .add_op_with_parent(
                     f,
                     LeafOp::Noop {
-                        ty: ClassicType::i64().into(),
+                        ty: Type::i64().into(),
                     },
                 )
                 .unwrap();

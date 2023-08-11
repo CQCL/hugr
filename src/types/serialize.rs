@@ -57,15 +57,13 @@ impl From<SerSimpleType> for Type {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::types::custom::test::CLASSIC_CUST;
+    use crate::types::custom::test::COPYABLE_CUST;
     use crate::types::AbstractSignature;
     use crate::types::Type;
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::graph(AbstractSignature::new_linear(vec![
-            crate::types::SimpleType::Qubit,
-        ]));
+        let g: Type = Type::graph(AbstractSignature::new_linear(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 
@@ -74,7 +72,7 @@ mod test {
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum([Type::usize(), Type::new_extension(CLASSIC_CUST)]);
+        let t = Type::new_sum([Type::usize(), Type::new_extension(COPYABLE_CUST)]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable array

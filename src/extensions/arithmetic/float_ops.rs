@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::{
     resource::{ResourceSet, SignatureError},
-    types::{type_param::TypeArg, SimpleRow},
+    types::{type_param::TypeArg, TypeRow},
     Resource,
 };
 
@@ -14,9 +14,7 @@ use super::float_types::float64_type;
 /// The resource identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 
-fn fcmp_sig(
-    _arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![float64_type(); 2].into(),
         vec![bool_type()].into(),
@@ -24,9 +22,7 @@ fn fcmp_sig(
     ))
 }
 
-fn fbinop_sig(
-    _arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn fbinop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![float64_type(); 2].into(),
         vec![float64_type()].into(),
@@ -34,9 +30,7 @@ fn fbinop_sig(
     ))
 }
 
-fn funop_sig(
-    _arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn funop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![float64_type()].into(),
         vec![float64_type()].into(),

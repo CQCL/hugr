@@ -274,7 +274,7 @@ pub mod test {
         },
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{AbstractSignature, Type, Type},
         Port,
     };
     use itertools::Itertools;
@@ -282,8 +282,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Qubit;
+    const NAT: Type = Type::Classic(Type::i64());
+    const QB: Type = Type::Qubit;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -303,13 +303,13 @@ pub mod test {
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
                 signature: AbstractSignature::new_df(
-                    vec![ClassicType::usize().into(); inputs - 1],
-                    vec![ClassicType::usize().into(); outputs - 1],
+                    vec![Type::usize().into(); inputs - 1],
+                    vec![Type::usize().into(); outputs - 1],
                 ),
             }
             .into(),
-            (true, false) => Input::new(vec![ClassicType::usize().into(); outputs - 1]).into(),
-            (false, true) => Output::new(vec![ClassicType::usize().into(); inputs - 1]).into(),
+            (true, false) => Input::new(vec![Type::usize().into(); outputs - 1]).into(),
+            (false, true) => Output::new(vec![Type::usize().into(); inputs - 1]).into(),
             (true, true) => Module.into(),
         }
     }
@@ -360,7 +360,7 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             module_builder.set_metadata(json!({"name": "test"}));
 
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
                 .define_function(
                     "main",
@@ -398,7 +398,7 @@ pub mod test {
     fn metadata_hugr_ser() {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
                 .define_function(
                     "main",
@@ -433,7 +433,7 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<SimpleType> = vec![ClassicType::usize().into(); 2];
+        let tp: Vec<Type> = vec![Type::usize().into(); 2];
         let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
@@ -461,7 +461,7 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb = SimpleType::Qubit;
+        let qb = Type::Qubit;
         let dfg = DFGBuilder::new(AbstractSignature::new_df(
             vec![qb.clone()],
             vec![qb.clone()],

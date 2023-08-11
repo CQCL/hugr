@@ -4,16 +4,14 @@ pub mod custom;
 mod primitive;
 mod serialize;
 mod signature;
-pub mod simple;
+// pub mod simple;
 pub mod type_param;
 pub mod type_row;
 
 pub use custom::CustomType;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use signature::{AbstractSignature, Signature, SignatureDescription};
-pub use simple::{
-    ClassicRow, ClassicType, Container, HashableType, PrimType, SimpleRow, SimpleType,
-};
+
 pub use type_row::TypeRow;
 
 use itertools::FoldWhile::{Continue, Done};
@@ -28,9 +26,9 @@ pub enum EdgeKind {
     /// Control edges of a CFG region.
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
-    Value(SimpleType),
+    Value(Type),
     /// A reference to a static value definition.
-    Static(ClassicType),
+    Static(Type),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }
@@ -50,10 +48,10 @@ impl EdgeKind {
 )]
 #[repr(u8)]
 pub enum TypeTag {
-    /// Any [SimpleType], including linear and quantum types;
+    /// Any [Type], including linear and quantum types;
     /// cannot necessarily be copied or discarded.
     Simple = 0,
-    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [ClassicType]
+    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [Type]
     Copyable = 1,
     /// Subset of [TypeTag::Classic]: types that can also be hashed and support
     /// a strong notion of equality. See [HashableType]
@@ -73,7 +71,7 @@ impl TypeTag {
     }
 
     /// Do types in this tag contain only classic data
-    /// (which can be copied and discarded, i.e. [ClassicType]s)
+    /// (which can be copied and discarded, i.e. [Type]s)
     pub fn is_classical(self) -> bool {
         self != Self::Simple
     }
@@ -271,11 +269,40 @@ where
     variant_rows.into_iter().map(Type::new_tuple).collect()
 }
 
+pub(crate) const ERROR_TYPE: Type = Type(
+    TypeEnum::Prim(primitive::PrimType::E(CustomType::new_simple(
+        smol_str::SmolStr::new_inline("error"),
+        smol_str::SmolStr::new_inline("MyRsrc"),
+        Some(TypeBound::Eq),
+    ))),
+    Some(TypeBound::Copyable),
+);
+
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
+
+    use super::{
+        custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
+        primitive::PrimType,
+        *,
+    };
     use crate::ops::AliasDecl;
 
-    use super::*;
+    pub(crate) const EQ_T: Type = Type(
+        TypeEnum::Prim(PrimType::E(EQ_CUST)),
+        Some(TypeBound::Copyable),
+    );
+
+    pub(crate) const CLASSIC_T: Type = Type(
+        TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
+        Some(TypeBound::Copyable),
+    );
+
+    pub(crate) const ANY_T: Type = Type(
+        TypeEnum::Prim(PrimType::E(ANY_CUST)),
+        Some(TypeBound::Copyable),
+    );
+
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple([
@@ -287,7 +314,7 @@ mod test {
                 "my_resource",
                 Some(TypeBound::Copyable),
             )),
-            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
+            Type::new_alias(AliasDecl::new("my_alias", Some(TypeBound::Eq))),
         ]);
         assert_eq!(
             t.to_string(),

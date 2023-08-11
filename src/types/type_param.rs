@@ -7,7 +7,8 @@
 use thiserror::Error;
 
 use super::CustomType;
-use super::{SimpleType, TypeBound};
+use super::Type;
+use super::TypeBound;
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -31,7 +32,7 @@ pub enum TypeParam {
 #[non_exhaustive]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
-    Type(SimpleType),
+    Type(Type),
     /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
     USize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.

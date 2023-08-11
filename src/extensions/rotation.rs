@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use crate::ops::constant::CustomConst;
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, TypeBound};
+use crate::types::{CustomType, TypeBound};
 use crate::values::CustomCheckFail;
 use crate::Resource;
 
@@ -33,7 +33,7 @@ pub fn resource() -> Resource {
             vec![],
             |_arg_values: &[TypeArg]| {
                 let t = todo!();
-                // let t: SimpleRow = vec![Type::Angle.custom_type()].into();
+                // let t: TypeRow = vec![Type::Angle.custom_type()].into();
                 Ok((t.clone(), t, ResourceSet::default()))
             },
         )

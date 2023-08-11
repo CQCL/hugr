@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-use crate::types::SimpleType;
+use crate::types::Type;
 use crate::values::ConstTypeError;
 
 pub mod handle;
@@ -71,7 +71,7 @@ pub enum BuildError {
 
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
-    NoCopyLinear(SimpleType),
+    NoCopyLinear(Type),
 
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
@@ -88,16 +88,16 @@ impl From<BuildError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use crate::types::{ClassicType, Signature, SimpleType};
+    use crate::types::{Signature, Type, Type};
     use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::usize());
-    pub(super) const QB: SimpleType = SimpleType::Qubit;
+    pub(super) const NAT: Type = Type::Classic(Type::i64());
+    pub(super) const BIT: Type = Type::Classic(Type::usize());
+    pub(super) const QB: Type = Type::Qubit;
 
     /// Wire up inputs of a Dataflow container to the outputs.
     pub(super) fn n_identity<T: DataflowSubContainer>(

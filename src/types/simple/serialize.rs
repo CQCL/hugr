@@ -1,4 +1,4 @@
-use super::ClassicType;
+use super::Type;
 
 use super::Container;
 
@@ -13,11 +13,9 @@ use super::super::custom::CustomType;
 
 use super::TypeRow;
 
-use super::SimpleType;
+use super::Type;
 
 use super::super::AbstractSignature;
-
-use crate::types::type_row::TypeRowElem;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -58,11 +56,11 @@ trait SerializableType: PrimType {
     const TAG: TypeTag;
 }
 
-impl SerializableType for ClassicType {
+impl SerializableType for Type {
     const TAG: TypeTag = TypeTag::Copyable;
 }
 
-impl SerializableType for SimpleType {
+impl SerializableType for Type {
     const TAG: TypeTag = TypeTag::Simple;
 }
 
@@ -73,7 +71,7 @@ impl SerializableType for HashableType {
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
 where
     SerSimpleType: From<T>,
-    SimpleType: From<T>,
+    Type: From<T>,
 {
     fn from(value: Container<T>) -> Self {
         match value {
@@ -107,24 +105,24 @@ impl From<HashableType> for SerSimpleType {
     }
 }
 
-impl From<ClassicType> for SerSimpleType {
-    fn from(value: ClassicType) -> Self {
+impl From<Type> for SerSimpleType {
+    fn from(value: Type) -> Self {
         match value {
-            ClassicType::Graph(inner) => SerSimpleType::G {
+            Type::Graph(inner) => SerSimpleType::G {
                 signature: Box::new(*inner),
             },
-            ClassicType::Container(c) => c.into(),
-            ClassicType::Hashable(h) => h.into(),
+            Type::Container(c) => c.into(),
+            Type::Hashable(h) => h.into(),
         }
     }
 }
 
-impl From<SimpleType> for SerSimpleType {
-    fn from(value: SimpleType) -> Self {
+impl From<Type> for SerSimpleType {
+    fn from(value: Type) -> Self {
         match value {
-            SimpleType::Classic(c) => c.into(),
-            SimpleType::Qubit => SerSimpleType::Q,
-            SimpleType::Qontainer(c) => c.into(),
+            Type::Classic(c) => c.into(),
+            Type::Qubit => SerSimpleType::Q,
+            Type::Qontainer(c) => c.into(),
         }
     }
 }
@@ -142,20 +140,20 @@ fn try_convert_list<T: TryInto<T2>, T2: TypeRowElem>(
 macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
-            TypeTag::Simple => (Container::<SimpleType>::$variant($($r),*)).into(),
-            TypeTag::Copyable => (Container::<ClassicType>::$variant($($r),*)).into(),
+            TypeTag::Simple => (Container::<Type>::$variant($($r),*)).into(),
+            TypeTag::Copyable => (Container::<Type>::$variant($($r),*)).into(),
             TypeTag::Eq => (Container::<HashableType>::$variant($($r),*)).into()
         }
     }
 }
 
-impl From<SerSimpleType> for SimpleType {
+impl From<SerSimpleType> for Type {
     fn from(value: SerSimpleType) -> Self {
         match value {
-            SerSimpleType::Q => SimpleType::Qubit,
+            SerSimpleType::Q => Type::Qubit,
             SerSimpleType::I => HashableType::USize.into(),
             SerSimpleType::S => HashableType::String.into(),
-            SerSimpleType::G { signature } => ClassicType::Graph(Box::new(*signature)).into(),
+            SerSimpleType::G { signature } => Type::Graph(Box::new(*signature)).into(),
             SerSimpleType::Tuple { row: inner, c } => {
                 handle_container!(c, Tuple(Box::new(try_convert_list(inner).unwrap())))
             }
@@ -170,21 +168,21 @@ impl From<SerSimpleType> for SimpleType {
                 handle_container!(c, Opaque(custom))
             }
             SerSimpleType::Var { name: s } => {
-                ClassicType::Hashable(HashableType::Variable(s)).into()
+                Type::Hashable(HashableType::Variable(s)).into()
             }
         }
     }
 }
 
-impl TryFrom<SerSimpleType> for ClassicType {
+impl TryFrom<SerSimpleType> for Type {
     type Error = String;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
-        let s: SimpleType = value.into();
-        if let SimpleType::Classic(c) = s {
+        let s: Type = value.into();
+        if let Type::Classic(c) = s {
             Ok(c)
         } else {
-            Err(format!("Not a ClassicType: {}", s))
+            Err(format!("Not a Type: {}", s))
         }
     }
 }
@@ -193,7 +191,7 @@ impl TryFrom<SerSimpleType> for HashableType {
     type Error = String;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         match value.try_into()? {
-            ClassicType::Hashable(h) => Ok(h),
+            Type::Hashable(h) => Ok(h),
             ty => Err(format!("Classic type is not hashable: {}", ty)),
         }
     }
@@ -203,26 +201,26 @@ impl TryFrom<SerSimpleType> for HashableType {
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::types::custom::test::CLASSIC_T;
-    use crate::types::{ClassicType, Container, HashableType, SimpleType};
+    use crate::types::{Type, Container, HashableType, Type};
 
     #[test]
     fn serialize_types_roundtrip() {
         // A Simple tuple
-        let t = SimpleType::new_tuple(vec![
-            SimpleType::Qubit,
-            SimpleType::from(HashableType::USize),
+        let t = Type::new_tuple(vec![
+            Type::Qubit,
+            Type::from(HashableType::USize),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = SimpleType::new_sum(vec![
-            SimpleType::Classic(ClassicType::Hashable(HashableType::USize)),
-            SimpleType::Classic(CLASSIC_T),
+        let t = Type::new_sum(vec![
+            Type::Classic(Type::Hashable(HashableType::USize)),
+            Type::Classic(CLASSIC_T),
         ]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable list
-        let t = SimpleType::Classic(ClassicType::Hashable(HashableType::Container(
+        let t = Type::Classic(Type::Hashable(HashableType::Container(
             Container::Array(Box::new(HashableType::USize), 3),
         )));
         assert_eq!(ser_roundtrip(&t), t);
@@ -231,8 +229,8 @@ mod test {
     #[test]
     fn serialize_types_current_behaviour() {
         // This list should be represented as a HashableType::Container.
-        let malformed = SimpleType::Qontainer(Container::Array(
-            Box::new(SimpleType::Classic(ClassicType::Hashable(
+        let malformed = Type::Qontainer(Container::Array(
+            Box::new(Type::Classic(Type::Hashable(
                 HashableType::USize,
             ))),
             6,

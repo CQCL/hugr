@@ -9,16 +9,14 @@ use crate::types::type_param::TypeParam;
 use crate::utils::collect_array;
 use crate::{
     resource::{ResourceSet, SignatureError},
-    types::{type_param::TypeArg, SimpleRow, SimpleType, TypeRow},
+    types::{type_param::TypeArg, Type, TypeRow, TypeRow},
     Resource,
 };
 
 /// The resource identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
-fn iwiden_sig(
-    arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
@@ -32,9 +30,7 @@ fn iwiden_sig(
     ))
 }
 
-fn inarrow_sig(
-    arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
@@ -43,14 +39,12 @@ fn inarrow_sig(
     }
     Ok((
         vec![int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
 
-fn itob_sig(
-    _arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![int_type(1)].into(),
         vec![bool_type()].into(),
@@ -58,9 +52,7 @@ fn itob_sig(
     ))
 }
 
-fn btoi_sig(
-    _arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![bool_type()].into(),
         vec![int_type(1)].into(),
@@ -68,7 +60,7 @@ fn btoi_sig(
     ))
 }
 
-fn icmp_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
@@ -78,9 +70,7 @@ fn icmp_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet
     ))
 }
 
-fn ibinop_sig(
-    arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn ibinop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
@@ -90,9 +80,7 @@ fn ibinop_sig(
     ))
 }
 
-fn iunop_sig(
-    arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
@@ -102,47 +90,41 @@ fn iunop_sig(
     ))
 }
 
-fn idivmod_sig(
-    arg_values: &[TypeArg],
-) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
-    let intpair: TypeRow<SimpleType> = vec![int_type(n), int_type(m)].into();
+    let intpair: TypeRow<Type> = vec![int_type(n), int_type(m)].into();
     Ok((
         intpair.clone(),
-        vec![SimpleType::new_sum(vec![
-            SimpleType::new_tuple(intpair),
-            ERROR_TYPE,
-        ])]
-        .into(),
+        vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
 
-fn idiv_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     Ok((
         vec![int_type(n), int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
 
-fn imod_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     Ok((
         vec![int_type(n), int_type(m)].into(),
-        vec![SimpleType::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
+        vec![Type::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
         ResourceSet::default(),
     ))
 }
 
-fn ish_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;

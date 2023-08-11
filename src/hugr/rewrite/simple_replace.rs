@@ -213,12 +213,12 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{AbstractSignature, ClassicType, SimpleType};
+    use crate::types::{AbstractSignature, Type, Type};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
 
-    const QB: SimpleType = SimpleType::Qubit;
+    const QB: Type = Type::Qubit;
 
     /// Creates a hugr like the following:
     /// --   H   --
@@ -465,7 +465,7 @@ mod test {
 
     #[test]
     fn test_replace_cx_cross() {
-        let q_row: Vec<SimpleType> = vec![SimpleType::Qubit, SimpleType::Qubit];
+        let q_row: Vec<Type> = vec![Type::Qubit, Type::Qubit];
         let mut builder = DFGBuilder::new(AbstractSignature::new_df(q_row.clone(), q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(LeafOp::CX, [0, 1]).unwrap();
@@ -509,9 +509,8 @@ mod test {
 
     #[test]
     fn test_replace_after_copy() {
-        let one_bit: Vec<SimpleType> = vec![ClassicType::usize().into()];
-        let two_bit: Vec<SimpleType> =
-            vec![ClassicType::usize().into(), ClassicType::usize().into()];
+        let one_bit: Vec<Type> = vec![Type::usize().into()];
+        let two_bit: Vec<Type> = vec![Type::usize().into(), Type::usize().into()];
 
         let mut builder =
             DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();

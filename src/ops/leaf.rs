@@ -7,9 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
-    types::{
-        AbstractSignature, ClassicType, EdgeKind, SignatureDescription, SimpleRow, SimpleType,
-    },
+    types::{AbstractSignature, EdgeKind, SignatureDescription, Type, Type, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -45,7 +43,7 @@ pub enum LeafOp {
     /// A no-op operation.
     Noop {
         /// The type of edges connecting the Noop.
-        ty: SimpleType,
+        ty: Type,
     },
     /// A qubit measurement operation.
     Measure,
@@ -54,25 +52,25 @@ pub enum LeafOp {
     /// An operation that packs all its inputs into a tuple.
     MakeTuple {
         ///Tuple element types.
-        tys: SimpleRow,
+        tys: TypeRow,
     },
     /// An operation that unpacks a tuple into its components.
     UnpackTuple {
         ///Tuple element types.
-        tys: SimpleRow,
+        tys: TypeRow,
     },
     /// An operation that creates a tagged sum value from one of its variants.
     Tag {
         /// The variant to create.
         tag: usize,
         /// The variants of the sum type.
-        variants: SimpleRow,
+        variants: TypeRow,
     },
     /// A node which adds a resource req to the types of the wires it is passed
     /// It has no effect on the values passed along the edge
     Lift {
         /// The types of the edges
-        type_row: SimpleRow,
+        type_row: TypeRow,
         /// The resources which we're adding to the inputs
         new_resource: ResourceId,
     },
@@ -80,9 +78,7 @@ pub enum LeafOp {
 
 impl Default for LeafOp {
     fn default() -> Self {
-        Self::Noop {
-            ty: SimpleType::Qubit,
-        }
+        Self::Noop { ty: Type::Qubit }
     }
 }
 impl OpName for LeafOp {
@@ -151,8 +147,8 @@ impl OpTrait for LeafOp {
     fn signature(&self) -> AbstractSignature {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
-        const Q: SimpleType = SimpleType::Qubit;
-        const B: SimpleType = SimpleType::Classic(ClassicType::usize());
+        const Q: Type = Type::Qubit;
+        const B: Type = Type::Classic(Type::usize());
 
         match self {
             LeafOp::Noop { ty: typ } => {
@@ -172,14 +168,14 @@ impl OpTrait for LeafOp {
             LeafOp::Xor => AbstractSignature::new_df(type_row![B, B], type_row![B]),
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
-                AbstractSignature::new_df(types.clone(), vec![SimpleType::new_tuple(types.clone())])
+                AbstractSignature::new_df(types.clone(), vec![Type::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                AbstractSignature::new_df(vec![SimpleType::new_tuple(types.clone())], types.clone())
+                AbstractSignature::new_df(vec![Type::new_tuple(types.clone())], types.clone())
             }
             LeafOp::Tag { tag, variants } => AbstractSignature::new_df(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
-                vec![SimpleType::new_sum(variants.clone())],
+                vec![Type::new_sum(variants.clone())],
             ),
             LeafOp::Lift {
                 type_row,
