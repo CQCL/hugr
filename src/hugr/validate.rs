@@ -14,12 +14,12 @@ use pyo3::prelude::*;
 
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
-use crate::resource::ResourceSet;
+use crate::resource::validate::{ResourceError, ResourceValidator};
 use crate::types::{ClassicType, EdgeKind, SimpleType};
 use crate::{Direction, Hugr, Node, Port};
 
-use super::hierarchical_views::{HierarchyView, SiblingGraph};
-use super::view::HugrView;
+use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::NodeType;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -30,8 +30,8 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Resource requirements associated with each edge
-    resources: HashMap<(Node, Direction), ResourceSet>,
+    /// Context for the resource validation.
+    resource_validator: ResourceValidator,
 }
 
 impl Hugr {
@@ -48,7 +48,7 @@ impl<'a> ValidationContext<'a> {
         Self {
             hugr,
             dominators: HashMap::new(),
-            resources: HashMap::new(),
+            resource_validator: ResourceValidator::new(hugr),
         }
     }
 
@@ -61,36 +61,11 @@ impl<'a> ValidationContext<'a> {
             });
         }
 
-        for node in self.hugr.graph.nodes_iter().map_into() {
-            self.gather_resources(&node)?;
-        }
-
         // Node-specific checks
         for node in self.hugr.graph.nodes_iter().map_into() {
             self.validate_node(node)?;
         }
 
-        Ok(())
-    }
-
-    /// Use the signature supplied by a dataflow node to work out the
-    /// resource requirements for all of its input and output edges, then put
-    /// those requirements in the ValidationContext
-    fn gather_resources(&mut self, node: &Node) -> Result<(), ValidationError> {
-        let node_type = self.hugr.get_nodetype(*node);
-
-        match node_type.signature() {
-            // Require that input resources are specified on every node for this check
-            None => return Err(ValidationError::MissingInputResources(*node)),
-            Some(sig) => {
-                for dir in Direction::BOTH {
-                    assert!(self
-                        .resources
-                        .insert((*node, dir), sig.get_resources(&dir))
-                        .is_none());
-                }
-            }
-        }
         Ok(())
     }
 
@@ -100,7 +75,7 @@ impl<'a> ValidationContext<'a> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region, entry_node)
     }
@@ -111,7 +86,8 @@ impl<'a> ValidationContext<'a> {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
-        let op_type = self.hugr.get_optype(node);
+        let node_type = self.hugr.get_nodetype(node);
+        let op_type = &node_type.op;
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -159,50 +135,16 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Check operation-specific constraints
-        self.validate_operation(node, op_type)?;
+        self.validate_operation(node, node_type)?;
+
+        // If this is a container with I/O nodes, check that the resources they
+        // define match the resources of the container.
+        if let Some([input, output]) = self.hugr.get_io(node) {
+            self.resource_validator
+                .validate_io_resources(node, input, output)?;
+        }
 
         Ok(())
-    }
-
-    /// Check that two `PortIndex` have compatible resource requirements,
-    /// according to the information accumulated by `gather_resources`.
-    ///
-    /// This resource checking assumes that free resource variables
-    ///   (e.g. implicit lifting of `A -> B` to `[R]A -> [R]B`)
-    /// and adding of lift nodes
-    ///   (i.e. those which transform an edge from `A` to `[R]A`)
-    /// has already been done.
-    fn check_resources_compatible(
-        &self,
-        src: &(Node, Port),
-        tgt: &(Node, Port),
-    ) -> Result<(), ValidationError> {
-        let rs_src = self.resources.get(&(src.0, Direction::Outgoing)).unwrap();
-        let rs_tgt = self.resources.get(&(tgt.0, Direction::Incoming)).unwrap();
-
-        if rs_src == rs_tgt {
-            Ok(())
-        } else if rs_src.is_subset(rs_tgt) {
-            // The extra resource requirements reside in the target node.
-            // If so, we can fix this mismatch with a lift node
-            Err(ValidationError::TgtExceedsSrcResources {
-                from: src.0,
-                from_offset: src.1,
-                from_resources: rs_src.clone(),
-                to: tgt.0,
-                to_offset: tgt.1,
-                to_resources: rs_tgt.clone(),
-            })
-        } else {
-            Err(ValidationError::SrcExceedsTgtResources {
-                from: src.0,
-                from_offset: src.1,
-                from_resources: rs_src.clone(),
-                to: tgt.0,
-                to_offset: tgt.1,
-                to_resources: rs_tgt.clone(),
-            })
-        }
     }
 
     /// Check whether a port is valid.
@@ -257,7 +199,8 @@ impl<'a> ValidationContext<'a> {
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
-            self.check_resources_compatible(&(node, port), &(other_node, other_offset))?;
+            self.resource_validator
+                .check_resources_compatible(&(node, port), &(other_node, other_offset))?;
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
@@ -286,7 +229,8 @@ impl<'a> ValidationContext<'a> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_operation(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
+    fn validate_operation(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
+        let op_type = &node_type.op;
         let flags = op_type.validity_flags();
 
         if self.hugr.hierarchy.child_count(node.index) > 0 {
@@ -391,7 +335,7 @@ impl<'a> ValidationContext<'a> {
             return Ok(());
         };
 
-        let region = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
 
         let postorder = DfsPostOrder::new(&region, entry_node);
@@ -647,28 +591,9 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// Missing lift node
-    #[error("Resources at target node {to:?} ({to_offset:?}) ({to_resources}) exceed those at source {from:?} ({from_offset:?}) ({from_resources})")]
-    TgtExceedsSrcResources {
-        from: Node,
-        from_offset: Port,
-        from_resources: ResourceSet,
-        to: Node,
-        to_offset: Port,
-        to_resources: ResourceSet,
-    },
-    /// Too many resource requirements coming from src
-    #[error("Resources at source node {from:?} ({from_offset:?}) ({from_resources}) exceed those at target {to:?} ({to_offset:?}) ({to_resources})")]
-    SrcExceedsTgtResources {
-        from: Node,
-        from_offset: Port,
-        from_resources: ResourceSet,
-        to: Node,
-        to_offset: Port,
-        to_resources: ResourceSet,
-    },
-    #[error("Missing input resources for node {0:?}")]
-    MissingInputResources(Node),
+    /// There are errors in the resource declarations.
+    #[error(transparent)]
+    ResourceError(#[from] ResourceError),
 }
 
 #[cfg(feature = "pyo3")]
@@ -750,6 +675,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
+    use crate::resource::ResourceSet;
     use crate::types::{AbstractSignature, ClassicType, HashableType};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -1191,7 +1117,12 @@ mod test {
         main.finish_with_outputs([f_output])?;
         let handle = module_builder.finish_hugr();
 
-        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        assert_matches!(
+            handle,
+            Err(ValidationError::ResourceError(
+                ResourceError::TgtExceedsSrcResources { .. }
+            ))
+        );
         Ok(())
     }
 
@@ -1222,7 +1153,12 @@ mod test {
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
         let handle = module_builder.finish_hugr();
-        assert_matches!(handle, Err(ValidationError::SrcExceedsTgtResources { .. }));
+        assert_matches!(
+            handle,
+            Err(ValidationError::ResourceError(
+                ResourceError::SrcExceedsTgtResources { .. }
+            ))
+        );
         Ok(())
     }
 
@@ -1279,7 +1215,12 @@ mod test {
 
         main.finish_with_outputs([output])?;
         let handle = module_builder.finish_hugr();
-        assert_matches!(handle, Err(ValidationError::TgtExceedsSrcResources { .. }));
+        assert_matches!(
+            handle,
+            Err(ValidationError::ResourceError(
+                ResourceError::TgtExceedsSrcResources { .. }
+            ))
+        );
         Ok(())
     }
 
@@ -1294,9 +1235,9 @@ mod test {
 
         assert_matches!(
             hugr,
-            Err(BuildError::InvalidHUGR(
-                ValidationError::TgtExceedsSrcResources { .. }
-            ))
+            Err(BuildError::InvalidHUGR(ValidationError::ResourceError(
+                ResourceError::TgtExceedsSrcResources { .. }
+            )))
         );
         Ok(())
     }

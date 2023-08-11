@@ -43,7 +43,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
@@ -398,7 +398,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::hugr::hierarchical_views::{HierarchyView, SiblingGraph};
+    use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
     use crate::types::{ClassicType, SimpleType};
@@ -447,7 +447,7 @@ pub(crate) mod test {
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's).
-        let v = SiblingGraph::new(&h, h.root());
+        let v: SiblingGraph = SiblingGraph::new(&h, h.root());
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 

@@ -1,16 +1,17 @@
-#![allow(unused)]
-//! A Trait for "read-only" HUGRs.
+//! Read-only access into HUGR graphs and subgraphs.
 
-use std::iter::FusedIterator;
-use std::ops::Deref;
+pub mod hierarchy;
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
+pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
+
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, NodeMetadata, NodeType};
 use super::{Node, Port};
+use crate::ops::handle::NodeHandle;
 use crate::ops::{OpName, OpTag, OpType};
 use crate::types::EdgeKind;
 use crate::Direction;
@@ -18,6 +19,12 @@ use crate::Direction;
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: sealed::HugrInternals {
+    /// The kind of handle that can be used to refer to the root node.
+    ///
+    /// The handle is guaranteed to be able to contain the operation returned by
+    /// [`HugrView::root_type`].
+    type RootHandle: NodeHandle;
+
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -199,6 +206,8 @@ impl<T> HugrView for T
 where
     T: AsRef<Hugr>,
 {
+    type RootHandle = Node;
+
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
@@ -299,7 +308,6 @@ where
     #[inline]
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         let op = self.get_nodetype(node);
-        let dfp = OpTag::DataflowParent;
         if op.tag().is_superset(OpTag::DataflowParent) {
             self.children(node).take(2).collect_vec().try_into().ok()
         } else {

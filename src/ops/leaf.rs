@@ -19,7 +19,7 @@ use crate::{
 pub enum LeafOp {
     /// A user-defined operation that can be downcasted by the extensions that
     /// define it.
-    CustomOp(ExternalOp),
+    CustomOp(Box<ExternalOp>),
     /// A Hadamard gate.
     H,
     /// A T gate.

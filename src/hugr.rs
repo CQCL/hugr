@@ -2,11 +2,10 @@
 
 mod hugrmut;
 
-pub mod hierarchical_views;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
-pub mod view;
+pub mod views;
 
 use std::collections::VecDeque;
 use std::iter;
@@ -24,7 +23,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-pub use self::view::HugrView;
+pub use self::views::HugrView;
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, Signature};
@@ -52,7 +51,8 @@ pub struct Hugr {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The type of a node on a graph
+/// The type of a node on a graph. In addition to the [`OpType`], it also
+/// describes the resources inferred to be used by the node.
 pub struct NodeType {
     /// The underlying OpType
     op: OpType,
@@ -97,16 +97,34 @@ impl NodeType {
     pub fn op_signature(&self) -> AbstractSignature {
         self.op.signature()
     }
+
+    /// The input resources defined for this node.
+    ///
+    /// The output resources will correspond to the input resources plus any
+    /// resource delta defined by the operation type.
+    ///
+    /// If the input resources are not known, this will return None.
+    pub fn input_resources(&self) -> Option<&ResourceSet> {
+        self.input_resources.as_ref()
+    }
 }
 
 impl NodeType {
-    #![allow(missing_docs)]
     delegate! {
         to self.op {
+            /// Tag identifying the operation.
             pub fn tag(&self) -> OpTag;
+            /// Returns the number of inputs ports for the operation.
             pub fn input_count(&self) -> usize;
+            /// Returns the number of outputs ports for the operation.
             pub fn output_count(&self) -> usize;
         }
+    }
+}
+
+impl<'a> From<&'a NodeType> for &'a OpType {
+    fn from(nt: &'a NodeType) -> Self {
+        &nt.op
     }
 }
 

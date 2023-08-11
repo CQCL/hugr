@@ -5,7 +5,7 @@ use super::{
 };
 
 use crate::{
-    hugr::{view::HugrView, ValidationError},
+    hugr::{views::HugrView, ValidationError},
     ops,
     types::{PrimType, SimpleType, TypeTag},
 };
