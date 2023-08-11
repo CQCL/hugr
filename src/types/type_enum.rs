@@ -6,12 +6,9 @@ use crate::{ops::AliasDecl, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
-    // leaf::{AnyLeaf, CopyableLeaf, EqLeaf, InvalidBound, Tagged, TypeClass},
     leaf::{least_upper_bound, PrimType, TypeBound},
     type_param::TypeArg,
-    // TypeTag,
-    AbstractSignature,
-    CustomType,
+    AbstractSignature, CustomType,
 };
 
 mod serialize;
