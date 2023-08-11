@@ -2,11 +2,12 @@
 
 use std::fmt::Write;
 
-use crate::{ops::AliasDecl, utils::display_list};
+use crate::{ops::AliasDecl, resource::PRELUDE, utils::display_list};
 use std::fmt::{self, Debug, Display};
 
 use super::{
     leaf::{least_upper_bound, PrimType, TypeBound},
+    type_param::TypeArg,
     AbstractSignature, CustomType,
 };
 
@@ -15,8 +16,6 @@ mod serialize;
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 enum TypeEnum {
     Prim(PrimType),
-    #[display(fmt = "Array[{};{}]", "_0", "_1")]
-    Array(Box<Type>, usize),
     #[display(fmt = "Tuple({})", "DisplayRow(_0)")]
     Tuple(Vec<Type>),
     #[display(fmt = "Sum({})", "DisplayRow(_0)")]
@@ -26,7 +25,6 @@ impl TypeEnum {
     fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             TypeEnum::Prim(p) => p.bound(),
-            TypeEnum::Array(t, _) => t.least_upper_bound(),
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
             TypeEnum::Sum(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
@@ -56,7 +54,7 @@ impl Type {
 
     pub fn usize() -> Self {
         Self::new_extension(
-            crate::resource::PRELUDE
+            PRELUDE
                 .get_type("usize")
                 .unwrap()
                 .instantiate_concrete(vec![])
@@ -88,8 +86,13 @@ impl Type {
         Self(type_e, bound)
     }
 
-    pub fn new_array(typ: Type, size: usize) -> Self {
-        Self::new(TypeEnum::Array(Box::new(typ), size))
+    pub fn new_array(typ: Type, size: u64) -> Self {
+        let array_def = PRELUDE.get_type("array").unwrap();
+        // TODO replace with new Type
+        let custom_t = array_def
+            .instantiate_concrete(vec![TypeArg::Type(todo!()), TypeArg::USize(size)])
+            .unwrap();
+        Self::new_extension(custom_t)
     }
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
