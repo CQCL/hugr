@@ -6,7 +6,7 @@ use crate::{
     resource::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        CustomType, SimpleType, TypeTag,
+        CustomType, SimpleType, TypeBound,
     },
     Resource,
 };
@@ -21,11 +21,12 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
 pub fn int_type(n: u8) -> SimpleType {
+    todo!();
     CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
         RESOURCE_ID,
-        TypeTag::Classic,
+        Some(TypeBound::Copyable),
     )
     .into()
 }
@@ -61,7 +62,7 @@ pub fn resource() -> Resource {
             INT_TYPE_ID,
             vec![TypeParam::USize],
             "integral value of a given bit width".to_owned(),
-            TypeTag::Classic.into(),
+            TypeBound::Copyable.into(),
         )
         .unwrap();
 

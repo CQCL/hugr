@@ -1,6 +1,6 @@
 //! Handles to nodes in HUGR.
 //!
-use crate::types::{ClassicType, Container, HashableType, SimpleType, TypeTag};
+use crate::types::{ClassicType, Container, HashableType, SimpleType, TypeBound};
 use crate::Node;
 
 use derive_more::From as DerFrom;
@@ -74,21 +74,20 @@ pub struct FuncID<const DEF: bool>(Node);
 pub struct AliasID<const DEF: bool> {
     node: Node,
     name: SmolStr,
-    tag: TypeTag,
+    tag: TypeBound,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: Node, name: SmolStr, tag: TypeTag) -> Self {
+    pub fn new(node: Node, name: SmolStr, tag: TypeBound) -> Self {
         Self { node, name, tag }
     }
 
     /// Construct new AliasID
     pub fn get_alias_type(&self) -> SimpleType {
         match self.tag {
-            TypeTag::Hashable => Container::<HashableType>::Alias(self.name.clone()).into(),
-            TypeTag::Classic => Container::<ClassicType>::Alias(self.name.clone()).into(),
-            TypeTag::Simple => Container::<SimpleType>::Alias(self.name.clone()).into(),
+            TypeBound::Eq => Container::<HashableType>::Alias(self.name.clone()).into(),
+            TypeBound::Copyable => Container::<ClassicType>::Alias(self.name.clone()).into(),
         }
     }
     /// Retrieve the underlying core type

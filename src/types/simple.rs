@@ -249,9 +249,9 @@ impl Display for HashableType {
 impl PrimType for ClassicType {
     fn tag(&self) -> TypeTag {
         if self.is_hashable() {
-            TypeTag::Hashable
+            TypeTag::Eq
         } else {
-            TypeTag::Classic
+            TypeTag::Copyable
         }
     }
 }
@@ -267,7 +267,7 @@ impl PrimType for SimpleType {
 
 impl PrimType for HashableType {
     fn tag(&self) -> TypeTag {
-        TypeTag::Hashable
+        TypeTag::Eq
     }
 }
 
@@ -411,7 +411,7 @@ impl<T: PrimType> TypeRow<T> {
     pub fn containing_tag(&self) -> TypeTag {
         self.iter()
             .map(PrimType::tag)
-            .fold(TypeTag::Hashable, TypeTag::union)
+            .fold(TypeTag::Eq, TypeTag::union)
     }
 }
 

@@ -16,6 +16,10 @@ pub use simple::{
 };
 pub use type_row::TypeRow;
 
+use itertools::FoldWhile::{Continue, Done};
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -50,10 +54,10 @@ pub enum TypeTag {
     /// cannot necessarily be copied or discarded.
     Simple = 0,
     /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [ClassicType]
-    Classic = 1,
+    Copyable = 1,
     /// Subset of [TypeTag::Classic]: types that can also be hashed and support
     /// a strong notion of equality. See [HashableType]
-    Hashable = 2,
+    Eq = 2,
 }
 
 impl TypeTag {
@@ -77,22 +81,15 @@ impl TypeTag {
     /// Do types in this tag contain only hashable classic data
     /// (with a strong notion of equality, i.e. [HashableType]s)
     pub fn is_hashable(self) -> bool {
-        self == Self::Hashable
+        self == Self::Eq
     }
 
     /// Report if this tag contains another.
     pub fn contains(&self, other: TypeTag) -> bool {
         use TypeTag::*;
-        matches!(
-            (self, other),
-            (Simple, _) | (_, Hashable) | (Classic, Classic)
-        )
+        matches!((self, other), (Simple, _) | (_, Eq) | (Copyable, Copyable))
     }
 }
-
-use itertools::FoldWhile::{Continue, Done};
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
 /// Bounds on capabilities of a type.
@@ -129,7 +126,9 @@ impl TypeBound {
 }
 
 /// Calculate the least upper bound for an iterator of bounds
-fn least_upper_bound(mut tags: impl Iterator<Item = Option<TypeBound>>) -> Option<TypeBound> {
+pub(crate) fn least_upper_bound(
+    mut tags: impl Iterator<Item = Option<TypeBound>>,
+) -> Option<TypeBound> {
     tags.fold_while(Some(TypeBound::Eq), |acc, new| {
         if let (Some(acc), Some(new)) = (acc, new) {
             Continue(Some(acc.union(new)))
@@ -286,9 +285,9 @@ mod test {
                 "my_custom",
                 [],
                 "my_resource",
-                TypeTag::Classic,
+                Some(TypeBound::Copyable),
             )),
-            Type::new_alias(AliasDecl::new("my_alias", TypeTag::Hashable)),
+            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
         ]);
         assert_eq!(
             t.to_string(),

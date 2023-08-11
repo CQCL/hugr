@@ -13,12 +13,12 @@ use thiserror::Error;
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomType, TypeTag};
+use crate::types::{CustomType, TypeBound};
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
 mod type_def;
-pub use type_def::{TypeDef, TypeDefTag};
+pub use type_def::{TypeDef, TypeDefBound};
 pub mod validate;
 
 /// An error that can occur in computing the signature of a node.
@@ -293,7 +293,7 @@ lazy_static! {
                 SmolStr::new_inline("float64"),
                 vec![],
                 "float64".into(),
-                TypeDefTag::Explicit(crate::types::TypeTag::Classic),
+                TypeDefBound::Explicit(Some(crate::types::TypeBound::Copyable)),
             )
             .unwrap();
 
@@ -302,7 +302,7 @@ lazy_static! {
                 SmolStr::new_inline("usize"),
                 vec![],
                 "usize".into(),
-                TypeDefTag::Explicit(crate::types::TypeTag::Hashable),
+                TypeDefBound::Explicit(Some(crate::types::TypeBound::Eq)),
             )
             .unwrap();
 
@@ -310,9 +310,9 @@ lazy_static! {
             prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![TypeParam::Type(TypeTag::Simple), TypeParam::USize],
+                vec![TypeParam::Type(None), TypeParam::USize],
                 "array".into(),
-                TypeDefTag::FromParams(vec![0]),
+                TypeDefBound::FromParams(vec![0]),
             )
             .unwrap();
         prelude

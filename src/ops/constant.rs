@@ -324,7 +324,7 @@ mod test {
         classic_row, type_row,
         types::custom::test::{CLASSIC_CUST, CLASSIC_T},
         types::{simple::Container, type_param::TypeArg},
-        types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeTag},
+        types::{AbstractSignature, ClassicType, CustomType, SimpleRow, SimpleType, TypeBound},
         values::{ConstTypeError, CustomCheckFail, HashableValue, ValueOfType},
     };
 
@@ -406,7 +406,7 @@ mod test {
             "mytype",
             vec![TypeArg::USize(8)],
             "myrsrc",
-            TypeTag::Hashable,
+            Some(TypeBound::Eq),
         );
         let val = ConstValue::Opaque((Box::new(CustomSerialized {
             typ: typ_int.clone(),
@@ -426,7 +426,7 @@ mod test {
             "mytype",
             vec![TypeArg::Type(SimpleType::Qubit)],
             "myrsrc",
-            TypeTag::Hashable,
+            Some(TypeBound::Eq),
         );
         let t: SimpleType = typ_qb.clone().into();
         assert_matches!(val.check_type(&t.try_into().unwrap()),

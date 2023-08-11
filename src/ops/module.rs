@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::TypeTag;
+use crate::types::TypeBound;
 use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleType};
 
 use super::StaticTag;
@@ -116,12 +116,12 @@ pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is classical
-    pub tag: TypeTag,
+    pub tag: TypeBound,
 }
 
 impl AliasDecl {
     /// Construct a new Alias declaration.
-    pub fn new(name: impl Into<SmolStr>, tag: TypeTag) -> Self {
+    pub fn new(name: impl Into<SmolStr>, tag: TypeBound) -> Self {
         Self {
             name: name.into(),
             tag,

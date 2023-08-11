@@ -7,7 +7,7 @@ use super::{
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
-    types::{PrimType, SimpleType, TypeTag},
+    types::{PrimType, SimpleType, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -155,7 +155,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        tag: TypeTag,
+        tag: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
@@ -207,7 +207,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeTag::Simple)?;
+                module_builder.add_alias_declare("qubit_state", TypeBound::Simple)?;
 
             let f_build = module_builder.define_function(
                 "main",

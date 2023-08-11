@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 use super::CustomType;
-use super::{PrimType, SimpleType, TypeTag};
+use super::{SimpleType, TypeBound};
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -15,7 +15,7 @@ use super::{PrimType, SimpleType, TypeTag};
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
-    Type(TypeTag),
+    Type(Option<TypeBound>),
     /// Argument is a [TypeArg::USize].
     USize,
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
@@ -55,7 +55,7 @@ pub struct CustomTypeArg {
 impl CustomTypeArg {
     /// Create a new CustomTypeArg. Enforces that the type must be Hashable.
     pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
-        if typ.tag() == TypeTag::Hashable {
+        if typ.bound() == Some(TypeBound::Eq) {
             Ok(Self { typ, value })
         } else {
             Err("Only Hashable CustomTypes can be used as TypeArgs")
@@ -63,20 +63,16 @@ impl CustomTypeArg {
     }
 }
 
-impl TypeArg {
-    /// Report [`TypeTag`] if param is a type
-    pub fn tag_of_type(&self) -> Option<TypeTag> {
-        match self {
-            TypeArg::Type(s) => Some(s.tag()),
-            _ => None,
-        }
-    }
-}
-
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(t), TypeParam::Type(tag)) if tag.contains(t.tag()) => Ok(()),
+        (TypeArg::Type(t), TypeParam::Type(bound)) => {
+            if let Some(bound) = bound {
+                todo!()
+            } else {
+                Ok(())
+            }
+        }
         (TypeArg::Sequence(items), TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
@@ -92,7 +88,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
         (TypeArg::USize(_), TypeParam::USize) => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param))
-            if param.tag() == TypeTag::Hashable && &arg.typ == param =>
+            if param.bound() == Some(TypeBound::Eq) && &arg.typ == param =>
         {
             Ok(())
         }

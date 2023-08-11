@@ -59,7 +59,7 @@ trait SerializableType: PrimType {
 }
 
 impl SerializableType for ClassicType {
-    const TAG: TypeTag = TypeTag::Classic;
+    const TAG: TypeTag = TypeTag::Copyable;
 }
 
 impl SerializableType for SimpleType {
@@ -67,7 +67,7 @@ impl SerializableType for SimpleType {
 }
 
 impl SerializableType for HashableType {
-    const TAG: TypeTag = TypeTag::Hashable;
+    const TAG: TypeTag = TypeTag::Eq;
 }
 
 impl<T: SerializableType> From<Container<T>> for SerSimpleType
@@ -143,8 +143,8 @@ macro_rules! handle_container {
    ($tag:ident, $variant:ident($($r:expr),*)) => {
         match $tag {
             TypeTag::Simple => (Container::<SimpleType>::$variant($($r),*)).into(),
-            TypeTag::Classic => (Container::<ClassicType>::$variant($($r),*)).into(),
-            TypeTag::Hashable => (Container::<HashableType>::$variant($($r),*)).into()
+            TypeTag::Copyable => (Container::<ClassicType>::$variant($($r),*)).into(),
+            TypeTag::Eq => (Container::<HashableType>::$variant($($r),*)).into()
         }
     }
 }
