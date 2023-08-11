@@ -174,6 +174,7 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+/// A HUGR type.
 pub struct Type(TypeEnum, Option<TypeBound>);
 
 struct DisplayRow<'a>(&'a Vec<Type>);
@@ -186,10 +187,12 @@ impl<'a> Display for DisplayRow<'a> {
 }
 
 impl Type {
+    /// Initialize a new graph type with a signature.
     pub fn graph(signature: AbstractSignature) -> Self {
         Self::new(TypeEnum::Prim(NewPrimType::Graph(Box::new(signature))))
     }
 
+    /// Initialize a new usize type.
     pub fn usize() -> Self {
         Self::new_extension(
             PRELUDE
@@ -199,6 +202,8 @@ impl Type {
                 .unwrap(),
         )
     }
+
+    /// Initialize a new tuple type by providing the elements..
     pub fn new_tuple(types: impl IntoIterator<Item = Type>) -> Self {
         Self::new(TypeEnum::Tuple(types.into_iter().collect()))
     }
@@ -208,13 +213,18 @@ impl Type {
         Self::new_tuple(vec![])
     }
 
+    /// Initialize a new sum type by providing the possible variant types.
     pub fn new_sum(types: impl IntoIterator<Item = Type>) -> Self {
         Self::new(TypeEnum::Sum(types.into_iter().collect()))
     }
 
+    /// Initialize a new custom type.
+    // TODO remove? Resources/TypeDefs should just provide `Type` directly
     pub fn new_extension(opaque: CustomType) -> Self {
         Self::new(TypeEnum::Prim(NewPrimType::E(Box::new(opaque))))
     }
+
+    /// Initialize a new alias.
     pub fn new_alias(alias: AliasDecl) -> Self {
         Self::new(TypeEnum::Prim(NewPrimType::A(alias)))
     }
@@ -224,6 +234,7 @@ impl Type {
         Self(type_e, bound)
     }
 
+    /// Initialize a new array of type `typ` of length `size`
     pub fn new_array(typ: Type, size: u64) -> Self {
         let array_def = PRELUDE.get_type("array").unwrap();
         // TODO replace with new Type
@@ -246,6 +257,7 @@ impl Type {
         Self::new_predicate(std::iter::repeat(vec![]).take(size))
     }
 
+    /// Report the least upper TypeBound, if there is one.
     pub fn least_upper_bound(&self) -> Option<TypeBound> {
         self.1
     }
