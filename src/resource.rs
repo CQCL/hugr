@@ -288,19 +288,6 @@ lazy_static! {
     /// Prelude resource
     pub static ref PRELUDE: Resource = {
         let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
-
-        prelude
-            .add_type(
-                SmolStr::new_inline("graph"),
-                vec![
-                    TypeParam::List(Box::new(TypeParam::Type(crate::types::TypeTag::Simple))),
-                    TypeParam::List(Box::new(TypeParam::Type(crate::types::TypeTag::Simple))),
-                ],
-                "graph".into(),
-                TypeDefTag::Explicit(crate::types::TypeTag::Classic),
-            )
-            .unwrap();
-
         prelude
             .add_type(
                 SmolStr::new_inline("float64"),

@@ -541,8 +541,7 @@ mod test {
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), graph([Sequence([]), Sequence([])]), my_custom([]), Alias(my_alias)])"
-                .to_string()
+            "Tuple([usize([]), Graph([[]][]), my_custom([]), Alias(my_alias)])".to_string()
         );
     }
 }

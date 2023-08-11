@@ -7,7 +7,6 @@ use std::fmt::{self, Debug, Display};
 
 use super::{
     leaf::{least_upper_bound, PrimType, TypeBound},
-    type_param::TypeArg,
     AbstractSignature, CustomType,
 };
 
@@ -51,31 +50,8 @@ impl<'a> Display for DisplayRow<'a> {
 }
 
 impl Type {
-    pub fn graph(_signature: AbstractSignature) -> Self {
-        Self::new_extension(
-            crate::resource::PRELUDE
-                .get_type("graph")
-                .unwrap()
-                .instantiate_concrete(vec![
-                    TypeArg::Sequence(
-                        _signature
-                            .input
-                            .iter()
-                            .cloned()
-                            .map(TypeArg::Type)
-                            .collect(),
-                    ),
-                    TypeArg::Sequence(
-                        _signature
-                            .output
-                            .iter()
-                            .cloned()
-                            .map(TypeArg::Type)
-                            .collect(),
-                    ),
-                ])
-                .unwrap(),
-        )
+    pub fn graph(signature: AbstractSignature) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
     }
 
     pub fn usize() -> Self {
@@ -101,7 +77,7 @@ impl Type {
     }
 
     pub fn new_extension(opaque: CustomType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::E(opaque)))
+        Self::new(TypeEnum::Prim(PrimType::E(Box::new(opaque))))
     }
     pub fn new_alias(alias: AliasDecl) -> Self {
         Self::new(TypeEnum::Prim(PrimType::A(alias)))

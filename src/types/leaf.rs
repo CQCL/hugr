@@ -7,7 +7,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use super::CustomType;
+use super::{AbstractSignature, CustomType};
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
 pub enum TypeBound {
     #[serde(rename = "E")]
@@ -53,18 +53,22 @@ pub fn least_upper_bound(mut tags: impl Iterator<Item = Option<TypeBound>>) -> O
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-pub enum PrimType {
-    E(CustomType),
+pub(super) enum PrimType {
+    E(Box<CustomType>),
     #[display(fmt = "Alias({})", "_0.name()")]
     A(AliasDecl),
+    #[display(fmt = "Graph({})", "_0")]
+    Graph(Box<AbstractSignature>),
 }
 
 impl PrimType {
-    pub fn bound(&self) -> Option<TypeBound> {
+    pub(super) fn bound(&self) -> Option<TypeBound> {
+        // TODO update once inner types are updated to new TypeBound
         return None;
         match self {
             PrimType::E(_c) => todo!(),
             PrimType::A(_) => todo!(),
+            PrimType::Graph(_) => Some(TypeBound::Copyable),
         }
     }
 }
