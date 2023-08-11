@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::CustomType;
+use crate::types::{CustomType, TypeTag};
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
@@ -280,4 +280,41 @@ impl FromIterator<ResourceId> for ResourceSet {
     fn from_iter<I: IntoIterator<Item = ResourceId>>(iter: I) -> Self {
         Self(HashSet::from_iter(iter))
     }
+}
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    /// Prelude resource
+    pub static ref PRELUDE: Resource = {
+        let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
+        prelude
+            .add_type(
+                SmolStr::new_inline("float64"),
+                vec![],
+                "float64".into(),
+                TypeDefTag::Explicit(crate::types::TypeTag::Classic),
+            )
+            .unwrap();
+
+            prelude
+            .add_type(
+                SmolStr::new_inline("usize"),
+                vec![],
+                "usize".into(),
+                TypeDefTag::Explicit(crate::types::TypeTag::Hashable),
+            )
+            .unwrap();
+
+
+            prelude
+            .add_type(
+                SmolStr::new_inline("array"),
+                vec![TypeParam::Type(TypeTag::Simple), TypeParam::USize],
+                "array".into(),
+                TypeDefTag::FromParams(vec![0]),
+            )
+            .unwrap();
+        prelude
+    };
 }
