@@ -311,7 +311,7 @@ lazy_static! {
             .add_type(
                 SmolStr::new_inline("array"),
                 vec![TypeParam::Type(TypeTag::Simple), TypeParam::USize],
-                "usize".into(),
+                "array".into(),
                 TypeDefTag::FromParams(vec![0]),
             )
             .unwrap();
