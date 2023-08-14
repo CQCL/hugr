@@ -1,8 +1,9 @@
 //! Constant value definitions.
 
 use crate::{
-    types::{ConstTypeError, EdgeKind, Type, TypeRow},
-    values::Value,
+    resource::PRELUDE,
+    types::{ConstTypeError, CustomCheckFail, CustomType, EdgeKind, Type, TypeRow},
+    values::{CustomConst, Value},
 };
 
 use smol_str::SmolStr;
@@ -78,6 +79,36 @@ impl Const {
             .map(|Const { value, typ }| (value, typ))
             .unzip();
         Self::new(Value::tuple(values), Type::new_tuple(types)).unwrap()
+    }
+    /// Constant usize value.
+    pub fn usize(u: usize) -> Self {
+        // TODO replace with prelude constant once implemented
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+        struct ConstUsize(usize);
+        #[typetag::serde]
+        impl CustomConst for ConstUsize {
+            fn name(&self) -> SmolStr {
+                format!("ConstUsize({:?})", self.0).into()
+            }
+
+            fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+                let correct = PRELUDE
+                    .get_type("usize")
+                    .unwrap()
+                    .instantiate_concrete(vec![])
+                    .unwrap();
+                if typ == &correct {
+                    Ok(())
+                } else {
+                    Err(CustomCheckFail::TypeMismatch(correct, typ.clone()))
+                }
+            }
+        }
+
+        Self {
+            value: ConstUsize(u).into(),
+            typ: Type::usize(),
+        }
     }
 }
 

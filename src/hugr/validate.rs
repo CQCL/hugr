@@ -1072,7 +1072,7 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1).unwrap())?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
