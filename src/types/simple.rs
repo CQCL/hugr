@@ -41,7 +41,7 @@ impl Display for Type {
 /// Trait of primitive types, i.e. that are uniquely identified by a [TypeTag]
 pub trait PrimType: TypeRowElem + std::fmt::Debug + sealed::Sealed {
     // may be updated with functions in future for necessary shared functionality
-    // across Type, Type and HashableType.
+    // across Type and HashableType.
     // Currently used to constrain Container<T>
     /// Tells us the [TypeTag] of the type represented by the receiver.
     fn tag(&self) -> TypeTag;

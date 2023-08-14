@@ -213,7 +213,7 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::{AbstractSignature, Type, Type};
+    use crate::types::{AbstractSignature, Type};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;

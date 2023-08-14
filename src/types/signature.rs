@@ -13,7 +13,7 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::{EdgeKind, PrimType, Type, Type, TypeRow, TypeRow, TypeRow};
+use super::{EdgeKind, Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -375,10 +375,10 @@ impl SignatureDescription {
         }
     }
 
-    pub(crate) fn row_zip<'a, T: PrimType>(
-        type_row: &'a TypeRow<T>,
+    pub(crate) fn row_zip<'a>(
+        type_row: &'a TypeRow,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a Type)> {
         name_row
             .iter()
             .chain(&EmptyStringIterator)

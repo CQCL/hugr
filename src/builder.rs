@@ -88,7 +88,7 @@ impl From<BuildError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use crate::types::{Signature, Type, Type};
+    use crate::types::{Signature, Type};
     use crate::Hugr;
 
     use super::handle::BuildHandle;

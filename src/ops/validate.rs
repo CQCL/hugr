@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{Type, TypeRow, TypeRow};
+use crate::types::{Type, TypeRow};
 use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -452,12 +452,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 #[cfg(test)]
 mod test {
     use crate::ops;
-    use crate::{
-        ops::dataflow::IOTrait,
-        ops::LeafOp,
-        type_row,
-        types::{Type, Type},
-    };
+    use crate::{ops::dataflow::IOTrait, ops::LeafOp, type_row, types::Type};
     use cool_asserts::assert_matches;
 
     use super::*;

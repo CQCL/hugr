@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::validate::{ResourceError, ResourceValidator};
-use crate::types::{EdgeKind, Type, Type};
+use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -676,7 +676,7 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::resource::ResourceSet;
-    use crate::types::{AbstractSignature, HashableType, Type};
+    use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -804,7 +804,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: HashableType::USize.into(),
+            ty: crate::types::test::EQ_T,
         }
         .into();
 

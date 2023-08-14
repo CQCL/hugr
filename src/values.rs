@@ -5,7 +5,7 @@
 
 use thiserror::Error;
 
-use crate::types::{Container, CustomType, HashableType, PrimType, Type};
+use crate::types::{CustomType, Type};
 use crate::{ops::constant::ConstValue, types::TypeRow};
 
 /// A constant value/instance of a [HashableType]. Note there is no

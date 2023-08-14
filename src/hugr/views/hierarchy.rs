@@ -475,7 +475,7 @@ mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{AbstractSignature, Type, Type},
+        types::{AbstractSignature, Type},
     };
 
     use super::*;

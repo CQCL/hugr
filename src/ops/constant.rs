@@ -5,10 +5,7 @@ use std::any::Any;
 use crate::{
     macros::impl_box_clone,
     types::{CustomType, EdgeKind, Type, TypeRow},
-    values::{
-        map_container_type, ConstTypeError, ContainerValue, CustomCheckFail, HashableValue,
-        ValueOfType,
-    },
+    values::{ConstTypeError, ContainerValue, CustomCheckFail, HashableValue, ValueOfType},
 };
 
 use downcast_rs::{impl_downcast, Downcast};
@@ -314,7 +311,7 @@ mod test {
     use super::{Const, ConstValue, CustomSerialized};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-        classic_row, type_row,
+        type_row,
         types::type_param::TypeArg,
         types::{custom::test::COPYABLE_CUST, test::CLASSIC_T, TypeRow},
         types::{AbstractSignature, CustomType, Type, TypeBound},

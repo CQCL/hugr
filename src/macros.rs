@@ -43,7 +43,7 @@ pub(crate) use impl_box_clone;
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
-/// # use hugr::types::{AbstractSignature, Type, Type, TypeRow};
+/// # use hugr::types::{AbstractSignature, Type, TypeRow};
 /// const B: Type = Type::Classic(Type::usize());
 /// const QB: Type = Type::Qubit;
 /// let static_row: TypeRow = type_row![B, QB];

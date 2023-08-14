@@ -7,7 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
     type_row,
-    types::{AbstractSignature, EdgeKind, SignatureDescription, Type, Type, TypeRow},
+    types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
 };
 
 /// Dataflow operations with no children.

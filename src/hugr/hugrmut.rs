@@ -477,7 +477,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{AbstractSignature, Type, Type},
+        types::{AbstractSignature, Type},
     };
 
     use super::sealed::HugrInternalsMut;
