@@ -213,13 +213,13 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
-    use crate::types::test::ANY_T;
+    use crate::types::test::QB_T;
     use crate::types::{AbstractSignature, Type};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
 
-    const QB: Type = ANY_T;
+    const QB: Type = QB_T;
 
     /// Creates a hugr like the following:
     /// --   H   --

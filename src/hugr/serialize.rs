@@ -275,7 +275,7 @@ pub mod test {
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{
-            test::{ANY_T, COPYABLE_T},
+            test::{QB_T, USIZE_T},
             AbstractSignature, Type,
         },
         Port,
@@ -285,8 +285,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: Type = COPYABLE_T;
-    const QB: Type = ANY_T;
+    const NAT: Type = USIZE_T;
+    const QB: Type = QB_T;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -464,7 +464,7 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb = ANY_T;
+        let qb = QB_T;
         let dfg = DFGBuilder::new(AbstractSignature::new_df(
             vec![qb.clone()],
             vec![qb.clone()],

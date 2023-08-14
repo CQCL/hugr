@@ -476,15 +476,15 @@ mod test {
         ops::{handle::NodeHandle, LeafOp},
         type_row,
         types::{
-            test::{ANY_T, COPYABLE_T},
+            test::{QB_T, USIZE_T},
             AbstractSignature, Type,
         },
     };
 
     use super::*;
 
-    const NAT: Type = COPYABLE_T;
-    const QB: Type = ANY_T;
+    const NAT: Type = USIZE_T;
+    const QB: Type = QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///

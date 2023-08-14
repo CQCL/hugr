@@ -676,14 +676,14 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::resource::ResourceSet;
-    use crate::types::test::{ANY_T, COPYABLE_T};
+    use crate::types::test::{QB_T, USIZE_T};
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: Type = COPYABLE_T;
-    const B: Type = COPYABLE_T;
-    const Q: Type = ANY_T;
+    const NAT: Type = USIZE_T;
+    const B: Type = USIZE_T;
+    const Q: Type = QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///

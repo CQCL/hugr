@@ -262,6 +262,15 @@ pub(crate) mod test {
         Some(TypeBound::Eq),
     );
 
+    pub(crate) const QB_T: Type = Type(
+        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
+            SmolStr::new_inline("qubit"),
+            SmolStr::new_inline("prelude"),
+            None,
+        ))),
+        None,
+    );
+
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
