@@ -511,7 +511,7 @@ pub trait Dataflow: Container {
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
-        let variants = TypeRow::predicate_variants_row(predicate_variants).map_into();
+        let variants = crate::types::predicate_variants_row(predicate_variants);
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
@@ -659,7 +659,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_offset).unwrap() {
         if !local_source {
             // Non-local value sources require a state edge to an ancestor of dst
-            if !typ.tag().is_classical() {
+            if typ.least_upper_bound().is_none() {
                 let val_err: ValidationError = InterGraphEdgeError::NonClassicalData {
                     from: src,
                     from_offset: Port::new_outgoing(src_port),
@@ -691,7 +691,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             // TODO: Avoid adding duplicate edges
             // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
             base.add_other_edge(src, src_sibling)?;
-        } else if !typ.tag().is_classical() && base.linked_ports(src, src_offset).next().is_some() {
+        } else if typ.least_upper_bound().is_none()
+            & base.linked_ports(src, src_offset).next().is_some()
+        {
             // Don't copy linear edges.
             return Err(BuildError::NoCopyLinear(typ));
         }

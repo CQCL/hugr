@@ -228,7 +228,6 @@ fn predicate_first(pred: &TypeRow, rest: &TypeRow) -> TypeRow {
     TypeRow::from(
         pred.iter()
             .cloned()
-            .map(Type::Classic)
             .chain(rest.iter().cloned())
             .collect::<Vec<_>>(),
     )

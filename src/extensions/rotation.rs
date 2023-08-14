@@ -12,7 +12,8 @@ use pyo3::prelude::*;
 
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
-use crate::types::CustomCheckFail;
+use crate::types::Type as HugrType;
+use crate::types::{CustomCheckFail, TypeRow};
 use crate::types::{CustomType, TypeBound};
 use crate::values::CustomConst;
 use crate::Resource;
@@ -32,8 +33,7 @@ pub fn resource() -> Resource {
             "".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                let t = todo!();
-                // let t: TypeRow = vec![Type::Angle.custom_type()].into();
+                let t: TypeRow = vec![HugrType::new_extension(Type::Angle.custom_type())].into();
                 Ok((t.clone(), t, ResourceSet::default()))
             },
         )

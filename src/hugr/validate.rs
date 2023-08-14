@@ -393,7 +393,8 @@ impl<'a> ValidationContext<'a> {
                 true
             }
             ty => {
-                if !local && !matches!(ty, EdgeKind::Value(Type::Classic(_))) {
+                if !local && !matches!(ty, EdgeKind::Value(ty) if ty.least_upper_bound().is_some())
+                {
                     return Err(InterGraphEdgeError::NonClassicalData {
                         from,
                         from_offset,
@@ -741,7 +742,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ops::Const::simple_predicate(0, predicate_size);
-        let tag_type = Type::Classic(Type::new_simple_predicate(predicate_size));
+        let tag_type = Type::new_simple_predicate(predicate_size);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
