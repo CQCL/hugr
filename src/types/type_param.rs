@@ -6,6 +6,7 @@
 
 use thiserror::Error;
 
+use super::optional_bound_contains;
 use super::CustomType;
 use super::Type;
 use super::TypeBound;
@@ -67,12 +68,10 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(_t), TypeParam::Type(bound)) => {
-            if let Some(_bound) = bound {
-                todo!()
-            } else {
-                Ok(())
-            }
+        (TypeArg::Type(t), TypeParam::Type(bound))
+            if optional_bound_contains(*bound, t.least_upper_bound()) =>
+        {
+            Ok(())
         }
         (TypeArg::Sequence(items), TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))

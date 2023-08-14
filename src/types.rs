@@ -82,6 +82,17 @@ impl TypeBound {
     }
 }
 
+/// Check containment of optional type bound (where None implies no bound -
+/// which contains bounded types).
+pub fn optional_bound_contains(bound: Option<TypeBound>, other: Option<TypeBound>) -> bool {
+    match (bound, other) {
+        // If no bound on left, always contains.
+        (None, _) => true,
+        // If some bound on left but right is unbounded, cannot contain.
+        (_, None) => false,
+        (Some(left), Some(right)) => left.contains(right),
+    }
+}
 /// Calculate the least upper bound for an iterator of bounds
 pub(crate) fn least_upper_bound(
     mut tags: impl Iterator<Item = Option<TypeBound>>,
@@ -231,20 +242,14 @@ pub(crate) mod test {
     };
     use crate::ops::AliasDecl;
 
-    pub(crate) const EQ_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(EQ_CUST)),
-        Some(TypeBound::Copyable),
-    );
+    pub(crate) const EQ_T: Type = Type(TypeEnum::Prim(PrimType::E(EQ_CUST)), Some(TypeBound::Eq));
 
     pub(crate) const COPYABLE_T: Type = Type(
         TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
         Some(TypeBound::Copyable),
     );
 
-    pub(crate) const ANY_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(ANY_CUST)),
-        Some(TypeBound::Copyable),
-    );
+    pub(crate) const ANY_T: Type = Type(TypeEnum::Prim(PrimType::E(ANY_CUST)), None);
 
     #[test]
     fn construct() {
