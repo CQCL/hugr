@@ -8,7 +8,9 @@ use super::{AbstractSignature, CustomType, TypeBound};
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 pub(super) enum PrimType {
-    E(Box<CustomType>),
+    // TODO optimise with Box<CustomType> ?
+    // or some static version of this?
+    E(CustomType),
     #[display(fmt = "Alias({})", "_0.name()")]
     A(AliasDecl),
     #[display(fmt = "Graph({})", "_0")]

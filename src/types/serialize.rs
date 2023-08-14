@@ -17,7 +17,7 @@ pub(crate) enum SerSimpleType {
     Tuple { inner: Vec<SerSimpleType> },
     Sum { inner: Vec<SerSimpleType> },
     Array { inner: Box<SerSimpleType>, len: u64 },
-    Opaque(Box<CustomType>),
+    Opaque(CustomType),
     Alias(AliasDecl),
 }
 
@@ -26,7 +26,7 @@ impl From<Type> for SerSimpleType {
         let Type(value, _) = value;
         match value {
             TypeEnum::Prim(t) => match t {
-                PrimType::E(c) => SerSimpleType::Opaque(Box::new(*c)),
+                PrimType::E(c) => SerSimpleType::Opaque(c),
                 PrimType::A(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
@@ -52,7 +52,7 @@ impl From<SerSimpleType> for Type {
                 Type::new_sum(inner.into_iter().map_into().collect_vec())
             }
             SerSimpleType::Array { inner, len } => Type::new_array((*inner).into(), len),
-            SerSimpleType::Opaque(custom) => Type::new_extension(*custom),
+            SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
         }
     }

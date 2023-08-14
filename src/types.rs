@@ -205,7 +205,7 @@ impl Type {
     /// Initialize a new custom type.
     // TODO remove? Resources/TypeDefs should just provide `Type` directly
     pub fn new_extension(opaque: CustomType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::E(Box::new(opaque))))
+        Self::new(TypeEnum::Prim(PrimType::E(opaque)))
     }
 
     /// Initialize a new alias.
@@ -260,14 +260,11 @@ where
 }
 
 pub(crate) const ERROR_TYPE: Type = Type(
-    TypeEnum::Prim(primitive::PrimType::E(
-        CustomType::new_simple(
-            smol_str::SmolStr::new_inline("error"),
-            smol_str::SmolStr::new_inline("MyRsrc"),
-            Some(TypeBound::Eq),
-        )
-        .into(),
-    )),
+    TypeEnum::Prim(primitive::PrimType::E(CustomType::new_simple(
+        smol_str::SmolStr::new_inline("error"),
+        smol_str::SmolStr::new_inline("MyRsrc"),
+        Some(TypeBound::Eq),
+    ))),
     Some(TypeBound::Copyable),
 );
 
@@ -282,17 +279,17 @@ pub(crate) mod test {
     use crate::ops::AliasDecl;
 
     pub(crate) const EQ_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(EQ_CUST.into())),
+        TypeEnum::Prim(PrimType::E(EQ_CUST)),
         Some(TypeBound::Copyable),
     );
 
     pub(crate) const COPYABLE_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(COPYABLE_CUST.into())),
+        TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
         Some(TypeBound::Copyable),
     );
 
     pub(crate) const ANY_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(ANY_CUST.into())),
+        TypeEnum::Prim(PrimType::E(ANY_CUST)),
         Some(TypeBound::Copyable),
     );
 
