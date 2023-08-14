@@ -103,22 +103,26 @@ impl BoundaryEdge {
         }
     }
 
-    /// Create an incoming boundary from the incoming edges of a node.
+    /// Create an outgoing boundary from the incoming edges of a node.
+    ///
+    /// Pass it an Output node to obtain the incoming boundary.
     ///
     /// Filters out any non-DFG edges.
-    fn from_node_inputs<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
+    fn from_output_node<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
         hugr.node_inputs(node)
             .filter(move |&p| hugr.get_optype(node).signature().get(p).is_some())
-            .flat_map(move |p| BoundaryEdge::new_boundary_incoming(node, p, hugr))
+            .flat_map(move |p| BoundaryEdge::new_boundary_outgoing(node, p, hugr))
     }
 
-    /// Create an outgoing boundary from the outgoing edges of a node.
+    /// Create an incoming boundary from the outgoing edges of a node.
+    ///
+    /// Pass it an Input node to obtain the outgoing boundary.
     ///
     /// Filters out any non-DFG edges.
-    fn from_node_outputs<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
+    fn from_input_node<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
         hugr.node_outputs(node)
             .filter(move |&p| hugr.get_optype(node).signature().get(p).is_some())
-            .flat_map(move |p| BoundaryEdge::new_boundary_outgoing(node, p, hugr))
+            .flat_map(move |p| BoundaryEdge::new_boundary_incoming(node, p, hugr))
     }
 }
 
@@ -214,8 +218,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         Base: HugrView,
     {
         let (inp, out) = hugr.children(root).take(2).collect_tuple().unwrap();
-        let incoming = BoundaryEdge::from_node_outputs(inp, hugr);
-        let outgoing = BoundaryEdge::from_node_inputs(out, hugr);
+        let incoming = BoundaryEdge::from_input_node(inp, hugr);
+        let outgoing = BoundaryEdge::from_output_node(out, hugr);
         let boundary = incoming.chain(outgoing).collect();
         Self {
             hugr,
@@ -320,8 +324,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             .children(rep_root)
             .take(2)
             .collect_tuple() else { panic!("Invalid DFG node") };
-        let rep_inputs = BoundaryEdge::from_node_outputs(rep_input, &replacement);
-        let rep_outputs = BoundaryEdge::from_node_inputs(rep_output, &replacement);
+        let rep_inputs = BoundaryEdge::from_input_node(rep_input, &replacement);
+        let rep_outputs = BoundaryEdge::from_output_node(rep_output, &replacement);
         let incoming = self
             .boundary
             .iter()
