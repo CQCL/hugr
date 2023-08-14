@@ -48,7 +48,7 @@ where
     graph: FlatRegionGraph<'g, Base>,
 
     /// The rest of the HUGR.
-    hugr: &'g Base,
+    pub(super) hugr: &'g Base,
 
     /// The operation type of the root node.
     _phantom: std::marker::PhantomData<Root>,
@@ -57,12 +57,8 @@ where
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals,
+    Base: HugrInternals + HugrView,
 {
-    pub(super) fn base(&self) -> &Base {
-        self.hugr
-    }
-
     fn clone(&self) -> Self {
         SiblingGraph::new(self.hugr, self.root)
     }
@@ -388,7 +384,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -414,7 +410,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -437,7 +433,7 @@ where
     }
 }
 
-impl<'g, Root, Base> super::sealed::HugrInternals for SiblingGraph<'g, Root, Base>
+impl<'g, Root, Base> HugrInternals for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
     Base: HugrInternals,

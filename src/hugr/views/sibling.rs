@@ -25,7 +25,7 @@ use itertools::Itertools;
 use portgraph::{view::Subgraph, LinkView, PortIndex, PortView};
 
 use crate::{
-    ops::{OpTag, OpTrait},
+    ops::{handle::NodeHandle, OpTag, OpTrait},
     Direction, Hugr, Node, Port, SimpleReplacement,
 };
 
@@ -128,18 +128,21 @@ pub struct SiblingSubgraph<'g, Base: HugrInternals> {
     sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
 }
 
-impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+impl<'g> SiblingSubgraph<'g, Hugr> {
     /// A sibling subgraph from a [`SiblingGraph`] object.
     ///
     /// The subgraph is given by the entire sibling graph.
-    pub fn from_sibling_graph(region: &'g SiblingGraph<'g, Base>) -> Self
+    pub fn from_sibling_graph<Base, Root>(region: &'g SiblingGraph<'g, Root, Base>) -> Self
     where
-        Base: HugrView,
+        Base: HugrView + HugrInternals,
+        Root: NodeHandle,
     {
         let root = region.root();
-        Self::new(region.base(), root, [], [])
+        Self::new(region.base_hugr(), root, [], [])
     }
+}
 
+impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// A sibling subgraph given by a HUGR and a `root` node.
     ///
     /// The subgraph is given by the entire sibling graph.
@@ -242,7 +245,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         Base: HugrView,
     {
         self.get_sibling_graph().nodes_iter().flat_map(|index| {
-            let region = SiblingGraph::new(self.hugr, Node { index });
+            let region: SiblingGraph<'_, Node, Base> = SiblingGraph::new(self.hugr, Node { index });
             region.nodes().collect_vec()
         })
     }
@@ -346,7 +349,7 @@ mod tests {
     fn construct_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
         let from_root = SiblingSubgraph::from_root(&hugr, func_root);
-        let region = SiblingGraph::new(&hugr, func_root);
+        let region: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
         let from_region = SiblingSubgraph::from_sibling_graph(&region);
         assert_eq!(from_root.root, from_region.root);
         assert_eq!(from_root.incoming, from_region.incoming);
