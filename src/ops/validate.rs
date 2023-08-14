@@ -466,10 +466,7 @@ mod test {
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = LeafOp::Noop {
-            ty: Type::usize().into(),
-        }
-        .into();
+        let leaf_node = LeafOp::Noop { ty: Type::usize() }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![

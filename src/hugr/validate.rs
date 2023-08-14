@@ -715,12 +715,7 @@ mod test {
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(
-                parent,
-                LeafOp::Noop {
-                    ty: Type::usize().into(),
-                },
-            )
+            .add_op_with_parent(parent, LeafOp::Noop { ty: Type::usize() })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -752,12 +747,7 @@ mod test {
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
-            .add_op_with_parent(
-                parent,
-                ops::LoadConstant {
-                    datatype: tag_type.try_into().unwrap(),
-                },
-            )
+            .add_op_with_parent(parent, ops::LoadConstant { datatype: tag_type })
             .unwrap();
 
         b.connect(tag_def, 0, tag, 0).unwrap();
@@ -892,12 +882,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(
-            output,
-            NodeType::pure(LeafOp::Noop {
-                ty: Type::usize().into(),
-            }),
-        );
+        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: Type::usize() }));
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)

@@ -62,6 +62,11 @@ impl PrimType {
 }
 
 impl Type {
+    /// Check that a [`Value`] is a valid instance of this [`Type`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is a type check error.
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
         match (&self.0, val) {
             (TypeEnum::Prim(p), Value::Prim(p_v)) => p.check_type(p_v),

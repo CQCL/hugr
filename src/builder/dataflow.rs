@@ -220,7 +220,7 @@ mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
-    use crate::types::Type;
+
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},

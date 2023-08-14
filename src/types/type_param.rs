@@ -67,8 +67,8 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(t), TypeParam::Type(bound)) => {
-            if let Some(bound) = bound {
+        (TypeArg::Type(_t), TypeParam::Type(bound)) => {
+            if let Some(_bound) = bound {
                 todo!()
             } else {
                 Ok(())

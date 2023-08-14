@@ -47,6 +47,7 @@ pub enum Value {
 }
 
 impl Value {
+    /// Returns the name of this [`Value`].
     pub fn name(&self) -> String {
         match self {
             Value::Prim(p) => p.name(),
@@ -88,6 +89,7 @@ impl Value {
         Self::Sum(tag, Box::new(value))
     }
 
+    /// New custom value (of type that implements [`CustomConst`]).
     pub fn custom<C: CustomConst>(c: C) -> Self {
         Self::Prim(PrimValue::Extension((Box::new(c),)))
     }

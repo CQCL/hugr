@@ -1,4 +1,4 @@
-use super::{Type, TypeEnum, TypeRow};
+use super::{Type, TypeEnum};
 
 use itertools::Itertools;
 

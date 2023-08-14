@@ -96,7 +96,7 @@ impl TypeDef {
                 }
                 least_upper_bound(indices.iter().map(|i| {
                     args.get(*i).and_then(|ta| match ta {
-                        TypeArg::Type(s) => todo!(),
+                        TypeArg::Type(_s) => todo!(),
                         _ => panic!("TypeArg index does not refer to a type."),
                     })
                 }))
