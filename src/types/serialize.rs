@@ -1,4 +1,4 @@
-use super::{Type, TypeEnum};
+use super::{Type, TypeEnum, TypeRow};
 
 use itertools::Itertools;
 
@@ -31,10 +31,10 @@ impl From<Type> for SerSimpleType {
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
             TypeEnum::Sum(inner) => SerSimpleType::Sum {
-                inner: inner.into_iter().map_into().collect(),
+                inner: inner.into_owned().into_iter().map_into().collect(),
             },
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
-                inner: inner.into_iter().map_into().collect(),
+                inner: inner.into_owned().into_iter().map_into().collect(),
             },
         }
     }
@@ -45,8 +45,12 @@ impl From<SerSimpleType> for Type {
         match value {
             SerSimpleType::I => Type::usize(),
             SerSimpleType::G(sig) => Type::graph(*sig),
-            SerSimpleType::Tuple { inner } => Type::new_tuple(inner.into_iter().map_into()),
-            SerSimpleType::Sum { inner } => Type::new_sum(inner.into_iter().map_into()),
+            SerSimpleType::Tuple { inner } => {
+                Type::new_tuple(inner.into_iter().map_into().collect_vec())
+            }
+            SerSimpleType::Sum { inner } => {
+                Type::new_sum(inner.into_iter().map_into().collect_vec())
+            }
             SerSimpleType::Array { inner, len } => Type::new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(*custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
@@ -57,6 +61,7 @@ impl From<SerSimpleType> for Type {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
+    use crate::type_row;
     use crate::types::custom::test::COPYABLE_CUST;
     use crate::types::AbstractSignature;
     use crate::types::Type;
@@ -68,11 +73,11 @@ mod test {
         assert_eq!(ser_roundtrip(&g), g);
 
         // A Simple tuple
-        let t = Type::new_tuple([Type::usize(), g]);
+        let t = Type::new_tuple(vec![Type::usize(), g]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum([Type::usize(), Type::new_extension(COPYABLE_CUST)]);
+        let t = Type::new_sum(type_row![Type::usize(), Type::new_extension(COPYABLE_CUST)]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable array

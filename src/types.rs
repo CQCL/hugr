@@ -18,6 +18,12 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::{ops::AliasDecl, resource::PRELUDE};
+use std::fmt::Debug;
+
+use self::primitive::PrimType;
+use self::type_param::TypeArg;
+
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -138,23 +144,13 @@ pub(crate) fn least_upper_bound(
     .into_inner()
 }
 
-use std::fmt::Write;
-
-use crate::{ops::AliasDecl, resource::PRELUDE, utils::display_list};
-use std::fmt::{self, Debug, Display};
-
-use self::type_param::TypeArg;
-
-//TODO remove
-type NewPrimType = primitive::PrimType;
-
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 enum TypeEnum {
-    Prim(NewPrimType),
-    #[display(fmt = "Tuple({})", "DisplayRow(_0)")]
-    Tuple(Vec<Type>),
-    #[display(fmt = "Sum({})", "DisplayRow(_0)")]
-    Sum(Vec<Type>),
+    Prim(PrimType),
+    #[display(fmt = "Tuple({})", "_0")]
+    Tuple(TypeRow),
+    #[display(fmt = "Sum({})", "_0")]
+    Sum(TypeRow),
 }
 impl TypeEnum {
     fn least_upper_bound(&self) -> Option<TypeBound> {
@@ -174,19 +170,10 @@ impl TypeEnum {
 /// A HUGR type.
 pub struct Type(TypeEnum, Option<TypeBound>);
 
-struct DisplayRow<'a>(&'a Vec<Type>);
-impl<'a> Display for DisplayRow<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_char('[')?;
-        display_list(self.0, f)?;
-        f.write_char(']')
-    }
-}
-
 impl Type {
     /// Initialize a new graph type with a signature.
     pub fn graph(signature: AbstractSignature) -> Self {
-        Self::new(TypeEnum::Prim(NewPrimType::Graph(Box::new(signature))))
+        Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
     }
 
     /// Initialize a new usize type.
@@ -201,8 +188,8 @@ impl Type {
     }
 
     /// Initialize a new tuple type by providing the elements..
-    pub fn new_tuple(types: impl IntoIterator<Item = Type>) -> Self {
-        Self::new(TypeEnum::Tuple(types.into_iter().collect()))
+    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+        Self::new(TypeEnum::Tuple(types.into()))
     }
 
     /// New unit type, defined as an empty Tuple.
@@ -211,19 +198,19 @@ impl Type {
     }
 
     /// Initialize a new sum type by providing the possible variant types.
-    pub fn new_sum(types: impl IntoIterator<Item = Type>) -> Self {
-        Self::new(TypeEnum::Sum(types.into_iter().collect()))
+    pub fn new_sum(types: impl Into<TypeRow>) -> Self {
+        Self::new(TypeEnum::Sum(types.into()))
     }
 
     /// Initialize a new custom type.
     // TODO remove? Resources/TypeDefs should just provide `Type` directly
     pub fn new_extension(opaque: CustomType) -> Self {
-        Self::new(TypeEnum::Prim(NewPrimType::E(Box::new(opaque))))
+        Self::new(TypeEnum::Prim(PrimType::E(Box::new(opaque))))
     }
 
     /// Initialize a new alias.
     pub fn new_alias(alias: AliasDecl) -> Self {
-        Self::new(TypeEnum::Prim(NewPrimType::A(alias)))
+        Self::new(TypeEnum::Prim(PrimType::A(alias)))
     }
 
     fn new(type_e: TypeEnum) -> Self {
@@ -234,9 +221,8 @@ impl Type {
     /// Initialize a new array of type `typ` of length `size`
     pub fn new_array(typ: Type, size: u64) -> Self {
         let array_def = PRELUDE.get_type("array").unwrap();
-        // TODO replace with new Type
         let custom_t = array_def
-            .instantiate_concrete(vec![TypeArg::Type(todo!()), TypeArg::USize(size)])
+            .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::USize(size)])
             .unwrap();
         Self::new_extension(custom_t)
     }
@@ -244,7 +230,7 @@ impl Type {
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
     where
-        V: IntoIterator<Item = Type>,
+        V: Into<TypeRow>,
     {
         Self::new_sum(predicate_variants_row(variant_rows))
     }
@@ -262,11 +248,15 @@ impl Type {
 
 /// Return the type row of variants required to define a Sum of Tuples type
 /// given the rows of each tuple
-pub(crate) fn predicate_variants_row<V>(variant_rows: impl IntoIterator<Item = V>) -> Vec<Type>
+pub(crate) fn predicate_variants_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
 where
-    V: IntoIterator<Item = Type>,
+    V: Into<TypeRow>,
 {
-    variant_rows.into_iter().map(Type::new_tuple).collect()
+    variant_rows
+        .into_iter()
+        .map(Type::new_tuple)
+        .collect_vec()
+        .into()
 }
 
 pub(crate) const ERROR_TYPE: Type = Type(
@@ -290,6 +280,7 @@ pub(crate) mod test {
         *,
     };
     use crate::ops::AliasDecl;
+    use crate::type_row;
 
     pub(crate) const EQ_T: Type = Type(
         TypeEnum::Prim(PrimType::E(EQ_CUST.into())),
@@ -308,7 +299,7 @@ pub(crate) mod test {
 
     #[test]
     fn construct() {
-        let t: Type = Type::new_tuple([
+        let t: Type = Type::new_tuple(type_row![
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(
