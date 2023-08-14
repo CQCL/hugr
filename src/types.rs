@@ -42,7 +42,7 @@ impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         match self {
-            EdgeKind::Value(t) => t.least_upper_bound().is_some(),
+            EdgeKind::Value(t) => t.least_upper_bound().is_none(),
             _ => false,
         }
     }
