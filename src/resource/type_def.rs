@@ -147,7 +147,7 @@ impl Resource {
 #[cfg(test)]
 mod test {
     use crate::resource::SignatureError;
-    use crate::types::test::{ANY_T, CLASSIC_T, EQ_T};
+    use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{AbstractSignature, Type, TypeBound};
 
@@ -188,7 +188,7 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(CLASSIC_T), TypeArg::Type(CLASSIC_T),])
+            def.instantiate_concrete([TypeArg::Type(COPYABLE_T), TypeArg::Type(COPYABLE_T),])
                 .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );

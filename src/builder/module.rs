@@ -139,13 +139,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let tag = typ.tag();
+        let bound = typ.least_upper_bound();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 
     /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
@@ -206,8 +206,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Simple)?;
+            let qubit_state_type = module_builder.add_alias_declare("qubit_state", None)?;
 
             let f_build = module_builder.define_function(
                 "main",

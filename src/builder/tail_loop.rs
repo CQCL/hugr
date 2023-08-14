@@ -136,7 +136,7 @@ mod test {
                     let mut loop_b = fbuild.tail_loop_builder(
                         vec![(Type::usize(), b1)],
                         vec![],
-                        type_row![Type::i64()],
+                        type_row![NAT],
                     )?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(Const::true_val())?;

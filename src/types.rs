@@ -287,7 +287,7 @@ pub(crate) mod test {
         Some(TypeBound::Copyable),
     );
 
-    pub(crate) const CLASSIC_T: Type = Type(
+    pub(crate) const COPYABLE_T: Type = Type(
         TypeEnum::Prim(PrimType::E(COPYABLE_CUST.into())),
         Some(TypeBound::Copyable),
     );

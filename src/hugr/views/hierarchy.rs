@@ -475,13 +475,16 @@ mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{AbstractSignature, Type},
+        types::{
+            test::{ANY_T, COPYABLE_T},
+            AbstractSignature, Type,
+        },
     };
 
     use super::*;
 
-    const NAT: Type = Type::Classic(Type::i64());
-    const QB: Type = Type::Qubit;
+    const NAT: Type = COPYABLE_T;
+    const QB: Type = ANY_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///

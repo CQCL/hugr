@@ -213,12 +213,13 @@ mod test {
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
+    use crate::types::test::ANY_T;
     use crate::types::{AbstractSignature, Type};
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
 
-    const QB: Type = Type::Qubit;
+    const QB: Type = ANY_T;
 
     /// Creates a hugr like the following:
     /// --   H   --
@@ -465,7 +466,7 @@ mod test {
 
     #[test]
     fn test_replace_cx_cross() {
-        let q_row: Vec<Type> = vec![Type::Qubit, Type::Qubit];
+        let q_row: Vec<Type> = vec![QB, QB];
         let mut builder = DFGBuilder::new(AbstractSignature::new_df(q_row.clone(), q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(LeafOp::CX, [0, 1]).unwrap();

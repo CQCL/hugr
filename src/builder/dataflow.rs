@@ -333,7 +333,7 @@ mod test {
             Ok(module_builder.finish_hugr()?)
         };
 
-        assert_eq!(builder(), Err(BuildError::NoCopyLinear(Type::Qubit)));
+        assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
     }
 
     #[test]

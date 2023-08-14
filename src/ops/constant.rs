@@ -109,7 +109,7 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         type_row,
-        types::{test::CLASSIC_T, TypeRow},
+        types::{test::COPYABLE_T, TypeRow},
         types::{test::EQ_T, type_param::TypeArg, CustomCheckFail},
         types::{AbstractSignature, CustomType, Type, TypeBound},
         values::{
@@ -125,7 +125,7 @@ mod test {
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![EQ_T, CLASSIC_T], type_row![]];
+        let pred_rows = vec![type_row![EQ_T, COPYABLE_T], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(AbstractSignature::new_df(
@@ -156,7 +156,7 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = [type_row![EQ_T, CLASSIC_T], type_row![]];
+        let pred_rows = [type_row![EQ_T, COPYABLE_T], type_row![]];
 
         let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
@@ -167,12 +167,12 @@ mod test {
         const T_INT: Type = Type::usize();
         const V_INT: Value = CustomTestValue(Some(TypeBound::Eq)).into();
         T_INT.check_type(&V_INT).unwrap();
-        CLASSIC_T.check_type(&serialized_float(17.4)).unwrap();
+        COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
-            CLASSIC_T.check_type(&V_INT),
-            Err(ConstTypeError::ValueCheckFail(t, v)) => t == CLASSIC_T && v == V_INT
+            COPYABLE_T.check_type(&V_INT),
+            Err(ConstTypeError::ValueCheckFail(t, v)) => t == COPYABLE_T && v == V_INT
         );
-        let tuple_ty = Type::new_tuple(type_row![T_INT, CLASSIC_T]);
+        let tuple_ty = Type::new_tuple(type_row![T_INT, COPYABLE_T]);
         let tuple_val = Value::tuple([V_INT, serialized_float(5.1)]);
         tuple_ty.check_type(&tuple_val).unwrap();
         let tuple_val2 = Value::tuple([serialized_float(6.1), V_INT]);

@@ -341,7 +341,7 @@ mod test {
     fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
-        let sum2_variants = vec![type_row![Type::i64()], type_row![Type::i64()]];
+        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
         let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();
