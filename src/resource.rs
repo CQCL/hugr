@@ -315,6 +315,15 @@ lazy_static! {
                 TypeDefBound::FromParams(vec![0]),
             )
             .unwrap();
+
+            prelude
+            .add_type(
+                SmolStr::new_inline("qubit"),
+                vec![],
+                "qubit".into(),
+                TypeDefBound::Explicit(None),
+            )
+            .unwrap();
         prelude
     };
 }

@@ -6,7 +6,6 @@ use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::{
     resource::{ResourceId, ResourceSet},
-    type_row,
     types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
 };
 
@@ -149,8 +148,16 @@ impl OpTrait for LeafOp {
     fn signature(&self) -> AbstractSignature {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
-        const Q: Type = Type::Qubit;
-        const B: Type = Type::Classic(Type::usize());
+
+        // TODO use constants and type_row! once static prelude is implemented
+        let qb_type: Type = Type::new_extension(
+            crate::resource::PRELUDE
+                .get_type("qubit")
+                .unwrap()
+                .instantiate_concrete(vec![])
+                .unwrap(),
+        );
+        let bit_type: Type = Type::usize();
 
         match self {
             LeafOp::Noop { ty: typ } => {
@@ -164,10 +171,16 @@ impl OpTrait for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => AbstractSignature::new_linear(type_row![Q]),
-            LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![Q, Q]),
-            LeafOp::Measure => AbstractSignature::new_df(type_row![Q], type_row![Q, B]),
-            LeafOp::Xor => AbstractSignature::new_df(type_row![B, B], type_row![B]),
+            | LeafOp::Z => AbstractSignature::new_linear(vec![qb_type]),
+            LeafOp::CX | LeafOp::ZZMax => {
+                AbstractSignature::new_linear(vec![qb_type.clone(), qb_type])
+            }
+            LeafOp::Measure => {
+                AbstractSignature::new_df(vec![qb_type.clone()], vec![qb_type, bit_type])
+            }
+            LeafOp::Xor => {
+                AbstractSignature::new_df(vec![bit_type.clone(), bit_type.clone()], vec![bit_type])
+            }
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 AbstractSignature::new_df(types.clone(), vec![Type::new_tuple(types.clone())])
