@@ -14,7 +14,7 @@ use crate::types::{CustomCheckFail, CustomType};
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum PrimValue {
+pub enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
@@ -128,6 +128,13 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 pub struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
+}
+
+impl CustomSerialized {
+    /// Creates a new [`CustomSerialized`].
+    pub fn new(typ: CustomType, value: serde_yaml::Value) -> Self {
+        Self { typ, value }
+    }
 }
 
 #[typetag::serde]

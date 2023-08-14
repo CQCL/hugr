@@ -226,11 +226,7 @@ mod test {
             "myrsrc",
             Some(TypeBound::Eq),
         );
-        let val: Value = CustomSerialized {
-            typ: typ_int.clone(),
-            value: YamlValue::Number(6.into()),
-        }
-        .into();
+        let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Eq));
         classic_t.check_type(&val).unwrap();
