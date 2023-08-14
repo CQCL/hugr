@@ -11,8 +11,7 @@ use smol_str::SmolStr;
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFail, CustomType};
 
-/// A constant value/instance of a [HashableType]. Note there is no
-/// equivalent of [HashableType::Variable]; we can't have instances of that.
+/// A constant value of a primitive (or leaf) type.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].

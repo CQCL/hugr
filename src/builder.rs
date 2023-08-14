@@ -42,9 +42,9 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
-    /// Tried to add a malformed [ConstValue]
+    /// Tried to add a malformed [Const]
     ///
-    /// [ConstValue]: crate::ops::constant::ConstValue
+    /// [Const]: crate::ops::constant::Const
     #[error("Constant failed typechecking: {0}")]
     BadConstant(#[from] ConstTypeError),
     /// HUGR construction error.
