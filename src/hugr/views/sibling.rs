@@ -220,7 +220,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             .flat_map(|(n, p)| BoundaryEdge::new_boundary_incoming(n, p, hugr));
         let outgoing = outgoing
             .into_iter()
-            .flat_map(|(n, p)| BoundaryEdge::new_boundary_incoming(n, p, hugr));
+            .flat_map(|(n, p)| BoundaryEdge::new_boundary_outgoing(n, p, hugr));
         let boundary = incoming.chain(outgoing).collect_vec();
         let sibling_graph = compute_subgraph(hugr, boundary.iter().copied());
         Self {
