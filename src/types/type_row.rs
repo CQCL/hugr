@@ -12,8 +12,6 @@ use crate::utils::display_list;
 /// Base trait for anything that can be put in a [TypeRow]
 pub trait TypeRowElem: Clone + 'static {}
 
-impl<T: Clone + 'static> TypeRowElem for T {}
-
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 //#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions

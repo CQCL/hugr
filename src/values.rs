@@ -6,13 +6,7 @@
 use thiserror::Error;
 
 use crate::types::{ClassicType, Container, CustomType, HashableType, PrimType};
-use crate::{
-    ops::constant::{
-        typecheck::{check_int_fits_in_width, ConstIntError},
-        ConstValue, HugrIntValueStore,
-    },
-    types::TypeRow,
-};
+use crate::{ops::constant::ConstValue, types::TypeRow};
 
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
@@ -20,8 +14,8 @@ use crate::{
 pub enum HashableValue {
     /// A string, i.e. corresponding to [HashableType::String]
     String(String),
-    /// An integer, i.e. an instance of all [HashableType::Int]s of sufficient width
-    Int(HugrIntValueStore),
+    /// A 64-bit integer
+    Int(u64),
     /// A container of other hashable values
     Container(ContainerValue<HashableValue>),
 }
@@ -63,9 +57,9 @@ impl ValueOfType for HashableValue {
                     return Ok(());
                 };
             }
-            HashableValue::Int(value) => {
-                if let HashableType::Int(width) = ty {
-                    return check_int_fits_in_width(*value, *width).map_err(ConstTypeError::Int);
+            HashableValue::Int(_) => {
+                if let HashableType::USize = ty {
+                    return Ok(());
                 };
             }
             HashableValue::Container(vals) => {
@@ -99,10 +93,8 @@ impl ValueOfType for HashableValue {
 /// sets of values (see e.g. [ConstValue::Opaque])
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ContainerValue<T> {
-    /// A [Container::Array] or [Container::Tuple] or [Container::List]
+    /// A [Container::Array] or [Container::Tuple]
     Sequence(Vec<T>),
-    /// A [Container::Map]
-    Map(Vec<(HashableValue, T)>), // TODO try to make this an actual map?
     /// A [Container::Sum] - for any Sum type where this value meets
     /// the type of the variant indicated by the tag
     Sum(usize, Box<T>), // Tag and value
@@ -115,18 +107,11 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 let names: Vec<_> = vals.iter().map(ValueOfType::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
-            ContainerValue::Map(_) => "a map".to_string(),
             ContainerValue::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
         }
     }
     pub(crate) fn check_container(&self, ty: &Container<Elem::T>) -> Result<(), ConstTypeError> {
         match (self, ty) {
-            (ContainerValue::Sequence(elems), Container::List(elem_ty)) => {
-                for elem in elems {
-                    elem.check_type(elem_ty)?;
-                }
-                Ok(())
-            }
             (ContainerValue::Sequence(elems), Container::Tuple(tup_tys)) => {
                 if elems.len() != tup_tys.len() {
                     return Err(ConstTypeError::TupleWrongLength);
@@ -145,14 +130,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
                 }
                 Ok(())
             }
-            (ContainerValue::Map(mappings), Container::Map(kv)) => {
-                let (key_ty, val_ty) = &**kv;
-                for (key, val) in mappings {
-                    key.check_type(key_ty)?;
-                    val.check_type(val_ty)?;
-                }
-                Ok(())
-            }
             (ContainerValue::Sum(tag, value), Container::Sum(variants)) => {
                 value.check_type(variants.get(*tag).ok_or(ConstTypeError::InvalidSumTag)?)
             }
@@ -166,7 +143,6 @@ impl<Elem: ValueOfType> ContainerValue<Elem> {
             ContainerValue::Sequence(vals) => {
                 ContainerValue::Sequence(vals.iter().cloned().map(f).collect())
             }
-            ContainerValue::Map(_) => todo!(),
             ContainerValue::Sum(tag, value) => {
                 ContainerValue::Sum(*tag, Box::new(f((**value).clone())))
             }
@@ -192,11 +168,6 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
         ))
     }
     match container {
-        Container::List(elem) => Container::List(Box::new(f(*(elem).clone()))),
-        Container::Map(kv) => {
-            let (k, v) = (**kv).clone();
-            Container::Map(Box::new((k, f(v))))
-        }
         Container::Tuple(elems) => Container::Tuple(map_row(elems, f)),
         Container::Sum(variants) => Container::Sum(map_row(variants, f)),
         Container::Array(elem, sz) => Container::Array(Box::new(f((**elem).clone())), *sz),
@@ -206,7 +177,7 @@ pub(crate) fn map_container_type<T: PrimType, T2: PrimType>(
 }
 
 /// Struct for custom type check fails.
-#[derive(Clone, Debug, PartialEq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum CustomCheckFail {
     /// The value had a specific type that was not what was expected
     #[error("Expected type: {0} but value was of type: {1}")]
@@ -219,9 +190,6 @@ pub enum CustomCheckFail {
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
 pub enum ConstTypeError {
-    /// There was some problem fitting a const int into its declared size
-    #[error("Error with int constant")]
-    Int(#[from] ConstIntError),
     /// Found a Var type constructor when we're checking a const val
     #[error("Type of a const value can't be Var")]
     ConstCantBeVar,
@@ -242,3 +210,6 @@ pub enum ConstTypeError {
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFail),
 }
+
+#[cfg(test)]
+mod test {}

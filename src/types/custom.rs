@@ -40,6 +40,21 @@ impl CustomType {
             tag,
         }
     }
+
+    /// Creates a new opaque type (constant version, no type arguments)
+    pub const fn new_simple(id: SmolStr, resource: ResourceId, tag: TypeTag) -> Self {
+        Self {
+            id,
+            args: vec![],
+            resource,
+            tag,
+        }
+    }
+
+    /// Returns the tag of this [`CustomType`].
+    pub fn tag(&self) -> TypeTag {
+        self.tag
+    }
 }
 
 impl CustomType {
@@ -74,4 +89,21 @@ impl From<CustomType> for SimpleType {
             TypeTag::Hashable => HashableType::Container(Container::Opaque(value)).into(),
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use smol_str::SmolStr;
+
+    use super::CustomType;
+    use crate::types::{ClassicType, Container, TypeTag};
+
+    pub(crate) const CLASSIC_T: ClassicType =
+        ClassicType::Container(Container::Opaque(CLASSIC_CUST));
+
+    pub(crate) const CLASSIC_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyType"),
+        SmolStr::new_inline("MyRsrc"),
+        TypeTag::Classic,
+    );
 }

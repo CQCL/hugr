@@ -19,7 +19,7 @@ use crate::Node;
 use smol_str::SmolStr;
 
 use crate::{
-    hugr::{HugrMut, NodeType},
+    hugr::{HugrInternalsMut, NodeType},
     Hugr,
 };
 

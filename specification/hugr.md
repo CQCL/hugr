@@ -544,7 +544,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 #### `ErrorType`
 
   - There is some type of errors, perhaps just a string, or
-    `Tuple(Int,String)` with some errorcode, that is returned along with
+    `Tuple(USize,String)` with some errorcode, that is returned along with
     the fact that the graph/program panicked.
 
 #### Catch
@@ -829,7 +829,7 @@ See [Type System](#type-system) for more on Resources.
 
 # Import other header files to use their custom types
   # TODO: allow qualified, and maybe locally-scoped
-imports: [Quantum]
+imports: [Quantum, Array]
 
 resources:
 - name: MyGates
@@ -837,7 +837,7 @@ resources:
   types:
   - name: QubitVector
     # Opaque types can take type arguments, with specified names
-    params: [["size", Int]]
+    params: [["size", USize]]
   operations:
   - name: measure
     description: "measure a qubit"
@@ -865,9 +865,9 @@ resources:
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     params:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: Int
-      - j: Int
-      - k: Int
+      - i: USize
+      - j: USize
+      - k: USize
     signature:
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
@@ -876,7 +876,7 @@ resources:
   - name: max_float
     description: "Variable number of inputs"
     params:
-      - n: Int
+      - n: USize
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
@@ -885,8 +885,8 @@ resources:
     description: "Concatenate two arrays. Resource provides a compute_signature implementation."
     params:
       - t: Type  # Classic or Quantum
-      - i: Int
-      - j: Int
+      - i: USize
+      - j: USize
     # inputs could be: Array<i>(t), Array<j>(t)
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
@@ -896,8 +896,8 @@ resources:
     params:
       - r: ResourceSet
     signature:
-      inputs: [[null, Graph[r](Int -> Int)], ["arg", Int]]
-      outputs: [[null, Int]]
+      inputs: [[null, Graph[r](USize -> USize)], ["arg", USize]]
+      outputs: [[null, USize]]
       resources: r # Indicates that running this operation also invokes resources r
     lowering:
       file: "graph_op_hugr.bin"
@@ -908,8 +908,17 @@ The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type" | "ClassicType" | Int | "List"(TypeParam)
+TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "USize" | "Resources" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+
+Opaque ::= string<[TypeArgs]>
+
+TypeArgs ::= Type(Type) | USize(u64) | Resources | List([TypeArg]) | Tuple([TypeArg])
+
+Type ::= Name<[TypeArg]>
 ```
+(We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
+
+To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a constant usize, a set of resources, a list or tuple of arguments.
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
@@ -980,101 +989,45 @@ indices after the list of node indices?
 
 ## Type System
 
-The type system will resemble the tierkreis type system, but with some
-extensions. Namely, the things the tierkreis type system is missing are:
+There are three classes of type: Any $\supset$ Copyable $\supset$ Equatable. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
+  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Resource Tracking](#resource-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
-  - User-defined types
-  - Resource management - knowing what plugins a given graph depends on
+    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum resource](#quantum-resource) for more.
 
-A grammar of available types is defined below.
+  - The next class are "Copyable" types, aka "Classic" types, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
+
+  - The final class are "Equatable" types: these are Copyable types where additionally there is a well-defined notion of equality between values. (While *some* notion of equality is defined on
+  any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
+
+For example, a `float` type (defined in an extension) would be Copyable, but not Equatable. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
+
+**Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
+
+The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
 
 ```haskell
-Type ::= [Resources]SimpleType
--- Rows are ordered lists, not sets
-#    ::= #(SimpleType)
-#(T) ::= (T)*
 
-Resources ::= (Resource)* -- set not list
+Resources ::= (Resource)* -- a set, not a list
 
-Container(T) ::= List(T)
-              | Tuple(#(T))
-              | Array<u64>(T)
-              | Map<ClassicType, T>
-              | NewType(Name, T)
-              | Sum (#(T))
-ClassicType ::= int<N>
-              | Var(X)
-              | String
-              | Graph[R](#, #)
-              | Opaque(Name, #)
-              | Container(ClassicType)
-SimpleType ::= Qubit
-              | QPaque(Name, #)
-              | Container(SimpleType)  -- Sometimes called 'Qontainer'
-              | ClassicType
+Type ::= Tuple(#) -- fixed-arity, heterogenous components 
+       | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
+       | Graph[Resources](#, #) -- monomorphic
+       | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
 ```
+<!--      Graph(TypeParams, #, #, Resources) -- polymorphic, so move TypeParams section here
+#       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
-SimpleTypes are the types of *values* which can be sent down wires,
-except for type variables `Var`. All of the ClassicTypes can also be
-sent down Static edges.
+The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Graph type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Function signatures are made up of *rows* (\#), which consist of an
-arbitrary number of SimpleTypes, plus a resource spec.
+Graphs are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
-ClassicTypes such as `int<N>` (where `N` is the bit-width) are fixed-size, as is
-Qubit.
-`Sum` is a disjoint union tagged by unsigned int; `Tuple`s have
-statically-known number and type of elements, as does `Array<N>` (where
-N is a static constant). These types are also fixed-size if their
-components are.
+Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
 
-For integer types, the width is provided in the type, and signedness is left unspecified to be interpreted by operations. The width is allowed to be 2^i for i in the range [0,7], so the allowed integer types are [I1, I2, I4, ... , I128].
+### Resource Tracking
 
-Container types are defined in terms of statically-known element types.
-Besides `Array<N>`, `Sum` and `Tuple`, these also include variable-sized
-types: `Graph`, `Map` and
-`List` (TODO: can we leave those to the Tierkreis resource?). `NewType`
-allows named newtypes to be used. Containers are classic (copyable) only
-if all of their components are classic.
+The type of `Graph` includes a set of resources (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of resources required to produce its inputs, and the set of resources required to execute the node; the union of these two must match the set of resources on each successor node.
 
-Note: any array can be turned into an equivalent tuple, but arrays also
-support dynamically-indexed `get`. (TODO: Indexed by u64, with panic if
-out-of-range? Or by known-range `Sum( ()^N )`?)
-
-**Row Types** The `#` is a *row type* which consists of zero or more
-simple types. Types in the row can optionally be given names in metadata
-i.e. this does not affect behaviour of the HUGR. Row types are used
-
-  - in the signatures for `Graph` inputs and outputs, and functions
-  - Tuples - the 0-ary Tuple `()` aka `unit` takes no storage
-  - Sums - allowing a bounded nat: `Sum((),(),())` is a ternary value;
-    the 2-ary version takes the place of a boolean type
-  - Arguments to `Opaque` types - where their meaning is
-    extension-defined.
-
-### Linearity
-
-For expressing and rewriting quantum programs we draw a distinction between
-arbitrary `SimpleType`s and the subset of `ClassicType`s. Only `ClassicType`s
-may be used more than once or discarded; the former must always be used
-exactly once. This leads to a constraint on the HUGR that outgoing ports
-must have exactly one edge leaving them unless they are `ClassicType`, where
-outgoing ports may have any number of connected edges (0 is equivalent
-to a discard). All incoming ports must have exactly one edge connected to them.
-
-In fully qubit-counted contexts programs take in a number of qubits
-as input and return the same number, with no discarding. See
-[quantum resource](#quantum-resource) for more.
-
-### Resources
-
-The type of `Graph` has been altered to add
-*R*: a resource requirement.
-The *R* here refer to a set
-of [resources](#resources) which are required to produce a given type.
-Graphs are annotated with the resources that they need to run and, when
-run, their outputs are annotated with those resources. Keeping track of
-the resource requirements of graphs allows plugin designers and backends
+Keeping track of the resource requirements like this allows extension designers and backends
 (like tierkreis) to control how/where a module is run.
 
 Concretely, if a plugin writer adds a resource
@@ -1089,36 +1042,8 @@ running different resources. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
 resource requirements.
 
-### Type Constraints
-
-We will likely also want to add a fixed set of attributes to certain
-subsets of `TYPE`. In Tierkreis these are called “type constraints”. For
-example, the `Map` type can only be constructed when the type that we
-map from is `Hashable`. For the Hugr, we will need this `Hashable`
-constraint, as well as a `Classic` constraint.
-
-**TODO**: fix this set of constraints (classic/copyable, hashable);
-extensions/resources *cannot* add new constraints. Use hashable for
-static type parameters, put Map in Tierkreis resource not core spec.
-
-### Resources
-
-On top of the Tierkreis type system, will be a system of Resources. A
-resource is a collection of operations which are available to use in
-certain graphs. The operations must be callable at the point of
-execution, but otherwise only signatures need to be known. Edges contain
-information on the resources that were needed to produce them, and
-Functions note their resource requirements in their `Graph` type. All
-operations declared as part of a resource interface implicitly have the
-resource they pertain to as a requirement.
-
-Resources can be added and used by plugin writers. We will also have
-some built in resources, see
-[standard library](#standard-library)
-
-Unification will demand that resource constraints are equal and, to make
-it so, we will have an operations called **lift** and **liftGraph**
-which can add a resource constraints to values.
+To allow resource annotations on nodes to be made equal, we will have operations
+ **lift** and **liftGraph** which can add resource constraints to values.
 
 $\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
 
@@ -1713,7 +1638,7 @@ Other operations:
 | `imin_s<N>`            | `int<N>`, `int<N>` | `int<N>`                           | minimum of signed integers                                                                                                                               |
 | `iadd<N>`              | `int<N>`, `int<N>` | `int<N>`                           | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `isub<N>`              | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                    |
-| `ineg<N>`              | `int<M>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
+| `ineg<N>`              | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `imul<N>`              | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                 |
 | `idivmod_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
 | `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |

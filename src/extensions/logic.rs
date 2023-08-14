@@ -1,7 +1,5 @@
 //! Basic logical operations.
 
-use std::collections::HashMap;
-
 use itertools::Itertools;
 use smol_str::SmolStr;
 
@@ -9,15 +7,13 @@ use crate::{
     resource::ResourceSet,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        HashableType, SimpleType,
+        SimpleType,
     },
     Resource,
 };
 
 /// The resource identifier.
-pub const fn resource_id() -> SmolStr {
-    SmolStr::new_inline("Logic")
-}
+pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Construct a boolean type.
 pub fn bool_type() -> SimpleType {
@@ -26,16 +22,14 @@ pub fn bool_type() -> SimpleType {
 
 /// Resource for basic logical operations.
 pub fn resource() -> Resource {
-    const H_INT: TypeParam = TypeParam::Value(HashableType::Int(8));
-    let mut resource = Resource::new(resource_id());
+    const H_INT: TypeParam = TypeParam::USize;
+    let mut resource = Resource::new(RESOURCE_ID);
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "Not".into(),
             "logical 'not'".into(),
             vec![],
-            HashMap::default(),
-            Vec::new(),
             |_arg_values: &[TypeArg]| {
                 Ok((
                     vec![bool_type()].into(),
@@ -47,16 +41,14 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "And".into(),
             "logical 'and'".into(),
             vec![H_INT],
-            HashMap::default(),
-            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
-                let n: u128 = match a {
-                    TypeArg::Int(n) => *n,
+                let n: u64 = match a {
+                    TypeArg::USize(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                     }
@@ -71,16 +63,14 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             "Or".into(),
             "logical 'or'".into(),
             vec![H_INT],
-            HashMap::default(),
-            Vec::new(),
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
-                let n: u128 = match a {
-                    TypeArg::Int(n) => *n,
+                let n: u64 = match a {
+                    TypeArg::USize(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
                     }
@@ -106,7 +96,7 @@ mod test {
     #[test]
     fn test_logic_resource() {
         let r: Resource = resource();
-        assert_eq!(r.name(), "Logic");
+        assert_eq!(r.name(), "logic");
         assert_eq!(r.operations().count(), 3);
     }
 }
