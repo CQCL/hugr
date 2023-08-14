@@ -196,12 +196,14 @@ mod test {
     #[test]
     fn test_constant_values() {
         let int_type: Type = Type::usize();
-        let int_value: Value = CustomTestValue(Some(TypeBound::Eq)).into();
+        let int_value = Const::usize(257).value;
         int_type.check_type(&int_value).unwrap();
         COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
             COPYABLE_T.check_type(&int_value),
-            Err(ConstTypeError::ValueCheckFail(t, v)) => t == COPYABLE_T && v == int_value
+            Err(ConstTypeError::CustomCheckFail(
+                CustomCheckFail::TypeMismatch(_, _)
+            ))
         );
         let tuple_ty = Type::new_tuple(vec![int_type, COPYABLE_T]);
         let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);

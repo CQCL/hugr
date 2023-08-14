@@ -74,10 +74,10 @@ impl Type {
                 if t.len() != t_v.len() {
                     return Err(ConstTypeError::TupleWrongLength);
                 }
-                for (elem, ty) in t_v.iter().zip(t.iter()) {
-                    ty.check_type(elem)?
-                }
-                Ok(())
+                t_v.iter()
+                    .zip(t.iter())
+                    .try_for_each(|(elem, ty)| ty.check_type(elem))
+                    .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
             (TypeEnum::Sum(variants), Value::Sum(tag, value)) => variants
                 .get(*tag)
