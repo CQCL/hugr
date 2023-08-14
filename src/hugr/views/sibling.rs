@@ -2,10 +2,9 @@
 //!
 //! Views into subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Such a subgraph is
-//! given by a root node, of which all nodes in the sibling subgraph are
-//! children, as well as a subgraph boundary, defining the separation between
-//! inside and outside the subgraph. The boundary is fully contained within the
-//! sibling graph.
+//! represented by a root node, of which all nodes in the sibling subgraph are
+//! children, as well as a set of edges forming the subgraph boundary.
+//! The boundary must be fully contained within the sibling graph of the root.
 //!
 //! Sibling subgraphs complement [`super::HierarchyView`]s in the sense that the
 //! latter provide views for subgraphs defined by hierarchical relationships,
@@ -20,7 +19,6 @@
 
 use std::cell::OnceCell;
 
-use derive_more::Into;
 use itertools::Itertools;
 use portgraph::{view::Subgraph, LinkView, PortIndex, PortView};
 
@@ -33,55 +31,94 @@ use super::{sealed::HugrInternals, HierarchyView, HugrView, SiblingGraph};
 
 /// A boundary edge of a sibling subgraph.
 ///
-/// It is always uniquely identified (any Hugr edge is) by the node and port
-/// of the target of the edge. Source edges are not unique as they can involve
-/// copies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Into)]
-struct BoundaryEdge(Node, Port);
+/// Boundary edges come in two types: incoming and outgoing. The target of an
+/// incoming edge is a node in the subgraph, and the source of an outgoing
+/// edge is a node in the subgraph. The other ends are typically not in the
+/// subgraph, except in the special where an edge is both an incoming and
+/// outgoing boundary edge.
+///
+/// We uniquely identify a boundary edge by the node and port of the target of
+/// the edge. Source edges are not unique as they can involve copies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct BoundaryEdge {
+    target: (Node, Port),
+    direction: Direction,
+}
 
 impl BoundaryEdge {
-    fn target_port_index<G: PortView>(&self, g: &G) -> PortIndex {
-        let Node { index: node } = self.0;
-        let Port { offset: port } = self.1;
-        g.port_index(node, port).unwrap()
+    /// Target port of the edge in a portgraph.
+    fn portgraph_target<G: PortView>(&self, g: &G) -> PortIndex {
+        let (node, port) = self.target;
+        g.port_index(node.index, port.offset).unwrap()
     }
 
-    fn source_port_index<G: LinkView>(&self, g: &G) -> Option<PortIndex> {
-        let tgt = self.target_port_index(g);
-        g.port_link(tgt).map(Into::into)
+    /// Source port of the edge in a portgraph.
+    fn portgraph_source<G: LinkView>(&self, g: &G) -> PortIndex {
+        let tgt = self.portgraph_target(g);
+        g.port_link(tgt).expect("invalid boundary edge").into()
     }
 
-    fn get_boundary_edges<H: HugrView>(
-        node: Node,
-        port: Port,
-        hugr: &H,
-    ) -> impl Iterator<Item = Self> {
-        if port.direction() == Direction::Incoming {
-            vec![BoundaryEdge(node, port)].into_iter()
-        } else {
-            hugr.linked_ports(node, port)
-                .map(|(n, p)| BoundaryEdge(n, p))
-                .collect_vec()
-                .into_iter()
+    /// Port Index in a portgraph that is within the boundary.
+    ///
+    /// If the edge is incoming, this is the target port, otherwise it is the
+    /// source port.
+    fn portgraph_internal_port<G: LinkView>(&self, g: &G) -> PortIndex {
+        match self.direction {
+            Direction::Incoming => self.portgraph_target(g),
+            Direction::Outgoing => self.portgraph_source(g),
         }
     }
 
-    /// The DFG input ports of a `node`
-    fn get_boundary_incoming<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
-        hugr.node_inputs(node)
-            .filter(move |&p| hugr.get_optype(node).signature().get(p).is_some())
-            .map(move |p| BoundaryEdge(node, p))
+    /// Create incoming boundary edges incident at a port
+    fn new_boundary_incoming<H: HugrView>(node: Node, port: Port, hugr: &H) -> Vec<Self> {
+        if port.direction() == Direction::Incoming {
+            vec![BoundaryEdge {
+                target: (node, port),
+                direction: Direction::Incoming,
+            }]
+        } else {
+            hugr.linked_ports(node, port)
+                .map(|(n, p)| BoundaryEdge {
+                    target: (n, p),
+                    direction: Direction::Incoming,
+                })
+                .collect()
+        }
     }
 
-    /// The linked ports of DFG output ports of a `node`
+    /// Create outgoing boundary edges incident at a port
+    fn new_boundary_outgoing<H: HugrView>(node: Node, port: Port, hugr: &H) -> Vec<Self> {
+        if port.direction() == Direction::Incoming {
+            vec![BoundaryEdge {
+                target: (node, port),
+                direction: Direction::Outgoing,
+            }]
+        } else {
+            hugr.linked_ports(node, port)
+                .map(|(n, p)| BoundaryEdge {
+                    target: (n, p),
+                    direction: Direction::Outgoing,
+                })
+                .collect()
+        }
+    }
+
+    /// Create an incoming boundary from the incoming edges of a node.
     ///
-    /// We always consider target ports, as they are unique
-    /// (source ports can be copied)
-    fn get_boundary_outgoing<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
+    /// Filters out any non-DFG edges.
+    fn from_node_inputs<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
+        hugr.node_inputs(node)
+            .filter(move |&p| hugr.get_optype(node).signature().get(p).is_some())
+            .flat_map(move |p| BoundaryEdge::new_boundary_incoming(node, p, hugr))
+    }
+
+    /// Create an outgoing boundary from the outgoing edges of a node.
+    ///
+    /// Filters out any non-DFG edges.
+    fn from_node_outputs<H: HugrView>(node: Node, hugr: &H) -> impl Iterator<Item = Self> + '_ {
         hugr.node_outputs(node)
             .filter(move |&p| hugr.get_optype(node).signature().get(p).is_some())
-            .flat_map(move |p| hugr.linked_ports(node, p))
-            .map(|(n, p)| BoundaryEdge(n, p))
+            .flat_map(move |p| BoundaryEdge::new_boundary_outgoing(node, p, hugr))
     }
 }
 
@@ -123,8 +160,7 @@ impl BoundaryEdge {
 pub struct SiblingSubgraph<'g, Base: HugrInternals> {
     hugr: &'g Base,
     root: Node,
-    incoming: Vec<BoundaryEdge>,
-    outgoing: Vec<BoundaryEdge>,
+    boundary: Vec<BoundaryEdge>,
     sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
 }
 
@@ -150,8 +186,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         Self {
             hugr,
             root,
-            incoming: Vec::new(),
-            outgoing: Vec::new(),
+            boundary: Vec::new(),
             sibling_graph: OnceCell::new(),
         }
     }
@@ -179,13 +214,13 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         Base: HugrView,
     {
         let (inp, out) = hugr.children(root).take(2).collect_tuple().unwrap();
-        let incoming = BoundaryEdge::get_boundary_outgoing(inp, hugr).collect();
-        let outgoing = BoundaryEdge::get_boundary_incoming(out, hugr).collect();
+        let incoming = BoundaryEdge::from_node_outputs(inp, hugr);
+        let outgoing = BoundaryEdge::from_node_inputs(out, hugr);
+        let boundary = incoming.chain(outgoing).collect();
         Self {
             hugr,
             root,
-            incoming,
-            outgoing,
+            boundary,
             sibling_graph: OnceCell::new(),
         }
     }
@@ -207,17 +242,15 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     {
         let incoming = incoming
             .into_iter()
-            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, hugr))
-            .collect();
+            .flat_map(|(n, p)| BoundaryEdge::new_boundary_incoming(n, p, hugr));
         let outgoing = outgoing
             .into_iter()
-            .flat_map(|(n, p)| BoundaryEdge::get_boundary_edges(n, p, hugr))
-            .collect();
+            .flat_map(|(n, p)| BoundaryEdge::new_boundary_incoming(n, p, hugr));
+        let boundary = incoming.chain(outgoing).collect();
         Self {
             hugr,
             root,
-            incoming,
-            outgoing,
+            boundary,
             sibling_graph: OnceCell::new(),
         }
     }
@@ -225,17 +258,12 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     fn get_sibling_graph(&self) -> &Subgraph<'g, Base::Portgraph> {
         self.sibling_graph.get_or_init(|| {
             let graph = self.hugr.portgraph();
-            let incoming = self
-                .incoming
+            let boundary = self
+                .boundary
                 .iter()
                 .copied()
-                .map(|e| e.target_port_index(graph));
-            let outgoing = self
-                .outgoing
-                .iter()
-                .copied()
-                .filter_map(|e| e.source_port_index(graph));
-            Subgraph::new_subgraph(graph, incoming.chain(outgoing))
+                .map(|e| e.portgraph_internal_port(graph));
+            Subgraph::new_subgraph(graph, boundary)
         })
     }
 
@@ -255,8 +283,16 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
-        let incoming = self.incoming.len();
-        let outgoing = self.outgoing.len();
+        let incoming = self
+            .boundary
+            .iter()
+            .filter(|e| e.direction == Direction::Incoming)
+            .count();
+        let outgoing = self
+            .boundary
+            .iter()
+            .filter(|e| e.direction == Direction::Outgoing)
+            .count();
         (incoming, outgoing)
     }
 
@@ -284,18 +320,25 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             .children(rep_root)
             .take(2)
             .collect_tuple() else { panic!("Invalid DFG node") };
-        let rep_inputs = BoundaryEdge::get_boundary_outgoing(rep_input, &replacement);
-        let rep_outputs = BoundaryEdge::get_boundary_incoming(rep_output, &replacement);
-        let nu_inp = rep_inputs
-            .map_into()
-            .zip_eq(self.incoming.iter().copied().map_into())
-            .collect();
-        let nu_out = self
-            .outgoing
+        let rep_inputs = BoundaryEdge::from_node_outputs(rep_input, &replacement);
+        let rep_outputs = BoundaryEdge::from_node_inputs(rep_output, &replacement);
+        let incoming = self
+            .boundary
             .iter()
             .copied()
-            .map_into()
-            .zip_eq(rep_outputs.map(|BoundaryEdge(_, p)| p))
+            .filter(|e| e.direction == Direction::Incoming);
+        let outgoing = self
+            .boundary
+            .iter()
+            .copied()
+            .filter(|e| e.direction == Direction::Outgoing);
+        let nu_inp = rep_inputs
+            .map(|e| e.target)
+            .zip_eq(incoming.map(|e| e.target))
+            .collect();
+        let nu_out = outgoing
+            .map(|e| e.target)
+            .zip_eq(rep_outputs.map(|e| e.target.1))
             .collect();
 
         SimpleReplacement::new(self.root, removal, replacement, nu_inp, nu_out)
@@ -352,8 +395,7 @@ mod tests {
         let region: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
         let from_region = SiblingSubgraph::from_sibling_graph(&region);
         assert_eq!(from_root.root, from_region.root);
-        assert_eq!(from_root.incoming, from_region.incoming);
-        assert_eq!(from_root.outgoing, from_region.outgoing);
+        assert_eq!(from_root.boundary, from_region.boundary);
     }
 
     #[test]
