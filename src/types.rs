@@ -10,7 +10,6 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFail};
 pub use custom::CustomType;
-use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use signature::{AbstractSignature, Signature, SignatureDescription};
 pub use type_row::TypeRow;
 
@@ -46,52 +45,6 @@ impl EdgeKind {
             EdgeKind::Value(t) => t.least_upper_bound().is_some(),
             _ => false,
         }
-    }
-}
-/// Categorizes types into three classes according to basic operations supported.
-#[derive(
-    Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize_repr, Deserialize_repr,
-)]
-#[repr(u8)]
-pub enum TypeTag {
-    /// Any [Type], including linear and quantum types;
-    /// cannot necessarily be copied or discarded.
-    Simple = 0,
-    /// Subset of [TypeTag::Simple]; types that can be copied and discarded. See [Type]
-    Copyable = 1,
-    /// Subset of [TypeTag::Classic]: types that can also be hashed and support
-    /// a strong notion of equality. See [HashableType]
-    Eq = 2,
-}
-
-impl TypeTag {
-    /// Returns the smallest TypeTag containing both the receiver and argument.
-    /// (This will be one of the receiver or the argument.)
-    pub fn union(self, other: Self) -> Self {
-        if self.contains(other) {
-            self
-        } else {
-            debug_assert!(other.contains(self));
-            other
-        }
-    }
-
-    /// Do types in this tag contain only classic data
-    /// (which can be copied and discarded, i.e. [Type]s)
-    pub fn is_classical(self) -> bool {
-        self != Self::Simple
-    }
-
-    /// Do types in this tag contain only hashable classic data
-    /// (with a strong notion of equality, i.e. [HashableType]s)
-    pub fn is_hashable(self) -> bool {
-        self == Self::Eq
-    }
-
-    /// Report if this tag contains another.
-    pub fn contains(&self, other: TypeTag) -> bool {
-        use TypeTag::*;
-        matches!((self, other), (Simple, _) | (_, Eq) | (Copyable, Copyable))
     }
 }
 
