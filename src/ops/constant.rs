@@ -195,23 +195,23 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        const T_INT: Type = Type::usize();
-        const V_INT: Value = CustomTestValue(Some(TypeBound::Eq)).into();
-        T_INT.check_type(&V_INT).unwrap();
+        let int_type: Type = Type::usize();
+        let int_value: Value = CustomTestValue(Some(TypeBound::Eq)).into();
+        int_type.check_type(&int_value).unwrap();
         COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
-            COPYABLE_T.check_type(&V_INT),
-            Err(ConstTypeError::ValueCheckFail(t, v)) => t == COPYABLE_T && v == V_INT
+            COPYABLE_T.check_type(&int_value),
+            Err(ConstTypeError::ValueCheckFail(t, v)) => t == COPYABLE_T && v == int_value
         );
-        let tuple_ty = Type::new_tuple(type_row![T_INT, COPYABLE_T]);
-        let tuple_val = Value::tuple([V_INT, serialized_float(5.1)]);
+        let tuple_ty = Type::new_tuple(vec![int_type, COPYABLE_T]);
+        let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
         tuple_ty.check_type(&tuple_val).unwrap();
-        let tuple_val2 = Value::tuple([serialized_float(6.1), V_INT]);
+        let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);
         assert_matches!(
             tuple_ty.check_type(&tuple_val2),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
-        let tuple_val3 = Value::tuple([V_INT, serialized_float(3.3), serialized_float(2.0)]);
+        let tuple_val3 = Value::tuple([int_value, serialized_float(3.3), serialized_float(2.0)]);
         assert_eq!(
             tuple_ty.check_type(&tuple_val3),
             Err(ConstTypeError::TupleWrongLength)
@@ -231,12 +231,12 @@ mod test {
             value: YamlValue::Number(6.into()),
         }
         .into();
-        let classic_t = Type::new_extension(typ_int);
+        let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Eq));
         classic_t.check_type(&val).unwrap();
 
         let typ_qb = CustomType::new("mytype", vec![], "myrsrc", Some(TypeBound::Eq));
-        let t = Type::new_extension(typ_qb);
+        let t = Type::new_extension(typ_qb.clone());
         assert_matches!(t.check_type(&val),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);
 

@@ -280,7 +280,6 @@ pub(crate) mod test {
         *,
     };
     use crate::ops::AliasDecl;
-    use crate::type_row;
 
     pub(crate) const EQ_T: Type = Type(
         TypeEnum::Prim(PrimType::E(EQ_CUST.into())),
@@ -299,7 +298,7 @@ pub(crate) mod test {
 
     #[test]
     fn construct() {
-        let t: Type = Type::new_tuple(type_row![
+        let t: Type = Type::new_tuple(vec![
             Type::usize(),
             Type::graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(

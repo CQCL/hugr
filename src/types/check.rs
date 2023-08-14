@@ -63,7 +63,7 @@ impl PrimType {
 
 impl Type {
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
-        match (self.0, val) {
+        match (&self.0, val) {
             (TypeEnum::Prim(p), Value::Prim(p_v)) => p.check_type(p_v),
             (TypeEnum::Tuple(t), Value::Tuple(t_v)) => {
                 if t.len() != t_v.len() {

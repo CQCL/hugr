@@ -393,8 +393,7 @@ impl<'a> ValidationContext<'a> {
                 true
             }
             ty => {
-                if !local && !matches!(ty, EdgeKind::Value(ty) if ty.least_upper_bound().is_some())
-                {
+                if !local && !matches!(&ty, EdgeKind::Value(t) if t.least_upper_bound().is_some()) {
                     return Err(InterGraphEdgeError::NonClassicalData {
                         from,
                         from_offset,

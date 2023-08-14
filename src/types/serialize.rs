@@ -61,8 +61,7 @@ impl From<SerSimpleType> for Type {
 #[cfg(test)]
 mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::type_row;
-    use crate::types::custom::test::COPYABLE_CUST;
+    use crate::types::test::COPYABLE_T;
     use crate::types::AbstractSignature;
     use crate::types::Type;
 
@@ -77,7 +76,7 @@ mod test {
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum(type_row![Type::usize(), Type::new_extension(COPYABLE_CUST)]);
+        let t = Type::new_sum(vec![Type::usize(), COPYABLE_T]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Hashable array

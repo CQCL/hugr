@@ -85,7 +85,7 @@ impl<const DEF: bool> AliasID<DEF> {
 
     /// Construct new AliasID
     pub fn get_alias_type(&self) -> Type {
-        Type::new_alias(AliasDecl::new(self.name, self.bound))
+        Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
     }
     /// Retrieve the underlying core type
     pub fn get_name(&self) -> &SmolStr {
