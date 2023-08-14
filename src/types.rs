@@ -235,6 +235,8 @@ pub(crate) const ERROR_TYPE: Type = Type(
 #[cfg(test)]
 pub(crate) mod test {
 
+    use smol_str::SmolStr;
+
     use super::{
         custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
         primitive::PrimType,
@@ -250,6 +252,15 @@ pub(crate) mod test {
     );
 
     pub(crate) const ANY_T: Type = Type(TypeEnum::Prim(PrimType::E(ANY_CUST)), None);
+
+    pub(crate) const USIZE_T: Type = Type(
+        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
+            SmolStr::new_inline("usize"),
+            SmolStr::new_inline("prelude"),
+            Some(TypeBound::Eq),
+        ))),
+        Some(TypeBound::Eq),
+    );
 
     #[test]
     fn construct() {

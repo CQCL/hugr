@@ -88,7 +88,7 @@ impl From<BuildError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use crate::types::test::{ANY_T, COPYABLE_T};
+    use crate::types::test::{ANY_T, USIZE_T};
     use crate::types::{Signature, Type};
     use crate::Hugr;
 
@@ -96,8 +96,8 @@ mod test {
     use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: Type = COPYABLE_T;
-    pub(super) const BIT: Type = COPYABLE_T;
+    pub(super) const NAT: Type = USIZE_T;
+    pub(super) const BIT: Type = USIZE_T;
     pub(super) const QB: Type = ANY_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
