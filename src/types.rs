@@ -1,17 +1,17 @@
 //! General wire types used in the compiler
 
+mod check;
 pub mod custom;
 mod primitive;
 mod serialize;
 mod signature;
-// pub mod simple;
 pub mod type_param;
 pub mod type_row;
 
+pub use check::{ConstTypeError, CustomCheckFail};
 pub use custom::CustomType;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use signature::{AbstractSignature, Signature, SignatureDescription};
-
 pub use type_row::TypeRow;
 
 use itertools::FoldWhile::{Continue, Done};
@@ -37,7 +37,7 @@ impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         match self {
-            EdgeKind::Value(t) => !t.tag().is_classical(),
+            EdgeKind::Value(t) => t.least_upper_bound().is_some(),
             _ => false,
         }
     }
@@ -270,11 +270,14 @@ where
 }
 
 pub(crate) const ERROR_TYPE: Type = Type(
-    TypeEnum::Prim(primitive::PrimType::E(CustomType::new_simple(
-        smol_str::SmolStr::new_inline("error"),
-        smol_str::SmolStr::new_inline("MyRsrc"),
-        Some(TypeBound::Eq),
-    ))),
+    TypeEnum::Prim(primitive::PrimType::E(
+        CustomType::new_simple(
+            smol_str::SmolStr::new_inline("error"),
+            smol_str::SmolStr::new_inline("MyRsrc"),
+            Some(TypeBound::Eq),
+        )
+        .into(),
+    )),
     Some(TypeBound::Copyable),
 );
 
@@ -289,17 +292,17 @@ pub(crate) mod test {
     use crate::ops::AliasDecl;
 
     pub(crate) const EQ_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(EQ_CUST)),
+        TypeEnum::Prim(PrimType::E(EQ_CUST.into())),
         Some(TypeBound::Copyable),
     );
 
     pub(crate) const CLASSIC_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
+        TypeEnum::Prim(PrimType::E(COPYABLE_CUST.into())),
         Some(TypeBound::Copyable),
     );
 
     pub(crate) const ANY_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(ANY_CUST)),
+        TypeEnum::Prim(PrimType::E(ANY_CUST.into())),
         Some(TypeBound::Copyable),
     );
 
