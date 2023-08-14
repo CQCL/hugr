@@ -78,10 +78,5 @@ mod test {
         // A Classic sum
         let t = Type::new_sum(vec![Type::usize(), COPYABLE_T]);
         assert_eq!(ser_roundtrip(&t), t);
-
-        // A Hashable array
-        // TODO uncomment once refactor complete
-        // let t: Type = Type::new_array(Type::usize(), 3);
-        // assert_eq!(ser_roundtrip(&t), t);
     }
 }

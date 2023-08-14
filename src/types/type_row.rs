@@ -13,7 +13,7 @@ use super::Type;
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-//#[cfg_attr(feature = "pyo3", pyclass)] // TODO: expose unparameterized versions
+//#[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow {
