@@ -146,7 +146,7 @@ impl DataflowOpTrait for Call {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature {
-            static_input: vec![Type::graph_from_sig(self.signature.clone())].into(),
+            static_input: vec![Type::graph(self.signature.clone())].into(),
             ..self.signature.clone()
         }
     }
@@ -171,7 +171,7 @@ impl DataflowOpTrait for CallIndirect {
         let mut s = self.signature.clone();
         s.input
             .to_mut()
-            .insert(0, Type::graph_from_sig(self.signature.clone()).into());
+            .insert(0, Type::graph(self.signature.clone()).into());
         s
     }
 }
@@ -193,7 +193,7 @@ impl DataflowOpTrait for LoadConstant {
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new(
             TypeRow::new(),
-            vec![Type::Classic(self.datatype.clone())],
+            vec![self.datatype.clone()],
             vec![self.datatype.clone()],
         )
     }

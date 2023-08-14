@@ -17,7 +17,7 @@ use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
-pub use constant::{Const, ConstValue};
+pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;

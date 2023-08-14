@@ -78,7 +78,9 @@ pub enum LeafOp {
 
 impl Default for LeafOp {
     fn default() -> Self {
-        Self::Noop { ty: Type::Qubit }
+        Self::Noop {
+            ty: Type::graph(AbstractSignature::new_linear(vec![])),
+        }
     }
 }
 impl OpName for LeafOp {

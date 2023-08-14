@@ -94,7 +94,7 @@ fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet)
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
-    let intpair: TypeRow<Type> = vec![int_type(n), int_type(m)].into();
+    let intpair: TypeRow = vec![int_type(n), int_type(m)].into();
     Ok((
         intpair.clone(),
         vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),

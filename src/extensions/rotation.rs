@@ -10,11 +10,11 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::CustomConst;
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
+use crate::types::CustomCheckFail;
 use crate::types::{CustomType, TypeBound};
-use crate::values::CustomCheckFail;
+use crate::values::CustomConst;
 use crate::Resource;
 
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");

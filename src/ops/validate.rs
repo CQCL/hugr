@@ -459,7 +459,7 @@ mod test {
 
     #[test]
     fn test_validate_io_nodes() {
-        const B: Type = Type::Classic(Type::usize());
+        const B: Type = Type::usize();
 
         let in_types = type_row![B];
         let out_types = type_row![B, B];

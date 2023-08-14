@@ -227,14 +227,16 @@ impl AbstractSignature {
         debug_assert_eq!(
             self.input
                 .iter()
-                .filter(|t| !t.tag().is_classical())
+                .filter(|t| t.least_upper_bound().is_none())
                 .collect::<Vec<_>>(),
             self.output
                 .iter()
-                .filter(|t| !t.tag().is_classical())
+                .filter(|t| t.least_upper_bound().is_none())
                 .collect::<Vec<_>>()
         );
-        self.input.iter().filter(|t| !t.tag().is_classical())
+        self.input
+            .iter()
+            .filter(|t| t.least_upper_bound().is_none())
     }
 
     /// Returns the value `Port`s in the signature for a given direction.
