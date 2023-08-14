@@ -1,14 +1,10 @@
 //! Constant value definitions.
 
-use std::any::Any;
-
 use crate::{
-    macros::impl_box_clone,
-    types::{ConstTypeError, CustomCheckFail, CustomType, EdgeKind, Type, TypeRow},
-    values::{PrimValue, Value},
+    types::{ConstTypeError, EdgeKind, Type, TypeRow},
+    values::Value,
 };
 
-use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use super::OpTag;
@@ -107,80 +103,24 @@ impl OpTrait for Const {
     }
 }
 
-// impl ValueOfType for Value {
-//     type T = Type;
-
-//     fn name(&self) -> String {
-//         match self {
-//             Value::Hashable(hv) => hv.name(),
-//             Value::Container(ctr) => ctr.desc(),
-//             Value::Opaque((v,)) => format!("const:custom:{}", v.name()),
-//         }
-//     }
-
-//     fn check_type(&self, ty: &Type) -> Result<(), ConstTypeError> {
-//         todo!();
-//         match self {
-//             Value::Hashable(hv) => {
-//                 match ty {
-//                     Type::Hashable(exp) => return hv.check_type(exp),
-//                     Type::Container(cty) => {
-//                         // A "hashable" value might be an instance of a non-hashable type:
-//                         // e.g. an empty list is hashable, yet can be checked against a classic element type!
-//                         if let HashableValue::Container(ctr) = hv {
-//                             return ctr.map_vals(&Value::Hashable).check_container(cty);
-//                         }
-//                     }
-//                     _ => (),
-//                 }
-//             }
-//             Value::Container(vals) => {
-//                 match ty {
-//                     Type::Container(cty) => return vals.check_container(cty),
-//                     // We might also fail to deduce a container *value* was hashable,
-//                     // because it contains opaque values whose tag is unknown.
-//                     Type::Hashable(HashableType::Container(cty)) => {
-//                         return vals.check_container(&map_container_type(cty, &Type::Hashable))
-//                     }
-//                     _ => (),
-//                 };
-//             }
-//             Value::Opaque((val,)) => {
-//                 let maybe_cty = match ty {
-//                     Type::Container(Container::Opaque(t)) => Some(t),
-//                     Type::Hashable(HashableType::Container(Container::Opaque(t))) => Some(t),
-//                     _ => None,
-//                 };
-//                 if let Some(cu_ty) = maybe_cty {
-//                     return val.check_custom_type(cu_ty).map_err(ConstTypeError::from);
-//                 }
-//             }
-//         };
-//         Err(ConstTypeError::ValueCheckFail(ty.clone(), self.clone()))
-//     }
-// }
-
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
-    use serde_yaml::Value as YamlValue;
-
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         type_row,
-        types::{custom::test::COPYABLE_CUST, test::CLASSIC_T, TypeRow},
-        types::{test::EQ_T, type_param::TypeArg},
+        types::{test::CLASSIC_T, TypeRow},
+        types::{test::EQ_T, type_param::TypeArg, CustomCheckFail},
         types::{AbstractSignature, CustomType, Type, TypeBound},
-        values::{PrimValue, Value},
+        values::{
+            test::{serialized_float, CustomTestValue},
+            CustomSerialized, Value,
+        },
     };
+    use cool_asserts::assert_matches;
+    use serde_yaml::Value as YamlValue;
 
-    fn custom_value(f: f64) -> Value {
-        Value::Prim(PrimValue::Extension((Box::new(CustomSerialized {
-            typ: COPYABLE_CUST,
-            value: serde_yaml::Value::Number(f.into()),
-        }),)))
-    }
+    use super::*;
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
@@ -194,7 +134,10 @@ mod test {
         ))?;
         let c = b.add_constant(Const::predicate(
             0,
-            Value::tuple(&[Value::Hashable(HashableValue::Int(3)), custom_value(5.1)]),
+            Value::tuple([
+                CustomTestValue(Some(TypeBound::Eq)).into(),
+                serialized_float(5.1),
+            ]),
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
@@ -213,33 +156,33 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = vec![type_row![Type::i64(), CLASSIC_T], type_row![]];
+        let pred_rows = [type_row![EQ_T, CLASSIC_T], type_row![]];
 
-        let res = Const::predicate(0, Value::sequence(&[]), pred_rows);
+        let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
     }
 
     #[test]
     fn test_constant_values() {
         const T_INT: Type = Type::usize();
-        const V_INT: Value = Value::Hashable(HashableValue::Int(257));
-        V_INT.check_type(&T_INT).unwrap();
-        custom_value(17.4).check_type(&CLASSIC_T).unwrap();
+        const V_INT: Value = CustomTestValue(Some(TypeBound::Eq)).into();
+        T_INT.check_type(&V_INT).unwrap();
+        CLASSIC_T.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
-            V_INT.check_type(&CLASSIC_T),
+            CLASSIC_T.check_type(&V_INT),
             Err(ConstTypeError::ValueCheckFail(t, v)) => t == CLASSIC_T && v == V_INT
         );
         let tuple_ty = Type::new_tuple(type_row![T_INT, CLASSIC_T]);
-        let tuple_val = Value::sequence(&[V_INT, custom_value(5.1)]);
-        tuple_val.check_type(&tuple_ty).unwrap();
-        let tuple_val2 = Value::sequence(&[custom_value(6.1), V_INT]);
+        let tuple_val = Value::tuple([V_INT, serialized_float(5.1)]);
+        tuple_ty.check_type(&tuple_val).unwrap();
+        let tuple_val2 = Value::tuple([serialized_float(6.1), V_INT]);
         assert_matches!(
-            tuple_val2.check_type(&tuple_ty),
+            tuple_ty.check_type(&tuple_val2),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
-        let tuple_val3 = Value::sequence(&[V_INT, custom_value(3.3), custom_value(2.0)]);
+        let tuple_val3 = Value::tuple([V_INT, serialized_float(3.3), serialized_float(2.0)]);
         assert_eq!(
-            tuple_val3.check_type(&tuple_ty),
+            tuple_ty.check_type(&tuple_val3),
             Err(ConstTypeError::TupleWrongLength)
         );
     }
@@ -252,17 +195,18 @@ mod test {
             "myrsrc",
             Some(TypeBound::Eq),
         );
-        let val = Value::Opaque((Box::new(CustomSerialized {
+        let val: Value = CustomSerialized {
             typ: typ_int.clone(),
-            value: Value::Number(6.into()),
-        }),));
+            value: YamlValue::Number(6.into()),
+        }
+        .into();
         let classic_t = Type::new_extension(typ_int);
         assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Eq));
-        val.check_type(&classic_t).unwrap();
+        classic_t.check_type(&val).unwrap();
 
         let typ_qb = CustomType::new("mytype", vec![], "myrsrc", Some(TypeBound::Eq));
         let t = Type::new_extension(typ_qb);
-        assert_matches!(val.check_type(&t.try_into().unwrap()),
+        assert_matches!(t.check_type(&val),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);
 
         assert_eq!(val, val);

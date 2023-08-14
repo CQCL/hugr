@@ -14,7 +14,7 @@ use crate::types::{CustomCheckFail, CustomType};
 /// A constant value/instance of a [HashableType]. Note there is no
 /// equivalent of [HashableType::Variable]; we can't have instances of that.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum PrimValue {
+pub(crate) enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
@@ -87,11 +87,15 @@ impl Value {
     pub fn sum(tag: usize, value: Value) -> Self {
         Self::Sum(tag, Box::new(value))
     }
+
+    pub fn custom<C: CustomConst>(c: C) -> Self {
+        Self::Prim(PrimValue::Extension((Box::new(c),)))
+    }
 }
 
 impl<T: CustomConst> From<T> for Value {
     fn from(v: T) -> Self {
-        Self::Prim(PrimValue::Extension((Box::new(v),)))
+        Self::custom(v)
     }
 }
 
@@ -121,7 +125,7 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A value stored as a serialized blob that can report its own type.
-struct CustomSerialized {
+pub struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
 }
@@ -148,5 +152,41 @@ impl CustomConst for CustomSerialized {
 impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
         (*self).equal_consts(other)
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use crate::types::{custom::test::COPYABLE_CUST, TypeBound};
+
+    use super::*;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+
+    /// A custom constant value used in testing that purports to be an instance
+    /// of a custom type with a specific type bound.
+    pub(crate) struct CustomTestValue(pub Option<TypeBound>);
+    #[typetag::serde]
+    impl CustomConst for CustomTestValue {
+        fn name(&self) -> SmolStr {
+            format!("CustomTestValue({:?})", self.0).into()
+        }
+
+        fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+            if self.0 == typ.bound() {
+                Ok(())
+            } else {
+                Err(CustomCheckFail::Message(
+                    "CustomTestValue check fail.".into(),
+                ))
+            }
+        }
+    }
+
+    pub(crate) fn serialized_float(f: f64) -> Value {
+        Value::custom(CustomSerialized {
+            typ: COPYABLE_CUST,
+            value: serde_yaml::Value::Number(f.into()),
+        })
     }
 }
