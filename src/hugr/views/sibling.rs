@@ -17,17 +17,16 @@
 // //! implemented by the [`SiblingSubgraph`] struct in this module, as well as
 // //! the [`SiblingGraph`] hierarchical view.
 
-use std::cell::OnceCell;
-
 use itertools::Itertools;
 use portgraph::{view::Subgraph, LinkView, PortIndex, PortView};
+use thiserror::Error;
 
 use crate::{
-    ops::{handle::NodeHandle, OpTag, OpTrait},
+    ops::{OpTag, OpTrait},
     Direction, Hugr, Node, Port, SimpleReplacement,
 };
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView, SiblingGraph};
+use super::{sealed::HugrInternals, HugrView};
 
 /// A boundary edge of a sibling subgraph.
 ///
@@ -38,7 +37,8 @@ use super::{sealed::HugrInternals, HierarchyView, HugrView, SiblingGraph};
 /// outgoing boundary edge.
 ///
 /// We uniquely identify a boundary edge by the node and port of the target of
-/// the edge. Source edges are not unique as they can involve copies.
+/// the edge. Source ports do not uniquely identify edges as they can be copied
+/// and be linked to multiple targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct BoundaryEdge {
     target: (Node, Port),
@@ -156,16 +156,12 @@ impl BoundaryEdge {
 ///
 /// The parent node itself is not included in the subgraph. If both incoming and
 /// outgoing ports are empty, the subgraph is taken to be all children of the
-/// parent and is equivalent to a [`SiblingGraph`].
-///
-/// This does not implement Sync as we use a `OnceCell` to cache the sibling
-/// graph.
+/// parent and is equivalent to a [`super::SiblingGraph`].
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph<'g, Base: HugrInternals> {
-    hugr: &'g Base,
     parent: Node,
     boundary: Vec<BoundaryEdge>,
-    sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
+    sibling_graph: Subgraph<'g, Base::Portgraph>,
 }
 
 impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
@@ -173,7 +169,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///
     /// The subgraph is given by the sibling graph of the root. If you wish to
     /// create a subgraph from another root, wrap the argument `region` in a
-    /// [`SiblingGraph`].
+    /// [`super::SiblingGraph`].
     pub fn from_sibling_graph(region: &'g Base) -> Self
     where
         Base: HugrView + HugrInternals,
@@ -186,7 +182,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///
     /// The subgraph is given by the nodes between the input and output
     /// children nodes of the parent node. If you wish to create a subgraph
-    /// from another root, wrap the `region` argument in a [`SiblingGraph`].
+    /// from another root, wrap the `region` argument in a [`super::SiblingGraph`].
     pub fn from_dataflow_graph(region: &'g Base) -> Self
     where
         Base: HugrView,
@@ -195,12 +191,12 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         let (inp, out) = region.children(parent).take(2).collect_tuple().unwrap();
         let incoming = BoundaryEdge::from_input_node(inp, region);
         let outgoing = BoundaryEdge::from_output_node(out, region);
-        let boundary = incoming.chain(outgoing).collect();
+        let boundary = incoming.chain(outgoing).collect_vec();
+        let sibling_graph = compute_subgraph(region, boundary.iter().copied());
         Self {
-            hugr: region,
             parent,
             boundary,
-            sibling_graph: OnceCell::new(),
+            sibling_graph,
         }
     }
 
@@ -225,25 +221,13 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         let outgoing = outgoing
             .into_iter()
             .flat_map(|(n, p)| BoundaryEdge::new_boundary_incoming(n, p, hugr));
-        let boundary = incoming.chain(outgoing).collect();
+        let boundary = incoming.chain(outgoing).collect_vec();
+        let sibling_graph = compute_subgraph(hugr, boundary.iter().copied());
         Self {
-            hugr,
             parent,
             boundary,
-            sibling_graph: OnceCell::new(),
+            sibling_graph,
         }
-    }
-
-    fn get_sibling_graph(&self) -> &Subgraph<'g, Base::Portgraph> {
-        self.sibling_graph.get_or_init(|| {
-            let graph = self.hugr.portgraph();
-            let boundary = self
-                .boundary
-                .iter()
-                .copied()
-                .map(|e| e.portgraph_internal_port(graph));
-            Subgraph::new_subgraph(graph, boundary)
-        })
     }
 
     /// An iterator over the nodes in the subgraph.
@@ -251,14 +235,11 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
-        self.get_sibling_graph().nodes_iter().flat_map(|index| {
-            let region: SiblingGraph<'_, Node, Base> = SiblingGraph::new(self.hugr, Node { index });
-            region.nodes().collect_vec()
-        })
+        self.sibling_graph.nodes_iter().map_into()
     }
 
     /// The number of incoming and outgoing wires of the subgraph.
-    pub fn boundary_signature(&self) -> (usize, usize)
+    pub fn boundary_size(&self) -> (usize, usize)
     where
         Base: HugrView,
     {
@@ -280,12 +261,20 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// `replacement` must be a hugr with DFG root and its signature must
     /// match the signature of the subgraph.
     ///
-    /// Panics if
-    ///  - `replacement` is not a hugr with DFG root, or
-    ///  - the DFG root does not have an input and output node, or
-    ///  - the number of incoming and outgoing ports in replacement does not
-    ///    match the subgraph boundary signature.
-    pub fn create_simple_replacement(&self, replacement: Hugr) -> SimpleReplacement
+    /// May return one of the following four errors
+    ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
+    ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
+    ///  - [`InvalidReplacement::InvalidDataflowParent`]: the replacement does
+    ///    not have an input and output node,
+    ///  - [`InvalidReplacement::InvalidBoundarySize`]: the number of incoming
+    ///    and outgoing ports in replacement does not match the subgraph boundary
+    ///    signature, or
+    ///  - [`InvalidReplacement::NonConvexSubgrah`]: the sibling subgraph is not
+    ///    convex.
+    pub fn create_simple_replacement(
+        &self,
+        replacement: Hugr,
+    ) -> Result<SimpleReplacement, InvalidReplacement>
     where
         Base: HugrView,
     {
@@ -293,14 +282,18 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
 
         let rep_root = replacement.root();
         if replacement.get_optype(rep_root).tag() != OpTag::Dfg {
-            panic!("Replacement must have DFG root");
+            return Err(InvalidReplacement::InvalidDataflowGraph);
         }
         let Some((rep_input, rep_output)) = replacement
             .children(rep_root)
             .take(2)
-            .collect_tuple() else { panic!("Invalid DFG node") };
-        let rep_inputs = BoundaryEdge::from_input_node(rep_input, &replacement);
-        let rep_outputs = BoundaryEdge::from_output_node(rep_output, &replacement);
+            .collect_tuple()
+        else { return Err(InvalidReplacement::InvalidDataflowParent) };
+        let rep_inputs = BoundaryEdge::from_input_node(rep_input, &replacement).collect_vec();
+        let rep_outputs = BoundaryEdge::from_output_node(rep_output, &replacement).collect_vec();
+        if (rep_inputs.len(), rep_outputs.len()) != self.boundary_size() {
+            return Err(InvalidReplacement::InvalidBoundarySize);
+        }
         let incoming = self
             .boundary
             .iter()
@@ -312,21 +305,56 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             .copied()
             .filter(|e| e.direction == Direction::Outgoing);
         let nu_inp = rep_inputs
+            .into_iter()
             .map(|e| e.target)
             .zip_eq(incoming.map(|e| e.target))
             .collect();
         let nu_out = outgoing
             .map(|e| e.target)
-            .zip_eq(rep_outputs.map(|e| e.target.1))
+            .zip_eq(rep_outputs.into_iter().map(|e| e.target.1))
             .collect();
 
-        SimpleReplacement::new(self.parent, removal, replacement, nu_inp, nu_out)
+        Ok(SimpleReplacement::new(
+            self.parent,
+            removal,
+            replacement,
+            nu_inp,
+            nu_out,
+        ))
     }
 
     /// Whether the sibling subgraph is convex.
     pub fn is_convex(&self) -> bool {
-        self.get_sibling_graph().is_convex()
+        self.sibling_graph.is_convex()
     }
+}
+
+/// Errors that can occur while constructing a [`SimpleReplacement`].
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum InvalidReplacement {
+    /// No DataflowParent root in replacement graph.
+    #[error("No DataflowParent root in replacement graph.")]
+    InvalidDataflowGraph,
+    /// Malformed DataflowParent in replacement graph.
+    #[error("Malformed DataflowParent in replacement graph.")]
+    InvalidDataflowParent,
+    /// Replacement graph boundary size mismatch.
+    #[error("Replacement graph boundary size mismatch.")]
+    InvalidBoundarySize,
+    /// SiblingSubgraph is not convex.
+    #[error("SiblingSubgraph is not convex.")]
+    NonConvexSubgrah,
+}
+
+fn compute_subgraph<Base: HugrInternals>(
+    hugr: &Base,
+    boundary: impl IntoIterator<Item = BoundaryEdge>,
+) -> Subgraph<'_, Base::Portgraph> {
+    let graph = hugr.portgraph();
+    let boundary = boundary
+        .into_iter()
+        .map(|e| e.portgraph_internal_port(graph));
+    Subgraph::new_subgraph(graph, boundary)
 }
 
 // /// A common trait for views of a HUGR sibling subgraph.
@@ -341,6 +369,7 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        hugr::views::{HierarchyView, SiblingGraph},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
         types::{AbstractSignature, SimpleType},
@@ -391,7 +420,7 @@ mod tests {
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
 
-        let rep = sub.create_simple_replacement(empty_dfg);
+        let rep = sub.create_simple_replacement(empty_dfg).unwrap();
 
         assert_eq!(rep.removal.len(), 1);
 
@@ -401,7 +430,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "zip_eq")]
     fn construct_simple_replacement_signature_panics() {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, dfg);
@@ -413,7 +441,10 @@ mod tests {
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
 
-        sub.create_simple_replacement(empty_dfg);
+        assert_eq!(
+            sub.create_simple_replacement(empty_dfg).unwrap_err(),
+            InvalidReplacement::InvalidBoundarySize
+        )
     }
 
     #[test]
