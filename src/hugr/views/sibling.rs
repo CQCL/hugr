@@ -168,61 +168,36 @@ pub struct SiblingSubgraph<'g, Base: HugrInternals> {
     sibling_graph: OnceCell<Subgraph<'g, Base::Portgraph>>,
 }
 
-impl<'g> SiblingSubgraph<'g, Hugr> {
-    /// A sibling subgraph from a [`SiblingGraph`] object.
+impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+    /// A sibling subgraph from a HUGR.
     ///
-    /// The subgraph is given by the entire sibling graph.
-    pub fn from_sibling_graph<Base, Root>(region: &'g SiblingGraph<'g, Root, Base>) -> Self
+    /// The subgraph is given by the sibling graph of the root. If you wish to
+    /// create a subgraph from another root, wrap the argument `region` in a
+    /// [`SiblingGraph`].
+    pub fn from_sibling_graph(region: &'g Base) -> Self
     where
         Base: HugrView + HugrInternals,
-        Root: NodeHandle,
     {
         let parent = region.root();
-        Self::new(region.base_hugr(), parent, [], [])
-    }
-}
-
-impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
-    /// A sibling subgraph given by a HUGR and a parent node.
-    ///
-    /// The subgraph is given by the entire sibling graph.
-    pub fn from_parent(hugr: &'g Base, parent: Node) -> Self {
-        Self {
-            hugr,
-            parent,
-            boundary: Vec::new(),
-            sibling_graph: OnceCell::new(),
-        }
+        Self::new(region, parent, [], [])
     }
 
     /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted HUGR.
     ///
     /// The subgraph is given by the nodes between the input and output
-    /// children nodes of the parent node.
-    pub fn from_dfg(hugr: &'g Base) -> Self
+    /// children nodes of the parent node. If you wish to create a subgraph
+    /// from another root, wrap the `region` argument in a [`SiblingGraph`].
+    pub fn from_dataflow_graph(region: &'g Base) -> Self
     where
         Base: HugrView,
     {
-        let parent = hugr.root();
-        Self::from_dfg_parent(hugr, parent)
-    }
-
-    /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`] node in a HUGR.
-    ///
-    /// The subgraph is given by the nodes between the input and output
-    /// children nodes of the parent node.
-    ///
-    /// Panics if it could not find an input and an output node.
-    pub fn from_dfg_parent(hugr: &'g Base, parent: Node) -> Self
-    where
-        Base: HugrView,
-    {
-        let (inp, out) = hugr.children(parent).take(2).collect_tuple().unwrap();
-        let incoming = BoundaryEdge::from_input_node(inp, hugr);
-        let outgoing = BoundaryEdge::from_output_node(out, hugr);
+        let parent = region.root();
+        let (inp, out) = region.children(parent).take(2).collect_tuple().unwrap();
+        let incoming = BoundaryEdge::from_input_node(inp, region);
+        let outgoing = BoundaryEdge::from_output_node(out, region);
         let boundary = incoming.chain(outgoing).collect();
         Self {
-            hugr,
+            hugr: region,
             parent,
             boundary,
             sibling_graph: OnceCell::new(),
@@ -312,7 +287,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///    match the subgraph boundary signature.
     pub fn create_simple_replacement(&self, replacement: Hugr) -> SimpleReplacement
     where
-        Base: AsRef<Hugr>,
+        Base: HugrView,
     {
         let removal = self.nodes().collect();
 
@@ -395,7 +370,8 @@ mod tests {
     #[test]
     fn construct_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let from_root = SiblingSubgraph::from_parent(&hugr, func_root);
+        let sibling_graph: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
+        let from_root = SiblingSubgraph::from_sibling_graph(&sibling_graph);
         let region: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
         let from_region = SiblingSubgraph::from_sibling_graph(&region);
         assert_eq!(from_root.parent, from_region.parent);
@@ -405,7 +381,8 @@ mod tests {
     #[test]
     fn construct_simple_replacement() {
         let (mut hugr, func_root) = build_hugr().unwrap();
-        let sub = SiblingSubgraph::from_dfg_parent(&hugr, func_root);
+        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
+        let sub = SiblingSubgraph::from_dataflow_graph(&func);
 
         let empty_dfg = {
             let builder =
@@ -427,7 +404,8 @@ mod tests {
     #[should_panic(expected = "zip_eq")]
     fn construct_simple_replacement_signature_panics() {
         let (hugr, dfg) = build_hugr().unwrap();
-        let sub = SiblingSubgraph::from_dfg_parent(&hugr, dfg);
+        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, dfg);
+        let sub = SiblingSubgraph::from_sibling_graph(&func);
 
         let empty_dfg = {
             let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB])).unwrap();
@@ -441,7 +419,8 @@ mod tests {
     #[test]
     fn convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let sub = SiblingSubgraph::from_dfg_parent(&hugr, func_root);
+        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
+        let sub = SiblingSubgraph::from_dataflow_graph(&func);
         assert!(sub.is_convex());
     }
 
