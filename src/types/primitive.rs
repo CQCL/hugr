@@ -19,11 +19,9 @@ pub(super) enum PrimType {
 
 impl PrimType {
     pub(super) fn bound(&self) -> Option<TypeBound> {
-        // TODO update once inner types are updated to new TypeBound
-        return None;
         match self {
-            PrimType::E(_c) => todo!(),
-            PrimType::A(_) => todo!(),
+            PrimType::E(c) => c.bound(),
+            PrimType::A(a) => a.bound,
             PrimType::Graph(_) => Some(TypeBound::Copyable),
         }
     }
