@@ -44,13 +44,12 @@ pub(crate) use impl_box_clone;
 /// ```
 /// # use hugr::macros::type_row;
 /// # use hugr::types::{AbstractSignature, Type, TypeRow};
-/// const B: Type = Type::Classic(Type::usize());
-/// const QB: Type = Type::Qubit;
-/// let static_row: TypeRow = type_row![B, QB];
-/// let dynamic_row: TypeRow = vec![B, B, B].into();
+/// const U: Type = Type::unit();
+/// let static_row: TypeRow = type_row![U, U];
+/// let dynamic_row: TypeRow = vec![U, U, U].into();
 /// let sig = AbstractSignature::new_df(static_row, dynamic_row).pure();
 ///
-/// let repeated_row: TypeRow = type_row![B; 3];
+/// let repeated_row: TypeRow = type_row![U; 3];
 /// assert_eq!(repeated_row, *sig.output());
 /// ```
 #[allow(unused_macros)]

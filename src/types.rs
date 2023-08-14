@@ -17,6 +17,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::type_row;
 use crate::{ops::AliasDecl, resource::PRELUDE};
 use std::fmt::Debug;
 
@@ -202,6 +203,11 @@ impl Type {
     /// New simple predicate with empty Tuple variants
     pub fn new_simple_predicate(size: usize) -> Self {
         Self::new_predicate(std::iter::repeat(vec![]).take(size))
+    }
+
+    /// New unit type (empty tuple).
+    pub const fn unit() -> Self {
+        Type(TypeEnum::Tuple(type_row![]), Some(TypeBound::Eq))
     }
 
     /// Report the least upper TypeBound, if there is one.
