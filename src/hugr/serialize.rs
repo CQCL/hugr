@@ -8,7 +8,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::hugr::{Hugr, HugrMut, NodeType};
+use crate::hugr::{Hugr, HugrInternalsMut, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::resource::ResourceSet;

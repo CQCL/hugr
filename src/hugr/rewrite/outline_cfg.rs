@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::hugr::rewrite::Rewrite;
-use crate::hugr::{HugrMut, HugrView};
+use crate::hugr::{HugrInternalsMut, HugrView};
 use crate::ops;
 use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
 use crate::{type_row, Hugr, Node};

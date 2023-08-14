@@ -10,7 +10,7 @@ pub mod views;
 use std::collections::VecDeque;
 use std::iter;
 
-pub(crate) use self::hugrmut::HugrMut;
+pub(crate) use self::hugrmut::HugrInternalsMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
