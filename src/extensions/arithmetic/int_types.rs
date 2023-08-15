@@ -25,7 +25,7 @@ pub fn int_type(n: u8) -> Type {
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
         RESOURCE_ID,
-        Some(TypeBound::Copyable),
+        TypeBound::Copyable,
     ))
 }
 

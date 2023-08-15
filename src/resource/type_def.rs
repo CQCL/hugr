@@ -16,8 +16,6 @@ use crate::types::TypeBound;
 /// The type bound of a [`TypeDef`]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TypeDefBound {
-    /// Explicitly no bound.
-    NoBound,
     /// Defined by an explicit bound.
     Explicit(TypeBound),
     /// Derived as the least upper bound of the marked parameters.
@@ -87,21 +85,21 @@ impl TypeDef {
         ))
     }
     /// The [`TypeBound`] of the definition.
-    pub fn bound(&self, args: &[TypeArg]) -> Option<TypeBound> {
+    pub fn bound(&self, args: &[TypeArg]) -> TypeBound {
         match &self.bound {
-            TypeDefBound::NoBound => None,
-            TypeDefBound::Explicit(bound) => Some(*bound),
+            TypeDefBound::Explicit(bound) => *bound,
             TypeDefBound::FromParams(indices) => {
                 let args: Vec<_> = args.iter().collect();
                 if indices.is_empty() {
                     // Assume most general case
-                    return None;
+                    return TypeBound::Any;
                 }
                 least_upper_bound(indices.iter().map(|i| {
-                    args.get(*i).and_then(|ta| match ta {
-                        TypeArg::Type(s) => s.least_upper_bound(),
+                    let ta = args.get(*i);
+                    match ta {
+                        Some(TypeArg::Type(s)) => s.least_upper_bound(),
                         _ => panic!("TypeArg index does not refer to a type."),
-                    })
+                    }
                 }))
             }
         }
@@ -160,7 +158,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::Type(Some(TypeBound::Copyable))],
+            params: vec![TypeParam::Type(TypeBound::Copyable)],
             resource: "MyRsrc".into(),
             description: "Some parameterised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
@@ -171,16 +169,16 @@ mod test {
             ))])
             .unwrap(),
         );
-        assert_eq!(typ.least_upper_bound(), Some(TypeBound::Copyable));
+        assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
         let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(EQ_T)]).unwrap());
-        assert_eq!(typ2.least_upper_bound(), Some(TypeBound::Eq));
+        assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
             def.instantiate_concrete([TypeArg::Type(ANY_T)]),
             Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
                 TypeArg::Type(ANY_T),
-                TypeParam::Type(Some(TypeBound::Copyable))
+                TypeParam::Type(TypeBound::Copyable)
             )))
         );
         // Too few arguments:

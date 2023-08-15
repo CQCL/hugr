@@ -65,7 +65,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, Some(TypeBound::Copyable))
+        CustomType::new(self.name(), [], RESOURCE_ID, TypeBound::Copyable)
     }
 
     fn add_to_resource(self, resource: &mut Resource) {
@@ -331,7 +331,7 @@ mod test {
             custom.name().clone(),
             vec![],
             "wrong_resource",
-            Some(TypeBound::Copyable),
+            TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),

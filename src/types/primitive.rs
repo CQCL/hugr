@@ -18,11 +18,11 @@ pub(super) enum PrimType {
 }
 
 impl PrimType {
-    pub(super) fn bound(&self) -> Option<TypeBound> {
+    pub(super) fn bound(&self) -> TypeBound {
         match self {
             PrimType::E(c) => c.bound(),
             PrimType::A(a) => a.bound,
-            PrimType::Graph(_) => Some(TypeBound::Copyable),
+            PrimType::Graph(_) => TypeBound::Copyable,
         }
     }
 }

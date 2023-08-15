@@ -38,7 +38,7 @@ lazy_static! {
             prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![TypeParam::Type(None), TypeParam::USize],
+                vec![TypeParam::Type(TypeBound::Any), TypeParam::USize],
                 "array".into(),
                 TypeDefBound::FromParams(vec![0]),
             )
@@ -49,7 +49,7 @@ lazy_static! {
                 SmolStr::new_inline("qubit"),
                 vec![],
                 "qubit".into(),
-                TypeDefBound::NoBound,
+                TypeDefBound::Explicit(TypeBound::Any),
             )
             .unwrap();
         prelude
@@ -59,13 +59,13 @@ lazy_static! {
 pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
     SmolStr::new_inline("usize"),
     SmolStr::new_inline("prelude"),
-    Some(TypeBound::Eq),
+    TypeBound::Eq,
 );
 
 pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
     SmolStr::new_inline("qubit"),
     SmolStr::new_inline("prelude"),
-    None,
+    TypeBound::Any,
 );
 
 pub(crate) const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
@@ -83,5 +83,5 @@ pub fn new_array(typ: Type, size: u64) -> Type {
 pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
     smol_str::SmolStr::new_inline("error"),
     smol_str::SmolStr::new_inline("prelude"),
-    Some(TypeBound::Eq),
+    TypeBound::Eq,
 ));

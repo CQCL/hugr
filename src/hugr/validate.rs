@@ -393,7 +393,7 @@ impl<'a> ValidationContext<'a> {
                 true
             }
             ty => {
-                if !local && !matches!(&ty, EdgeKind::Value(t) if t.least_upper_bound().is_some()) {
+                if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
                     return Err(InterGraphEdgeError::NonClassicalData {
                         from,
                         from_offset,

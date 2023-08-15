@@ -22,7 +22,7 @@ pub struct CustomType {
     /// [`TypeParam`]: super::type_param::TypeParam
     args: Vec<TypeArg>,
     /// The [TypeBound] describing what can be done to instances of this type
-    bound: Option<TypeBound>,
+    bound: TypeBound,
 }
 
 impl CustomType {
@@ -31,7 +31,7 @@ impl CustomType {
         id: impl Into<SmolStr>,
         args: impl Into<Vec<TypeArg>>,
         resource: impl Into<ResourceId>,
-        bound: Option<TypeBound>,
+        bound: TypeBound,
     ) -> Self {
         Self {
             id: id.into(),
@@ -42,7 +42,7 @@ impl CustomType {
     }
 
     /// Creates a new opaque type (constant version, no type arguments)
-    pub const fn new_simple(id: SmolStr, resource: ResourceId, bound: Option<TypeBound>) -> Self {
+    pub const fn new_simple(id: SmolStr, resource: ResourceId, bound: TypeBound) -> Self {
         Self {
             id,
             args: vec![],
@@ -52,7 +52,7 @@ impl CustomType {
     }
 
     /// Returns the bound of this [`CustomType`].
-    pub const fn bound(&self) -> Option<TypeBound> {
+    pub const fn bound(&self) -> TypeBound {
         self.bound
     }
 }
@@ -91,18 +91,18 @@ pub(crate) mod test {
     pub(crate) const EQ_CUST: CustomType = CustomType::new_simple(
         SmolStr::new_inline("MyEqType"),
         SmolStr::new_inline("MyRsrc"),
-        Some(TypeBound::Eq),
+        TypeBound::Eq,
     );
 
     pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
         SmolStr::new_inline("MyCopyableType"),
         SmolStr::new_inline("MyRsrc"),
-        Some(TypeBound::Copyable),
+        TypeBound::Copyable,
     );
 
     pub(crate) const ANY_CUST: CustomType = CustomType::new_simple(
         SmolStr::new_inline("MyAnyType"),
         SmolStr::new_inline("MyRsrc"),
-        None,
+        TypeBound::Any,
     );
 }

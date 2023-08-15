@@ -155,7 +155,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        bound: Option<TypeBound>,
+        bound: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
@@ -206,7 +206,8 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type = module_builder.add_alias_declare("qubit_state", None)?;
+            let qubit_state_type =
+                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
 
             let f_build = module_builder.define_function(
                 "main",

@@ -160,10 +160,7 @@ mod test {
         ))?;
         let c = b.add_constant(Const::predicate(
             0,
-            Value::tuple([
-                CustomTestValue(Some(TypeBound::Eq)).into(),
-                serialized_float(5.1),
-            ]),
+            Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
@@ -217,18 +214,13 @@ mod test {
 
     #[test]
     fn test_yaml_const() {
-        let typ_int = CustomType::new(
-            "mytype",
-            vec![TypeArg::USize(8)],
-            "myrsrc",
-            Some(TypeBound::Eq),
-        );
+        let typ_int = CustomType::new("mytype", vec![TypeArg::USize(8)], "myrsrc", TypeBound::Eq);
         let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Eq));
+        assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();
 
-        let typ_qb = CustomType::new("mytype", vec![], "myrsrc", Some(TypeBound::Eq));
+        let typ_qb = CustomType::new("mytype", vec![], "myrsrc", TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
         assert_matches!(t.check_type(&val),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);

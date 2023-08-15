@@ -6,7 +6,6 @@
 
 use thiserror::Error;
 
-use super::optional_bound_contains;
 use super::CustomType;
 use super::Type;
 use super::TypeBound;
@@ -17,7 +16,7 @@ use super::TypeBound;
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
-    Type(Option<TypeBound>),
+    Type(TypeBound),
     /// Argument is a [TypeArg::USize].
     USize,
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
@@ -58,7 +57,7 @@ impl CustomTypeArg {
     /// Create a new CustomTypeArg. Enforces that the type must be checkable for
     /// equality.
     pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
-        if typ.bound() == Some(TypeBound::Eq) {
+        if typ.bound() == TypeBound::Eq {
             Ok(Self { typ, value })
         } else {
             Err("Only TypeBound::Eq CustomTypes can be used as TypeArgs")
@@ -69,9 +68,7 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(t), TypeParam::Type(bound))
-            if optional_bound_contains(*bound, t.least_upper_bound()) =>
-        {
+        (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
             Ok(())
         }
         (TypeArg::Sequence(items), TypeParam::List(param)) => {
@@ -89,7 +86,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
         (TypeArg::USize(_), TypeParam::USize) => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param))
-            if param.bound() == Some(TypeBound::Eq) && &arg.typ == param =>
+            if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())
         }

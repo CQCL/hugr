@@ -173,7 +173,7 @@ pub(crate) mod test {
 
     /// A custom constant value used in testing that purports to be an instance
     /// of a custom type with a specific type bound.
-    pub(crate) struct CustomTestValue(pub Option<TypeBound>);
+    pub(crate) struct CustomTestValue(pub TypeBound);
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
         fn name(&self) -> SmolStr {

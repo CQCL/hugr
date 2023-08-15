@@ -41,16 +41,19 @@ pub enum EdgeKind {
 impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
-        match self {
-            EdgeKind::Value(t) => t.least_upper_bound().is_none(),
-            _ => false,
-        }
+        matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
+#[derive(
+    Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
+)]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
+    /// The equality operation is valid on this type.
+    #[serde(rename = "A")]
+    #[default]
+    Any,
     /// The equality operation is valid on this type.
     #[serde(rename = "E")]
     Eq,
@@ -72,37 +75,19 @@ impl TypeBound {
     }
 
     /// Report if this bound contains another.
-    pub fn contains(&self, other: TypeBound) -> bool {
+    pub const fn contains(&self, other: TypeBound) -> bool {
         use TypeBound::*;
-        match (self, other) {
-            (Copyable, Eq) => true,
-            (Eq, Copyable) => false,
-            _ => true,
-        }
+        matches!((self, other), (Any, _) | (_, Eq) | (Copyable, Copyable))
     }
 }
 
-/// Check containment of optional type bound (where None implies no bound -
-/// which contains bounded types).
-pub fn optional_bound_contains(bound: Option<TypeBound>, other: Option<TypeBound>) -> bool {
-    match (bound, other) {
-        // If no bound on left, always contains.
-        (None, _) => true,
-        // If some bound on left but right is unbounded, cannot contain.
-        (_, None) => false,
-        (Some(left), Some(right)) => left.contains(right),
-    }
-}
 /// Calculate the least upper bound for an iterator of bounds
-pub(crate) fn least_upper_bound(
-    mut tags: impl Iterator<Item = Option<TypeBound>>,
-) -> Option<TypeBound> {
-    tags.fold_while(Some(TypeBound::Eq), |acc, new| {
-        if let (Some(acc), Some(new)) = (acc, new) {
-            Continue(Some(acc.union(new)))
+pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
+    tags.fold_while(TypeBound::Eq, |acc, new| {
+        if acc == TypeBound::Any || new == TypeBound::Any {
+            Done(TypeBound::Any)
         } else {
-            // if any type is unbounded, short-circuit
-            Done(None)
+            Continue(acc.union(new))
         }
     })
     .into_inner()
@@ -118,8 +103,8 @@ enum TypeEnum {
     Sum(TypeRow),
 }
 impl TypeEnum {
-    /// The smallest type bound - if any - that covers the whole type.
-    fn least_upper_bound(&self) -> Option<TypeBound> {
+    /// The smallest type bound that covers the whole type.
+    fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
@@ -145,7 +130,7 @@ impl TypeEnum {
 ///
 /// const unit: Type = Type::new_unit();
 /// let sum = Type::new_sum(type_row![unit, unit]);
-/// assert_eq!(sum.least_upper_bound(), Some(TypeBound::Eq));
+/// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 ///
 /// ```
 ///
@@ -153,11 +138,11 @@ impl TypeEnum {
 /// # use hugr::types::{Type, TypeBound, AbstractSignature};
 ///
 /// let graph_type = Type::new_graph(AbstractSignature::new_linear(vec![]));
-/// assert_eq!(graph_type.least_upper_bound(), Some(TypeBound::Copyable));
+/// assert_eq!(graph_type.least_upper_bound(), TypeBound::Copyable);
 ///
 /// ```
 ///
-pub struct Type(TypeEnum, Option<TypeBound>);
+pub struct Type(TypeEnum, TypeBound);
 
 impl Type {
     /// Initialize a new graph type with a signature.
@@ -211,13 +196,19 @@ impl Type {
     /// New unit type (empty tuple).
     #[inline(always)]
     pub const fn new_unit() -> Self {
-        Type(TypeEnum::Tuple(type_row![]), Some(TypeBound::Eq))
+        Type(TypeEnum::Tuple(type_row![]), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
     #[inline(always)]
-    pub const fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub const fn least_upper_bound(&self) -> TypeBound {
         self.1
+    }
+
+    /// Report if the type is copyable - i.e.the least upper bound of the type
+    /// is contained by the copyable bound.
+    pub const fn copyable(&self) -> bool {
+        TypeBound::Copyable.contains(self.least_upper_bound())
     }
 }
 
@@ -256,9 +247,9 @@ pub(crate) mod test {
                 "my_custom",
                 [],
                 "my_resource",
-                Some(TypeBound::Copyable),
+                TypeBound::Copyable,
             )),
-            Type::new_alias(AliasDecl::new("my_alias", Some(TypeBound::Eq))),
+            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
         ]);
         assert_eq!(
             t.to_string(),

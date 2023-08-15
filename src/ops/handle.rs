@@ -74,12 +74,12 @@ pub struct FuncID<const DEF: bool>(Node);
 pub struct AliasID<const DEF: bool> {
     node: Node,
     name: SmolStr,
-    bound: Option<TypeBound>,
+    bound: TypeBound,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: Node, name: SmolStr, bound: Option<TypeBound>) -> Self {
+    pub fn new(node: Node, name: SmolStr, bound: TypeBound) -> Self {
         Self { node, name, bound }
     }
 

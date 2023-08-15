@@ -112,12 +112,12 @@ pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is classical
-    pub bound: Option<TypeBound>,
+    pub bound: TypeBound,
 }
 
 impl AliasDecl {
     /// Construct a new Alias declaration.
-    pub fn new(name: impl Into<SmolStr>, bound: Option<TypeBound>) -> Self {
+    pub fn new(name: impl Into<SmolStr>, bound: TypeBound) -> Self {
         Self {
             name: name.into(),
             bound,

@@ -19,7 +19,7 @@ pub fn float64_type() -> Type {
         FLOAT_TYPE_ID,
         [],
         RESOURCE_ID,
-        Some(TypeBound::Copyable),
+        TypeBound::Copyable,
     ))
 }
 
