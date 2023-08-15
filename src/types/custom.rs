@@ -52,7 +52,7 @@ impl CustomType {
     }
 
     /// Returns the bound of this [`CustomType`].
-    pub fn bound(&self) -> Option<TypeBound> {
+    pub const fn bound(&self) -> Option<TypeBound> {
         self.bound
     }
 }

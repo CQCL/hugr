@@ -100,16 +100,15 @@ mod test {
         },
         hugr::ValidationError,
         ops::Const,
-        type_row,
-        types::Type,
-        Hugr,
+        resource::prelude::USIZE_T,
+        type_row, Hugr,
     };
 
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![Type::new_usize()])?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_const(Const::usize(1))?;
 
@@ -133,11 +132,8 @@ mod test {
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
-                    let mut loop_b = fbuild.tail_loop_builder(
-                        vec![(Type::new_usize(), b1)],
-                        vec![],
-                        type_row![NAT],
-                    )?;
+                    let mut loop_b =
+                        fbuild.tail_loop_builder(vec![(USIZE_T, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(Const::true_val())?;
                     let [b1] = loop_b.input_wires_arr();

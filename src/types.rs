@@ -17,12 +17,11 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::ops::AliasDecl;
 use crate::type_row;
-use crate::{ops::AliasDecl, resource::PRELUDE};
 use std::fmt::Debug;
 
 use self::primitive::PrimType;
-use self::type_param::TypeArg;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -166,17 +165,6 @@ impl Type {
         Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
     }
 
-    /// Initialize a new usize type.
-    pub fn new_usize() -> Self {
-        Self::new_extension(
-            PRELUDE
-                .get_type("usize")
-                .unwrap()
-                .instantiate_concrete(vec![])
-                .unwrap(),
-        )
-    }
-
     /// Initialize a new tuple type by providing the elements..
     #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
@@ -191,8 +179,9 @@ impl Type {
 
     /// Initialize a new custom type.
     // TODO remove? Resources/TypeDefs should just provide `Type` directly
-    pub fn new_extension(opaque: CustomType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::E(opaque)))
+    pub const fn new_extension(opaque: CustomType) -> Self {
+        let bound = opaque.bound();
+        Type(TypeEnum::Prim(PrimType::E(opaque)), bound)
     }
 
     /// Initialize a new alias.
@@ -205,14 +194,6 @@ impl Type {
         Self(type_e, bound)
     }
 
-    /// Initialize a new array of type `typ` of length `size`
-    pub fn new_array(typ: Type, size: u64) -> Self {
-        let array_def = PRELUDE.get_type("array").unwrap();
-        let custom_t = array_def
-            .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::USize(size)])
-            .unwrap();
-        Self::new_extension(custom_t)
-    }
     /// New Sum of Tuple types, used as predicates in branching.
     /// Tuple rows are defined in order by input rows.
     pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
@@ -253,58 +234,23 @@ where
         .into()
 }
 
-pub(crate) const ERROR_TYPE: Type = Type(
-    TypeEnum::Prim(primitive::PrimType::E(CustomType::new_simple(
-        smol_str::SmolStr::new_inline("error"),
-        smol_str::SmolStr::new_inline("MyRsrc"),
-        Some(TypeBound::Eq),
-    ))),
-    Some(TypeBound::Copyable),
-);
-
 #[cfg(test)]
 pub(crate) mod test {
 
-    use smol_str::SmolStr;
-
     use super::{
         custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
-        primitive::PrimType,
         *,
     };
-    use crate::ops::AliasDecl;
+    use crate::{ops::AliasDecl, resource::prelude::USIZE_T};
 
-    pub(crate) const EQ_T: Type = Type(TypeEnum::Prim(PrimType::E(EQ_CUST)), Some(TypeBound::Eq));
-
-    pub(crate) const COPYABLE_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
-        Some(TypeBound::Copyable),
-    );
-
-    pub(crate) const ANY_T: Type = Type(TypeEnum::Prim(PrimType::E(ANY_CUST)), None);
-
-    pub(crate) const USIZE_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
-            SmolStr::new_inline("usize"),
-            SmolStr::new_inline("prelude"),
-            Some(TypeBound::Eq),
-        ))),
-        Some(TypeBound::Eq),
-    );
-
-    pub(crate) const QB_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
-            SmolStr::new_inline("qubit"),
-            SmolStr::new_inline("prelude"),
-            None,
-        ))),
-        None,
-    );
+    pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
+    pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
+    pub(crate) const ANY_T: Type = Type::new_extension(ANY_CUST);
 
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            Type::new_usize(),
+            USIZE_T,
             Type::new_graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",

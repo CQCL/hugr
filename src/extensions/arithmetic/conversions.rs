@@ -8,7 +8,7 @@ use crate::{
     resource::{ResourceSet, SignatureError},
     types::{
         type_param::{TypeArg, TypeParam},
-        Type, TypeRow, ERROR_TYPE,
+        Type, TypeRow,
     },
     utils::collect_array,
     Resource,
@@ -25,7 +25,11 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), S
     let n: u8 = get_width(arg)?;
     Ok((
         vec![float64_type()].into(),
-        vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        vec![Type::new_sum(vec![
+            int_type(n),
+            crate::resource::prelude::ERROR_TYPE,
+        ])]
+        .into(),
         ResourceSet::default(),
     ))
 }
