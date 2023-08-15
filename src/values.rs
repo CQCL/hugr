@@ -9,7 +9,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
-use crate::types::{CustomCheckFail, CustomType};
+use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -112,7 +112,7 @@ pub trait CustomConst:
     fn name(&self) -> SmolStr;
 
     /// Check the value is a valid instance of the provided type.
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail>;
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -144,11 +144,14 @@ impl CustomConst for CustomSerialized {
         format!("yaml:{:?}", self.value).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         if &self.typ == typ {
             Ok(())
         } else {
-            Err(CustomCheckFail::TypeMismatch(typ.clone(), self.typ.clone()))
+            Err(CustomCheckFailure::TypeMismatch {
+                expected: typ.clone(),
+                found: self.typ.clone(),
+            })
         }
     }
 
@@ -180,11 +183,11 @@ pub(crate) mod test {
             format!("CustomTestValue({:?})", self.0).into()
         }
 
-        fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+        fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
             if self.0 == typ.bound() {
                 Ok(())
             } else {
-                Err(CustomCheckFail::Message(
+                Err(CustomCheckFailure::Message(
                     "CustomTestValue check fail.".into(),
                 ))
             }

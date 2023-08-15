@@ -50,7 +50,11 @@ pub fn resource() -> Resource {
                 let n: u64 = match a {
                     TypeArg::USize(n) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(TypeArgError::TypeMismatch {
+                            arg: a.clone(),
+                            param: H_INT,
+                        }
+                        .into());
                     }
                 };
                 Ok((
@@ -72,7 +76,11 @@ pub fn resource() -> Resource {
                 let n: u64 = match a {
                     TypeArg::USize(n) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(TypeArgError::TypeMismatch {
+                            arg: a.clone(),
+                            param: H_INT,
+                        }
+                        .into());
                     }
                 };
                 Ok((

@@ -34,7 +34,11 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
     let n: u8 = match arg {
         TypeArg::USize(n) => *n as u8,
         _ => {
-            return Err(TypeArgError::TypeMismatch(arg.clone(), TypeParam::USize).into());
+            return Err(TypeArgError::TypeMismatch {
+                arg: arg.clone(),
+                param: TypeParam::USize,
+            }
+            .into());
         }
     };
     if (n != 1)

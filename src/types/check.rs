@@ -7,10 +7,15 @@ use super::{primitive::PrimType, CustomType, Type, TypeEnum};
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
-pub enum CustomCheckFail {
+pub enum CustomCheckFailure {
     /// The value had a specific type that was not what was expected
-    #[error("Expected type: {0} but value was of type: {1}")]
-    TypeMismatch(CustomType, CustomType),
+    #[error("Expected type: {expected} but value was of type: {found}")]
+    TypeMismatch {
+        /// The expected custom type.
+        expected: CustomType,
+        /// The custom type found when checking.
+        found: CustomType,
+    },
     /// Any other message
     #[error("{0}")]
     Message(String),
@@ -37,7 +42,7 @@ pub enum ConstTypeError {
     ValueCheckFail(Type, Value),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
-    CustomCheckFail(#[from] CustomCheckFail),
+    CustomCheckFail(#[from] CustomCheckFailure),
 }
 
 impl PrimType {

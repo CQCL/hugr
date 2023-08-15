@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomCheckFail, Type, TypeRow};
+use crate::types::{CustomCheckFailure, Type, TypeRow};
 use crate::types::{CustomType, TypeBound};
 use crate::values::CustomConst;
 use crate::Resource;
@@ -112,13 +112,13 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         let self_typ = self.rotation_type();
 
         if &self_typ.custom_type() == typ {
             Ok(())
         } else {
-            Err(CustomCheckFail::Message(
+            Err(CustomCheckFailure::Message(
                 "Rotation constant type mismatch.".into(),
             ))
         }

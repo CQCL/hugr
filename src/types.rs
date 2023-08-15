@@ -8,7 +8,7 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-pub use check::{ConstTypeError, CustomCheckFail};
+pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
 pub use signature::{AbstractSignature, Signature, SignatureDescription};
 pub use type_row::TypeRow;

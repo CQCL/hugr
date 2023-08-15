@@ -91,18 +91,22 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
 
-        _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
+        _ => Err(TypeArgError::TypeMismatch {
+            arg: arg.clone(),
+            param: param.clone(),
+        }),
     }
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum TypeArgError {
+    #[allow(missing_docs)]
     /// For now, general case of a type arg not fitting a param.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Type argument {0:?} does not fit declared parameter {1:?}")]
-    TypeMismatch(TypeArg, TypeParam),
+    #[error("Type argument {arg:?} does not fit declared parameter {param:?}")]
+    TypeMismatch { param: TypeParam, arg: TypeArg },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -114,7 +118,7 @@ pub enum TypeArgError {
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0:?}")]
-    OpaqueTypeMismatch(#[from] crate::types::CustomCheckFail),
+    OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),

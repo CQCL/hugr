@@ -176,10 +176,12 @@ mod test {
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
             def.instantiate_concrete([TypeArg::Type(ANY_T)]),
-            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::Type(ANY_T),
-                TypeParam::Type(TypeBound::Copyable)
-            )))
+            Err(SignatureError::TypeArgMismatch(
+                TypeArgError::TypeMismatch {
+                    arg: TypeArg::Type(ANY_T),
+                    param: TypeParam::Type(TypeBound::Copyable)
+                }
+            ))
         );
         // Too few arguments:
         assert_eq!(

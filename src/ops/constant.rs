@@ -2,7 +2,7 @@
 
 use crate::{
     resource::prelude::{USIZE_CUSTOM_T, USIZE_T},
-    types::{ConstTypeError, CustomCheckFail, CustomType, EdgeKind, Type, TypeRow},
+    types::{ConstTypeError, CustomCheckFailure, CustomType, EdgeKind, Type, TypeRow},
     values::{CustomConst, Value},
 };
 
@@ -91,11 +91,14 @@ impl Const {
                 format!("ConstUsize({:?})", self.0).into()
             }
 
-            fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+            fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
                 if typ == &USIZE_CUSTOM_T {
                     Ok(())
                 } else {
-                    Err(CustomCheckFail::TypeMismatch(USIZE_CUSTOM_T, typ.clone()))
+                    Err(CustomCheckFailure::TypeMismatch {
+                        expected: USIZE_CUSTOM_T,
+                        found: typ.clone(),
+                    })
                 }
             }
         }
@@ -136,7 +139,7 @@ mod test {
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         type_row,
         types::{test::COPYABLE_T, TypeRow},
-        types::{test::EQ_T, type_param::TypeArg, CustomCheckFail},
+        types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},
         types::{AbstractSignature, CustomType, Type, TypeBound},
         values::{
             test::{serialized_float, CustomTestValue},
@@ -194,7 +197,7 @@ mod test {
         assert_matches!(
             COPYABLE_T.check_type(&int_value),
             Err(ConstTypeError::CustomCheckFail(
-                CustomCheckFail::TypeMismatch(_, _)
+                CustomCheckFailure::TypeMismatch { .. }
             ))
         );
         let tuple_ty = Type::new_tuple(vec![int_type, COPYABLE_T]);
@@ -223,7 +226,7 @@ mod test {
         let typ_qb = CustomType::new("mytype", vec![], "myrsrc", TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
         assert_matches!(t.check_type(&val),
-            Err(ConstTypeError::CustomCheckFail(CustomCheckFail::TypeMismatch(a, b))) => a == typ_int && b == typ_qb);
+            Err(ConstTypeError::CustomCheckFail(CustomCheckFailure::TypeMismatch{expected, found})) => expected == typ_int && found == typ_qb);
 
         assert_eq!(val, val);
     }
