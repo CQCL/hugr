@@ -45,7 +45,6 @@ impl TypeRow {
             pub fn iter(&self) -> impl Iterator<Item = &Type>;
 
             /// Returns the number of types in the row.
-            #[inline(always)]
             pub fn len(&self) -> usize;
 
             /// Mutable iterator over the types in the row.
@@ -54,12 +53,10 @@ impl TypeRow {
             /// Allow access (consumption) of the contained elements
             pub fn into_owned(self) -> Vec<Type>;
 
-            #[inline(always)]
             /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
             pub fn get(&self, offset: usize) -> Option<&Type>;
 
             /// Returns `true` if the row contains no types.
-            #[inline(always)]
             pub fn is_empty(&self) -> bool ;
         }
     }
