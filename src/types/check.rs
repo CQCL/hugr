@@ -42,16 +42,15 @@ pub enum ConstTypeError {
 
 impl PrimType {
     pub fn check_type(&self, val: &PrimValue) -> Result<(), ConstTypeError> {
-        if let PrimType::A(alias) = self {
+        if let PrimType::Alias(alias) = self {
             return Err(ConstTypeError::NoAliases(alias.name().to_string()));
         }
 
         match (self, val) {
-            (PrimType::E(e), PrimValue::Extension(e_val)) => {
+            (PrimType::Extension(e), PrimValue::Extension(e_val)) => {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (PrimType::A(s), _) => Err(ConstTypeError::NoAliases(s.name().to_string())),
             (PrimType::Graph(_), PrimValue::Graph) => todo!(),
             _ => Err(ConstTypeError::ValueCheckFail(
                 Type::new(TypeEnum::Prim(self.clone())),

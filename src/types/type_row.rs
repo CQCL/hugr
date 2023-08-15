@@ -47,7 +47,7 @@ impl TypeRow {
             /// Returns the number of types in the row.
             pub fn len(&self) -> usize;
 
-            /// Mutable iterator over the types in the row.
+            /// Mutable vector of the types in the row.
             pub fn to_mut(&mut self) -> &mut Vec<Type>;
 
             /// Allow access (consumption) of the contained elements

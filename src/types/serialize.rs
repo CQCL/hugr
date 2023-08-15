@@ -35,8 +35,8 @@ impl From<Type> for SerSimpleType {
         let Type(value, _) = value;
         match value {
             TypeEnum::Prim(t) => match t {
-                PrimType::E(c) => SerSimpleType::Opaque(c),
-                PrimType::A(a) => SerSimpleType::Alias(a),
+                PrimType::Extension(c) => SerSimpleType::Opaque(c),
+                PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
             TypeEnum::Sum(inner) => SerSimpleType::Sum {

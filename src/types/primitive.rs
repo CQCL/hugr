@@ -10,9 +10,9 @@ use super::{AbstractSignature, CustomType, TypeBound};
 pub(super) enum PrimType {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
-    E(CustomType),
+    Extension(CustomType),
     #[display(fmt = "Alias({})", "_0.name()")]
-    A(AliasDecl),
+    Alias(AliasDecl),
     #[display(fmt = "Graph({})", "_0")]
     Graph(Box<AbstractSignature>),
 }
@@ -20,8 +20,8 @@ pub(super) enum PrimType {
 impl PrimType {
     pub(super) fn bound(&self) -> TypeBound {
         match self {
-            PrimType::E(c) => c.bound(),
-            PrimType::A(a) => a.bound,
+            PrimType::Extension(c) => c.bound(),
+            PrimType::Alias(a) => a.bound,
             PrimType::Graph(_) => TypeBound::Copyable,
         }
     }

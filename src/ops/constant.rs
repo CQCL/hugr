@@ -81,10 +81,10 @@ impl Const {
         Self::new(Value::tuple(values), Type::new_tuple(types)).unwrap()
     }
     /// Constant usize value.
-    pub fn usize(u: usize) -> Self {
+    pub fn usize(u: u64) -> Self {
         // TODO replace with prelude constant once implemented
         #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-        struct ConstUsize(usize);
+        struct ConstUsize(u64);
         #[typetag::serde]
         impl CustomConst for ConstUsize {
             fn name(&self) -> SmolStr {

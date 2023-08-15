@@ -150,7 +150,7 @@ impl Type {
         Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
     }
 
-    /// Initialize a new tuple type by providing the elements..
+    /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new(TypeEnum::Tuple(types.into()))
@@ -166,12 +166,12 @@ impl Type {
     // TODO remove? Resources/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Type(TypeEnum::Prim(PrimType::E(opaque)), bound)
+        Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
     }
 
     /// Initialize a new alias.
     pub fn new_alias(alias: AliasDecl) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::A(alias)))
+        Self::new(TypeEnum::Prim(PrimType::Alias(alias)))
     }
 
     fn new(type_e: TypeEnum) -> Self {
