@@ -163,10 +163,9 @@ mod test {
             tag: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type(Type::graph(AbstractSignature::new_df(
-                vec![],
-                vec![],
-            )))])
+            def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(
+                AbstractSignature::new_df(vec![], vec![]),
+            ))])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), Some(TypeBound::Copyable));

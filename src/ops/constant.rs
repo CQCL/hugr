@@ -107,7 +107,7 @@ impl Const {
 
         Self {
             value: ConstUsize(u).into(),
-            typ: Type::usize(),
+            typ: Type::new_usize(),
         }
     }
 }
@@ -195,7 +195,7 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        let int_type: Type = Type::usize();
+        let int_type: Type = Type::new_usize();
         let int_value = Const::usize(257).value;
         int_type.check_type(&int_value).unwrap();
         COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();

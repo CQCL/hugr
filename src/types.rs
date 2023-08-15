@@ -153,7 +153,7 @@ impl TypeEnum {
 /// ```
 /// # use hugr::types::{Type, TypeBound, AbstractSignature};
 ///
-/// let graph_type = Type::graph(AbstractSignature::new_linear(vec![]));
+/// let graph_type = Type::new_graph(AbstractSignature::new_linear(vec![]));
 /// assert_eq!(graph_type.least_upper_bound(), Some(TypeBound::Copyable));
 ///
 /// ```
@@ -162,12 +162,12 @@ pub struct Type(TypeEnum, Option<TypeBound>);
 
 impl Type {
     /// Initialize a new graph type with a signature.
-    pub fn graph(signature: AbstractSignature) -> Self {
+    pub fn new_graph(signature: AbstractSignature) -> Self {
         Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
     }
 
     /// Initialize a new usize type.
-    pub fn usize() -> Self {
+    pub fn new_usize() -> Self {
         Self::new_extension(
             PRELUDE
                 .get_type("usize")
@@ -304,8 +304,8 @@ pub(crate) mod test {
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            Type::usize(),
-            Type::graph(AbstractSignature::new_linear(vec![])),
+            Type::new_usize(),
+            Type::new_graph(AbstractSignature::new_linear(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],

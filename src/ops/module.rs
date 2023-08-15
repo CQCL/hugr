@@ -53,7 +53,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::graph(self.signature.clone())))
+        Some(EdgeKind::Static(Type::new_graph(self.signature.clone())))
     }
 }
 
@@ -80,7 +80,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::graph(self.signature.clone())))
+        Some(EdgeKind::Static(Type::new_graph(self.signature.clone())))
     }
 }
 

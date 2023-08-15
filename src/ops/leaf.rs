@@ -78,7 +78,7 @@ pub enum LeafOp {
 impl Default for LeafOp {
     fn default() -> Self {
         Self::Noop {
-            ty: Type::graph(AbstractSignature::new_linear(vec![])),
+            ty: Type::new_graph(AbstractSignature::new_linear(vec![])),
         }
     }
 }
@@ -157,7 +157,7 @@ impl OpTrait for LeafOp {
                 .instantiate_concrete(vec![])
                 .unwrap(),
         );
-        let bit_type: Type = Type::usize();
+        let bit_type: Type = Type::new_usize();
 
         match self {
             LeafOp::Noop { ty: typ } => {

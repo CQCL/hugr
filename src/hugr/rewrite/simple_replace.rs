@@ -510,8 +510,8 @@ mod test {
 
     #[test]
     fn test_replace_after_copy() {
-        let one_bit: Vec<Type> = vec![Type::usize()];
-        let two_bit: Vec<Type> = vec![Type::usize(), Type::usize()];
+        let one_bit: Vec<Type> = vec![Type::new_usize()];
+        let two_bit: Vec<Type> = vec![Type::new_usize(), Type::new_usize()];
 
         let mut builder =
             DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();

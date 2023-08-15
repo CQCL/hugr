@@ -43,8 +43,8 @@ impl From<Type> for SerSimpleType {
 impl From<SerSimpleType> for Type {
     fn from(value: SerSimpleType) -> Type {
         match value {
-            SerSimpleType::I => Type::usize(),
-            SerSimpleType::G(sig) => Type::graph(*sig),
+            SerSimpleType::I => Type::new_usize(),
+            SerSimpleType::G(sig) => Type::new_graph(*sig),
             SerSimpleType::Tuple { inner } => {
                 Type::new_tuple(inner.into_iter().map_into().collect_vec())
             }
@@ -67,16 +67,16 @@ mod test {
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::graph(AbstractSignature::new_linear(vec![]));
+        let g: Type = Type::new_graph(AbstractSignature::new_linear(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 
         // A Simple tuple
-        let t = Type::new_tuple(vec![Type::usize(), g]);
+        let t = Type::new_tuple(vec![Type::new_usize(), g]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum(vec![Type::usize(), COPYABLE_T]);
+        let t = Type::new_sum(vec![Type::new_usize(), COPYABLE_T]);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

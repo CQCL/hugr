@@ -109,7 +109,7 @@ mod test {
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![Type::usize()])?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![Type::new_usize()])?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_const(Const::usize(1))?;
 
@@ -134,7 +134,7 @@ mod test {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b = fbuild.tail_loop_builder(
-                        vec![(Type::usize(), b1)],
+                        vec![(Type::new_usize(), b1)],
                         vec![],
                         type_row![NAT],
                     )?;
