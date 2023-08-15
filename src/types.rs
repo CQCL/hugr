@@ -234,15 +234,6 @@ where
         .into()
 }
 
-pub(crate) const ERROR_TYPE: Type = Type(
-    TypeEnum::Prim(primitive::PrimType::E(CustomType::new_simple(
-        smol_str::SmolStr::new_inline("error"),
-        smol_str::SmolStr::new_inline("MyRsrc"),
-        Some(TypeBound::Eq),
-    ))),
-    Some(TypeBound::Copyable),
-);
-
 #[cfg(test)]
 pub(crate) mod test {
 

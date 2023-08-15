@@ -4,8 +4,8 @@ use smol_str::SmolStr;
 
 use super::super::logic::bool_type;
 use super::int_types::{get_width, int_type};
+use crate::resource::prelude::ERROR_TYPE;
 use crate::types::type_param::TypeParam;
-use crate::types::ERROR_TYPE;
 use crate::utils::collect_array;
 use crate::{
     resource::{ResourceSet, SignatureError},

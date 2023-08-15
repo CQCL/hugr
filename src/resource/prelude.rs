@@ -79,3 +79,9 @@ pub fn new_array(typ: Type, size: u64) -> Type {
         .unwrap();
     Type::new_extension(custom_t)
 }
+
+pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
+    smol_str::SmolStr::new_inline("error"),
+    smol_str::SmolStr::new_inline("prelude"),
+    Some(TypeBound::Eq),
+));
