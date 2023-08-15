@@ -18,15 +18,6 @@ lazy_static! {
         let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
         prelude
             .add_type(
-                SmolStr::new_inline("float64"),
-                vec![],
-                "float64".into(),
-                TypeDefBound::Explicit(crate::types::TypeBound::Copyable),
-            )
-            .unwrap();
-
-            prelude
-            .add_type(
                 SmolStr::new_inline("usize"),
                 vec![],
                 "usize".into(),
@@ -35,7 +26,7 @@ lazy_static! {
             .unwrap();
 
 
-            prelude
+        prelude
             .add_type(
                 SmolStr::new_inline("array"),
                 vec![TypeParam::Type(TypeBound::Any), TypeParam::USize],
@@ -44,7 +35,7 @@ lazy_static! {
             )
             .unwrap();
 
-            prelude
+        prelude
             .add_type(
                 SmolStr::new_inline("qubit"),
                 vec![],
