@@ -452,6 +452,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 #[cfg(test)]
 mod test {
     use crate::ops;
+    use crate::resource::prelude::USIZE_T;
     use crate::{ops::dataflow::IOTrait, ops::LeafOp, types::Type};
     use cool_asserts::assert_matches;
 
@@ -459,7 +460,7 @@ mod test {
 
     #[test]
     fn test_validate_io_nodes() {
-        let bit_type: Type = Type::new_usize();
+        let bit_type: Type = USIZE_T;
 
         let in_types: TypeRow = vec![bit_type.clone()].into();
         let out_types: TypeRow = vec![bit_type.clone(), bit_type.clone()].into();

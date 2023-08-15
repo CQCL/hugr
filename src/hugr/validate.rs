@@ -676,14 +676,13 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::resource::ResourceSet;
-    use crate::types::test::{QB_T, USIZE_T};
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: Type = USIZE_T;
-    const B: Type = USIZE_T;
-    const Q: Type = QB_T;
+    const NAT: Type = crate::resource::prelude::USIZE_T;
+    const B: Type = crate::resource::prelude::USIZE_T;
+    const Q: Type = crate::resource::prelude::QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
@@ -715,12 +714,7 @@ mod test {
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(
-                parent,
-                LeafOp::Noop {
-                    ty: Type::new_usize(),
-                },
-            )
+            .add_op_with_parent(parent, LeafOp::Noop { ty: NAT })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -887,12 +881,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(
-            output,
-            NodeType::pure(LeafOp::Noop {
-                ty: Type::new_usize(),
-            }),
-        );
+        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }));
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
@@ -1067,12 +1056,7 @@ mod test {
         );
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
-        let lcst = h.add_op_with_parent(
-            h.root(),
-            ops::LoadConstant {
-                datatype: Type::new_usize(),
-            },
-        )?;
+        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:

@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
+use crate::resource::prelude::{QB_T, USIZE_T};
 use crate::{
     resource::{ResourceId, ResourceSet},
     types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
@@ -150,14 +151,8 @@ impl OpTrait for LeafOp {
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
         // TODO use constants and type_row! once static prelude is implemented
-        let qb_type: Type = Type::new_extension(
-            crate::resource::PRELUDE
-                .get_type("qubit")
-                .unwrap()
-                .instantiate_concrete(vec![])
-                .unwrap(),
-        );
-        let bit_type: Type = Type::new_usize();
+        let qb_type: Type = QB_T;
+        let bit_type: Type = USIZE_T;
 
         match self {
             LeafOp::Noop { ty: typ } => {

@@ -274,10 +274,7 @@ pub mod test {
         },
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{
-            test::{QB_T, USIZE_T},
-            AbstractSignature, Type,
-        },
+        types::{AbstractSignature, Type},
         Port,
     };
     use itertools::Itertools;
@@ -285,8 +282,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: Type = USIZE_T;
-    const QB: Type = QB_T;
+    const NAT: Type = crate::resource::prelude::USIZE_T;
+    const QB: Type = crate::resource::prelude::QB_T;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -305,14 +302,11 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: AbstractSignature::new_df(
-                    vec![Type::new_usize(); inputs - 1],
-                    vec![Type::new_usize(); outputs - 1],
-                ),
+                signature: AbstractSignature::new_df(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
             }
             .into(),
-            (true, false) => Input::new(vec![Type::new_usize(); outputs - 1]).into(),
-            (false, true) => Output::new(vec![Type::new_usize(); inputs - 1]).into(),
+            (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
+            (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
             (true, true) => Module.into(),
         }
     }
@@ -436,7 +430,7 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<Type> = vec![Type::new_usize(); 2];
+        let tp: Vec<Type> = vec![NAT; 2];
         let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
@@ -464,18 +458,13 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb = QB_T;
-        let dfg = DFGBuilder::new(AbstractSignature::new_df(
-            vec![qb.clone()],
-            vec![qb.clone()],
-        ))
-        .unwrap();
+        let dfg = DFGBuilder::new(AbstractSignature::new_df(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        let new_in = hugr.add_op(Input::new([QB].to_vec()));
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
