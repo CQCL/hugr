@@ -388,7 +388,7 @@ mod test {
         assert_matches!(
             id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
             Err(BuildError::InvalidHUGR(
-                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonClassicalData { .. })
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCopyableData { .. })
             ))
         );
 

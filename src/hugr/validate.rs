@@ -394,7 +394,7 @@ impl<'a> ValidationContext<'a> {
             }
             ty => {
                 if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
-                    return Err(InterGraphEdgeError::NonClassicalData {
+                    return Err(InterGraphEdgeError::NonCopyableData {
                         from,
                         from_offset,
                         to,
@@ -608,9 +608,9 @@ impl From<ValidationError> for PyErr {
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum InterGraphEdgeError {
-    /// Inter-Graph edges can only carry classical data.
-    #[error("Inter-graph edges can only carry classical data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
-    NonClassicalData {
+    /// Inter-Graph edges can only carry copyable data.
+    #[error("Inter-graph edges can only carry copyable data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
+    NonCopyableData {
         from: Node,
         from_offset: Port,
         to: Node,

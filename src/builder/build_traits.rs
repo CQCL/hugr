@@ -660,7 +660,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         if !local_source {
             // Non-local value sources require a state edge to an ancestor of dst
             if !typ.copyable() {
-                let val_err: ValidationError = InterGraphEdgeError::NonClassicalData {
+                let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
                     from: src,
                     from_offset: Port::new_outgoing(src_port),
                     to: dst,
