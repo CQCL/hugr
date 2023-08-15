@@ -51,15 +51,15 @@ impl EdgeKind {
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.
-    #[serde(rename = "A")]
-    #[default]
-    Any,
-    /// The equality operation is valid on this type.
     #[serde(rename = "E")]
     Eq,
     /// The type can be copied in the program.
     #[serde(rename = "C")]
     Copyable,
+    /// No bound on the type.
+    #[serde(rename = "A")]
+    #[default]
+    Any,
 }
 
 impl TypeBound {
