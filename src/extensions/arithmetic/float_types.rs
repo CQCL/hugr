@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    types::{CustomType, SimpleType, TypeTag},
+    types::{CustomType, Type, TypeBound},
     Resource,
 };
 
@@ -14,8 +14,13 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type
-pub fn float64_type() -> SimpleType {
-    CustomType::new(FLOAT_TYPE_ID, [], RESOURCE_ID, TypeTag::Classic).into()
+pub fn float64_type() -> Type {
+    Type::new_extension(CustomType::new(
+        FLOAT_TYPE_ID,
+        [],
+        RESOURCE_ID,
+        Some(TypeBound::Copyable),
+    ))
 }
 
 /// Resource for basic floating-point types.
@@ -27,7 +32,7 @@ pub fn resource() -> Resource {
             FLOAT_TYPE_ID,
             vec![],
             "64-bit IEEE 754-2019 floating-point value".to_owned(),
-            TypeTag::Classic.into(),
+            TypeBound::Copyable.into(),
         )
         .unwrap();
 

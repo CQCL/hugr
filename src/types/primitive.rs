@@ -8,7 +8,9 @@ use super::{AbstractSignature, CustomType, TypeBound};
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 pub(super) enum PrimType {
-    E(Box<CustomType>),
+    // TODO optimise with Box<CustomType> ?
+    // or some static version of this?
+    E(CustomType),
     #[display(fmt = "Alias({})", "_0.name()")]
     A(AliasDecl),
     #[display(fmt = "Graph({})", "_0")]
@@ -17,11 +19,9 @@ pub(super) enum PrimType {
 
 impl PrimType {
     pub(super) fn bound(&self) -> Option<TypeBound> {
-        // TODO update once inner types are updated to new TypeBound
-        return None;
         match self {
-            PrimType::E(_c) => todo!(),
-            PrimType::A(_) => todo!(),
+            PrimType::E(c) => c.bound(),
+            PrimType::A(a) => a.bound,
             PrimType::Graph(_) => Some(TypeBound::Copyable),
         }
     }

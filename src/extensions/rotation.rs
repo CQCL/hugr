@@ -10,11 +10,12 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::CustomConst;
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, TypeTag};
-use crate::values::CustomCheckFail;
+use crate::types::Type as HugrType;
+use crate::types::{CustomCheckFail, TypeRow};
+use crate::types::{CustomType, TypeBound};
+use crate::values::CustomConst;
 use crate::Resource;
 
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
@@ -32,7 +33,7 @@ pub fn resource() -> Resource {
             "".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
+                let t: TypeRow = vec![HugrType::new_extension(Type::Angle.custom_type())].into();
                 Ok((t.clone(), t, ResourceSet::default()))
             },
         )
@@ -64,7 +65,7 @@ impl Type {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, TypeTag::Classic)
+        CustomType::new(self.name(), [], RESOURCE_ID, Some(TypeBound::Copyable))
     }
 
     fn add_to_resource(self, resource: &mut Resource) {
@@ -73,7 +74,7 @@ impl Type {
                 self.name(),
                 vec![],
                 self.description().to_string(),
-                TypeTag::Classic.into(),
+                TypeBound::Copyable.into(),
             )
             .unwrap();
     }
@@ -312,7 +313,7 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::{resource::SignatureError, types::TypeTag};
+    use crate::{resource::SignatureError, types::TypeBound};
 
     use super::*;
 
@@ -330,7 +331,7 @@ mod test {
             custom.name().clone(),
             vec![],
             "wrong_resource",
-            TypeTag::Classic,
+            Some(TypeBound::Copyable),
         );
         assert_eq!(
             angle.check_custom(&false_custom),

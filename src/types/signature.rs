@@ -13,7 +13,7 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::{ClassicRow, ClassicType, EdgeKind, PrimType, SimpleRow, SimpleType, TypeRow};
+use super::{EdgeKind, Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -28,11 +28,11 @@ use delegate::delegate;
 /// and also the target (value) of a call (static).
 pub struct AbstractSignature {
     /// Value inputs of the function.
-    pub input: SimpleRow,
+    pub input: TypeRow,
     /// Value outputs of the function.
-    pub output: SimpleRow,
+    pub output: TypeRow,
     /// Possible static input (for call / load-constant).
-    pub static_input: ClassicRow,
+    pub static_input: TypeRow,
     /// The resource requirements which are added by the operation
     pub resource_reqs: ResourceSet,
 }
@@ -49,9 +49,9 @@ pub struct Signature {
 impl AbstractSignature {
     /// Create a new signature.
     pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-        static_input: impl Into<ClassicRow>,
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+        static_input: impl Into<TypeRow>,
     ) -> Self {
         Self {
             input: input.into(),
@@ -107,11 +107,11 @@ impl AbstractSignature {
 
 impl AbstractSignature {
     /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<SimpleRow>, output: impl Into<SimpleRow>) -> Self {
+    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Self::new(input, output, type_row![])
     }
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<SimpleRow>) -> Self {
+    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self::new_df(linear.clone(), linear)
     }
@@ -132,7 +132,7 @@ impl AbstractSignature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds or if it is not a value.
     #[inline]
-    pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
+    pub fn get_df(&self, port: Port) -> Option<&Type> {
         match port.direction() {
             Direction::Incoming => self.input.get(port.index()),
             Direction::Outgoing => self.output.get(port.index()),
@@ -142,7 +142,7 @@ impl AbstractSignature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds or if it is not a value.
     #[inline]
-    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
+    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut Type> {
         match port.direction() {
             Direction::Incoming => self.input.get_mut(port.index()),
             Direction::Outgoing => self.output.get_mut(port.index()),
@@ -181,7 +181,7 @@ impl AbstractSignature {
 
     /// Returns a slice of the value types for the given direction.
     #[inline]
-    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
+    pub fn df_types(&self, dir: Direction) -> &[Type] {
         match dir {
             Direction::Incoming => &self.input,
             Direction::Outgoing => &self.output,
@@ -190,31 +190,31 @@ impl AbstractSignature {
 
     /// Returns a slice of the input value types.
     #[inline]
-    pub fn input_df_types(&self) -> &[SimpleType] {
+    pub fn input_df_types(&self) -> &[Type] {
         self.df_types(Direction::Incoming)
     }
 
     /// Returns a slice of the output value types.
     #[inline]
-    pub fn output_df_types(&self) -> &[SimpleType] {
+    pub fn output_df_types(&self) -> &[Type] {
         self.df_types(Direction::Outgoing)
     }
 
     #[inline]
     /// Returns the input row
-    pub fn input(&self) -> &SimpleRow {
+    pub fn input(&self) -> &TypeRow {
         &self.input
     }
 
     #[inline]
     /// Returns the output row
-    pub fn output(&self) -> &SimpleRow {
+    pub fn output(&self) -> &TypeRow {
         &self.output
     }
 
     #[inline]
     /// Returns the row of static inputs
-    pub fn static_input(&self) -> &ClassicRow {
+    pub fn static_input(&self) -> &TypeRow {
         &self.static_input
     }
 }
@@ -223,18 +223,20 @@ impl AbstractSignature {
     /// Returns the linear part of the signature
     /// TODO: This fails when mixing different linear types.
     #[inline(always)]
-    pub fn linear(&self) -> impl Iterator<Item = &SimpleType> {
+    pub fn linear(&self) -> impl Iterator<Item = &Type> {
         debug_assert_eq!(
             self.input
                 .iter()
-                .filter(|t| !t.tag().is_classical())
+                .filter(|t| t.least_upper_bound().is_none())
                 .collect::<Vec<_>>(),
             self.output
                 .iter()
-                .filter(|t| !t.tag().is_classical())
+                .filter(|t| t.least_upper_bound().is_none())
                 .collect::<Vec<_>>()
         );
-        self.input.iter().filter(|t| !t.tag().is_classical())
+        self.input
+            .iter()
+            .filter(|t| t.least_upper_bound().is_none())
     }
 
     /// Returns the value `Port`s in the signature for a given direction.
@@ -287,11 +289,11 @@ impl Signature {
     delegate! {
         to self.signature {
             /// Inputs of the abstract signature
-            pub fn input(&self) -> &SimpleRow;
+            pub fn input(&self) -> &TypeRow;
             /// Outputs of the abstract signature
-            pub fn output(&self) -> &SimpleRow;
+            pub fn output(&self) -> &TypeRow;
             /// Static inputs of the abstract signature
-            pub fn static_input(&self) -> &ClassicRow;
+            pub fn static_input(&self) -> &TypeRow;
         }
     }
 }
@@ -375,10 +377,10 @@ impl SignatureDescription {
         }
     }
 
-    pub(crate) fn row_zip<'a, T: PrimType>(
-        type_row: &'a TypeRow<T>,
+    pub(crate) fn row_zip<'a>(
+        type_row: &'a TypeRow,
         name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a T)> {
+    ) -> impl Iterator<Item = (&'a SmolStr, &'a Type)> {
         name_row
             .iter()
             .chain(&EmptyStringIterator)
@@ -393,7 +395,7 @@ impl SignatureDescription {
     pub fn input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &Type)> {
         Self::row_zip(signature.input(), &self.input)
     }
 
@@ -403,7 +405,7 @@ impl SignatureDescription {
     pub fn output_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &Type)> {
         Self::row_zip(signature.output(), &self.output)
     }
 
@@ -411,7 +413,7 @@ impl SignatureDescription {
     pub fn static_input_zip<'a>(
         &'a self,
         signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &ClassicType)> {
+    ) -> impl Iterator<Item = (&SmolStr, &Type)> {
         Self::row_zip(signature.static_input(), &self.static_input)
     }
 }

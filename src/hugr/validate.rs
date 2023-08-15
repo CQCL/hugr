@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::validate::{ResourceError, ResourceValidator};
-use crate::types::{ClassicType, EdgeKind, SimpleType};
+use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -393,7 +393,7 @@ impl<'a> ValidationContext<'a> {
                 true
             }
             ty => {
-                if !local && !matches!(ty, EdgeKind::Value(SimpleType::Classic(_))) {
+                if !local && !matches!(&ty, EdgeKind::Value(t) if t.least_upper_bound().is_some()) {
                     return Err(InterGraphEdgeError::NonClassicalData {
                         from,
                         from_offset,
@@ -659,7 +659,7 @@ pub enum InterGraphEdgeError {
     InvalidConstSrc {
         from: Node,
         from_offset: Port,
-        typ: ClassicType,
+        typ: Type,
     },
 }
 
@@ -676,13 +676,14 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::resource::ResourceSet;
-    use crate::types::{AbstractSignature, ClassicType, HashableType};
+    use crate::types::test::{QB_T, USIZE_T};
+    use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const B: SimpleType = SimpleType::Classic(ClassicType::usize());
-    const Q: SimpleType = SimpleType::Qubit;
+    const NAT: Type = USIZE_T;
+    const B: Type = USIZE_T;
+    const Q: Type = QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
@@ -717,7 +718,7 @@ mod test {
             .add_op_with_parent(
                 parent,
                 LeafOp::Noop {
-                    ty: ClassicType::usize().into(),
+                    ty: Type::new_usize(),
                 },
             )
             .unwrap();
@@ -741,7 +742,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ops::Const::simple_predicate(0, predicate_size);
-        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
+        let tag_type = Type::new_simple_predicate(predicate_size);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
@@ -751,12 +752,7 @@ mod test {
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
-            .add_op_with_parent(
-                parent,
-                ops::LoadConstant {
-                    datatype: tag_type.try_into().unwrap(),
-                },
-            )
+            .add_op_with_parent(parent, ops::LoadConstant { datatype: tag_type })
             .unwrap();
 
         b.connect(tag_def, 0, tag, 0).unwrap();
@@ -804,7 +800,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: HashableType::USize.into(),
+            ty: crate::types::test::EQ_T,
         }
         .into();
 
@@ -894,7 +890,7 @@ mod test {
         b.replace_op(
             output,
             NodeType::pure(LeafOp::Noop {
-                ty: ClassicType::usize().into(),
+                ty: Type::new_usize(),
             }),
         );
         assert_matches!(
@@ -1000,10 +996,7 @@ mod test {
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(vec![
-                SimpleType::new_simple_predicate(1),
-                Q,
-            ])),
+            NodeType::pure(ops::Output::new(vec![Type::new_simple_predicate(1), Q])),
         );
         assert_matches!(
             b.validate(),
@@ -1073,11 +1066,11 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1).unwrap())?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
         let lcst = h.add_op_with_parent(
             h.root(),
             ops::LoadConstant {
-                datatype: ClassicType::usize(),
+                datatype: Type::new_usize(),
             },
         )?;
         h.connect(cst, 0, lcst, 0)?;

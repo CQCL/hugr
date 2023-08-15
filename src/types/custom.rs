@@ -1,12 +1,12 @@
-//! Opaque types, used to represent a user-defined [`SimpleType`].
+//! Opaque types, used to represent a user-defined [`Type`].
 //!
-//! [`SimpleType`]: super::SimpleType
+//! [`Type`]: super::Type
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
 use crate::resource::ResourceId;
 
-use super::{type_param::TypeArg, ClassicType, Container, HashableType, SimpleType, TypeTag};
+use super::{type_param::TypeArg, TypeBound};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -21,8 +21,8 @@ pub struct CustomType {
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
     args: Vec<TypeArg>,
-    /// The [TypeTag] describing what can be done to instances of this type
-    tag: TypeTag,
+    /// The [TypeBound] describing what can be done to instances of this type
+    bound: Option<TypeBound>,
 }
 
 impl CustomType {
@@ -31,29 +31,29 @@ impl CustomType {
         id: impl Into<SmolStr>,
         args: impl Into<Vec<TypeArg>>,
         resource: impl Into<ResourceId>,
-        tag: TypeTag,
+        bound: Option<TypeBound>,
     ) -> Self {
         Self {
             id: id.into(),
             args: args.into(),
             resource: resource.into(),
-            tag,
+            bound,
         }
     }
 
     /// Creates a new opaque type (constant version, no type arguments)
-    pub const fn new_simple(id: SmolStr, resource: ResourceId, tag: TypeTag) -> Self {
+    pub const fn new_simple(id: SmolStr, resource: ResourceId, bound: Option<TypeBound>) -> Self {
         Self {
             id,
             args: vec![],
             resource,
-            tag,
+            bound,
         }
     }
 
-    /// Returns the tag of this [`CustomType`].
-    pub fn tag(&self) -> TypeTag {
-        self.tag
+    /// Returns the bound of this [`CustomType`].
+    pub fn bound(&self) -> Option<TypeBound> {
+        self.bound
     }
 }
 
@@ -80,30 +80,29 @@ impl Display for CustomType {
     }
 }
 
-/// This parallels [SimpleType::new_tuple] and [SimpleType::new_sum]
-impl From<CustomType> for SimpleType {
-    fn from(value: CustomType) -> Self {
-        match value.tag {
-            TypeTag::Simple => SimpleType::Qontainer(Container::Opaque(value)),
-            TypeTag::Classic => ClassicType::Container(Container::Opaque(value)).into(),
-            TypeTag::Hashable => HashableType::Container(Container::Opaque(value)).into(),
-        }
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use smol_str::SmolStr;
 
+    use crate::types::TypeBound;
+
     use super::CustomType;
-    use crate::types::{ClassicType, Container, TypeTag};
 
-    pub(crate) const CLASSIC_T: ClassicType =
-        ClassicType::Container(Container::Opaque(CLASSIC_CUST));
-
-    pub(crate) const CLASSIC_CUST: CustomType = CustomType::new_simple(
-        SmolStr::new_inline("MyType"),
+    pub(crate) const EQ_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyEqType"),
         SmolStr::new_inline("MyRsrc"),
-        TypeTag::Classic,
+        Some(TypeBound::Eq),
+    );
+
+    pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyCopyableType"),
+        SmolStr::new_inline("MyRsrc"),
+        Some(TypeBound::Copyable),
+    );
+
+    pub(crate) const ANY_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyAnyType"),
+        SmolStr::new_inline("MyRsrc"),
+        None,
     );
 }
