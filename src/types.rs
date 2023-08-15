@@ -191,8 +191,9 @@ impl Type {
 
     /// Initialize a new custom type.
     // TODO remove? Resources/TypeDefs should just provide `Type` directly
-    pub fn new_extension(opaque: CustomType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::E(opaque)))
+    pub const fn new_extension(opaque: CustomType) -> Self {
+        let bound = opaque.bound();
+        Type(TypeEnum::Prim(PrimType::E(opaque)), bound)
     }
 
     /// Initialize a new alias.
@@ -269,37 +270,25 @@ pub(crate) mod test {
 
     use super::{
         custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
-        primitive::PrimType,
         *,
     };
     use crate::ops::AliasDecl;
 
-    pub(crate) const EQ_T: Type = Type(TypeEnum::Prim(PrimType::E(EQ_CUST)), Some(TypeBound::Eq));
+    pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
+    pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
+    pub(crate) const ANY_T: Type = Type::new_extension(ANY_CUST);
 
-    pub(crate) const COPYABLE_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(COPYABLE_CUST)),
-        Some(TypeBound::Copyable),
-    );
-
-    pub(crate) const ANY_T: Type = Type(TypeEnum::Prim(PrimType::E(ANY_CUST)), None);
-
-    pub(crate) const USIZE_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
-            SmolStr::new_inline("usize"),
-            SmolStr::new_inline("prelude"),
-            Some(TypeBound::Eq),
-        ))),
+    pub(crate) const USIZE_T: Type = Type::new_extension(CustomType::new_simple(
+        SmolStr::new_inline("usize"),
+        SmolStr::new_inline("prelude"),
         Some(TypeBound::Eq),
-    );
+    ));
 
-    pub(crate) const QB_T: Type = Type(
-        TypeEnum::Prim(PrimType::E(CustomType::new_simple(
-            SmolStr::new_inline("qubit"),
-            SmolStr::new_inline("prelude"),
-            None,
-        ))),
+    pub(crate) const QB_T: Type = Type::new_extension(CustomType::new_simple(
+        SmolStr::new_inline("qubit"),
+        SmolStr::new_inline("prelude"),
         None,
-    );
+    ));
 
     #[test]
     fn construct() {
