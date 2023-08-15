@@ -44,7 +44,7 @@ pub enum TypeArg {
 }
 
 /// A serialized representation of a value of a [CustomType]
-/// restricted to Hashable types.
+/// restricted to equatable types.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CustomTypeArg {
     /// The type of the constant.
@@ -55,12 +55,13 @@ pub struct CustomTypeArg {
 }
 
 impl CustomTypeArg {
-    /// Create a new CustomTypeArg. Enforces that the type must be Hashable.
+    /// Create a new CustomTypeArg. Enforces that the type must be checkable for
+    /// equality.
     pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
         if typ.bound() == Some(TypeBound::Eq) {
             Ok(Self { typ, value })
         } else {
-            Err("Only Hashable CustomTypes can be used as TypeArgs")
+            Err("Only TypeBound::Eq CustomTypes can be used as TypeArgs")
         }
     }
 }
