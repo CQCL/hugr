@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::resource::validate::{ResourceError, ResourceValidator};
-use crate::types::{ClassicType, EdgeKind, SimpleType};
+use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -393,8 +393,8 @@ impl<'a> ValidationContext<'a> {
                 true
             }
             ty => {
-                if !local && !matches!(ty, EdgeKind::Value(SimpleType::Classic(_))) {
-                    return Err(InterGraphEdgeError::NonClassicalData {
+                if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
+                    return Err(InterGraphEdgeError::NonCopyableData {
                         from,
                         from_offset,
                         to,
@@ -608,9 +608,9 @@ impl From<ValidationError> for PyErr {
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum InterGraphEdgeError {
-    /// Inter-Graph edges can only carry classical data.
-    #[error("Inter-graph edges can only carry classical data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
-    NonClassicalData {
+    /// Inter-Graph edges can only carry copyable data.
+    #[error("Inter-graph edges can only carry copyable data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
+    NonCopyableData {
         from: Node,
         from_offset: Port,
         to: Node,
@@ -659,7 +659,7 @@ pub enum InterGraphEdgeError {
     InvalidConstSrc {
         from: Node,
         from_offset: Port,
-        typ: ClassicType,
+        typ: Type,
     },
 }
 
@@ -676,13 +676,13 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::resource::ResourceSet;
-    use crate::types::{AbstractSignature, ClassicType, HashableType};
+    use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const B: SimpleType = SimpleType::Classic(ClassicType::usize());
-    const Q: SimpleType = SimpleType::Qubit;
+    const NAT: Type = crate::resource::prelude::USIZE_T;
+    const B: Type = crate::resource::prelude::USIZE_T;
+    const Q: Type = crate::resource::prelude::QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
@@ -714,12 +714,7 @@ mod test {
             .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(
-                parent,
-                LeafOp::Noop {
-                    ty: ClassicType::usize().into(),
-                },
-            )
+            .add_op_with_parent(parent, LeafOp::Noop { ty: NAT })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -741,7 +736,7 @@ mod test {
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
         let const_op = ops::Const::simple_predicate(0, predicate_size);
-        let tag_type = SimpleType::Classic(ClassicType::new_simple_predicate(predicate_size));
+        let tag_type = Type::new_simple_predicate(predicate_size);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![B]))
@@ -751,12 +746,7 @@ mod test {
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
-            .add_op_with_parent(
-                parent,
-                ops::LoadConstant {
-                    datatype: tag_type.try_into().unwrap(),
-                },
-            )
+            .add_op_with_parent(parent, ops::LoadConstant { datatype: tag_type })
             .unwrap();
 
         b.connect(tag_def, 0, tag, 0).unwrap();
@@ -804,7 +794,7 @@ mod test {
     #[test]
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop {
-            ty: HashableType::USize.into(),
+            ty: crate::types::test::EQ_T,
         }
         .into();
 
@@ -891,12 +881,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(
-            output,
-            NodeType::pure(LeafOp::Noop {
-                ty: ClassicType::usize().into(),
-            }),
-        );
+        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }));
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
@@ -1000,10 +985,7 @@ mod test {
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(vec![
-                SimpleType::new_simple_predicate(1),
-                Q,
-            ])),
+            NodeType::pure(ops::Output::new(vec![Type::new_simple_predicate(1), Q])),
         );
         assert_matches!(
             b.validate(),
@@ -1073,13 +1055,8 @@ mod test {
             })
         );
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1).unwrap())?;
-        let lcst = h.add_op_with_parent(
-            h.root(),
-            ops::LoadConstant {
-                datatype: ClassicType::usize(),
-            },
-        )?;
+        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
+        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:

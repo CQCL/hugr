@@ -7,9 +7,8 @@ use smol_str::SmolStr;
 use crate::{
     resource::{ResourceSet, SignatureError},
     types::{
-        simple::ERROR_TYPE,
         type_param::{TypeArg, TypeParam},
-        SimpleRow, SimpleType,
+        Type, TypeRow,
     },
     utils::collect_array,
     Resource,
@@ -21,17 +20,21 @@ use super::int_types::{get_width, int_type};
 /// The resource identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
-fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![float64_type()].into(),
-        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        vec![Type::new_sum(vec![
+            int_type(n),
+            crate::resource::prelude::ERROR_TYPE,
+        ])]
+        .into(),
         ResourceSet::default(),
     ))
 }
 
-fn itof_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((

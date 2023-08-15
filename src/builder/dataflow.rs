@@ -220,7 +220,7 @@ mod test {
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
-    use crate::types::SimpleType;
+
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -333,7 +333,7 @@ mod test {
             Ok(module_builder.finish_hugr()?)
         };
 
-        assert_eq!(builder(), Err(BuildError::NoCopyLinear(SimpleType::Qubit)));
+        assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
     }
 
     #[test]
@@ -388,7 +388,7 @@ mod test {
         assert_matches!(
             id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
             Err(BuildError::InvalidHUGR(
-                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonClassicalData { .. })
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCopyableData { .. })
             ))
         );
 

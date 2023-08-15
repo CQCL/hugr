@@ -6,7 +6,7 @@ use crate::{
     resource::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        CustomType, SimpleType, TypeTag,
+        CustomType, Type, TypeBound,
     },
     Resource,
 };
@@ -20,14 +20,13 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 /// Integer type of a given bit width.
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub fn int_type(n: u8) -> SimpleType {
-    CustomType::new(
+pub fn int_type(n: u8) -> Type {
+    Type::new_extension(CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
         RESOURCE_ID,
-        TypeTag::Classic,
-    )
-    .into()
+        TypeBound::Copyable,
+    ))
 }
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
@@ -35,7 +34,11 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
     let n: u8 = match arg {
         TypeArg::USize(n) => *n as u8,
         _ => {
-            return Err(TypeArgError::TypeMismatch(arg.clone(), TypeParam::USize).into());
+            return Err(TypeArgError::TypeMismatch {
+                arg: arg.clone(),
+                param: TypeParam::USize,
+            }
+            .into());
         }
     };
     if (n != 1)
@@ -61,7 +64,7 @@ pub fn resource() -> Resource {
             INT_TYPE_ID,
             vec![TypeParam::USize],
             "integral value of a given bit width".to_owned(),
-            TypeTag::Classic.into(),
+            TypeBound::Copyable.into(),
         )
         .unwrap();
 

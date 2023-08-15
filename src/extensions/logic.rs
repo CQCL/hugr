@@ -7,7 +7,7 @@ use crate::{
     resource::ResourceSet,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        SimpleType,
+        Type,
     },
     Resource,
 };
@@ -16,8 +16,8 @@ use crate::{
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Construct a boolean type.
-pub fn bool_type() -> SimpleType {
-    SimpleType::new_simple_predicate(2)
+pub fn bool_type() -> Type {
+    Type::new_simple_predicate(2)
 }
 
 /// Resource for basic logical operations.
@@ -50,7 +50,11 @@ pub fn resource() -> Resource {
                 let n: u64 = match a {
                     TypeArg::USize(n) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(TypeArgError::TypeMismatch {
+                            arg: a.clone(),
+                            param: H_INT,
+                        }
+                        .into());
                     }
                 };
                 Ok((
@@ -72,7 +76,11 @@ pub fn resource() -> Resource {
                 let n: u64 = match a {
                     TypeArg::USize(n) => *n,
                     _ => {
-                        return Err(TypeArgError::TypeMismatch(a.clone(), H_INT).into());
+                        return Err(TypeArgError::TypeMismatch {
+                            arg: a.clone(),
+                            param: H_INT,
+                        }
+                        .into());
                     }
                 };
                 Ok((

@@ -7,7 +7,7 @@ use super::{
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
-    types::{simple::TypeTag, PrimType, SimpleType},
+    types::{Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -131,7 +131,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
-        typ: SimpleType,
+        typ: Type,
     ) -> Result<AliasID<true>, BuildError> {
         // TODO: add AliasDefn in other containers
         // This is currently tricky as they are not connected to anything so do
@@ -139,13 +139,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let tag = typ.tag();
+        let bound = typ.least_upper_bound();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 
     /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
@@ -155,15 +155,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        tag: TypeTag,
+        bound: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
-            tag,
+            bound,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 }
 
@@ -207,7 +207,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeTag::Simple)?;
+                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
 
             let f_build = module_builder.define_function(
                 "main",

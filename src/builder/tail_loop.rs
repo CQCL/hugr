@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::{views::HugrView, NodeType};
-use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
+use crate::types::{AbstractSignature, TypeRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -50,7 +50,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     }
 
     /// The output types of the child graph, including the predicate as the first.
-    pub fn internal_output_row(&self) -> Result<SimpleRow, BuildError> {
+    pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }
 }
@@ -73,9 +73,9 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
 impl TailLoopBuilder<Hugr> {
     /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
     pub fn new(
-        just_inputs: impl Into<ClassicRow>,
-        inputs_outputs: impl Into<SimpleRow>,
-        just_outputs: impl Into<ClassicRow>,
+        just_inputs: impl Into<TypeRow>,
+        inputs_outputs: impl Into<TypeRow>,
+        just_outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
@@ -98,21 +98,19 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
-        classic_row,
         hugr::ValidationError,
         ops::Const,
-        type_row,
-        types::ClassicType,
-        Hugr,
+        resource::prelude::USIZE_T,
+        type_row, Hugr,
     };
 
     use super::*;
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![ClassicType::usize()])?;
+            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T])?;
             let [i1] = loop_b.input_wires_arr();
-            let const_wire = loop_b.add_load_const(Const::usize(1)?)?;
+            let const_wire = loop_b.add_load_const(Const::usize(1))?;
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
@@ -134,11 +132,8 @@ mod test {
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
-                    let mut loop_b = fbuild.tail_loop_builder(
-                        vec![(ClassicType::usize(), b1)],
-                        vec![],
-                        classic_row![ClassicType::i64()],
-                    )?;
+                    let mut loop_b =
+                        fbuild.tail_loop_builder(vec![(USIZE_T, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(Const::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
@@ -160,7 +155,7 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.add_load_const(Const::usize(2)?)?;
+                        let wire = branch_1.add_load_const(Const::usize(2))?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

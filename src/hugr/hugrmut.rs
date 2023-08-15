@@ -477,13 +477,13 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{test::COPYABLE_T, AbstractSignature, Type},
     };
 
     use super::sealed::HugrInternalsMut;
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = COPYABLE_T;
 
     #[test]
     fn simple_function() {
@@ -514,12 +514,7 @@ mod test {
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = builder
-                .add_op_with_parent(
-                    f,
-                    LeafOp::Noop {
-                        ty: ClassicType::i64().into(),
-                    },
-                )
+                .add_op_with_parent(f, LeafOp::Noop { ty: COPYABLE_T })
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());
