@@ -5,6 +5,7 @@ use smol_str::SmolStr;
 use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::resource::prelude::{QB_T, USIZE_T};
+use crate::type_row;
 use crate::{
     resource::{ResourceId, ResourceSet},
     types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
@@ -150,10 +151,7 @@ impl OpTrait for LeafOp {
         // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
-        // TODO use constants and type_row! once static prelude is implemented
-        let qb_type: Type = QB_T;
-        let bit_type: Type = USIZE_T;
-
+        const BIT_TYPE: Type = USIZE_T;
         match self {
             LeafOp::Noop { ty: typ } => {
                 AbstractSignature::new_df(vec![typ.clone()], vec![typ.clone()])
@@ -166,15 +164,13 @@ impl OpTrait for LeafOp {
             | LeafOp::Sadj
             | LeafOp::X
             | LeafOp::Y
-            | LeafOp::Z => AbstractSignature::new_linear(vec![qb_type]),
-            LeafOp::CX | LeafOp::ZZMax => {
-                AbstractSignature::new_linear(vec![qb_type.clone(), qb_type])
-            }
+            | LeafOp::Z => AbstractSignature::new_linear(type_row![QB_T]),
+            LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![QB_T, QB_T]),
             LeafOp::Measure => {
-                AbstractSignature::new_df(vec![qb_type.clone()], vec![qb_type, bit_type])
+                AbstractSignature::new_df(type_row![QB_T], type_row![QB_T, BIT_TYPE])
             }
             LeafOp::Xor => {
-                AbstractSignature::new_df(vec![bit_type.clone(), bit_type.clone()], vec![bit_type])
+                AbstractSignature::new_df(type_row![BIT_TYPE, BIT_TYPE], type_row![BIT_TYPE])
             }
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
