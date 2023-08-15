@@ -153,16 +153,13 @@ impl Type {
     }
 
     /// Initialize a new tuple type by providing the elements..
+    #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new(TypeEnum::Tuple(types.into()))
     }
 
-    /// New unit type, defined as an empty Tuple.
-    pub fn new_unit() -> Self {
-        Self::new_tuple(vec![])
-    }
-
     /// Initialize a new sum type by providing the possible variant types.
+    #[inline(always)]
     pub fn new_sum(types: impl Into<TypeRow>) -> Self {
         Self::new(TypeEnum::Sum(types.into()))
     }
@@ -206,12 +203,14 @@ impl Type {
     }
 
     /// New unit type (empty tuple).
-    pub const fn unit() -> Self {
+    #[inline(always)]
+    pub const fn new_unit() -> Self {
         Type(TypeEnum::Tuple(type_row![]), Some(TypeBound::Eq))
     }
 
     /// Report the least upper TypeBound, if there is one.
-    pub fn least_upper_bound(&self) -> Option<TypeBound> {
+    #[inline(always)]
+    pub const fn least_upper_bound(&self) -> Option<TypeBound> {
         self.1
     }
 }
