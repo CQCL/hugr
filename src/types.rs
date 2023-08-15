@@ -50,7 +50,7 @@ impl EdgeKind {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize)]
-/// Bounds on capabilities of a type.
+/// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.
     #[serde(rename = "E")]
@@ -110,6 +110,7 @@ pub(crate) fn least_upper_bound(
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+/// Core types: primitive (leaf), tuple (product) or sum (co-product).
 enum TypeEnum {
     Prim(PrimType),
     #[display(fmt = "Tuple({})", "_0")]
@@ -118,6 +119,7 @@ enum TypeEnum {
     Sum(TypeRow),
 }
 impl TypeEnum {
+    /// The smallest type bound - if any - that covers the whole type.
     fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             TypeEnum::Prim(p) => p.bound(),
@@ -132,7 +134,30 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
-/// A HUGR type.
+/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
+/// Such an edge is valid if the ports on either end agree on the [Type].
+/// Types have an optional [TypeBound] which places limits on the valid
+/// operations on a type.
+///
+/// Examples:
+/// ```
+/// # use hugr::types::{Type, TypeBound};
+/// # use hugr::type_row;
+///
+/// const unit: Type = Type::new_unit();
+/// let sum = Type::new_sum(type_row![unit, unit]);
+/// assert_eq!(sum.least_upper_bound(), Some(TypeBound::Eq));
+///
+/// ```
+///
+/// ```
+/// # use hugr::types::{Type, TypeBound, AbstractSignature};
+///
+/// let graph_type = Type::graph(AbstractSignature::new_linear(vec![]));
+/// assert_eq!(graph_type.least_upper_bound(), Some(TypeBound::Copyable));
+///
+/// ```
+///
 pub struct Type(TypeEnum, Option<TypeBound>);
 
 impl Type {
