@@ -16,15 +16,17 @@ use crate::types::TypeBound;
 /// The type bound of a [`TypeDef`]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TypeDefBound {
-    /// Defined by an explicit tag.
-    Explicit(Option<TypeBound>),
-    /// Derived as the tag containing all marked type parameters.
+    /// Explicitly no bound.
+    NoBound,
+    /// Defined by an explicit bound.
+    Explicit(TypeBound),
+    /// Derived as the least upper bound of the marked parameters.
     FromParams(Vec<usize>),
 }
 
 impl From<TypeBound> for TypeDefBound {
     fn from(bound: TypeBound) -> Self {
-        Self::Explicit(Some(bound))
+        Self::Explicit(bound)
     }
 }
 
@@ -44,8 +46,8 @@ pub struct TypeDef {
     params: Vec<TypeParam>,
     /// Human readable description of the type definition.
     description: String,
-    /// The definition of the type tag of this definition.
-    tag: TypeDefBound,
+    /// The definition of the type bound of this definition.
+    bound: TypeDefBound,
 }
 
 impl TypeDef {
@@ -86,8 +88,9 @@ impl TypeDef {
     }
     /// The [`TypeBound`] of the definition.
     pub fn bound(&self, args: &[TypeArg]) -> Option<TypeBound> {
-        match &self.tag {
-            TypeDefBound::Explicit(bound) => *bound,
+        match &self.bound {
+            TypeDefBound::NoBound => None,
+            TypeDefBound::Explicit(bound) => Some(*bound),
             TypeDefBound::FromParams(indices) => {
                 let args: Vec<_> = args.iter().collect();
                 if indices.is_empty() {
@@ -128,14 +131,14 @@ impl Resource {
         name: SmolStr,
         params: Vec<TypeParam>,
         description: String,
-        tag: TypeDefBound,
+        bound: TypeDefBound,
     ) -> Result<&TypeDef, ResourceBuildError> {
         let ty = TypeDef {
             resource: self.name().into(),
             name,
             params,
             description,
-            tag,
+            bound,
         };
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(ty.name)),
@@ -160,7 +163,7 @@ mod test {
             params: vec![TypeParam::Type(Some(TypeBound::Copyable))],
             resource: "MyRsrc".into(),
             description: "Some parameterised type".into(),
-            tag: TypeDefBound::FromParams(vec![0]),
+            bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
             def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(

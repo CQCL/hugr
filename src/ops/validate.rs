@@ -462,14 +462,11 @@ mod test {
         let bit_type: Type = Type::new_usize();
 
         let in_types: TypeRow = vec![bit_type.clone()].into();
-        let out_types: TypeRow = vec![bit_type.clone(), bit_type].into();
+        let out_types: TypeRow = vec![bit_type.clone(), bit_type.clone()].into();
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = LeafOp::Noop {
-            ty: Type::new_usize(),
-        }
-        .into();
+        let leaf_node = LeafOp::Noop { ty: bit_type }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![

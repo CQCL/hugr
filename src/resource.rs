@@ -293,7 +293,7 @@ lazy_static! {
                 SmolStr::new_inline("float64"),
                 vec![],
                 "float64".into(),
-                TypeDefBound::Explicit(Some(crate::types::TypeBound::Copyable)),
+                TypeDefBound::Explicit(crate::types::TypeBound::Copyable),
             )
             .unwrap();
 
@@ -302,7 +302,7 @@ lazy_static! {
                 SmolStr::new_inline("usize"),
                 vec![],
                 "usize".into(),
-                TypeDefBound::Explicit(Some(crate::types::TypeBound::Eq)),
+                TypeDefBound::Explicit(crate::types::TypeBound::Eq),
             )
             .unwrap();
 
@@ -321,7 +321,7 @@ lazy_static! {
                 SmolStr::new_inline("qubit"),
                 vec![],
                 "qubit".into(),
-                TypeDefBound::Explicit(None),
+                TypeDefBound::NoBound,
             )
             .unwrap();
         prelude
