@@ -1,9 +1,8 @@
 //! Constant value definitions.
 
 use crate::{
-    resource::prelude::{USIZE_CUSTOM_T, USIZE_T},
-    types::{ConstTypeError, CustomCheckFailure, CustomType, EdgeKind, Type, TypeRow},
-    values::{CustomConst, Value},
+    types::{ConstTypeError, EdgeKind, Type, TypeRow},
+    values::{CustomConst, KnownTypeConst, Value},
 };
 
 use smol_str::SmolStr;
@@ -80,34 +79,6 @@ impl Const {
             .unzip();
         Self::new(Value::tuple(values), Type::new_tuple(types)).unwrap()
     }
-    /// Constant usize value.
-    pub fn usize(u: u64) -> Self {
-        // TODO replace with prelude constant once implemented
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-        struct ConstUsize(u64);
-        #[typetag::serde]
-        impl CustomConst for ConstUsize {
-            fn name(&self) -> SmolStr {
-                format!("ConstUsize({:?})", self.0).into()
-            }
-
-            fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-                if typ == &USIZE_CUSTOM_T {
-                    Ok(())
-                } else {
-                    Err(CustomCheckFailure::TypeMismatch {
-                        expected: USIZE_CUSTOM_T,
-                        found: typ.clone(),
-                    })
-                }
-            }
-        }
-
-        Self {
-            value: ConstUsize(u).into(),
-            typ: USIZE_T,
-        }
-    }
 }
 
 impl OpName for Const {
@@ -132,11 +103,26 @@ impl OpTrait for Const {
     }
 }
 
+// [KnownTypeConst] is guaranteed to be the right type, so can be constructed
+// without initial type check.
+impl<T> From<T> for Const
+where
+    T: KnownTypeConst + CustomConst,
+{
+    fn from(value: T) -> Self {
+        Const {
+            value: Value::custom(value),
+            typ: Type::new_extension(T::TYPE),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
+        resource::prelude::{ConstUsize, USIZE_T},
         type_row,
         types::{test::COPYABLE_T, TypeRow},
         types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},
@@ -190,9 +176,8 @@ mod test {
 
     #[test]
     fn test_constant_values() {
-        let int_type: Type = USIZE_T;
-        let int_value = Const::usize(257).value;
-        int_type.check_type(&int_value).unwrap();
+        let int_value: Value = ConstUsize::new(257).into();
+        USIZE_T.check_type(&int_value).unwrap();
         COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
             COPYABLE_T.check_type(&int_value),
@@ -200,7 +185,7 @@ mod test {
                 CustomCheckFailure::TypeMismatch { .. }
             ))
         );
-        let tuple_ty = Type::new_tuple(vec![int_type, COPYABLE_T]);
+        let tuple_ty = Type::new_tuple(vec![USIZE_T, COPYABLE_T]);
         let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
         tuple_ty.check_type(&tuple_val).unwrap();
         let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);

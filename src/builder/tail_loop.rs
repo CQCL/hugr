@@ -100,7 +100,7 @@ mod test {
         },
         hugr::ValidationError,
         ops::Const,
-        resource::prelude::USIZE_T,
+        resource::prelude::{ConstUsize, USIZE_T},
         type_row, Hugr,
     };
 
@@ -110,7 +110,7 @@ mod test {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T])?;
             let [i1] = loop_b.input_wires_arr();
-            let const_wire = loop_b.add_load_const(Const::usize(1))?;
+            let const_wire = loop_b.add_load_const(ConstUsize::new(1).into())?;
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
@@ -155,7 +155,7 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.add_load_const(Const::usize(2))?;
+                        let wire = branch_1.add_load_const(ConstUsize::new(2).into())?;
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

@@ -4,6 +4,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
+    ops,
     resource::ResourceSet,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
@@ -11,6 +12,11 @@ use crate::{
     },
     Resource,
 };
+
+/// Name of resource false value.
+pub const FALSE_NAME: &str = "FALSE";
+/// Name of resource true value.
+pub const TRUE_NAME: &str = "TRUE";
 
 /// The resource identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
@@ -93,18 +99,36 @@ pub fn resource() -> Resource {
         .unwrap();
 
     resource
+        .add_value(FALSE_NAME, ops::Const::simple_predicate(0, 2))
+        .unwrap();
+    resource
+        .add_value(TRUE_NAME, ops::Const::simple_predicate(1, 2))
+        .unwrap();
+    resource
 }
 
 #[cfg(test)]
 mod test {
     use crate::Resource;
 
-    use super::resource;
+    use super::{bool_type, resource, FALSE_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_resource() {
         let r: Resource = resource();
         assert_eq!(r.name(), "logic");
         assert_eq!(r.operations().count(), 3);
+    }
+
+    #[test]
+    fn test_values() {
+        let r: Resource = resource();
+        let false_val = r.get_value(FALSE_NAME).unwrap();
+        let true_val = r.get_value(TRUE_NAME).unwrap();
+
+        for v in [false_val, true_val] {
+            let simpl = v.typed_value().const_type();
+            assert_eq!(simpl, &bool_type());
+        }
     }
 }
