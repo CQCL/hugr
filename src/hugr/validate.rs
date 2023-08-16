@@ -12,7 +12,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::validate::{ResourceError, ResourceValidator};
+use crate::extension::validate::{ExtensionError, ExtensionValidator};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -31,7 +31,7 @@ struct ValidationContext<'a> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
     /// Context for the resource validation.
-    resource_validator: ResourceValidator,
+    extension_validator: ExtensionValidator,
 }
 
 impl Hugr {
@@ -48,7 +48,7 @@ impl<'a> ValidationContext<'a> {
         Self {
             hugr,
             dominators: HashMap::new(),
-            resource_validator: ResourceValidator::new(hugr),
+            extension_validator: ExtensionValidator::new(hugr),
         }
     }
 
@@ -140,7 +140,7 @@ impl<'a> ValidationContext<'a> {
         // If this is a container with I/O nodes, check that the resources they
         // define match the resources of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
-            self.resource_validator
+            self.extension_validator
                 .validate_io_resources(node, input, output)?;
         }
 
@@ -199,8 +199,8 @@ impl<'a> ValidationContext<'a> {
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
-            self.resource_validator
-                .check_resources_compatible(&(node, port), &(other_node, other_offset))?;
+            self.extension_validator
+                .check_extensions_compatible(&(node, port), &(other_node, other_offset))?;
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
@@ -593,7 +593,7 @@ pub enum ValidationError {
     InterGraphEdgeError(#[from] InterGraphEdgeError),
     /// There are errors in the resource declarations.
     #[error(transparent)]
-    ResourceError(#[from] ResourceError),
+    ExtensionError(#[from] ExtensionError),
 }
 
 #[cfg(feature = "pyo3")]
@@ -673,7 +673,7 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::ConstUsize;
-    use crate::extension::ResourceSet;
+    use crate::extension::ExtensionSet;
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
@@ -1083,11 +1083,11 @@ mod test {
 
         let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
             // Inner DFG has resource requirements that the wire wont satisfy
-            .with_input_resources(ResourceSet::from_iter(["A".into(), "B".into()]));
+            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "B".into()]));
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
-            Some(inner_sig.input_resources),
+            Some(inner_sig.input_extensions),
             [main_input],
         )?;
         let f_inputs = f_builder.input_wires();
@@ -1098,8 +1098,8 @@ mod test {
 
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensions { .. }
             ))
         );
         Ok(())
@@ -1119,12 +1119,12 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            .with_resource_delta(&ResourceSet::singleton(&"A".into()))
-            .with_input_resources(ResourceSet::new());
+            .with_extension_delta(&ExtensionSet::singleton(&"A".into()))
+            .with_input_extensions(ExtensionSet::new());
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
-            Some(inner_sig.input_resources),
+            Some(inner_sig.input_extensions),
             [main_input],
         )?;
         let f_inputs = f_builder.input_wires();
@@ -1134,8 +1134,8 @@ mod test {
         let handle = module_builder.finish_hugr();
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::SrcExceedsTgtResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::SrcExceedsTgtExtensions { .. }
             ))
         );
         Ok(())
@@ -1149,27 +1149,27 @@ mod test {
     fn resource_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+        let all_rs = ExtensionSet::from_iter(["A".into(), "B".into()]);
 
         let main_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_resource_delta(&all_rs)
-            .with_input_resources(ResourceSet::new());
+            .with_extension_delta(&all_rs)
+            .with_input_extensions(ExtensionSet::new());
 
         let mut main = module_builder.define_function("main", main_sig)?;
 
         let inner_left_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_input_resources(ResourceSet::singleton(&"A".into()));
+            .with_input_extensions(ExtensionSet::singleton(&"A".into()));
 
         let inner_right_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_input_resources(ResourceSet::singleton(&"B".into()));
+            .with_input_extensions(ExtensionSet::singleton(&"B".into()));
 
         let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
-            .with_input_resources(all_rs);
+            .with_input_extensions(all_rs);
 
         let [left_wire] = main
             .dfg_builder(
                 inner_left_sig.signature,
-                Some(inner_left_sig.input_resources),
+                Some(inner_left_sig.input_extensions),
                 [],
             )?
             .finish_with_outputs([])?
@@ -1178,7 +1178,7 @@ mod test {
         let [right_wire] = main
             .dfg_builder(
                 inner_right_sig.signature,
-                Some(inner_right_sig.input_resources),
+                Some(inner_right_sig.input_extensions),
                 [],
             )?
             .finish_with_outputs([])?
@@ -1186,7 +1186,7 @@ mod test {
 
         let builder = main.dfg_builder(
             inner_mult_sig.signature,
-            Some(inner_mult_sig.input_resources),
+            Some(inner_mult_sig.input_extensions),
             [left_wire, right_wire],
         )?;
         let [_left, _right] = builder.input_wires_arr();
@@ -1196,8 +1196,8 @@ mod test {
         let handle = module_builder.finish_hugr();
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensions { .. }
             ))
         );
         Ok(())
@@ -1206,7 +1206,7 @@ mod test {
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
         let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            .with_resource_delta(&ResourceSet::singleton(&"R".into()));
+            .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
 
         let builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
@@ -1214,8 +1214,8 @@ mod test {
 
         assert_matches!(
             hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+            Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensions { .. }
             )))
         );
         Ok(())

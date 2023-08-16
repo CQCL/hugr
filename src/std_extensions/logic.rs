@@ -4,13 +4,13 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::ResourceSet,
+    extension::ExtensionSet,
     ops,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         Type,
     },
-    Resource,
+    Extension,
 };
 
 /// Name of resource false value.
@@ -27,11 +27,11 @@ pub fn bool_type() -> Type {
 }
 
 /// Resource for basic logical operations.
-pub fn resource() -> Resource {
+pub fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
-    let mut resource = Resource::new(RESOURCE_ID);
+    let mut extension = Extension::new(RESOURCE_ID);
 
-    resource
+    extension
         .add_op_custom_sig_simple(
             "Not".into(),
             "logical 'not'".into(),
@@ -40,13 +40,13 @@ pub fn resource() -> Resource {
                 Ok((
                     vec![bool_type()].into(),
                     vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_op_custom_sig_simple(
             "And".into(),
             "logical 'and'".into(),
@@ -66,13 +66,13 @@ pub fn resource() -> Resource {
                 Ok((
                     vec![bool_type(); n as usize].into(),
                     vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_op_custom_sig_simple(
             "Or".into(),
             "logical 'or'".into(),
@@ -92,37 +92,37 @@ pub fn resource() -> Resource {
                 Ok((
                     vec![bool_type(); n as usize].into(),
                     vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_value(FALSE_NAME, ops::Const::simple_predicate(0, 2))
         .unwrap();
-    resource
+    extension
         .add_value(TRUE_NAME, ops::Const::simple_predicate(1, 2))
         .unwrap();
-    resource
+    extension
 }
 
 #[cfg(test)]
 mod test {
-    use crate::Resource;
+    use crate::Extension;
 
-    use super::{bool_type, resource, FALSE_NAME, TRUE_NAME};
+    use super::{bool_type, extension, FALSE_NAME, TRUE_NAME};
 
     #[test]
-    fn test_logic_resource() {
-        let r: Resource = resource();
+    fn test_logic_extension() {
+        let r: Extension = extension();
         assert_eq!(r.name(), "logic");
         assert_eq!(r.operations().count(), 3);
     }
 
     #[test]
     fn test_values() {
-        let r: Resource = resource();
+        let r: Extension = extension();
         let false_val = r.get_value(FALSE_NAME).unwrap();
         let true_val = r.get_value(TRUE_NAME).unwrap();
 

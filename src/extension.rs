@@ -35,7 +35,7 @@ pub enum SignatureError {
     NameMismatch(SmolStr, SmolStr),
     /// Resource mismatch
     #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
-    ResourceMismatch(ResourceId, ResourceId),
+    ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TypeArgError),
@@ -48,7 +48,7 @@ pub enum SignatureError {
 trait CustomConcrete {
     fn def_name(&self) -> &SmolStr;
     fn type_args(&self) -> &[TypeArg];
-    fn parent_resource(&self) -> &ResourceId;
+    fn parent_extension(&self) -> &ExtensionId;
 }
 
 impl CustomConcrete for OpaqueOp {
@@ -60,8 +60,8 @@ impl CustomConcrete for OpaqueOp {
         self.args()
     }
 
-    fn parent_resource(&self) -> &ResourceId {
-        self.resource()
+    fn parent_extension(&self) -> &ExtensionId {
+        self.extension()
     }
 }
 
@@ -74,8 +74,8 @@ impl CustomConcrete for CustomType {
         self.args()
     }
 
-    fn parent_resource(&self) -> &ResourceId {
-        self.resource()
+    fn parent_extension(&self) -> &ExtensionId {
+        self.extension()
     }
 }
 
@@ -88,7 +88,7 @@ trait TypeParametrised {
     /// Type parameters.
     fn params(&self) -> &[TypeParam];
     /// The parent resource.
-    fn resource(&self) -> &ResourceId;
+    fn extension(&self) -> &ExtensionId;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         if args.len() != self.params().len() {
@@ -109,10 +109,10 @@ trait TypeParametrised {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
-        if self.resource() != custom.parent_resource() {
-            return Err(SignatureError::ResourceMismatch(
-                self.resource().clone(),
-                custom.parent_resource().clone(),
+        if self.extension() != custom.parent_extension() {
+            return Err(SignatureError::ExtensionMismatch(
+                self.extension().clone(),
+                custom.parent_extension().clone(),
             ));
         }
         if self.name() != custom.def_name() {
@@ -131,13 +131,13 @@ trait TypeParametrised {
 /// A constant value provided by a resource.
 /// Must be an instance of a type available to the resource.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResourceValue {
-    resource: ResourceId,
+pub struct ExtensionValue {
+    resource: ExtensionId,
     name: SmolStr,
     typed_value: ops::Const,
 }
 
-impl ResourceValue {
+impl ExtensionValue {
     /// Returns a reference to the typed value of this [`ResourceValue`].
     pub fn typed_value(&self) -> &ops::Const {
         &self.typed_value
@@ -149,7 +149,7 @@ impl ResourceValue {
     }
 
     /// Returns a reference to the resource this [`ResourceValue`] belongs to.
-    pub fn resource(&self) -> &ResourceId {
+    pub fn resource(&self) -> &ExtensionId {
         &self.resource
     }
 }
@@ -157,22 +157,22 @@ impl ResourceValue {
 /// A unique identifier for a resource.
 ///
 /// The actual [`Resource`] is stored externally.
-pub type ResourceId = SmolStr;
+pub type ExtensionId = SmolStr;
 
 /// A resource is a set of capabilities required to execute a graph.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct Resource {
+pub struct Extension {
     /// Unique identifier for the resource.
-    pub name: ResourceId,
+    pub name: ExtensionId,
     /// Other resources defining types used by this resource.
     /// That is, an upper-bound on the types that can be returned by
     /// computing the signature of any operation in this resource,
     /// for any possible [TypeArg].
-    pub resource_reqs: ResourceSet,
+    pub resource_reqs: ExtensionSet,
     /// Types defined by this resource.
     types: HashMap<SmolStr, TypeDef>,
     /// Static values defined by this resource.
-    values: HashMap<SmolStr, ResourceValue>,
+    values: HashMap<SmolStr, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
@@ -182,9 +182,9 @@ pub struct Resource {
     operations: HashMap<SmolStr, Arc<op_def::OpDef>>,
 }
 
-impl Resource {
+impl Extension {
     /// Creates a new resource with the given name.
-    pub fn new(name: ResourceId) -> Self {
+    pub fn new(name: ExtensionId) -> Self {
         Self {
             name,
             ..Default::default()
@@ -192,10 +192,10 @@ impl Resource {
     }
 
     /// Creates a new resource with the given name and requirements.
-    pub fn new_with_reqs(name: ResourceId, resource_reqs: ResourceSet) -> Self {
+    pub fn new_with_reqs(name: ExtensionId, extension_reqs: ExtensionSet) -> Self {
         Self {
             name,
-            resource_reqs,
+            resource_reqs: extension_reqs,
             ..Default::default()
         }
     }
@@ -211,7 +211,7 @@ impl Resource {
     }
 
     /// Allows read-only access to the values in this Resource
-    pub fn get_value(&self, type_name: &str) -> Option<&ResourceValue> {
+    pub fn get_value(&self, type_name: &str) -> Option<&ExtensionValue> {
         self.values.get(type_name)
     }
 
@@ -235,20 +235,20 @@ impl Resource {
         &mut self,
         name: impl Into<SmolStr>,
         typed_value: ops::Const,
-    ) -> Result<&mut ResourceValue, ResourceBuildError> {
-        let resource_value = ResourceValue {
+    ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
+        let extension_value = ExtensionValue {
             resource: self.name().into(),
             name: name.into(),
             typed_value,
         };
-        match self.values.entry(resource_value.name.clone()) {
-            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(resource_value.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(resource_value)),
+        match self.values.entry(extension_value.name.clone()) {
+            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(extension_value.name)),
+            Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
     }
 }
 
-impl PartialEq for Resource {
+impl PartialEq for Extension {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
@@ -257,7 +257,7 @@ impl PartialEq for Resource {
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum ResourceBuildError {
+pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
     #[error("Resource already has an op called {0}.")]
     OpDefExists(SmolStr),
@@ -268,26 +268,26 @@ pub enum ResourceBuildError {
 
 /// A set of resources identified by their unique [`ResourceId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ResourceSet(HashSet<ResourceId>);
+pub struct ExtensionSet(HashSet<ExtensionId>);
 
-impl ResourceSet {
+impl ExtensionSet {
     /// Creates a new empty resource set.
     pub fn new() -> Self {
         Self(HashSet::new())
     }
 
     /// Creates a new resource set from some resources.
-    pub fn new_from_resources(resources: impl Into<HashSet<ResourceId>>) -> Self {
+    pub fn new_from_extensions(resources: impl Into<HashSet<ExtensionId>>) -> Self {
         Self(resources.into())
     }
 
     /// Adds a resource to the set.
-    pub fn insert(&mut self, resource: &ResourceId) {
+    pub fn insert(&mut self, resource: &ExtensionId) {
         self.0.insert(resource.clone());
     }
 
     /// Returns `true` if the set contains the given resource.
-    pub fn contains(&self, resource: &ResourceId) -> bool {
+    pub fn contains(&self, resource: &ExtensionId) -> bool {
         self.0.contains(resource)
     }
 
@@ -302,7 +302,7 @@ impl ResourceSet {
     }
 
     /// Create a resource set with a single element.
-    pub fn singleton(resource: &ResourceId) -> Self {
+    pub fn singleton(resource: &ExtensionId) -> Self {
         let mut set = Self::new();
         set.insert(resource);
         set
@@ -316,23 +316,23 @@ impl ResourceSet {
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        ResourceSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+        ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
     }
 
     /// Iterate over the contained ResourceIds
-    pub fn iter(&self) -> impl Iterator<Item = &ResourceId> {
+    pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
     }
 }
 
-impl Display for ResourceSet {
+impl Display for ExtensionSet {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
-impl FromIterator<ResourceId> for ResourceSet {
-    fn from_iter<I: IntoIterator<Item = ResourceId>>(iter: I) -> Self {
+impl FromIterator<ExtensionId> for ExtensionSet {
+    fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
         Self(HashSet::from_iter(iter))
     }
 }

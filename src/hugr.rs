@@ -24,7 +24,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::ResourceSet;
+use crate::extension::ExtensionSet;
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{AbstractSignature, Signature};
 
@@ -57,15 +57,15 @@ pub struct NodeType {
     /// The underlying OpType
     op: OpType,
     /// The resources that the signature has been specialised to
-    input_resources: Option<ResourceSet>,
+    input_extensions: Option<ExtensionSet>,
 }
 
 impl NodeType {
     /// Create a new optype with some ResourceSet
-    pub fn new(op: impl Into<OpType>, input_resources: ResourceSet) -> Self {
+    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(input_resources),
+            input_extensions: Some(input_extensions),
         }
     }
 
@@ -73,24 +73,24 @@ impl NodeType {
     pub fn pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(ResourceSet::new()),
+            input_extensions: Some(ExtensionSet::new()),
         }
     }
 
     /// Instantiate an OpType with an unknown set of input resources
     /// (to be inferred later)
-    pub fn open_resources(op: impl Into<OpType>) -> Self {
+    pub fn open_extensions(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: None,
+            input_extensions: None,
         }
     }
 
     /// Use the input resources to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
-        self.input_resources
+        self.input_extensions
             .as_ref()
-            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
+            .map(|rs| self.op.signature().with_input_extensions(rs.clone()))
     }
 
     /// Get the abstract signature from the embedded op
@@ -104,8 +104,8 @@ impl NodeType {
     /// resource delta defined by the operation type.
     ///
     /// If the input resources are not known, this will return None.
-    pub fn input_resources(&self) -> Option<&ResourceSet> {
-        self.input_resources.as_ref()
+    pub fn input_extensions(&self) -> Option<&ExtensionSet> {
+        self.input_extensions.as_ref()
     }
 }
 
@@ -130,10 +130,10 @@ impl<'a> From<&'a NodeType> for &'a OpType {
 
 impl OpType {
     /// Convert an OpType to a NodeType by giving it some input resources
-    pub fn with_resources(self, rs: ResourceSet) -> NodeType {
+    pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
         NodeType {
             op: self,
-            input_resources: Some(rs),
+            input_extensions: Some(rs),
         }
     }
 }

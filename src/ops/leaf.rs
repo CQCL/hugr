@@ -7,7 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 use crate::extension::prelude::{QB_T, USIZE_T};
 use crate::type_row;
 use crate::{
-    extension::{ResourceId, ResourceSet},
+    extension::{ExtensionId, ExtensionSet},
     types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
 };
 
@@ -73,7 +73,7 @@ pub enum LeafOp {
         /// The types of the edges
         type_row: TypeRow,
         /// The resources which we're adding to the inputs
-        new_resource: ResourceId,
+        new_extension: ExtensionId,
     },
 }
 
@@ -185,9 +185,9 @@ impl OpTrait for LeafOp {
             ),
             LeafOp::Lift {
                 type_row,
-                new_resource,
+                new_extension,
             } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
-                .with_resource_delta(&ResourceSet::singleton(new_resource)),
+                .with_extension_delta(&ExtensionSet::singleton(new_extension)),
         }
     }
 

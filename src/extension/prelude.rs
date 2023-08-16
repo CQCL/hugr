@@ -10,13 +10,13 @@ use crate::{
         CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::{CustomConst, KnownTypeConst},
-    Resource,
+    Extension,
 };
 
 lazy_static! {
     /// Prelude resource
-    pub static ref PRELUDE: Resource = {
-        let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
+    pub static ref PRELUDE: Extension = {
+        let mut prelude = Extension::new(SmolStr::new_inline("prelude"));
         prelude
             .add_type(
                 SmolStr::new_inline("usize"),

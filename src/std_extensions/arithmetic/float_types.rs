@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::{
     types::{CustomType, Type, TypeBound},
-    Resource,
+    Extension,
 };
 
 /// The resource identifier.
@@ -24,10 +24,10 @@ pub fn float64_type() -> Type {
 }
 
 /// Resource for basic floating-point types.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(RESOURCE_ID);
 
-    resource
+    extension
         .add_type(
             FLOAT_TYPE_ID,
             vec![],
@@ -36,7 +36,7 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    resource
+    extension
 }
 
 #[cfg(test)]
@@ -44,8 +44,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_float_types_resource() {
-        let r = resource();
+    fn test_float_types_extension() {
+        let r = extension();
         assert_eq!(r.name(), "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);

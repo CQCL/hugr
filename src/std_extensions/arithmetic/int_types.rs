@@ -8,7 +8,7 @@ use crate::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         CustomType, Type, TypeBound,
     },
-    Resource,
+    Extension,
 };
 
 /// The resource identifier.
@@ -56,10 +56,10 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
 }
 
 /// Resource for basic integer types.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(RESOURCE_ID);
 
-    resource
+    extension
         .add_type(
             INT_TYPE_ID,
             vec![TypeParam::USize],
@@ -68,7 +68,7 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    resource
+    extension
 }
 
 #[cfg(test)]
@@ -78,8 +78,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_int_types_resource() {
-        let r = resource();
+    fn test_int_types_extension() {
+        let r = extension();
         assert_eq!(r.name(), "arithmetic.int.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);

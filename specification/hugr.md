@@ -1505,7 +1505,7 @@ struct Node{
   // parent node index
   parent: Int,
   // The input extensions to the node
-  input_resources: Option<ResourceSet>
+  input_extensions: Option<ResourceSet>
   // name of operation
   op: String
   //other op-specific fields

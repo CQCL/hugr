@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use super::{
-    Resource, ResourceBuildError, ResourceId, ResourceSet, SignatureError, TypeParametrised,
+    Extension, ExtensionBuildError, ExtensionId, ExtensionSet, SignatureError, TypeParametrised,
 };
 
 use crate::types::{SignatureDescription, TypeRow};
@@ -32,7 +32,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         // TODO: Make return type an AbstractSignature
-    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError>;
+    ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError>;
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the resource definition YAML.
@@ -48,14 +48,14 @@ pub trait CustomSignatureFunc: Send + Sync {
 
 impl<F> CustomSignatureFunc for F
 where
-    F: Fn(&[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> + Send + Sync,
+    F: Fn(&[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> + Send + Sync,
 {
     fn compute_signature(
         &self,
         _name: &SmolStr,
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
+    ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
         self(arg_values)
     }
 }
@@ -79,7 +79,7 @@ pub trait CustomLowerFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
-        available_resources: &ResourceSet,
+        available_resources: &ExtensionSet,
     ) -> Option<Hugr>;
 }
 
@@ -116,7 +116,7 @@ pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
     /// this will generally only be applicable if the [OpDef] has no [TypeParam]s.
     #[serde(rename = "hugr")]
-    FixedHugr(ResourceSet, Hugr),
+    FixedHugr(ExtensionSet, Hugr),
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available resources.
     #[serde(skip)]
@@ -138,7 +138,7 @@ impl Debug for LowerFunc {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
     /// The unique Resource owning this OpDef (of which this OpDef is a member)
-    resource: ResourceId,
+    extension: ExtensionId,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
     name: SmolStr,
@@ -169,8 +169,8 @@ impl TypeParametrised for OpDef {
         self.name()
     }
 
-    fn resource(&self) -> &ResourceId {
-        self.resource()
+    fn extension(&self) -> &ExtensionId {
+        self.extension()
     }
 }
 
@@ -204,7 +204,7 @@ impl OpDef {
         self.check_args(&args)?;
 
         Ok(OpaqueOp::new(
-            self.resource().clone(),
+            self.extension().clone(),
             self.name().clone(),
             // TODO add description
             "".to_string(),
@@ -224,8 +224,8 @@ impl OpDef {
             }
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
-        assert!(res.contains(self.resource()));
-        Ok(AbstractSignature::new_df(ins, outs).with_resource_delta(&res))
+        assert!(res.contains(self.extension()));
+        Ok(AbstractSignature::new_df(ins, outs).with_extension_delta(&res))
     }
 
     /// Optional description of the ports in the signature.
@@ -247,7 +247,7 @@ impl OpDef {
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available resources that may be used in the Hugr.
-    pub fn try_lower(&self, args: &[TypeArg], available_resources: &ResourceSet) -> Option<Hugr> {
+    pub fn try_lower(&self, args: &[TypeArg], available_resources: &ExtensionSet) -> Option<Hugr> {
         self.lower_funcs
             .iter()
             .flat_map(|f| match f {
@@ -271,8 +271,8 @@ impl OpDef {
     }
 
     /// Returns a reference to the resource of this [`OpDef`].
-    pub fn resource(&self) -> &ResourceId {
-        &self.resource
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 
     /// Returns a reference to the description of this [`OpDef`].
@@ -286,7 +286,7 @@ impl OpDef {
     }
 }
 
-impl Resource {
+impl Extension {
     /// Add an operation definition to the resource.
     fn add_op(
         &mut self,
@@ -296,9 +296,9 @@ impl Resource {
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: SignatureFunc,
-    ) -> Result<&OpDef, ResourceBuildError> {
+    ) -> Result<&OpDef, ExtensionBuildError> {
         let op = OpDef {
-            resource: self.name.clone(),
+            extension: self.name.clone(),
             name,
             description,
             params,
@@ -308,7 +308,7 @@ impl Resource {
         };
 
         match self.operations.entry(op.name.clone()) {
-            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(op.name)),
+            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(op.name)),
             Entry::Vacant(ve) => Ok(ve.insert(Arc::new(op))),
         }
     }
@@ -322,7 +322,7 @@ impl Resource {
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
-    ) -> Result<&OpDef, ResourceBuildError> {
+    ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op(
             name,
             description,
@@ -341,7 +341,7 @@ impl Resource {
         description: String,
         params: Vec<TypeParam>,
         signature_func: impl CustomSignatureFunc + 'static,
-    ) -> Result<&OpDef, ResourceBuildError> {
+    ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op_custom_sig(
             name,
             description,
@@ -362,7 +362,7 @@ impl Resource {
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         (inputs, outputs): (String, String), // separating these makes clippy complain about too many args
-    ) -> Result<&OpDef, ResourceBuildError> {
+    ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op(
             name,
             description,

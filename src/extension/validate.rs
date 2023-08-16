@@ -8,25 +8,25 @@ use thiserror::Error;
 use crate::hugr::NodeType;
 use crate::{Direction, Hugr, HugrView, Node, Port};
 
-use super::ResourceSet;
+use super::ExtensionSet;
 
 /// Context for validating the resource requirements defined in a Hugr.
 #[derive(Debug, Clone, Default)]
-pub struct ResourceValidator {
+pub struct ExtensionValidator {
     /// Resource requirements associated with each edge
-    resources: HashMap<(Node, Direction), ResourceSet>,
+    extensions: HashMap<(Node, Direction), ExtensionSet>,
 }
 
-impl ResourceValidator {
+impl ExtensionValidator {
     /// Initialise a new resource validator, pre-computing the resource
     /// requirements for each node in the Hugr.
     pub fn new(hugr: &Hugr) -> Self {
-        let mut validator = ResourceValidator {
-            resources: HashMap::new(),
+        let mut validator = ExtensionValidator {
+            extensions: HashMap::new(),
         };
 
         for node in hugr.nodes() {
-            validator.gather_resources(&node, hugr.get_nodetype(node));
+            validator.gather_extensions(&node, hugr.get_nodetype(node));
         }
 
         validator
@@ -35,12 +35,12 @@ impl ResourceValidator {
     /// Use the signature supplied by a dataflow node to work out the
     /// resource requirements for all of its input and output edges, then put
     /// those requirements in the resource validation context.
-    fn gather_resources(&mut self, node: &Node, node_type: &NodeType) {
+    fn gather_extensions(&mut self, node: &Node, node_type: &NodeType) {
         if let Some(sig) = node_type.signature() {
             for dir in Direction::BOTH {
                 assert!(self
-                    .resources
-                    .insert((*node, dir), sig.get_resources(&dir))
+                    .extensions
+                    .insert((*node, dir), sig.get_extension(&dir))
                     .is_none());
             }
         }
@@ -51,10 +51,14 @@ impl ResourceValidator {
     /// # Errors
     ///
     /// If the node resources are missing.
-    fn query_resources(&self, node: Node, dir: Direction) -> Result<&ResourceSet, ResourceError> {
-        self.resources
+    fn query_extensions(
+        &self,
+        node: Node,
+        dir: Direction,
+    ) -> Result<&ExtensionSet, ExtensionError> {
+        self.extensions
             .get(&(node, dir))
-            .ok_or(ResourceError::MissingInputResources(node))
+            .ok_or(ExtensionError::MissingInputExtensions(node))
     }
 
     /// Check that two `PortIndex` have compatible resource requirements,
@@ -65,35 +69,35 @@ impl ResourceValidator {
     /// and adding of lift nodes
     ///   (i.e. those which transform an edge from `A` to `[R]A`)
     /// has already been done.
-    pub fn check_resources_compatible(
+    pub fn check_extensions_compatible(
         &self,
         src: &(Node, Port),
         tgt: &(Node, Port),
-    ) -> Result<(), ResourceError> {
-        let rs_src = self.query_resources(src.0, Direction::Outgoing)?;
-        let rs_tgt = self.query_resources(tgt.0, Direction::Incoming)?;
+    ) -> Result<(), ExtensionError> {
+        let rs_src = self.query_extensions(src.0, Direction::Outgoing)?;
+        let rs_tgt = self.query_extensions(tgt.0, Direction::Incoming)?;
 
         if rs_src == rs_tgt {
             Ok(())
         } else if rs_src.is_subset(rs_tgt) {
             // The extra resource requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
-            Err(ResourceError::TgtExceedsSrcResources {
+            Err(ExtensionError::TgtExceedsSrcExtensions {
                 from: src.0,
                 from_offset: src.1,
-                from_resources: rs_src.clone(),
+                from_extensions: rs_src.clone(),
                 to: tgt.0,
                 to_offset: tgt.1,
-                to_resources: rs_tgt.clone(),
+                to_extensions: rs_tgt.clone(),
             })
         } else {
-            Err(ResourceError::SrcExceedsTgtResources {
+            Err(ExtensionError::SrcExceedsTgtExtensions {
                 from: src.0,
                 from_offset: src.1,
-                from_resources: rs_src.clone(),
+                from_extensions: rs_src.clone(),
                 to: tgt.0,
                 to_offset: tgt.1,
-                to_resources: rs_tgt.clone(),
+                to_extensions: rs_tgt.clone(),
             })
         }
     }
@@ -105,26 +109,26 @@ impl ResourceValidator {
         parent: Node,
         input: Node,
         output: Node,
-    ) -> Result<(), ResourceError> {
-        let parent_input_resources = self.query_resources(parent, Direction::Incoming)?;
-        let parent_output_resources = self.query_resources(parent, Direction::Outgoing)?;
+    ) -> Result<(), ExtensionError> {
+        let parent_input_resources = self.query_extensions(parent, Direction::Incoming)?;
+        let parent_output_resources = self.query_extensions(parent, Direction::Outgoing)?;
         for dir in Direction::BOTH {
-            let input_resources = self.query_resources(input, dir)?;
-            let output_resources = self.query_resources(output, dir)?;
+            let input_resources = self.query_extensions(input, dir)?;
+            let output_resources = self.query_extensions(output, dir)?;
             if parent_input_resources != input_resources {
-                return Err(ResourceError::ParentIOResourceMismatch {
+                return Err(ExtensionError::ParentIOExtensionMismatch {
                     parent,
-                    parent_resources: parent_input_resources.clone(),
+                    parent_extensions: parent_input_resources.clone(),
                     child: input,
-                    child_resources: input_resources.clone(),
+                    child_extensions: input_resources.clone(),
                 });
             };
             if parent_output_resources != output_resources {
-                return Err(ResourceError::ParentIOResourceMismatch {
+                return Err(ExtensionError::ParentIOExtensionMismatch {
                     parent,
-                    parent_resources: parent_output_resources.clone(),
+                    parent_extensions: parent_output_resources.clone(),
                     child: output,
-                    child_resources: output_resources.clone(),
+                    child_extensions: output_resources.clone(),
                 });
             };
         }
@@ -135,34 +139,34 @@ impl ResourceValidator {
 /// Errors that can occur while validating a Hugr.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
-pub enum ResourceError {
+pub enum ExtensionError {
     /// Missing lift node
-    #[error("Resources at target node {to:?} ({to_offset:?}) ({to_resources}) exceed those at source {from:?} ({from_offset:?}) ({from_resources})")]
-    TgtExceedsSrcResources {
+    #[error("Resources at target node {to:?} ({to_offset:?}) ({to_extensions}) exceed those at source {from:?} ({from_offset:?}) ({from_extensions})")]
+    TgtExceedsSrcExtensions {
         from: Node,
         from_offset: Port,
-        from_resources: ResourceSet,
+        from_extensions: ExtensionSet,
         to: Node,
         to_offset: Port,
-        to_resources: ResourceSet,
+        to_extensions: ExtensionSet,
     },
     /// Too many resource requirements coming from src
-    #[error("Resources at source node {from:?} ({from_offset:?}) ({from_resources}) exceed those at target {to:?} ({to_offset:?}) ({to_resources})")]
-    SrcExceedsTgtResources {
+    #[error("Resources at source node {from:?} ({from_offset:?}) ({from_extensions}) exceed those at target {to:?} ({to_offset:?}) ({to_extensions})")]
+    SrcExceedsTgtExtensions {
         from: Node,
         from_offset: Port,
-        from_resources: ResourceSet,
+        from_extensions: ExtensionSet,
         to: Node,
         to_offset: Port,
-        to_resources: ResourceSet,
+        to_extensions: ExtensionSet,
     },
     #[error("Missing input resources for node {0:?}")]
-    MissingInputResources(Node),
-    #[error("Resources of I/O node ({child:?}) {child_resources:?} don't match those expected by parent node ({parent:?}): {parent_resources:?}")]
-    ParentIOResourceMismatch {
+    MissingInputExtensions(Node),
+    #[error("Resources of I/O node ({child:?}) {child_extensions:?} don't match those expected by parent node ({parent:?}): {parent_extensions:?}")]
+    ParentIOExtensionMismatch {
         parent: Node,
-        parent_resources: ResourceSet,
+        parent_extensions: ExtensionSet,
         child: Node,
-        child_resources: ResourceSet,
+        child_extensions: ExtensionSet,
     },
 }

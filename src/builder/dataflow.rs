@@ -9,7 +9,7 @@ use crate::ops;
 
 use crate::types::{AbstractSignature, Signature};
 
-use crate::extension::ResourceSet;
+use crate::extension::ExtensionSet;
 use crate::Node;
 use crate::{hugr::HugrInternalsMut, Hugr};
 
@@ -27,7 +27,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         mut base: T,
         parent: Node,
         signature: AbstractSignature,
-        input_resources: Option<ResourceSet>,
+        input_extensions: Option<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input().len();
         let num_out_wires = signature.output().len();
@@ -51,7 +51,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         };
         base.as_mut().add_node_with_parent(
             parent,
-            match &input_resources {
+            match &input_extensions {
                 // TODO: Make this NodeType::open_resources
                 None => NodeType::pure(input),
                 Some(rs) => NodeType::new(input, rs.clone()),
@@ -59,9 +59,9 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         )?;
         base.as_mut().add_node_with_parent(
             parent,
-            match input_resources.map(|inp| inp.union(&signature.resource_reqs)) {
+            match input_extensions.map(|inp| inp.union(&signature.extension_reqs)) {
                 // TODO: Make this NodeType::open_resources
-                None => NodeType::new(output, signature.resource_reqs),
+                None => NodeType::new(output, signature.extension_reqs),
                 Some(rs) => NodeType::new(output, rs),
             },
         )?;
@@ -159,14 +159,14 @@ impl FunctionBuilder<Hugr> {
             name: name.into(),
         };
 
-        let base = Hugr::new(NodeType::new(op, signature.input_resources.clone()));
+        let base = Hugr::new(NodeType::new(op, signature.input_extensions.clone()));
         let root = base.root();
 
         let db = DFGBuilder::create_with_io(
             base,
             root,
             signature.signature,
-            Some(signature.input_resources),
+            Some(signature.input_extensions),
         )?;
         Ok(Self::from_dfg_builder(db))
     }
@@ -226,7 +226,7 @@ mod test {
             test::{n_identity, BIT, NAT, QB},
             BuildError,
         },
-        extension::ResourceSet,
+        extension::ExtensionSet,
         type_row, Wire,
     };
 
@@ -249,7 +249,7 @@ mod test {
                 let inner_builder = func_builder.dfg_builder(
                     AbstractSignature::new_df(type_row![NAT], type_row![NAT]),
                     // TODO: This should be None
-                    Some(ResourceSet::new()),
+                    Some(ExtensionSet::new()),
                     [int],
                 )?;
                 let inner_id = n_identity(inner_builder)?;
@@ -441,34 +441,34 @@ mod test {
     fn lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let ab_resources = ResourceSet::from_iter(["A".into(), "B".into()]);
-        let c_resources = ResourceSet::singleton(&"C".into());
-        let abc_resources = ab_resources.clone().union(&c_resources);
+        let ab_extensions = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let c_extensions = ExtensionSet::singleton(&"C".into());
+        let abc_extensions = ab_extensions.clone().union(&c_extensions);
 
         let parent_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&abc_resources);
+            .with_extension_delta(&abc_extensions);
         let mut parent = module_builder.define_function(
             "parent",
-            parent_sig.with_input_resources(ResourceSet::new()),
+            parent_sig.with_input_extensions(ExtensionSet::new()),
         )?;
 
         let add_c_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&c_resources)
-            .with_input_resources(ab_resources.clone());
+            .with_extension_delta(&c_extensions)
+            .with_input_extensions(ab_extensions.clone());
 
         let [w] = parent.input_wires_arr();
 
         let add_ab_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&ab_resources);
+            .with_extension_delta(&ab_extensions);
 
         // A box which adds resources A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(add_ab_sig, Some(ResourceSet::new()), [w])?;
+        let mut add_ab = parent.dfg_builder(add_ab_sig, Some(ExtensionSet::new()), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
             LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_resource: "A".into(),
+                new_extension: "A".into(),
             },
             [w],
         )?;
@@ -478,9 +478,9 @@ mod test {
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],
-                    new_resource: "B".into(),
+                    new_extension: "B".into(),
                 },
-                ResourceSet::from_iter(["A".into()]),
+                ExtensionSet::from_iter(["A".into()]),
             ),
             [w],
         )?;
@@ -492,15 +492,15 @@ mod test {
         // Add another node (a sibling to add_ab) which adds resource C
         // via a child lift node
         let mut add_c =
-            parent.dfg_builder(add_c_sig.signature, Some(add_c_sig.input_resources), [w])?;
+            parent.dfg_builder(add_c_sig.signature, Some(add_c_sig.input_extensions), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_node(
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],
-                    new_resource: "C".into(),
+                    new_extension: "C".into(),
                 },
-                ab_resources,
+                ab_extensions,
             ),
             [w],
         )?;

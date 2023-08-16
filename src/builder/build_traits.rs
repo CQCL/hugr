@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::ResourceSet;
+use crate::extension::ExtensionSet;
 use crate::types::{AbstractSignature, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -95,7 +95,7 @@ pub trait Container {
             self.hugr_mut(),
             f_node,
             signature.signature,
-            Some(signature.input_resources),
+            Some(signature.input_extensions),
         )?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
@@ -277,20 +277,20 @@ pub trait Dataflow: Container {
     fn dfg_builder(
         &mut self,
         signature: AbstractSignature,
-        input_resources: Option<ResourceSet>,
+        input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = match &input_resources {
+        let nodetype = match &input_extensions {
             // TODO: Make this NodeType::open_resources
             None => NodeType::pure(op),
             Some(rs) => NodeType::new(op, rs.clone()),
         };
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
-        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_resources)
+        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,

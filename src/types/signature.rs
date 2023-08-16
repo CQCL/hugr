@@ -19,7 +19,7 @@ use crate::hugr::Port;
 
 use crate::type_row;
 
-use crate::extension::ResourceSet;
+use crate::extension::ExtensionSet;
 use delegate::delegate;
 
 #[cfg_attr(feature = "pyo3", pyclass)]
@@ -34,7 +34,7 @@ pub struct AbstractSignature {
     /// Possible static input (for call / load-constant).
     pub static_input: TypeRow,
     /// The resource requirements which are added by the operation
-    pub resource_reqs: ResourceSet,
+    pub extension_reqs: ExtensionSet,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -43,7 +43,7 @@ pub struct Signature {
     /// The underlying signature
     pub signature: AbstractSignature,
     /// The resources which are associated with all the inputs and carried through
-    pub input_resources: ResourceSet,
+    pub input_extensions: ExtensionSet,
 }
 
 impl AbstractSignature {
@@ -57,27 +57,27 @@ impl AbstractSignature {
             input: input.into(),
             output: output.into(),
             static_input: static_input.into(),
-            resource_reqs: ResourceSet::new(),
+            extension_reqs: ExtensionSet::new(),
         }
     }
 
     /// Builder method, add resource_reqs to an AbstractSignature
-    pub fn with_resource_delta(mut self, rs: &ResourceSet) -> Self {
-        self.resource_reqs = self.resource_reqs.union(rs);
+    pub fn with_extension_delta(mut self, rs: &ExtensionSet) -> Self {
+        self.extension_reqs = self.extension_reqs.union(rs);
         self
     }
 
     /// Instantiate an AbstractSignature, converting it to a concrete one
-    pub fn with_input_resources(self, rs: ResourceSet) -> Signature {
+    pub fn with_input_extensions(self, es: ExtensionSet) -> Signature {
         Signature {
             signature: self,
-            input_resources: rs,
+            input_extensions: es,
         }
     }
 
     /// Instantiate a signature with the empty set of resources
     pub fn pure(self) -> Signature {
-        self.with_input_resources(ResourceSet::new())
+        self.with_input_extensions(ExtensionSet::new())
     }
 }
 
@@ -89,10 +89,10 @@ impl From<Signature> for AbstractSignature {
 
 impl Signature {
     /// Calculate the resource requirements of the output wires
-    pub fn output_resources(&self) -> ResourceSet {
-        self.input_resources
+    pub fn output_extensions(&self) -> ExtensionSet {
+        self.input_extensions
             .clone()
-            .union(&self.signature.resource_reqs)
+            .union(&self.signature.extension_reqs)
     }
 }
 
@@ -277,10 +277,10 @@ impl AbstractSignature {
 impl Signature {
     /// Returns a reference to the resource set for the ports of the
     /// signature in a given direction
-    pub fn get_resources(&self, dir: &Direction) -> ResourceSet {
+    pub fn get_extension(&self, dir: &Direction) -> ExtensionSet {
         match dir {
-            Direction::Incoming => self.input_resources.clone(),
-            Direction::Outgoing => self.output_resources(),
+            Direction::Incoming => self.input_extensions.clone(),
+            Direction::Outgoing => self.output_extensions(),
         }
     }
 
@@ -309,7 +309,7 @@ impl Display for AbstractSignature {
             f.write_str(" -> ")?;
         }
         f.write_char('[')?;
-        self.resource_reqs.fmt(f)?;
+        self.extension_reqs.fmt(f)?;
         f.write_char(']')?;
         self.output.fmt(f)
     }

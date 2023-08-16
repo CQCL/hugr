@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 
-use super::ResourceBuildError;
-use super::{Resource, ResourceId, SignatureError, TypeParametrised};
+use super::ExtensionBuildError;
+use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
 
 use crate::types::{least_upper_bound, CustomType};
 
@@ -34,7 +34,7 @@ impl From<TypeBound> for TypeDefBound {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
     /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
-    resource: ResourceId,
+    extension: ExtensionId,
     /// The unique name of the type
     name: SmolStr,
     /// Declaration of type parameters. The TypeDef must be instantiated
@@ -80,7 +80,7 @@ impl TypeDef {
         Ok(CustomType::new(
             self.name().clone(),
             args,
-            self.resource().clone(),
+            self.extension().clone(),
             bound,
         ))
     }
@@ -117,12 +117,12 @@ impl TypeParametrised for TypeDef {
         &self.name
     }
 
-    fn resource(&self) -> &ResourceId {
-        &self.resource
+    fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 
-impl Resource {
+impl Extension {
     /// Add an exported type to the resource.
     pub fn add_type(
         &mut self,
@@ -130,16 +130,16 @@ impl Resource {
         params: Vec<TypeParam>,
         description: String,
         bound: TypeDefBound,
-    ) -> Result<&TypeDef, ResourceBuildError> {
+    ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
-            resource: self.name().into(),
+            extension: self.name().into(),
             name,
             params,
             description,
             bound,
         };
         match self.types.entry(ty.name.clone()) {
-            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(ty.name)),
+            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(ty.name)),
             Entry::Vacant(ve) => Ok(ve.insert(ty)),
         }
     }
@@ -159,7 +159,7 @@ mod test {
         let def = TypeDef {
             name: "MyType".into(),
             params: vec![TypeParam::Type(TypeBound::Copyable)],
-            resource: "MyRsrc".into(),
+            extension: "MyRsrc".into(),
             description: "Some parameterised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
         };
