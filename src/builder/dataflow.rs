@@ -96,7 +96,7 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
         self.base.infer_resources()?;
         self.base.validate()?;
         Ok(self.base)

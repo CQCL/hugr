@@ -8,11 +8,13 @@
 
 use super::{ResourceId, ResourceSet};
 use crate::{
-    hugr::{HugrView, Node},
-    hugr::hierarchical_views::{HierarchyView, SiblingGraph},
-    hugr::validate::ValidationError,
+    hugr::{Hugr, Node},
+    hugr::HugrInternalsMut,
+    hugr::views::{HugrView, HierarchyView, SiblingGraph},
     Direction,
 };
+
+use super::validate::ResourceError;
 
 use petgraph::graph as pg;
 
@@ -22,8 +24,10 @@ use thiserror::Error;
 use std::collections::BTreeSet;
 use std::cmp::{Ord, Ordering};
 
+pub type ResourceSolution = HashMap<(Node, Direction), ResourceSet>;
+
 /// Infer resources for a hugr. This is the main API exposed by this module
-pub fn infer_resources(hugr: &impl HugrView) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+pub fn infer_resources(hugr: &impl HugrView) -> Result<ResourceSolution, InferResourceError> {
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()
 }
@@ -103,7 +107,7 @@ pub enum InferResourceError {
     /// This should mirror (or reuse) `ValidationError`'s SrcExceedsTgtResources
     /// and TgtExceedsSrcResources
     #[error("Edge mismatch: {0}")]
-    EdgeMismatch(#[from] ValidationError),
+    EdgeMismatch(#[from] ResourceError),
 }
 
 /// A graph of metavariables which we've found equality constraints for. Edges
@@ -152,11 +156,6 @@ impl EqGraph {
                       .unwrap())
                  .collect())
             .collect()
-    }
-
-    /// Return the number of connected components in the graph
-    pub fn cc_count(&self) -> usize {
-        petgraph::algo::connected_components(&self.equalities)
     }
 }
 
@@ -249,6 +248,8 @@ impl UnificationContext {
         self.add_constraint(output, Constraint::Equal(last_meta));
     }
 
+    /// Return the metavariable corresponding to the given location on the
+    /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
         if let Some(m) = self.resources.get(&(node, dir)) {
             *m
@@ -259,9 +260,11 @@ impl UnificationContext {
         }
     }
 
-    fn gen_constraints(&mut self, hugr: &impl HugrView) {
+    /// Iterate over the nodes in a hugr and generate unification constraints
+    fn gen_constraints<T>(&mut self, hugr: &T) where T: HugrView {
         // The toplevel sibling graph can be open, and we should note what those variables are
-        for toplevel_node in SiblingGraph::new(hugr, hugr.root()).nodes().into_iter() {
+        let toplevel: SiblingGraph<Node, T> = SiblingGraph::new(hugr, hugr.root());
+        for toplevel_node in toplevel.nodes().into_iter() {
             let m_input = self.make_or_get_meta(toplevel_node, Direction::Incoming);
             self.variables.insert(m_input);
         }
@@ -439,17 +442,16 @@ impl UnificationContext {
     /// still makes sense (should pass the resource validation check)
     pub fn results(
         &mut self,
-    ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+    ) -> Result<ResourceSolution, InferResourceError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
-        let mut results: HashMap<(Node, Direction), ResourceSet> = HashMap::new();
+        let mut results: ResourceSolution = HashMap::new();
         for (loc, meta) in self.resources.iter() {
             let rs = match self.get_solution(meta) {
                 Some(rs) => Ok(rs.clone()),
                 None => {
                     // Cut through the riff raff
                     if let Some(live_var) = self.live_var(meta) {
-                        self.debug();
                         Err(InferResourceError::Unsolved { location: *loc })
                     } else {
                         continue;
@@ -498,35 +500,11 @@ impl UnificationContext {
             .collect()
     }
 
-    fn debug(&self) {
-        println!("Metas:");
-        for (loc, m) in self.resources.iter() {
-            println!("  {:?}: {:?}", loc, m);
-        }
-        println!("Constraints:");
-        for (m, cs) in self.constraints.iter() {
-            println!("  {:?}: {:?}", m, cs);
-        }
-        println!("Variables:");
-        for var in self.variables.iter() {
-            println!("  {:?}", var);
-        }
-        println!("Shunted:");
-        for (src, tgt) in self.shunted.iter() {
-            println!("  {:?} -> {:?}", src, tgt);
-        }
-        println!("Solved:");
-        for (m, sol) in self.solved.iter() {
-            println!("  {:?}: {:?}", m, sol);
-        }
-    }
-
     /// Returns the metas that we solved
     fn solve_constraints(
         &mut self,
         vars: &HashSet<Meta>,
     ) -> Result<HashSet<Meta>, InferResourceError> {
-        self.debug();
         let mut solved = HashSet::new();
         for m in vars.into_iter() {
             if self.solve_meta(*m)? {
@@ -546,7 +524,7 @@ impl UnificationContext {
     /// variable in the toplevel graph, don't include that location in the map
     pub fn main_loop(
         &mut self,
-    ) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+    ) -> Result<ResourceSolution, InferResourceError> {
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
         // Keep going as long as we're making progress (= merging nodes)
@@ -578,18 +556,19 @@ mod test {
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
     };
-    use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
+    use crate::hugr::HugrInternalsMut;
+    use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
     use crate::resource::ResourceSet;
     use crate::type_row;
-    use crate::types::{AbstractSignature, ClassicType, SimpleType};
+    use crate::types::{AbstractSignature, Type};
 
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
 
     use crate::utils::test::viz_dotstr;
 
-    const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
+    const BIT: Type = crate::resource::prelude::USIZE_T;
 
     #[test]
     // Build up a graph with some holes in its resources, and infer them
@@ -705,8 +684,6 @@ mod test {
         let mut abc = ab.clone();
         abc.insert(&"C".into());
 
-        ctx.debug();
-
         assert_eq!(ctx.get_solution(&metas[0]).unwrap(), &ab);
         assert_eq!(ctx.get_solution(&metas[1]).unwrap(), &a);
         assert_eq!(ctx.get_solution(&metas[2]).unwrap(), &a);
@@ -759,8 +736,6 @@ mod test {
         )?;
         let [w] = mult.outputs_arr();
 
-        viz_dotstr(&builder.hugr().dot_string());
-
         let h = builder.finish_hugr_with_outputs([w])?;
         Ok(())
     }
@@ -779,7 +754,7 @@ mod test {
         assert_matches!(
             hugr,
             Err(BuildError::InvalidHUGR(
-                ValidationError::TgtExceedsSrcResources { .. }
+                ValidationError::ResourceError(ResourceError::TgtExceedsSrcResources { .. })
             ))
         );
         Ok(())
@@ -890,7 +865,6 @@ mod test {
         ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
         ctx.add_constraint(ab, Constraint::Plus("B".into(), a));
         ctx.main_loop()?;
-        ctx.debug();
         Ok(())
     }
 }

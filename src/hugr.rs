@@ -26,8 +26,10 @@ use pyo3::prelude::*;
 pub use self::views::HugrView;
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::resource::{
-    unify::{InferResourceError, UnificationContext},
+    infer_resources,
+    InferResourceError,
     ResourceSet,
+    ResourceSolution,
 };
 use crate::types::{AbstractSignature, Signature};
 
@@ -197,10 +199,15 @@ impl Hugr {
     }
 
     /// Infer resources
-    pub fn infer_resources(&self) -> Result<(), InferResourceError> {
-        let mut ctx = UnificationContext::new(self);
-        ctx.main_loop()?;
+    pub fn infer_resources(&mut self) -> Result<(), InferResourceError> {
+        let solution = infer_resources(self)?;
+        self.instantiate_resources(solution);
         Ok(())
+    }
+
+    /// TODO: Write this
+    fn instantiate_resources(&mut self, _solution: ResourceSolution) {
+        //todo!()
     }
 }
 
