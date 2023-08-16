@@ -2,7 +2,7 @@
 
 use crate::{
     types::{ConstTypeError, EdgeKind, Type, TypeRow},
-    values::{KnownTypeConst, Value},
+    values::{CustomConst, KnownTypeConst, Value},
 };
 
 use smol_str::SmolStr;
@@ -105,7 +105,10 @@ impl OpTrait for Const {
 
 // [KnownTypeConst] is guaranteed to be the right type, so can be constructed
 // without initial type check.
-impl<T: KnownTypeConst> From<T> for Const {
+impl<T> From<T> for Const
+where
+    T: KnownTypeConst + CustomConst,
+{
     fn from(value: T) -> Self {
         Const {
             value: Value::custom(value),

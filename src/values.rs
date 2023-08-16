@@ -136,13 +136,13 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
 }
 
 /// Simpler trait for constant structs that have a known custom type to check against.
-pub trait KnownTypeConst: CustomConst {
+pub trait KnownTypeConst {
     /// The type of the constants.
     const TYPE: CustomType;
 
     /// Fixed implementation of [CustomConst::check_custom_type] that checks
     /// against known correct type.
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+    fn check_known_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         if typ == &Self::TYPE {
             Ok(())
         } else {

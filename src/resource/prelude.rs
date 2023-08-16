@@ -96,7 +96,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        <Self as KnownTypeConst>::check_custom_type(self, typ)
+        self.check_known_type(typ)
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
