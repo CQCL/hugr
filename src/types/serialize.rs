@@ -1,4 +1,4 @@
-use super::{Type, TypeEnum};
+use super::{Sum, Type, TypeEnum};
 
 use itertools::Itertools;
 
@@ -18,6 +18,7 @@ pub(crate) enum SerSimpleType {
     G(Box<AbstractSignature>),
     Tuple { inner: Vec<SerSimpleType> },
     Sum { inner: Vec<SerSimpleType> },
+    SimplePredicate { size: usize },
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
@@ -39,9 +40,10 @@ impl From<Type> for SerSimpleType {
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
-            TypeEnum::Sum(inner) => SerSimpleType::Sum {
+            TypeEnum::Sum(Sum::General(inner)) => SerSimpleType::Sum {
                 inner: inner.into_owned().into_iter().map_into().collect(),
             },
+            TypeEnum::Sum(Sum::Simple(size)) => SerSimpleType::SimplePredicate { size },
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
                 inner: inner.into_owned().into_iter().map_into().collect(),
             },
@@ -61,6 +63,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Sum { inner } => {
                 Type::new_sum(inner.into_iter().map_into().collect_vec())
             }
+            SerSimpleType::SimplePredicate { size } => Type::new_simple_predicate(size),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
@@ -88,6 +91,10 @@ mod test {
 
         // A Classic sum
         let t = Type::new_sum(vec![USIZE_T, COPYABLE_T]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        // A simple predicate
+        let t = Type::new_simple_predicate(4);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

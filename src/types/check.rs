@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::values::{PrimValue, Value};
 
-use super::{primitive::PrimType, CustomType, Type, TypeEnum};
+use super::{primitive::PrimType, CustomType, Sum, Type, TypeEnum};
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -83,7 +83,7 @@ impl Type {
                     .try_for_each(|(elem, ty)| ty.check_type(elem))
                     .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
-            (TypeEnum::Sum(variants), Value::Sum(tag, value)) => variants
+            (TypeEnum::Sum(Sum::General(variants)), Value::Sum(tag, value)) => variants
                 .get(*tag)
                 .ok_or(ConstTypeError::InvalidSumTag)?
                 .check_type(value),
