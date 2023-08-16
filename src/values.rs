@@ -9,6 +9,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
+
 use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
@@ -118,6 +119,25 @@ pub trait CustomConst:
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         let _ = other;
         false
+    }
+}
+
+/// Simpler trait for constant structs that have a known custom type to check against.
+pub trait KnownTypeConst: CustomConst {
+    /// The type of the constants.
+    const TYPE: CustomType;
+
+    /// Fixed implementation of [CustomConst::check_custom_type] that checks
+    /// against known correct type.
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        if typ == &Self::TYPE {
+            Ok(())
+        } else {
+            Err(CustomCheckFailure::TypeMismatch {
+                expected: Self::TYPE,
+                found: typ.clone(),
+            })
+        }
     }
 }
 

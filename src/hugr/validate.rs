@@ -675,6 +675,7 @@ mod test {
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
+    use crate::resource::prelude::ConstUsize;
     use crate::resource::ResourceSet;
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
@@ -1054,8 +1055,9 @@ mod test {
                 port_kind: EdgeKind::Value(B)
             })
         );
+        let const_op: ops::Const = ConstUsize::new(1).into();
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
+        let cst = h.add_op_with_parent(h.root(), const_op)?;
         let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, xor, 1)?;

@@ -7,8 +7,9 @@ use crate::{
     resource::TypeDefBound,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, Type, TypeBound,
+        CustomCheckFailure, CustomType, Type, TypeBound,
     },
+    values::{CustomConst, KnownTypeConst},
     Resource,
 };
 
@@ -76,3 +77,29 @@ pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
     smol_str::SmolStr::new_inline("prelude"),
     TypeBound::Eq,
 ));
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// Structure for holding constant usize values.
+pub struct ConstUsize(u64);
+
+impl ConstUsize {
+    /// Creates a new [`ConstUsize`].
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+#[typetag::serde]
+impl CustomConst for ConstUsize {
+    fn name(&self) -> SmolStr {
+        format!("ConstUsize({:?})", self.0).into()
+    }
+
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        <Self as KnownTypeConst>::check_custom_type(self, typ)
+    }
+}
+
+impl KnownTypeConst for ConstUsize {
+    const TYPE: CustomType = USIZE_CUSTOM_T;
+}
