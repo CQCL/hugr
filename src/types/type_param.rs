@@ -7,7 +7,8 @@
 use thiserror::Error;
 
 use super::CustomType;
-use super::{PrimType, SimpleType, TypeTag};
+use super::Type;
+use super::TypeBound;
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
@@ -15,7 +16,7 @@ use super::{PrimType, SimpleType, TypeTag};
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
-    Type(TypeTag),
+    Type(TypeBound),
     /// Argument is a [TypeArg::USize].
     USize,
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
@@ -31,7 +32,7 @@ pub enum TypeParam {
 #[non_exhaustive]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
-    Type(SimpleType),
+    Type(Type),
     /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
     USize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
@@ -42,7 +43,7 @@ pub enum TypeArg {
 }
 
 /// A serialized representation of a value of a [CustomType]
-/// restricted to Hashable types.
+/// restricted to equatable types.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CustomTypeArg {
     /// The type of the constant.
@@ -53,22 +54,13 @@ pub struct CustomTypeArg {
 }
 
 impl CustomTypeArg {
-    /// Create a new CustomTypeArg. Enforces that the type must be Hashable.
+    /// Create a new CustomTypeArg. Enforces that the type must be checkable for
+    /// equality.
     pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
-        if typ.tag() == TypeTag::Hashable {
+        if typ.bound() == TypeBound::Eq {
             Ok(Self { typ, value })
         } else {
-            Err("Only Hashable CustomTypes can be used as TypeArgs")
-        }
-    }
-}
-
-impl TypeArg {
-    /// Report [`TypeTag`] if param is a type
-    pub fn tag_of_type(&self) -> Option<TypeTag> {
-        match self {
-            TypeArg::Type(s) => Some(s.tag()),
-            _ => None,
+            Err("Only TypeBound::Eq CustomTypes can be used as TypeArgs")
         }
     }
 }
@@ -76,7 +68,9 @@ impl TypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(t), TypeParam::Type(tag)) if tag.contains(t.tag()) => Ok(()),
+        (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
+            Ok(())
+        }
         (TypeArg::Sequence(items), TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
@@ -92,23 +86,27 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
         (TypeArg::USize(_), TypeParam::USize) => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param))
-            if param.tag() == TypeTag::Hashable && &arg.typ == param =>
+            if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())
         }
 
-        _ => Err(TypeArgError::TypeMismatch(arg.clone(), param.clone())),
+        _ => Err(TypeArgError::TypeMismatch {
+            arg: arg.clone(),
+            param: param.clone(),
+        }),
     }
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum TypeArgError {
+    #[allow(missing_docs)]
     /// For now, general case of a type arg not fitting a param.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Type argument {0:?} does not fit declared parameter {1:?}")]
-    TypeMismatch(TypeArg, TypeParam),
+    #[error("Type argument {arg:?} does not fit declared parameter {param:?}")]
+    TypeMismatch { param: TypeParam, arg: TypeArg },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -120,7 +118,7 @@ pub enum TypeArgError {
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0:?}")]
-    OpaqueTypeMismatch(#[from] crate::values::CustomCheckFail),
+    OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),

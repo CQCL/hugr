@@ -10,11 +10,11 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::CustomConst;
 use crate::resource::ResourceSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, TypeTag};
-use crate::values::CustomCheckFail;
+use crate::types::{CustomCheckFailure, Type, TypeRow};
+use crate::types::{CustomType, TypeBound};
+use crate::values::CustomConst;
 use crate::Resource;
 
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
@@ -23,8 +23,8 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
 pub fn resource() -> Resource {
     let mut resource = Resource::new(RESOURCE_ID);
 
-    Type::Angle.add_to_resource(&mut resource);
-    Type::Quaternion.add_to_resource(&mut resource);
+    RotationType::Angle.add_to_resource(&mut resource);
+    RotationType::Quaternion.add_to_resource(&mut resource);
 
     resource
         .add_op_custom_sig_simple(
@@ -32,7 +32,8 @@ pub fn resource() -> Resource {
             "".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
+                let t: TypeRow =
+                    vec![Type::new_extension(RotationType::Angle.custom_type())].into();
                 Ok((t.clone(), t, ResourceSet::default()))
             },
         )
@@ -43,28 +44,28 @@ pub fn resource() -> Resource {
 
 /// Custom types defined by this extension.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Type {
+pub enum RotationType {
     Angle,
     Quaternion,
 }
 
-impl Type {
+impl RotationType {
     pub const fn name(&self) -> SmolStr {
         match self {
-            Type::Angle => SmolStr::new_inline("angle"),
-            Type::Quaternion => SmolStr::new_inline("quat"),
+            RotationType::Angle => SmolStr::new_inline("angle"),
+            RotationType::Quaternion => SmolStr::new_inline("quat"),
         }
     }
 
     pub const fn description(&self) -> &str {
         match self {
-            Type::Angle => "Floating point angle",
-            Type::Quaternion => "Quaternion specifying rotation.",
+            RotationType::Angle => "Floating point angle",
+            RotationType::Quaternion => "Quaternion specifying rotation.",
         }
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, TypeTag::Classic)
+        CustomType::new(self.name(), [], RESOURCE_ID, TypeBound::Copyable)
     }
 
     fn add_to_resource(self, resource: &mut Resource) {
@@ -73,14 +74,14 @@ impl Type {
                 self.name(),
                 vec![],
                 self.description().to_string(),
-                TypeTag::Classic.into(),
+                TypeBound::Copyable.into(),
             )
             .unwrap();
     }
 }
 
-impl From<Type> for CustomType {
-    fn from(ty: Type) -> Self {
+impl From<RotationType> for CustomType {
+    fn from(ty: RotationType) -> Self {
         ty.custom_type()
     }
 }
@@ -93,10 +94,10 @@ pub enum Constant {
 }
 
 impl Constant {
-    fn rotation_type(&self) -> Type {
+    fn rotation_type(&self) -> RotationType {
         match self {
-            Constant::Angle(_) => Type::Angle,
-            Constant::Quaternion(_) => Type::Quaternion,
+            Constant::Angle(_) => RotationType::Angle,
+            Constant::Quaternion(_) => RotationType::Quaternion,
         }
     }
 }
@@ -111,13 +112,13 @@ impl CustomConst for Constant {
         .into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         let self_typ = self.rotation_type();
 
         if &self_typ.custom_type() == typ {
             Ok(())
         } else {
-            Err(CustomCheckFail::Message(
+            Err(CustomCheckFailure::Message(
                 "Rotation constant type mismatch.".into(),
             ))
         }
@@ -312,7 +313,7 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::{resource::SignatureError, types::TypeTag};
+    use crate::{resource::SignatureError, types::TypeBound};
 
     use super::*;
 
@@ -330,7 +331,7 @@ mod test {
             custom.name().clone(),
             vec![],
             "wrong_resource",
-            TypeTag::Classic,
+            TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),

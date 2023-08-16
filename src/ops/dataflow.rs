@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::ops::StaticTag;
 use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, ClassicType, EdgeKind, SimpleRow, SimpleType};
+use crate::types::{AbstractSignature, EdgeKind, Type, TypeRow};
 
 pub(super) trait DataflowOpTrait {
     const TAG: OpTag;
@@ -31,7 +31,7 @@ pub(super) trait DataflowOpTrait {
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
     /// Construct a new I/O node from a type row with no resource requirements
-    fn new(types: impl Into<SimpleRow>) -> Self;
+    fn new(types: impl Into<TypeRow>) -> Self;
 }
 
 /// An input node.
@@ -39,13 +39,13 @@ pub trait IOTrait {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     /// Input value types
-    pub types: SimpleRow,
+    pub types: TypeRow,
 }
 
 impl_op_name!(Input);
 
 impl IOTrait for Input {
-    fn new(types: impl Into<SimpleRow>) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Input {
             types: types.into(),
         }
@@ -56,13 +56,13 @@ impl IOTrait for Input {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
     /// Output value types
-    pub types: SimpleRow,
+    pub types: TypeRow,
 }
 
 impl_op_name!(Output);
 
 impl IOTrait for Output {
-    fn new(types: impl Into<SimpleRow>) -> Self {
+    fn new(types: impl Into<TypeRow>) -> Self {
         Output {
             types: types.into(),
         }
@@ -81,7 +81,7 @@ impl DataflowOpTrait for Input {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(SimpleRow::new(), self.types.clone())
+        AbstractSignature::new_df(TypeRow::new(), self.types.clone())
             .with_resource_delta(&ResourceSet::new())
     }
 }
@@ -95,7 +95,7 @@ impl DataflowOpTrait for Output {
     // Note: We know what the input resources should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(self.types.clone(), SimpleRow::new())
+        AbstractSignature::new_df(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -146,7 +146,7 @@ impl DataflowOpTrait for Call {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature {
-            static_input: vec![ClassicType::graph_from_sig(self.signature.clone())].into(),
+            static_input: vec![Type::new_graph(self.signature.clone())].into(),
             ..self.signature.clone()
         }
     }
@@ -169,10 +169,9 @@ impl DataflowOpTrait for CallIndirect {
 
     fn signature(&self) -> AbstractSignature {
         let mut s = self.signature.clone();
-        s.input.to_mut().insert(
-            0,
-            ClassicType::graph_from_sig(self.signature.clone()).into(),
-        );
+        s.input
+            .to_mut()
+            .insert(0, Type::new_graph(self.signature.clone()));
         s
     }
 }
@@ -181,7 +180,7 @@ impl DataflowOpTrait for CallIndirect {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoadConstant {
     /// Constant type
-    pub datatype: ClassicType,
+    pub datatype: Type,
 }
 impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
@@ -193,8 +192,8 @@ impl DataflowOpTrait for LoadConstant {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new(
-            SimpleRow::new(),
-            vec![SimpleType::Classic(self.datatype.clone())],
+            TypeRow::new(),
+            vec![self.datatype.clone()],
             vec![self.datatype.clone()],
         )
     }

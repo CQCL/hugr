@@ -475,13 +475,13 @@ mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::{handle::NodeHandle, LeafOp},
         type_row,
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{AbstractSignature, Type},
     };
 
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Qubit;
+    const NAT: Type = crate::resource::prelude::USIZE_T;
+    const QB: Type = crate::resource::prelude::QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
