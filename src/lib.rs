@@ -11,11 +11,11 @@
 
 pub mod algorithm;
 pub mod builder;
-pub mod extensions;
 pub mod hugr;
 pub mod macros;
 pub mod ops;
 pub mod resource;
+pub mod std_extensions;
 pub mod types;
 mod utils;
 pub mod values;
