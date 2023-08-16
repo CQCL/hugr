@@ -335,13 +335,18 @@ mod test {
 
     use rstest::{fixture, rstest};
 
-    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME};
+    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, PI_NAME};
     use crate::{
         resource::SignatureError,
         types::{CustomType, Type, TypeBound},
         values::CustomConst,
         Resource,
     };
+
+    #[fixture]
+    fn resource() -> Resource {
+        super::resource()
+    }
 
     #[rstest]
     fn test_types(resource: Resource) {
@@ -390,8 +395,10 @@ mod test {
         assert!(res.is_err());
     }
 
-    #[fixture]
-    fn resource() -> Resource {
-        super::resource()
+    #[rstest]
+    fn test_constant(resource: Resource) {
+        let pi_val = resource.get_value(PI_NAME).unwrap();
+
+        ANGLE_T.check_type(pi_val.typed_value().value()).unwrap();
     }
 }
