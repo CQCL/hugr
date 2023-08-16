@@ -15,7 +15,7 @@ pub struct CustomType {
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
-    /// [`TypeDef`]: crate::resource::TypeDef
+    /// [`TypeDef`]: crate::extension::TypeDef
     id: SmolStr,
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
@@ -68,7 +68,7 @@ impl CustomType {
         &self.args
     }
 
-    /// Parent resource.
+    /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }

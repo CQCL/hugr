@@ -11,7 +11,7 @@ use crate::{
     Extension,
 };
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
 /// Identfier for the integer type.
@@ -55,7 +55,7 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
     Ok(n)
 }
 
-/// Resource for basic integer types.
+/// Extension for basic integer types.
 pub fn extension() -> Extension {
     let mut extension = Extension::new(RESOURCE_ID);
 

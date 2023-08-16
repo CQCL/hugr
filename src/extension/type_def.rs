@@ -30,10 +30,10 @@ impl From<TypeBound> for TypeDefBound {
 
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
-/// - typically these are operations also provided by the Resource.
+/// - typically these are operations also provided by the Extension.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
-    /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
+    /// The unique Extension owning this TypeDef (of which this TypeDef is a member)
     extension: ExtensionId,
     /// The unique name of the type
     name: SmolStr,
@@ -123,7 +123,7 @@ impl TypeParametrised for TypeDef {
 }
 
 impl Extension {
-    /// Add an exported type to the resource.
+    /// Add an exported type to the extension.
     pub fn add_type(
         &mut self,
         name: SmolStr,

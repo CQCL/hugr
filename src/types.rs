@@ -163,7 +163,7 @@ impl Type {
     }
 
     /// Initialize a new custom type.
-    // TODO remove? Resources/TypeDefs should just provide `Type` directly
+    // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
         Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
@@ -246,7 +246,7 @@ pub(crate) mod test {
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                "my_resource",
+                "my_extension",
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),

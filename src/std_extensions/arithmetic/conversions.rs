@@ -17,7 +17,7 @@ use crate::{
 use super::float_types::float64_type;
 use super::int_types::{get_width, int_type};
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
@@ -44,7 +44,7 @@ fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
     ))
 }
 
-/// Resource for basic arithmetic operations.
+/// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
         RESOURCE_ID,

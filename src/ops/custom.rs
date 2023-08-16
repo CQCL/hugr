@@ -13,13 +13,13 @@ use crate::{Extension, Hugr, Node};
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
 
-/// An instantiation of an operation (declared by a resource) with values for the type arguments
+/// An instantiation of an operation (declared by a extension) with values for the type arguments
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
-    /// When we've found (loaded) the [Resource] definition and identified the [OpDef]
+    /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
     Extension(ExtensionOp),
-    /// When we either haven't tried to identify the [Resource] or failed to find it.
+    /// When we either haven't tried to identify the [Extension] or failed to find it.
     Opaque(OpaqueOp),
 }
 
@@ -93,7 +93,7 @@ impl OpTrait for ExternalOp {
     }
 }
 
-/// An operation defined by an [OpDef] from a loaded [Resource].
+/// An operation defined by an [OpDef] from a loaded [Extension].
 // Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
 #[derive(Clone, Debug)]
 pub struct ExtensionOp {
@@ -103,7 +103,7 @@ pub struct ExtensionOp {
 }
 
 impl ExtensionOp {
-    /// Create a new ResourceOp given the type arguments and specified input resources
+    /// Create a new ExtensionOp given the type arguments and specified input extensions
     pub fn new(def: Arc<OpDef>, args: &[TypeArg]) -> Result<Self, SignatureError> {
         let signature = def.compute_signature(args)?;
         Ok(Self {
@@ -193,7 +193,7 @@ impl OpaqueOp {
         &self.args
     }
 
-    /// Parent resource.
+    /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
@@ -210,11 +210,11 @@ pub fn resolve_extension_ops(
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
                 if let Some(r) = extension_registry.get(&opaque.extension) {
-                    // Fail if the Resource was found but did not have the expected operation
+                    // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                     return Err(CustomOpError::OpNotFoundInExtension(opaque.op_name.to_string(), r.name().to_string()));
                 };
-                    // TODO input resources. From type checker, or just drop by storing only delta in Signature.
+                    // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
                     let op =
                         ExternalOp::Extension(ExtensionOp::new(def.clone(), &opaque.args).unwrap());
                     if let Some(sig) = &opaque.signature {
@@ -242,16 +242,16 @@ pub fn resolve_extension_ops(
 }
 
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
-/// when trying to resolve the serialized names against a registry of known Resources.
+/// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error)]
 pub enum CustomOpError {
-    /// Resource not found, and no signature
+    /// Extension not found, and no signature
     #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
     NoStoredSignature(SmolStr, Node),
-    /// The Resource was found but did not contain the expected OpDef
-    #[error("Operation {0} not found in Resource {1}")]
+    /// The Extension was found but did not contain the expected OpDef
+    #[error("Operation {0} not found in Extension {1}")]
     OpNotFoundInExtension(String, String),
-    /// Resource and OpDef found, but computed signature did not match stored
+    /// Extension and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
     SignatureMismatch(String, AbstractSignature, AbstractSignature),
 }

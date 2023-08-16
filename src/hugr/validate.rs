@@ -30,7 +30,7 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Context for the resource validation.
+    /// Context for the extension validation.
     extension_validator: ExtensionValidator,
 }
 
@@ -137,11 +137,11 @@ impl<'a> ValidationContext<'a> {
         // Check operation-specific constraints
         self.validate_operation(node, node_type)?;
 
-        // If this is a container with I/O nodes, check that the resources they
-        // define match the resources of the container.
+        // If this is a container with I/O nodes, check that the extensions they
+        // define match the extensions of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
             self.extension_validator
-                .validate_io_resources(node, input, output)?;
+                .validate_io_extensions(node, input, output)?;
         }
 
         Ok(())
@@ -591,7 +591,7 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// There are errors in the resource declarations.
+    /// There are errors in the extension declarations.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
 }
@@ -1070,8 +1070,8 @@ mod test {
     }
 
     #[test]
-    /// A wire with no resource requirements is wired into a node which has
-    /// [A,B] resources required on its inputs and outputs. This could be fixed
+    /// A wire with no extension requirements is wired into a node which has
+    /// [A,B] extensions required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
@@ -1082,7 +1082,7 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            // Inner DFG has resource requirements that the wire wont satisfy
+            // Inner DFG has extension requirements that the wire wont satisfy
             .with_input_extensions(ExtensionSet::from_iter(["A".into(), "B".into()]));
 
         let f_builder = main.dfg_builder(
@@ -1106,11 +1106,11 @@ mod test {
     }
 
     #[test]
-    /// A wire with resource requirement `[A]` is wired into a an output with no
-    /// resource req. In the validation resource typechecking, we don't do any
-    /// unification, so don't allow open resource variables on the function
+    /// A wire with extension requirement `[A]` is wired into a an output with no
+    /// extension req. In the validation extension typechecking, we don't do any
+    /// unification, so don't allow open extension variables on the function
     /// signature, so this fails.
-    fn too_many_resources() -> Result<(), BuildError> {
+    fn too_many_extensions() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
         let main_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure();
@@ -1142,11 +1142,11 @@ mod test {
     }
 
     #[test]
-    /// A wire with resource requirements `[A]` and another with requirements
+    /// A wire with extension requirements `[A]` and another with requirements
     /// `[B]` are both wired into a node which requires its inputs to have
     /// requirements `[A,B]`. A slightly more complex test of the error from
     /// `missing_lift_node`.
-    fn resource_mismatch() -> Result<(), BuildError> {
+    fn extensions_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
         let all_rs = ExtensionSet::from_iter(["A".into(), "B".into()]);

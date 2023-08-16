@@ -67,12 +67,12 @@ pub enum LeafOp {
         /// The variants of the sum type.
         variants: TypeRow,
     },
-    /// A node which adds a resource req to the types of the wires it is passed
+    /// A node which adds a extension req to the types of the wires it is passed
     /// It has no effect on the values passed along the edge
     Lift {
         /// The types of the edges
         type_row: TypeRow,
-        /// The resources which we're adding to the inputs
+        /// The extensions which we're adding to the inputs
         new_extension: ExtensionId,
     },
 }
@@ -138,7 +138,7 @@ impl OpTrait for LeafOp {
             LeafOp::MakeTuple { tys: _ } => "MakeTuple operation",
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
-            LeafOp::Lift { .. } => "Add a resource requirement to an edge",
+            LeafOp::Lift { .. } => "Add a extension requirement to an edge",
         }
     }
 

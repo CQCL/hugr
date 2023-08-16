@@ -7,7 +7,7 @@ use crate::{
     Extension,
 };
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
@@ -23,7 +23,7 @@ pub fn float64_type() -> Type {
     ))
 }
 
-/// Resource for basic floating-point types.
+/// Extension for basic floating-point types.
 pub fn extension() -> Extension {
     let mut extension = Extension::new(RESOURCE_ID);
 

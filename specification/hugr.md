@@ -894,14 +894,14 @@ extensions:
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
     params:
-      - r: ResourceSet
+      - r: ExtensionSet
     signature:
       inputs: [[null, Graph[r](USize -> USize)], ["arg", USize]]
       outputs: [[null, USize]]
       extensions: r # Indicates that running this operation also invokes extensions r
     lowering:
       file: "graph_op_hugr.bin"
-      extensions: ["arithmetic", r] # r is the ResourceSet in "params"
+      extensions: ["arithmetic", r] # r is the ExtensionSet in "params"
 ```
 
 The declaration of the `params` uses a language that is a distinct, simplified
@@ -1505,7 +1505,7 @@ struct Node{
   // parent node index
   parent: Int,
   // The input extensions to the node
-  input_extensions: Option<ResourceSet>
+  input_extensions: Option<ExtensionSet>
   // name of operation
   op: String
   //other op-specific fields

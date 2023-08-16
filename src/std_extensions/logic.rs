@@ -13,12 +13,12 @@ use crate::{
     Extension,
 };
 
-/// Name of resource false value.
+/// Name of extension false value.
 pub const FALSE_NAME: &str = "FALSE";
-/// Name of resource true value.
+/// Name of extension true value.
 pub const TRUE_NAME: &str = "TRUE";
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Construct a boolean type.
@@ -26,7 +26,7 @@ pub fn bool_type() -> Type {
     Type::new_simple_predicate(2)
 }
 
-/// Resource for basic logical operations.
+/// Extension for basic logical operations.
 pub fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
     let mut extension = Extension::new(RESOURCE_ID);

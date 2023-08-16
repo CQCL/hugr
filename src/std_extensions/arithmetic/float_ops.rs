@@ -11,7 +11,7 @@ use crate::{
 use super::super::logic::bool_type;
 use super::float_types::float64_type;
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 
 fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
@@ -38,7 +38,7 @@ fn funop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet)
     ))
 }
 
-/// Resource for basic arithmetic operations.
+/// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
         RESOURCE_ID,

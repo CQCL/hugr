@@ -33,16 +33,16 @@ pub struct AbstractSignature {
     pub output: TypeRow,
     /// Possible static input (for call / load-constant).
     pub static_input: TypeRow,
-    /// The resource requirements which are added by the operation
+    /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// A concrete signature, which has been instantiated with a set of input resources
+/// A concrete signature, which has been instantiated with a set of input extensions
 pub struct Signature {
     /// The underlying signature
     pub signature: AbstractSignature,
-    /// The resources which are associated with all the inputs and carried through
+    /// The extensions which are associated with all the inputs and carried through
     pub input_extensions: ExtensionSet,
 }
 
@@ -61,7 +61,7 @@ impl AbstractSignature {
         }
     }
 
-    /// Builder method, add resource_reqs to an AbstractSignature
+    /// Builder method, add extension_reqs to an AbstractSignature
     pub fn with_extension_delta(mut self, rs: &ExtensionSet) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs);
         self
@@ -75,7 +75,7 @@ impl AbstractSignature {
         }
     }
 
-    /// Instantiate a signature with the empty set of resources
+    /// Instantiate a signature with the empty set of extensions
     pub fn pure(self) -> Signature {
         self.with_input_extensions(ExtensionSet::new())
     }
@@ -88,7 +88,7 @@ impl From<Signature> for AbstractSignature {
 }
 
 impl Signature {
-    /// Calculate the resource requirements of the output wires
+    /// Calculate the extension requirements of the output wires
     pub fn output_extensions(&self) -> ExtensionSet {
         self.input_extensions
             .clone()
@@ -275,7 +275,7 @@ impl AbstractSignature {
 }
 
 impl Signature {
-    /// Returns a reference to the resource set for the ports of the
+    /// Returns a reference to the extension set for the ports of the
     /// signature in a given direction
     pub fn get_extension(&self, dir: &Direction) -> ExtensionSet {
         match dir {

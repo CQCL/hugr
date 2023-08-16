@@ -13,7 +13,7 @@ use crate::{
     Extension,
 };
 
-/// The resource identifier.
+/// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
 fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
@@ -135,7 +135,7 @@ fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), S
     ))
 }
 
-/// Resource for basic integer operations.
+/// Extension for basic integer operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
         RESOURCE_ID,

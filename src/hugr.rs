@@ -52,16 +52,16 @@ pub struct Hugr {
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The type of a node on a graph. In addition to the [`OpType`], it also
-/// describes the resources inferred to be used by the node.
+/// describes the extensions inferred to be used by the node.
 pub struct NodeType {
     /// The underlying OpType
     op: OpType,
-    /// The resources that the signature has been specialised to
+    /// The extensions that the signature has been specialised to
     input_extensions: Option<ExtensionSet>,
 }
 
 impl NodeType {
-    /// Create a new optype with some ResourceSet
+    /// Create a new optype with some ExtensionSet
     pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
         NodeType {
             op: op.into(),
@@ -69,7 +69,7 @@ impl NodeType {
         }
     }
 
-    /// Instantiate an OpType with no input resources
+    /// Instantiate an OpType with no input extensions
     pub fn pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
@@ -77,7 +77,7 @@ impl NodeType {
         }
     }
 
-    /// Instantiate an OpType with an unknown set of input resources
+    /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
     pub fn open_extensions(op: impl Into<OpType>) -> Self {
         NodeType {
@@ -86,7 +86,7 @@ impl NodeType {
         }
     }
 
-    /// Use the input resources to calculate the concrete signature of the node
+    /// Use the input extensions to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
         self.input_extensions
             .as_ref()
@@ -98,12 +98,12 @@ impl NodeType {
         self.op.signature()
     }
 
-    /// The input resources defined for this node.
+    /// The input extensions defined for this node.
     ///
-    /// The output resources will correspond to the input resources plus any
-    /// resource delta defined by the operation type.
+    /// The output extensions will correspond to the input extensions plus any
+    /// extension delta defined by the operation type.
     ///
-    /// If the input resources are not known, this will return None.
+    /// If the input extensions are not known, this will return None.
     pub fn input_extensions(&self) -> Option<&ExtensionSet> {
         self.input_extensions.as_ref()
     }
@@ -129,7 +129,7 @@ impl<'a> From<&'a NodeType> for &'a OpType {
 }
 
 impl OpType {
-    /// Convert an OpType to a NodeType by giving it some input resources
+    /// Convert an OpType to a NodeType by giving it some input extensions
     pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
         NodeType {
             op: self,
@@ -211,8 +211,8 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        // TODO: These resources should be open in principle, but lets wait
-        // until resources can be inferred for open sets until changing this
+        // TODO: These extensions should be open in principle, but lets wait
+        // until extensions can be inferred for open sets until changing this
         op_types[root] = root_node;
 
         Self {

@@ -21,11 +21,11 @@ use crate::types::type_param::TypeParam;
 
 use smol_str::SmolStr;
 
-/// Trait for resources to provide custom binary code for computing signature.
+/// Trait for extensions to provide custom binary code for computing signature.
 pub trait CustomSignatureFunc: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
-    /// and 'misc' data from the resource definition YAML
+    /// and 'misc' data from the extension definition YAML
     fn compute_signature(
         &self,
         name: &SmolStr,
@@ -35,7 +35,7 @@ pub trait CustomSignatureFunc: Send + Sync {
     ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError>;
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
-    /// and 'misc' data from the resource definition YAML.
+    /// and 'misc' data from the extension definition YAML.
     fn describe_signature(
         &self,
         _name: &SmolStr,
@@ -60,26 +60,26 @@ where
     }
 }
 
-/// Trait for Resources to provide custom binary code that can lower an operation to
-/// a Hugr using only a limited set of other resources. That is, trait
+/// Trait for Extensions to provide custom binary code that can lower an operation to
+/// a Hugr using only a limited set of other extensions. That is, trait
 /// implementations can return a Hugr that implements the operation using only
-/// those resources and that can be used to replace the operation node. This may be
-/// useful for third-party Resources or as a fallback for tools that do not support
+/// those extensions and that can be used to replace the operation node. This may be
+/// useful for third-party Extensions or as a fallback for tools that do not support
 /// the operation natively.
 ///
 /// This trait allows the Hugr to be varied according to the operation's [TypeArg]s;
 /// if this is not necessary then a single Hugr can be provided instead via
 /// [LowerFunc::FixedHugr].
 pub trait CustomLowerFunc: Send + Sync {
-    /// Return a Hugr that implements the node using only the specified available resources;
+    /// Return a Hugr that implements the node using only the specified available extensions;
     /// may fail.
-    /// TODO: some error type to indicate Resources required?
+    /// TODO: some error type to indicate Extensions required?
     fn try_lower(
         &self,
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
-        available_resources: &ExtensionSet,
+        available_extensions: &ExtensionSet,
     ) -> Option<Hugr>;
 }
 
@@ -110,7 +110,7 @@ impl Debug for SignatureFunc {
 }
 
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
-/// that implements the operation using a set of other resources.
+/// that implements the operation using a set of other extensions.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
@@ -118,7 +118,7 @@ pub enum LowerFunc {
     #[serde(rename = "hugr")]
     FixedHugr(ExtensionSet, Hugr),
     /// Custom binary function that can (fallibly) compute a Hugr
-    /// for the particular instance and set of available resources.
+    /// for the particular instance and set of available extensions.
     #[serde(skip)]
     CustomFunc(Box<dyn CustomLowerFunc>),
 }
@@ -137,7 +137,7 @@ impl Debug for LowerFunc {
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
-    /// The unique Resource owning this OpDef (of which this OpDef is a member)
+    /// The unique Extension owning this OpDef (of which this OpDef is a member)
     extension: ExtensionId,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
@@ -246,20 +246,20 @@ impl OpDef {
     }
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
-    /// given a set of available resources that may be used in the Hugr.
-    pub fn try_lower(&self, args: &[TypeArg], available_resources: &ExtensionSet) -> Option<Hugr> {
+    /// given a set of available extensions that may be used in the Hugr.
+    pub fn try_lower(&self, args: &[TypeArg], available_extensions: &ExtensionSet) -> Option<Hugr> {
         self.lower_funcs
             .iter()
             .flat_map(|f| match f {
                 LowerFunc::FixedHugr(req_res, h) => {
-                    if available_resources.is_superset(req_res) {
+                    if available_extensions.is_superset(req_res) {
                         Some(h.clone())
                     } else {
                         None
                     }
                 }
                 LowerFunc::CustomFunc(f) => {
-                    f.try_lower(&self.name, args, &self.misc, available_resources)
+                    f.try_lower(&self.name, args, &self.misc, available_extensions)
                 }
             })
             .next()
@@ -270,7 +270,7 @@ impl OpDef {
         &self.name
     }
 
-    /// Returns a reference to the resource of this [`OpDef`].
+    /// Returns a reference to the extension of this [`OpDef`].
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
@@ -287,7 +287,7 @@ impl OpDef {
 }
 
 impl Extension {
-    /// Add an operation definition to the resource.
+    /// Add an operation definition to the extension.
     fn add_op(
         &mut self,
         name: SmolStr,

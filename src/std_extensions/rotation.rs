@@ -32,7 +32,7 @@ pub const QUAT_T: Type = Type::new_extension(CustomType::new_simple(
     RESOURCE_ID,
     TypeBound::Copyable,
 ));
-/// The resource with all the operations and types defined in this extension.
+/// The extension with all the operations and types defined in this extension.
 pub fn extension() -> Extension {
     let mut extension = Extension::new(RESOURCE_ID);
 
@@ -355,14 +355,14 @@ mod test {
         let false_custom = CustomType::new(
             custom.name().clone(),
             vec![],
-            "wrong_resource",
+            "wrong_extension",
             TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),
             Err(SignatureError::ExtensionMismatch(
                 "rotations".into(),
-                "wrong_resource".into(),
+                "wrong_extension".into(),
             ))
         );
 

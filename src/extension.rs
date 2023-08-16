@@ -1,4 +1,4 @@
-//! Resources
+//! Extensions
 //!
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
@@ -33,8 +33,8 @@ pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
     NameMismatch(SmolStr, SmolStr),
-    /// Resource mismatch
-    #[error("Definition resource ({0:?}) and instantiation resource ({1:?}) do not match.")]
+    /// Extension mismatch
+    #[error("Definition extension ({0:?}) and instantiation extension ({1:?}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
@@ -44,7 +44,7 @@ pub enum SignatureError {
     InvalidTypeArgs,
 }
 
-/// Concrete instantiations of types and operations defined in resources.
+/// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
     fn def_name(&self) -> &SmolStr;
     fn type_args(&self) -> &[TypeArg];
@@ -83,11 +83,11 @@ impl CustomConcrete for CustomType {
 trait TypeParametrised {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
-    /// The resource-unique name.
+    /// The extension-unique name.
     fn name(&self) -> &SmolStr;
     /// Type parameters.
     fn params(&self) -> &[TypeParam];
-    /// The parent resource.
+    /// The parent extension.
     fn extension(&self) -> &ExtensionId;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
@@ -128,50 +128,50 @@ trait TypeParametrised {
     }
 }
 
-/// A constant value provided by a resource.
-/// Must be an instance of a type available to the resource.
+/// A constant value provided by a extension.
+/// Must be an instance of a type available to the extension.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ExtensionValue {
-    resource: ExtensionId,
+    extension: ExtensionId,
     name: SmolStr,
     typed_value: ops::Const,
 }
 
 impl ExtensionValue {
-    /// Returns a reference to the typed value of this [`ResourceValue`].
+    /// Returns a reference to the typed value of this [`ExtensionValue`].
     pub fn typed_value(&self) -> &ops::Const {
         &self.typed_value
     }
 
-    /// Returns a reference to the name of this [`ResourceValue`].
+    /// Returns a reference to the name of this [`ExtensionValue`].
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
 
-    /// Returns a reference to the resource this [`ResourceValue`] belongs to.
-    pub fn resource(&self) -> &ExtensionId {
-        &self.resource
+    /// Returns a reference to the extension this [`ExtensionValue`] belongs to.
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 
-/// A unique identifier for a resource.
+/// A unique identifier for a extension.
 ///
-/// The actual [`Resource`] is stored externally.
+/// The actual [`Extension`] is stored externally.
 pub type ExtensionId = SmolStr;
 
-/// A resource is a set of capabilities required to execute a graph.
+/// A extension is a set of capabilities required to execute a graph.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Extension {
-    /// Unique identifier for the resource.
+    /// Unique identifier for the extension.
     pub name: ExtensionId,
-    /// Other resources defining types used by this resource.
+    /// Other extensions defining types used by this extension.
     /// That is, an upper-bound on the types that can be returned by
-    /// computing the signature of any operation in this resource,
+    /// computing the signature of any operation in this extension,
     /// for any possible [TypeArg].
-    pub resource_reqs: ExtensionSet,
-    /// Types defined by this resource.
+    pub extension_reqs: ExtensionSet,
+    /// Types defined by this extension.
     types: HashMap<SmolStr, TypeDef>,
-    /// Static values defined by this resource.
+    /// Static values defined by this extension.
     values: HashMap<SmolStr, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
@@ -183,7 +183,7 @@ pub struct Extension {
 }
 
 impl Extension {
-    /// Creates a new resource with the given name.
+    /// Creates a new extension with the given name.
     pub fn new(name: ExtensionId) -> Self {
         Self {
             name,
@@ -191,53 +191,53 @@ impl Extension {
         }
     }
 
-    /// Creates a new resource with the given name and requirements.
+    /// Creates a new extension with the given name and requirements.
     pub fn new_with_reqs(name: ExtensionId, extension_reqs: ExtensionSet) -> Self {
         Self {
             name,
-            resource_reqs: extension_reqs,
+            extension_reqs,
             ..Default::default()
         }
     }
 
-    /// Allows read-only access to the operations in this Resource
+    /// Allows read-only access to the operations in this Extension
     pub fn get_op(&self, op_name: &str) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
     }
 
-    /// Allows read-only access to the types in this Resource
+    /// Allows read-only access to the types in this Extension
     pub fn get_type(&self, type_name: &str) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
-    /// Allows read-only access to the values in this Resource
+    /// Allows read-only access to the values in this Extension
     pub fn get_value(&self, type_name: &str) -> Option<&ExtensionValue> {
         self.values.get(type_name)
     }
 
-    /// Returns the name of the resource.
+    /// Returns the name of the extension.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Iterator over the operations of this [`Resource`].
+    /// Iterator over the operations of this [`Extension`].
     pub fn operations(&self) -> impl Iterator<Item = (&SmolStr, &Arc<OpDef>)> {
         self.operations.iter()
     }
 
-    /// Iterator over the types of this [`Resource`].
+    /// Iterator over the types of this [`Extension`].
     pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
         self.types.iter()
     }
 
-    /// Add a named static value to the resource.
+    /// Add a named static value to the extension.
     pub fn add_value(
         &mut self,
         name: impl Into<SmolStr>,
         typed_value: ops::Const,
     ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
         let extension_value = ExtensionValue {
-            resource: self.name().into(),
+            extension: self.name().into(),
             name: name.into(),
             typed_value,
         };
@@ -259,36 +259,36 @@ impl PartialEq for Extension {
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
-    #[error("Resource already has an op called {0}.")]
+    #[error("Extension already has an op called {0}.")]
     OpDefExists(SmolStr),
     /// Existing [`TypeDef`]
-    #[error("Resource already has an type called {0}.")]
+    #[error("Extension already has an type called {0}.")]
     TypeDefExists(SmolStr),
 }
 
-/// A set of resources identified by their unique [`ResourceId`].
+/// A set of extensions identified by their unique [`ExtensionId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExtensionSet(HashSet<ExtensionId>);
 
 impl ExtensionSet {
-    /// Creates a new empty resource set.
+    /// Creates a new empty extension set.
     pub fn new() -> Self {
         Self(HashSet::new())
     }
 
-    /// Creates a new resource set from some resources.
-    pub fn new_from_extensions(resources: impl Into<HashSet<ExtensionId>>) -> Self {
-        Self(resources.into())
+    /// Creates a new extension set from some extensions.
+    pub fn new_from_extensions(extensions: impl Into<HashSet<ExtensionId>>) -> Self {
+        Self(extensions.into())
     }
 
-    /// Adds a resource to the set.
-    pub fn insert(&mut self, resource: &ExtensionId) {
-        self.0.insert(resource.clone());
+    /// Adds a extension to the set.
+    pub fn insert(&mut self, extension: &ExtensionId) {
+        self.0.insert(extension.clone());
     }
 
-    /// Returns `true` if the set contains the given resource.
-    pub fn contains(&self, resource: &ExtensionId) -> bool {
-        self.0.contains(resource)
+    /// Returns `true` if the set contains the given extension.
+    pub fn contains(&self, extension: &ExtensionId) -> bool {
+        self.0.contains(extension)
     }
 
     /// Returns `true` if the set is a subset of `other`.
@@ -301,14 +301,14 @@ impl ExtensionSet {
         self.0.is_superset(&other.0)
     }
 
-    /// Create a resource set with a single element.
-    pub fn singleton(resource: &ExtensionId) -> Self {
+    /// Create a extension set with a single element.
+    pub fn singleton(extension: &ExtensionId) -> Self {
         let mut set = Self::new();
-        set.insert(resource);
+        set.insert(extension);
         set
     }
 
-    /// Returns the union of two resource sets.
+    /// Returns the union of two extension sets.
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
         self
@@ -319,7 +319,7 @@ impl ExtensionSet {
         ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
     }
 
-    /// Iterate over the contained ResourceIds
+    /// Iterate over the contained ExtensionIds
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
     }

@@ -14,7 +14,7 @@ use crate::{
 };
 
 lazy_static! {
-    /// Prelude resource
+    /// Prelude extension
     pub static ref PRELUDE: Extension = {
         let mut prelude = Extension::new(SmolStr::new_inline("prelude"));
         prelude

@@ -284,7 +284,7 @@ pub trait Dataflow: Container {
             signature: signature.clone(),
         };
         let nodetype = match &input_extensions {
-            // TODO: Make this NodeType::open_resources
+            // TODO: Make this NodeType::open_extensions
             None => NodeType::pure(op),
             Some(rs) => NodeType::new(op, rs.clone()),
         };
@@ -314,7 +314,7 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            // TODO: Make input resources a parameter
+            // TODO: Make input extensions a parameter
             NodeType::pure(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
@@ -385,7 +385,7 @@ pub trait Dataflow: Container {
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        // TODO: Make input resources a parameter
+        // TODO: Make input extensions a parameter
         let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
@@ -596,7 +596,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    // TODO: Make this NodeType::open_resources
+    // TODO: Make this NodeType::open_extensions
     add_node_with_wires(data_builder, NodeType::pure(optype), inputs)
 }
 

@@ -31,15 +31,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input().len();
         let num_out_wires = signature.output().len();
-        /* For a given dataflow graph with resource requirements IR -> IR + dR,
-         - The output node's resource requirements are IR + dR -> IR + dR
+        /* For a given dataflow graph with extension requirements IR -> IR + dR,
+         - The output node's extension requirements are IR + dR -> IR + dR
            (but we expect no output wires)
 
-         - The input node's resource requirements are IR -> IR, though we
+         - The input node's extension requirements are IR -> IR, though we
            expect no input wires. We must avoid the case where the difference
-           in resources is an open variable, as it would be if the requirements
+           in extensions is an open variable, as it would be if the requirements
            were 0 -> IR.
-           N.B. This means that for input nodes, we can't infer the resources
+           N.B. This means that for input nodes, we can't infer the extensions
            from the input wires as we normally expect, but have to infer the
            output wires and make use of the equality between the two.
         */
@@ -52,7 +52,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         base.as_mut().add_node_with_parent(
             parent,
             match &input_extensions {
-                // TODO: Make this NodeType::open_resources
+                // TODO: Make this NodeType::open_extensions
                 None => NodeType::pure(input),
                 Some(rs) => NodeType::new(input, rs.clone()),
             },
@@ -60,7 +60,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         base.as_mut().add_node_with_parent(
             parent,
             match input_extensions.map(|inp| inp.union(&signature.extension_reqs)) {
-                // TODO: Make this NodeType::open_resources
+                // TODO: Make this NodeType::open_extensions
                 None => NodeType::new(output, signature.extension_reqs),
                 Some(rs) => NodeType::new(output, rs),
             },
@@ -85,11 +85,11 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(dfg_op));
         let root = base.root();
         DFGBuilder::create_with_io(
-            base, root, signature, // TODO: Make input resources a parameter
+            base, root, signature, // TODO: Make input extensions a parameter
             None,
         )
     }
@@ -461,7 +461,7 @@ mod test {
         let add_ab_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
             .with_extension_delta(&ab_extensions);
 
-        // A box which adds resources A and B, via child Lift nodes
+        // A box which adds extensions A and B, via child Lift nodes
         let mut add_ab = parent.dfg_builder(add_ab_sig, Some(ExtensionSet::new()), [w])?;
         let [w] = add_ab.input_wires_arr();
 
@@ -489,7 +489,7 @@ mod test {
         let add_ab = add_ab.finish_with_outputs([w])?;
         let [w] = add_ab.outputs_arr();
 
-        // Add another node (a sibling to add_ab) which adds resource C
+        // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
         let mut add_c =
             parent.dfg_builder(add_c_sig.signature, Some(add_c_sig.input_extensions), [w])?;
