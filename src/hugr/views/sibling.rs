@@ -144,7 +144,7 @@ impl BoundaryEdge {
 /// [`super::SiblingGraph`],  not all nodes of the sibling graph must be
 /// included.
 ///
-/// For a given parent, let E be the set of edges of its sibling graph. A
+/// Given a node in a HUGR, let E be the set of edges of its sibling graph. A
 /// sibling subgraph is described by a set of boundary edges B ⊂ E that can be
 /// marked as incoming boundary edge, outgoing boundary edge or both.
 ///
@@ -357,7 +357,7 @@ pub enum InvalidReplacement {
 
 /// Errors that can occur while constructing a [`BoundaryEdge`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum InvalidEdge {
+enum InvalidEdge {
     /// The port is not connected to an edge.
     #[error("Port must be connected to an edge.")]
     DisconnectedPort,
