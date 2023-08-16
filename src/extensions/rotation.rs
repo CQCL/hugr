@@ -144,11 +144,7 @@ impl CustomConst for RotationValue {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<RotationValue>() {
-            self == other
-        } else {
-            false
-        }
+        crate::values::downcast_equal_consts(self, other)
     }
 }
 

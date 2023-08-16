@@ -78,7 +78,7 @@ pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
     TypeBound::Eq,
 ));
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
 pub struct ConstUsize(u64);
 
@@ -97,6 +97,10 @@ impl CustomConst for ConstUsize {
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         <Self as KnownTypeConst>::check_custom_type(self, typ)
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::values::downcast_equal_consts(self, other)
     }
 }
 

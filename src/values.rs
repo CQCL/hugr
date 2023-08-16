@@ -116,8 +116,21 @@ pub trait CustomConst:
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        let _ = other;
+    // Can't derive PartialEq for trait objects
+    fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
+        // false unless overloaded
+        false
+    }
+}
+
+/// Const equality for types that have PartialEq
+pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
+    value: &T,
+    other: &dyn CustomConst,
+) -> bool {
+    if let Some(other) = other.as_any().downcast_ref::<T>() {
+        value == other
+    } else {
         false
     }
 }
