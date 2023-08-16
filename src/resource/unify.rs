@@ -1,3 +1,11 @@
+//! Inference for resource requirements on nodes of a hugr.
+//!
+//! Checks if the resources requirements are sane, and comes up with concrete
+//! solutions when possible. Inference operates when toplevel nodes can be open
+//! variables. When resource requirements of nodes depend on these open
+//! variables, then the validation check for resources will succeed regardless
+//! of what the variable is instantiated to.
+
 use super::{ResourceId, ResourceSet};
 use crate::{
     hugr::{HugrView, Node},
@@ -10,19 +18,18 @@ use petgraph::graph as pg;
 
 use std::collections::{HashMap, HashSet};
 
+use thiserror::Error;
 use std::collections::BTreeSet;
 use std::cmp::{Ord, Ordering};
 
+/// Infer resources for a hugr. This is the main API exposed by this module
+pub fn infer_resources(hugr: &impl HugrView) -> Result<HashMap<(Node, Direction), ResourceSet>, InferResourceError> {
+    let mut ctx = UnificationContext::new(hugr);
+    ctx.main_loop()
+}
+
 /* TODO:
-
-- Success should be when we have a solution, for a set of universally
-  quantified variables, not just when we have no variables
-
-- We need to add a constraint for dataflow graphs (say, of type A -> [R]B) which
-  adds a constraint that the output node equals the input node's resources + R
-
 - Add more complicated solving that can handle the case of "reverse"
-
 */
 
 /// Metavariables don't need much
@@ -30,7 +37,7 @@ type Meta = usize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Things we know about metavariables
-pub enum Constraint {
+enum Constraint {
     /// Constrain a variable to a specific value
     Exactly(ResourceSet),
     /// A variable has the same value as another variable
@@ -154,7 +161,7 @@ impl EqGraph {
 }
 
 /// Our current knowledge about the resources of the graph
-pub struct UnificationContext {
+struct UnificationContext {
     /// A list of constraints for each metavariable
     constraints: HashMap<Meta, BTreeSet<Constraint>>,
     /// A map which says which nodes correspond to which metavariables
@@ -483,7 +490,7 @@ impl UnificationContext {
     ///   - Is associated to a location in the graph in `UnifyContext.resources`
     ///   - Is still unsolved
     ///   - Isn't a variable
-    pub fn live_metas(&self) -> HashSet<Meta> {
+    fn live_metas(&self) -> HashSet<Meta> {
         self.resources
             .values()
             .filter_map(|m| self.live_var(m))
@@ -515,7 +522,7 @@ impl UnificationContext {
     }
 
     /// Returns the metas that we solved
-    pub fn solve_constraints(
+    fn solve_constraints(
         &mut self,
         vars: &HashSet<Meta>,
     ) -> Result<HashSet<Meta>, InferResourceError> {
