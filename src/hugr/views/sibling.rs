@@ -391,19 +391,18 @@ mod tests {
         },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::{handle::NodeHandle, LeafOp},
+        resource::prelude::QB_T,
         type_row,
-        types::{AbstractSignature, SimpleType},
+        types::AbstractSignature,
     };
 
     use super::*;
-
-    const QB: SimpleType = SimpleType::Qubit;
 
     fn build_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            AbstractSignature::new_linear(type_row![QB, QB]).pure(),
+            AbstractSignature::new_linear(type_row![QB_T, QB_T]).pure(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -435,7 +434,7 @@ mod tests {
 
         let empty_dfg = {
             let builder =
-                DFGBuilder::new(AbstractSignature::new_linear(type_row![QB, QB])).unwrap();
+                DFGBuilder::new(AbstractSignature::new_linear(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -456,7 +455,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func);
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB])).unwrap();
+            let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
