@@ -4,8 +4,8 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
+    extension::ResourceSet,
     ops,
-    resource::ResourceSet,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         Type,

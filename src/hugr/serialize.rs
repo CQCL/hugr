@@ -8,10 +8,10 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::ResourceSet;
 use crate::hugr::{Hugr, HugrInternalsMut, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
-use crate::resource::ResourceSet;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -282,8 +282,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const QB: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     #[test]
     fn empty_hugr_serialize() {

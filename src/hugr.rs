@@ -24,8 +24,8 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
+use crate::extension::ResourceSet;
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, Signature};
 
 use delegate::delegate;

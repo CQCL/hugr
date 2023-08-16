@@ -9,7 +9,7 @@ use crate::ops;
 
 use crate::types::{AbstractSignature, Signature};
 
-use crate::resource::ResourceSet;
+use crate::extension::ResourceSet;
 use crate::Node;
 use crate::{hugr::HugrInternalsMut, Hugr};
 
@@ -226,7 +226,7 @@ mod test {
             test::{n_identity, BIT, NAT, QB},
             BuildError,
         },
-        resource::ResourceSet,
+        extension::ResourceSet,
         type_row, Wire,
     };
 

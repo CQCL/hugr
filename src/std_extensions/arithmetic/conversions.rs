@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::{ResourceSet, SignatureError},
+    extension::{ResourceSet, SignatureError},
     types::{
         type_param::{TypeArg, TypeParam},
         Type, TypeRow,
@@ -27,7 +27,7 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), S
         vec![float64_type()].into(),
         vec![Type::new_sum(vec![
             int_type(n),
-            crate::resource::prelude::ERROR_TYPE,
+            crate::extension::prelude::ERROR_TYPE,
         ])]
         .into(),
         ResourceSet::default(),

@@ -98,9 +98,9 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
+        extension::prelude::{ConstUsize, USIZE_T},
         hugr::ValidationError,
         ops::Const,
-        resource::prelude::{ConstUsize, USIZE_T},
         type_row, Hugr,
     };
 

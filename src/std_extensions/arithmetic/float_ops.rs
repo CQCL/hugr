@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    resource::{ResourceSet, SignatureError},
+    extension::{ResourceSet, SignatureError},
     types::{type_param::TypeArg, TypeRow},
     Resource,
 };

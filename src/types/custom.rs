@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::resource::ResourceId;
+use crate::extension::ResourceId;
 
 use super::{type_param::TypeArg, TypeBound};
 

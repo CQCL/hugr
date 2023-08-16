@@ -10,7 +10,7 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::resource::ResourceSet;
+use crate::extension::ResourceSet;
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeRow};
 use crate::values::CustomConst;
@@ -333,7 +333,7 @@ mod test {
 
     use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, PI_NAME};
     use crate::{
-        resource::SignatureError,
+        extension::SignatureError,
         types::{CustomType, Type, TypeBound},
         values::CustomConst,
         Resource,

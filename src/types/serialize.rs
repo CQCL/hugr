@@ -6,8 +6,8 @@ use super::custom::CustomType;
 
 use super::AbstractSignature;
 
+use crate::extension::prelude::{new_array, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
-use crate::resource::prelude::{new_array, QB_T, USIZE_T};
 use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -70,8 +70,8 @@ impl From<SerSimpleType> for Type {
 
 #[cfg(test)]
 mod test {
+    use crate::extension::prelude::USIZE_T;
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::resource::prelude::USIZE_T;
     use crate::types::test::COPYABLE_T;
     use crate::types::AbstractSignature;
     use crate::types::Type;

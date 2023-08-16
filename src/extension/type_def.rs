@@ -147,7 +147,7 @@ impl Resource {
 
 #[cfg(test)]
 mod test {
-    use crate::resource::SignatureError;
+    use crate::extension::SignatureError;
     use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{AbstractSignature, Type, TypeBound};

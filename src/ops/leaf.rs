@@ -4,10 +4,10 @@ use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
-use crate::resource::prelude::{QB_T, USIZE_T};
+use crate::extension::prelude::{QB_T, USIZE_T};
 use crate::type_row;
 use crate::{
-    resource::{ResourceId, ResourceSet},
+    extension::{ResourceId, ResourceSet},
     types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
 };
 

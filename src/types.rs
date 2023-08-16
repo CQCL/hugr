@@ -232,7 +232,7 @@ pub(crate) mod test {
         custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
         *,
     };
-    use crate::{ops::AliasDecl, resource::prelude::USIZE_T};
+    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
     pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);

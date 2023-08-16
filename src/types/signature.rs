@@ -19,7 +19,7 @@ use crate::hugr::Port;
 
 use crate::type_row;
 
-use crate::resource::ResourceSet;
+use crate::extension::ResourceSet;
 use delegate::delegate;
 
 #[cfg_attr(feature = "pyo3", pyclass)]

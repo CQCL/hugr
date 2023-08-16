@@ -12,9 +12,9 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::validate::{ResourceError, ResourceValidator};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
-use crate::resource::validate::{ResourceError, ResourceValidator};
 use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -672,18 +672,18 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
+    use crate::extension::prelude::ConstUsize;
+    use crate::extension::ResourceSet;
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
-    use crate::resource::prelude::ConstUsize;
-    use crate::resource::ResourceSet;
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const B: Type = crate::resource::prelude::USIZE_T;
-    const Q: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const B: Type = crate::extension::prelude::USIZE_T;
+    const Q: Type = crate::extension::prelude::QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///

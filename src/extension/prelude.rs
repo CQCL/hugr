@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::TypeDefBound,
+    extension::TypeDefBound,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, Type, TypeBound,
