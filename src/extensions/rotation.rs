@@ -17,9 +17,21 @@ use crate::values::CustomConst;
 use crate::{ops, Resource};
 
 pub const PI_NAME: &str = "PI";
-
+pub const ANGLE_T_NAME: &str = "angle";
+pub const QUAT_T_NAME: &str = "quat";
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
 
+pub const ANGLE_T: Type = Type::new_extension(CustomType::new_simple(
+    SmolStr::new_inline(ANGLE_T_NAME),
+    RESOURCE_ID,
+    TypeBound::Copyable,
+));
+
+pub const QUAT_T: Type = Type::new_extension(CustomType::new_simple(
+    SmolStr::new_inline(QUAT_T_NAME),
+    RESOURCE_ID,
+    TypeBound::Copyable,
+));
 /// The resource with all the operations and types defined in this extension.
 pub fn resource() -> Resource {
     let mut resource = Resource::new(RESOURCE_ID);
@@ -40,16 +52,10 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    let pi_val = Constant::Angle(AngleValue::Rational(Rational(Rational64::new(1, 1))));
-    let pi_type = Type::new_extension(
-        resource
-            .get_type("angle")
-            .unwrap()
-            .instantiate_concrete([])
-            .unwrap(),
-    );
+    let pi_val = RotationValue::PI;
+
     resource
-        .add_value(PI_NAME, ops::Const::new(pi_val.into(), pi_type).unwrap())
+        .add_value(PI_NAME, ops::Const::new(pi_val.into(), ANGLE_T).unwrap())
         .unwrap();
     resource
 }
@@ -64,8 +70,8 @@ pub enum RotationType {
 impl RotationType {
     pub const fn name(&self) -> SmolStr {
         match self {
-            RotationType::Angle => SmolStr::new_inline("angle"),
-            RotationType::Quaternion => SmolStr::new_inline("quat"),
+            RotationType::Angle => SmolStr::new_inline(ANGLE_T_NAME),
+            RotationType::Quaternion => SmolStr::new_inline(QUAT_T_NAME),
         }
     }
 
@@ -100,26 +106,27 @@ impl From<RotationType> for CustomType {
 
 /// Constant values for [`RotationType`].
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Constant {
+pub enum RotationValue {
     Angle(AngleValue),
     Quaternion(cgmath::Quaternion<f64>),
 }
 
-impl Constant {
+impl RotationValue {
+    const PI: Self = Self::Angle(AngleValue::PI);
     fn rotation_type(&self) -> RotationType {
         match self {
-            Constant::Angle(_) => RotationType::Angle,
-            Constant::Quaternion(_) => RotationType::Quaternion,
+            RotationValue::Angle(_) => RotationType::Angle,
+            RotationValue::Quaternion(_) => RotationType::Quaternion,
         }
     }
 }
 
 #[typetag::serde]
-impl CustomConst for Constant {
+impl CustomConst for RotationValue {
     fn name(&self) -> SmolStr {
         match self {
-            Constant::Angle(val) => format!("AngleConstant({})", val.radians()),
-            Constant::Quaternion(val) => format!("QuatConstant({:?})", val),
+            RotationValue::Angle(val) => format!("AngleConstant({})", val.radians()),
+            RotationValue::Quaternion(val) => format!("QuatConstant({:?})", val),
         }
         .into()
     }
@@ -137,7 +144,7 @@ impl CustomConst for Constant {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Constant>() {
+        if let Some(other) = other.as_any().downcast_ref::<RotationValue>() {
             self == other
         } else {
             false
@@ -201,6 +208,7 @@ pub enum AngleValue {
 }
 
 impl AngleValue {
+    const PI: Self = AngleValue::Rational(Rational(Rational64::new_raw(1, 1)));
     fn binary_op<F: FnOnce(f64, f64) -> f64, G: FnOnce(Rational64, Rational64) -> Rational64>(
         self,
         rhs: Self,
@@ -325,15 +333,19 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::{resource::SignatureError, types::TypeBound};
+    use rstest::{fixture, rstest};
 
-    use super::*;
+    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME};
+    use crate::{
+        resource::SignatureError,
+        types::{CustomType, Type, TypeBound},
+        values::CustomConst,
+        Resource,
+    };
 
-    #[test]
-    fn test_types() {
-        let resource = resource();
-
-        let angle = resource.get_type("angle").unwrap();
+    #[rstest]
+    fn test_types(resource: Resource) {
+        let angle = resource.get_type(ANGLE_T_NAME).unwrap();
 
         let custom = angle.instantiate_concrete([]).unwrap();
 
@@ -352,19 +364,19 @@ mod test {
                 "wrong_resource".into(),
             ))
         );
+
+        assert_eq!(Type::new_extension(custom), ANGLE_T);
     }
 
-    #[test]
-    fn test_type_check() {
-        let resource = resource();
-
+    #[rstest]
+    fn test_type_check(resource: Resource) {
         let custom_type = resource
-            .get_type("angle")
+            .get_type(ANGLE_T_NAME)
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
 
-        let custom_value = Constant::Angle(AngleValue::F64(0.0));
+        let custom_value = RotationValue::Angle(AngleValue::F64(0.0));
 
         // correct type
         custom_value.check_custom_type(&custom_type).unwrap();
@@ -376,5 +388,10 @@ mod test {
             .unwrap();
         let res = custom_value.check_custom_type(&wrong_custom_type);
         assert!(res.is_err());
+    }
+
+    #[fixture]
+    fn resource() -> Resource {
+        super::resource()
     }
 }
