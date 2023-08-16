@@ -98,7 +98,7 @@ impl From<RotationType> for CustomType {
     }
 }
 
-/// Constant values for [`Type`].
+/// Constant values for [`RotationType`].
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Constant {
     Angle(AngleValue),
