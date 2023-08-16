@@ -140,35 +140,32 @@ impl BoundaryEdge {
 
 /// A subgraph of a HUGR sibling graph.
 ///
-/// The subgraph is described by the following data:
-///  - a HugrView to the underlying HUGR,
-///  - a parent node, of which all nodes in the [`SiblingSubgraph`] must be
-///    children,
-///  - incoming/outgoing boundary edges, pointing into/out of the subgraph.
-/// The incoming/outgoing edges must be contained within the sibling graph of the
-/// parent node. Their ordering matters when using the [`SiblingSubgraph`] for
-/// replacements, as it will match the ordering of the ports in the replacement.
-/// The list of incoming and/or outgoing ports may be empty.
+/// A HUGR region in which all nodes share the same parent. Unlike
+/// [`super::SiblingGraph`],  not all nodes of the sibling graph must be
+/// included.
 ///
-/// A subgraph is well-defined if the incoming/outgoing edges partition the
-/// edges of the sibling graph into three sets:
-///  - boundary edges: either incoming boundary or outgoing boundary edges,
-///  - interior edges: edges such that all the successor edges are either
-///    outgoing boundary edges or interior edges AND all the predecessor edges
-///    are either incoming boundary edges or interior edges,
-///  - exterior edges: edges such that all the successor edges are either
-///    incoming boundary edges or exterior edges AND all the predecessor edges
-///    are either outgoing boundary edges or exterior edges.
+/// For a given parent, let E be the set of edges of its sibling graph. A
+/// sibling subgraph is described by a set of boundary edges B ⊂ E that can be
+/// marked as incoming boundary edge, outgoing boundary edge or both.
 ///
-/// Then the subgraph contains all nodes of the sibling graph of the parent that
-/// are
-///  - adjacent to an interior edge, or
-///  - the target of an incoming boundary edge and the source of an outgoing
-///    boundary edge.
+/// The sibling subgraph defined by B is the graph given by the connected
+/// components of the graph with edges E\B which contain at least one
+/// node that is either
+///  - the target of an incoming boundary edge, or
+///  - the source of an outgoing boundary edge.
 ///
-/// The parent node itself is not included in the subgraph. If both incoming and
-/// outgoing ports are empty, the subgraph is taken to be all children of the
-/// parent and is equivalent to a [`super::SiblingGraph`].
+/// A subgraph is well-formed if every edge in B into the subgraph is an
+/// incoming boundary edge and every edge in B pointing out of the subgraph is
+/// an outgoing boundary edge.
+///
+/// The parent node itself is not included in the subgraph. If the boundary set
+/// is empty, the subgraph is taken to be all children of the parent and is
+/// equivalent to a [`super::SiblingGraph`].
+///
+/// In this implementation, the order of the boundary edges is used to determine
+/// the ordered boundary of the subgraph. When using [`SiblingSubgraph`] for
+/// rewriting, this must thus match the boundary ordering of the replacement
+/// graph.
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph<'g, Base: HugrInternals> {
     parent: Node,
