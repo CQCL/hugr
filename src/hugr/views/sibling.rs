@@ -46,6 +46,28 @@ struct BoundaryEdge {
 }
 
 impl BoundaryEdge {
+    /// Construct a new boundary edge.
+    ///
+    /// Only a target port can be used to create a new edge. Also ensures that
+    /// the edge exists.
+    fn try_new<H: HugrView>(
+        node: Node,
+        port: Port,
+        direction: Direction,
+        hugr: &H,
+    ) -> Result<Self, InvalidEdge> {
+        if port.direction() != Direction::Incoming {
+            Err(InvalidEdge::ExpectedTargetPort)
+        } else if hugr.linked_ports(node, port).next().is_none() {
+            Err(InvalidEdge::DisconnectedPort)
+        } else {
+            Ok(Self {
+                target: (node, port),
+                direction,
+            })
+        }
+    }
+
     /// Target port of the edge in a portgraph.
     fn portgraph_target<G: PortView>(&self, g: &G) -> PortIndex {
         let (node, port) = self.target;
@@ -69,38 +91,28 @@ impl BoundaryEdge {
         }
     }
 
-    /// Create incoming boundary edges incident at a port
-    fn new_boundary_incoming<H: HugrView>(node: Node, port: Port, hugr: &H) -> Vec<Self> {
+    /// Create boundary edges incident at a port, either incoming or outgoing.
+    fn new_boundary<H: HugrView>(node: Node, port: Port, dir: Direction, hugr: &H) -> Vec<Self> {
         if port.direction() == Direction::Incoming {
-            vec![BoundaryEdge {
-                target: (node, port),
-                direction: Direction::Incoming,
-            }]
+            BoundaryEdge::try_new(node, port, dir, hugr)
+                .ok()
+                .into_iter()
+                .collect()
         } else {
             hugr.linked_ports(node, port)
-                .map(|(n, p)| BoundaryEdge {
-                    target: (n, p),
-                    direction: Direction::Incoming,
-                })
+                .flat_map(|(n, p)| BoundaryEdge::try_new(n, p, dir, hugr).ok())
                 .collect()
         }
     }
 
-    /// Create outgoing boundary edges incident at a port
+    /// Create incoming boundary edges incident at a port
+    fn new_boundary_incoming<H: HugrView>(node: Node, port: Port, hugr: &H) -> Vec<Self> {
+        Self::new_boundary(node, port, Direction::Incoming, hugr)
+    }
+
+    /// Create outgoing boundary edges incident at a port.
     fn new_boundary_outgoing<H: HugrView>(node: Node, port: Port, hugr: &H) -> Vec<Self> {
-        if port.direction() == Direction::Incoming {
-            vec![BoundaryEdge {
-                target: (node, port),
-                direction: Direction::Outgoing,
-            }]
-        } else {
-            hugr.linked_ports(node, port)
-                .map(|(n, p)| BoundaryEdge {
-                    target: (n, p),
-                    direction: Direction::Outgoing,
-                })
-                .collect()
-        }
+        Self::new_boundary(node, port, Direction::Outgoing, hugr)
     }
 
     /// Create an outgoing boundary from the incoming edges of a node.
@@ -344,6 +356,17 @@ pub enum InvalidReplacement {
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
     NonConvexSubgrah,
+}
+
+/// Errors that can occur while constructing a [`BoundaryEdge`].
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum InvalidEdge {
+    /// The port is not connected to an edge.
+    #[error("Port must be connected to an edge.")]
+    DisconnectedPort,
+    /// Edges must be defined through their target port.
+    #[error("Edges must be defined through their target port.")]
+    ExpectedTargetPort,
 }
 
 fn compute_subgraph<Base: HugrInternals>(
