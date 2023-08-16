@@ -94,21 +94,31 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+enum Sum {
+    #[display(fmt = "SimplePredicate({})", "_0")]
+    Simple(usize),
+    General(TypeRow),
+}
+
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 /// Core types: primitive (leaf), tuple (product) or sum (co-product).
 enum TypeEnum {
     Prim(PrimType),
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
     #[display(fmt = "Sum({})", "_0")]
-    Sum(TypeRow),
+    Sum(Sum),
 }
 impl TypeEnum {
     /// The smallest type bound that covers the whole type.
     fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
+            TypeEnum::Sum(Sum::Simple(_)) => TypeBound::Eq,
+            TypeEnum::Sum(Sum::General(ts)) => {
+                least_upper_bound(ts.iter().map(Type::least_upper_bound))
+            }
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
-            TypeEnum::Sum(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
     }
 }
@@ -159,7 +169,7 @@ impl Type {
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
     pub fn new_sum(types: impl Into<TypeRow>) -> Self {
-        Self::new(TypeEnum::Sum(types.into()))
+        Self::new(TypeEnum::Sum(Sum::General(types.into())))
     }
 
     /// Initialize a new custom type.
@@ -189,8 +199,8 @@ impl Type {
     }
 
     /// New simple predicate with empty Tuple variants
-    pub fn new_simple_predicate(size: usize) -> Self {
-        Self::new_predicate(std::iter::repeat(vec![]).take(size))
+    pub const fn new_simple_predicate(size: usize) -> Self {
+        Self(TypeEnum::Sum(Sum::Simple(size)), TypeBound::Eq)
     }
 
     /// New unit type (empty tuple).
