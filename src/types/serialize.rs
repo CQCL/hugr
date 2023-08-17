@@ -10,12 +10,12 @@ use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
-pub(crate) enum SerSimpleType {
+pub(super) enum SerSimpleType {
     Q,
     I,
     G(Box<AbstractSignature>),
     Tuple { inner: TypeRow },
-    Sum { inner: TypeRow },
+    Sum(SumType),
     SimplePredicate { size: u8 },
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
@@ -38,8 +38,7 @@ impl From<Type> for SerSimpleType {
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
-            TypeEnum::Sum(SumType::General(inner)) => SerSimpleType::Sum { inner },
-            TypeEnum::Sum(SumType::Simple(size)) => SerSimpleType::SimplePredicate { size },
+            TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }
     }
@@ -52,7 +51,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::I => USIZE_T,
             SerSimpleType::G(sig) => Type::new_graph(*sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
-            SerSimpleType::Sum { inner } => Type::new_sum(inner),
+            SerSimpleType::Sum(sum) => sum.into(),
             SerSimpleType::SimplePredicate { size } => Type::new_simple_predicate(size),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
