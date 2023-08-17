@@ -9,6 +9,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
+
 use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
@@ -115,9 +116,41 @@ pub trait CustomConst:
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        let _ = other;
+    // Can't derive PartialEq for trait objects
+    fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
+        // false unless overloaded
         false
+    }
+}
+
+/// Const equality for types that have PartialEq
+pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
+    value: &T,
+    other: &dyn CustomConst,
+) -> bool {
+    if let Some(other) = other.as_any().downcast_ref::<T>() {
+        value == other
+    } else {
+        false
+    }
+}
+
+/// Simpler trait for constant structs that have a known custom type to check against.
+pub trait KnownTypeConst {
+    /// The type of the constants.
+    const TYPE: CustomType;
+
+    /// Fixed implementation of [CustomConst::check_custom_type] that checks
+    /// against known correct type.
+    fn check_known_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        if typ == &Self::TYPE {
+            Ok(())
+        } else {
+            Err(CustomCheckFailure::TypeMismatch {
+                expected: Self::TYPE,
+                found: typ.clone(),
+            })
+        }
     }
 }
 
