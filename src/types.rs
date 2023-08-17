@@ -100,6 +100,19 @@ enum SumType {
     General(TypeRow),
 }
 
+impl SumType {
+    fn new(types: impl Into<TypeRow>) -> Self {
+        let row: TypeRow = types.into();
+
+        let len = row.len();
+        if row.iter().all(|t| t == &Type::UNIT) && len <= (u8::MAX as usize) {
+            Self::Simple(len as u8)
+        } else {
+            Self::General(row)
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 /// Core types: primitive (leaf), tuple (product) or sum (co-product).
 enum TypeEnum {
@@ -172,7 +185,7 @@ impl Type {
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
     pub fn new_sum(types: impl Into<TypeRow>) -> Self {
-        Self::new(TypeEnum::Sum(SumType::General(types.into())))
+        Self::new(TypeEnum::Sum(SumType::new(types)))
     }
 
     /// Initialize a new custom type.
