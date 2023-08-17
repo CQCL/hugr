@@ -1,6 +1,6 @@
 //! Primitive types which are leaves of the type tree
 
-use crate::{ops::AliasDecl, utils::MaybeStatic};
+use crate::{ops::AliasDecl, utils::MaybeRef};
 
 use super::{AbstractSignature, CustomType, TypeBound};
 
@@ -9,7 +9,7 @@ pub(super) enum PrimType {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
     #[display(fmt = "{}", "_0.as_ref()")]
-    Extension(MaybeStatic<CustomType>),
+    Extension(MaybeRef<'static, CustomType>),
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[display(fmt = "Graph({})", "_0")]

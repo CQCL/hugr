@@ -41,14 +41,16 @@ pub(crate) mod test {
 }
 
 #[derive(Clone, Debug, Eq)]
-pub(crate) enum MaybeStatic<T: 'static> {
+/// Utility struct that can be either owned value or reference, used to short
+/// circuit PartialEq with pointer equality when possible.
+pub(crate) enum MaybeRef<'a, T> {
     Value(T),
-    Static(&'static T),
+    Ref(&'a T),
 }
 
-impl<T> MaybeStatic<T> {
-    pub(super) const fn new_static(v_ref: &'static T) -> Self {
-        Self::Static(v_ref)
+impl<'a, T> MaybeRef<'a, T> {
+    pub(super) const fn new_static(v_ref: &'a T) -> Self {
+        Self::Ref(v_ref)
     }
 
     pub(super) const fn new_value(v: T) -> Self {
@@ -56,34 +58,32 @@ impl<T> MaybeStatic<T> {
     }
 }
 
-impl<T: Clone> MaybeStatic<T> {
+impl<'a, T: Clone> MaybeRef<'a, T> {
     pub(crate) fn into_inner(self) -> T {
         match self {
-            MaybeStatic::Value(v) => v,
-            MaybeStatic::Static(v_ref) => v_ref.clone(),
+            MaybeRef::Value(v) => v,
+            MaybeRef::Ref(v_ref) => v_ref.clone(),
         }
     }
 }
 
-impl<T> AsRef<T> for MaybeStatic<T> {
+impl<'a, T> AsRef<T> for MaybeRef<'a, T> {
     fn as_ref(&self) -> &T {
         match self {
-            MaybeStatic::Value(v) => v,
-            MaybeStatic::Static(v_ref) => v_ref,
+            MaybeRef::Value(v) => v,
+            MaybeRef::Ref(v_ref) => v_ref,
         }
     }
 }
 
 // can use pointer equality to compare static instances
-impl<T: PartialEq> PartialEq for MaybeStatic<T> {
+impl<'a, T: PartialEq> PartialEq for MaybeRef<'a, T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             // pointer equality can give false-negative
-            (Self::Static(l0), Self::Static(r0)) => std::ptr::eq(*l0, *r0) || l0 == r0,
+            (Self::Ref(l0), Self::Ref(r0)) => std::ptr::eq(*l0, *r0) || l0 == r0,
             (Self::Value(l0), Self::Value(r0)) => l0 == r0,
-            (Self::Value(v), Self::Static(v_ref)) | (Self::Static(v_ref), Self::Value(v)) => {
-                v == *v_ref
-            }
+            (Self::Value(v), Self::Ref(v_ref)) | (Self::Ref(v_ref), Self::Value(v)) => v == *v_ref,
         }
     }
 }

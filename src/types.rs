@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ops::AliasDecl;
 use crate::type_row;
-use crate::utils::MaybeStatic;
+use crate::utils::MaybeRef;
 use std::fmt::Debug;
 
 use self::primitive::PrimType;
@@ -214,7 +214,7 @@ impl Type {
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
         Type(
-            TypeEnum::Prim(PrimType::Extension(MaybeStatic::new_value(opaque))),
+            TypeEnum::Prim(PrimType::Extension(MaybeRef::new_value(opaque))),
             bound,
         )
     }
@@ -224,7 +224,7 @@ impl Type {
     pub const fn new_static_extension(opaque: &'static CustomType) -> Self {
         let bound = opaque.bound();
         Type(
-            TypeEnum::Prim(PrimType::Extension(MaybeStatic::new_static(opaque))),
+            TypeEnum::Prim(PrimType::Extension(MaybeRef::new_static(opaque))),
             bound,
         )
     }
