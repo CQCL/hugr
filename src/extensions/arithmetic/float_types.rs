@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::{
     types::{CustomCheckFailure, CustomType, Type, TypeBound},
-    values::CustomConst,
+    values::{CustomConst, KnownTypeConst},
     Resource,
 };
 
@@ -33,6 +33,10 @@ impl ConstF64 {
     }
 }
 
+impl KnownTypeConst for ConstF64 {
+    const TYPE: CustomType = FLOAT64_CUSTOM_TYPE;
+}
+
 #[typetag::serde]
 impl CustomConst for ConstF64 {
     fn name(&self) -> SmolStr {
@@ -40,13 +44,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == FLOAT64_CUSTOM_TYPE {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::Message(
-                "Floating-point constant type mismatch.".into(),
-            ))
-        }
+        self.check_known_type(typ)
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
