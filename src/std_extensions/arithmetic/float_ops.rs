@@ -8,7 +8,6 @@ use crate::{
     Extension,
 };
 
-use super::super::logic::bool_type;
 use super::float_types::float64_type;
 
 /// The extension identifier.
@@ -17,7 +16,7 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
         vec![float64_type(); 2].into(),
-        vec![bool_type()].into(),
+        vec![crate::extension::prelude::BOOL_T].into(),
         ExtensionSet::default(),
     ))
 }

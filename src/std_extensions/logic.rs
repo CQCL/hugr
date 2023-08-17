@@ -4,12 +4,9 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::ExtensionSet,
-    ops,
-    types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
-        Type,
-    },
+    extension::{prelude::BOOL_T, ExtensionSet},
+    ops, type_row,
+    types::type_param::{TypeArg, TypeArgError, TypeParam},
     Extension,
 };
 
@@ -20,11 +17,6 @@ pub const TRUE_NAME: &str = "TRUE";
 
 /// The extension identifier.
 pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
-
-/// Construct a boolean type.
-pub fn bool_type() -> Type {
-    Type::new_simple_predicate(2)
-}
 
 /// Extension for basic logical operations.
 pub fn extension() -> Extension {
@@ -38,8 +30,8 @@ pub fn extension() -> Extension {
             vec![],
             |_arg_values: &[TypeArg]| {
                 Ok((
-                    vec![bool_type()].into(),
-                    vec![bool_type()].into(),
+                    type_row![BOOL_T],
+                    type_row![BOOL_T],
                     ExtensionSet::default(),
                 ))
             },
@@ -64,8 +56,8 @@ pub fn extension() -> Extension {
                     }
                 };
                 Ok((
-                    vec![bool_type(); n as usize].into(),
-                    vec![bool_type()].into(),
+                    vec![BOOL_T; n as usize].into(),
+                    type_row![BOOL_T],
                     ExtensionSet::default(),
                 ))
             },
@@ -90,8 +82,8 @@ pub fn extension() -> Extension {
                     }
                 };
                 Ok((
-                    vec![bool_type(); n as usize].into(),
-                    vec![bool_type()].into(),
+                    vec![BOOL_T; n as usize].into(),
+                    type_row![BOOL_T],
                     ExtensionSet::default(),
                 ))
             },
@@ -109,9 +101,9 @@ pub fn extension() -> Extension {
 
 #[cfg(test)]
 mod test {
-    use crate::Extension;
+    use crate::{extension::prelude::BOOL_T, Extension};
 
-    use super::{bool_type, extension, FALSE_NAME, TRUE_NAME};
+    use super::{extension, FALSE_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
@@ -128,7 +120,7 @@ mod test {
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().const_type();
-            assert_eq!(simpl, &bool_type());
+            assert_eq!(simpl, &BOOL_T);
         }
     }
 }
