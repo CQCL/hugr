@@ -171,8 +171,7 @@ impl TypeEnum {
 /// # use hugr::types::{Type, TypeBound};
 /// # use hugr::type_row;
 ///
-/// const unit: Type = Type::UNIT;
-/// let sum = Type::new_sum(type_row![unit, unit]);
+/// let sum = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 ///
 /// ```
