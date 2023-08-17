@@ -1,4 +1,4 @@
-use super::{Sum, Type, TypeEnum};
+use super::{SumType, Type, TypeEnum};
 
 use itertools::Itertools;
 
@@ -40,10 +40,10 @@ impl From<Type> for SerSimpleType {
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
-            TypeEnum::Sum(Sum::General(inner)) => SerSimpleType::Sum {
+            TypeEnum::Sum(SumType::General(inner)) => SerSimpleType::Sum {
                 inner: inner.into_owned().into_iter().map_into().collect(),
             },
-            TypeEnum::Sum(Sum::Simple(size)) => SerSimpleType::SimplePredicate { size },
+            TypeEnum::Sum(SumType::Simple(size)) => SerSimpleType::SimplePredicate { size },
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
                 inner: inner.into_owned().into_iter().map_into().collect(),
             },
