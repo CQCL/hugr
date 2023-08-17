@@ -60,8 +60,8 @@ const QB_CUSTOM_T: CustomType = CustomType::new_simple(
     TypeBound::Any,
 );
 
-pub(crate) const USIZE_CUSTOM_REF: &CustomType = &USIZE_CUSTOM_T;
-pub(crate) const QB_CUSTOM_REF: &CustomType = &QB_CUSTOM_T;
+const USIZE_CUSTOM_REF: &CustomType = &USIZE_CUSTOM_T;
+const QB_CUSTOM_REF: &CustomType = &QB_CUSTOM_T;
 
 pub(crate) const QB_T: Type = Type::new_static_extension(QB_CUSTOM_REF);
 pub(crate) const USIZE_T: Type = Type::new_static_extension(USIZE_CUSTOM_REF);
