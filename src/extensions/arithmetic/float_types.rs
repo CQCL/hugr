@@ -14,13 +14,12 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
-fn float64_custom_type() -> CustomType {
-    CustomType::new(FLOAT_TYPE_ID, [], RESOURCE_ID, TypeBound::Copyable)
-}
+const FLOAT64_CUSTOM_TYPE: CustomType =
+    CustomType::new_simple(FLOAT_TYPE_ID, RESOURCE_ID, TypeBound::Copyable);
 
 /// 64-bit IEEE 754-2019 floating-point type
 pub fn float64_type() -> Type {
-    Type::new_extension(float64_custom_type())
+    Type::new_extension(FLOAT64_CUSTOM_TYPE)
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -41,7 +40,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == float64_custom_type() {
+        if typ.clone() == FLOAT64_CUSTOM_TYPE {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
