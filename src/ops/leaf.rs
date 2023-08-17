@@ -79,9 +79,7 @@ pub enum LeafOp {
 
 impl Default for LeafOp {
     fn default() -> Self {
-        Self::Noop {
-            ty: Type::new_unit(),
-        }
+        Self::Noop { ty: Type::UNIT }
     }
 }
 impl OpName for LeafOp {
