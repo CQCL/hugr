@@ -96,7 +96,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 enum SumType {
     #[display(fmt = "SimplePredicate({})", "_0")]
-    Simple(usize),
+    Simple(u8),
     General(TypeRow),
 }
 
@@ -202,7 +202,7 @@ impl Type {
     }
 
     /// New simple predicate with empty Tuple variants
-    pub const fn new_simple_predicate(size: usize) -> Self {
+    pub const fn new_simple_predicate(size: u8) -> Self {
         Self(TypeEnum::Sum(SumType::Simple(size)), TypeBound::Eq)
     }
 
