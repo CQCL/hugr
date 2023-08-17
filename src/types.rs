@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ops::AliasDecl;
 use crate::type_row;
+use crate::utils::MaybeStatic;
 use std::fmt::Debug;
 
 use self::primitive::PrimType;
@@ -212,7 +213,20 @@ impl Type {
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
+        Type(
+            TypeEnum::Prim(PrimType::Extension(MaybeStatic::new_value(opaque))),
+            bound,
+        )
+    }
+
+    /// Initialize a new custom type with a static definition - allowing for
+    /// pointer equality comparisons.
+    pub const fn new_static_extension(opaque: &'static CustomType) -> Self {
+        let bound = opaque.bound();
+        Type(
+            TypeEnum::Prim(PrimType::Extension(MaybeStatic::new_static(opaque))),
+            bound,
+        )
     }
 
     /// Initialize a new alias.
@@ -270,14 +284,14 @@ where
 pub(crate) mod test {
 
     use super::{
-        custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
+        custom::test::{ANY_CUST_REF, COPYABLE_CUST_REF, EQ_CUST_REF},
         *,
     };
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
-    pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
-    pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
-    pub(crate) const ANY_T: Type = Type::new_extension(ANY_CUST);
+    pub(crate) const EQ_T: Type = Type::new_static_extension(EQ_CUST_REF);
+    pub(crate) const COPYABLE_T: Type = Type::new_static_extension(COPYABLE_CUST_REF);
+    pub(crate) const ANY_T: Type = Type::new_static_extension(ANY_CUST_REF);
 
     #[test]
     fn construct() {

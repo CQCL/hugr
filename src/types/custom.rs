@@ -105,4 +105,8 @@ pub(crate) mod test {
         SmolStr::new_inline("MyRsrc"),
         TypeBound::Any,
     );
+
+    pub(crate) const EQ_CUST_REF: &CustomType = &EQ_CUST;
+    pub(crate) const COPYABLE_CUST_REF: &CustomType = &COPYABLE_CUST;
+    pub(crate) const ANY_CUST_REF: &CustomType = &ANY_CUST;
 }

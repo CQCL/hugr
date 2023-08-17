@@ -33,7 +33,7 @@ impl From<Type> for SerSimpleType {
         let Type(value, _) = value;
         match value {
             TypeEnum::Prim(t) => match t {
-                PrimType::Extension(c) => SerSimpleType::Opaque(c),
+                PrimType::Extension(c) => SerSimpleType::Opaque(c.into_inner()),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },

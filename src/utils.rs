@@ -39,3 +39,51 @@ pub(crate) mod test {
         webbrowser::open(&base).unwrap();
     }
 }
+
+#[derive(Clone, Debug, Eq)]
+pub(crate) enum MaybeStatic<T: 'static> {
+    Value(T),
+    Static(&'static T),
+}
+
+impl<T> MaybeStatic<T> {
+    pub(super) const fn new_static(v_ref: &'static T) -> Self {
+        Self::Static(v_ref)
+    }
+
+    pub(super) const fn new_value(v: T) -> Self {
+        Self::Value(v)
+    }
+}
+
+impl<T: Clone> MaybeStatic<T> {
+    pub(crate) fn into_inner(self) -> T {
+        match self {
+            MaybeStatic::Value(v) => v,
+            MaybeStatic::Static(v_ref) => v_ref.clone(),
+        }
+    }
+}
+
+impl<T> AsRef<T> for MaybeStatic<T> {
+    fn as_ref(&self) -> &T {
+        match self {
+            MaybeStatic::Value(v) => v,
+            MaybeStatic::Static(v_ref) => v_ref,
+        }
+    }
+}
+
+// can use pointer equality to compare static instances
+impl<T: PartialEq> PartialEq for MaybeStatic<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            // pointer equality can give false-negative
+            (Self::Static(l0), Self::Static(r0)) => std::ptr::eq(*l0, *r0) || l0 == r0,
+            (Self::Value(l0), Self::Value(r0)) => l0 == r0,
+            (Self::Value(v), Self::Static(v_ref)) | (Self::Static(v_ref), Self::Value(v)) => {
+                v == *v_ref
+            }
+        }
+    }
+}

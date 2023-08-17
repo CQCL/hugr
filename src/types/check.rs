@@ -53,7 +53,7 @@ impl PrimType {
 
         match (self, val) {
             (PrimType::Extension(e), PrimValue::Extension(e_val)) => {
-                e_val.0.check_custom_type(e)?;
+                e_val.0.check_custom_type(e.as_ref())?;
                 Ok(())
             }
             (PrimType::Graph(_), PrimValue::Graph) => todo!(),

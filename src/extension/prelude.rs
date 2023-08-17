@@ -48,20 +48,23 @@ lazy_static! {
     };
 }
 
-pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
+const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
     SmolStr::new_inline("usize"),
     SmolStr::new_inline("prelude"),
     TypeBound::Eq,
 );
 
-pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
+const QB_CUSTOM_T: CustomType = CustomType::new_simple(
     SmolStr::new_inline("qubit"),
     SmolStr::new_inline("prelude"),
     TypeBound::Any,
 );
 
-pub(crate) const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
-pub(crate) const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
+pub(crate) const USIZE_CUSTOM_REF: &CustomType = &USIZE_CUSTOM_T;
+pub(crate) const QB_CUSTOM_REF: &CustomType = &QB_CUSTOM_T;
+
+pub(crate) const QB_T: Type = Type::new_static_extension(QB_CUSTOM_REF);
+pub(crate) const USIZE_T: Type = Type::new_static_extension(USIZE_CUSTOM_REF);
 pub(crate) const BOOL_T: Type = Type::new_simple_predicate(2);
 
 /// Initialize a new array of type `typ` of length `size`
