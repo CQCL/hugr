@@ -1,6 +1,4 @@
-use super::{SumType, Type, TypeEnum};
-
-use itertools::Itertools;
+use super::{SumType, Type, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 
@@ -16,8 +14,8 @@ pub(crate) enum SerSimpleType {
     Q,
     I,
     G(Box<AbstractSignature>),
-    Tuple { inner: Vec<SerSimpleType> },
-    Sum { inner: Vec<SerSimpleType> },
+    Tuple { inner: TypeRow },
+    Sum { inner: TypeRow },
     SimplePredicate { size: u8 },
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
@@ -40,13 +38,9 @@ impl From<Type> for SerSimpleType {
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
             },
-            TypeEnum::Sum(SumType::General(inner)) => SerSimpleType::Sum {
-                inner: inner.into_owned().into_iter().map_into().collect(),
-            },
+            TypeEnum::Sum(SumType::General(inner)) => SerSimpleType::Sum { inner },
             TypeEnum::Sum(SumType::Simple(size)) => SerSimpleType::SimplePredicate { size },
-            TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
-                inner: inner.into_owned().into_iter().map_into().collect(),
-            },
+            TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }
     }
 }
@@ -57,12 +51,8 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
             SerSimpleType::G(sig) => Type::new_graph(*sig),
-            SerSimpleType::Tuple { inner } => {
-                Type::new_tuple(inner.into_iter().map_into().collect_vec())
-            }
-            SerSimpleType::Sum { inner } => {
-                Type::new_sum(inner.into_iter().map_into().collect_vec())
-            }
+            SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
+            SerSimpleType::Sum { inner } => Type::new_sum(inner),
             SerSimpleType::SimplePredicate { size } => Type::new_simple_predicate(size),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
