@@ -27,19 +27,6 @@ pub fn collect_array<const N: usize, T: Debug>(arr: &[T]) -> [&T; N] {
     arr.iter().collect_vec().try_into().unwrap()
 }
 
-#[allow(dead_code)]
-// Test only utils
-#[cfg(test)]
-pub(crate) mod test {
-    /// Open a browser page to render a dot string graph.
-    #[cfg(not(ci_run))]
-    pub(crate) fn viz_dotstr(dotstr: &str) {
-        let mut base: String = "https://dreampuf.github.io/GraphvizOnline/#".into();
-        base.push_str(&urlencoding::encode(dotstr));
-        webbrowser::open(&base).unwrap();
-    }
-}
-
 #[derive(Clone, Debug, Eq)]
 /// Utility struct that can be either owned value or reference, used to short
 /// circuit PartialEq with pointer equality when possible.
@@ -77,7 +64,7 @@ impl<'a, T> AsRef<T> for MaybeRef<'a, T> {
 }
 
 // can use pointer equality to compare static instances
-impl<'a, T: PartialEq> PartialEq for MaybeRef<'a, T> {
+impl<'a, T: PartialEq + Eq> PartialEq for MaybeRef<'a, T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             // pointer equality can give false-negative
@@ -85,5 +72,18 @@ impl<'a, T: PartialEq> PartialEq for MaybeRef<'a, T> {
             (Self::Value(l0), Self::Value(r0)) => l0 == r0,
             (Self::Value(v), Self::Ref(v_ref)) | (Self::Ref(v_ref), Self::Value(v)) => v == *v_ref,
         }
+    }
+}
+
+#[allow(dead_code)]
+// Test only utils
+#[cfg(test)]
+pub(crate) mod test {
+    /// Open a browser page to render a dot string graph.
+    #[cfg(not(ci_run))]
+    pub(crate) fn viz_dotstr(dotstr: &str) {
+        let mut base: String = "https://dreampuf.github.io/GraphvizOnline/#".into();
+        base.push_str(&urlencoding::encode(dotstr));
+        webbrowser::open(&base).unwrap();
     }
 }
