@@ -6,8 +6,9 @@ use crate::{
     resource::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        CustomType, Type, TypeBound,
+        ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
     },
+    values::CustomConst,
     Resource,
 };
 
@@ -17,16 +18,31 @@ pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
-/// Integer type of a given bit width.
-/// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
-/// or bit string.
-pub fn int_type(n: u8) -> Type {
-    Type::new_extension(CustomType::new(
+fn int_custom_type(n: u8) -> CustomType {
+    CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
         RESOURCE_ID,
         TypeBound::Copyable,
-    ))
+    )
+}
+
+/// Integer type of a given bit width.
+/// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
+/// or bit string.
+pub fn int_type(n: u8) -> Type {
+    Type::new_extension(int_custom_type(n))
+}
+
+fn is_valid_width(n: u8) -> bool {
+    (n == 1)
+        || (n == 2)
+        || (n == 4)
+        || (n == 8)
+        || (n == 16)
+        || (n == 32)
+        || (n == 64)
+        || (n == 128)
 }
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
@@ -41,18 +57,100 @@ pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
             .into());
         }
     };
-    if (n != 1)
-        && (n != 2)
-        && (n != 4)
-        && (n != 8)
-        && (n != 16)
-        && (n != 32)
-        && (n != 64)
-        && (n != 128)
-    {
+    if !is_valid_width(n) {
         return Err(TypeArgError::InvalidValue(arg.clone()).into());
     }
     Ok(n)
+}
+
+/// An unsigned integer
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ConstIntU {
+    width: u8,
+    value: u128,
+}
+
+/// A signed integer
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ConstIntS {
+    width: u8,
+    value: i128,
+}
+
+impl ConstIntU {
+    /// Create a new [`ConstIntU`]
+    pub fn new(width: u8, value: u128) -> Result<Self, ConstTypeError> {
+        if !is_valid_width(width) {
+            return Err(ConstTypeError::CustomCheckFail(
+                crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
+            ));
+        }
+        if (width <= 64) && (value >= (1u128 << width)) {
+            return Err(ConstTypeError::CustomCheckFail(
+                crate::types::CustomCheckFailure::Message(
+                    "Invalid unsigned integer value.".to_owned(),
+                ),
+            ));
+        }
+        Ok(Self { width, value })
+    }
+}
+
+impl ConstIntS {
+    /// Create a new [`ConstIntS`]
+    pub fn new(width: u8, value: i128) -> Result<Self, ConstTypeError> {
+        if !is_valid_width(width) {
+            return Err(ConstTypeError::CustomCheckFail(
+                crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
+            ));
+        }
+        if (width <= 64) && (value >= (1i128 << (width - 1)) || value < -(1i128 << (width - 1))) {
+            return Err(ConstTypeError::CustomCheckFail(
+                crate::types::CustomCheckFailure::Message(
+                    "Invalid signed integer value.".to_owned(),
+                ),
+            ));
+        }
+        Ok(Self { width, value })
+    }
+}
+
+#[typetag::serde]
+impl CustomConst for ConstIntU {
+    fn name(&self) -> SmolStr {
+        format!("u{}({})", self.width, self.value).into()
+    }
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        if typ.clone() == int_custom_type(self.width) {
+            Ok(())
+        } else {
+            Err(CustomCheckFailure::Message(
+                "Unsigned integer constant type mismatch.".into(),
+            ))
+        }
+    }
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::values::downcast_equal_consts(self, other)
+    }
+}
+
+#[typetag::serde]
+impl CustomConst for ConstIntS {
+    fn name(&self) -> SmolStr {
+        format!("i{}({})", self.width, self.value).into()
+    }
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        if typ.clone() == int_custom_type(self.width) {
+            Ok(())
+        } else {
+            Err(CustomCheckFailure::Message(
+                "Signed integer constant type mismatch.".into(),
+            ))
+        }
+    }
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::values::downcast_equal_consts(self, other)
+    }
 }
 
 /// Resource for basic integer types.
@@ -104,5 +202,28 @@ mod test {
             get_width(&type_arg_256),
             Err(SignatureError::TypeArgMismatch(_))
         );
+    }
+
+    #[test]
+    fn test_int_consts() {
+        let const_u32_7 = ConstIntU::new(32, 7);
+        let const_u64_7 = ConstIntU::new(64, 7);
+        let const_u32_8 = ConstIntU::new(32, 8);
+        assert_ne!(const_u32_7, const_u64_7);
+        assert_ne!(const_u32_7, const_u32_8);
+        assert_eq!(const_u32_7, ConstIntU::new(32, 7));
+        assert_matches!(
+            ConstIntU::new(8, 256),
+            Err(ConstTypeError::CustomCheckFail(_))
+        );
+        assert_matches!(
+            ConstIntU::new(9, 256),
+            Err(ConstTypeError::CustomCheckFail(_))
+        );
+        assert_matches!(
+            ConstIntS::new(8, 128),
+            Err(ConstTypeError::CustomCheckFail(_))
+        );
+        assert_matches!(ConstIntS::new(8, -128), Ok(_));
     }
 }
