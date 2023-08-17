@@ -46,7 +46,7 @@ impl Const {
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+    pub fn simple_predicate(tag: usize, size: u8) -> Self {
         Self {
             value: Value::simple_predicate(tag),
             typ: Type::new_simple_predicate(size),

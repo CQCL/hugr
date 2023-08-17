@@ -18,7 +18,7 @@ pub(crate) enum SerSimpleType {
     G(Box<AbstractSignature>),
     Tuple { inner: Vec<SerSimpleType> },
     Sum { inner: Vec<SerSimpleType> },
-    SimplePredicate { size: usize },
+    SimplePredicate { size: u8 },
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
