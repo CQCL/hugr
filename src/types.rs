@@ -298,4 +298,15 @@ pub(crate) mod test {
             "Tuple([usize([]), Graph([[]][]), my_custom([]), Alias(my_alias)])".to_string()
         );
     }
+
+    #[test]
+    fn sum_construct() {
+        let pred1 = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
+        let pred2 = Type::new_simple_predicate(2);
+
+        assert_eq!(pred1, pred2);
+
+        let pred_direct = SumType::Simple(2);
+        assert_eq!(pred1, pred_direct.into())
+    }
 }
