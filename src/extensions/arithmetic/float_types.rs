@@ -18,9 +18,7 @@ const FLOAT64_CUSTOM_TYPE: CustomType =
     CustomType::new_simple(FLOAT_TYPE_ID, RESOURCE_ID, TypeBound::Copyable);
 
 /// 64-bit IEEE 754-2019 floating-point type
-pub fn float64_type() -> Type {
-    Type::new_extension(FLOAT64_CUSTOM_TYPE)
-}
+pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.

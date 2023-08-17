@@ -14,7 +14,7 @@ use crate::{
     Resource,
 };
 
-use super::float_types::float64_type;
+use super::float_types::FLOAT64_TYPE;
 use super::int_types::{get_width, int_type};
 
 /// The resource identifier.
@@ -24,7 +24,7 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), S
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
-        vec![float64_type()].into(),
+        vec![FLOAT64_TYPE].into(),
         vec![Type::new_sum(vec![
             int_type(n),
             crate::resource::prelude::ERROR_TYPE,
@@ -39,7 +39,7 @@ fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), S
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n)].into(),
-        vec![float64_type()].into(),
+        vec![FLOAT64_TYPE].into(),
         ResourceSet::default(),
     ))
 }
