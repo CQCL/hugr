@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 use crate::{
     resource::{ResourceSet, SignatureError},
+    type_row,
     types::{type_param::TypeArg, TypeRow},
     Resource,
 };
@@ -25,15 +26,15 @@ fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), 
 fn fbinop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
         vec![FLOAT64_TYPE; 2].into(),
-        vec![FLOAT64_TYPE].into(),
+        type_row![FLOAT64_TYPE],
         ResourceSet::default(),
     ))
 }
 
 fn funop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ResourceSet), SignatureError> {
     Ok((
-        vec![FLOAT64_TYPE].into(),
-        vec![FLOAT64_TYPE].into(),
+        type_row![FLOAT64_TYPE],
+        type_row![FLOAT64_TYPE],
         ResourceSet::default(),
     ))
 }
