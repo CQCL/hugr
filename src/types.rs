@@ -105,10 +105,18 @@ impl SumType {
         let row: TypeRow = types.into();
 
         let len = row.len();
-        if row.iter().all(|t| t == &Type::UNIT) && len <= (u8::MAX as usize) {
+        if row.iter().all(|t| *t == Type::UNIT) && len <= (u8::MAX as usize) {
             Self::Simple(len as u8)
         } else {
             Self::General(row)
+        }
+    }
+
+    fn get_variant(&self, tag: usize) -> Option<&Type> {
+        match self {
+            SumType::Simple(size) if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::General(row) => row.get(tag),
+            _ => None,
         }
     }
 }
@@ -170,6 +178,7 @@ pub struct Type(TypeEnum, TypeBound);
 impl Type {
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Tuple(type_row![]), TypeBound::Eq);
+    const UNIT_REF: &'static Self = &Self::UNIT;
 
     /// Initialize a new graph type with a signature.
     pub fn new_graph(signature: AbstractSignature) -> Self {
