@@ -986,7 +986,10 @@ mod test {
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(vec![Type::new_simple_predicate(1), Q])),
+            NodeType::pure(ops::Output::new(type_row![
+                Type::new_simple_predicate(1),
+                Q
+            ])),
         );
         assert_matches!(
             b.validate(),
