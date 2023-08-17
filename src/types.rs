@@ -138,7 +138,7 @@ impl TypeEnum {
 /// # use hugr::types::{Type, TypeBound};
 /// # use hugr::type_row;
 ///
-/// const unit: Type = Type::new_unit();
+/// const unit: Type = Type::UNIT;
 /// let sum = Type::new_sum(type_row![unit, unit]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 ///
@@ -155,6 +155,9 @@ impl TypeEnum {
 pub struct Type(TypeEnum, TypeBound);
 
 impl Type {
+    /// Unit type (empty tuple).
+    pub const UNIT: Self = Self(TypeEnum::Tuple(type_row![]), TypeBound::Eq);
+
     /// Initialize a new graph type with a signature.
     pub fn new_graph(signature: AbstractSignature) -> Self {
         Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
@@ -201,12 +204,6 @@ impl Type {
     /// New simple predicate with empty Tuple variants
     pub const fn new_simple_predicate(size: usize) -> Self {
         Self(TypeEnum::Sum(Sum::Simple(size)), TypeBound::Eq)
-    }
-
-    /// New unit type (empty tuple).
-    #[inline(always)]
-    pub const fn new_unit() -> Self {
-        Type(TypeEnum::Tuple(type_row![]), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
