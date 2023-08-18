@@ -2,9 +2,9 @@
 
 use smol_str::SmolStr;
 
-use super::super::logic::bool_type;
 use super::int_types::{get_width, int_type};
-use crate::extension::prelude::ERROR_TYPE;
+use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
+use crate::type_row;
 use crate::types::type_param::TypeParam;
 use crate::utils::collect_array;
 use crate::{
@@ -47,14 +47,14 @@ fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet
 fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
         vec![int_type(1)].into(),
-        vec![bool_type()].into(),
+        type_row![BOOL_T],
         ExtensionSet::default(),
     ))
 }
 
 fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
-        vec![bool_type()].into(),
+        type_row![BOOL_T],
         vec![int_type(1)].into(),
         ExtensionSet::default(),
     ))
@@ -65,7 +65,7 @@ fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n); 2].into(),
-        vec![bool_type()].into(),
+        type_row![BOOL_T],
         ExtensionSet::default(),
     ))
 }
