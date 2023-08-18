@@ -21,7 +21,7 @@ pub const POP_NAME: SmolStr = SmolStr::new_inline("pop");
 /// Push operation name.
 pub const PUSH_NAME: SmolStr = SmolStr::new_inline("push");
 /// Reported unique name of the extension
-pub const RESOURCE_NAME: SmolStr = SmolStr::new_inline("Collections");
+pub const EXTENSION_NAME: SmolStr = SmolStr::new_inline("Collections");
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
@@ -65,7 +65,7 @@ impl CustomConst for ListValue {
 }
 
 fn extension() -> Extension {
-    let mut extension = Extension::new(RESOURCE_NAME);
+    let mut extension = Extension::new(EXTENSION_NAME);
 
     extension
         .add_type(
@@ -87,8 +87,8 @@ fn extension() -> Extension {
 
                 let inputs = TypeRow::from(vec![list_type.clone()]);
                 let outputs = TypeRow::from(vec![list_type, element_type]);
-                let resource_set = ExtensionSet::singleton(&RESOURCE_NAME);
-                Ok((inputs, outputs, resource_set))
+                let extension_set = ExtensionSet::singleton(&EXTENSION_NAME);
+                Ok((inputs, outputs, extension_set))
             },
         )
         .unwrap();
@@ -104,8 +104,8 @@ fn extension() -> Extension {
 
                 let outputs = TypeRow::from(vec![list_type.clone()]);
                 let inputs = TypeRow::from(vec![list_type, element_type]);
-                let resource_set = ExtensionSet::singleton(&RESOURCE_NAME);
-                Ok((inputs, outputs, resource_set))
+                let extension_set = ExtensionSet::singleton(&EXTENSION_NAME);
+                Ok((inputs, outputs, extension_set))
             },
         )
         .unwrap();
@@ -145,9 +145,9 @@ mod test {
         EXTENSION.get_op(name).unwrap()
     }
     #[test]
-    fn test_resource() {
+    fn test_extension() {
         let r: Extension = extension();
-        assert_eq!(r.name(), &RESOURCE_NAME);
+        assert_eq!(r.name(), &EXTENSION_NAME);
         let ops = r.operations();
         assert_eq!(ops.count(), 2);
     }
@@ -181,7 +181,7 @@ mod test {
         let list_type = Type::new_extension(CustomType::new(
             LIST_TYPENAME,
             vec![TypeArg::Type(QB_T)],
-            RESOURCE_NAME,
+            EXTENSION_NAME,
             TypeBound::Any,
         ));
 
@@ -197,7 +197,7 @@ mod test {
         let list_type = Type::new_extension(CustomType::new(
             LIST_TYPENAME,
             vec![TypeArg::Type(FLOAT64_TYPE)],
-            RESOURCE_NAME,
+            EXTENSION_NAME,
             TypeBound::Copyable,
         ));
         let both_row: TypeRow = vec![list_type.clone(), FLOAT64_TYPE].into();
