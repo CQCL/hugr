@@ -12,7 +12,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::ops;
-use crate::ops::custom::OpaqueOp;
+use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
@@ -245,6 +245,16 @@ impl Extension {
             Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(extension_value.name)),
             Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
+    }
+
+    /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this resource.
+    pub fn instantiate_extension_op(
+        &self,
+        op_name: &str,
+        args: impl Into<Vec<TypeArg>>,
+    ) -> Result<ExtensionOp, SignatureError> {
+        let op_def = self.get_op(op_name).expect("Op not found.");
+        ExtensionOp::new(op_def.clone(), args)
     }
 }
 
