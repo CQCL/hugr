@@ -1,4 +1,4 @@
-//! Basic logical operations.
+//! List type and operations.
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
