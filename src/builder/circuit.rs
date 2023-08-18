@@ -101,7 +101,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
         let output_wires = self
             .builder
             .add_dataflow_op(
-                op, // TODO: Add resource param
+                op, // TODO: Add extension param
                 input_wires,
             )?
             .outputs();

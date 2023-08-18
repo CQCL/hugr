@@ -451,7 +451,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::resource::prelude::USIZE_T;
+    use crate::extension::prelude::USIZE_T;
     use crate::{ops, type_row};
     use crate::{ops::dataflow::IOTrait, ops::LeafOp};
     use cool_asserts::assert_matches;

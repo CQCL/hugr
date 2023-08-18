@@ -4,19 +4,19 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::TypeDefBound,
+    extension::TypeDefBound,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::{CustomConst, KnownTypeConst},
-    Resource,
+    Extension,
 };
 
 lazy_static! {
-    /// Prelude resource
-    pub static ref PRELUDE: Resource = {
-        let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
+    /// Prelude extension
+    pub static ref PRELUDE: Extension = {
+        let mut prelude = Extension::new(SmolStr::new_inline("prelude"));
         prelude
             .add_type(
                 SmolStr::new_inline("usize"),

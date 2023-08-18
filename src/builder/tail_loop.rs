@@ -82,7 +82,7 @@ impl TailLoopBuilder<Hugr> {
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(tail_loop.clone()));
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
@@ -98,9 +98,9 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
+        extension::prelude::{ConstUsize, USIZE_T},
         hugr::ValidationError,
         ops::Const,
-        resource::prelude::{ConstUsize, USIZE_T},
         type_row, Hugr,
     };
 

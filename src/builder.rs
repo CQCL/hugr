@@ -95,9 +95,9 @@ mod test {
     use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: Type = crate::resource::prelude::USIZE_T;
-    pub(super) const BIT: Type = crate::resource::prelude::USIZE_T;
-    pub(super) const QB: Type = crate::resource::prelude::QB_T;
+    pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const BIT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
     pub(super) fn n_identity<T: DataflowSubContainer>(

@@ -111,7 +111,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let rs = signature.input_resources.clone();
+        let rs = signature.input_extensions.clone();
         let declare_n = self.add_child_node(NodeType::new(
             ops::FuncDecl {
                 signature: signature.into(),

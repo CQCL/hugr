@@ -122,7 +122,7 @@ mod test {
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-        resource::prelude::{ConstUsize, USIZE_T},
+        extension::prelude::{ConstUsize, USIZE_T},
         type_row,
         types::{test::COPYABLE_T, TypeRow},
         types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},

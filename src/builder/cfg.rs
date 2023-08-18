@@ -62,7 +62,7 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
@@ -89,7 +89,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
-            // Make the resources a parameter
+            // Make the extensions a parameter
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -131,10 +131,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
-            // TODO: Make resources a parameter
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
-            // TODO: Make resources a parameter
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
@@ -276,7 +276,7 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)

@@ -5,17 +5,17 @@ use smol_str::SmolStr;
 use crate::{
     types::{CustomCheckFailure, CustomType, Type, TypeBound},
     values::{CustomConst, KnownTypeConst},
-    Resource,
+    Extension,
 };
 
-/// The resource identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
+/// The extension identifier.
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 const FLOAT64_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(FLOAT_TYPE_ID, RESOURCE_ID, TypeBound::Copyable);
+    CustomType::new_simple(FLOAT_TYPE_ID, EXTENSION_ID, TypeBound::Copyable);
 
 /// 64-bit IEEE 754-2019 floating-point type
 pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
@@ -50,11 +50,11 @@ impl CustomConst for ConstF64 {
     }
 }
 
-/// Resource for basic floating-point types.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+/// Extension for basic floating-point types.
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(EXTENSION_ID);
 
-    resource
+    extension
         .add_type(
             FLOAT_TYPE_ID,
             vec![],
@@ -63,7 +63,7 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    resource
+    extension
 }
 
 #[cfg(test)]
@@ -71,8 +71,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_float_types_resource() {
-        let r = resource();
+    fn test_float_types_extension() {
+        let r = extension();
         assert_eq!(r.name(), "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);

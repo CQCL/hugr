@@ -3,17 +3,17 @@
 use smol_str::SmolStr;
 
 use crate::{
-    resource::SignatureError,
+    extension::SignatureError,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::CustomConst,
-    Resource,
+    Extension,
 };
 
-/// The resource identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
+/// The extension identifier.
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
@@ -22,7 +22,7 @@ fn int_custom_type(n: u8) -> CustomType {
     CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
-        RESOURCE_ID,
+        EXTENSION_ID,
         TypeBound::Copyable,
     )
 }
@@ -153,11 +153,11 @@ impl CustomConst for ConstIntS {
     }
 }
 
-/// Resource for basic integer types.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+/// Extension for basic integer types.
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(EXTENSION_ID);
 
-    resource
+    extension
         .add_type(
             INT_TYPE_ID,
             vec![TypeParam::USize],
@@ -166,7 +166,7 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    resource
+    extension
 }
 
 #[cfg(test)]
@@ -176,8 +176,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_int_types_resource() {
-        let r = resource();
+    fn test_int_types_extension() {
+        let r = extension();
         assert_eq!(r.name(), "arithmetic.int.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);

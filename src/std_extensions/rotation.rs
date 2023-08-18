@@ -10,36 +10,36 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::resource::ResourceSet;
+use crate::extension::ExtensionSet;
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeRow};
 use crate::values::CustomConst;
-use crate::{ops, Resource};
+use crate::{ops, Extension};
 
 pub const PI_NAME: &str = "PI";
 pub const ANGLE_T_NAME: &str = "angle";
 pub const QUAT_T_NAME: &str = "quat";
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("rotations");
 
 pub const ANGLE_T: Type = Type::new_extension(CustomType::new_simple(
     SmolStr::new_inline(ANGLE_T_NAME),
-    RESOURCE_ID,
+    EXTENSION_ID,
     TypeBound::Copyable,
 ));
 
 pub const QUAT_T: Type = Type::new_extension(CustomType::new_simple(
     SmolStr::new_inline(QUAT_T_NAME),
-    RESOURCE_ID,
+    EXTENSION_ID,
     TypeBound::Copyable,
 ));
-/// The resource with all the operations and types defined in this extension.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+/// The extension with all the operations and types defined in this extension.
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(EXTENSION_ID);
 
-    RotationType::Angle.add_to_resource(&mut resource);
-    RotationType::Quaternion.add_to_resource(&mut resource);
+    RotationType::Angle.add_to_extension(&mut extension);
+    RotationType::Quaternion.add_to_extension(&mut extension);
 
-    resource
+    extension
         .add_op_custom_sig_simple(
             "AngleAdd".into(),
             "".into(),
@@ -47,17 +47,17 @@ pub fn resource() -> Resource {
             |_arg_values: &[TypeArg]| {
                 let t: TypeRow =
                     vec![Type::new_extension(RotationType::Angle.custom_type())].into();
-                Ok((t.clone(), t, ResourceSet::default()))
+                Ok((t.clone(), t, ExtensionSet::default()))
             },
         )
         .unwrap();
 
     let pi_val = RotationValue::PI;
 
-    resource
+    extension
         .add_value(PI_NAME, ops::Const::new(pi_val.into(), ANGLE_T).unwrap())
         .unwrap();
-    resource
+    extension
 }
 
 /// Custom types defined by this extension.
@@ -83,11 +83,11 @@ impl RotationType {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, TypeBound::Copyable)
+        CustomType::new(self.name(), [], EXTENSION_ID, TypeBound::Copyable)
     }
 
-    fn add_to_resource(self, resource: &mut Resource) {
-        resource
+    fn add_to_extension(self, extension: &mut Extension) {
+        extension
             .add_type(
                 self.name(),
                 vec![],
@@ -333,20 +333,20 @@ mod test {
 
     use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, PI_NAME};
     use crate::{
-        resource::SignatureError,
+        extension::SignatureError,
         types::{CustomType, Type, TypeBound},
         values::CustomConst,
-        Resource,
+        Extension,
     };
 
     #[fixture]
-    fn resource() -> Resource {
-        super::resource()
+    fn extension() -> Extension {
+        super::extension()
     }
 
     #[rstest]
-    fn test_types(resource: Resource) {
-        let angle = resource.get_type(ANGLE_T_NAME).unwrap();
+    fn test_types(extension: Extension) {
+        let angle = extension.get_type(ANGLE_T_NAME).unwrap();
 
         let custom = angle.instantiate_concrete([]).unwrap();
 
@@ -355,14 +355,14 @@ mod test {
         let false_custom = CustomType::new(
             custom.name().clone(),
             vec![],
-            "wrong_resource",
+            "wrong_extension",
             TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),
-            Err(SignatureError::ResourceMismatch(
+            Err(SignatureError::ExtensionMismatch(
                 "rotations".into(),
-                "wrong_resource".into(),
+                "wrong_extension".into(),
             ))
         );
 
@@ -370,8 +370,8 @@ mod test {
     }
 
     #[rstest]
-    fn test_type_check(resource: Resource) {
-        let custom_type = resource
+    fn test_type_check(extension: Extension) {
+        let custom_type = extension
             .get_type(ANGLE_T_NAME)
             .unwrap()
             .instantiate_concrete([])
@@ -382,7 +382,7 @@ mod test {
         // correct type
         custom_value.check_custom_type(&custom_type).unwrap();
 
-        let wrong_custom_type = resource
+        let wrong_custom_type = extension
             .get_type("quat")
             .unwrap()
             .instantiate_concrete([])
@@ -392,8 +392,8 @@ mod test {
     }
 
     #[rstest]
-    fn test_constant(resource: Resource) {
-        let pi_val = resource.get_value(PI_NAME).unwrap();
+    fn test_constant(extension: Extension) {
+        let pi_val = extension.get_value(PI_NAME).unwrap();
 
         ANGLE_T.check_type(pi_val.typed_value().value()).unwrap();
     }

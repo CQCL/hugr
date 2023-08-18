@@ -1,4 +1,4 @@
-//! Experiments for `Resource` definitions.
+//! Experiments for `Extension` definitions.
 //!
 //! These may be moved to other crates in the future, or dropped altogether.
 

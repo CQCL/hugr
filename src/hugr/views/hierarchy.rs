@@ -480,8 +480,8 @@ mod test {
 
     use super::*;
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const QB: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
