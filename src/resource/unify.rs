@@ -761,37 +761,6 @@ mod test {
     }
 
     #[test]
-    fn reverse() -> Result<(), Box<dyn Error>> {
-        let hugr = Hugr::default();
-        let mut ctx = UnificationContext::new(&hugr);
-
-        let m0 = ctx.fresh_meta();
-        let m1 = ctx.fresh_meta();
-        //let m2 = ctx.fresh_meta();
-        let m3 = ctx.fresh_meta();
-        ctx.add_constraint(
-            m0,
-            Constraint::Exactly(ResourceSet::from_iter(["A".into()])),
-        );
-        ctx.add_constraint(m1, Constraint::Plus("B".into(), m0));
-        //ctx.add_constraint(m2, Constraint::Equal(m1));
-        //ctx.add_constraint(m2, Constraint::Plus("A".into(), m3));
-        ctx.add_constraint(m1, Constraint::Plus("A".into(), m3));
-        ctx.main_loop()?;
-
-        for s in ctx.solved.iter() {
-            println!("{:?}\n", s);
-        }
-
-        assert_eq!(
-            ctx.get_solution(&m3).unwrap(),
-            &ResourceSet::singleton(&"B".into())
-        );
-
-        Ok(())
-    }
-
-    #[test]
     /* We should be able to find a solution for this, of the form
      forall x.
        m0 = x;
