@@ -319,16 +319,20 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// `replacement` must be a hugr with DFG root and its signature must
     /// match the signature of the subgraph.
     ///
-    /// May return one of the following four errors
+    /// We currently do not support inputs of the replacement graph being
+    /// copied.
+    ///
+    /// May return one of the following five errors
     ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
     ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
     ///  - [`InvalidReplacement::InvalidDataflowParent`]: the replacement does
     ///    not have an input and output node,
-    ///  - [`InvalidReplacement::InvalidBoundarySize`]: the number of incoming
-    ///    and outgoing ports in replacement does not match the subgraph boundary
-    ///    signature, or
+    ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
+    ///    replacement DFG does not match the subgraph signature,
     ///  - [`InvalidReplacement::NonConvexSubgrah`]: the sibling subgraph is not
-    ///    convex.
+    ///    convex, or
+    ///  - [`InvalidReplacement::InvalidCopy`]: the replacement has a copy at
+    ///    the input boundary.
     pub fn create_simple_replacement(
         &self,
         replacement: Hugr,
