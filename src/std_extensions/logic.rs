@@ -9,23 +9,30 @@ use crate::{
     types::type_param::{TypeArg, TypeArgError, TypeParam},
     Extension,
 };
+use lazy_static::lazy_static;
 
 /// Name of extension false value.
 pub const FALSE_NAME: &str = "FALSE";
 /// Name of extension true value.
 pub const TRUE_NAME: &str = "TRUE";
 
+/// Name of the "not" operation.
+pub const NOT_NAME: &str = "Not";
+/// Name of the "and" operation.
+pub const AND_NAME: &str = "And";
+/// Name of the "or" operation.
+pub const OR_NAME: &str = "Or";
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Extension for basic logical operations.
-pub fn extension() -> Extension {
+fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
         .add_op_custom_sig_simple(
-            "Not".into(),
+            SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
@@ -40,7 +47,7 @@ pub fn extension() -> Extension {
 
     extension
         .add_op_custom_sig_simple(
-            "And".into(),
+            SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -66,7 +73,7 @@ pub fn extension() -> Extension {
 
     extension
         .add_op_custom_sig_simple(
-            "Or".into(),
+            SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -97,6 +104,11 @@ pub fn extension() -> Extension {
         .add_value(TRUE_NAME, ops::Const::simple_predicate(1, 2))
         .unwrap();
     extension
+}
+
+lazy_static! {
+    /// Reference to the logic Extension.
+    pub static ref EXTENSION: Extension = extension();
 }
 
 #[cfg(test)]
