@@ -30,11 +30,7 @@ pub struct ListValue(Vec<Value>);
 #[typetag::serde]
 impl CustomConst for ListValue {
     fn name(&self) -> SmolStr {
-        if self.0.is_empty() {
-            "list".into()
-        } else {
-            format!("list:<{}>", self.0[0].name()).into()
-        }
+        SmolStr::new_inline("list")
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
