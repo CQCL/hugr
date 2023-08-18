@@ -209,12 +209,13 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::BOOL_T;
     use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{LeafOp, OpTrait, OpType};
     use crate::types::{AbstractSignature, Type};
+    use crate::utils::test::and_op;
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
@@ -510,14 +511,14 @@ mod test {
 
     #[test]
     fn test_replace_after_copy() {
-        let one_bit: Vec<Type> = vec![USIZE_T];
-        let two_bit: Vec<Type> = vec![USIZE_T, USIZE_T];
+        let one_bit = type_row![BOOL_T];
+        let two_bit = type_row![BOOL_T, BOOL_T];
 
         let mut builder =
             DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
-            .add_dataflow_op(LeafOp::Xor, [inw, inw])
+            .add_dataflow_op(and_op(), [inw, inw])
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
@@ -525,7 +526,7 @@ mod test {
 
         let mut builder = DFGBuilder::new(AbstractSignature::new_df(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
-        let outw = builder.add_dataflow_op(LeafOp::Xor, inw).unwrap().outputs();
+        let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
         let repl = builder.finish_hugr_with_outputs(outw).unwrap();
 

@@ -672,11 +672,13 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::ConstUsize;
+    use crate::extension::prelude::BOOL_T;
     use crate::extension::ExtensionSet;
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
+    use crate::std_extensions::logic;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -1001,22 +1003,22 @@ mod test {
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
         // Nested DFG B -> B
         let sub_dfg = h.add_op_with_parent(
             h.root(),
             ops::DFG {
-                signature: AbstractSignature::new_linear(type_row![B]),
+                signature: AbstractSignature::new_linear(type_row![BOOL_T]),
             },
         )?;
         // this Xor has its 2nd input unconnected
         let sub_op = {
-            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![B]))?;
-            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![B]))?;
-            let sub_op = h.add_op_with_parent(sub_dfg, LeafOp::Xor)?;
+            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]))?;
+            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]))?;
+            let sub_op = h.add_op_with_parent(sub_dfg, and_op())?;
             h.connect(sub_input, 0, sub_op, 0)?;
             h.connect(sub_op, 0, sub_output, 0)?;
             sub_op
@@ -1043,27 +1045,31 @@ mod test {
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
-        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
-        h.connect(input, 0, xor, 0)?;
-        h.connect(xor, 0, output, 0)?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, output, 0)?;
         assert_eq!(
             h.validate(),
             Err(ValidationError::UnconnectedPort {
-                node: xor,
+                node: and,
                 port: Port::new_incoming(1),
-                port_kind: EdgeKind::Value(B)
+                port_kind: EdgeKind::Value(BOOL_T)
             })
         );
-        let const_op: ops::Const = ConstUsize::new(1).into();
+        let const_op: ops::Const = logic::EXTENSION
+            .get_value(logic::TRUE_NAME)
+            .unwrap()
+            .typed_value()
+            .clone();
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(h.root(), const_op)?;
-        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
+        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
-        h.connect(lcst, 0, xor, 1)?;
+        h.connect(lcst, 0, and, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:
         assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
         // Now include the LoadConstant node in the causal cone

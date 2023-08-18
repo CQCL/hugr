@@ -112,10 +112,10 @@ lazy_static! {
 }
 
 #[cfg(test)]
-mod test {
-    use crate::{extension::prelude::BOOL_T, Extension};
+pub(crate) mod test {
+    use crate::{extension::prelude::BOOL_T, ops::LeafOp, types::type_param::TypeArg, Extension};
 
-    use super::{extension, FALSE_NAME, TRUE_NAME};
+    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
@@ -134,5 +134,13 @@ mod test {
             let simpl = v.typed_value().const_type();
             assert_eq!(simpl, &BOOL_T);
         }
+    }
+
+    /// Generate a logic extension and operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn and_op() -> LeafOp {
+        EXTENSION
+            .instantiate_extension_op(AND_NAME, [TypeArg::USize(2)])
+            .unwrap()
+            .into()
     }
 }

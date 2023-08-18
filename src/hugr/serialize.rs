@@ -272,6 +272,7 @@ pub mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{AbstractSignature, Type},
@@ -430,12 +431,12 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<Type> = vec![NAT; 2];
+        let tp: Vec<Type> = vec![BOOL_T; 2];
         let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .add_dataflow_op(LeafOp::Noop { ty: BOOL_T }, [*p])
                 .unwrap()
                 .out_wire(0);
         }

@@ -48,8 +48,6 @@ pub enum LeafOp {
     },
     /// A qubit measurement operation.
     Measure,
-    /// A bitwise XOR operation.
-    Xor,
     /// An operation that packs all its inputs into a tuple.
     MakeTuple {
         ///Tuple element types.
@@ -100,7 +98,6 @@ impl OpName for LeafOp {
             LeafOp::Reset => "Reset",
             LeafOp::Noop { ty: _ } => "Noop",
             LeafOp::Measure => "Measure",
-            LeafOp::Xor => "Xor",
             LeafOp::MakeTuple { tys: _ } => "MakeTuple",
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
@@ -132,7 +129,6 @@ impl OpTrait for LeafOp {
             LeafOp::Reset => "Qubit reset",
             LeafOp::Noop { ty: _ } => "Noop gate",
             LeafOp::Measure => "Qubit measurement gate",
-            LeafOp::Xor => "Bitwise XOR",
             LeafOp::MakeTuple { tys: _ } => "MakeTuple operation",
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
@@ -166,9 +162,6 @@ impl OpTrait for LeafOp {
             LeafOp::CX | LeafOp::ZZMax => AbstractSignature::new_linear(type_row![QB_T, QB_T]),
             LeafOp::Measure => {
                 AbstractSignature::new_df(type_row![QB_T], type_row![QB_T, BIT_TYPE])
-            }
-            LeafOp::Xor => {
-                AbstractSignature::new_df(type_row![BIT_TYPE, BIT_TYPE], type_row![BIT_TYPE])
             }
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {

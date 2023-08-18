@@ -218,9 +218,11 @@ mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
+    use crate::extension::prelude::BOOL_T;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
+    use crate::std_extensions::logic::test::and_op;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -274,7 +276,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![BIT], type_row![BIT, BIT]).pure(),
+                AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).pure(),
             )?;
 
             f(f_build)?;
@@ -298,7 +300,7 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
+                let xor = f_build.add_dataflow_op(and_op(), [b1, b1])?;
                 f_build.finish_with_outputs([xor.out_wire(0), b1])
             },
             "Copy input and use with binary function",
@@ -307,8 +309,8 @@ mod test {
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
-                let xor1 = f_build.add_dataflow_op(LeafOp::Xor, [b1, b1])?;
-                let xor2 = f_build.add_dataflow_op(LeafOp::Xor, [b1, xor1.out_wire(0)])?;
+                let xor1 = f_build.add_dataflow_op(and_op(), [b1, b1])?;
+                let xor2 = f_build.add_dataflow_op(and_op(), [b1, xor1.out_wire(0)])?;
                 f_build.finish_with_outputs([xor2.out_wire(0), b1])
             },
             "Copy multiple times",

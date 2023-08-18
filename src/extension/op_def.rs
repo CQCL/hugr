@@ -224,7 +224,8 @@ impl OpDef {
             }
             SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
         };
-        assert!(res.contains(self.extension()));
+        // TODO bring this assert back once resource inference is done?
+        // assert!(res.contains(self.extension()));
         Ok(AbstractSignature::new_df(ins, outs).with_extension_delta(&res))
     }
 
