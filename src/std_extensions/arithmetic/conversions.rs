@@ -19,7 +19,7 @@ use super::float_types::FLOAT64_TYPE;
 use super::int_types::{get_width, int_type};
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
@@ -48,10 +48,10 @@ fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 /// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
-        RESOURCE_ID,
+        EXTENSION_ID,
         ExtensionSet::new_from_extensions(HashSet::from_iter(vec![
-            super::int_types::RESOURCE_ID,
-            super::float_types::RESOURCE_ID,
+            super::int_types::EXTENSION_ID,
+            super::float_types::EXTENSION_ID,
         ])),
     );
 

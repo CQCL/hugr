@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
 fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
@@ -138,8 +138,8 @@ fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), S
 /// Extension for basic integer operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
-        RESOURCE_ID,
-        ExtensionSet::singleton(&super::int_types::RESOURCE_ID),
+        EXTENSION_ID,
+        ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
     );
 
     extension

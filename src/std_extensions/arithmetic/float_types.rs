@@ -9,13 +9,13 @@ use crate::{
 };
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
 
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 const FLOAT64_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(FLOAT_TYPE_ID, RESOURCE_ID, TypeBound::Copyable);
+    CustomType::new_simple(FLOAT_TYPE_ID, EXTENSION_ID, TypeBound::Copyable);
 
 /// 64-bit IEEE 754-2019 floating-point type
 pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
@@ -52,7 +52,7 @@ impl CustomConst for ConstF64 {
 
 /// Extension for basic floating-point types.
 pub fn extension() -> Extension {
-    let mut extension = Extension::new(RESOURCE_ID);
+    let mut extension = Extension::new(EXTENSION_ID);
 
     extension
         .add_type(

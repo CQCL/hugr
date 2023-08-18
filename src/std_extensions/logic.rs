@@ -19,7 +19,7 @@ pub const FALSE_NAME: &str = "FALSE";
 pub const TRUE_NAME: &str = "TRUE";
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Construct a boolean type.
 pub fn bool_type() -> Type {
@@ -29,7 +29,7 @@ pub fn bool_type() -> Type {
 /// Extension for basic logical operations.
 pub fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
-    let mut extension = Extension::new(RESOURCE_ID);
+    let mut extension = Extension::new(EXTENSION_ID);
 
     extension
         .add_op_custom_sig_simple(

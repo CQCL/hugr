@@ -19,22 +19,22 @@ use crate::{ops, Extension};
 pub const PI_NAME: &str = "PI";
 pub const ANGLE_T_NAME: &str = "angle";
 pub const QUAT_T_NAME: &str = "quat";
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("rotations");
 
 pub const ANGLE_T: Type = Type::new_extension(CustomType::new_simple(
     SmolStr::new_inline(ANGLE_T_NAME),
-    RESOURCE_ID,
+    EXTENSION_ID,
     TypeBound::Copyable,
 ));
 
 pub const QUAT_T: Type = Type::new_extension(CustomType::new_simple(
     SmolStr::new_inline(QUAT_T_NAME),
-    RESOURCE_ID,
+    EXTENSION_ID,
     TypeBound::Copyable,
 ));
 /// The extension with all the operations and types defined in this extension.
 pub fn extension() -> Extension {
-    let mut extension = Extension::new(RESOURCE_ID);
+    let mut extension = Extension::new(EXTENSION_ID);
 
     RotationType::Angle.add_to_extension(&mut extension);
     RotationType::Quaternion.add_to_extension(&mut extension);
@@ -83,7 +83,7 @@ impl RotationType {
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, TypeBound::Copyable)
+        CustomType::new(self.name(), [], EXTENSION_ID, TypeBound::Copyable)
     }
 
     fn add_to_extension(self, extension: &mut Extension) {

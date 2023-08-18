@@ -13,7 +13,7 @@ use super::super::logic::bool_type;
 use super::float_types::FLOAT64_TYPE;
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 
 fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
@@ -42,8 +42,8 @@ fn funop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet)
 /// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
-        RESOURCE_ID,
-        ExtensionSet::singleton(&super::float_types::RESOURCE_ID),
+        EXTENSION_ID,
+        ExtensionSet::singleton(&super::float_types::EXTENSION_ID),
     );
 
     extension

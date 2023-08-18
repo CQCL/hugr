@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// The extension identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
 /// Identfier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
@@ -22,7 +22,7 @@ fn int_custom_type(n: u8) -> CustomType {
     CustomType::new(
         INT_TYPE_ID,
         [TypeArg::USize(n as u64)],
-        RESOURCE_ID,
+        EXTENSION_ID,
         TypeBound::Copyable,
     )
 }
@@ -155,7 +155,7 @@ impl CustomConst for ConstIntS {
 
 /// Extension for basic integer types.
 pub fn extension() -> Extension {
-    let mut extension = Extension::new(RESOURCE_ID);
+    let mut extension = Extension::new(EXTENSION_ID);
 
     extension
         .add_type(
