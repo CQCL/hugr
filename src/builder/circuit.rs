@@ -140,6 +140,7 @@ mod test {
             Dataflow, DataflowSubContainer, Wire,
         },
         ops::{custom::OpaqueOp, LeafOp},
+        std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
         types::AbstractSignature,
     };
@@ -159,9 +160,9 @@ mod test {
                 assert_eq!(linear.n_wires(), 2);
 
                 linear
-                    .append(LeafOp::H, [0])?
-                    .append(LeafOp::CX, [0, 1])?
-                    .append(LeafOp::CX, [1, 0])?;
+                    .append(h_gate(), [0])?
+                    .append(cx_gate(), [0, 1])?
+                    .append(cx_gate(), [1, 0])?;
 
                 let outs = linear.finish();
                 f_build.finish_with_outputs(outs)
@@ -191,12 +192,12 @@ mod test {
                 let mut linear = f_build.as_circuit(vec![q0, q1]);
 
                 let measure_out = linear
-                    .append(LeafOp::CX, [0, 1])?
+                    .append(cx_gate(), [0, 1])?
                     .append_and_consume(
                         my_custom_op,
                         [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
                     )?
-                    .append_with_outputs(LeafOp::Measure, [0])?;
+                    .append_with_outputs(measure(), [0])?;
 
                 let out_qbs = linear.finish();
                 f_build.finish_with_outputs(out_qbs.into_iter().chain(measure_out))

@@ -213,9 +213,10 @@ mod test {
     use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
-    use crate::ops::{LeafOp, OpTrait, OpType};
+    use crate::ops::{OpTrait, OpType};
+    use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::quantum::test::{cx_gate, h_gate};
     use crate::types::{AbstractSignature, Type};
-    use crate::utils::test::and_op;
     use crate::{type_row, Port};
 
     use super::SimpleReplacement;
@@ -241,7 +242,7 @@ mod test {
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb2])?;
+            let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb2])?;
 
             let mut inner_builder = func_builder.dfg_builder(
                 AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]),
@@ -250,13 +251,13 @@ mod test {
             )?;
             let inner_graph = {
                 let [wire0, wire1] = inner_builder.input_wires_arr();
-                let wire2 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire0])?;
-                let wire3 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
+                let wire2 = inner_builder.add_dataflow_op(h_gate(), vec![wire0])?;
+                let wire3 = inner_builder.add_dataflow_op(h_gate(), vec![wire1])?;
                 let wire45 = inner_builder
-                    .add_dataflow_op(LeafOp::CX, wire2.outputs().chain(wire3.outputs()))?;
+                    .add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
                 let [wire4, wire5] = wire45.outputs_arr();
-                let wire6 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire4])?;
-                let wire7 = inner_builder.add_dataflow_op(LeafOp::H, vec![wire5])?;
+                let wire6 = inner_builder.add_dataflow_op(h_gate(), vec![wire4])?;
+                let wire7 = inner_builder.add_dataflow_op(h_gate(), vec![wire5])?;
                 inner_builder.finish_with_outputs(wire6.outputs().chain(wire7.outputs()))
             }?;
 
@@ -277,10 +278,10 @@ mod test {
             type_row![QB, QB],
         ))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
-        let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire0])?;
-        let wire3 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
+        let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
+        let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
-            dfg_builder.add_dataflow_op(LeafOp::CX, wire2.outputs().chain(wire3.outputs()))?;
+            dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
         dfg_builder.finish_hugr_with_outputs(wire45.outputs())
     }
 
@@ -295,7 +296,7 @@ mod test {
             type_row![QB, QB],
         ))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
-        let wire2 = dfg_builder.add_dataflow_op(LeafOp::H, vec![wire1])?;
+        let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
         dfg_builder.finish_hugr_with_outputs(wireoutvec)
@@ -330,7 +331,7 @@ mod test {
         // 2. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
             .nodes()
-            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
         let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
@@ -340,7 +341,7 @@ mod test {
         // 4.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
             .nodes()
-            .find(|node: &Node| *n.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *n.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 4.2. Locate the ports we need to specify as "glue" in n
@@ -416,7 +417,7 @@ mod test {
         // 2. Locate the CX in h
         let h_node_cx: Node = h
             .nodes()
-            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(LeafOp::CX))
+            .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
         let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
@@ -470,8 +471,8 @@ mod test {
         let q_row: Vec<Type> = vec![QB, QB];
         let mut builder = DFGBuilder::new(AbstractSignature::new_df(q_row.clone(), q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
-        circ.append(LeafOp::CX, [0, 1]).unwrap();
-        circ.append(LeafOp::CX, [1, 0]).unwrap();
+        circ.append(cx_gate(), [0, 1]).unwrap();
+        circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
         let mut h = builder.finish_hugr_with_outputs(wires).unwrap();

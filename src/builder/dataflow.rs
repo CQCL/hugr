@@ -223,6 +223,7 @@ mod test {
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::quantum::test::h_gate;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -246,7 +247,7 @@ mod test {
 
                 let [int, qb] = func_builder.input_wires_arr();
 
-                let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+                let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
                 let inner_builder = func_builder.dfg_builder(
                     AbstractSignature::new_df(type_row![NAT], type_row![NAT]),

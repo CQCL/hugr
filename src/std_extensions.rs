@@ -5,4 +5,5 @@
 pub mod arithmetic;
 pub mod collections;
 pub mod logic;
+pub mod quantum;
 pub mod rotation;
