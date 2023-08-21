@@ -157,9 +157,8 @@ the node). Incoming ports are associated with exactly one edge. All edges associ
 with a port have the same type; thus a port has a well-defined type, matching that
 of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
 
-The sequences of incoming and outgoing port types of a node constitute its
-_signature_. This signature may include the types of both `Value` and `Static`
-edges, with `Static` edges following `Value` edges in the ordering.
+The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
+_signature_.
 
 Note that the locality is not fixed or even specified by the signature.
 
