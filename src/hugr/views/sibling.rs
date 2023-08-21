@@ -337,7 +337,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
 
         let rep_root = replacement.root();
         let dfg_optype = replacement.get_optype(rep_root);
-        if dfg_optype.tag() != OpTag::Dfg {
+        if !OpTag::Dfg.is_superset(dfg_optype.tag())  {
             return Err(InvalidReplacement::InvalidDataflowGraph);
         }
         let Some((rep_input, rep_output)) = replacement
