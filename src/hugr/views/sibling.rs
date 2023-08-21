@@ -123,7 +123,6 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///
     /// This function fails if the subgraph if it is not convex, if the nodes
     /// do not share a common parent or if the subgraph is empty.
-    /// TODO: fail if not well-formed.
     ///
     /// The order of the boundary edges is used to determine the order of the
     /// signature.
