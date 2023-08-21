@@ -33,7 +33,7 @@ pub enum EdgeKind {
     /// Data edges of a DDG region, also known as "wires".
     Value(Type),
     /// A reference to a static value definition.
-    Static(Type),
+    Static,
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }

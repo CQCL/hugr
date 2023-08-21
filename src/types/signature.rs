@@ -119,11 +119,9 @@ impl AbstractSignature {
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
     pub fn get(&self, port: Port) -> Option<EdgeKind> {
         if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            Some(EdgeKind::Static(
-                self.static_input
-                    .get(port.index() - self.input.len())?
-                    .clone(),
-            ))
+            self.static_input
+                .get(port.index() - self.input.len())
+                .map(|_| EdgeKind::Static)
         } else {
             self.get_df(port).cloned().map(EdgeKind::Value)
         }
