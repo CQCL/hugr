@@ -296,11 +296,8 @@ impl UnificationContext {
                         node_type.op_signature().resource_reqs,
                     );
                 }
-                // We're in the money!
+                // We have a solution for everything!
                 Some(sig) => {
-                    println!("node {:?}", node);
-                    println!("in   {:?}", sig.input_resources);
-                    println!("out  {:?}", sig.output_resources());
                     self.add_solution(m_input, sig.input_resources.clone());
                     self.add_solution(m_output, sig.output_resources());
                 }
