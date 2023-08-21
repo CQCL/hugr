@@ -473,7 +473,8 @@ where
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{handle::NodeHandle, LeafOp},
+        ops::handle::NodeHandle,
+        std_extensions::quantum::test::h_gate,
         type_row,
         types::{AbstractSignature, Type},
     };
@@ -497,7 +498,7 @@ mod test {
 
             let [int, qb] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+            let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(

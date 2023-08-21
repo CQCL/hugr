@@ -9,23 +9,30 @@ use crate::{
     types::type_param::{TypeArg, TypeArgError, TypeParam},
     Extension,
 };
+use lazy_static::lazy_static;
 
 /// Name of extension false value.
 pub const FALSE_NAME: &str = "FALSE";
 /// Name of extension true value.
 pub const TRUE_NAME: &str = "TRUE";
 
+/// Name of the "not" operation.
+pub const NOT_NAME: &str = "Not";
+/// Name of the "and" operation.
+pub const AND_NAME: &str = "And";
+/// Name of the "or" operation.
+pub const OR_NAME: &str = "Or";
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Extension for basic logical operations.
-pub fn extension() -> Extension {
+fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
         .add_op_custom_sig_simple(
-            "Not".into(),
+            SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
@@ -40,7 +47,7 @@ pub fn extension() -> Extension {
 
     extension
         .add_op_custom_sig_simple(
-            "And".into(),
+            SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -66,7 +73,7 @@ pub fn extension() -> Extension {
 
     extension
         .add_op_custom_sig_simple(
-            "Or".into(),
+            SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -99,11 +106,16 @@ pub fn extension() -> Extension {
     extension
 }
 
-#[cfg(test)]
-mod test {
-    use crate::{extension::prelude::BOOL_T, Extension};
+lazy_static! {
+    /// Reference to the logic Extension.
+    pub static ref EXTENSION: Extension = extension();
+}
 
-    use super::{extension, FALSE_NAME, TRUE_NAME};
+#[cfg(test)]
+pub(crate) mod test {
+    use crate::{extension::prelude::BOOL_T, ops::LeafOp, types::type_param::TypeArg, Extension};
+
+    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
@@ -122,5 +134,13 @@ mod test {
             let simpl = v.typed_value().const_type();
             assert_eq!(simpl, &BOOL_T);
         }
+    }
+
+    /// Generate a logic extension and operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn and_op() -> LeafOp {
+        EXTENSION
+            .instantiate_extension_op(AND_NAME, [TypeArg::USize(2)])
+            .unwrap()
+            .into()
     }
 }

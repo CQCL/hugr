@@ -672,17 +672,18 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::ConstUsize;
+    use crate::extension::prelude::BOOL_T;
     use crate::extension::ExtensionSet;
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
+    use crate::std_extensions::logic;
+    use crate::std_extensions::logic::test::and_op;
     use crate::types::{AbstractSignature, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
-    const B: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -691,7 +692,7 @@ mod test {
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
         let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
-            signature: AbstractSignature::new_df(type_row![B], vec![B; copies]),
+            signature: AbstractSignature::new_df(type_row![BOOL_T], vec![BOOL_T; copies]),
         }
         .into();
 
@@ -704,18 +705,18 @@ mod test {
         (b, def)
     }
 
-    /// Adds an input{B}, copy{B -> B^copies}, and output{B^copies} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, copy{BOOL_T -> BOOL_T^copies}, and output{BOOL_T^copies} operation to a dataflow container.
     ///
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
+            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
+            .add_op_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop { ty: NAT })
+            .add_op_with_parent(parent, LeafOp::Noop { ty: BOOL_T })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -726,8 +727,8 @@ mod test {
         (input, copy, output)
     }
 
-    /// Adds an input{B}, tag_constant(0, B^pred_size), tag(B^pred_size), and
-    /// output{Sum{unit^pred_size}, B} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^pred_size), tag(BOOL_T^pred_size), and
+    /// output{Sum{unit^pred_size}, BOOL_T} operation to a dataflow container.
     /// Intended to be used to populate a BasicBlock node in a CFG.
     ///
     /// Returns the node indices of each of the operations.
@@ -740,10 +741,10 @@ mod test {
         let tag_type = Type::new_simple_predicate(predicate_size as u8);
 
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
+            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B]))
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
@@ -806,7 +807,7 @@ mod test {
     #[test]
     fn dfg_root() {
         let dfg_op: OpType = ops::DFG {
-            signature: AbstractSignature::new_linear(type_row![B]),
+            signature: AbstractSignature::new_linear(type_row![BOOL_T]),
         }
         .into();
 
@@ -835,7 +836,7 @@ mod test {
             .unwrap();
 
         // Add a definition without children
-        let def_sig = AbstractSignature::new_df(type_row![B], type_row![B, B]);
+        let def_sig = AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
         let new_def = b
             .add_op_with_parent(
                 root,
@@ -889,16 +890,22 @@ mod test {
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![B])));
+        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])));
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![B, B])));
+        b.replace_op(
+            output,
+            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+        );
 
         // After fixing the output back, replace the copy with an output op
-        b.replace_op(copy, NodeType::pure(ops::Output::new(type_row![B, B])));
+        b.replace_op(
+            copy,
+            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+        );
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -920,8 +927,8 @@ mod test {
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
-                inputs: type_row![B],
-                outputs: type_row![B],
+                inputs: type_row![BOOL_T],
+                outputs: type_row![BOOL_T],
             }),
         );
         assert_matches!(
@@ -935,9 +942,9 @@ mod test {
             .add_op_with_parent(
                 cfg,
                 ops::BasicBlock::DFB {
-                    inputs: type_row![B],
+                    inputs: type_row![BOOL_T],
                     predicate_variants: vec![type_row![]],
-                    other_outputs: type_row![B],
+                    other_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -946,7 +953,7 @@ mod test {
             .add_op_with_parent(
                 cfg,
                 ops::BasicBlock::Exit {
-                    cfg_outputs: type_row![B],
+                    cfg_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -960,7 +967,7 @@ mod test {
             .add_op_after(
                 exit,
                 ops::BasicBlock::Exit {
-                    cfg_outputs: type_row![B],
+                    cfg_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -1001,22 +1008,22 @@ mod test {
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
-        // Nested DFG B -> B
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        // Nested DFG BOOL_T -> BOOL_T
         let sub_dfg = h.add_op_with_parent(
             h.root(),
             ops::DFG {
-                signature: AbstractSignature::new_linear(type_row![B]),
+                signature: AbstractSignature::new_linear(type_row![BOOL_T]),
             },
         )?;
         // this Xor has its 2nd input unconnected
         let sub_op = {
-            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![B]))?;
-            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![B]))?;
-            let sub_op = h.add_op_with_parent(sub_dfg, LeafOp::Xor)?;
+            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]))?;
+            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]))?;
+            let sub_op = h.add_op_with_parent(sub_dfg, and_op())?;
             h.connect(sub_input, 0, sub_op, 0)?;
             h.connect(sub_op, 0, sub_output, 0)?;
             sub_op
@@ -1043,27 +1050,31 @@ mod test {
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B], type_row![B]),
+            signature: AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
-        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
-        h.connect(input, 0, xor, 0)?;
-        h.connect(xor, 0, output, 0)?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, output, 0)?;
         assert_eq!(
             h.validate(),
             Err(ValidationError::UnconnectedPort {
-                node: xor,
+                node: and,
                 port: Port::new_incoming(1),
-                port_kind: EdgeKind::Value(B)
+                port_kind: EdgeKind::Value(BOOL_T)
             })
         );
-        let const_op: ops::Const = ConstUsize::new(1).into();
+        let const_op: ops::Const = logic::EXTENSION
+            .get_value(logic::TRUE_NAME)
+            .unwrap()
+            .typed_value()
+            .clone();
         // Second input of Xor from a constant
         let cst = h.add_op_with_parent(h.root(), const_op)?;
-        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
+        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
-        h.connect(lcst, 0, xor, 1)?;
+        h.connect(lcst, 0, and, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:
         assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
         // Now include the LoadConstant node in the causal cone
@@ -1074,7 +1085,7 @@ mod test {
 
     #[test]
     /// A wire with no resource requirements is wired into a node which has
-    /// [A,B] resources required on its inputs and outputs. This could be fixed
+    /// [A,BOOL_T] resources required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
@@ -1086,7 +1097,7 @@ mod test {
 
         let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
             // Inner DFG has resource requirements that the wire wont satisfy
-            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "B".into()]));
+            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
@@ -1146,13 +1157,13 @@ mod test {
 
     #[test]
     /// A wire with resource requirements `[A]` and another with requirements
-    /// `[B]` are both wired into a node which requires its inputs to have
-    /// requirements `[A,B]`. A slightly more complex test of the error from
+    /// `[BOOL_T]` are both wired into a node which requires its inputs to have
+    /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
     /// `missing_lift_node`.
     fn extensions_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let all_rs = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let all_rs = ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]);
 
         let main_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
             .with_extension_delta(&all_rs)
@@ -1164,7 +1175,7 @@ mod test {
             .with_input_extensions(ExtensionSet::singleton(&"A".into()));
 
         let inner_right_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_input_extensions(ExtensionSet::singleton(&"B".into()));
+            .with_input_extensions(ExtensionSet::singleton(&"BOOL_T".into()));
 
         let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
             .with_input_extensions(all_rs);

@@ -104,11 +104,12 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
-    pub fn new(def: Arc<OpDef>, args: &[TypeArg]) -> Result<Self, SignatureError> {
-        let signature = def.compute_signature(args)?;
+    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
+        let args = args.into();
+        let signature = def.compute_signature(&args)?;
         Ok(Self {
             def,
-            args: args.to_vec(),
+            args,
             signature,
         })
     }
@@ -138,6 +139,12 @@ impl From<ExtensionOp> for OpaqueOp {
             args,
             signature: opt_sig,
         }
+    }
+}
+
+impl From<ExtensionOp> for LeafOp {
+    fn from(value: ExtensionOp) -> Self {
+        LeafOp::CustomOp(Box::new(ExternalOp::Extension(value)))
     }
 }
 
@@ -215,8 +222,9 @@ pub fn resolve_extension_ops(
                     return Err(CustomOpError::OpNotFoundInExtension(opaque.op_name.to_string(), r.name().to_string()));
                 };
                     // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
-                    let op =
-                        ExternalOp::Extension(ExtensionOp::new(def.clone(), &opaque.args).unwrap());
+                    let op = ExternalOp::Extension(
+                        ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
+                    );
                     if let Some(sig) = &opaque.signature {
                         if sig != &op.signature() {
                             return Err(CustomOpError::SignatureMismatch(
