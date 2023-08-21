@@ -680,20 +680,8 @@ mod test {
             signature: main_sig,
         };
 
-        println!("{:?}", op.clone().tag());
-
-        let root_node = NodeType::pure(op);
-
-        // TODO: This harder case:
-        //let root_node = NodeType::open_resources(ops::DFG { signature: main_sig });
+        let root_node = NodeType::open_resources(op);
         let mut hugr = Hugr::new(root_node);
-
-        /*
-                let f_node = hugr.add_child_op(root_node
-                    name: name.into(),
-                    signature: signature.clone().into(),
-                })?;
-        */
 
         let input = NodeType::open_resources(ops::Input::new(type_row![BIT, BIT]));
         let output = NodeType::open_resources(ops::Output::new(type_row![BIT]));
