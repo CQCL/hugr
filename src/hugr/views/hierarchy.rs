@@ -465,11 +465,11 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph<'p> = FlatRegionGraph<'p> where Self: 'p;
+    type Portgraph = FlatRegionGraph<'g>;
 
     #[inline]
-    fn portgraph(&self) -> Self::Portgraph<'_> {
-        Self::init_graph(self.hugr, self.root)
+    fn portgraph(&self) -> &Self::Portgraph {
+        &self.graph
     }
 
     #[inline]
@@ -488,11 +488,11 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph<'p> = RegionGraph<'p> where Self: 'p;
+    type Portgraph = RegionGraph<'g>;
 
     #[inline]
-    fn portgraph(&self) -> Self::Portgraph<'_> {
-        Self::init_graph(self.hugr, self.root)
+    fn portgraph(&self) -> &Self::Portgraph {
+        &self.graph
     }
 
     #[inline]

@@ -354,12 +354,10 @@ pub(crate) mod sealed {
     /// view.
     pub trait HugrInternals {
         /// The underlying portgraph view type.
-        type Portgraph<'p>: LinkView + 'p
-        where
-            Self: 'p;
+        type Portgraph: LinkView;
 
         /// Returns a reference to the underlying portgraph.
-        fn portgraph(&self) -> Self::Portgraph<'_>;
+        fn portgraph(&self) -> &Self::Portgraph;
 
         /// Returns the Hugr at the base of a chain of views.
         fn base_hugr(&self) -> &Hugr;
@@ -372,10 +370,10 @@ pub(crate) mod sealed {
     where
         T: AsRef<super::Hugr>,
     {
-        type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
+        type Portgraph = MultiPortGraph;
 
         #[inline]
-        fn portgraph(&self) -> Self::Portgraph<'_> {
+        fn portgraph(&self) -> &Self::Portgraph {
             &self.as_ref().graph
         }
 
