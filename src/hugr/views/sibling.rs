@@ -111,7 +111,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// target ports, then all edges from the same source port are outgoing
     /// boundary edges.
     ///
-    /// More fomally, the sibling subgraph defined by $B_I$ and $B_O$ is the
+    /// More formally, the sibling subgraph defined by $B_I$ and $B_O$ is the
     /// graph given by the connected components of the graph with edges
     /// $E\B_I\B_O$ which contain at least one node that is either
     ///  - the target of an incoming boundary edge, or
