@@ -7,8 +7,8 @@ use pyo3::prelude::*;
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-use crate::types::SimpleType;
-use crate::values::ConstTypeError;
+use crate::types::ConstTypeError;
+use crate::types::Type;
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -42,9 +42,9 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
-    /// Tried to add a malformed [ConstValue]
+    /// Tried to add a malformed [Const]
     ///
-    /// [ConstValue]: crate::ops::constant::ConstValue
+    /// [Const]: crate::ops::constant::Const
     #[error("Constant failed typechecking: {0}")]
     BadConstant(#[from] ConstTypeError),
     /// HUGR construction error.
@@ -71,7 +71,7 @@ pub enum BuildError {
 
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
-    NoCopyLinear(SimpleType),
+    NoCopyLinear(Type),
 
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
@@ -87,17 +87,22 @@ impl From<BuildError> for PyErr {
 }
 
 #[cfg(test)]
-mod test {
-    use crate::types::{ClassicType, Signature, SimpleType};
-    use crate::Hugr;
+pub(crate) mod test {
+    use rstest::fixture;
+
+    use crate::types::{FunctionType, Signature, Type};
+    use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
-    use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID, FunctionBuilder,
+        ModuleBuilder,
+    };
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::usize());
-    pub(super) const QB: SimpleType = SimpleType::Qubit;
+    pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const BIT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
     pub(super) fn n_identity<T: DataflowSubContainer>(
@@ -116,5 +121,13 @@ mod test {
 
         f(f_builder)?;
         Ok(module_builder.finish_hugr()?)
+    }
+
+    #[fixture]
+    pub(crate) fn simple_dfg_hugr() -> Hugr {
+        let dfg_builder =
+            DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
+        let [i1] = dfg_builder.input_wires_arr();
+        dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
     }
 }

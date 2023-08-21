@@ -70,7 +70,7 @@ where
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView + Clone,
+    Base: HugrInternals + HugrView,
 {
     fn clone(&self) -> Self {
         SiblingGraph::new(self.hugr, self.root)
@@ -209,6 +209,10 @@ where
         } else {
             None
         }
+    }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
     }
 }
 
@@ -385,6 +389,10 @@ where
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         self.base_hugr().get_io(node)
     }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
+    }
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
@@ -411,7 +419,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -433,7 +441,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -452,7 +460,7 @@ where
     }
 }
 
-impl<'g, Root, Base> super::sealed::HugrInternals for SiblingGraph<'g, Root, Base>
+impl<'g, Root, Base> HugrInternals for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
     Base: HugrInternals,
@@ -502,15 +510,16 @@ where
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{handle::NodeHandle, LeafOp},
+        ops::handle::NodeHandle,
+        std_extensions::quantum::test::h_gate,
         type_row,
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{FunctionType, Type},
     };
 
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Qubit;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
@@ -521,16 +530,16 @@ mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT, QB], type_row![NAT, QB]).pure(),
+                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).pure(),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+            let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(
-                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]),
+                    FunctionType::new(type_row![NAT], type_row![NAT]),
                     None,
                     [int],
                 )?;

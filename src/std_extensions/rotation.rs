@@ -10,125 +10,141 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::ops::constant::CustomConst;
-use crate::resource::ResourceSet;
+use crate::extension::ExtensionSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomType, SimpleRow, TypeTag};
-use crate::values::CustomCheckFail;
-use crate::Resource;
+use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeRow};
+use crate::values::CustomConst;
+use crate::{ops, Extension};
 
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("rotations");
+pub const PI_NAME: &str = "PI";
+pub const ANGLE_T_NAME: &str = "angle";
+pub const QUAT_T_NAME: &str = "quat";
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("rotations");
 
-/// The resource with all the operations and types defined in this extension.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new(RESOURCE_ID);
+pub const ANGLE_T: Type = Type::new_extension(CustomType::new_simple(
+    SmolStr::new_inline(ANGLE_T_NAME),
+    EXTENSION_ID,
+    TypeBound::Copyable,
+));
 
-    Type::Angle.add_to_resource(&mut resource);
-    Type::Quaternion.add_to_resource(&mut resource);
+pub const QUAT_T: Type = Type::new_extension(CustomType::new_simple(
+    SmolStr::new_inline(QUAT_T_NAME),
+    EXTENSION_ID,
+    TypeBound::Copyable,
+));
+/// The extension with all the operations and types defined in this extension.
+pub fn extension() -> Extension {
+    let mut extension = Extension::new(EXTENSION_ID);
 
-    resource
+    RotationType::Angle.add_to_extension(&mut extension);
+    RotationType::Quaternion.add_to_extension(&mut extension);
+
+    extension
         .add_op_custom_sig_simple(
             "AngleAdd".into(),
             "".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                let t: SimpleRow = vec![Type::Angle.custom_type().into()].into();
-                Ok((t.clone(), t, ResourceSet::default()))
+                let t: TypeRow =
+                    vec![Type::new_extension(RotationType::Angle.custom_type())].into();
+                Ok((t.clone(), t, ExtensionSet::default()))
             },
         )
         .unwrap();
 
-    resource
+    let pi_val = RotationValue::PI;
+
+    extension
+        .add_value(PI_NAME, ops::Const::new(pi_val.into(), ANGLE_T).unwrap())
+        .unwrap();
+    extension
 }
 
 /// Custom types defined by this extension.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Type {
+pub enum RotationType {
     Angle,
     Quaternion,
 }
 
-impl Type {
+impl RotationType {
     pub const fn name(&self) -> SmolStr {
         match self {
-            Type::Angle => SmolStr::new_inline("angle"),
-            Type::Quaternion => SmolStr::new_inline("quat"),
+            RotationType::Angle => SmolStr::new_inline(ANGLE_T_NAME),
+            RotationType::Quaternion => SmolStr::new_inline(QUAT_T_NAME),
         }
     }
 
     pub const fn description(&self) -> &str {
         match self {
-            Type::Angle => "Floating point angle",
-            Type::Quaternion => "Quaternion specifying rotation.",
+            RotationType::Angle => "Floating point angle",
+            RotationType::Quaternion => "Quaternion specifying rotation.",
         }
     }
 
     pub fn custom_type(self) -> CustomType {
-        CustomType::new(self.name(), [], RESOURCE_ID, TypeTag::Classic)
+        CustomType::new(self.name(), [], EXTENSION_ID, TypeBound::Copyable)
     }
 
-    fn add_to_resource(self, resource: &mut Resource) {
-        resource
+    fn add_to_extension(self, extension: &mut Extension) {
+        extension
             .add_type(
                 self.name(),
                 vec![],
                 self.description().to_string(),
-                TypeTag::Classic.into(),
+                TypeBound::Copyable.into(),
             )
             .unwrap();
     }
 }
 
-impl From<Type> for CustomType {
-    fn from(ty: Type) -> Self {
+impl From<RotationType> for CustomType {
+    fn from(ty: RotationType) -> Self {
         ty.custom_type()
     }
 }
 
-/// Constant values for [`Type`].
+/// Constant values for [`RotationType`].
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Constant {
+pub enum RotationValue {
     Angle(AngleValue),
     Quaternion(cgmath::Quaternion<f64>),
 }
 
-impl Constant {
-    fn rotation_type(&self) -> Type {
+impl RotationValue {
+    const PI: Self = Self::Angle(AngleValue::PI);
+    fn rotation_type(&self) -> RotationType {
         match self {
-            Constant::Angle(_) => Type::Angle,
-            Constant::Quaternion(_) => Type::Quaternion,
+            RotationValue::Angle(_) => RotationType::Angle,
+            RotationValue::Quaternion(_) => RotationType::Quaternion,
         }
     }
 }
 
 #[typetag::serde]
-impl CustomConst for Constant {
+impl CustomConst for RotationValue {
     fn name(&self) -> SmolStr {
         match self {
-            Constant::Angle(val) => format!("AngleConstant({})", val.radians()),
-            Constant::Quaternion(val) => format!("QuatConstant({:?})", val),
+            RotationValue::Angle(val) => format!("AngleConstant({})", val.radians()),
+            RotationValue::Quaternion(val) => format!("QuatConstant({:?})", val),
         }
         .into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFail> {
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         let self_typ = self.rotation_type();
 
         if &self_typ.custom_type() == typ {
             Ok(())
         } else {
-            Err(CustomCheckFail::Message(
+            Err(CustomCheckFailure::Message(
                 "Rotation constant type mismatch.".into(),
             ))
         }
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Constant>() {
-            self == other
-        } else {
-            false
-        }
+        crate::values::downcast_equal_consts(self, other)
     }
 }
 
@@ -151,15 +167,15 @@ impl CustomConst for Constant {
 //
 // signatures:
 //
-//             LeafOp::AngleAdd | LeafOp::AngleMul => AbstractSignature::new_linear([Type::Angle]),
-//             LeafOp::QuatMul => AbstractSignature::new_linear([Type::Quat64]),
-//             LeafOp::AngleNeg => AbstractSignature::new_linear([Type::Angle]),
+//             LeafOp::AngleAdd | LeafOp::AngleMul => FunctionType::new_linear([Type::Angle]),
+//             LeafOp::QuatMul => FunctionType::new_linear([Type::Quat64]),
+//             LeafOp::AngleNeg => FunctionType::new_linear([Type::Angle]),
 //             LeafOp::RxF64 | LeafOp::RzF64 => {
-//                 AbstractSignature::new_df([Type::Qubit], [Type::Angle])
+//                 FunctionType::new_df([Type::Qubit], [Type::Angle])
 //             }
-//             LeafOp::TK1 => AbstractSignature::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
-//             LeafOp::Rotation => AbstractSignature::new_df([Type::Qubit], [Type::Quat64]),
-//             LeafOp::ToRotation => AbstractSignature::new_df(
+//             LeafOp::TK1 => FunctionType::new_df(vec![Type::Qubit], vec![Type::Angle; 3]),
+//             LeafOp::Rotation => FunctionType::new_df([Type::Qubit], [Type::Quat64]),
+//             LeafOp::ToRotation => FunctionType::new_df(
 //                 [
 //                     Type::Angle,
 //                     Type::F64,
@@ -188,6 +204,7 @@ pub enum AngleValue {
 }
 
 impl AngleValue {
+    const PI: Self = AngleValue::Rational(Rational(Rational64::new_raw(1, 1)));
     fn binary_op<F: FnOnce(f64, f64) -> f64, G: FnOnce(Rational64, Rational64) -> Rational64>(
         self,
         rhs: Self,
@@ -312,15 +329,24 @@ impl Neg for &AngleValue {
 #[cfg(test)]
 mod test {
 
-    use crate::{resource::SignatureError, types::TypeTag};
+    use rstest::{fixture, rstest};
 
-    use super::*;
+    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, PI_NAME};
+    use crate::{
+        extension::SignatureError,
+        types::{CustomType, Type, TypeBound},
+        values::CustomConst,
+        Extension,
+    };
 
-    #[test]
-    fn test_types() {
-        let resource = resource();
+    #[fixture]
+    fn extension() -> Extension {
+        super::extension()
+    }
 
-        let angle = resource.get_type("angle").unwrap();
+    #[rstest]
+    fn test_types(extension: Extension) {
+        let angle = extension.get_type(ANGLE_T_NAME).unwrap();
 
         let custom = angle.instantiate_concrete([]).unwrap();
 
@@ -329,39 +355,46 @@ mod test {
         let false_custom = CustomType::new(
             custom.name().clone(),
             vec![],
-            "wrong_resource",
-            TypeTag::Classic,
+            "wrong_extension",
+            TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),
-            Err(SignatureError::ResourceMismatch(
+            Err(SignatureError::ExtensionMismatch(
                 "rotations".into(),
-                "wrong_resource".into(),
+                "wrong_extension".into(),
             ))
         );
+
+        assert_eq!(Type::new_extension(custom), ANGLE_T);
     }
 
-    #[test]
-    fn test_type_check() {
-        let resource = resource();
-
-        let custom_type = resource
-            .get_type("angle")
+    #[rstest]
+    fn test_type_check(extension: Extension) {
+        let custom_type = extension
+            .get_type(ANGLE_T_NAME)
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
 
-        let custom_value = Constant::Angle(AngleValue::F64(0.0));
+        let custom_value = RotationValue::Angle(AngleValue::F64(0.0));
 
         // correct type
         custom_value.check_custom_type(&custom_type).unwrap();
 
-        let wrong_custom_type = resource
+        let wrong_custom_type = extension
             .get_type("quat")
             .unwrap()
             .instantiate_concrete([])
             .unwrap();
         let res = custom_value.check_custom_type(&wrong_custom_type);
         assert!(res.is_err());
+    }
+
+    #[rstest]
+    fn test_constant(extension: Extension) {
+        let pi_val = extension.get_value(PI_NAME).unwrap();
+
+        ANGLE_T.check_type(pi_val.typed_value().value()).unwrap();
     }
 }

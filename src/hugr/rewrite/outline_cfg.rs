@@ -91,8 +91,9 @@ impl Rewrite for OutlineCfg {
         let (entry, exit, outside) = self.compute_entry_exit_outside(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry)
-            else {panic!("Entry node is not a basic block")};
+        let OpType::BasicBlock(BasicBlock::DFB { inputs, .. }) = h.get_optype(entry) else {
+            panic!("Entry node is not a basic block")
+        };
         let inputs = inputs.clone();
         let outputs = match h.get_optype(outside) {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),

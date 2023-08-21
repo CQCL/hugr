@@ -1,9 +1,9 @@
 use std::collections::hash_map::Entry;
 
-use super::ResourceBuildError;
-use super::{Resource, ResourceId, SignatureError, TypeParametrised};
+use super::ExtensionBuildError;
+use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
 
-use crate::types::CustomType;
+use crate::types::{least_upper_bound, CustomType};
 
 use crate::types::type_param::TypeArg;
 
@@ -11,30 +11,30 @@ use crate::types::type_param::TypeParam;
 
 use smol_str::SmolStr;
 
-use crate::types::TypeTag;
+use crate::types::TypeBound;
 
-/// The type tag of a [`TypeDef`]
+/// The type bound of a [`TypeDef`]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum TypeDefTag {
-    /// Defined by an explicit tag.
-    Explicit(TypeTag),
-    /// Derived as the tag containing all marked type parameters.
+pub enum TypeDefBound {
+    /// Defined by an explicit bound.
+    Explicit(TypeBound),
+    /// Derived as the least upper bound of the marked parameters.
     FromParams(Vec<usize>),
 }
 
-impl From<TypeTag> for TypeDefTag {
-    fn from(tag: TypeTag) -> Self {
-        Self::Explicit(tag)
+impl From<TypeBound> for TypeDefBound {
+    fn from(bound: TypeBound) -> Self {
+        Self::Explicit(bound)
     }
 }
 
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
-/// - typically these are operations also provided by the Resource.
+/// - typically these are operations also provided by the Extension.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
-    /// The unique Resource owning this TypeDef (of which this TypeDef is a member)
-    resource: ResourceId,
+    /// The unique Extension owning this TypeDef (of which this TypeDef is a member)
+    extension: ExtensionId,
     /// The unique name of the type
     name: SmolStr,
     /// Declaration of type parameters. The TypeDef must be instantiated
@@ -44,8 +44,8 @@ pub struct TypeDef {
     params: Vec<TypeParam>,
     /// Human readable description of the type definition.
     description: String,
-    /// The definition of the type tag of this definition.
-    tag: TypeDefTag,
+    /// The definition of the type bound of this definition.
+    bound: TypeDefBound,
 }
 
 impl TypeDef {
@@ -76,32 +76,31 @@ impl TypeDef {
     ) -> Result<CustomType, SignatureError> {
         let args = args.into();
         self.check_args_impl(&args)?;
-        let tag = self.tag(&args);
+        let bound = self.bound(&args);
         Ok(CustomType::new(
             self.name().clone(),
             args,
-            self.resource().clone(),
-            tag,
+            self.extension().clone(),
+            bound,
         ))
     }
-    /// The [`TypeTag`] of the definition.
-    pub fn tag(&self, args: &[TypeArg]) -> TypeTag {
-        match &self.tag {
-            TypeDefTag::Explicit(tag) => *tag,
-            TypeDefTag::FromParams(indices) => {
+    /// The [`TypeBound`] of the definition.
+    pub fn bound(&self, args: &[TypeArg]) -> TypeBound {
+        match &self.bound {
+            TypeDefBound::Explicit(bound) => *bound,
+            TypeDefBound::FromParams(indices) => {
                 let args: Vec<_> = args.iter().collect();
                 if indices.is_empty() {
                     // Assume most general case
-                    return TypeTag::Simple;
+                    return TypeBound::Any;
                 }
-                indices
-                    .iter()
-                    .map(|i| {
-                        args.get(*i)
-                            .and_then(|ta| ta.tag_of_type())
-                            .expect("TypeParam index invalid or param does not have a TypeTag.")
-                    })
-                    .fold(TypeTag::Hashable, TypeTag::union)
+                least_upper_bound(indices.iter().map(|i| {
+                    let ta = args.get(*i);
+                    match ta {
+                        Some(TypeArg::Type(s)) => s.least_upper_bound(),
+                        _ => panic!("TypeArg index does not refer to a type."),
+                    }
+                }))
             }
         }
     }
@@ -118,29 +117,29 @@ impl TypeParametrised for TypeDef {
         &self.name
     }
 
-    fn resource(&self) -> &ResourceId {
-        &self.resource
+    fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 
-impl Resource {
-    /// Add an exported type to the resource.
+impl Extension {
+    /// Add an exported type to the extension.
     pub fn add_type(
         &mut self,
         name: SmolStr,
         params: Vec<TypeParam>,
         description: String,
-        tag: TypeDefTag,
-    ) -> Result<&TypeDef, ResourceBuildError> {
+        bound: TypeDefBound,
+    ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
-            resource: self.name().into(),
+            extension: self.name().into(),
             name,
             params,
             description,
-            tag,
+            bound,
         };
         match self.types.entry(ty.name.clone()) {
-            Entry::Occupied(_) => Err(ResourceBuildError::OpDefExists(ty.name)),
+            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(ty.name)),
             Entry::Vacant(ve) => Ok(ve.insert(ty)),
         }
     }
@@ -148,44 +147,42 @@ impl Resource {
 
 #[cfg(test)]
 mod test {
-    use crate::resource::SignatureError;
-    use crate::types::custom::test::CLASSIC_T;
+    use crate::extension::SignatureError;
+    use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{
-        AbstractSignature, ClassicType, HashableType, PrimType, SimpleType, TypeTag,
-    };
+    use crate::types::{FunctionType, Type, TypeBound};
 
-    use super::{TypeDef, TypeDefTag};
+    use super::{TypeDef, TypeDefBound};
 
     #[test]
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::Type(TypeTag::Classic)],
-            resource: "MyRsrc".into(),
+            params: vec![TypeParam::Type(TypeBound::Copyable)],
+            extension: "MyRsrc".into(),
             description: "Some parameterised type".into(),
-            tag: TypeDefTag::FromParams(vec![0]),
+            bound: TypeDefBound::FromParams(vec![0]),
         };
-        let typ: SimpleType = def
-            .instantiate_concrete(vec![TypeArg::Type(
-                ClassicType::Graph(Box::new(AbstractSignature::new_df(vec![], vec![]))).into(),
-            )])
-            .unwrap()
-            .into();
-        assert_eq!(typ.tag(), TypeTag::Classic);
-        let typ2: SimpleType = def
-            .instantiate_concrete([TypeArg::Type(HashableType::String.into())])
-            .unwrap()
-            .into();
-        assert_eq!(typ2.tag(), TypeTag::Hashable);
+        let typ = Type::new_extension(
+            def.instantiate_concrete(vec![TypeArg::Type(Type::new_function(FunctionType::new(
+                vec![],
+                vec![],
+            )))])
+            .unwrap(),
+        );
+        assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
+        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(EQ_T)]).unwrap());
+        assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(SimpleType::Qubit)]),
-            Err(SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch(
-                TypeArg::Type(SimpleType::Qubit),
-                TypeParam::Type(TypeTag::Classic)
-            )))
+            def.instantiate_concrete([TypeArg::Type(ANY_T)]),
+            Err(SignatureError::TypeArgMismatch(
+                TypeArgError::TypeMismatch {
+                    arg: TypeArg::Type(ANY_T),
+                    param: TypeParam::Type(TypeBound::Copyable)
+                }
+            ))
         );
         // Too few arguments:
         assert_eq!(
@@ -194,11 +191,8 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([
-                TypeArg::Type(CLASSIC_T.into()),
-                TypeArg::Type(CLASSIC_T.into()),
-            ])
-            .unwrap_err(),
+            def.instantiate_concrete([TypeArg::Type(COPYABLE_T), TypeArg::Type(COPYABLE_T),])
+                .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );
     }

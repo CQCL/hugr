@@ -87,7 +87,7 @@ Each node is defined by its **operation**; the possible operations are
 outlined in [Node
 Operations](#node-operations)
 but may be [extended by
-Resources](#operation-extensibility).
+Extensions](#operation-extensibility).
 
 **Simple HUGR example**
 ```mermaid
@@ -157,9 +157,8 @@ the node). Incoming ports are associated with exactly one edge. All edges associ
 with a port have the same type; thus a port has a well-defined type, matching that
 of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
 
-The sequences of incoming and outgoing port types of a node constitute its
-_signature_. This signature may include the types of both `Value` and `Static`
-edges, with `Static` edges following `Value` edges in the ordering.
+The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
+_signature_.
 
 Note that the locality is not fixed or even specified by the signature.
 
@@ -198,7 +197,7 @@ source node, to an incoming port of the target node.
 
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
-are classical, and do not include a resource specification. Only a few nodes may be
+are classical, and do not include an extension specification. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see [operations](#node-operations).
 
@@ -235,7 +234,7 @@ edges. The following operations are *only* valid as immediate children of a
 
   - `FuncDecl`: an external function declaration. The name of the function 
     and function attributes (relevant for compilation)
-    define the node weight. The node has an outgoing `Static<Graph>`
+    define the node weight. The node has an outgoing `Static<Function>`
     edge for each use of the function. The function name is used at link time to
     look up definitions in linked
     modules (other hugr instances specified to the linker).
@@ -279,7 +278,7 @@ the following basic dataflow operations are available (in addition to the
     nodes starting from `Input` with respect to the Value and Order
     edges.
   - `Call`: Call a statically defined function. There is an incoming
-    `Static<Graph>` edge to specify the graph being called. The
+    `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
@@ -554,7 +553,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
     inputs matching the child DSG; but one output, of type
     `Sum(O,ErrorType)` where O is the outputs of the child DSG.
   - There is also a higher-order `catch` operation in the Tierkreis
-    resource, taking a graph argument; and `run_circuit` will return the
+    extension, taking a graph argument; and `run_circuit` will return the
     same way.
 
 #### **Non-local Edges**
@@ -770,7 +769,7 @@ at runtime. In many cases this is desirable.
 
 #### Extension Implementation
 
-To strike a balance then, every resource provides YAML that declares its opaque
+To strike a balance then, every extension provides YAML that declares its opaque
 types and a number of named **OpDef**s (operation-definitions), which may be
 polymorphic in type. Each OpDef specifies one of two methods for how the type
 of individual operations is computed:
@@ -795,17 +794,17 @@ what the operations *do*---that is, new operations may be be defined independent
 any tool, but without providing any way for the tooling to treat them as anything other
 than a black box. The *semantics* of any operation are necessarily specific to both
 operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
-resources to provide semantics portable across tools.
+extensions to provide semantics portable across tools.
 
 1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
-   that takes the type arguments and a set of target resources and may fallibly return
-   a subgraph or function-body-HUGR using only those target resources.
+   that takes the type arguments and a set of target extensions and may fallibly return
+   a subgraph or function-body-HUGR using only those target extensions.
 2. They may provide a HUGR, that declares functions implementing those operations. This
    is a simple case of the above (where the binary code is a constant function) but
    easy to pass between tools. However note this will only be possible for operations
    with sufficiently simple type (schemes), and is considered a "fallback" for use
    when a higher-performance (e.g. native HW) implementation is not available.
-   Such a HUGR may itself require other resources.
+   Such a HUGR may itself require other extensions.
 
 Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
@@ -822,7 +821,7 @@ that may be used by compiler extensions. This suggests a flexible
 standard format such as YAML would be suitable. Here we provide an
 illustrative example:
 
-See [Type System](#type-system) for more on Resources.
+See [Type System](#type-system) for more on Extensions.
 
 ```yaml
 # may need some top level data, e.g. namespace?
@@ -831,7 +830,7 @@ See [Type System](#type-system) for more on Resources.
   # TODO: allow qualified, and maybe locally-scoped
 imports: [Quantum, Array]
 
-resources:
+extensions:
 - name: MyGates
   # Declare custom types
   types:
@@ -843,7 +842,7 @@ resources:
     description: "measure a qubit"
     signature:
       # The first element of each pair is an optional parameter name.
-      inputs: [[null, Q]]  # Q is defined in Quantum resource
+      inputs: [[null, Q]]  # Q is defined in Quantum extension
       outputs: [[null, Q], ["measured", B]]
   - name: ZZPhase
     description: "Apply a parametric ZZPhase gate"
@@ -882,7 +881,7 @@ resources:
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
       outputs: [[null, F64, 1]]
   - name: ArrayConcat
-    description: "Concatenate two arrays. Resource provides a compute_signature implementation."
+    description: "Concatenate two arrays. Extension provides a compute_signature implementation."
     params:
       - t: Type  # Classic or Quantum
       - i: USize
@@ -894,31 +893,31 @@ resources:
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
     params:
-      - r: ResourceSet
+      - r: ExtensionSet
     signature:
-      inputs: [[null, Graph[r](USize -> USize)], ["arg", USize]]
+      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
       outputs: [[null, USize]]
-      resources: r # Indicates that running this operation also invokes resources r
+      extensions: r # Indicates that running this operation also invokes extensions r
     lowering:
       file: "graph_op_hugr.bin"
-      resources: ["arithmetic", r] # r is the ResourceSet in "params"
+      extensions: ["arithmetic", r] # r is the ExtensionSet in "params"
 ```
 
 The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "USize" | "Resources" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "USize" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
 
 Opaque ::= string<[TypeArgs]>
 
-TypeArgs ::= Type(Type) | USize(u64) | Resources | List([TypeArg]) | Tuple([TypeArg])
+TypeArgs ::= Type(Type) | USize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
 
 Type ::= Name<[TypeArg]>
 ```
 (We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
 
-To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a constant usize, a set of resources, a list or tuple of arguments.
+To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a constant usize, a set of extensions, a list or tuple of arguments.
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
@@ -926,7 +925,7 @@ Serialization section). It is also trivial to serialize these
 definitions in to the overall HUGR serialization format.
 
 Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists, and may have `resources`.
+must have children `inputs` and `outputs`, each lists, and may have `extensions`.
 
 The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
  passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
@@ -990,9 +989,9 @@ indices after the list of node indices?
 ## Type System
 
 There are three classes of type: Any $\supset$ Copyable $\supset$ Equatable. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
-  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Resource Tracking](#resource-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
-    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum resource](#quantum-resource) for more.
+    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
 
   - The next class are "Copyable" types, aka "Classic" types, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
 
@@ -1007,61 +1006,61 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 
 ```haskell
 
-Resources ::= (Resource)* -- a set, not a list
+Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Tuple(#) -- fixed-arity, heterogenous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
-       | Graph[Resources](#, #) -- monomorphic
+       | Function[Extensions](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
 ```
-<!--      Graph(TypeParams, #, #, Resources) -- polymorphic, so move TypeParams section here
+<!--      Function(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
 #       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
-The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Graph type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
+The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Graphs are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+Functions are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
 Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
 
-### Resource Tracking
+### Extension Tracking
 
-The type of `Graph` includes a set of resources (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of resources required to produce its inputs, and the set of resources required to execute the node; the union of these two must match the set of resources on each successor node.
+The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
 
-Keeping track of the resource requirements like this allows extension designers and backends
+Keeping track of the extension requirements like this allows extension designers and backends
 (like tierkreis) to control how/where a module is run.
 
-Concretely, if a plugin writer adds a resource
+Concretely, if a plugin writer adds an extension
 *X*, then some function from
 a plugin needs to provide a mechanism to convert the
-*X* to some other resource
+*X* to some other extension
 requirement before it can interface with other plugins which don’t know
 about *X*.
 
 A Tierkreis runtime could be connected to workers which provide means of
-running different resources. By the same mechanism, Tierkreis can reason
+running different extensions. By the same mechanism, Tierkreis can reason
 about where to run different parts of the graph by inspecting their
-resource requirements.
+extension requirements.
 
-To allow resource annotations on nodes to be made equal, we will have operations
- **lift** and **liftGraph** which can add resource constraints to values.
+To allow extension annotations on nodes to be made equal, we will have operations
+ **lift** and **liftGraph** which can add extension constraints to values.
 
 $\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
 
-**lift** - Takes as a node weight parameter the single resource
+**lift** - Takes as a node weight parameter the single extension
 **X** which it adds to the
-resource requirements of its argument.
+extension requirements of its argument.
 
-$\displaystyle{\frac{f : [ \rho ] \textbf{Graph}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Graph}[X, R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
 
-**liftGraph** - Like **lift**, takes a
-resource X as a constant node
-weight parameter. Given a graph, it will add resource
+**liftGraph** - Like **lift**, takes an
+extension X as a constant node
+weight parameter. Given a graph, it will add extension
 X to the requirements of the
 graph.
 
 Having these as explicit nodes on the graph allows us to search for the
-point before resources were added when we want to copy graphs, allowing
-us to get the version with minimal resource requirements.
+point before extensions were added when we want to copy graphs, allowing
+us to get the version with minimal extension requirements.
 
 Graphs which are almost alike can both be squeezed into a
 Conditional-node that selects one or the other, by wrapping them in a
@@ -1076,11 +1075,11 @@ equality constraint of `typeof(b) ~ Bool`.
 ### Types of built-ins
 
 We will provide some built in modules to provide basic functionality.
-I’m going to define them in terms of resources. We have the “builtin”
-resource which should always be available when writing hugr plugins.
+I’m going to define them in terms of extensions. We have the “builtin”
+extension which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
-$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
+$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
 
 **Call** - This operation, like **to\_const**, uses its Static graph as
 a type parameter.
@@ -1089,7 +1088,7 @@ On top of that, we're definitely going to want modules which handle
 graph-based control flow at runtime, arithmetic and basic quantum
 circuits.
 
-These should all be defined as a part of their own resource
+These should all be defined as a part of their own extension
 inferface(s). For example, we don’t assume that we can handle arithmetic
 while running a circuit, so we track its use in the Graph’s type so that
 we can perform rewrites which remove the arithmetic.
@@ -1097,23 +1096,23 @@ we can perform rewrites which remove the arithmetic.
 We would expect standard circuits to look something like
 
 ```
-GraphType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
+FunctionType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
-A circuit built using our higher-order resource to manage control flow
+A circuit built using our higher-order extension to manage control flow
 could then look like:
 
 ```
-GraphType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
+FunctionType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 So we’d need to perform some graph transformation pass to turn the
 graph-based control flow into a CFG node that a quantum computer could
-run, which removes the `HigherOrder` resource requirement:
+run, which removes the `HigherOrder` extension requirement:
 
 ```
-precompute :: GraphType[](GraphType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         GraphType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+precompute :: FunctionType[](FunctionType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
+                                         FunctionType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
 Before we can run the circuit.
@@ -1504,8 +1503,8 @@ struct HUGR {
 struct Node{
   // parent node index
   parent: Int,
-  // The input resources to the node
-  input_resources: Option<ResourceSet>
+  // The input extensions to the node
+  input_extensions: Option<ExtensionSet>
   // name of operation
   op: String
   //other op-specific fields
@@ -1543,9 +1542,9 @@ implementation of this design document is available on GitHub.
 `panic`: panics unconditionally; no inputs, any type of outputs (these
 are never produced)
 
-### Logic Resource
+### Logic Extension
 
-The Logic Resource provides a boolean type and basic logical operations.
+The Logic Extension provides a boolean type and basic logical operations.
 
 The boolean type `bool` is defined to be `Sum((),())`, with the convention that the
 first option in the sum represents "false" and the second represents "true".
@@ -1561,9 +1560,9 @@ The following operations are defined:
 Note that an `and<0>` operation produces the constant value "true" and an
 `or<0>` operation produces the constant value "false".
 
-### Arithmetic Resource
+### Arithmetic Extension
 
-The Arithmetic Resource provides types and operations for integer and
+The Arithmetic Extension provides types and operations for integer and
 floating-point operations.
 
 We largely adopt (a subset of) the definitions of
@@ -1693,9 +1692,9 @@ Conversions between integers and floats:
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
-### Quantum Resource
+### Quantum Extension
 
-This is the resource that is designed to be natively understood by
+This is the extension that is designed to be natively understood by
 TKET2. Besides a range of quantum operations (like Hadamard, CX, etc.)
 that take and return `Qubit`, we note the following operations for
 allocating/deallocating `Qubit`s:
@@ -1727,43 +1726,43 @@ input and has one output of the same type (the same statically known
 size). If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
 
-### Higher-order (Tierkreis) Resource
+### Higher-order (Tierkreis) Extension
 
 In **some** contexts, notably the Tierkreis runtime, higher-order
 operations allow graphs to be valid dataflow values, and be executed.
 These operations allow this.
 
   - `CallIndirect`: Call a function indirectly. Like `Call`, but the
-    first input is a standard dataflow graph type. This is essentially
+    first input is a standard dataflow function type. This is essentially
     `eval` in Tierkreis.
   - `catch`: like `CallIndirect`, the first argument is of type
-    `Graph[R]<I,O>` and the rest of the arguments are of type `I`.
+    `Function[R]<I,O>` and the rest of the arguments are of type `I`.
     However the result is not `O` but `Sum(O,ErrorType)`
   - `parallel`, `sequence`, `partial`? Note that these could be executed
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Graph}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
+$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Function}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
 
-**loop** - In order to run the *body* graph, we need the resources
+**loop** - In order to run the *body* graph, we need the extensions
 R that the graph requires, so
-calling the **loop** function requires those same resources. Since the
+calling the **loop** function requires those same extensions. Since the
 result of the body is fed into the input of the graph, it needs to have
-the same resource requirements on its inputs and outputs. We require
-that *v* is lifted to have resource requirement
+the same extension requirements on its inputs and outputs. We require
+that *v* is lifted to have extension requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-$\displaystyle{\frac{\Theta : [R] \textbf{Graph}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
+$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
-graph requires it’s resources.
+graph requires it’s extensions.
 
-$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Graph}[R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
 
 **to_const** - For operations which instantiate a graph (**to\_const**
 and **Call**) the functions are given an extra parameter at graph
-construction time which corresponds to the graph type that they are
+construction time which corresponds to the function type that they are
 meant to instantiate. This type will be given by a typeless edge from
 the graph in question to the operation, with the graph’s type added as
 an edge weight.
@@ -1847,12 +1846,12 @@ an edge weight.
   - **port index**: An identifier for a port that is unique within the
     HUGR.
   - **replacement**: TODO
-  - **resource**: TODO
+  - **extension**: TODO
   - **sibling graph**: TODO
   - **signature**: The signature of a node is the combination of its
     input and output signatures.
   - **simple type**: a quantum or classical type annotated with the
-    Resources required to produce the value
+    Extensions required to produce the value
   - **order edge**: An edge implying dependency of the target node on
     the source node.
   - **TailLoop node**: TODO

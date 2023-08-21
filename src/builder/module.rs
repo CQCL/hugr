@@ -8,7 +8,7 @@ use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
-    types::{simple::TypeTag, PrimType, SimpleType},
+    types::{Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -109,7 +109,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let rs = signature.input_resources.clone();
+        let rs = signature.input_extensions.clone();
         let declare_n = self.add_child_node(NodeType::new(
             ops::FuncDecl {
                 signature: signature.into(),
@@ -129,7 +129,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
-        typ: SimpleType,
+        typ: Type,
     ) -> Result<AliasID<true>, BuildError> {
         // TODO: add AliasDefn in other containers
         // This is currently tricky as they are not connected to anything so do
@@ -137,13 +137,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let tag = typ.tag();
+        let bound = typ.least_upper_bound();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 
     /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
@@ -153,15 +153,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        tag: TypeTag,
+        bound: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
-            tag,
+            bound,
         })?;
 
-        Ok(AliasID::new(node, name, tag))
+        Ok(AliasID::new(node, name, bound))
     }
 }
 
@@ -175,7 +175,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
-        types::AbstractSignature,
+        types::FunctionType,
     };
 
     use super::*;
@@ -186,7 +186,7 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
@@ -205,11 +205,11 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeTag::Simple)?;
+                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
 
             let f_build = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(
+                FunctionType::new(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
                 )
@@ -229,11 +229,11 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;

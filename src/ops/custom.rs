@@ -5,22 +5,22 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
+use crate::extension::{ExtensionId, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
-use crate::resource::{OpDef, ResourceId, SignatureError};
-use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
-use crate::{Hugr, Node, Resource};
+use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
+use crate::{Extension, Hugr, Node};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
 
-/// An instantiation of an operation (declared by a resource) with values for the type arguments
+/// An instantiation of an operation (declared by a extension) with values for the type arguments
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
-    /// When we've found (loaded) the [Resource] definition and identified the [OpDef]
-    Resource(ResourceOp),
-    /// When we either haven't tried to identify the [Resource] or failed to find it.
+    /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
+    Extension(ExtensionOp),
+    /// When we either haven't tried to identify the [Extension] or failed to find it.
     Opaque(OpaqueOp),
 }
 
@@ -29,7 +29,7 @@ impl ExternalOp {
     pub fn args(&self) -> &[TypeArg] {
         match self {
             Self::Opaque(op) => op.args(),
-            Self::Resource(op) => op.args(),
+            Self::Extension(op) => op.args(),
         }
     }
 }
@@ -38,7 +38,7 @@ impl From<ExternalOp> for OpaqueOp {
     fn from(value: ExternalOp) -> Self {
         match value {
             ExternalOp::Opaque(op) => op,
-            ExternalOp::Resource(op) => op.into(),
+            ExternalOp::Extension(op) => op.into(),
         }
     }
 }
@@ -58,8 +58,8 @@ impl From<ExternalOp> for LeafOp {
 impl OpName for ExternalOp {
     fn name(&self) -> SmolStr {
         let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.resource, &op.op_name),
-            Self::Resource(ResourceOp { def, .. }) => (def.resource(), def.name()),
+            Self::Opaque(op) => (&op.extension, &op.op_name),
+            Self::Extension(ExtensionOp { def, .. }) => (def.extension(), def.name()),
         };
         qualify_name(res_id, op_name)
     }
@@ -69,14 +69,14 @@ impl OpTrait for ExternalOp {
     fn description(&self) -> &str {
         match self {
             Self::Opaque(op) => op.description.as_str(),
-            Self::Resource(ResourceOp { def, .. }) => def.description(),
+            Self::Extension(ExtensionOp { def, .. }) => def.description(),
         }
     }
 
     fn signature_desc(&self) -> SignatureDescription {
         match self {
             Self::Opaque(_) => SignatureDescription::default(),
-            Self::Resource(ResourceOp { def, args, .. }) => def.signature_desc(args),
+            Self::Extension(ExtensionOp { def, args, .. }) => def.signature_desc(args),
         }
     }
 
@@ -86,30 +86,31 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> AbstractSignature {
+    fn signature(&self) -> FunctionType {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
-            Self::Resource(ResourceOp { signature, .. }) => signature.clone(),
+            Self::Extension(ExtensionOp { signature, .. }) => signature.clone(),
         }
     }
 }
 
-/// An operation defined by an [OpDef] from a loaded [Resource].
+/// An operation defined by an [OpDef] from a loaded [Extension].
 // Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
 #[derive(Clone, Debug)]
-pub struct ResourceOp {
+pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: AbstractSignature, // Cache
+    signature: FunctionType, // Cache
 }
 
-impl ResourceOp {
-    /// Create a new ResourceOp given the type arguments and specified input resources
-    pub fn new(def: Arc<OpDef>, args: &[TypeArg]) -> Result<Self, SignatureError> {
-        let signature = def.compute_signature(args)?;
+impl ExtensionOp {
+    /// Create a new ExtensionOp given the type arguments and specified input extensions
+    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
+        let args = args.into();
+        let signature = def.compute_signature(&args)?;
         Ok(Self {
             def,
-            args: args.to_vec(),
+            args,
             signature,
         })
     }
@@ -120,9 +121,9 @@ impl ResourceOp {
     }
 }
 
-impl From<ResourceOp> for OpaqueOp {
-    fn from(op: ResourceOp) -> Self {
-        let ResourceOp {
+impl From<ExtensionOp> for OpaqueOp {
+    fn from(op: ExtensionOp) -> Self {
+        let ExtensionOp {
             def,
             args,
             signature,
@@ -133,7 +134,7 @@ impl From<ResourceOp> for OpaqueOp {
             None
         };
         OpaqueOp {
-            resource: def.resource().clone(),
+            extension: def.extension().clone(),
             op_name: def.name().clone(),
             description: def.description().into(),
             args,
@@ -142,39 +143,45 @@ impl From<ResourceOp> for OpaqueOp {
     }
 }
 
-impl PartialEq for ResourceOp {
+impl From<ExtensionOp> for LeafOp {
+    fn from(value: ExtensionOp) -> Self {
+        LeafOp::CustomOp(Box::new(ExternalOp::Extension(value)))
+    }
+}
+
+impl PartialEq for ExtensionOp {
     fn eq(&self, other: &Self) -> bool {
         Arc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
     }
 }
 
-impl Eq for ResourceOp {}
+impl Eq for ExtensionOp {}
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {
-    resource: ResourceId,
+    extension: ExtensionId,
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Option<AbstractSignature>,
+    signature: Option<FunctionType>,
 }
 
-fn qualify_name(res_id: &ResourceId, op_name: &SmolStr) -> SmolStr {
+fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
     format!("{}.{}", res_id, op_name).into()
 }
 
 impl OpaqueOp {
     /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
     pub fn new(
-        resource: ResourceId,
+        extension: ExtensionId,
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Option<AbstractSignature>,
+        signature: Option<FunctionType>,
     ) -> Self {
         Self {
-            resource,
+            extension,
             op_name: op_name.into(),
             description,
             args: args.into(),
@@ -194,9 +201,9 @@ impl OpaqueOp {
         &self.args
     }
 
-    /// Parent resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.resource
+    /// Parent extension.
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 
@@ -204,20 +211,24 @@ impl OpaqueOp {
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
     h: &mut Hugr,
-    resource_registry: &HashMap<SmolStr, Resource>,
+    extension_registry: &HashMap<SmolStr, Extension>,
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = resource_registry.get(&opaque.resource) {
-                    // Fail if the Resource was found but did not have the expected operation
+                if let Some(r) = extension_registry.get(&opaque.extension) {
+                    // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
-                    return Err(CustomOpError::OpNotFoundInResource(opaque.op_name.to_string(), r.name().to_string()));
-                };
-                    // TODO input resources. From type checker, or just drop by storing only delta in Signature.
-                    let op =
-                        ExternalOp::Resource(ResourceOp::new(def.clone(), &opaque.args).unwrap());
+                        return Err(CustomOpError::OpNotFoundInExtension(
+                            opaque.op_name.to_string(),
+                            r.name().to_string(),
+                        ));
+                    };
+                    // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
+                    let op = ExternalOp::Extension(
+                        ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
+                    );
                     if let Some(sig) = &opaque.signature {
                         if sig != &op.signature() {
                             return Err(CustomOpError::SignatureMismatch(
@@ -243,23 +254,24 @@ pub fn resolve_extension_ops(
 }
 
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
-/// when trying to resolve the serialized names against a registry of known Resources.
+/// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error)]
 pub enum CustomOpError {
-    /// Resource not found, and no signature
+    /// Extension not found, and no signature
     #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
     NoStoredSignature(SmolStr, Node),
-    /// The Resource was found but did not contain the expected OpDef
-    #[error("Operation {0} not found in Resource {1}")]
-    OpNotFoundInResource(String, String),
-    /// Resource and OpDef found, but computed signature did not match stored
+    /// The Extension was found but did not contain the expected OpDef
+    #[error("Operation {0} not found in Extension {1}")]
+    OpNotFoundInExtension(String, String),
+    /// Extension and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, AbstractSignature, AbstractSignature),
+    SignatureMismatch(String, FunctionType, FunctionType),
 }
 
 #[cfg(test)]
 mod test {
-    use crate::types::HashableType;
+
+    use crate::types::test::EQ_T;
 
     use super::*;
 
@@ -269,12 +281,12 @@ mod test {
             "res".into(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type(HashableType::USize.into())],
+            vec![TypeArg::Type(EQ_T)],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type(HashableType::USize.into())]);
+        assert_eq!(op.args(), &[TypeArg::Type(EQ_T)]);
     }
 }

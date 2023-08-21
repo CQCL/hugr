@@ -180,7 +180,7 @@ where
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        // TODO: Default to `NodeType::open_resources` once we can infer resources
+        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
         self.add_node_with_parent(parent, NodeType::pure(op))
     }
 
@@ -334,7 +334,7 @@ pub(crate) mod sealed {
 
         /// Add a node to the graph, with the default conversion from OpType to NodeType
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-            // TODO: Default to `NodeType::open_resources` once we can infer resources
+            // TODO: Default to `NodeType::open_extensions` once we can infer extensions
             self.add_node(NodeType::pure(op))
         }
 
@@ -409,7 +409,7 @@ pub(crate) mod sealed {
         /// Replace the OpType at node and return the old OpType.
         /// In general this invalidates the ports, which may need to be resized to
         /// match the OpType signature.
-        /// TODO: Add a version which ignores input resources
+        /// TODO: Add a version which ignores input extensions
         fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
             match self.contains_node(node) {
                 true => self.hugr_mut().replace_op(node, op),
@@ -490,12 +490,12 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{test::COPYABLE_T, FunctionType, Type},
     };
 
     use super::*;
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = COPYABLE_T;
 
     #[test]
     fn simple_function() {
@@ -513,7 +513,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                    signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
             .expect("Failed to add function definition node");
@@ -526,12 +526,7 @@ mod test {
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = builder
-                .add_op_with_parent(
-                    f,
-                    LeafOp::Noop {
-                        ty: ClassicType::i64().into(),
-                    },
-                )
+                .add_op_with_parent(f, LeafOp::Noop { ty: COPYABLE_T })
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());

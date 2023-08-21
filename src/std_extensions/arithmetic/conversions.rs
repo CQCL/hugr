@@ -5,53 +5,57 @@ use std::collections::HashSet;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::{ResourceSet, SignatureError},
+    extension::{ExtensionSet, SignatureError},
+    type_row,
     types::{
-        simple::ERROR_TYPE,
         type_param::{TypeArg, TypeParam},
-        SimpleRow, SimpleType,
+        Type, TypeRow,
     },
     utils::collect_array,
-    Resource,
+    Extension,
 };
 
-use super::float_types::float64_type;
+use super::float_types::FLOAT64_TYPE;
 use super::int_types::{get_width, int_type};
 
-/// The resource identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
+/// The extension identifier.
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
-fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
-        vec![float64_type()].into(),
-        vec![SimpleType::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
-        ResourceSet::default(),
+        type_row![FLOAT64_TYPE],
+        vec![Type::new_sum(vec![
+            int_type(n),
+            crate::extension::prelude::ERROR_TYPE,
+        ])]
+        .into(),
+        ExtensionSet::default(),
     ))
 }
 
-fn itof_sig(arg_values: &[TypeArg]) -> Result<(SimpleRow, SimpleRow, ResourceSet), SignatureError> {
+fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
     Ok((
         vec![int_type(n)].into(),
-        vec![float64_type()].into(),
-        ResourceSet::default(),
+        type_row![FLOAT64_TYPE],
+        ExtensionSet::default(),
     ))
 }
 
-/// Resource for basic arithmetic operations.
-pub fn resource() -> Resource {
-    let mut resource = Resource::new_with_reqs(
-        RESOURCE_ID,
-        ResourceSet::new_from_resources(HashSet::from_iter(vec![
-            super::int_types::RESOURCE_ID,
-            super::float_types::RESOURCE_ID,
+/// Extension for basic arithmetic operations.
+pub fn extension() -> Extension {
+    let mut extension = Extension::new_with_reqs(
+        EXTENSION_ID,
+        ExtensionSet::new_from_extensions(HashSet::from_iter(vec![
+            super::int_types::EXTENSION_ID,
+            super::float_types::EXTENSION_ID,
         ])),
     );
 
-    resource
+    extension
         .add_op_custom_sig_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
@@ -59,7 +63,7 @@ pub fn resource() -> Resource {
             ftoi_sig,
         )
         .unwrap();
-    resource
+    extension
         .add_op_custom_sig_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
@@ -67,7 +71,7 @@ pub fn resource() -> Resource {
             ftoi_sig,
         )
         .unwrap();
-    resource
+    extension
         .add_op_custom_sig_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
@@ -75,7 +79,7 @@ pub fn resource() -> Resource {
             itof_sig,
         )
         .unwrap();
-    resource
+    extension
         .add_op_custom_sig_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
@@ -84,7 +88,7 @@ pub fn resource() -> Resource {
         )
         .unwrap();
 
-    resource
+    extension
 }
 
 #[cfg(test)]
@@ -92,8 +96,8 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_conversions_resource() {
-        let r = resource();
+    fn test_conversions_extension() {
+        let r = extension();
         assert_eq!(r.name(), "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {

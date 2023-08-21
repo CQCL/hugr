@@ -8,10 +8,10 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
-use crate::resource::ResourceSet;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -41,7 +41,7 @@ enum Versioned {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
-    input_resources: Option<ResourceSet>,
+    input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
 }
@@ -141,7 +141,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                input_resources: opt.input_resources.clone(),
+                input_extensions: opt.input_extensions.clone(),
                 op: opt.op.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
@@ -201,7 +201,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
-            input_resources,
+            input_extensions,
             op: root_type,
         } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
@@ -210,8 +210,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
-            match input_resources {
-                None => NodeType::open_resources(root_type),
+            match input_extensions {
+                None => NodeType::open_extensions(root_type),
                 Some(rs) => NodeType::new(root_type, rs),
             },
             nodes.len(),
@@ -221,8 +221,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         for node_ser in nodes {
             hugr.add_node_with_parent(
                 node_ser.parent,
-                match node_ser.input_resources {
-                    None => NodeType::open_resources(node_ser.op),
+                match node_ser.input_extensions {
+                    None => NodeType::open_extensions(node_ser.op),
                     Some(rs) => NodeType::new(node_ser.op, rs),
                 },
             )?;
@@ -273,9 +273,10 @@ pub mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{AbstractSignature, ClassicType, SimpleType},
+        types::{FunctionType, Type},
         Port,
     };
     use itertools::Itertools;
@@ -283,8 +284,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Qubit;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -303,14 +304,11 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: AbstractSignature::new_df(
-                    vec![ClassicType::usize().into(); inputs - 1],
-                    vec![ClassicType::usize().into(); outputs - 1],
-                ),
+                signature: FunctionType::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
             }
             .into(),
-            (true, false) => Input::new(vec![ClassicType::usize().into(); outputs - 1]).into(),
-            (false, true) => Output::new(vec![ClassicType::usize().into(); inputs - 1]).into(),
+            (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
+            (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
             (true, true) => Module.into(),
         }
     }
@@ -334,7 +332,7 @@ pub mod test {
         let mut h = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::new();
 
-        op_types[root] = NodeType::open_resources(gen_optype(&g, root));
+        op_types[root] = NodeType::open_extensions(gen_optype(&g, root));
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
@@ -361,12 +359,9 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             module_builder.set_metadata(json!({"name": "test"}));
 
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function(
-                    "main",
-                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
-                )
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -399,12 +394,9 @@ pub mod test {
     fn metadata_hugr_ser() {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function(
-                    "main",
-                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
-                )
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -434,12 +426,12 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<SimpleType> = vec![ClassicType::usize().into(); 2];
-        let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
+        let tp: Vec<Type> = vec![BOOL_T; 2];
+        let mut dfg = DFGBuilder::new(FunctionType::new(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .add_dataflow_op(LeafOp::Noop { ty: BOOL_T }, [*p])
                 .unwrap()
                 .out_wire(0);
         }
@@ -462,18 +454,13 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb = SimpleType::Qubit;
-        let dfg = DFGBuilder::new(AbstractSignature::new_df(
-            vec![qb.clone()],
-            vec![qb.clone()],
-        ))
-        .unwrap();
+        let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        let new_in = hugr.add_op(Input::new([QB].to_vec()));
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();

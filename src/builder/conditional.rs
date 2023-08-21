@@ -1,5 +1,5 @@
 use crate::hugr::views::HugrView;
-use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
+use crate::types::{FunctionType, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -117,7 +117,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: AbstractSignature::new_df(inputs.clone(), outputs.clone()),
+            signature: FunctionType::new(inputs.clone(), outputs.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -134,7 +134,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            AbstractSignature::new_df(inputs, outputs),
+            FunctionType::new(inputs, outputs),
             None,
         )?;
 
@@ -152,9 +152,9 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = ClassicRow>,
-        other_inputs: impl Into<SimpleRow>,
-        outputs: impl Into<SimpleRow>,
+        predicate_inputs: impl IntoIterator<Item = TypeRow>,
+        other_inputs: impl Into<TypeRow>,
+        outputs: impl Into<TypeRow>,
     ) -> Result<Self, BuildError> {
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
         let other_inputs = other_inputs.into();
@@ -168,7 +168,7 @@ impl ConditionalBuilder<Hugr> {
             other_inputs,
             outputs,
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let conditional_node = base.root();
 
@@ -183,17 +183,14 @@ impl ConditionalBuilder<Hugr> {
 
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
-    pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-    ) -> Result<Self, BuildError> {
+    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = AbstractSignature::new_df(input, output);
+        let signature = FunctionType::new(input, output);
         let op = ops::Case {
             signature: signature.clone(),
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
@@ -235,7 +232,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let tru_const = fbuild.add_constant(Const::true_val())?;
             let _fdef = {

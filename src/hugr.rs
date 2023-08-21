@@ -24,9 +24,9 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
+use crate::extension::ExtensionSet;
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, Signature};
+use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
 
@@ -52,60 +52,60 @@ pub struct Hugr {
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The type of a node on a graph. In addition to the [`OpType`], it also
-/// describes the resources inferred to be used by the node.
+/// describes the extensions inferred to be used by the node.
 pub struct NodeType {
     /// The underlying OpType
     op: OpType,
-    /// The resources that the signature has been specialised to
-    input_resources: Option<ResourceSet>,
+    /// The extensions that the signature has been specialised to
+    input_extensions: Option<ExtensionSet>,
 }
 
 impl NodeType {
-    /// Create a new optype with some ResourceSet
-    pub fn new(op: impl Into<OpType>, input_resources: ResourceSet) -> Self {
+    /// Create a new optype with some ExtensionSet
+    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(input_resources),
+            input_extensions: Some(input_extensions),
         }
     }
 
-    /// Instantiate an OpType with no input resources
+    /// Instantiate an OpType with no input extensions
     pub fn pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(ResourceSet::new()),
+            input_extensions: Some(ExtensionSet::new()),
         }
     }
 
-    /// Instantiate an OpType with an unknown set of input resources
+    /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
-    pub fn open_resources(op: impl Into<OpType>) -> Self {
+    pub fn open_extensions(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: None,
+            input_extensions: None,
         }
     }
 
-    /// Use the input resources to calculate the concrete signature of the node
+    /// Use the input extensions to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
-        self.input_resources
+        self.input_extensions
             .as_ref()
-            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
+            .map(|rs| self.op.signature().with_input_extensions(rs.clone()))
     }
 
-    /// Get the abstract signature from the embedded op
-    pub fn op_signature(&self) -> AbstractSignature {
+    /// Get the function type from the embedded op
+    pub fn op_signature(&self) -> FunctionType {
         self.op.signature()
     }
 
-    /// The input resources defined for this node.
+    /// The input extensions defined for this node.
     ///
-    /// The output resources will correspond to the input resources plus any
-    /// resource delta defined by the operation type.
+    /// The output extensions will correspond to the input extensions plus any
+    /// extension delta defined by the operation type.
     ///
-    /// If the input resources are not known, this will return None.
-    pub fn input_resources(&self) -> Option<&ResourceSet> {
-        self.input_resources.as_ref()
+    /// If the input extensions are not known, this will return None.
+    pub fn input_extensions(&self) -> Option<&ExtensionSet> {
+        self.input_extensions.as_ref()
     }
 }
 
@@ -129,11 +129,11 @@ impl<'a> From<&'a NodeType> for &'a OpType {
 }
 
 impl OpType {
-    /// Convert an OpType to a NodeType by giving it some input resources
-    pub fn with_resources(self, rs: ResourceSet) -> NodeType {
+    /// Convert an OpType to a NodeType by giving it some input extensions
+    pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
         NodeType {
             op: self,
-            input_resources: Some(rs),
+            input_extensions: Some(rs),
         }
     }
 }
@@ -211,8 +211,8 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        // TODO: These resources should be open in principle, but lets wait
-        // until resources can be inferred for open sets until changing this
+        // TODO: These extensions should be open in principle, but lets wait
+        // until extensions can be inferred for open sets until changing this
         op_types[root] = root_node;
 
         Self {
