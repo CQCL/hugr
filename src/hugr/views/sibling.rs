@@ -12,13 +12,8 @@
 //! hierarchy.
 //!
 
-// TODO:
-// //! This module exposes the [`SiblingView`] trait, which is currently
-// //! implemented by the [`SiblingSubgraph`] struct in this module, as well as
-// //! the [`SiblingGraph`] hierarchical view.
-
 use itertools::{Either, Itertools};
-use portgraph::{algorithms::ConvexChecker, view::Subgraph, PortView};
+use portgraph::{algorithms::ConvexChecker, view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::{
@@ -60,19 +55,21 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// create a subgraph from another root, wrap the argument `region` in a
     /// [`super::SiblingGraph`].
     ///
-    /// This panics if the sibling graph is empty.
-    pub fn from_sibling_graph(sibling_graph: &'g Base) -> Self
+    /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
+    /// subgraph is empty.
+    pub fn from_sibling_graph(sibling_graph: &'g Base) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView,
     {
         let root = sibling_graph.root();
         let nodes = sibling_graph.children(root).collect_vec();
         if nodes.is_empty() {
-            panic!("Empty graph");
-        }
-        Self {
-            base: sibling_graph,
-            nodes,
+            Err(InvalidSubgraph::EmptySubgraph)
+        } else {
+            Ok(Self {
+                base: sibling_graph,
+                nodes,
+            })
         }
     }
 
@@ -82,19 +79,21 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// children nodes of the parent node. If you wish to create a subgraph
     /// from another root, wrap the `region` argument in a [`super::SiblingGraph`].
     ///
-    /// This panics if the DFG graph is empty.
-    pub fn from_dataflow_graph(dfg_graph: &'g Base) -> Self
+    /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
+    /// subgraph is empty.
+    pub fn from_dataflow_graph(dfg_graph: &'g Base) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView<RootHandle = DfgID>,
     {
         let parent = dfg_graph.root();
         let nodes = dfg_graph.children(parent).skip(2).collect_vec();
         if nodes.is_empty() {
-            panic!("Empty DFG graph");
-        }
-        Self {
-            base: dfg_graph,
-            nodes,
+            Err(InvalidSubgraph::EmptySubgraph)
+        } else {
+            Ok(Self {
+                base: dfg_graph,
+                nodes,
+            })
         }
     }
 
@@ -117,9 +116,11 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///  - the target of an incoming boundary edge, or
     ///  - the source of an outgoing boundary edge.
     ///
-    /// A subgraph is well-formed if every edge in B into the subgraph is an
-    /// incoming boundary edge and every edge in B pointing out of the subgraph
-    /// is an outgoing boundary edge.
+    /// A subgraph is well-formed if for every edge in the HUGR
+    ///  - it is in $B_I$ if and only if it has a source outside of the subgraph
+    ///    and a target inside of it, and
+    ///  - it is in $B_O$ if and only if it has a source inside of the subgraph
+    ///    and a target outside of it.
     ///
     /// This function fails if the subgraph if it is not convex, if the nodes
     /// do not share a common parent or if the subgraph is empty.
@@ -157,19 +158,13 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     {
         let pg = base.portgraph();
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
-        let incoming = incoming.into_iter().flat_map(|(n, p)| {
-            if p.direction() == Direction::Outgoing {
-                base.linked_ports(n, p).map(to_pg).collect()
-            } else {
-                vec![to_pg((n, p))]
-            }
+        let incoming = incoming.into_iter().flat_map(|(n, p)| match p.direction() {
+            Direction::Outgoing => base.linked_ports(n, p).map(to_pg).collect(),
+            Direction::Incoming => vec![to_pg((n, p))],
         });
-        let outgoing = outgoing.into_iter().flat_map(|(n, p)| {
-            if p.direction() == Direction::Incoming {
-                base.linked_ports(n, p).map(to_pg).collect()
-            } else {
-                vec![to_pg((n, p))]
-            }
+        let outgoing = outgoing.into_iter().flat_map(|(n, p)| match p.direction() {
+            Direction::Incoming => base.linked_ports(n, p).map(to_pg).collect(),
+            Direction::Outgoing => vec![to_pg((n, p))],
         });
         let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing));
         if !subpg.is_convex_with_checker(checker) {
