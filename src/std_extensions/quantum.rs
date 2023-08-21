@@ -50,7 +50,9 @@ fn extension() -> Extension {
                 Ok((
                     type_row![QB_T],
                     type_row![QB_T, BOOL_T],
-                    // TODO add logic as an extension delta when inference is done?
+                    // TODO add logic as an extension delta when inference is
+                    // done?
+                    // https://github.com/CQCL-DEV/hugr/issues/425
                     ExtensionSet::new(),
                 ))
             },
