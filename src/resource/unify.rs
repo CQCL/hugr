@@ -319,6 +319,75 @@ impl UnificationContext {
         }
     }
 
+    /// Try to turn mismatches into `ResourceError` when possible
+    fn report_mismatch(
+        &self,
+        m1: Meta,
+        m2: Meta,
+        rs1: ResourceSet,
+        rs2: ResourceSet,
+    ) -> InferResourceError {
+        let loc1 = self
+            .resources
+            .iter()
+            .filter(|(_, m)| **m == m1 || self.resolve(**m) == m1)
+            .next()
+            .map(|a| a.0);
+        let loc2 = self
+            .resources
+            .iter()
+            .filter(|(_, m)| **m == m2 || self.resolve(**m) == m2)
+            .next()
+            .map(|a| a.0);
+        let err = if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
+            // N.B. We're looking for the case where an equality constraint
+            // arose because the two locations are connected by an edge
+
+            // If the directions are the same, they shouldn't be connected
+            // to each other. If the nodes are the same, there's no edge!
+            //
+            // TODO: It's still possible that the equality constraint
+            // arose because one node is a dataflow parent and the other
+            // is one of it's I/O nodes. In that case, the directions could be
+            // the same, and we should try to detect it
+            if dir1 != dir2 && node1 != node2 {
+                let [(src, src_rs), (tgt, tgt_rs)] = if *dir2 == Direction::Incoming {
+                    [(node1, rs1.clone()), (node2, rs2.clone())]
+                } else {
+                    [(node2, rs2.clone()), (node1, rs1.clone())]
+                };
+
+                if src_rs.is_subset(&tgt_rs) {
+                    Some(InferResourceError::EdgeMismatch(ResourceError::TgtExceedsSrcResources {
+                        from: *src,
+                        from_offset: Port::new(Direction::Outgoing, 0),
+                        from_resources: src_rs,
+                        to: *tgt,
+                        to_offset: Port::new(Direction::Incoming, 0),
+                        to_resources: tgt_rs,
+                    }))
+                } else {
+                    Some(InferResourceError::EdgeMismatch(ResourceError::SrcExceedsTgtResources {
+                        from: *src,
+                        from_offset: Port::new(Direction::Outgoing, 0),
+                        from_resources: src_rs,
+                        to: *tgt,
+                        to_offset: Port::new(Direction::Incoming, 0),
+                        to_resources: tgt_rs,
+                    }))
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        err.unwrap_or(InferResourceError::MismatchedConcrete {
+            expected: rs1,
+            actual: rs2,
+        })
+    }
+
     /// Take a group of equal metas and merge them into a new, single meta.
     /// 
     /// Returns the set of new metas created and the set of metas that were
@@ -351,7 +420,7 @@ impl UnificationContext {
                     match self.solved.get(&combined_meta) {
                         Some(existing_solution) => {
                             if solution != existing_solution {
-                                return Err(InferResourceError::MismatchedConcrete { expected: solution.clone(), actual: existing_solution.clone() });
+                                return Err(self.report_mismatch(*m, combined_meta, solution.clone(), existing_solution.clone() ));
                             }
                         },
                         None => { self.solved.insert(combined_meta, solution.clone()); },
@@ -411,11 +480,8 @@ impl UnificationContext {
                             match self.get_solution(&meta) {
                                 // Let's check that this is right?
                                 Some(rs) => {
-                                    if *rs != rrs {
-                                        return Err(InferResourceError::MismatchedConcrete {
-                                            expected: rs.clone(),
-                                            actual: rrs,
-                                        });
+                                    if rs != &rrs {
+                                        return Err(self.report_mismatch(meta, *other_meta, rs.clone(), rrs));
                                     }
                                 }
                                 None => self.add_solution(meta, rrs),
