@@ -8,10 +8,11 @@
 
 use super::{ResourceId, ResourceSet};
 use crate::{
-    hugr::{Hugr, Node},
-    hugr::HugrInternalsMut,
+    hugr::{Node, Port},
     hugr::views::{HugrView, HierarchyView, SiblingGraph},
     Direction,
+    ops::OpType,
+    types::EdgeKind,
 };
 
 use super::validate::ResourceError;
@@ -308,16 +309,15 @@ impl UnificationContext {
         }
         // Seperate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
-        for node in hugr.nodes() {
-            let m_input = self.resources.get(&(node, Direction::Incoming)).unwrap().clone();
-            let m_output = self.resources.get(&(node, Direction::Outgoing)).unwrap().clone();
-            for in_neighbour in hugr.input_neighbours(node) {
-                let m_src = self.resources.get(&(in_neighbour, Direction::Outgoing)).unwrap();
-                self.add_constraint(m_input, Constraint::Equal(*m_src));
-            }
-            for out_neighbour in hugr.output_neighbours(node) {
-                let m_tgt = self.resources.get(&(out_neighbour, Direction::Incoming)).unwrap();
-                self.add_constraint(m_output, Constraint::Equal(*m_tgt));
+        for tgt_node in hugr.nodes() {
+            let sig: &OpType = hugr.get_nodetype(tgt_node).into();
+            // Incoming ports with a dataflow edge
+            for port in hugr.node_inputs(tgt_node).filter(|src_port| matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_)))) {
+                for (src_node, _) in hugr.linked_ports(tgt_node, port) {
+                    let m_src = self.resources.get(&(src_node, Direction::Outgoing)).unwrap();
+                    let m_tgt = self.resources.get(&(tgt_node, Direction::Incoming)).unwrap();
+                    self.add_constraint(*m_src, Constraint::Equal(*m_tgt));
+                }
             }
         }
     }
