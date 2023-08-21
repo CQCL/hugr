@@ -1013,8 +1013,6 @@ Type ::= Tuple(#) -- fixed-arity, heterogenous components
        | Function[Extensions](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
 ```
-<!--      Function(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
-#       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
