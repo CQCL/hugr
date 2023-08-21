@@ -5,8 +5,6 @@
 //!
 //! For read-only views of the hierarchical subgraphs, see [`::hugr::views`].
 
-use std::sync::{OnceLock, RwLock};
-
 use delegate::delegate;
 
 use crate::ops::handle::NodeHandle;
@@ -42,7 +40,6 @@ where
         Self {
             root,
             hugr,
-            view: Default::default(),
             _phantom: std::marker::PhantomData,
         }
     }
@@ -57,16 +54,10 @@ where
         self.hugr
     }
 
-    /// TODO
+    /// Returns an immutable sibling graph with the same root node.
     #[inline]
-    fn new_view(&self) -> SiblingGraph<'g, Root> {
+    pub fn as_sibling_graph(&self) -> SiblingGraph<'_, Root> {
         SiblingGraph::new(self.hugr(), self.root)
-    }
-
-    /// Read-only view of the sibling graph rooted at the current node.
-    #[inline]
-    fn view(&self) -> &SiblingGraph<'g, Root> {
-        self.view.read().unwrap().get_or_init(|| self.new_view())
     }
 }
 

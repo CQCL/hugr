@@ -354,7 +354,7 @@ pub(crate) mod sealed {
     /// view.
     pub trait HugrInternals {
         /// The underlying portgraph view type.
-        type Portgraph<'p>: LinkView + 'p
+        type Portgraph<'p>: LinkView + Clone + 'p
         where
             Self: 'p;
 

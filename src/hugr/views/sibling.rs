@@ -134,12 +134,12 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         base: &'g Base,
         incoming: impl IntoIterator<Item = (Node, Port)>,
         outgoing: impl IntoIterator<Item = (Node, Port)>,
-        checker: &mut ConvexChecker<&'g Base::Portgraph>,
+        checker: &mut ConvexChecker<Base::Portgraph<'g>>,
     ) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView,
     {
-        let pg = base.portgraph();
+        let pg: Base::Portgraph<'g> = base.portgraph();
         let incoming = incoming.into_iter().flat_map(|(n, p)| match p.direction() {
             Direction::Outgoing => base.linked_ports(n, p).collect(),
             Direction::Incoming => vec![(n, p)],
@@ -150,8 +150,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         });
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
         // Ordering of the edges here is preserved and becomes ordering of the signature.
-        let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing).map(to_pg));
-        if !subpg.is_convex_with_checker(checker) {
+        let subpg: Subgraph<Base::Portgraph<'g>> = Subgraph::new_subgraph(pg.clone(), incoming.chain(outgoing).map(to_pg));
+        if !subpg.is_convex_with_checker(&mut *checker) {
             return Err(InvalidSubgraph::NotConvex);
         }
         let nodes = subpg.nodes_iter().map_into().collect_vec();
@@ -186,7 +186,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     pub fn try_new_with_checker(
         base: &'g Base,
         nodes: Vec<Node>,
-        checker: &mut ConvexChecker<&'g Base::Portgraph>,
+        checker: &mut ConvexChecker<Base::Portgraph<'g>>,
     ) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView,

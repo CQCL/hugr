@@ -128,13 +128,13 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the
-    /// operation's [`OpType::other_input`] or [`OpType::other_output`].
+    /// operation's [`OpTrait::other_input`] or [`OpTrait::other_output`].
     ///
     /// Returns the offsets of the new input and output ports, or an error if
     /// the connection failed.
     ///
-    /// [`OpType::other_input`]: crate::ops::OpType::other_input
-    /// [`OpType::other_output`]: crate::ops::OpType::other_output.
+    /// [`OpTrait::other_input`]: crate::ops::OpTrait::other_input
+    /// [`OpTrait::other_output`]: crate::ops::OpTrait::other_output
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
         match (self.contains_node(src), self.contains_node(dst)) {
             (true, true) => self.hugr_mut().add_other_edge(src, dst),
