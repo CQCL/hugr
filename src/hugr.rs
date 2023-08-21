@@ -26,7 +26,7 @@ use pyo3::prelude::*;
 pub use self::views::HugrView;
 use crate::extension::ExtensionSet;
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::types::{AbstractSignature, Signature};
+use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
 
@@ -93,8 +93,8 @@ impl NodeType {
             .map(|rs| self.op.signature().with_input_extensions(rs.clone()))
     }
 
-    /// Get the abstract signature from the embedded op
-    pub fn op_signature(&self) -> AbstractSignature {
+    /// Get the function type from the embedded op
+    pub fn op_signature(&self) -> FunctionType {
         self.op.signature()
     }
 

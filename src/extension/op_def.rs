@@ -9,7 +9,7 @@ use super::{
 
 use crate::types::{SignatureDescription, TypeRow};
 
-use crate::types::AbstractSignature;
+use crate::types::FunctionType;
 
 use crate::types::type_param::TypeArg;
 
@@ -31,7 +31,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
-        // TODO: Make return type an AbstractSignature
+        // TODO: Make return type an FunctionType
     ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError>;
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
@@ -215,7 +215,7 @@ impl OpDef {
 
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<AbstractSignature, SignatureError> {
+    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<FunctionType, SignatureError> {
         self.check_args(args)?;
         let (ins, outs, res) = match &self.signature_func {
             SignatureFunc::FromDecl { .. } => {
@@ -227,7 +227,7 @@ impl OpDef {
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
-        Ok(AbstractSignature::new(ins, outs).with_extension_delta(&res))
+        Ok(FunctionType::new(ins, outs).with_extension_delta(&res))
     }
 
     /// Optional description of the ports in the signature.

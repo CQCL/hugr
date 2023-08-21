@@ -22,7 +22,7 @@ use delegate::delegate;
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
-pub struct AbstractSignature {
+pub struct FunctionType {
     /// Value inputs of the function.
     pub input: TypeRow,
     /// Value outputs of the function.
@@ -35,19 +35,19 @@ pub struct AbstractSignature {
 /// A concrete signature, which has been instantiated with a set of input extensions
 pub struct Signature {
     /// The underlying signature
-    pub signature: AbstractSignature,
+    pub signature: FunctionType,
     /// The extensions which are associated with all the inputs and carried through
     pub input_extensions: ExtensionSet,
 }
 
-impl AbstractSignature {
-    /// Builder method, add extension_reqs to an AbstractSignature
+impl FunctionType {
+    /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: &ExtensionSet) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs);
         self
     }
 
-    /// Instantiate an AbstractSignature, converting it to a concrete one
+    /// Instantiate an FunctionType, converting it to a concrete one
     pub fn with_input_extensions(self, es: ExtensionSet) -> Signature {
         Signature {
             signature: self,
@@ -61,7 +61,7 @@ impl AbstractSignature {
     }
 }
 
-impl From<Signature> for AbstractSignature {
+impl From<Signature> for FunctionType {
     fn from(sig: Signature) -> Self {
         sig.signature
     }
@@ -77,7 +77,7 @@ impl Signature {
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
-impl AbstractSignature {
+impl FunctionType {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -85,7 +85,7 @@ impl AbstractSignature {
     }
 }
 
-impl AbstractSignature {
+impl FunctionType {
     /// Create a new signature with specified inputs and outputs.
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         // TODO rename to just "new"
@@ -176,7 +176,7 @@ impl AbstractSignature {
     }
 }
 
-impl AbstractSignature {
+impl FunctionType {
     /// Returns the linear part of the signature
     /// TODO: This fails when mixing different linear types.
     #[inline(always)]
@@ -225,15 +225,15 @@ impl Signature {
 
     delegate! {
         to self.signature {
-            /// Inputs of the abstract signature
+            /// Inputs of the function type
             pub fn input(&self) -> &TypeRow;
-            /// Outputs of the abstract signature
+            /// Outputs of the function type
             pub fn output(&self) -> &TypeRow;
         }
     }
 }
 
-impl Display for AbstractSignature {
+impl Display for FunctionType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;
