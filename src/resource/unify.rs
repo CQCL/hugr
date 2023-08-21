@@ -323,9 +323,12 @@ impl UnificationContext {
     }
 
     /// Take a group of equal metas and merge them into a new, single meta.
-    /// Returns a set of metas that were merged.
-    fn coalesce(&mut self) -> Result<HashSet<Meta>, InferResourceError> {
+    /// 
+    /// Returns the set of new metas created and the set of metas that were
+    /// merged.
+    fn coalesce(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferResourceError> {
         let mut merged: HashSet<Meta> = HashSet::new();
+        let mut new_metas: HashSet<Meta> = HashSet::new();
         for cc in self.eq_graph.ccs().into_iter() {
             // Within a connected component everything is equal
             let combined_meta = self.fresh_meta();
@@ -341,6 +344,10 @@ impl UnificationContext {
                     }
                     self.constraints.remove(m).unwrap();
                     merged.insert(*m);
+                    // Record a new meta the first time that we use it; don't
+                    // bother recording a new meta if we don't add any
+                    // constraints. It should be safe to call this multiple times
+                    new_metas.insert(combined_meta);
                     println!("Coalesce Merged {:?}", m);
                 }
                 if let Some(solution) = self.solved.get(m) {
@@ -370,7 +377,7 @@ impl UnificationContext {
                 }
             }
         }
-        Ok(merged)
+        Ok((new_metas, merged))
     }
 
     /// Inspect the constraints of a given metavariable and try to find a
@@ -529,9 +536,11 @@ impl UnificationContext {
 
         // Keep going as long as we're making progress (= merging nodes)
         loop {
-            let mut to_delete = self.solve_constraints(&remaining)?;
-            let merged = self.coalesce()?;
-            let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).into_iter().cloned());
+            let to_delete = self.solve_constraints(&remaining)?;
+            let (new, merged) = self.coalesce()?;
+            let delta: HashSet<Meta> = HashSet::from_iter(to_delete
+                                                          .union(&merged)
+                                                          .into_iter().cloned());
 
             for m in delta.iter() {
                 if !merged.contains(&m) {
@@ -540,9 +549,11 @@ impl UnificationContext {
                 remaining.remove(m);
             }
 
-            if delta.is_empty() {
+            if delta.is_empty() && new.is_empty() {
                 break;
             }
+
+            new.into_iter().for_each(|m| { remaining.insert(m); });
         }
         self.results()
     }
