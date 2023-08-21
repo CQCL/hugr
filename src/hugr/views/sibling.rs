@@ -214,7 +214,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     }
 
     /// An iterator of the incoming boundary ports.
-    fn incoming_ports(&self) -> impl Iterator<Item = (Node, Port)> + '_
+    pub fn incoming_ports(&self) -> impl Iterator<Item = (Node, Port)> + '_
     where
         Base: HugrView,
     {
@@ -222,7 +222,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     }
 
     /// An iterator of the outgoing boundary ports.
-    fn outgoing_ports(&self) -> impl Iterator<Item = (Node, Port)> + '_
+    pub fn outgoing_ports(&self) -> impl Iterator<Item = (Node, Port)> + '_
     where
         Base: HugrView,
     {
@@ -230,7 +230,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     }
 
     /// An iterator of the boundary ports, either incoming or outgoing.
-    fn boundary_ports(&self, dir: Direction) -> impl Iterator<Item = (Node, Port)> + '_
+    pub fn boundary_ports(&self, dir: Direction) -> impl Iterator<Item = (Node, Port)> + '_
     where
         Base: HugrView,
     {
