@@ -179,8 +179,8 @@ impl TypeEnum {
 /// ```
 /// # use hugr::types::{Type, TypeBound, FunctionType};
 ///
-/// let graph_type = Type::new_graph(FunctionType::new_linear(vec![]));
-/// assert_eq!(graph_type.least_upper_bound(), TypeBound::Copyable);
+/// let func_type = Type::new_function(FunctionType::new_linear(vec![]));
+/// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 ///
 /// ```
 ///
@@ -191,9 +191,9 @@ impl Type {
     pub const UNIT: Self = Self(TypeEnum::Tuple(type_row![]), TypeBound::Eq);
     const UNIT_REF: &'static Self = &Self::UNIT;
 
-    /// Initialize a new graph type with a signature.
-    pub fn new_graph(signature: FunctionType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
+    /// Initialize a new function type.
+    pub fn new_function(signature: FunctionType) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(signature))))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -283,7 +283,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_graph(FunctionType::new_linear(vec![])),
+            Type::new_function(FunctionType::new_linear(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
@@ -294,7 +294,7 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), Graph([[]][]), my_custom([]), Alias(my_alias)])".to_string()
+            "Tuple([usize([]), Function([[]][]), my_custom([]), Alias(my_alias)])".to_string()
         );
     }
 

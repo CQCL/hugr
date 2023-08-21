@@ -56,7 +56,7 @@ impl PrimType {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (PrimType::Graph(_), PrimValue::Graph) => todo!(),
+            (PrimType::Function(_), PrimValue::Function) => todo!(),
             _ => Err(ConstTypeError::ValueCheckFail(
                 Type::new(TypeEnum::Prim(self.clone())),
                 Value::Prim(val.clone()),

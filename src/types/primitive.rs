@@ -13,8 +13,8 @@ pub(super) enum PrimType {
     Extension(CustomType),
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
-    #[display(fmt = "Graph({})", "_0")]
-    Graph(Box<FunctionType>),
+    #[display(fmt = "Function({})", "_0")]
+    Function(Box<FunctionType>),
 }
 
 impl PrimType {
@@ -22,7 +22,7 @@ impl PrimType {
         match self {
             PrimType::Extension(c) => c.bound(),
             PrimType::Alias(a) => a.bound,
-            PrimType::Graph(_) => TypeBound::Copyable,
+            PrimType::Function(_) => TypeBound::Copyable,
         }
     }
 }

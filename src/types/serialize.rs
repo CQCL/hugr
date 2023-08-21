@@ -35,7 +35,7 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Prim(t) => match t {
                 PrimType::Extension(c) => SerSimpleType::Opaque(c),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
-                PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
+                PrimType::Function(sig) => SerSimpleType::G(Box::new(*sig)),
             },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
@@ -48,7 +48,7 @@ impl From<SerSimpleType> for Type {
         match value {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
-            SerSimpleType::G(sig) => Type::new_graph(*sig),
+            SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
             SerSimpleType::Sum(sum) => sum.into(),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
@@ -68,7 +68,7 @@ mod test {
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_graph(FunctionType::new_linear(vec![]));
+        let g: Type = Type::new_function(FunctionType::new_linear(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 

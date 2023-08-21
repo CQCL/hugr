@@ -159,7 +159,7 @@ impl DataflowOpTrait for Call {
 
     #[inline]
     fn static_input(&self) -> Option<Type> {
-        Some(Type::new_graph(self.signature.clone()))
+        Some(Type::new_function(self.signature.clone()))
     }
 }
 
@@ -182,7 +182,7 @@ impl DataflowOpTrait for CallIndirect {
         let mut s = self.signature.clone();
         s.input
             .to_mut()
-            .insert(0, Type::new_graph(self.signature.clone()));
+            .insert(0, Type::new_function(self.signature.clone()));
         s
     }
 }

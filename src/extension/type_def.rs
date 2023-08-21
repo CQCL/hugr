@@ -164,7 +164,7 @@ mod test {
             bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(FunctionType::new(
+            def.instantiate_concrete(vec![TypeArg::Type(Type::new_function(FunctionType::new(
                 vec![],
                 vec![],
             )))])
