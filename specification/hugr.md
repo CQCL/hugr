@@ -1758,14 +1758,6 @@ $\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \
 **CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s extensions.
 
-$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
-
-**to_const** - For operations which instantiate a graph (**to\_const**
-and **Call**) the functions are given an extra parameter at graph
-construction time which corresponds to the function type that they are
-meant to instantiate. This type will be given by a typeless edge from
-the graph in question to the operation, with the graph’s type added as
-an edge weight.
 
 ## Glossary
 
