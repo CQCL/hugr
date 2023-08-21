@@ -234,7 +234,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
-        self.base
+        self.nodes.contains(n) && self.base
             .linked_ports(n, p)
             .any(|(n, _)| !self.nodes.contains(&n))
     }
