@@ -1198,7 +1198,7 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+                ResourceError::ParentIOResourceMismatch { .. }
             ))
         );
         Ok(())
@@ -1209,15 +1209,16 @@ mod test {
         let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
             .with_resource_delta(&ResourceSet::singleton(&"R".into()));
 
-        let builder = DFGBuilder::new(main_signature)?;
+        let mut builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        builder.set_outputs([w])?;
+        let hugr = builder.base.validate(); // finish_hugr_with_outputs([w]);
 
         assert_matches!(
             hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::ResourceError(
+            Err(ValidationError::ResourceError(
                 ResourceError::TgtExceedsSrcResources { .. }
-            )))
+            ))
         );
         Ok(())
     }
