@@ -38,7 +38,7 @@ use super::{sealed::HugrInternals, HugrView};
 
 /// The incoming boundary (resp. outgoing boundary) is given by the input (resp.
 /// output) ports of the subgraph that are linked to nodes outside of the subgraph.
-/// The signature of the sugbraph is then given by the types of the incoming
+/// The signature of the subgraph is then given by the types of the incoming
 /// and outgoing boundary edges. Given a replacement with the same signature,
 /// a [`SimpleReplacement`] can be constructed to rewrite the subgraph with the
 /// replacement.
