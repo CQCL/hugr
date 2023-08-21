@@ -9,7 +9,7 @@
 //! while the former provide views for subgraphs within a single level of the
 //! hierarchy.
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use portgraph::{algorithms::ConvexChecker, view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
@@ -18,7 +18,7 @@ use crate::{
         handle::{ContainerHandle, DataflowOpID},
         OpTag, OpTrait,
     },
-    types::{AbstractSignature, EdgeKind},
+    types::FunctionType,
     Hugr, Node, Port, SimpleReplacement,
 };
 
@@ -244,32 +244,19 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self) -> AbstractSignature
+    pub fn signature(&self) -> FunctionType
     where
         Base: HugrView,
     {
-        let (input, input_static): (Vec<_>, Vec<_>) = self
+        let input = self
             .incoming_ports()
-            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p))
-            .partition_map(|edgekind| match edgekind {
-                EdgeKind::Value(t) => Either::Left(t),
-                EdgeKind::Static(t) => Either::Right(t),
-                _ => unimplemented!("ControlFlow and StateOrder edges not supported"),
-            });
+            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p).cloned())
+            .collect_vec();
         let output = self
             .outgoing_ports()
-            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p))
-            .map(|edgekind| {
-                if let EdgeKind::Value(t) = edgekind {
-                    t
-                } else {
-                    unimplemented!(
-                        "ControlFlow, StateOrder and Static edges not supported for output"
-                    )
-                }
-            })
+            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p).cloned())
             .collect_vec();
-        AbstractSignature::new(input, output, input_static)
+        FunctionType::new(input, output)
     }
 
     /// The parent of the sibling subgraph.
@@ -417,7 +404,6 @@ mod tests {
         ops::handle::{FuncID, NodeHandle},
         std_extensions::quantum::test::cx_gate,
         type_row,
-        types::AbstractSignature,
     };
 
     use super::*;
@@ -452,7 +438,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            AbstractSignature::new_linear(type_row![QB_T, QB_T]).pure(),
+            FunctionType::new_linear(type_row![QB_T, QB_T]).pure(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -484,8 +470,7 @@ mod tests {
         let sub = SiblingSubgraph::from_dataflow_graph(&func)?;
 
         let empty_dfg = {
-            let builder =
-                DFGBuilder::new(AbstractSignature::new_linear(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -507,7 +492,7 @@ mod tests {
         let sub = SiblingSubgraph::from_dataflow_graph(&func)?;
         assert_eq!(
             sub.signature(),
-            AbstractSignature::new_linear(type_row![QB_T, QB_T])
+            FunctionType::new_linear(type_row![QB_T, QB_T])
         );
         Ok(())
     }
@@ -519,7 +504,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
