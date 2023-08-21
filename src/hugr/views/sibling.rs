@@ -1,16 +1,13 @@
 //! Views for HUGR sibling subgraphs.
 //!
-//! Views into subgraphs of HUGRs within a single level of the
-//! hierarchy, i.e. within a sibling graph. Such a subgraph is
-//! represented by a parent node, of which all nodes in the sibling subgraph are
-//! children, as well as a set of edges forming the subgraph boundary.
-//! The boundary must be fully contained within the sibling graph of the parent.
+//! Views into convex subgraphs of HUGRs within a single level of the
+//! hierarchy, i.e. within a sibling graph. Convex subgraph are always
+//! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
 //!
 //! Sibling subgraphs complement [`super::HierarchyView`]s in the sense that the
 //! latter provide views for subgraphs defined by hierarchical relationships,
 //! while the former provide views for subgraphs within a single level of the
 //! hierarchy.
-//!
 
 use itertools::{Either, Itertools};
 use portgraph::{algorithms::ConvexChecker, view::Subgraph, Direction, PortView};
@@ -52,30 +49,6 @@ pub struct SiblingSubgraph<'g, Base> {
 }
 
 impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
-    /// A sibling subgraph from a HUGR.
-    ///
-    /// The subgraph is given by the sibling graph of the root. If you wish to
-    /// create a subgraph from another root, wrap the argument `region` in a
-    /// [`super::SiblingGraph`].
-    ///
-    /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
-    /// subgraph is empty.
-    pub fn from_sibling_graph(sibling_graph: &'g Base) -> Result<Self, InvalidSubgraph>
-    where
-        Base: HugrView,
-    {
-        let root = sibling_graph.root();
-        let nodes = sibling_graph.children(root).collect_vec();
-        if nodes.is_empty() {
-            Err(InvalidSubgraph::EmptySubgraph)
-        } else {
-            Ok(Self {
-                base: sibling_graph,
-                nodes,
-            })
-        }
-    }
-
     /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted HUGR.
     ///
     /// The subgraph is given by the nodes between the input and output
@@ -161,16 +134,16 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         Base: HugrView,
     {
         let pg = base.portgraph();
-        let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
         let incoming = incoming.into_iter().flat_map(|(n, p)| match p.direction() {
-            Direction::Outgoing => base.linked_ports(n, p).map(to_pg).collect(),
-            Direction::Incoming => vec![to_pg((n, p))],
+            Direction::Outgoing => base.linked_ports(n, p).collect(),
+            Direction::Incoming => vec![(n, p)],
         });
         let outgoing = outgoing.into_iter().flat_map(|(n, p)| match p.direction() {
-            Direction::Incoming => base.linked_ports(n, p).map(to_pg).collect(),
-            Direction::Outgoing => vec![to_pg((n, p))],
+            Direction::Incoming => base.linked_ports(n, p).collect(),
+            Direction::Outgoing => vec![(n, p)],
         });
-        let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing));
+        let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
+        let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing).map(to_pg));
         if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
         }
@@ -445,6 +418,32 @@ mod tests {
     };
 
     use super::*;
+
+    impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+        /// A sibling subgraph from a HUGR.
+        ///
+        /// The subgraph is given by the sibling graph of the root. If you wish to
+        /// create a subgraph from another root, wrap the argument `region` in a
+        /// [`super::SiblingGraph`].
+        ///
+        /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
+        /// subgraph is empty.
+        pub fn from_sibling_graph(sibling_graph: &'g Base) -> Result<Self, InvalidSubgraph>
+        where
+            Base: HugrView,
+        {
+            let root = sibling_graph.root();
+            let nodes = sibling_graph.children(root).collect_vec();
+            if nodes.is_empty() {
+                Err(InvalidSubgraph::EmptySubgraph)
+            } else {
+                Ok(Self {
+                    base: sibling_graph,
+                    nodes,
+                })
+            }
+        }
+    }
 
     fn build_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
