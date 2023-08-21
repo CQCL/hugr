@@ -1,7 +1,10 @@
 //! Logic for checking values against types.
 use thiserror::Error;
 
-use crate::values::{PrimValue, Value};
+use crate::{
+    values::{PrimValue, Value},
+    HugrView,
+};
 
 use super::{primitive::PrimType, CustomType, Type, TypeEnum};
 
@@ -56,7 +59,13 @@ impl PrimType {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (PrimType::Function(_), PrimValue::Function) => todo!(),
+            (PrimType::Function(t), PrimValue::Function(v))
+                if Some(t.as_ref()) == v.get_function_type(v.root()) =>
+            {
+                // exact signature equality, in future this may need to be
+                // relaxed to be compatibility checks between the signatures.
+                Ok(())
+            }
             _ => Err(ConstTypeError::ValueCheckFail(
                 Type::new(TypeEnum::Prim(self.clone())),
                 Value::Prim(val.clone()),

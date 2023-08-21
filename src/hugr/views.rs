@@ -12,8 +12,8 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 use super::{Hugr, NodeMetadata, NodeType};
 use super::{Node, Port};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{OpName, OpTag, OpType};
-use crate::types::EdgeKind;
+use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
+use crate::types::{EdgeKind, FunctionType};
 use crate::Direction;
 
 /// A trait for inspecting HUGRs.
@@ -151,6 +151,10 @@ pub trait HugrView: sealed::HugrInternals {
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
     fn get_io(&self, node: Node) -> Option<[Node; 2]>;
+
+    /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
+    /// type. Otherwise return None.
+    fn get_function_type(&self, node: Node) -> Option<&FunctionType>;
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
@@ -315,6 +319,15 @@ where
         }
     }
 
+    fn get_function_type(&self, node: Node) -> Option<&FunctionType> {
+        let op = self.get_nodetype(node);
+        match &op.op {
+            OpType::DFG(DFG { signature })
+            | OpType::FuncDecl(FuncDecl { signature, .. })
+            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
+            _ => None,
+        }
+    }
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.as_ref().metadata.get(node.index)
