@@ -695,52 +695,6 @@ mod test {
     }
 
     #[test]
-    // idk wht to call this
-    // We've got to be weird
-    // Is this the same as from_graph?
-    // this might be the minus test that we have elsewhere?
-    fn idk() -> Result<(), Box<dyn Error>> {
-        let rs = ResourceSet::singleton(&"R".into());
-        let root_signature =
-            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
-        let mut builder = DFGBuilder::new(root_signature)?;
-        let [input_wire] = builder.input_wires_arr();
-
-        let add_r_sig =
-            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
-
-        let add_r = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG {
-                signature: add_r_sig,
-            }),
-            [input_wire],
-        )?;
-        let [wl] = add_r.outputs_arr();
-
-        // Dangling thingy
-        let src_sig = AbstractSignature::new_df(type_row![], type_row![BIT])
-            .with_resource_delta(&ResourceSet::new());
-        let src = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG { signature: src_sig }),
-            [],
-        )?;
-        let [wr] = src.outputs_arr();
-
-        let mult_sig = AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::new());
-        let mult = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG {
-                signature: mult_sig,
-            }),
-            [wl, wr],
-        )?;
-        let [w] = mult.outputs_arr();
-
-        let h = builder.finish_hugr_with_outputs([w])?;
-        Ok(())
-    }
-
-    #[test]
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
@@ -837,6 +791,51 @@ mod test {
         ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
         ctx.add_constraint(ab, Constraint::Plus("B".into(), a));
         ctx.main_loop()?;
+        Ok(())
+    }
+
+    #[test]
+    // Infer an the resources on a child node with no inputs
+    fn dangling_src() -> Result<(), Box<dyn Error>> {
+        let rs = ResourceSet::singleton(&"R".into());
+        let root_signature =
+            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
+        let mut builder = DFGBuilder::new(root_signature)?;
+        let [input_wire] = builder.input_wires_arr();
+
+        let add_r_sig =
+            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
+
+        let add_r = builder.add_dataflow_node(
+            NodeType::open_resources(ops::DFG {
+                signature: add_r_sig,
+            }),
+            [input_wire],
+        )?;
+        let [wl] = add_r.outputs_arr();
+
+        // Dangling thingy
+        let src_sig = AbstractSignature::new_df(type_row![], type_row![BIT])
+            .with_resource_delta(&ResourceSet::new());
+        let src = builder.add_dataflow_node(
+            NodeType::open_resources(ops::DFG { signature: src_sig }),
+            [],
+        )?;
+        let [wr] = src.outputs_arr();
+
+
+        let mult_sig = AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT])
+            .with_resource_delta(&ResourceSet::new());
+        // Mult has open extension requirements, which we should solve to be "R"
+        let mult = builder.add_dataflow_node(
+            NodeType::open_resources(ops::DFG {
+                signature: mult_sig,
+            }),
+            [wl, wr],
+        )?;
+        let [w] = mult.outputs_arr();
+
+        let h = builder.finish_hugr_with_outputs([w])?;
         Ok(())
     }
 }
