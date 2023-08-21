@@ -8,11 +8,11 @@
 
 use super::{ResourceId, ResourceSet};
 use crate::{
+    hugr::views::{HierarchyView, HugrView, SiblingGraph},
     hugr::{Node, Port},
-    hugr::views::{HugrView, HierarchyView, SiblingGraph},
-    Direction,
     ops::OpType,
     types::EdgeKind,
+    Direction,
 };
 
 use super::validate::ResourceError;
@@ -21,9 +21,9 @@ use petgraph::graph as pg;
 
 use std::collections::{HashMap, HashSet};
 
-use thiserror::Error;
-use std::collections::BTreeSet;
 use std::cmp::{Ord, Ordering};
+use std::collections::BTreeSet;
+use thiserror::Error;
 
 pub type ResourceSolution = HashMap<(Node, Direction), ResourceSet>;
 
@@ -32,10 +32,6 @@ pub fn infer_resources(hugr: &impl HugrView) -> Result<ResourceSolution, InferRe
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()
 }
-
-/* TODO:
-- Add more complicated solving that can handle the case of "reverse"
-*/
 
 /// Metavariables don't need much
 type Meta = usize;
@@ -69,11 +65,10 @@ impl PartialOrd for Constraint {
                 } else {
                     Some(a_len.cmp(&b_len))
                 }
-
             }
             (Self::Exactly(_), _) => Some(Ordering::Greater),
             (_, Self::Exactly(_)) => Some(Ordering::Less),
-            (Self::Plus(r1, m1), Self::Plus(r2, m2)) => Some(m1.cmp(m2)),
+            (Self::Plus(_, m1), Self::Plus(_, m2)) => Some(m1.cmp(m2)),
             (Self::Plus(_, _), _) => Some(Ordering::Greater),
             (_, Self::Plus(_, _)) => Some(Ordering::Less),
             (Self::Equal(m1), Self::Equal(m2)) => m1.partial_cmp(m2),
@@ -115,7 +110,7 @@ pub enum InferResourceError {
 /// between nodes represent equality constraints.
 struct EqGraph {
     equalities: pg::Graph<Meta, (), petgraph::Undirected>,
-    node_map: HashMap<Meta, pg::NodeIndex>
+    node_map: HashMap<Meta, pg::NodeIndex>,
 }
 
 impl EqGraph {
@@ -149,13 +144,11 @@ impl EqGraph {
     pub fn ccs(&self) -> Vec<Vec<Meta>> {
         petgraph::algo::tarjan_scc(&self.equalities)
             .into_iter()
-            .map(|cc| cc
-                 .into_iter()
-                 .map(|n| *self
-                      .equalities
-                      .node_weight(n)
-                      .unwrap())
-                 .collect())
+            .map(|cc| {
+                cc.into_iter()
+                    .map(|n| *self.equalities.node_weight(n).unwrap())
+                    .collect()
+            })
             .collect()
     }
 }
@@ -209,7 +202,9 @@ impl UnificationContext {
     fn add_constraint(&mut self, m: Meta, c: Constraint) {
         self.constraints
             .entry(m)
-            .and_modify(|cs| { cs.insert(c.clone()); })
+            .and_modify(|cs| {
+                cs.insert(c.clone());
+            })
             .or_insert(BTreeSet::from_iter([c]));
     }
 
@@ -262,7 +257,10 @@ impl UnificationContext {
     }
 
     /// Iterate over the nodes in a hugr and generate unification constraints
-    fn gen_constraints<T>(&mut self, hugr: &T) where T: HugrView {
+    fn gen_constraints<T>(&mut self, hugr: &T)
+    where
+        T: HugrView,
+    {
         // The toplevel sibling graph can be open, and we should note what those variables are
         let toplevel: SiblingGraph<Node, T> = SiblingGraph::new(hugr, hugr.root());
         for toplevel_node in toplevel.nodes().into_iter() {
@@ -302,17 +300,25 @@ impl UnificationContext {
                     self.add_solution(m_output, sig.output_resources());
                 }
             }
-
         }
         // Seperate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
             let sig: &OpType = hugr.get_nodetype(tgt_node).into();
             // Incoming ports with a dataflow edge
-            for port in hugr.node_inputs(tgt_node).filter(|src_port| matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_)))) {
+            for port in hugr
+                .node_inputs(tgt_node)
+                .filter(|src_port| matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_))))
+            {
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
-                    let m_src = self.resources.get(&(src_node, Direction::Outgoing)).unwrap();
-                    let m_tgt = self.resources.get(&(tgt_node, Direction::Incoming)).unwrap();
+                    let m_src = self
+                        .resources
+                        .get(&(src_node, Direction::Outgoing))
+                        .unwrap();
+                    let m_tgt = self
+                        .resources
+                        .get(&(tgt_node, Direction::Incoming))
+                        .unwrap();
                     self.add_constraint(*m_src, Constraint::Equal(*m_tgt));
                 }
             }
@@ -358,23 +364,27 @@ impl UnificationContext {
                 };
 
                 if src_rs.is_subset(&tgt_rs) {
-                    Some(InferResourceError::EdgeMismatch(ResourceError::TgtExceedsSrcResources {
-                        from: *src,
-                        from_offset: Port::new(Direction::Outgoing, 0),
-                        from_resources: src_rs,
-                        to: *tgt,
-                        to_offset: Port::new(Direction::Incoming, 0),
-                        to_resources: tgt_rs,
-                    }))
+                    Some(InferResourceError::EdgeMismatch(
+                        ResourceError::TgtExceedsSrcResources {
+                            from: *src,
+                            from_offset: Port::new(Direction::Outgoing, 0),
+                            from_resources: src_rs,
+                            to: *tgt,
+                            to_offset: Port::new(Direction::Incoming, 0),
+                            to_resources: tgt_rs,
+                        },
+                    ))
                 } else {
-                    Some(InferResourceError::EdgeMismatch(ResourceError::SrcExceedsTgtResources {
-                        from: *src,
-                        from_offset: Port::new(Direction::Outgoing, 0),
-                        from_resources: src_rs,
-                        to: *tgt,
-                        to_offset: Port::new(Direction::Incoming, 0),
-                        to_resources: tgt_rs,
-                    }))
+                    Some(InferResourceError::EdgeMismatch(
+                        ResourceError::SrcExceedsTgtResources {
+                            from: *src,
+                            from_offset: Port::new(Direction::Outgoing, 0),
+                            from_resources: src_rs,
+                            to: *tgt,
+                            to_offset: Port::new(Direction::Incoming, 0),
+                            to_resources: tgt_rs,
+                        },
+                    ))
                 }
             } else {
                 None
@@ -389,7 +399,7 @@ impl UnificationContext {
     }
 
     /// Take a group of equal metas and merge them into a new, single meta.
-    /// 
+    ///
     /// Returns the set of new metas created and the set of metas that were
     /// merged.
     fn coalesce(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferResourceError> {
@@ -405,7 +415,10 @@ impl UnificationContext {
                 }
 
                 if let Some(cs) = self.constraints.get(m).cloned() {
-                    for c in cs.into_iter().filter(|c| !matches!(c, Constraint::Equal(_))) {
+                    for c in cs
+                        .into_iter()
+                        .filter(|c| !matches!(c, Constraint::Equal(_)))
+                    {
                         self.add_constraint(combined_meta, c.clone());
                     }
                     self.constraints.remove(m).unwrap();
@@ -420,10 +433,17 @@ impl UnificationContext {
                     match self.solved.get(&combined_meta) {
                         Some(existing_solution) => {
                             if solution != existing_solution {
-                                return Err(self.report_mismatch(*m, combined_meta, solution.clone(), existing_solution.clone() ));
+                                return Err(self.report_mismatch(
+                                    *m,
+                                    combined_meta,
+                                    solution.clone(),
+                                    existing_solution.clone(),
+                                ));
                             }
-                        },
-                        None => { self.solved.insert(combined_meta, solution.clone()); },
+                        }
+                        None => {
+                            self.solved.insert(combined_meta, solution.clone());
+                        }
                     }
                 }
                 if self.variables.contains(m) {
@@ -471,7 +491,9 @@ impl UnificationContext {
                     solved = true;
                 }
                 // Just register the equality in the EqGraph, we'll process it later
-                Constraint::Equal(other_meta) => { self.eq_graph.register_eq(meta, *other_meta); },
+                Constraint::Equal(other_meta) => {
+                    self.eq_graph.register_eq(meta, *other_meta);
+                }
                 Constraint::Plus(r, other_meta) => {
                     match self.get_solution(other_meta) {
                         Some(rs) => {
@@ -481,7 +503,12 @@ impl UnificationContext {
                                 // Let's check that this is right?
                                 Some(rs) => {
                                     if rs != &rrs {
-                                        return Err(self.report_mismatch(meta, *other_meta, rs.clone(), rrs));
+                                        return Err(self.report_mismatch(
+                                            meta,
+                                            *other_meta,
+                                            rs.clone(),
+                                            rrs,
+                                        ));
                                     }
                                 }
                                 None => self.add_solution(meta, rrs),
@@ -510,9 +537,7 @@ impl UnificationContext {
     /// available. When there are variables, we should leave the graph as it is,
     /// but make sure that no matter what they're instantiated to, the graph
     /// still makes sense (should pass the resource validation check)
-    pub fn results(
-        &mut self,
-    ) -> Result<ResourceSolution, InferResourceError> {
+    pub fn results(&mut self) -> Result<ResourceSolution, InferResourceError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
         let mut results: ResourceSolution = HashMap::new();
@@ -538,7 +563,7 @@ impl UnificationContext {
     // TODO: This should really be a list
     fn live_var(&self, m: &Meta) -> Option<Meta> {
         if self.variables.contains(m) || self.variables.contains(&self.resolve(*m)) {
-            return None
+            return None;
         }
 
         // TODO: We should be doing something to ensure that these are the same check...
@@ -592,18 +617,15 @@ impl UnificationContext {
     /// where it was possible to infer them. If it wasn't possible to infer a
     /// *concrete* `ResourceSet`, e.g. if the ResourceSet relies on an open
     /// variable in the toplevel graph, don't include that location in the map
-    pub fn main_loop(
-        &mut self,
-    ) -> Result<ResourceSolution, InferResourceError> {
+    pub fn main_loop(&mut self) -> Result<ResourceSolution, InferResourceError> {
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
         // Keep going as long as we're making progress (= merging nodes)
         loop {
             let to_delete = self.solve_constraints(&remaining)?;
             let (new, merged) = self.coalesce()?;
-            let delta: HashSet<Meta> = HashSet::from_iter(to_delete
-                                                          .union(&merged)
-                                                          .into_iter().cloned());
+            let delta: HashSet<Meta> =
+                HashSet::from_iter(to_delete.union(&merged).into_iter().cloned());
 
             for m in delta.iter() {
                 if !merged.contains(&m) {
@@ -616,7 +638,9 @@ impl UnificationContext {
                 break;
             }
 
-            new.into_iter().for_each(|m| { remaining.insert(m); });
+            new.into_iter().for_each(|m| {
+                remaining.insert(m);
+            });
         }
         self.results()
     }
@@ -627,9 +651,7 @@ mod test {
     use std::error::Error;
 
     use super::*;
-    use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
-    };
+    use crate::builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr};
     use crate::hugr::HugrInternalsMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
@@ -738,13 +760,20 @@ mod test {
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
 
-        let metas: Vec<Meta> = (2..8).into_iter().map(|i| {
-            let meta = ctx.fresh_meta();
-            ctx.resources.insert((NodeIndex::new(i).into(), Direction::Incoming), meta);
-            meta
-        }).collect();
+        let metas: Vec<Meta> = (2..8)
+            .into_iter()
+            .map(|i| {
+                let meta = ctx.fresh_meta();
+                ctx.resources
+                    .insert((NodeIndex::new(i).into(), Direction::Incoming), meta);
+                meta
+            })
+            .collect();
 
-        ctx.add_constraint(metas[2], Constraint::Exactly(ResourceSet::singleton(&"A".into())));
+        ctx.add_constraint(
+            metas[2],
+            Constraint::Exactly(ResourceSet::singleton(&"A".into())),
+        );
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
         ctx.add_constraint(metas[0], Constraint::Plus("B".into(), metas[2]));
         ctx.add_constraint(metas[4], Constraint::Plus("C".into(), metas[0]));
@@ -784,9 +813,7 @@ mod test {
         // to handle that.
         assert_matches!(
             hugr,
-            Err(BuildError::InvalidHUGR(
-                ValidationError::CantInfer(_)
-            ))
+            Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
         );
         Ok(())
     }
@@ -857,9 +884,12 @@ mod test {
         let b = ctx.fresh_meta();
         let ab = ctx.fresh_meta();
         // Some nonsense so that the constraints register as "live"
-        ctx.resources.insert((NodeIndex::new(2).into(), Direction::Outgoing), a);
-        ctx.resources.insert((NodeIndex::new(3).into(), Direction::Outgoing), b);
-        ctx.resources.insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
+        ctx.resources
+            .insert((NodeIndex::new(2).into(), Direction::Outgoing), a);
+        ctx.resources
+            .insert((NodeIndex::new(3).into(), Direction::Outgoing), b);
+        ctx.resources
+            .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
         ctx.variables.insert(a);
         ctx.variables.insert(b);
         ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
@@ -896,7 +926,6 @@ mod test {
             [],
         )?;
         let [wr] = src.outputs_arr();
-
 
         let mult_sig = AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT])
             .with_resource_delta(&ResourceSet::new());

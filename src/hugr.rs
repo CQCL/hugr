@@ -25,12 +25,7 @@ use pyo3::prelude::*;
 
 pub use self::views::HugrView;
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::resource::{
-    infer_resources,
-    InferResourceError,
-    ResourceSet,
-    ResourceSolution,
-};
+use crate::resource::{infer_resources, InferResourceError, ResourceSet, ResourceSolution};
 use crate::types::{AbstractSignature, Signature};
 
 use delegate::delegate;
