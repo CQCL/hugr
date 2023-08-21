@@ -222,10 +222,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         if nodes.is_empty() {
             return Err(InvalidSubgraph::EmptySubgraph);
         }
-        let Some(parent) = base.get_parent(nodes[0]) else {
-            return Err(InvalidSubgraph::NoSharedParent);
-        };
-        if !nodes.iter().all(|&n| base.get_parent(n) == Some(parent)) {
+        if !nodes.iter().map(|&n| base.get_parent(n)).all_equal() {
             return Err(InvalidSubgraph::NoSharedParent);
         }
         Ok(Self { base, nodes })
