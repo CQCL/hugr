@@ -99,7 +99,7 @@ impl OpTrait for Const {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static)
+        Some(EdgeKind::Static(self.typ.clone()))
     }
 }
 

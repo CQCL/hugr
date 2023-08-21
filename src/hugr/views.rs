@@ -171,6 +171,9 @@ pub trait HugrView: sealed::HugrInternals {
                 let optype = self.get_optype(node.into());
                 let offset = graph.port_offset(port).unwrap();
                 match optype.port_kind(offset).unwrap() {
+                    EdgeKind::Static(ty) => {
+                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+                    }
                     EdgeKind::Value(ty) => {
                         PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
                     }

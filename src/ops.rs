@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{AbstractSignature, EdgeKind, SignatureDescription};
+use crate::types::{AbstractSignature, EdgeKind, SignatureDescription, Type};
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;
@@ -80,8 +80,11 @@ impl OpType {
         let port_count = signature.port_count(dir);
         if port.index() < port_count {
             signature.get(port).cloned().map(EdgeKind::Value)
-        } else if port.index() == port_count && dir == Direction::Incoming && self.static_input() {
-            Some(EdgeKind::Static)
+        } else if port.index() == port_count
+            && dir == Direction::Incoming
+            && self.static_input().is_some()
+        {
+            self.static_input().map(EdgeKind::Static)
         } else {
             self.other_port(dir)
         }
@@ -95,7 +98,8 @@ impl OpType {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
             // if there is a static input it comes before the non_df_ports
-            let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
+            let static_input =
+                (dir == Direction::Incoming && self.static_input().is_some()) as usize;
 
             Some(Port::new(
                 dir,
@@ -115,7 +119,7 @@ impl OpType {
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
         // if there is a static input it comes before the non_df_ports
-        let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
+        let static_input = (dir == Direction::Incoming && self.static_input().is_some()) as usize;
         signature.port_count(dir) + non_df_count + static_input
     }
 
@@ -183,11 +187,11 @@ pub trait OpTrait {
         Default::default()
     }
 
-    /// Report whether this operation has a static input (only true for
+    /// Get the static input type of this operation if it has one (only Some for
     /// [`LoadConstant`] and [`Call`])
     #[inline]
-    fn static_input(&self) -> bool {
-        false
+    fn static_input(&self) -> Option<Type> {
+        None
     }
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,

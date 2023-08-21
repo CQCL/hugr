@@ -11,8 +11,8 @@ pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn signature(&self) -> AbstractSignature;
 
-    fn static_input(&self) -> bool {
-        false
+    fn static_input(&self) -> Option<Type> {
+        None
     }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -125,7 +125,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::other_output(self)
     }
 
-    fn static_input(&self) -> bool {
+    fn static_input(&self) -> Option<Type> {
         DataflowOpTrait::static_input(self)
     }
 }
@@ -157,8 +157,8 @@ impl DataflowOpTrait for Call {
     }
 
     #[inline]
-    fn static_input(&self) -> bool {
-        true
+    fn static_input(&self) -> Option<Type> {
+        Some(Type::new_graph(self.signature.clone()))
     }
 }
 
@@ -205,8 +205,8 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     #[inline]
-    fn static_input(&self) -> bool {
-        true
+    fn static_input(&self) -> Option<Type> {
+        Some(self.datatype.clone())
     }
 }
 

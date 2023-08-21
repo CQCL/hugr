@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::extension::validate::{ExtensionError, ExtensionValidator};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
-use crate::types::EdgeKind;
+use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -379,11 +379,16 @@ impl<'a> ValidationContext<'a> {
         let local = Some(from_parent) == to_parent;
 
         let is_static = match from_optype.port_kind(from_offset).unwrap() {
-            EdgeKind::Static => {
+            EdgeKind::Static(typ) => {
                 if !(OpTag::Const.is_superset(from_optype.tag())
                     || OpTag::Function.is_superset(from_optype.tag()))
                 {
-                    return Err(InterGraphEdgeError::InvalidConstSrc { from, from_offset }.into());
+                    return Err(InterGraphEdgeError::InvalidConstSrc {
+                        from,
+                        from_offset,
+                        typ,
+                    }
+                    .into());
                 };
                 true
             }
@@ -648,8 +653,14 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
-    #[error("Const edge comes from an invalid node type: {from:?} ({from_offset:?}).")]
-    InvalidConstSrc { from: Node, from_offset: Port },
+    #[error(
+        "Const edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
+    )]
+    InvalidConstSrc {
+        from: Node,
+        from_offset: Port,
+        typ: Type,
+    },
 }
 
 #[cfg(test)]
