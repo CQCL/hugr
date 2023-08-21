@@ -247,7 +247,7 @@ impl Extension {
         }
     }
 
-    /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this resource.
+    /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
     pub fn instantiate_extension_op(
         &self,
         op_name: &str,

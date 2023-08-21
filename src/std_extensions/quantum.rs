@@ -60,7 +60,7 @@ fn extension() -> Extension {
 }
 
 lazy_static! {
-    /// Collections extension definition.
+    /// Quantum extension definition.
     pub static ref EXTENSION: Extension = extension();
 }
 
