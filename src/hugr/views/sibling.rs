@@ -380,7 +380,7 @@ pub enum InvalidReplacement {
     InvalidSignature,
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
-    NonConvexSubgrah,
+    NonConvexSubgraph,
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
