@@ -94,6 +94,7 @@ impl OpType {
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
+            // if there is a static input it comes before the non_df_ports
             let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
 
             Some(Port::new(
@@ -113,8 +114,8 @@ impl OpType {
             .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
+        // if there is a static input it comes before the non_df_ports
         let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
-        dbg!(static_input);
         signature.port_count(dir) + non_df_count + static_input
     }
 
