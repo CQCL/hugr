@@ -17,9 +17,9 @@ use portgraph::{algorithms::ConvexChecker, view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::{
-    ops::{OpTag, OpTrait},
+    ops::{handle::DfgID, OpTag, OpTrait},
     types::{AbstractSignature, EdgeKind},
-    Direction, Hugr, Node, Port, SimpleReplacement,
+    Hugr, Node, Port, SimpleReplacement,
 };
 
 use super::{sealed::HugrInternals, HugrView};
@@ -229,9 +229,11 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
-        self.nodes.contains(n) && self.base
-            .linked_ports(n, p)
-            .any(|(n, _)| !self.nodes.contains(&n))
+        self.nodes.contains(&n)
+            && self
+                .base
+                .linked_ports(n, p)
+                .any(|(n, _)| !self.nodes.contains(&n))
     }
 
     /// An iterator of the incoming boundary ports.
@@ -332,7 +334,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
 
         let rep_root = replacement.root();
         let dfg_optype = replacement.get_optype(rep_root);
-        if !OpTag::Dfg.is_superset(dfg_optype.tag())  {
+        if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph);
         }
         let Some((rep_input, rep_output)) = replacement
@@ -366,14 +368,16 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
                 .get(p)
                 .is_some()
         });
-        let incoming = self.incoming_ports();
-        let outgoing = self
-            .outgoing_ports()
-            .map(|(n, p)| self.base.linked_ports(n, p));
-        let nu_inp = rep_inputs.into_iter().zip_eq(incoming).collect();
-        let nu_out = outgoing
+        let self_inputs = self.incoming_ports();
+        let self_outputs = self.outgoing_ports();
+        let nu_inp = rep_inputs.into_iter().zip_eq(self_inputs).collect();
+        let nu_out = self_outputs
             .zip_eq(rep_outputs)
-            .flat_map(|(outs, rep)| outs.map(move |out| (out, rep)))
+            .flat_map(|((self_source_n, self_source_p), rep_target)| {
+                self.base
+                    .linked_ports(self_source_n, self_source_p)
+                    .map(move |self_target| (self_target, rep_target))
+            })
             .collect();
 
         Ok(SimpleReplacement::new(
@@ -432,9 +436,9 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        extension::prelude::QB_T,
         hugr::views::{HierarchyView, SiblingGraph},
         ops::{handle::NodeHandle, LeafOp},
-        resource::prelude::QB_T,
         type_row,
         types::AbstractSignature,
     };
@@ -459,21 +463,22 @@ mod tests {
     }
 
     #[test]
-    fn construct_subgraph() {
+    fn construct_subgraph() -> Result<(), InvalidSubgraph> {
         let (hugr, func_root) = build_hugr().unwrap();
         let sibling_graph: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
-        let from_root = SiblingSubgraph::from_sibling_graph(&sibling_graph);
+        let from_root = SiblingSubgraph::from_sibling_graph(&sibling_graph)?;
         let region: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
-        let from_region = SiblingSubgraph::from_sibling_graph(&region);
+        let from_region = SiblingSubgraph::from_sibling_graph(&region)?;
         assert_eq!(from_root.get_parent(), from_region.get_parent());
         assert_eq!(from_root.signature(), from_region.signature());
+        Ok(())
     }
 
     #[test]
-    fn construct_simple_replacement() {
+    fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
-        let sub = SiblingSubgraph::from_dataflow_graph(&func);
+        let sub = SiblingSubgraph::from_dataflow_graph(&func)?;
 
         let empty_dfg = {
             let builder =
@@ -489,6 +494,7 @@ mod tests {
         hugr.apply_rewrite(rep).unwrap();
 
         assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
+        Ok(())
     }
 
     #[test]

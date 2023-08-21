@@ -4,7 +4,7 @@ pub mod hierarchy;
 pub mod sibling;
 
 pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
-pub use sibling::SiblingSubgraph
+pub use sibling::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
