@@ -143,7 +143,7 @@ mod test {
         let pred_rows = vec![type_row![EQ_T, COPYABLE_T], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(AbstractSignature::new_df(
+        let mut b = DFGBuilder::new(AbstractSignature::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
@@ -155,7 +155,7 @@ mod test {
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(AbstractSignature::new_df(
+        let mut b = DFGBuilder::new(AbstractSignature::new(
             type_row![],
             TypeRow::from(vec![pred_ty]),
         ))?;

@@ -10,6 +10,11 @@ pub(super) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
     fn signature(&self) -> AbstractSignature;
+
+    /// Get the static input type of this operation if it has one.
+    fn static_input(&self) -> Option<Type> {
+        None
+    }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -81,7 +86,7 @@ impl DataflowOpTrait for Input {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(TypeRow::new(), self.types.clone())
+        AbstractSignature::new(TypeRow::new(), self.types.clone())
             .with_extension_delta(&ExtensionSet::new())
     }
 }
@@ -95,7 +100,7 @@ impl DataflowOpTrait for Output {
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(self.types.clone(), TypeRow::new())
+        AbstractSignature::new(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -119,6 +124,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
+    }
+
+    fn static_input(&self) -> Option<Type> {
+        DataflowOpTrait::static_input(self)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -145,10 +154,12 @@ impl DataflowOpTrait for Call {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature {
-            static_input: vec![Type::new_graph(self.signature.clone())].into(),
-            ..self.signature.clone()
-        }
+        self.signature.clone()
+    }
+
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        Some(Type::new_graph(self.signature.clone()))
     }
 }
 
@@ -191,11 +202,12 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new(
-            TypeRow::new(),
-            vec![self.datatype.clone()],
-            vec![self.datatype.clone()],
-        )
+        AbstractSignature::new(TypeRow::new(), vec![self.datatype.clone()])
+    }
+
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        Some(self.datatype.clone())
     }
 }
 

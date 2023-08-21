@@ -117,7 +117,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: AbstractSignature::new_df(inputs.clone(), outputs.clone()),
+            signature: AbstractSignature::new(inputs.clone(), outputs.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -134,7 +134,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            AbstractSignature::new_df(inputs, outputs),
+            AbstractSignature::new(inputs, outputs),
             None,
         )?;
 
@@ -186,7 +186,7 @@ impl CaseBuilder<Hugr> {
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
         let input = input.into();
         let output = output.into();
-        let signature = AbstractSignature::new_df(input, output);
+        let signature = AbstractSignature::new(input, output);
         let op = ops::Case {
             signature: signature.clone(),
         };
@@ -232,7 +232,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                AbstractSignature::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let tru_const = fbuild.add_constant(Const::true_val())?;
             let _fdef = {

@@ -77,18 +77,6 @@ impl Rewrite for SimpleReplacement {
             .collect::<Vec<Node>>();
         // slice of nodes omitting Input and Output:
         let replacement_inner_nodes = &replacement_nodes[2..];
-        for &node in replacement_inner_nodes {
-            // Check there are no const inputs.
-            if !self
-                .replacement
-                .get_optype(node)
-                .signature()
-                .static_input()
-                .is_empty()
-            {
-                return Err(SimpleReplacementError::InvalidReplacementNode());
-            }
-        }
         let self_output_node = h.children(self.parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
@@ -237,7 +225,7 @@ mod test {
         let _f_id = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![QB, QB, QB], type_row![QB, QB, QB]).pure(),
+                AbstractSignature::new(type_row![QB, QB, QB], type_row![QB, QB, QB]).pure(),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
@@ -245,7 +233,7 @@ mod test {
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb2])?;
 
             let mut inner_builder = func_builder.dfg_builder(
-                AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]),
+                AbstractSignature::new(type_row![QB, QB], type_row![QB, QB]),
                 None,
                 [qb0, qb1],
             )?;
@@ -273,10 +261,8 @@ mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(AbstractSignature::new_df(
-            type_row![QB, QB],
-            type_row![QB, QB],
-        ))?;
+        let mut dfg_builder =
+            DFGBuilder::new(AbstractSignature::new(type_row![QB, QB], type_row![QB, QB]))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
@@ -291,10 +277,8 @@ mod test {
     /// ┤ H ├
     /// └───┘
     fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(AbstractSignature::new_df(
-            type_row![QB, QB],
-            type_row![QB, QB],
-        ))?;
+        let mut dfg_builder =
+            DFGBuilder::new(AbstractSignature::new(type_row![QB, QB], type_row![QB, QB]))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
@@ -469,7 +453,7 @@ mod test {
     #[test]
     fn test_replace_cx_cross() {
         let q_row: Vec<Type> = vec![QB, QB];
-        let mut builder = DFGBuilder::new(AbstractSignature::new_df(q_row.clone(), q_row)).unwrap();
+        let mut builder = DFGBuilder::new(AbstractSignature::new(q_row.clone(), q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires().collect());
         circ.append(cx_gate(), [0, 1]).unwrap();
         circ.append(cx_gate(), [1, 0]).unwrap();
@@ -516,7 +500,7 @@ mod test {
         let two_bit = type_row![BOOL_T, BOOL_T];
 
         let mut builder =
-            DFGBuilder::new(AbstractSignature::new_df(one_bit.clone(), one_bit.clone())).unwrap();
+            DFGBuilder::new(AbstractSignature::new(one_bit.clone(), one_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
             .add_dataflow_op(and_op(), [inw, inw])
@@ -525,7 +509,7 @@ mod test {
         let [input, _] = builder.io();
         let mut h = builder.finish_hugr_with_outputs(outw).unwrap();
 
-        let mut builder = DFGBuilder::new(AbstractSignature::new_df(two_bit, one_bit)).unwrap();
+        let mut builder = DFGBuilder::new(AbstractSignature::new(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();

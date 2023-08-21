@@ -692,7 +692,7 @@ mod test {
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
         let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
-            signature: AbstractSignature::new_df(type_row![BOOL_T], vec![BOOL_T; copies]),
+            signature: AbstractSignature::new(type_row![BOOL_T], vec![BOOL_T; copies]),
         }
         .into();
 
@@ -836,7 +836,7 @@ mod test {
             .unwrap();
 
         // Add a definition without children
-        let def_sig = AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
+        let def_sig = AbstractSignature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
         let new_def = b
             .add_op_with_parent(
                 root,
@@ -1008,7 +1008,7 @@ mod test {
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
+            signature: AbstractSignature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
         }));
         let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
         let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
@@ -1050,7 +1050,7 @@ mod test {
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![BOOL_T], type_row![BOOL_T]),
+            signature: AbstractSignature::new(type_row![BOOL_T], type_row![BOOL_T]),
         }));
         let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
         let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
@@ -1091,11 +1091,11 @@ mod test {
         let mut module_builder = ModuleBuilder::new();
         let mut main = module_builder.define_function(
             "main",
-            AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            AbstractSignature::new(type_row![NAT], type_row![NAT]).pure(),
         )?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+        let inner_sig = AbstractSignature::new(type_row![NAT], type_row![NAT])
             // Inner DFG has resource requirements that the wire wont satisfy
             .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
 
@@ -1127,12 +1127,12 @@ mod test {
     fn too_many_resources() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let main_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure();
+        let main_sig = AbstractSignature::new(type_row![NAT], type_row![NAT]).pure();
 
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+        let inner_sig = AbstractSignature::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"A".into()))
             .with_input_extensions(ExtensionSet::new());
 
@@ -1165,19 +1165,19 @@ mod test {
 
         let all_rs = ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]);
 
-        let main_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+        let main_sig = AbstractSignature::new(type_row![], type_row![NAT])
             .with_extension_delta(&all_rs)
             .with_input_extensions(ExtensionSet::new());
 
         let mut main = module_builder.define_function("main", main_sig)?;
 
-        let inner_left_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+        let inner_left_sig = AbstractSignature::new(type_row![], type_row![NAT])
             .with_input_extensions(ExtensionSet::singleton(&"A".into()));
 
-        let inner_right_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
+        let inner_right_sig = AbstractSignature::new(type_row![], type_row![NAT])
             .with_input_extensions(ExtensionSet::singleton(&"BOOL_T".into()));
 
-        let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
+        let inner_mult_sig = AbstractSignature::new(type_row![NAT, NAT], type_row![NAT])
             .with_input_extensions(all_rs);
 
         let [left_wire] = main
@@ -1219,7 +1219,7 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
+        let main_signature = AbstractSignature::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
 
         let builder = DFGBuilder::new(main_signature)?;

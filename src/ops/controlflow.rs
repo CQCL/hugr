@@ -31,7 +31,7 @@ impl DataflowOpTrait for TailLoop {
     fn signature(&self) -> AbstractSignature {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| predicate_first(row, &self.rest));
-        AbstractSignature::new_df(inputs, outputs)
+        AbstractSignature::new(inputs, outputs)
     }
 }
 
@@ -75,7 +75,7 @@ impl DataflowOpTrait for Conditional {
             0,
             Type::new_predicate(self.predicate_inputs.clone().into_iter()),
         );
-        AbstractSignature::new_df(inputs, self.outputs.clone())
+        AbstractSignature::new(inputs, self.outputs.clone())
     }
 }
 
@@ -107,7 +107,7 @@ impl DataflowOpTrait for CFG {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(self.inputs.clone(), self.outputs.clone())
+        AbstractSignature::new(self.inputs.clone(), self.outputs.clone())
     }
 }
 
