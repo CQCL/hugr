@@ -85,7 +85,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// This panics if the DFG graph is empty.
     pub fn from_dataflow_graph(dfg_graph: &'g Base) -> Self
     where
-        Base: HugrView,
+        Base: HugrView<RootHandle = DfgID>,
     {
         let parent = dfg_graph.root();
         let nodes = dfg_graph.children(parent).skip(2).collect_vec();
