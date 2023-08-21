@@ -318,6 +318,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         if dfg_optype.signature() != self.signature() {
             return Err(InvalidReplacement::InvalidSignature);
         }
+        // TODO: handle state order edges. For now we ignore them entirely.
+        // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement
             .node_outputs(rep_input)
             // filter out any non-dataflow ports
