@@ -351,6 +351,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         }
         let rep_inputs = replacement
             .node_outputs(rep_input)
+            // filter out any non-dataflow ports
             .filter(|&p| {
                 replacement
                     .get_optype(rep_input)
@@ -358,6 +359,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
                     .get(p)
                     .is_some()
             })
+            // take input ports, and fail if an input is copied
             .map(|p| {
                 replacement
                     .linked_ports(rep_input, p)
@@ -365,13 +367,16 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
                     .map_err(|_| InvalidReplacement::InvalidCopy)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let rep_outputs = replacement.node_inputs(rep_output).filter(|&p| {
-            replacement
-                .get_optype(rep_output)
-                .signature()
-                .get(p)
-                .is_some()
-        });
+        let rep_outputs = replacement
+            .node_inputs(rep_output)
+            // filter out any non-dataflow ports
+            .filter(|&p| {
+                replacement
+                    .get_optype(rep_output)
+                    .signature()
+                    .get(p)
+                    .is_some()
+            });
         let self_inputs = self.incoming_ports();
         let self_outputs = self.outgoing_ports();
         let nu_inp = rep_inputs.into_iter().zip_eq(self_inputs).collect();
