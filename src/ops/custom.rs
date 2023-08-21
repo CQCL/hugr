@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::hugr::{HugrInternalsMut, HugrView, NodeType};
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::{HugrView, NodeType};
 use crate::resource::{OpDef, ResourceId, SignatureError};
 use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
 use crate::{Hugr, Node, Resource};

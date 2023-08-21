@@ -4,6 +4,7 @@ use super::{
     BuildError, Container,
 };
 
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
@@ -18,10 +19,7 @@ use crate::types::Signature;
 use crate::Node;
 use smol_str::SmolStr;
 
-use crate::{
-    hugr::{HugrInternalsMut, NodeType},
-    Hugr,
-};
+use crate::{hugr::NodeType, Hugr};
 
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
