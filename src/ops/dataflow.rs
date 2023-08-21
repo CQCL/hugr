@@ -11,6 +11,7 @@ pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn signature(&self) -> AbstractSignature;
 
+    /// Get the static input type of this operation if it has one.
     fn static_input(&self) -> Option<Type> {
         None
     }

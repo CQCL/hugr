@@ -81,24 +81,6 @@ impl ValidateOp for super::Module {
     }
 }
 
-// impl ValidateOp for LoadConstant {
-//     fn validity_flags(&self) -> OpValidityFlags {
-//         OpValidityFlags {
-//             non_df_ports: (Some(1), None),
-//             ..Default::default()
-//         }
-//     }
-// }
-
-// impl ValidateOp for Call {
-//     fn validity_flags(&self) -> OpValidityFlags {
-//         OpValidityFlags {
-//             non_df_ports: (Some(1), None),
-//             ..Default::default()
-//         }
-//     }
-// }
-
 impl ValidateOp for super::FuncDefn {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {

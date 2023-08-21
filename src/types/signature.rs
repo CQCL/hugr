@@ -235,8 +235,7 @@ impl Signature {
 
 impl Display for AbstractSignature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let has_inputs = !self.input.is_empty();
-        if has_inputs {
+        if !self.input.is_empty() {
             self.input.fmt(f)?;
             f.write_str(" -> ")?;
         }
