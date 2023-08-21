@@ -183,7 +183,7 @@ pub trait OpTrait {
     }
 
     /// Report whether this operation has a static input (only true for
-    /// [LoadConst] and [Call])
+    /// [`LoadConstant`] and [`Call`])
     #[inline]
     fn static_input(&self) -> bool {
         false
