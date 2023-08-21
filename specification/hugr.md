@@ -1738,7 +1738,7 @@ These operations allow this.
     However the result is not `O` but `Sum(O,ErrorType)`
   - `parallel`, `sequence`, `partial`? Note that these could be executed
     in first order graphs as straightforward (albeit expensive)
-    manipulations of Graph `struct`s/protobufs\!
+    manipulations of Hugr `struct`s/protobufs/etc.\!
 
 $\displaystyle{\frac{\mathrm{body} : [R] \textbf{Function}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
 
