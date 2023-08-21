@@ -181,7 +181,7 @@ mod test {
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],
-                Some(AbstractSignature::new(vec![QB, NAT], vec![QB], vec![])),
+                Some(AbstractSignature::new_df(vec![QB, NAT], vec![QB])),
             ))
             .into(),
         );

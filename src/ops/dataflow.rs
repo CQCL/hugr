@@ -10,6 +10,10 @@ pub(super) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
     fn signature(&self) -> AbstractSignature;
+
+    fn static_input(&self) -> bool {
+        false
+    }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -120,6 +124,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
     }
+
+    fn static_input(&self) -> bool {
+        DataflowOpTrait::static_input(self)
+    }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
     const TAG: OpTag = T::TAG;
@@ -145,10 +153,12 @@ impl DataflowOpTrait for Call {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature {
-            static_input: vec![Type::new_graph(self.signature.clone())].into(),
-            ..self.signature.clone()
-        }
+        self.signature.clone()
+    }
+
+    #[inline]
+    fn static_input(&self) -> bool {
+        true
     }
 }
 
@@ -191,11 +201,12 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new(
-            TypeRow::new(),
-            vec![self.datatype.clone()],
-            vec![self.datatype.clone()],
-        )
+        AbstractSignature::new_df(TypeRow::new(), vec![self.datatype.clone()])
+    }
+
+    #[inline]
+    fn static_input(&self) -> bool {
+        true
     }
 }
 

@@ -77,18 +77,6 @@ impl Rewrite for SimpleReplacement {
             .collect::<Vec<Node>>();
         // slice of nodes omitting Input and Output:
         let replacement_inner_nodes = &replacement_nodes[2..];
-        for &node in replacement_inner_nodes {
-            // Check there are no const inputs.
-            if !self
-                .replacement
-                .get_optype(node)
-                .signature()
-                .static_input()
-                .is_empty()
-            {
-                return Err(SimpleReplacementError::InvalidReplacementNode());
-            }
-        }
         let self_output_node = h.children(self.parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {

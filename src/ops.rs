@@ -76,9 +76,14 @@ impl OpType {
         let signature = self.signature();
         let port = port.into();
         let dir = port.direction();
-        match port.index() < signature.port_count(dir) {
-            true => signature.get(port),
-            false => self.other_port(dir),
+
+        let port_count = signature.port_count(dir);
+        if port.index() < port_count {
+            signature.get(port).cloned().map(EdgeKind::Value)
+        } else if port.index() == port_count && dir == Direction::Incoming && self.static_input() {
+            Some(EdgeKind::Static)
+        } else {
+            self.other_port(dir)
         }
     }
 
@@ -89,7 +94,12 @@ impl OpType {
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
-            Some(Port::new(dir, self.signature().port_count(dir)))
+            let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
+
+            Some(Port::new(
+                dir,
+                self.signature().port_count(dir) + static_input,
+            ))
         } else {
             None
         }
@@ -103,7 +113,9 @@ impl OpType {
             .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
-        signature.port_count(dir) + non_df_count
+        let static_input = (dir == Direction::Incoming && self.static_input()) as usize;
+        dbg!(static_input);
+        signature.port_count(dir) + non_df_count + static_input
     }
 
     /// Returns the number of inputs ports for the operation.
@@ -168,6 +180,13 @@ pub trait OpTrait {
     /// Only dataflow operations have a non-empty signature.
     fn signature_desc(&self) -> SignatureDescription {
         Default::default()
+    }
+
+    /// Report whether this operation has a static input (only true for
+    /// [LoadConst] and [Call])
+    #[inline]
+    fn static_input(&self) -> bool {
+        false
     }
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,

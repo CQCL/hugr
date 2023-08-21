@@ -31,8 +31,6 @@ pub struct AbstractSignature {
     pub input: TypeRow,
     /// Value outputs of the function.
     pub output: TypeRow,
-    /// Possible static input (for call / load-constant).
-    pub static_input: TypeRow,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
@@ -47,20 +45,6 @@ pub struct Signature {
 }
 
 impl AbstractSignature {
-    /// Create a new signature.
-    pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-        static_input: impl Into<TypeRow>,
-    ) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            static_input: static_input.into(),
-            extension_reqs: ExtensionSet::new(),
-        }
-    }
-
     /// Builder method, add extension_reqs to an AbstractSignature
     pub fn with_extension_delta(mut self, rs: &ExtensionSet) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs);
@@ -101,14 +85,19 @@ impl AbstractSignature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
+        self.input.is_empty() && self.output.is_empty()
     }
 }
 
 impl AbstractSignature {
     /// Create a new signature with only dataflow inputs and outputs.
     pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self::new(input, output, type_row![])
+        // TODO rename to just "new"
+        Self {
+            input: input.into(),
+            output: output.into(),
+            extension_reqs: ExtensionSet::new(),
+        }
     }
     /// Create a new signature with the same input and output types.
     pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
@@ -117,14 +106,8 @@ impl AbstractSignature {
     }
 
     /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
-    pub fn get(&self, port: Port) -> Option<EdgeKind> {
-        if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            self.static_input
-                .get(port.index() - self.input.len())
-                .map(|_| EdgeKind::Static)
-        } else {
-            self.get_df(port).cloned().map(EdgeKind::Value)
-        }
+    pub fn get(&self, port: Port) -> Option<&Type> {
+        self.get_df(port)
     }
 
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
@@ -147,11 +130,11 @@ impl AbstractSignature {
         }
     }
 
-    /// Returns the number of value and static ports in the signature.
+    /// Returns the number of value ports in the signature.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
-            Direction::Incoming => self.input.len() + self.static_input.len(),
+            Direction::Incoming => self.input.len(),
             Direction::Outgoing => self.output.len(),
         }
     }
@@ -208,12 +191,6 @@ impl AbstractSignature {
     /// Returns the output row
     pub fn output(&self) -> &TypeRow {
         &self.output
-    }
-
-    #[inline]
-    /// Returns the row of static inputs
-    pub fn static_input(&self) -> &TypeRow {
-        &self.static_input
     }
 }
 
@@ -288,22 +265,16 @@ impl Signature {
             pub fn input(&self) -> &TypeRow;
             /// Outputs of the abstract signature
             pub fn output(&self) -> &TypeRow;
-            /// Static inputs of the abstract signature
-            pub fn static_input(&self) -> &TypeRow;
         }
     }
 }
 
 impl Display for AbstractSignature {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let has_inputs = !(self.static_input.is_empty() && self.input.is_empty());
+        let has_inputs = !self.input.is_empty();
         if has_inputs {
             self.input.fmt(f)?;
-            if !self.static_input.is_empty() {
-                f.write_char('<')?;
-                display_list(&self.static_input, f)?;
-                f.write_char('>')?;
-            }
+
             f.write_str(" -> ")?;
         }
         f.write_char('[')?;
@@ -403,14 +374,6 @@ impl SignatureDescription {
         signature: &'a Signature,
     ) -> impl Iterator<Item = (&SmolStr, &Type)> {
         Self::row_zip(signature.output(), &self.output)
-    }
-
-    /// Iterate over the static input wires of the signature and their names.
-    pub fn static_input_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &Type)> {
-        Self::row_zip(signature.static_input(), &self.static_input)
     }
 }
 
