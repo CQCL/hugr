@@ -265,8 +265,6 @@ pub struct SignatureDescription {
     pub input: Vec<SmolStr>,
     /// Output of the function.
     pub output: Vec<SmolStr>,
-    /// Static data references used by the function.
-    pub static_input: Vec<SmolStr>,
 }
 
 #[cfg_attr(feature = "pyo3", pymethods)]
@@ -274,37 +272,23 @@ impl SignatureDescription {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
+        self.input.is_empty() && self.output.is_empty()
     }
 }
 
 impl SignatureDescription {
     /// Create a new signature.
-    pub fn new(
-        input: impl Into<Vec<SmolStr>>,
-        output: impl Into<Vec<SmolStr>>,
-        static_input: impl Into<Vec<SmolStr>>,
-    ) -> Self {
+    pub fn new(input: impl Into<Vec<SmolStr>>, output: impl Into<Vec<SmolStr>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
-            static_input: static_input.into(),
         }
     }
 
-    /// Create a new signature with only linear dataflow inputs and outputs.
+    /// Create a new signature with only linear inputs and outputs.
     pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
         let linear = linear.into();
-        SignatureDescription::new_df(linear.clone(), linear)
-    }
-
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<Vec<SmolStr>>, output: impl Into<Vec<SmolStr>>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            ..Default::default()
-        }
+        SignatureDescription::new(linear.clone(), linear)
     }
 
     pub(crate) fn row_zip<'a>(
