@@ -313,20 +313,15 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// `replacement` must be a hugr with DFG root and its signature must
     /// match the signature of the subgraph.
     ///
-    /// We currently do not support inputs of the replacement graph being
-    /// copied.
-    ///
     /// May return one of the following five errors
     ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
     ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
     ///  - [`InvalidReplacement::InvalidDataflowParent`]: the replacement does
     ///    not have an input and output node,
     ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
-    ///    replacement DFG does not match the subgraph signature,
+    ///    replacement DFG does not match the subgraph signature, or
     ///  - [`InvalidReplacement::NonConvexSubgrah`]: the sibling subgraph is not
-    ///    convex, or
-    ///  - [`InvalidReplacement::InvalidCopy`]: the replacement has a copy at
-    ///    the input boundary.
+    ///    convex.
     pub fn create_simple_replacement(
         &self,
         replacement: Hugr,
@@ -358,15 +353,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
                     .signature()
                     .get(p)
                     .is_some()
-            })
-            // take input ports, and fail if an input is copied
-            .map(|p| {
-                replacement
-                    .linked_ports(rep_input, p)
-                    .exactly_one()
-                    .map_err(|_| InvalidReplacement::InvalidCopy)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+            });
         let rep_outputs = replacement
             .node_inputs(rep_output)
             // filter out any non-dataflow ports
@@ -379,7 +366,14 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             });
         let self_inputs = self.incoming_ports();
         let self_outputs = self.outgoing_ports();
-        let nu_inp = rep_inputs.into_iter().zip_eq(self_inputs).collect();
+        let nu_inp = rep_inputs
+            .zip_eq(self_inputs)
+            .flat_map(|(rep_source, self_target)| {
+                replacement
+                    .linked_ports(rep_input, rep_source)
+                    .map(move |rep_target| (rep_target, self_target))
+            })
+            .collect();
         let nu_out = self_outputs
             .zip_eq(rep_outputs)
             .flat_map(|((self_source_n, self_source_p), rep_target)| {
@@ -414,9 +408,6 @@ pub enum InvalidReplacement {
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
     NonConvexSubgrah,
-    /// Do not support copy at the input boundary of replacement.
-    #[error("Copy at incoming boundary of replacement.")]
-    InvalidCopy,
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
