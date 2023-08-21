@@ -157,9 +157,8 @@ the node). Incoming ports are associated with exactly one edge. All edges associ
 with a port have the same type; thus a port has a well-defined type, matching that
 of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
 
-The sequences of incoming and outgoing port types of a node constitute its
-_signature_. This signature may include the types of both `Value` and `Static`
-edges, with `Static` edges following `Value` edges in the ordering.
+The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
+_signature_.
 
 Note that the locality is not fixed or even specified by the signature.
 
@@ -235,7 +234,7 @@ edges. The following operations are *only* valid as immediate children of a
 
   - `FuncDecl`: an external function declaration. The name of the function 
     and function attributes (relevant for compilation)
-    define the node weight. The node has an outgoing `Static<Graph>`
+    define the node weight. The node has an outgoing `Static<Function>`
     edge for each use of the function. The function name is used at link time to
     look up definitions in linked
     modules (other hugr instances specified to the linker).
@@ -279,7 +278,7 @@ the following basic dataflow operations are available (in addition to the
     nodes starting from `Input` with respect to the Value and Order
     edges.
   - `Call`: Call a statically defined function. There is an incoming
-    `Static<Graph>` edge to specify the graph being called. The
+    `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
@@ -896,7 +895,7 @@ extensions:
     params:
       - r: ExtensionSet
     signature:
-      inputs: [[null, Graph[r](USize -> USize)], ["arg", USize]]
+      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
       outputs: [[null, USize]]
       extensions: r # Indicates that running this operation also invokes extensions r
     lowering:
@@ -1011,21 +1010,21 @@ Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Tuple(#) -- fixed-arity, heterogenous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
-       | Graph[Extensions](#, #) -- monomorphic
+       | Function[Extensions](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
 ```
-<!--      Graph(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
+<!--      Function(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
 #       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
 
-The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Graph type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
+The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Graphs are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+Functions are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
 Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
 
 ### Extension Tracking
 
-The type of `Graph` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
+The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
 
 Keeping track of the extension requirements like this allows extension designers and backends
 (like tierkreis) to control how/where a module is run.
@@ -1051,7 +1050,7 @@ $\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \
 **X** which it adds to the
 extension requirements of its argument.
 
-$\displaystyle{\frac{f : [ \rho ] \textbf{Graph}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Graph}[X, R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
 
 **liftGraph** - Like **lift**, takes an
 extension X as a constant node
@@ -1080,7 +1079,7 @@ I’m going to define them in terms of extensions. We have the “builtin”
 extension which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
-$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
+$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
 
 **Call** - This operation, like **to\_const**, uses its Static graph as
 a type parameter.
@@ -1097,14 +1096,14 @@ we can perform rewrites which remove the arithmetic.
 We would expect standard circuits to look something like
 
 ```
-GraphType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
+FunctionType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 A circuit built using our higher-order extension to manage control flow
 could then look like:
 
 ```
-GraphType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
+FunctionType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 So we’d need to perform some graph transformation pass to turn the
@@ -1112,8 +1111,8 @@ graph-based control flow into a CFG node that a quantum computer could
 run, which removes the `HigherOrder` extension requirement:
 
 ```
-precompute :: GraphType[](GraphType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         GraphType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+precompute :: FunctionType[](FunctionType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
+                                         FunctionType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
 Before we can run the circuit.
@@ -1734,16 +1733,16 @@ operations allow graphs to be valid dataflow values, and be executed.
 These operations allow this.
 
   - `CallIndirect`: Call a function indirectly. Like `Call`, but the
-    first input is a standard dataflow graph type. This is essentially
+    first input is a standard dataflow function type. This is essentially
     `eval` in Tierkreis.
   - `catch`: like `CallIndirect`, the first argument is of type
-    `Graph[R]<I,O>` and the rest of the arguments are of type `I`.
+    `Function[R]<I,O>` and the rest of the arguments are of type `I`.
     However the result is not `O` but `Sum(O,ErrorType)`
   - `parallel`, `sequence`, `partial`? Note that these could be executed
     in first order graphs as straightforward (albeit expensive)
     manipulations of Graph `struct`s/protobufs\!
 
-$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Graph}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
+$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Function}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
 
 **loop** - In order to run the *body* graph, we need the extensions
 R that the graph requires, so
@@ -1754,16 +1753,16 @@ that *v* is lifted to have extension requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-$\displaystyle{\frac{\Theta : [R] \textbf{Graph}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
+$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s extensions.
 
-$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Graph}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Graph}[R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
 
 **to_const** - For operations which instantiate a graph (**to\_const**
 and **Call**) the functions are given an extra parameter at graph
-construction time which corresponds to the graph type that they are
+construction time which corresponds to the function type that they are
 meant to instantiate. This type will be given by a typeless edge from
 the graph in question to the operation, with the graph’s type added as
 an edge weight.

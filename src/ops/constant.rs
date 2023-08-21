@@ -126,7 +126,7 @@ mod test {
         type_row,
         types::{test::COPYABLE_T, TypeRow},
         types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},
-        types::{AbstractSignature, CustomType, Type, TypeBound},
+        types::{CustomType, FunctionType, Type, TypeBound},
         values::{
             test::{serialized_float, CustomTestValue},
             CustomSerialized, Value,
@@ -143,7 +143,7 @@ mod test {
         let pred_rows = vec![type_row![EQ_T, COPYABLE_T], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(AbstractSignature::new_df(
+        let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
@@ -155,10 +155,7 @@ mod test {
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();
 
-        let mut b = DFGBuilder::new(AbstractSignature::new_df(
-            type_row![],
-            TypeRow::from(vec![pred_ty]),
-        ))?;
+        let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
         let c = b.add_constant(Const::predicate(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w]).unwrap();

@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::AbstractSignature;
+use crate::types::FunctionType;
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{ops::handle::NodeHandle, types::Type};
 
@@ -241,7 +241,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let predicate_type = Type::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = AbstractSignature::new_df(inputs, TypeRow::from(node_outputs));
+        let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
         let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
@@ -305,10 +305,8 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut func_builder = module_builder.define_function(
-                "main",
-                AbstractSignature::new_df(vec![NAT], type_row![NAT]).pure(),
-            )?;
+            let mut func_builder = module_builder
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).pure())?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 

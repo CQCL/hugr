@@ -143,13 +143,13 @@ mod test {
         ops::{custom::OpaqueOp, LeafOp},
         std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
-        types::AbstractSignature,
+        types::FunctionType,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).pure(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -181,12 +181,12 @@ mod test {
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],
-                Some(AbstractSignature::new(vec![QB, NAT], vec![QB], vec![])),
+                Some(FunctionType::new(vec![QB, NAT], vec![QB])),
             ))
             .into(),
         );
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

@@ -7,7 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 
 use crate::{
     extension::{ExtensionId, ExtensionSet},
-    types::{AbstractSignature, EdgeKind, SignatureDescription, Type, TypeRow},
+    types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -93,29 +93,27 @@ impl OpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> AbstractSignature {
-        // Static signatures. The `TypeRow`s in the `AbstractSignature` use a
+    fn signature(&self) -> FunctionType {
+        // Static signatures. The `TypeRow`s in the `FunctionType` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
         match self {
-            LeafOp::Noop { ty: typ } => {
-                AbstractSignature::new_df(vec![typ.clone()], vec![typ.clone()])
-            }
+            LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
-                AbstractSignature::new_df(types.clone(), vec![Type::new_tuple(types.clone())])
+                FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                AbstractSignature::new_df(vec![Type::new_tuple(types.clone())], types.clone())
+                FunctionType::new(vec![Type::new_tuple(types.clone())], types.clone())
             }
-            LeafOp::Tag { tag, variants } => AbstractSignature::new_df(
+            LeafOp::Tag { tag, variants } => FunctionType::new(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![Type::new_sum(variants.clone())],
             ),
             LeafOp::Lift {
                 type_row,
                 new_extension,
-            } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
+            } => FunctionType::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(&ExtensionSet::singleton(new_extension)),
         }
     }

@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{AbstractSignature, EdgeKind};
+use crate::types::{EdgeKind, FunctionType};
 use crate::types::{Type, TypeBound};
 
 use super::StaticTag;
@@ -36,7 +36,7 @@ pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: AbstractSignature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(FuncDefn);
@@ -53,7 +53,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::new_graph(self.signature.clone())))
+        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }
 
@@ -63,7 +63,7 @@ pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: AbstractSignature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(FuncDecl);
@@ -80,7 +80,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::new_graph(self.signature.clone())))
+        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }
 

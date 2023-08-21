@@ -21,14 +21,14 @@ pub enum PrimValue {
     Extension((Box<dyn CustomConst>,)),
     /// A higher-order function value.
     // TODO add  HUGR<DFG> payload
-    Graph,
+    Function,
 }
 
 impl PrimValue {
     fn name(&self) -> String {
         match self {
             PrimValue::Extension(e) => format!("const:custom:{}", e.0.name()),
-            PrimValue::Graph => todo!(),
+            PrimValue::Function => todo!(),
         }
     }
 }

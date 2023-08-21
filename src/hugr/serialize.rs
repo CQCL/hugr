@@ -275,7 +275,7 @@ pub mod test {
         extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{AbstractSignature, Type},
+        types::{FunctionType, Type},
         Port,
     };
     use itertools::Itertools;
@@ -303,7 +303,7 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: AbstractSignature::new_df(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
+                signature: FunctionType::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
             }
             .into(),
             (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
@@ -360,10 +360,7 @@ pub mod test {
 
             let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function(
-                    "main",
-                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
-                )
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -398,10 +395,7 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function(
-                    "main",
-                    AbstractSignature::new_df(t_row.clone(), t_row).pure(),
-                )
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -432,7 +426,7 @@ pub mod test {
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tp: Vec<Type> = vec![BOOL_T; 2];
-        let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
+        let mut dfg = DFGBuilder::new(FunctionType::new(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
@@ -459,7 +453,7 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let dfg = DFGBuilder::new(AbstractSignature::new_df(vec![QB], vec![QB])).unwrap();
+        let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
         let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
