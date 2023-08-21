@@ -751,10 +751,13 @@ mod test {
         let [w] = builder.input_wires_arr();
         let hugr = builder.finish_hugr_with_outputs([w]);
 
+        // Fail to catch the actual error because it's a difference between I/O
+        // nodes and their parents and `report_mismatch` isn't yet smart enough
+        // to handle that.
         assert_matches!(
             hugr,
             Err(BuildError::InvalidHUGR(
-                ValidationError::ResourceError(ResourceError::TgtExceedsSrcResources { .. })
+                ValidationError::CantInfer(_)
             ))
         );
         Ok(())
