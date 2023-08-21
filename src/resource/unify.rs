@@ -651,7 +651,7 @@ mod test {
     use std::error::Error;
 
     use super::*;
-    use crate::builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::hugr::HugrInternalsMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
@@ -662,15 +662,13 @@ mod test {
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
 
-    use crate::utils::test::viz_dotstr;
-
     const BIT: Type = crate::resource::prelude::USIZE_T;
 
     #[test]
     // Build up a graph with some holes in its resources, and infer them
     // See if it works!
     fn from_graph() -> Result<(), Box<dyn Error>> {
-        use crate::ops::OpTrait;
+        
 
         let rs = ResourceSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let main_sig =

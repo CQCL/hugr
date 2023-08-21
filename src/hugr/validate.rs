@@ -672,7 +672,7 @@ mod test {
 
     use super::*;
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
