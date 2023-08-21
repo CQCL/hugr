@@ -1756,6 +1756,41 @@ $\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \
 **CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s extensions.
 
+#### Polymorphism extension
+
+This might be part of the Tierkreis extension, or another extension that can be used with Tierkreis if needed. It allows passing around functions whose type is polymorphic: parameters or return values of types such as $\displaystyle{\forall{\alpha}.\textbf{RList}\langle{}\alpha\rangle{} \rightarrow \alpha}$. (I'll write `RList` for the opaque type of heap-allocated runtime lists to avoid confusion with the static-constant `List` that's a TypeParam; and write `Opaque("Name", arg1, arg2)` for the opaque type resulting for instantiating the TypeDef `Name' with two TypeArgs).
+
+Note there is an "encoding" here where we give all such values a special opaque type "Any", and do type-checking on the Hugr using some type language implemented purely externally (i.e. by the external code traversing the Hugr).  Instead, the following shows how such a type system can be encoded into the Hugr type system using custom/opaque types and operations so that the standard Hugr validation routines check the types are correct.
+
+* There is an opaque type (parameterless TypeDef) of `VariableId`. This could just be `String`, but we'll assume it's easy to generate fresh instances (*values*) without name collisions.
+* There is also a custom TypeDef `Variable`, parameterised by `VariableId`. (That is, `Variable<x>` is a type if `x` is an instance of `VariableId`).
+* There is another opaque TypeDef `PolyFunc` with four type parameters:
+   * A list of opaque values of type VariableId - these indicate the bound type variables
+   * The rest just as for normal functions: a set of Extensions, a list of input types, and a list of output types
+
+For example, the above polymorphic function of lists is a `PolyFunc<List(VariableId1), Exts, List(Opaque("RList", Opaque("Variable", VariableId1))), List(Opaque("Variable", VariableId1))`.
+
+* A custom OpDef `type_apply` with four type parameters:
+   * A list of types
+   * The rest as for a PolyFunc: a list of VariableIds, a set of Extensions, a list of input types, and a list of output types
+   * `compute_signature` computes the signature: the input is a single PolyFunc with those typeargs; the output is obtained by applying a type substitution to the input PolyFunc type, producing either a PolyFunc with fewer binders, or a general Function type (if there are no binders left). Note this `compute_signature` is fallible, so can check that the number of types in the first list is not more than the number of VariableIds.
+   * Actual *execution* of the operation will have to apply the same substitution to the input PolyFunc *value* (a Hugr), not just its type. Note that actual execution only happens on monomorphized Functions (with no type variables, free or bound). If the output is a (non-Poly)Function, we can validate it; otherwise, we may be unable to validate as it may contain custom operations which instantiate custom TypeDefs with Types that are `Opaque("Variable", ...)` and those custom TypeDef's `compute_signature` functions may fail. Again, these will be validated later, when they become monomorphic, before they are ever actually executed.
+      * **NOTE: If we wish to rule out `type_apply` failing at Tierkreis runtime** then a single pass over the Hugr can verify that all custom ops with binary `compute_signature` are only invoked with static-constant arguments. However, this is significantly worse than we can do (in a single pass) if such custom opdefs are given the ability to separate the type-parameters on which they (fallibly) compute from those which merely (and infallibly) substitute. A multi-pass analysis can consider every possible instantiation and check that they all pass `compute_signature` but this would be substantially more expensive.
+
+For example, `type_apply(List(Opaque("USize")), List(VariableId1), Exts, List(Opaque("RList", Opaque("Variable", VariableId1))), List(Opaque("Variable", VariableId1))` would compute a single input of the PolyFunc type above, and a single output a `Function[Exts]`(`Opaque("RList", Opaque("USize"))`$\rightarrow$`Opaque("USize")`).
+
+TODO (detail): the above does not allow alpha-conversion when equating polymorphic function types, i.e. the type `PolyFunc<List(VarX), Exts, List(Opaque("RList", Opaque("Variable", VarX))), List(Opaque("Variable", VarX))` would be seen as different from `PolyFunc<List(VarY), Exts, List(Opaque("RList", Opaque("Variable", VarY))), List(Opaque("Variable", VarY))` yet the two are alpha-equivalent. In practice this probably means we'd need to use "locally nameless" type variables, i.e. the `List<VariableId>` of binders becomes a `usize` and `VariableId`s are a Sum of usize *or* identifier.
+
+##### Polymorphism Extension, v2
+The above has a fundamental limitation - it only allows instantiation with *types*. It's not clear how a function can be polymorphic over, say, different sizes of array - that is, the above allows to create an `Array<T,n>` when `T` is an opaque type (which happens to represent a variable), but there is no way to pass a variable for `n`, only a `USize`.
+   1. Perhaps we can use Hugrs that are invalid in that they contain types+ops whose TypeArgs do not fit the TypeParams declared by the (Type/Op)Def (e.g. an `Array<T,S>` where both T and S are opaque types). If we don't validate them until we have a (non-Poly)Function type we might be OK. However, this is only a partial solution; we still do not have an OpDef for `type_apply` as the first TypeParam is no longer (jumping into Rust source) `TypeParam::List(TypeParam::Type)` but needs to be able to take values etc. too (depending on the PolyFunc, moreover! So we'd like to be able to `compute_signature` one level up and compute a list of `TypeParam`s *given the TypeArgs* that describe the PolyFunc)
+   2. Or, rather than "piggybacking" onto the Hugr type system, the extension could duplicate the definitions of the Hugr TypeArg+Type system internally, adding elements for variables - i.e. that can be turned back into a TypeArg when the variables are gone. That is,
+      * add a parameterless custom TypeDef, call it "TorV";
+      * PolyFunc is now parameterized by `List<VariableId>`, `Extensions` and two `List<TorV>` (inputs and outputs)
+         * (in fact it'd be better to add an Opaque equivalent to TypeParam too, so PolyFunc's binders are a `List<Tuple(VariableId,OpaqueTyP)>`)
+      * `type_apply` takes the same parameters as PolyFunc, plus another `List<TorV>` to actually apply; it can check the types/values (in `compute_signature`) fit the types expected by the binders.
+
+I think this "works". There are an increasing number of failure modes of `compute_signature` (specifically for `type_apply`) because we really want to jump in at an earlier stage than the monomorphic Hugr type system lets us. In Tierkreis, these would manifest as *runtime* failures, that (by general Tierkreis principle) we would like to rule out statically but cannot unless we extend core Hugr.
 
 ## Glossary
 
