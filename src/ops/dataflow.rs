@@ -2,8 +2,8 @@
 
 use super::{impl_op_name, OpTag, OpTrait};
 
+use crate::extension::ExtensionSet;
 use crate::ops::StaticTag;
-use crate::resource::ResourceSet;
 use crate::types::{AbstractSignature, EdgeKind, Type, TypeRow};
 
 pub(super) trait DataflowOpTrait {
@@ -30,7 +30,7 @@ pub(super) trait DataflowOpTrait {
 
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
-    /// Construct a new I/O node from a type row with no resource requirements
+    /// Construct a new I/O node from a type row with no extension requirements
     fn new(types: impl Into<TypeRow>) -> Self;
 }
 
@@ -82,7 +82,7 @@ impl DataflowOpTrait for Input {
 
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new_df(TypeRow::new(), self.types.clone())
-            .with_resource_delta(&ResourceSet::new())
+            .with_extension_delta(&ExtensionSet::new())
     }
 }
 impl DataflowOpTrait for Output {
@@ -92,7 +92,7 @@ impl DataflowOpTrait for Output {
         "The output node for this dataflow subgraph"
     }
 
-    // Note: We know what the input resources should be, so we *could* give an
+    // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> AbstractSignature {
         AbstractSignature::new_df(self.types.clone(), TypeRow::new())

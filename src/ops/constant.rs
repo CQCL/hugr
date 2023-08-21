@@ -46,7 +46,7 @@ impl Const {
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+    pub fn simple_predicate(tag: usize, size: u8) -> Self {
         Self {
             value: Value::simple_predicate(tag),
             typ: Type::new_simple_predicate(size),
@@ -122,7 +122,7 @@ mod test {
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-        resource::prelude::{ConstUsize, USIZE_T},
+        extension::prelude::{ConstUsize, USIZE_T},
         type_row,
         types::{test::COPYABLE_T, TypeRow},
         types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},

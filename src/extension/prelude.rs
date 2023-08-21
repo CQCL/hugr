@@ -4,19 +4,19 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    resource::TypeDefBound,
+    extension::TypeDefBound,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::{CustomConst, KnownTypeConst},
-    Resource,
+    Extension,
 };
 
 lazy_static! {
-    /// Prelude resource
-    pub static ref PRELUDE: Resource = {
-        let mut prelude = Resource::new(SmolStr::new_inline("prelude"));
+    /// Prelude extension
+    pub static ref PRELUDE: Extension = {
+        let mut prelude = Extension::new(SmolStr::new_inline("prelude"));
         prelude
             .add_type(
                 SmolStr::new_inline("usize"),
@@ -62,6 +62,7 @@ pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
 
 pub(crate) const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
 pub(crate) const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
+pub(crate) const BOOL_T: Type = Type::new_simple_predicate(2);
 
 /// Initialize a new array of type `typ` of length `size`
 pub fn new_array(typ: Type, size: u64) -> Type {

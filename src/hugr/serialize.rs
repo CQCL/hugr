@@ -8,10 +8,10 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, HugrInternalsMut, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
-use crate::resource::ResourceSet;
 use crate::Node;
 use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, NodeIndex, PortView};
@@ -41,7 +41,7 @@ enum Versioned {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
-    input_resources: Option<ResourceSet>,
+    input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
 }
@@ -141,7 +141,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                input_resources: opt.input_resources.clone(),
+                input_extensions: opt.input_extensions.clone(),
                 op: opt.op.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
@@ -201,7 +201,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
-            input_resources,
+            input_extensions,
             op: root_type,
         } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
@@ -210,8 +210,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
-            match input_resources {
-                None => NodeType::open_resources(root_type),
+            match input_extensions {
+                None => NodeType::open_extensions(root_type),
                 Some(rs) => NodeType::new(root_type, rs),
             },
             nodes.len(),
@@ -221,8 +221,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         for node_ser in nodes {
             hugr.add_node_with_parent(
                 node_ser.parent,
-                match node_ser.input_resources {
-                    None => NodeType::open_resources(node_ser.op),
+                match node_ser.input_extensions {
+                    None => NodeType::open_extensions(node_ser.op),
                     Some(rs) => NodeType::new(node_ser.op, rs),
                 },
             )?;
@@ -272,6 +272,7 @@ pub mod test {
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
+        extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{AbstractSignature, Type},
@@ -282,8 +283,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const QB: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -330,7 +331,7 @@ pub mod test {
         let mut h = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::new();
 
-        op_types[root] = NodeType::open_resources(gen_optype(&g, root));
+        op_types[root] = NodeType::open_extensions(gen_optype(&g, root));
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
@@ -430,12 +431,12 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<Type> = vec![NAT; 2];
+        let tp: Vec<Type> = vec![BOOL_T; 2];
         let mut dfg = DFGBuilder::new(AbstractSignature::new_df(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .add_dataflow_op(LeafOp::Noop { ty: BOOL_T }, [*p])
                 .unwrap()
                 .out_wire(0);
         }

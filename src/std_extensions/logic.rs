@@ -4,51 +4,50 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    ops,
-    resource::ResourceSet,
-    types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
-        Type,
-    },
-    Resource,
+    extension::{prelude::BOOL_T, ExtensionSet},
+    ops, type_row,
+    types::type_param::{TypeArg, TypeArgError, TypeParam},
+    Extension,
 };
+use lazy_static::lazy_static;
 
-/// Name of resource false value.
+/// Name of extension false value.
 pub const FALSE_NAME: &str = "FALSE";
-/// Name of resource true value.
+/// Name of extension true value.
 pub const TRUE_NAME: &str = "TRUE";
 
-/// The resource identifier.
-pub const RESOURCE_ID: SmolStr = SmolStr::new_inline("logic");
+/// Name of the "not" operation.
+pub const NOT_NAME: &str = "Not";
+/// Name of the "and" operation.
+pub const AND_NAME: &str = "And";
+/// Name of the "or" operation.
+pub const OR_NAME: &str = "Or";
+/// The extension identifier.
+pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
 
-/// Construct a boolean type.
-pub fn bool_type() -> Type {
-    Type::new_simple_predicate(2)
-}
-
-/// Resource for basic logical operations.
-pub fn resource() -> Resource {
+/// Extension for basic logical operations.
+fn extension() -> Extension {
     const H_INT: TypeParam = TypeParam::USize;
-    let mut resource = Resource::new(RESOURCE_ID);
+    let mut extension = Extension::new(EXTENSION_ID);
 
-    resource
+    extension
         .add_op_custom_sig_simple(
-            "Not".into(),
+            SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
                 Ok((
-                    vec![bool_type()].into(),
-                    vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    type_row![BOOL_T],
+                    type_row![BOOL_T],
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_op_custom_sig_simple(
-            "And".into(),
+            SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -64,17 +63,17 @@ pub fn resource() -> Resource {
                     }
                 };
                 Ok((
-                    vec![bool_type(); n as usize].into(),
-                    vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    vec![BOOL_T; n as usize].into(),
+                    type_row![BOOL_T],
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_op_custom_sig_simple(
-            "Or".into(),
+            SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
@@ -90,45 +89,58 @@ pub fn resource() -> Resource {
                     }
                 };
                 Ok((
-                    vec![bool_type(); n as usize].into(),
-                    vec![bool_type()].into(),
-                    ResourceSet::default(),
+                    vec![BOOL_T; n as usize].into(),
+                    type_row![BOOL_T],
+                    ExtensionSet::default(),
                 ))
             },
         )
         .unwrap();
 
-    resource
+    extension
         .add_value(FALSE_NAME, ops::Const::simple_predicate(0, 2))
         .unwrap();
-    resource
+    extension
         .add_value(TRUE_NAME, ops::Const::simple_predicate(1, 2))
         .unwrap();
-    resource
+    extension
+}
+
+lazy_static! {
+    /// Reference to the logic Extension.
+    pub static ref EXTENSION: Extension = extension();
 }
 
 #[cfg(test)]
-mod test {
-    use crate::Resource;
+pub(crate) mod test {
+    use crate::{extension::prelude::BOOL_T, ops::LeafOp, types::type_param::TypeArg, Extension};
 
-    use super::{bool_type, resource, FALSE_NAME, TRUE_NAME};
+    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, TRUE_NAME};
 
     #[test]
-    fn test_logic_resource() {
-        let r: Resource = resource();
+    fn test_logic_extension() {
+        let r: Extension = extension();
         assert_eq!(r.name(), "logic");
         assert_eq!(r.operations().count(), 3);
     }
 
     #[test]
     fn test_values() {
-        let r: Resource = resource();
+        let r: Extension = extension();
         let false_val = r.get_value(FALSE_NAME).unwrap();
         let true_val = r.get_value(TRUE_NAME).unwrap();
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().const_type();
-            assert_eq!(simpl, &bool_type());
+            assert_eq!(simpl, &BOOL_T);
         }
+    }
+
+    /// Generate a logic extension and operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn and_op() -> LeafOp {
+        EXTENSION
+            .instantiate_extension_op(AND_NAME, [TypeArg::USize(2)])
+            .unwrap()
+            .into()
     }
 }
