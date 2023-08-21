@@ -546,7 +546,7 @@ impl UnificationContext {
                 Some(rs) => Ok(rs.clone()),
                 None => {
                     // Cut through the riff raff
-                    if let Some(live_var) = self.live_var(meta) {
+                    if !self.live_var(meta).is_none() {
                         Err(InferResourceError::Unsolved { location: *loc })
                     } else {
                         continue;
@@ -787,7 +787,7 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let mut builder = DFGBuilder::new(
+        let builder = DFGBuilder::new(
             AbstractSignature::new_df(type_row![BIT], type_row![BIT])
                 .with_resource_delta(&ResourceSet::singleton(&"R".into())),
         )?;
@@ -924,7 +924,7 @@ mod test {
         )?;
         let [w] = mult.outputs_arr();
 
-        let h = builder.finish_hugr_with_outputs([w])?;
+        builder.finish_hugr_with_outputs([w])?;
         Ok(())
     }
 }
