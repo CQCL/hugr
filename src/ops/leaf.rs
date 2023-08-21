@@ -99,23 +99,23 @@ impl OpTrait for LeafOp {
 
         match self {
             LeafOp::Noop { ty: typ } => {
-                AbstractSignature::new_df(vec![typ.clone()], vec![typ.clone()])
+                AbstractSignature::new(vec![typ.clone()], vec![typ.clone()])
             }
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
-                AbstractSignature::new_df(types.clone(), vec![Type::new_tuple(types.clone())])
+                AbstractSignature::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                AbstractSignature::new_df(vec![Type::new_tuple(types.clone())], types.clone())
+                AbstractSignature::new(vec![Type::new_tuple(types.clone())], types.clone())
             }
-            LeafOp::Tag { tag, variants } => AbstractSignature::new_df(
+            LeafOp::Tag { tag, variants } => AbstractSignature::new(
                 vec![variants.get(*tag).expect("Not a valid tag").clone()],
                 vec![Type::new_sum(variants.clone())],
             ),
             LeafOp::Lift {
                 type_row,
                 new_extension,
-            } => AbstractSignature::new_df(type_row.clone(), type_row.clone())
+            } => AbstractSignature::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(&ExtensionSet::singleton(new_extension)),
         }
     }

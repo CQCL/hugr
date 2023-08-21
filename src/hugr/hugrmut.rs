@@ -501,7 +501,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                    signature: AbstractSignature::new(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
             .expect("Failed to add function definition node");

@@ -47,7 +47,7 @@ pub(crate) use impl_box_clone;
 /// const U: Type = Type::UNIT;
 /// let static_row: TypeRow = type_row![U, U];
 /// let dynamic_row: TypeRow = vec![U, U, U].into();
-/// let sig = AbstractSignature::new_df(static_row, dynamic_row).pure();
+/// let sig = AbstractSignature::new(static_row, dynamic_row).pure();
 ///
 /// let repeated_row: TypeRow = type_row![U; 3];
 /// assert_eq!(repeated_row, *sig.output());

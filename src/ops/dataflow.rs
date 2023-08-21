@@ -85,7 +85,7 @@ impl DataflowOpTrait for Input {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(TypeRow::new(), self.types.clone())
+        AbstractSignature::new(TypeRow::new(), self.types.clone())
             .with_extension_delta(&ExtensionSet::new())
     }
 }
@@ -99,7 +99,7 @@ impl DataflowOpTrait for Output {
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(self.types.clone(), TypeRow::new())
+        AbstractSignature::new(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -201,7 +201,7 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     fn signature(&self) -> AbstractSignature {
-        AbstractSignature::new_df(TypeRow::new(), vec![self.datatype.clone()])
+        AbstractSignature::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 
     #[inline]

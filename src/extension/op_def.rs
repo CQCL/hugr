@@ -227,7 +227,7 @@ impl OpDef {
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
-        Ok(AbstractSignature::new_df(ins, outs).with_extension_delta(&res))
+        Ok(AbstractSignature::new(ins, outs).with_extension_delta(&res))
     }
 
     /// Optional description of the ports in the signature.

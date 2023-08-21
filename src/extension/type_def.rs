@@ -165,7 +165,7 @@ mod test {
         };
         let typ = Type::new_extension(
             def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(
-                AbstractSignature::new_df(vec![], vec![]),
+                AbstractSignature::new(vec![], vec![]),
             ))])
             .unwrap(),
         );

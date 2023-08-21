@@ -7,17 +7,13 @@ use std::ops::Index;
 
 use smol_str::SmolStr;
 
-use crate::utils::display_list;
-
 use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::{EdgeKind, Type, TypeRow};
+use super::{Type, TypeRow};
 
 use crate::hugr::Port;
-
-use crate::type_row;
 
 use crate::extension::ExtensionSet;
 use delegate::delegate;
@@ -90,8 +86,8 @@ impl AbstractSignature {
 }
 
 impl AbstractSignature {
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    /// Create a new signature with specified inputs and outputs.
+    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         // TODO rename to just "new"
         Self {
             input: input.into(),
@@ -102,18 +98,13 @@ impl AbstractSignature {
     /// Create a new signature with the same input and output types.
     pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
-        Self::new_df(linear.clone(), linear)
-    }
-
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
-    pub fn get(&self, port: Port) -> Option<&Type> {
-        self.get_df(port)
+        Self::new(linear.clone(), linear)
     }
 
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
+    /// of bounds.
     #[inline]
-    pub fn get_df(&self, port: Port) -> Option<&Type> {
+    pub fn get(&self, port: Port) -> Option<&Type> {
         match port.direction() {
             Direction::Incoming => self.input.get(port.index()),
             Direction::Outgoing => self.output.get(port.index()),
@@ -121,16 +112,16 @@ impl AbstractSignature {
     }
 
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
+    /// of bounds.
     #[inline]
-    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut Type> {
+    pub fn get_mut(&mut self, port: Port) -> Option<&mut Type> {
         match port.direction() {
             Direction::Incoming => self.input.get_mut(port.index()),
             Direction::Outgoing => self.output.get_mut(port.index()),
         }
     }
 
-    /// Returns the number of value ports in the signature.
+    /// Returns the number of ports in the signature.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
         match dir {
@@ -139,46 +130,37 @@ impl AbstractSignature {
         }
     }
 
-    /// Returns the number of input value and static ports in the signature.
+    /// Returns the number of input ports in the signature.
     #[inline]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
-    /// Returns the number of output value and static ports in the signature.
+    /// Returns the number of output ports in the signature.
     #[inline]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
-    /// Returns the number of value ports in the signature.
+    /// Returns a slice of the types for the given direction.
     #[inline]
-    pub fn df_port_count(&self, dir: Direction) -> usize {
-        match dir {
-            Direction::Incoming => self.input.len(),
-            Direction::Outgoing => self.output.len(),
-        }
-    }
-
-    /// Returns a slice of the value types for the given direction.
-    #[inline]
-    pub fn df_types(&self, dir: Direction) -> &[Type] {
+    pub fn types(&self, dir: Direction) -> &[Type] {
         match dir {
             Direction::Incoming => &self.input,
             Direction::Outgoing => &self.output,
         }
     }
 
-    /// Returns a slice of the input value types.
+    /// Returns a slice of the input types.
     #[inline]
-    pub fn input_df_types(&self) -> &[Type] {
-        self.df_types(Direction::Incoming)
+    pub fn input_types(&self) -> &[Type] {
+        self.types(Direction::Incoming)
     }
 
-    /// Returns a slice of the output value types.
+    /// Returns a slice of the output types.
     #[inline]
-    pub fn output_df_types(&self) -> &[Type] {
-        self.df_types(Direction::Outgoing)
+    pub fn output_types(&self) -> &[Type] {
+        self.types(Direction::Outgoing)
     }
 
     #[inline]
@@ -210,24 +192,6 @@ impl AbstractSignature {
                 .collect::<Vec<_>>()
         );
         self.input.iter().filter(|t| !t.copyable())
-    }
-
-    /// Returns the value `Port`s in the signature for a given direction.
-    #[inline]
-    pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port> {
-        (0..self.df_port_count(dir)).map(move |i| Port::new(dir, i))
-    }
-
-    /// Returns the incoming value `Port`s in the signature.
-    #[inline]
-    pub fn input_ports_df(&self) -> impl Iterator<Item = Port> {
-        self.ports_df(Direction::Incoming)
-    }
-
-    /// Returns the outgoing value `Port`s in the signature.
-    #[inline]
-    pub fn output_ports_df(&self) -> impl Iterator<Item = Port> {
-        self.ports_df(Direction::Outgoing)
     }
 
     /// Returns the `Port`s in the signature for a given direction.
@@ -274,7 +238,6 @@ impl Display for AbstractSignature {
         let has_inputs = !self.input.is_empty();
         if has_inputs {
             self.input.fmt(f)?;
-
             f.write_str(" -> ")?;
         }
         f.write_char('[')?;
