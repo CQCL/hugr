@@ -2,7 +2,7 @@ use super::{SumType, Type, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 
-use super::AbstractSignature;
+use super::FunctionType;
 
 use crate::extension::prelude::{new_array, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
@@ -13,7 +13,7 @@ use crate::types::primitive::PrimType;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<AbstractSignature>),
+    G(Box<FunctionType>),
     Tuple { inner: TypeRow },
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
@@ -63,12 +63,12 @@ mod test {
     use crate::extension::prelude::USIZE_T;
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::types::test::COPYABLE_T;
-    use crate::types::AbstractSignature;
+    use crate::types::FunctionType;
     use crate::types::Type;
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_graph(AbstractSignature::new_linear(vec![]));
+        let g: Type = Type::new_graph(FunctionType::new_linear(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 

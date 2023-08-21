@@ -2,7 +2,7 @@
 
 use crate::ops::AliasDecl;
 
-use super::{AbstractSignature, CustomType, TypeBound};
+use super::{CustomType, FunctionType, TypeBound};
 
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
@@ -14,7 +14,7 @@ pub(super) enum PrimType {
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[display(fmt = "Graph({})", "_0")]
-    Graph(Box<AbstractSignature>),
+    Graph(Box<FunctionType>),
 }
 
 impl PrimType {

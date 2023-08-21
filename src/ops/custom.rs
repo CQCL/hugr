@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::extension::{ExtensionId, OpDef, SignatureError};
 use crate::hugr::{HugrInternalsMut, HugrView, NodeType};
-use crate::types::{type_param::TypeArg, AbstractSignature, SignatureDescription};
+use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
 use crate::{Extension, Hugr, Node};
 
 use super::tag::OpTag;
@@ -85,7 +85,7 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> AbstractSignature {
+    fn signature(&self) -> FunctionType {
         match self {
             Self::Opaque(op) => op.signature.clone().unwrap(),
             Self::Extension(ExtensionOp { signature, .. }) => signature.clone(),
@@ -99,7 +99,7 @@ impl OpTrait for ExternalOp {
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: AbstractSignature, // Cache
+    signature: FunctionType, // Cache
 }
 
 impl ExtensionOp {
@@ -163,7 +163,7 @@ pub struct OpaqueOp {
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Option<AbstractSignature>,
+    signature: Option<FunctionType>,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
@@ -177,7 +177,7 @@ impl OpaqueOp {
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Option<AbstractSignature>,
+        signature: Option<FunctionType>,
     ) -> Self {
         Self {
             extension,
@@ -261,7 +261,7 @@ pub enum CustomOpError {
     OpNotFoundInExtension(String, String),
     /// Extension and OpDef found, but computed signature did not match stored
     #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, AbstractSignature, AbstractSignature),
+    SignatureMismatch(String, FunctionType, FunctionType),
 }
 
 #[cfg(test)]

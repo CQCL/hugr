@@ -1,7 +1,7 @@
 use crate::ops::{self, OpType};
 
 use crate::hugr::{views::HugrView, NodeType};
-use crate::types::{AbstractSignature, TypeRow};
+use crate::types::{FunctionType, TypeRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;
@@ -20,8 +20,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         loop_node: Node,
         tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
-        let signature =
-            AbstractSignature::new(tail_loop.body_input_row(), tail_loop.body_output_row());
+        let signature = FunctionType::new(tail_loop.body_input_row(), tail_loop.body_output_row());
         let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature, None)?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
@@ -127,7 +126,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                AbstractSignature::new(type_row![BIT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![BIT], type_row![NAT]).pure(),
             )?;
             let _fdef = {
                 let [b1] = fbuild.input_wires_arr();

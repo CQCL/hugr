@@ -150,7 +150,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{AbstractSignature, Type, TypeBound};
+    use crate::types::{FunctionType, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
 
@@ -164,9 +164,10 @@ mod test {
             bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(
-                AbstractSignature::new(vec![], vec![]),
-            ))])
+            def.instantiate_concrete(vec![TypeArg::Type(Type::new_graph(FunctionType::new(
+                vec![],
+                vec![],
+            )))])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);

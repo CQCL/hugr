@@ -477,7 +477,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{test::COPYABLE_T, AbstractSignature, Type},
+        types::{test::COPYABLE_T, FunctionType, Type},
     };
 
     use super::sealed::HugrInternalsMut;
@@ -501,7 +501,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: AbstractSignature::new(type_row![NAT], type_row![NAT, NAT]),
+                    signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
             .expect("Failed to add function definition node");
