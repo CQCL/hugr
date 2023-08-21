@@ -438,7 +438,8 @@ mod tests {
         },
         extension::prelude::QB_T,
         hugr::views::{HierarchyView, SiblingGraph},
-        ops::{handle::NodeHandle, LeafOp},
+        ops::handle::NodeHandle,
+        std_extensions::quantum::test::cx_gate,
         type_row,
         types::AbstractSignature,
     };
@@ -453,7 +454,7 @@ mod tests {
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs = dfg.add_dataflow_op(LeafOp::CX, dfg.input_wires())?;
+            let outs = dfg.add_dataflow_op(cx_gate(), dfg.input_wires())?;
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
@@ -477,7 +478,7 @@ mod tests {
     #[test]
     fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
+        let func: SiblingGraph<'_, DfgID> = SiblingGraph::new(&hugr, func_root);
         let sub = SiblingSubgraph::from_dataflow_graph(&func)?;
 
         let empty_dfg = {
@@ -498,21 +499,22 @@ mod tests {
     }
 
     #[test]
-    fn test_signature() {
+    fn test_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, dfg);
-        let sub = SiblingSubgraph::from_dataflow_graph(&func);
+        let func: SiblingGraph<'_, DfgID> = SiblingGraph::new(&hugr, dfg);
+        let sub = SiblingSubgraph::from_dataflow_graph(&func)?;
         assert_eq!(
             sub.signature(),
             AbstractSignature::new_linear(type_row![QB_T, QB_T])
         );
+        Ok(())
     }
 
     #[test]
-    fn construct_simple_replacement_signature_panics() {
+    fn construct_simple_replacement_invalid_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, dfg);
-        let sub = SiblingSubgraph::from_sibling_graph(&func);
+        let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
             let builder = DFGBuilder::new(AbstractSignature::new_linear(type_row![QB_T])).unwrap();
@@ -523,14 +525,21 @@ mod tests {
         assert_eq!(
             sub.create_simple_replacement(empty_dfg).unwrap_err(),
             InvalidReplacement::InvalidSignature
-        )
+        );
+        Ok(())
     }
 
     #[test]
     fn convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root);
-        assert_eq!(SiblingSubgraph::from_dataflow_graph(&func).nodes().len(), 1)
+        let func: SiblingGraph<'_, DfgID> = SiblingGraph::new(&hugr, func_root);
+        assert_eq!(
+            SiblingSubgraph::from_dataflow_graph(&func)
+                .unwrap()
+                .nodes()
+                .len(),
+            1
+        )
     }
 
     #[test]
