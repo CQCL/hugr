@@ -281,7 +281,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///    not have an input and output node,
     ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
     ///    replacement DFG does not match the subgraph signature, or
-    ///  - [`InvalidReplacement::NonConvexSubgrah`]: the sibling subgraph is not
+    ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is not
     ///    convex.
     pub fn create_simple_replacement(
         &self,
