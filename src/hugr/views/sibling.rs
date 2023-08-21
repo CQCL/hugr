@@ -143,6 +143,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             Direction::Outgoing => vec![(n, p)],
         });
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
+        // Ordering of the edges here is preserved and becomes ordering of the signature.
         let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing).map(to_pg));
         if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);

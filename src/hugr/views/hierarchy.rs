@@ -48,7 +48,7 @@ where
     graph: FlatRegionGraph<'g, Base>,
 
     /// The rest of the HUGR.
-    pub(super) hugr: &'g Base,
+    hugr: &'g Base,
 
     /// The operation type of the root node.
     _phantom: std::marker::PhantomData<Root>,
