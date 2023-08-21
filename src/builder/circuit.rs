@@ -136,9 +136,10 @@ mod test {
 
     use crate::{
         builder::{
-            test::{build_main, BIT, NAT, QB},
+            test::{build_main, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
+        extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, LeafOp},
         std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
@@ -185,7 +186,7 @@ mod test {
             .into(),
         );
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB, NAT], type_row![QB, QB, BIT]).pure(),
+            AbstractSignature::new_df(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::extension::prelude::{QB_T, USIZE_T};
+use crate::extension::prelude::{BOOL_T, QB_T};
 use crate::extension::{ExtensionSet, SignatureError};
 use crate::type_row;
 use crate::types::type_param::TypeArg;
@@ -49,8 +49,9 @@ fn extension() -> Extension {
             |_arg_values: &[TypeArg]| {
                 Ok((
                     type_row![QB_T],
-                    type_row![QB_T, USIZE_T],
-                    ExtensionSet::default(),
+                    type_row![QB_T, BOOL_T],
+                    // TODO add logic as an extension delta when inference is done?
+                    ExtensionSet::new(),
                 ))
             },
         )
