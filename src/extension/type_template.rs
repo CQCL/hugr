@@ -278,7 +278,8 @@ impl TypeArgTemplate {
         }
     }
 
-    fn validate(
+    // TODO ensure we make all these checks in will_fit
+    /*fn validate(
         &self,
         exts: &HashMap<SmolStr, Extension>,
         binders: &Vec<TypeParam>,
@@ -299,5 +300,5 @@ impl TypeArgTemplate {
                 }
             }
         }
-    }
+    }*/
 }
