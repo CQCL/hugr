@@ -16,14 +16,14 @@ use crate::{
 };
 
 use super::float_types::FLOAT64_TYPE;
-use super::int_types::{get_width, int_type};
+use super::int_types::{get_width_power, int_type};
 
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
+    let n: u8 = get_width_power(arg);
     Ok((
         type_row![FLOAT64_TYPE],
         vec![Type::new_sum(vec![
@@ -37,7 +37,7 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 
 fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
+    let n: u8 = get_width_power(arg);
     Ok((
         vec![int_type(n)].into(),
         type_row![FLOAT64_TYPE],

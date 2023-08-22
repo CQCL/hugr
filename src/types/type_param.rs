@@ -21,6 +21,9 @@ pub enum TypeParam {
     Type(TypeBound),
     /// Argument is a [TypeArg::USize].
     USize,
+    /// Argument is a [TypeArg::SimplePredicate] which is bounded by the size
+    /// specified here.
+    SimplePredicate(usize),
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
     Opaque(CustomType),
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
@@ -41,6 +44,9 @@ pub enum TypeArg {
     Type(Type),
     /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
     USize(u64),
+    /// Instance of [TypeParam::SimplePredicate]. A Sum over unit types with
+    /// specified tag.
+    SimplePredicate(usize),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque(CustomTypeArg),
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -99,6 +105,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
         (TypeArg::Extensions(_), TypeParam::Extensions) => Ok(()),
+        (TypeArg::SimplePredicate(tag), TypeParam::SimplePredicate(size)) if tag < size => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),

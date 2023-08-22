@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use super::int_types::{get_width, int_type};
+use super::int_types::{get_width_power, int_type};
 use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
 use crate::type_row;
 use crate::types::type_param::TypeParam;
@@ -18,8 +18,8 @@ pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
 fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_width(arg0)?;
-    let n: u8 = get_width(arg1)?;
+    let m: u8 = get_width_power(arg0);
+    let n: u8 = get_width_power(arg1);
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
@@ -32,8 +32,8 @@ fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet)
 
 fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_width(arg0)?;
-    let n: u8 = get_width(arg1)?;
+    let m: u8 = get_width_power(arg0);
+    let n: u8 = get_width_power(arg1);
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
@@ -62,7 +62,7 @@ fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet),
 
 fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
+    let n: u8 = get_width_power(arg);
     Ok((
         vec![int_type(n); 2].into(),
         type_row![BOOL_T],
@@ -72,7 +72,7 @@ fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 
 fn ibinop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
+    let n: u8 = get_width_power(arg);
     Ok((
         vec![int_type(n); 2].into(),
         vec![int_type(n)].into(),
@@ -82,7 +82,7 @@ fn ibinop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet)
 
 fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
+    let n: u8 = get_width_power(arg);
     Ok((
         vec![int_type(n)].into(),
         vec![int_type(n)].into(),
@@ -92,8 +92,8 @@ fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet),
 
 fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let n: u8 = get_width(arg0)?;
-    let m: u8 = get_width(arg1)?;
+    let n: u8 = get_width_power(arg0);
+    let m: u8 = get_width_power(arg1);
     let intpair: TypeRow = vec![int_type(n), int_type(m)].into();
     Ok((
         intpair.clone(),
@@ -104,8 +104,8 @@ fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet
 
 fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let n: u8 = get_width(arg0)?;
-    let m: u8 = get_width(arg1)?;
+    let n: u8 = get_width_power(arg0);
+    let m: u8 = get_width_power(arg1);
     Ok((
         vec![int_type(n), int_type(m)].into(),
         vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
@@ -115,8 +115,8 @@ fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 
 fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let n: u8 = get_width(arg0)?;
-    let m: u8 = get_width(arg1)?;
+    let n: u8 = get_width_power(arg0);
+    let m: u8 = get_width_power(arg1);
     Ok((
         vec![int_type(n), int_type(m)].into(),
         vec![Type::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
@@ -126,8 +126,8 @@ fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 
 fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let n: u8 = get_width(arg0)?;
-    let m: u8 = get_width(arg1)?;
+    let n: u8 = get_width_power(arg0);
+    let m: u8 = get_width_power(arg1);
     Ok((
         vec![int_type(n), int_type(m)].into(),
         vec![int_type(n)].into(),

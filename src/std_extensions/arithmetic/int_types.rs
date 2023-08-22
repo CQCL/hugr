@@ -3,9 +3,8 @@
 use smol_str::SmolStr;
 
 use crate::{
-    extension::SignatureError,
     types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
+        type_param::{TypeArg, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::CustomConst,
@@ -21,7 +20,7 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 fn int_custom_type(n: u8) -> CustomType {
     CustomType::new(
         INT_TYPE_ID,
-        [TypeArg::USize(n as u64)],
+        [TypeArg::SimplePredicate(n as usize)],
         EXTENSION_ID,
         TypeBound::Copyable,
     )
@@ -30,37 +29,22 @@ fn int_custom_type(n: u8) -> CustomType {
 /// Integer type of a given bit width.
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub fn int_type(n: u8) -> Type {
-    Type::new_extension(int_custom_type(n))
+pub fn int_type(width_power: u8) -> Type {
+    Type::new_extension(int_custom_type(width_power))
 }
 
-fn is_valid_width(n: u8) -> bool {
-    (n == 1)
-        || (n == 2)
-        || (n == 4)
-        || (n == 8)
-        || (n == 16)
-        || (n == 32)
-        || (n == 64)
-        || (n == 128)
+const fn is_valid_width(n: u8) -> bool {
+    (n <= (1u8 << (POWERS_OF_TWO - 1))) && ((n & (n - 1)) == 0)
 }
+
+const POWERS_OF_TWO: usize = 8;
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
-pub fn get_width(arg: &TypeArg) -> Result<u8, SignatureError> {
-    let n: u8 = match arg {
-        TypeArg::USize(n) => *n as u8,
-        _ => {
-            return Err(TypeArgError::TypeMismatch {
-                arg: arg.clone(),
-                param: TypeParam::USize,
-            }
-            .into());
-        }
-    };
-    if !is_valid_width(n) {
-        return Err(TypeArgError::InvalidValue(arg.clone()).into());
+pub fn get_width_power(arg: &TypeArg) -> u8 {
+    match arg {
+        TypeArg::SimplePredicate(n) if *n < POWERS_OF_TWO => *n as u8,
+        _ => panic!("type check should prevent this."),
     }
-    Ok(n)
 }
 
 /// An unsigned integer
@@ -160,7 +144,7 @@ pub fn extension() -> Extension {
     extension
         .add_type(
             INT_TYPE_ID,
-            vec![TypeParam::USize],
+            vec![TypeParam::SimplePredicate(POWERS_OF_TWO)],
             "integral value of a given bit width".to_owned(),
             TypeBound::Copyable.into(),
         )
@@ -171,7 +155,7 @@ pub fn extension() -> Extension {
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
+    use cool_asserts::{assert_matches, assert_panics};
 
     use super::*;
 
@@ -185,23 +169,13 @@ mod test {
 
     #[test]
     fn test_int_widths() {
-        let type_arg_32 = TypeArg::USize(32);
-        assert_matches!(get_width(&type_arg_32), Ok(32));
+        let type_arg_32 = TypeArg::SimplePredicate(5);
+        assert_matches!(get_width_power(&type_arg_32), 5);
 
-        let type_arg_33 = TypeArg::USize(33);
-        assert_matches!(
-            get_width(&type_arg_33),
-            Err(SignatureError::TypeArgMismatch(_))
-        );
+        let type_arg_128 = TypeArg::SimplePredicate(7);
+        assert_matches!(get_width_power(&type_arg_128), 7);
 
-        let type_arg_128 = TypeArg::USize(128);
-        assert_matches!(get_width(&type_arg_128), Ok(128));
-
-        let type_arg_256 = TypeArg::USize(256);
-        assert_matches!(
-            get_width(&type_arg_256),
-            Err(SignatureError::TypeArgMismatch(_))
-        );
+        assert_panics!(get_width_power(&TypeArg::SimplePredicate(8)));
     }
 
     #[test]
