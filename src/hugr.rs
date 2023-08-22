@@ -24,7 +24,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::{infer_extensions, InferExtensionError, ExtensionSet, ExtensionSolution};
+use crate::extension::{infer_extensions, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 

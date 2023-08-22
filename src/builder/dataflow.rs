@@ -438,8 +438,8 @@ mod test {
         let c_extensions = ExtensionSet::singleton(&"C".into());
         let abc_extensions = ab_extensions.clone().union(&c_extensions);
 
-        let parent_sig = FunctionType::new(type_row![BIT], type_row![BIT])
-            .with_extension_delta(&abc_extensions);
+        let parent_sig =
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&abc_extensions);
         let mut parent = DFGBuilder::new(parent_sig)?;
 
         let add_c_sig = FunctionType::new(type_row![BIT], type_row![BIT])

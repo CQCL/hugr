@@ -18,7 +18,7 @@ use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
 
 mod infer;
-pub use infer::{infer_extensions, InferExtensionError, ExtensionSolution};
+pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};

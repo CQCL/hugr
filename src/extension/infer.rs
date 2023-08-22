@@ -616,10 +616,10 @@ mod test {
 
     use super::*;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::ExtensionSet;
     use crate::hugr::HugrInternalsMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
-    use crate::extension::ExtensionSet;
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -852,8 +852,7 @@ mod test {
         let mut builder = DFGBuilder::new(root_signature)?;
         let [input_wire] = builder.input_wires_arr();
 
-        let add_r_sig =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
+        let add_r_sig = FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
 
         let add_r = builder.add_dataflow_node(
             NodeType::open_extensions(ops::DFG {

@@ -12,7 +12,10 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::{InferExtensionError, validate::{ExtensionError, ExtensionValidator}};
+use crate::extension::{
+    validate::{ExtensionError, ExtensionValidator},
+    InferExtensionError,
+};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
