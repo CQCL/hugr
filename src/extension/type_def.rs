@@ -45,7 +45,7 @@ pub struct TypeDef {
     /// Human readable description of the type definition.
     description: String,
     /// The definition of the type bound of this definition.
-    bound: TypeDefBound,
+    pub(super) bound: TypeDefBound,
 }
 
 impl TypeDef {
