@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::extension::prelude::{BOOL_T, QB_T};
-use crate::extension::{ExtensionSet, SignatureError};
+use crate::extension::SignatureError;
 use crate::type_row;
 use crate::types::type_param::TypeArg;
 use crate::types::FunctionType;
@@ -14,19 +14,14 @@ use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("quantum");
 fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType {
-        input: type_row![QB_T],
-        output: type_row![QB_T],
-        extension_reqs: ExtensionSet::new(),
-    })
+    Ok(FunctionType::new(type_row![QB_T], type_row![QB_T]))
 }
 
 fn two_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType {
-        input: type_row![QB_T, QB_T],
-        output: type_row![QB_T, QB_T],
-        extension_reqs: ExtensionSet::new(),
-    })
+    Ok(FunctionType::new(
+        type_row![QB_T, QB_T],
+        type_row![QB_T, QB_T],
+    ))
 }
 
 fn extension() -> Extension {
@@ -51,14 +46,10 @@ fn extension() -> Extension {
             "Measure a qubit, returning the qubit and the measurement result.".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                Ok(FunctionType {
-                    input: type_row![QB_T],
-                    output: type_row![QB_T, BOOL_T],
-                    // TODO add logic as an extension delta when inference is
-                    // done?
-                    // https://github.com/CQCL-DEV/hugr/issues/425
-                    extension_reqs: ExtensionSet::new(),
-                })
+                Ok(FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]))
+                // TODO add logic as an extension delta when inference is
+                // done?
+                // https://github.com/CQCL-DEV/hugr/issues/425
             },
         )
         .unwrap();

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, ExtensionSet},
+    extension::prelude::BOOL_T,
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
@@ -38,13 +38,7 @@ fn extension() -> Extension {
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
-            |_arg_values: &[TypeArg]| {
-                Ok(FunctionType {
-                    input: type_row![BOOL_T],
-                    output: type_row![BOOL_T],
-                    extension_reqs: ExtensionSet::default(),
-                })
-            },
+            |_arg_values: &[TypeArg]| Ok(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])),
         )
         .unwrap();
 
@@ -65,11 +59,10 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok(FunctionType {
-                    input: vec![BOOL_T; n as usize].into(),
-                    output: type_row![BOOL_T],
-                    extension_reqs: ExtensionSet::default(),
-                })
+                Ok(FunctionType::new(
+                    vec![BOOL_T; n as usize],
+                    type_row![BOOL_T],
+                ))
             },
         )
         .unwrap();
@@ -91,11 +84,10 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok(FunctionType {
-                    input: vec![BOOL_T; n as usize].into(),
-                    output: type_row![BOOL_T],
-                    extension_reqs: ExtensionSet::default(),
-                })
+                Ok(FunctionType::new(
+                    vec![BOOL_T; n as usize],
+                    type_row![BOOL_T],
+                ))
             },
         )
         .unwrap();

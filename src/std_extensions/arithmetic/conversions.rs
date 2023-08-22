@@ -24,25 +24,22 @@ pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok(FunctionType {
-        input: type_row![FLOAT64_TYPE],
-        output: vec![Type::new_sum(vec![
+    Ok(FunctionType::new(
+        type_row![FLOAT64_TYPE],
+        vec![Type::new_sum(vec![
             int_type(n),
             crate::extension::prelude::ERROR_TYPE,
-        ])]
-        .into(),
-        extension_reqs: ExtensionSet::default(),
-    })
+        ])],
+    ))
 }
 
 fn itof_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok(FunctionType {
-        input: vec![int_type(n)].into(),
-        output: type_row![FLOAT64_TYPE],
-        extension_reqs: ExtensionSet::default(),
-    })
+    Ok(FunctionType::new(
+        vec![int_type(n)],
+        type_row![FLOAT64_TYPE],
+    ))
 }
 
 /// Extension for basic arithmetic operations.
