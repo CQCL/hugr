@@ -198,12 +198,8 @@ where
         }
     }
 
-    fn get_function_type(&self, node: Node) -> Option<&crate::types::FunctionType> {
-        if node == self.root() {
-            self.base_hugr().get_function_type(node)
-        } else {
-            None
-        }
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
     }
 }
 
@@ -367,8 +363,8 @@ where
         self.base_hugr().get_io(node)
     }
 
-    fn get_function_type(&self, node: Node) -> Option<&crate::types::FunctionType> {
-        self.base_hugr().get_function_type(node)
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
     }
 }
 

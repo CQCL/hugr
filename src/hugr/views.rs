@@ -154,7 +154,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self, node: Node) -> Option<&FunctionType>;
+    fn get_function_type(&self) -> Option<&FunctionType>;
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
@@ -319,8 +319,8 @@ where
         }
     }
 
-    fn get_function_type(&self, node: Node) -> Option<&FunctionType> {
-        let op = self.get_nodetype(node);
+    fn get_function_type(&self) -> Option<&FunctionType> {
+        let op = self.get_nodetype(self.root());
         match &op.op {
             OpType::DFG(DFG { signature })
             | OpType::FuncDecl(FuncDecl { signature, .. })

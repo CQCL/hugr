@@ -60,7 +60,7 @@ impl PrimType {
                 Ok(())
             }
             (PrimType::Function(t), PrimValue::Function(v))
-                if Some(t.as_ref()) == v.get_function_type(v.root()) =>
+                if Some(t.as_ref()) == v.get_function_type() =>
             {
                 // exact signature equality, in future this may need to be
                 // relaxed to be compatibility checks between the signatures.
