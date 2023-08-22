@@ -411,10 +411,13 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::prelude::QB_T,
+        extension::prelude::{BOOL_T, QB_T},
         hugr::views::{HierarchyView, SiblingGraph},
-        ops::handle::{FuncID, NodeHandle},
-        std_extensions::quantum::test::cx_gate,
+        ops::{
+            handle::{FuncID, NodeHandle},
+            OpType,
+        },
+        std_extensions::{logic::test::and_op, quantum::test::cx_gate},
         type_row,
     };
 
@@ -455,6 +458,25 @@ mod tests {
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs = dfg.add_dataflow_op(cx_gate(), dfg.input_wires())?;
+            dfg.finish_with_outputs(outs.outputs())?
+        };
+        let hugr = mod_builder
+            .finish_hugr()
+            .map_err(|e| -> BuildError { e.into() })?;
+        Ok((hugr, func_id.node()))
+    }
+
+    /// A HUGR with a copy
+    fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
+        let mut mod_builder = ModuleBuilder::new();
+        let func = mod_builder.declare(
+            "test",
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).pure(),
+        )?;
+        let func_id = {
+            let mut dfg = mod_builder.define_declaration(&func)?;
+            let in_wire = dfg.input_wires().exactly_one().unwrap();
+            let outs = dfg.add_dataflow_op(and_op(), [in_wire, in_wire])?;
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
@@ -571,5 +593,14 @@ mod tests {
             ),
             Err(InvalidSubgraph::NotConvex)
         ));
+    }
+
+    #[test]
+    fn preserve_signature() {
+        let (hugr, func_root) = build_hugr_classical().unwrap();
+        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::new(&hugr, func_root);
+        let func = SiblingSubgraph::from_dataflow_graph(&func).unwrap();
+        let OpType::FuncDefn(func_defn) = hugr.get_optype(func_root) else { panic!()};
+        assert_eq!(func_defn.signature, func.signature())
     }
 }
