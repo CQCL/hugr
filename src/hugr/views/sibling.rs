@@ -34,12 +34,16 @@ use super::{sealed::HugrInternals, HugrView};
 /// The incoming boundary (resp. outgoing boundary) is given by the input (resp.
 /// output) ports of the subgraph that are linked to nodes outside of the subgraph.
 /// The signature of the subgraph is then given by the types of the incoming
-/// and outgoing boundary edges. Given a replacement with the same signature,
+/// and outgoing boundary ports. Given a replacement with the same signature,
 /// a [`SimpleReplacement`] can be constructed to rewrite the subgraph with the
 /// replacement.
 ///
 /// The ordering of the nodes in the subgraph is irrelevant to define the convex
 /// subgraph, but it determines the ordering of the boundary signature.
+///
+/// At the moment we do not treat state order edges in any special way. If any
+/// are present in the induced subgraph they will be included. However, state
+/// order edges are not supported in replacements.
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph<'g, Base> {
     /// The underlying Hugr.
@@ -87,9 +91,10 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// target ports, then all edges from the same source port are outgoing
     /// boundary edges.
     ///
-    /// More formally, the sibling subgraph defined by $B_I$ and $B_O$ is the
-    /// graph given by the connected components of the graph with edges
-    /// $E\B_I\B_O$ which contain at least one node that is either
+    /// More formally, the sibling subgraph of a graph $G = (V, E)$ given
+    /// by sets of incoming and outoing boundary edges $B_I, B_O \subseteq E$
+    /// is the graph given by the connected components of the graph
+    /// $G' = (V, E \ B_I \ B_O)$ that contain at least one node that is either
     ///  - the target of an incoming boundary edge, or
     ///  - the source of an outgoing boundary edge.
     ///
@@ -144,6 +149,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         });
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
         // Ordering of the edges here is preserved and becomes ordering of the signature.
+        // TODO: handle state order edges
         let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing).map(to_pg));
         if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
@@ -283,6 +289,9 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///    replacement DFG does not match the subgraph signature, or
     ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is not
     ///    convex.
+    ///
+    /// At the moment we do not support state order edges. If any are found in
+    /// the replacement graph, this will panic.
     pub fn create_simple_replacement(
         &self,
         replacement: Hugr,
@@ -304,44 +313,35 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         if dfg_optype.signature() != self.signature() {
             return Err(InvalidReplacement::InvalidSignature);
         }
-        // TODO: handle state order edges. For now we ignore them entirely.
+
+        // TODO: handle state order edges. For now panic if any are present.
         // See https://github.com/CQCL-DEV/hugr/discussions/432
-        let rep_inputs = replacement
-            .node_outputs(rep_input)
-            // filter out any non-dataflow ports
-            .filter(|&p| {
-                replacement
-                    .get_optype(rep_input)
-                    .signature()
-                    .get(p)
-                    .is_some()
-            });
-        let rep_outputs = replacement
-            .node_inputs(rep_output)
-            // filter out any non-dataflow ports
-            .filter(|&p| {
-                replacement
-                    .get_optype(rep_output)
-                    .signature()
-                    .get(p)
-                    .is_some()
-            });
+        let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
+        let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
+        let mut rep_order_edges = rep_inputs
+            .clone()
+            .chain(rep_outputs.clone())
+            .filter(|&(n, p)| replacement.get_optype(n).signature().get(p).is_none());
+        if rep_order_edges.any(|(n, p)| replacement.linked_ports(n, p).count() > 0) {
+            unimplemented!("Found state order edges in replacement graph");
+        }
+
         let self_inputs = self.incoming_ports();
         let self_outputs = self.outgoing_ports();
         let nu_inp = rep_inputs
             .zip_eq(self_inputs)
-            .flat_map(|(rep_source, self_target)| {
+            .flat_map(|((rep_source_n, rep_source_p), self_target)| {
                 replacement
-                    .linked_ports(rep_input, rep_source)
+                    .linked_ports(rep_source_n, rep_source_p)
                     .map(move |rep_target| (rep_target, self_target))
             })
             .collect();
         let nu_out = self_outputs
             .zip_eq(rep_outputs)
-            .flat_map(|((self_source_n, self_source_p), rep_target)| {
+            .flat_map(|((self_source_n, self_source_p), (_, rep_target_p))| {
                 self.base
                     .linked_ports(self_source_n, self_source_p)
-                    .map(move |self_target| (self_target, rep_target))
+                    .map(move |self_target| (self_target, rep_target_p))
             })
             .collect();
 
@@ -386,11 +386,6 @@ pub enum InvalidSubgraph {
     EmptySubgraph,
 }
 
-// /// A common trait for views of a HUGR sibling subgraph.
-// pub trait SiblingView: HugrView {}
-
-// impl<'g, Base: HugrView> SiblingView for SiblingSubgraph<'g, Base> {}
-
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -416,7 +411,7 @@ mod tests {
         ///
         /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
         /// subgraph is empty.
-        pub fn from_sibling_graph(sibling_graph: &'g Base) -> Result<Self, InvalidSubgraph>
+        fn from_sibling_graph(sibling_graph: &'g Base) -> Result<Self, InvalidSubgraph>
         where
             Base: HugrView,
         {
@@ -478,9 +473,10 @@ mod tests {
 
         assert_eq!(rep.removal.len(), 1);
 
+        assert_eq!(hugr.node_count(), 5); // Module + Def + In + CX + Out
         hugr.apply_rewrite(rep).unwrap();
-
         assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
+
         Ok(())
     }
 
