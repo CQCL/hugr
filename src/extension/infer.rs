@@ -514,8 +514,8 @@ impl UnificationContext {
 
         // TODO: We should be doing something to ensure that these are the same check...
         if self.get_solution(m).is_none() {
-            if self.get_constraints(m).is_some() {
-                for c in self.get_constraints(m).unwrap().iter() {
+            if let Some(cs) = self.get_constraints(m) {
+                for c in cs {
                     match c {
                         Constraint::Plus(_, m) => return self.live_var(m),
                         _ => panic!("we shouldn't be here!"),
