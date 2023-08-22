@@ -27,7 +27,9 @@ pub enum TypeParam {
     List(Box<TypeParam>),
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
     Tuple(Vec<TypeParam>),
-    /// Argument is a [TypeArg::Extensions]. A set of extension (ids)
+    /// Argument is a [TypeArg::Extensions]. A set of [ExtensionId]s.
+    ///
+    /// [ExtensionId]: crate::extension::ExtensionId
     Extensions,
 }
 
