@@ -170,7 +170,7 @@ pub(crate) mod sealed {
         /// Replace the OpType at node and return the old OpType.
         /// In general this invalidates the ports, which may need to be resized to
         /// match the OpType signature.
-        /// TODO: Add a version which ignores input resources
+        /// TODO: Add a version which ignores input extensions
         fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType;
 
         /// Insert another hugr into this one, under a given root node.
@@ -211,7 +211,7 @@ pub(crate) mod sealed {
         }
 
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-            // TODO: Default to `NodeType::open_resources` once we can infer resources
+            // TODO: Default to `NodeType::open_extensions` once we can infer extensions
             self.add_node(NodeType::pure(op))
         }
 
@@ -324,7 +324,7 @@ pub(crate) mod sealed {
             parent: Node,
             op: impl Into<OpType>,
         ) -> Result<Node, HugrError> {
-            // TODO: Default to `NodeType::open_resources` once we can infer resources
+            // TODO: Default to `NodeType::open_extensions` once we can infer extensions
             self.add_node_with_parent(parent, NodeType::pure(op))
         }
 
@@ -477,7 +477,7 @@ mod test {
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{test::COPYABLE_T, AbstractSignature, Type},
+        types::{test::COPYABLE_T, FunctionType, Type},
     };
 
     use super::sealed::HugrInternalsMut;
@@ -501,7 +501,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: AbstractSignature::new_df(type_row![NAT], type_row![NAT, NAT]),
+                    signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
                 },
             )
             .expect("Failed to add function definition node");

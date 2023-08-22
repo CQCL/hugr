@@ -10,7 +10,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
-pub use signature::{AbstractSignature, Signature, SignatureDescription};
+pub use signature::{FunctionType, Signature, SignatureDescription};
 pub use type_row::TypeRow;
 
 use itertools::FoldWhile::{Continue, Done};
@@ -93,6 +93,46 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
     .into_inner()
 }
 
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+/// Representation of a Sum type.
+/// Either store the types of the variants, or in the special (but common) case
+/// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
+enum SumType {
+    #[display(fmt = "SimplePredicate({})", "_0")]
+    Simple(u8),
+    General(TypeRow),
+}
+
+impl SumType {
+    fn new(types: impl Into<TypeRow>) -> Self {
+        let row: TypeRow = types.into();
+
+        let len = row.len();
+        if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
+            Self::Simple(len as u8)
+        } else {
+            Self::General(row)
+        }
+    }
+
+    fn get_variant(&self, tag: usize) -> Option<&Type> {
+        match self {
+            SumType::Simple(size) if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::General(row) => row.get(tag),
+            _ => None,
+        }
+    }
+}
+
+impl From<SumType> for Type {
+    fn from(sum: SumType) -> Type {
+        match sum {
+            SumType::Simple(size) => Type::new_simple_predicate(size),
+            SumType::General(types) => Type::new_sum(types),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 /// Core types: primitive (leaf), tuple (product) or sum (co-product).
 enum TypeEnum {
@@ -100,15 +140,18 @@ enum TypeEnum {
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
     #[display(fmt = "Sum({})", "_0")]
-    Sum(TypeRow),
+    Sum(SumType),
 }
 impl TypeEnum {
     /// The smallest type bound that covers the whole type.
     fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
+            TypeEnum::Sum(SumType::Simple(_)) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::General(ts)) => {
+                least_upper_bound(ts.iter().map(Type::least_upper_bound))
+            }
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
-            TypeEnum::Sum(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
     }
 }
@@ -128,26 +171,29 @@ impl TypeEnum {
 /// # use hugr::types::{Type, TypeBound};
 /// # use hugr::type_row;
 ///
-/// const unit: Type = Type::new_unit();
-/// let sum = Type::new_sum(type_row![unit, unit]);
+/// let sum = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 ///
 /// ```
 ///
 /// ```
-/// # use hugr::types::{Type, TypeBound, AbstractSignature};
+/// # use hugr::types::{Type, TypeBound, FunctionType};
 ///
-/// let graph_type = Type::new_graph(AbstractSignature::new_linear(vec![]));
-/// assert_eq!(graph_type.least_upper_bound(), TypeBound::Copyable);
+/// let func_type = Type::new_function(FunctionType::new_linear(vec![]));
+/// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 ///
 /// ```
 ///
 pub struct Type(TypeEnum, TypeBound);
 
 impl Type {
-    /// Initialize a new graph type with a signature.
-    pub fn new_graph(signature: AbstractSignature) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Graph(Box::new(signature))))
+    /// Unit type (empty tuple).
+    pub const UNIT: Self = Self(TypeEnum::Tuple(type_row![]), TypeBound::Eq);
+    const UNIT_REF: &'static Self = &Self::UNIT;
+
+    /// Initialize a new function type.
+    pub fn new_function(signature: FunctionType) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(signature))))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -159,11 +205,11 @@ impl Type {
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
     pub fn new_sum(types: impl Into<TypeRow>) -> Self {
-        Self::new(TypeEnum::Sum(types.into()))
+        Self::new(TypeEnum::Sum(SumType::new(types)))
     }
 
     /// Initialize a new custom type.
-    // TODO remove? Resources/TypeDefs should just provide `Type` directly
+    // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
         Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
@@ -189,14 +235,9 @@ impl Type {
     }
 
     /// New simple predicate with empty Tuple variants
-    pub fn new_simple_predicate(size: usize) -> Self {
-        Self::new_predicate(std::iter::repeat(vec![]).take(size))
-    }
-
-    /// New unit type (empty tuple).
-    #[inline(always)]
-    pub const fn new_unit() -> Self {
-        Type(TypeEnum::Tuple(type_row![]), TypeBound::Eq)
+    pub const fn new_simple_predicate(size: u8) -> Self {
+        // should be the only way to avoid going through SumType::new
+        Self(TypeEnum::Sum(SumType::Simple(size)), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -232,7 +273,7 @@ pub(crate) mod test {
         custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
         *,
     };
-    use crate::{ops::AliasDecl, resource::prelude::USIZE_T};
+    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
     pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
@@ -242,18 +283,29 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_graph(AbstractSignature::new_linear(vec![])),
+            Type::new_function(FunctionType::new_linear(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                "my_resource",
+                "my_extension",
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), Graph([[]][]), my_custom([]), Alias(my_alias)])".to_string()
+            "Tuple([usize([]), Function([[]][]), my_custom([]), Alias(my_alias)])".to_string()
         );
+    }
+
+    #[test]
+    fn sum_construct() {
+        let pred1 = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
+        let pred2 = Type::new_simple_predicate(2);
+
+        assert_eq!(pred1, pred2);
+
+        let pred_direct = SumType::Simple(2);
+        assert_eq!(pred1, pred_direct.into())
     }
 }

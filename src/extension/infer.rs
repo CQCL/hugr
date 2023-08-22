@@ -1,12 +1,12 @@
-//! Inference for resource requirements on nodes of a hugr.
+//! Inference for extension requirements on nodes of a hugr.
 //!
-//! Checks if the resources requirements are sane, and comes up with concrete
+//! Checks if the extensions requirements are sane, and comes up with concrete
 //! solutions when possible. Inference operates when toplevel nodes can be open
-//! variables. When resource requirements of nodes depend on these open
-//! variables, then the validation check for resources will succeed regardless
+//! variables. When extension requirements of nodes depend on these open
+//! variables, then the validation check for extensions will succeed regardless
 //! of what the variable is instantiated to.
 
-use super::{ResourceId, ResourceSet};
+use super::{ExtensionId, ExtensionSet};
 use crate::{
     hugr::views::{HierarchyView, HugrView, SiblingGraph},
     hugr::{Node, Port},
@@ -15,7 +15,7 @@ use crate::{
     Direction,
 };
 
-use super::validate::ResourceError;
+use super::validate::ExtensionError;
 
 use petgraph::graph as pg;
 
@@ -27,10 +27,10 @@ use thiserror::Error;
 
 /// A mapping from locations on the hugr to extension requirement sets which
 /// have been inferred for them
-pub type ResourceSolution = HashMap<(Node, Direction), ResourceSet>;
+pub type ExtensionSolution = HashMap<(Node, Direction), ExtensionSet>;
 
-/// Infer resources for a hugr. This is the main API exposed by this module
-pub fn infer_resources(hugr: &impl HugrView) -> Result<ResourceSolution, InferResourceError> {
+/// Infer extensions for a hugr. This is the main API exposed by this module
+pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()
 }
@@ -43,8 +43,8 @@ type Meta = usize;
 enum Constraint {
     /// A variable has the same value as another variable
     Equal(Meta),
-    /// Variable extends the value of another by one resource
-    Plus(ResourceId, Meta),
+    /// Variable extends the value of another by one extension
+    Plus(ExtensionId, Meta),
 }
 
 // Implement ordering for constraints so that we can get to the most useful
@@ -68,15 +68,15 @@ impl Ord for Constraint {
 
 #[derive(Debug, Clone, PartialEq, Error)]
 /// Errors which arise during unification
-pub enum InferResourceError {
-    #[error("Mismatched resource sets {expected} and {actual}")]
+pub enum InferExtensionError {
+    #[error("Mismatched extension sets {expected} and {actual}")]
     /// We've solved a metavariable, then encountered a constraint
     /// that says it should be something other than our solution
     MismatchedConcrete {
         /// The solution we were trying to insert for this meta
-        expected: ResourceSet,
+        expected: ExtensionSet,
         /// The incompatible solution that we found was already there
-        actual: ResourceSet,
+        actual: ExtensionSet,
     },
     /// A variable went unsolved that wasn't related to a parameter
     #[error("Unsolved variable at location {:?}", location)]
@@ -85,11 +85,11 @@ pub enum InferResourceError {
         location: (Node, Direction),
         //constraints: Vec<Constraint>,
     },
-    /// An resource mismatch between two nodes which are connected by an edge.
-    /// This should mirror (or reuse) `ValidationError`'s SrcExceedsTgtResources
-    /// and TgtExceedsSrcResources
+    /// An extension mismatch between two nodes which are connected by an edge.
+    /// This should mirror (or reuse) `ValidationError`'s SrcExceedsTgtExtensions
+    /// and TgtExceedsSrcExtensions
     #[error("Edge mismatch: {0}")]
-    EdgeMismatch(#[from] ResourceError),
+    EdgeMismatch(#[from] ExtensionError),
 }
 
 /// A graph of metavariables which we've found equality constraints for. Edges
@@ -139,14 +139,14 @@ impl EqGraph {
     }
 }
 
-/// Our current knowledge about the resources of the graph
+/// Our current knowledge about the extensions of the graph
 struct UnificationContext {
     /// A list of constraints for each metavariable
     constraints: HashMap<Meta, BTreeSet<Constraint>>,
     /// A map which says which nodes correspond to which metavariables
-    resources: HashMap<(Node, Direction), Meta>,
+    extensions: HashMap<(Node, Direction), Meta>,
     /// Solutions to metavariables
-    solved: HashMap<Meta, ResourceSet>,
+    solved: HashMap<Meta, ExtensionSet>,
     /// A graph which says which metavariables should be equal
     eq_graph: EqGraph,
     /// A mapping from metavariables which have been merged, to the meta they've
@@ -165,7 +165,7 @@ impl UnificationContext {
     pub fn new(hugr: &impl HugrView) -> Self {
         let mut ctx = Self {
             constraints: HashMap::new(),
-            resources: HashMap::new(),
+            extensions: HashMap::new(),
             solved: HashMap::new(),
             eq_graph: EqGraph::new(),
             shunted: HashMap::new(),
@@ -195,7 +195,7 @@ impl UnificationContext {
     }
 
     /// Declare that a meta has been solved
-    fn add_solution(&mut self, m: Meta, rs: ResourceSet) {
+    fn add_solution(&mut self, m: Meta, rs: ExtensionSet) {
         assert!(self.solved.insert(m, rs).is_none());
     }
 
@@ -208,15 +208,15 @@ impl UnificationContext {
         self.constraints.get(&self.resolve(*m))
     }
 
-    fn get_solution(&self, m: &Meta) -> Option<&ResourceSet> {
+    fn get_solution(&self, m: &Meta) -> Option<&ExtensionSet> {
         self.solved.get(&self.resolve(*m))
     }
 
-    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ResourceSet) {
+    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
         let mut last_meta = input;
         // Create fresh metavariables with `Plus` constraints for
-        // each resource that should be added by the node
-        // Hence a resource delta [A, B] would lead to
+        // each extension that should be added by the node
+        // Hence a extension delta [A, B] would lead to
         // > ma = fresh_meta()
         // > add_constraint(ma, Plus(a, input)
         // > mb = fresh_meta()
@@ -233,11 +233,11 @@ impl UnificationContext {
     /// Return the metavariable corresponding to the given location on the
     /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
-        if let Some(m) = self.resources.get(&(node, dir)) {
+        if let Some(m) = self.extensions.get(&(node, dir)) {
             *m
         } else {
             let m = self.fresh_meta();
-            self.resources.insert((node, dir), m);
+            self.extensions.insert((node, dir), m);
             m
         }
     }
@@ -272,18 +272,18 @@ impl UnificationContext {
             }
 
             match node_type.signature() {
-                // Input resources are open
+                // Input extensions are open
                 None => {
                     self.gen_union_constraint(
                         m_input,
                         m_output,
-                        node_type.op_signature().resource_reqs,
+                        node_type.op_signature().extension_reqs,
                     );
                 }
                 // We have a solution for everything!
                 Some(sig) => {
-                    self.add_solution(m_input, sig.input_resources.clone());
-                    self.add_solution(m_output, sig.output_resources());
+                    self.add_solution(m_input, sig.input_extensions.clone());
+                    self.add_solution(m_output, sig.output_extensions());
                 }
             }
         }
@@ -298,11 +298,11 @@ impl UnificationContext {
             {
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
                     let m_src = self
-                        .resources
+                        .extensions
                         .get(&(src_node, Direction::Outgoing))
                         .unwrap();
                     let m_tgt = self
-                        .resources
+                        .extensions
                         .get(&(tgt_node, Direction::Incoming))
                         .unwrap();
                     self.add_constraint(*m_src, Constraint::Equal(*m_tgt));
@@ -311,21 +311,21 @@ impl UnificationContext {
         }
     }
 
-    /// Try to turn mismatches into `ResourceError` when possible
+    /// Try to turn mismatches into `ExtensionError` when possible
     fn report_mismatch(
         &self,
         m1: Meta,
         m2: Meta,
-        rs1: ResourceSet,
-        rs2: ResourceSet,
-    ) -> InferResourceError {
+        rs1: ExtensionSet,
+        rs2: ExtensionSet,
+    ) -> InferExtensionError {
         let loc1 = self
-            .resources
+            .extensions
             .iter()
             .find(|(_, m)| **m == m1 || self.resolve(**m) == m1)
             .map(|a| a.0);
         let loc2 = self
-            .resources
+            .extensions
             .iter()
             .find(|(_, m)| **m == m2 || self.resolve(**m) == m2)
             .map(|a| a.0);
@@ -348,25 +348,25 @@ impl UnificationContext {
                 };
 
                 if src_rs.is_subset(&tgt_rs) {
-                    Some(InferResourceError::EdgeMismatch(
-                        ResourceError::TgtExceedsSrcResources {
+                    Some(InferExtensionError::EdgeMismatch(
+                        ExtensionError::TgtExceedsSrcExtensions {
                             from: *src,
                             from_offset: Port::new(Direction::Outgoing, 0),
-                            from_resources: src_rs,
+                            from_extensions: src_rs,
                             to: *tgt,
                             to_offset: Port::new(Direction::Incoming, 0),
-                            to_resources: tgt_rs,
+                            to_extensions: tgt_rs,
                         },
                     ))
                 } else {
-                    Some(InferResourceError::EdgeMismatch(
-                        ResourceError::SrcExceedsTgtResources {
+                    Some(InferExtensionError::EdgeMismatch(
+                        ExtensionError::SrcExceedsTgtExtensions {
                             from: *src,
                             from_offset: Port::new(Direction::Outgoing, 0),
-                            from_resources: src_rs,
+                            from_extensions: src_rs,
                             to: *tgt,
                             to_offset: Port::new(Direction::Incoming, 0),
-                            to_resources: tgt_rs,
+                            to_extensions: tgt_rs,
                         },
                     ))
                 }
@@ -376,7 +376,7 @@ impl UnificationContext {
         } else {
             None
         };
-        err.unwrap_or(InferResourceError::MismatchedConcrete {
+        err.unwrap_or(InferExtensionError::MismatchedConcrete {
             expected: rs1,
             actual: rs2,
         })
@@ -386,7 +386,7 @@ impl UnificationContext {
     ///
     /// Returns the set of new metas created and the set of metas that were
     /// merged.
-    fn coalesce(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferResourceError> {
+    fn coalesce(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
         let mut merged: HashSet<Meta> = HashSet::new();
         let mut new_metas: HashSet<Meta> = HashSet::new();
         for cc in self.eq_graph.ccs().into_iter() {
@@ -439,7 +439,7 @@ impl UnificationContext {
             // This doesn't do anything, but if it did it would just be
             // implementing the same mechanism as provided by `resolve`
             let mut updates = HashMap::<(Node, Direction), Meta>::new();
-            for (loc, meta) in self.resources.iter() {
+            for (loc, meta) in self.extensions.iter() {
                 // If there's any node in this CC which equals `meta`, they are
                 // all equal to meta
                 if cc.iter().filter(|cc_meta| meta == *cc_meta).count() > 0 {
@@ -453,7 +453,7 @@ impl UnificationContext {
     /// Inspect the constraints of a given metavariable and try to find a
     /// solution based on those.
     /// Returns whether a solution was found
-    fn solve_meta(&mut self, meta: Meta) -> Result<bool, InferResourceError> {
+    fn solve_meta(&mut self, meta: Meta) -> Result<bool, InferExtensionError> {
         let mut solved = false;
         for c in self.get_constraints(&meta).unwrap().clone().iter() {
             match c {
@@ -484,7 +484,7 @@ impl UnificationContext {
                         // TODO: Try and go backwards with a `Minus` constraint
                         // I.e. If we have a concrete solution for this
                         // metavariable, we can then work out what `other_meta`
-                        // should be by subtracting the resource that's `Plus`d
+                        // should be by subtracting the extension that's `Plus`d
                         //
                         // N.B. This could be the case of Plus(r, a) where a
                         // parameterises the whole graph, in which case we're done
@@ -495,24 +495,24 @@ impl UnificationContext {
         Ok(solved)
     }
 
-    /// Tries to return concrete resources for each node in the graph. This only
+    /// Tries to return concrete extensions for each node in the graph. This only
     /// works when there are no variables in the graph!
     ///
-    /// What we really want is to give the concrete resources where they're
+    /// What we really want is to give the concrete extensions where they're
     /// available. When there are variables, we should leave the graph as it is,
     /// but make sure that no matter what they're instantiated to, the graph
-    /// still makes sense (should pass the resource validation check)
-    pub fn results(&mut self) -> Result<ResourceSolution, InferResourceError> {
+    /// still makes sense (should pass the extension validation check)
+    pub fn results(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
-        let mut results: ResourceSolution = HashMap::new();
-        for (loc, meta) in self.resources.iter() {
+        let mut results: ExtensionSolution = HashMap::new();
+        for (loc, meta) in self.extensions.iter() {
             let rs = match self.get_solution(meta) {
                 Some(rs) => Ok(rs.clone()),
                 None => {
                     // Cut through the riff raff
                     if self.live_var(meta).is_some() {
-                        Err(InferResourceError::Unsolved { location: *loc })
+                        Err(InferExtensionError::Unsolved { location: *loc })
                     } else {
                         continue;
                     }
@@ -549,11 +549,11 @@ impl UnificationContext {
 
     /// Return the set of "live" metavariables in the context.
     /// "Live" here means a metavariable:
-    ///   - Is associated to a location in the graph in `UnifyContext.resources`
+    ///   - Is associated to a location in the graph in `UnifyContext.extensions`
     ///   - Is still unsolved
     ///   - Isn't a variable
     fn live_metas(&self) -> HashSet<Meta> {
-        self.resources
+        self.extensions
             .values()
             .filter_map(|m| self.live_var(m))
             .filter(|m| !self.variables.contains(m))
@@ -564,7 +564,7 @@ impl UnificationContext {
     fn solve_constraints(
         &mut self,
         vars: &HashSet<Meta>,
-    ) -> Result<HashSet<Meta>, InferResourceError> {
+    ) -> Result<HashSet<Meta>, InferExtensionError> {
         let mut solved = HashSet::new();
         for m in vars.iter() {
             if self.solve_meta(*m)? {
@@ -575,14 +575,14 @@ impl UnificationContext {
         Ok(solved)
     }
 
-    /// Once the unification context is set up, attempt to infer ResourceSets
+    /// Once the unification context is set up, attempt to infer ExtensionSets
     /// for all of the metavariables in the `UnificationContext`.
     ///
-    /// Return a mapping from locations in the graph to concrete `ResourceSets`
+    /// Return a mapping from locations in the graph to concrete `ExtensionSets`
     /// where it was possible to infer them. If it wasn't possible to infer a
-    /// *concrete* `ResourceSet`, e.g. if the ResourceSet relies on an open
+    /// *concrete* `ExtensionSet`, e.g. if the ExtensionSet relies on an open
     /// variable in the toplevel graph, don't include that location in the map
-    pub fn main_loop(&mut self) -> Result<ResourceSolution, InferResourceError> {
+    pub fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
         // Keep going as long as we're making progress (= merging nodes)
@@ -619,71 +619,71 @@ mod test {
     use crate::hugr::HugrInternalsMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait};
-    use crate::resource::ResourceSet;
+    use crate::extension::ExtensionSet;
     use crate::type_row;
-    use crate::types::{AbstractSignature, Type};
+    use crate::types::{FunctionType, Type};
 
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
 
-    const BIT: Type = crate::resource::prelude::USIZE_T;
+    const BIT: Type = crate::extension::prelude::USIZE_T;
 
     #[test]
-    // Build up a graph with some holes in its resources, and infer them
+    // Build up a graph with some holes in its extensions, and infer them
     // See if it works!
     fn from_graph() -> Result<(), Box<dyn Error>> {
-        let rs = ResourceSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        let rs = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let main_sig =
-            AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT]).with_resource_delta(&rs);
+            FunctionType::new(type_row![BIT, BIT], type_row![BIT]).with_extension_delta(&rs);
 
         let op = ops::DFG {
             signature: main_sig,
         };
 
-        let root_node = NodeType::open_resources(op);
+        let root_node = NodeType::open_extensions(op);
         let mut hugr = Hugr::new(root_node);
 
-        let input = NodeType::open_resources(ops::Input::new(type_row![BIT, BIT]));
-        let output = NodeType::open_resources(ops::Output::new(type_row![BIT]));
+        let input = NodeType::open_extensions(ops::Input::new(type_row![BIT, BIT]));
+        let output = NodeType::open_extensions(ops::Output::new(type_row![BIT]));
 
         let input = hugr.add_node_with_parent(hugr.root(), input)?;
         let output = hugr.add_node_with_parent(hugr.root(), output)?;
 
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
-        let add_a_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::singleton(&"A".into()));
+        let add_a_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::singleton(&"A".into()));
 
-        let add_b_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::singleton(&"B".into()));
+        let add_b_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::singleton(&"B".into()));
 
-        let add_ab_sig = AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::from_iter(["A".into(), "B".into()]));
+        let add_ab_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::from_iter(["A".into(), "B".into()]));
 
-        let mult_c_sig = AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::singleton(&"C".into()));
+        let mult_c_sig = FunctionType::new(type_row![BIT, BIT], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::singleton(&"C".into()));
 
         let add_a = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: add_a_sig,
             }),
         )?;
         let add_b = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: add_b_sig,
             }),
         )?;
         let add_ab = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: add_ab_sig,
             }),
         )?;
         let mult_c = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: mult_c_sig,
             }),
         )?;
@@ -697,29 +697,28 @@ mod test {
 
         hugr.connect(mult_c, 0, output, 0)?;
 
-        hugr.infer_resources()?;
+        hugr.infer_extensions()?;
         // TODO: Add a more sensible validation check
         //hugr.validate()?;
         Ok(())
     }
 
     #[test]
-    fn plus() -> Result<(), InferResourceError> {
+    fn plus() -> Result<(), InferExtensionError> {
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
 
         let metas: Vec<Meta> = (2..8)
-            .into_iter()
             .map(|i| {
                 let meta = ctx.fresh_meta();
-                ctx.resources
+                ctx.extensions
                     .insert((NodeIndex::new(i).into(), Direction::Incoming), meta);
                 meta
             })
             .collect();
 
         ctx.solved
-            .insert(metas[2], ResourceSet::singleton(&"A".into()));
+            .insert(metas[2], ExtensionSet::singleton(&"A".into()));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
         ctx.add_constraint(metas[0], Constraint::Plus("B".into(), metas[2]));
         ctx.add_constraint(metas[4], Constraint::Plus("C".into(), metas[0]));
@@ -727,7 +726,7 @@ mod test {
         ctx.add_constraint(metas[5], Constraint::Equal(metas[0]));
         ctx.main_loop()?;
 
-        let a = ResourceSet::singleton(&"A".into());
+        let a = ExtensionSet::singleton(&"A".into());
         let mut ab = a.clone();
         ab.insert(&"B".into());
         let mut abc = ab.clone();
@@ -748,8 +747,8 @@ mod test {
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
         let builder = DFGBuilder::new(
-            AbstractSignature::new_df(type_row![BIT], type_row![BIT])
-                .with_resource_delta(&ResourceSet::singleton(&"R".into())),
+            FunctionType::new(type_row![BIT], type_row![BIT])
+                .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
         )?;
         let [w] = builder.input_wires_arr();
         let hugr = builder.finish_hugr_with_outputs([w]);
@@ -772,7 +771,7 @@ mod test {
        m2 = A, x;
        m3 = x;
     */
-    fn open() -> Result<(), InferResourceError> {
+    fn open() -> Result<(), InferExtensionError> {
         println!("awefiawef");
 
         let hugr = Hugr::default();
@@ -782,13 +781,13 @@ mod test {
         let m2 = ctx.fresh_meta();
         let m3 = ctx.fresh_meta();
         // Attach the metavariables to dummy nodes so that they're considered important
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(1).into(), Direction::Incoming), m0);
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(2).into(), Direction::Incoming), m1);
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(3).into(), Direction::Incoming), m2);
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(4).into(), Direction::Incoming), m3);
 
         ctx.add_constraint(m1, Constraint::Plus("A".into(), m0));
@@ -796,7 +795,7 @@ mod test {
         ctx.add_constraint(m3, Constraint::Equal(m0));
         ctx.variables.insert(m0);
         println!("Constraints before processing");
-        for r in ctx.resources.iter() {
+        for r in ctx.extensions.iter() {
             println!("     {:?}", r);
         }
         for r in ctx.constraints.iter() {
@@ -811,7 +810,7 @@ mod test {
     }
 
     #[test]
-    fn simple_dumb() -> Result<(), InferResourceError> {
+    fn simple_dumb() -> Result<(), InferExtensionError> {
         let mut ctx = UnificationContext::new(&Hugr::default());
         let m0 = ctx.fresh_meta();
         let m1 = ctx.fresh_meta();
@@ -824,17 +823,17 @@ mod test {
 
     #[test]
     // The dual of the thing in the previous test
-    fn simple_dumb_2() -> Result<(), InferResourceError> {
+    fn simple_dumb_2() -> Result<(), InferExtensionError> {
         let mut ctx = UnificationContext::new(&Hugr::default());
         let a = ctx.fresh_meta();
         let b = ctx.fresh_meta();
         let ab = ctx.fresh_meta();
         // Some nonsense so that the constraints register as "live"
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(2).into(), Direction::Outgoing), a);
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(3).into(), Direction::Outgoing), b);
-        ctx.resources
+        ctx.extensions
             .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
         ctx.variables.insert(a);
         ctx.variables.insert(b);
@@ -845,19 +844,19 @@ mod test {
     }
 
     #[test]
-    // Infer an the resources on a child node with no inputs
+    // Infer an the extensions on a child node with no inputs
     fn dangling_src() -> Result<(), Box<dyn Error>> {
-        let rs = ResourceSet::singleton(&"R".into());
+        let rs = ExtensionSet::singleton(&"R".into());
         let root_signature =
-            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
         let mut builder = DFGBuilder::new(root_signature)?;
         let [input_wire] = builder.input_wires_arr();
 
         let add_r_sig =
-            AbstractSignature::new_df(type_row![BIT], type_row![BIT]).with_resource_delta(&rs);
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
 
         let add_r = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: add_r_sig,
             }),
             [input_wire],
@@ -865,19 +864,19 @@ mod test {
         let [wl] = add_r.outputs_arr();
 
         // Dangling thingy
-        let src_sig = AbstractSignature::new_df(type_row![], type_row![BIT])
-            .with_resource_delta(&ResourceSet::new());
+        let src_sig = FunctionType::new(type_row![], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::new());
         let src = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG { signature: src_sig }),
+            NodeType::open_extensions(ops::DFG { signature: src_sig }),
             [],
         )?;
         let [wr] = src.outputs_arr();
 
-        let mult_sig = AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT])
-            .with_resource_delta(&ResourceSet::new());
+        let mult_sig = FunctionType::new(type_row![BIT, BIT], type_row![BIT])
+            .with_extension_delta(&ExtensionSet::new());
         // Mult has open extension requirements, which we should solve to be "R"
         let mult = builder.add_dataflow_node(
-            NodeType::open_resources(ops::DFG {
+            NodeType::open_extensions(ops::DFG {
                 signature: mult_sig,
             }),
             [wl, wr],

@@ -17,8 +17,8 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, Signature, Type, TypeRow};
+use crate::extension::ExtensionSet;
+use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
 
@@ -95,7 +95,7 @@ pub trait Container {
             self.hugr_mut(),
             f_node,
             signature.signature,
-            Some(signature.input_resources),
+            Some(signature.input_extensions),
         )?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
@@ -276,21 +276,21 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: AbstractSignature,
-        input_resources: Option<ResourceSet>,
+        signature: FunctionType,
+        input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = match &input_resources {
-            // TODO: Make this NodeType::open_resources
+        let nodetype = match &input_extensions {
+            // TODO: Make this NodeType::open_extensions
             None => NodeType::pure(op),
             Some(rs) => NodeType::new(op, rs.clone()),
         };
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
-        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_resources)
+        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
@@ -314,7 +314,7 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            // TODO: Make input resources a parameter
+            // TODO: Make input extensions a parameter
             NodeType::pure(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
@@ -385,7 +385,7 @@ pub trait Dataflow: Container {
             just_outputs: just_out_types,
             rest: rest_types.into(),
         };
-        // TODO: Make input resources a parameter
+        // TODO: Make input extensions a parameter
         let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
@@ -596,7 +596,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    // TODO: Make this NodeType::open_resources
+    // TODO: Make this NodeType::open_extensions
     add_node_with_wires(data_builder, NodeType::pure(optype), inputs)
 }
 

@@ -2,7 +2,7 @@
 //!
 //! Parameters for [`TypeDef`]s provided by extensions
 //!
-//! [`TypeDef`]: crate::resource::TypeDef
+//! [`TypeDef`]: crate::extension::TypeDef
 
 use thiserror::Error;
 

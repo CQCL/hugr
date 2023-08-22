@@ -4,18 +4,18 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::resource::ResourceId;
+use crate::extension::ExtensionId;
 
 use super::{type_param::TypeArg, TypeBound};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
-    resource: ResourceId,
+    extension: ExtensionId,
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
     ///
-    /// [`TypeDef`]: crate::resource::TypeDef
+    /// [`TypeDef`]: crate::extension::TypeDef
     id: SmolStr,
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
@@ -30,23 +30,23 @@ impl CustomType {
     pub fn new(
         id: impl Into<SmolStr>,
         args: impl Into<Vec<TypeArg>>,
-        resource: impl Into<ResourceId>,
+        extension: impl Into<ExtensionId>,
         bound: TypeBound,
     ) -> Self {
         Self {
             id: id.into(),
             args: args.into(),
-            resource: resource.into(),
+            extension: extension.into(),
             bound,
         }
     }
 
     /// Creates a new opaque type (constant version, no type arguments)
-    pub const fn new_simple(id: SmolStr, resource: ResourceId, bound: TypeBound) -> Self {
+    pub const fn new_simple(id: SmolStr, extension: ExtensionId, bound: TypeBound) -> Self {
         Self {
             id,
             args: vec![],
-            resource,
+            extension,
             bound,
         }
     }
@@ -68,9 +68,9 @@ impl CustomType {
         &self.args
     }
 
-    /// Parent resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.resource
+    /// Parent extension.
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 

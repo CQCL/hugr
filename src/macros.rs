@@ -43,11 +43,11 @@ pub(crate) use impl_box_clone;
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
-/// # use hugr::types::{AbstractSignature, Type, TypeRow};
-/// const U: Type = Type::new_unit();
+/// # use hugr::types::{FunctionType, Type, TypeRow};
+/// const U: Type = Type::UNIT;
 /// let static_row: TypeRow = type_row![U, U];
 /// let dynamic_row: TypeRow = vec![U, U, U].into();
-/// let sig = AbstractSignature::new_df(static_row, dynamic_row).pure();
+/// let sig = FunctionType::new(static_row, dynamic_row).pure();
 ///
 /// let repeated_row: TypeRow = type_row![U; 3];
 /// assert_eq!(repeated_row, *sig.output());

@@ -101,7 +101,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
         let output_wires = self
             .builder
             .add_dataflow_op(
-                op, // TODO: Add resource param
+                op, // TODO: Add extension param
                 input_wires,
             )?
             .outputs();
@@ -136,18 +136,20 @@ mod test {
 
     use crate::{
         builder::{
-            test::{build_main, BIT, NAT, QB},
+            test::{build_main, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
+        extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, LeafOp},
+        std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
-        types::AbstractSignature,
+        types::FunctionType,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB], type_row![QB, QB]).pure(),
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).pure(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -159,9 +161,9 @@ mod test {
                 assert_eq!(linear.n_wires(), 2);
 
                 linear
-                    .append(LeafOp::H, [0])?
-                    .append(LeafOp::CX, [0, 1])?
-                    .append(LeafOp::CX, [1, 0])?;
+                    .append(h_gate(), [0])?
+                    .append(cx_gate(), [0, 1])?
+                    .append(cx_gate(), [1, 0])?;
 
                 let outs = linear.finish();
                 f_build.finish_with_outputs(outs)
@@ -179,24 +181,24 @@ mod test {
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],
-                Some(AbstractSignature::new(vec![QB, NAT], vec![QB], vec![])),
+                Some(FunctionType::new(vec![QB, NAT], vec![QB])),
             ))
             .into(),
         );
         let build_res = build_main(
-            AbstractSignature::new_df(type_row![QB, QB, NAT], type_row![QB, QB, BIT]).pure(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
                 let mut linear = f_build.as_circuit(vec![q0, q1]);
 
                 let measure_out = linear
-                    .append(LeafOp::CX, [0, 1])?
+                    .append(cx_gate(), [0, 1])?
                     .append_and_consume(
                         my_custom_op,
                         [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
                     )?
-                    .append_with_outputs(LeafOp::Measure, [0])?;
+                    .append_with_outputs(measure(), [0])?;
 
                 let out_qbs = linear.finish();
                 f_build.finish_with_outputs(out_qbs.into_iter().chain(measure_out))

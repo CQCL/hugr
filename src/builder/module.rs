@@ -111,7 +111,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let rs = signature.input_resources.clone();
+        let rs = signature.input_extensions.clone();
         let declare_n = self.add_child_node(NodeType::new(
             ops::FuncDecl {
                 signature: signature.into(),
@@ -177,7 +177,7 @@ mod test {
             Dataflow, DataflowSubContainer,
         },
         type_row,
-        types::AbstractSignature,
+        types::FunctionType,
     };
 
     use super::*;
@@ -188,7 +188,7 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
@@ -211,7 +211,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(
+                FunctionType::new(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
                 )
@@ -231,11 +231,11 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;

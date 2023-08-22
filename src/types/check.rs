@@ -56,7 +56,7 @@ impl PrimType {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (PrimType::Graph(_), PrimValue::Graph) => todo!(),
+            (PrimType::Function(_), PrimValue::Function) => todo!(),
             _ => Err(ConstTypeError::ValueCheckFail(
                 Type::new(TypeEnum::Prim(self.clone())),
                 Value::Prim(val.clone()),
@@ -83,8 +83,8 @@ impl Type {
                     .try_for_each(|(elem, ty)| ty.check_type(elem))
                     .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
-            (TypeEnum::Sum(variants), Value::Sum(tag, value)) => variants
-                .get(*tag)
+            (TypeEnum::Sum(sum), Value::Sum(tag, value)) => sum
+                .get_variant(*tag)
                 .ok_or(ConstTypeError::InvalidSumTag)?
                 .check_type(value),
             _ => Err(ConstTypeError::ValueCheckFail(self.clone(), val.clone())),

@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::AbstractSignature;
+use crate::types::FunctionType;
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{ops::handle::NodeHandle, types::Type};
 
@@ -62,7 +62,7 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
@@ -89,7 +89,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
-            // Make the resources a parameter
+            // Make the extensions a parameter
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -131,10 +131,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
-            // TODO: Make resources a parameter
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
-            // TODO: Make resources a parameter
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
@@ -241,7 +241,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let predicate_type = Type::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = AbstractSignature::new_df(inputs, TypeRow::from(node_outputs));
+        let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
         let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
@@ -276,7 +276,7 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
@@ -305,10 +305,8 @@ mod test {
     fn basic_module_cfg() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
-            let mut func_builder = module_builder.define_function(
-                "main",
-                AbstractSignature::new_df(vec![NAT], type_row![NAT]).pure(),
-            )?;
+            let mut func_builder = module_builder
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).pure())?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 

@@ -1,23 +1,21 @@
-use super::{Type, TypeEnum};
-
-use itertools::Itertools;
+use super::{SumType, Type, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 
-use super::AbstractSignature;
+use super::FunctionType;
 
+use crate::extension::prelude::{new_array, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
-use crate::resource::prelude::{new_array, QB_T, USIZE_T};
 use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
-pub(crate) enum SerSimpleType {
+pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<AbstractSignature>),
-    Tuple { inner: Vec<SerSimpleType> },
-    Sum { inner: Vec<SerSimpleType> },
+    G(Box<FunctionType>),
+    Tuple { inner: TypeRow },
+    Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
@@ -37,14 +35,10 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Prim(t) => match t {
                 PrimType::Extension(c) => SerSimpleType::Opaque(c),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
-                PrimType::Graph(sig) => SerSimpleType::G(Box::new(*sig)),
+                PrimType::Function(sig) => SerSimpleType::G(Box::new(*sig)),
             },
-            TypeEnum::Sum(inner) => SerSimpleType::Sum {
-                inner: inner.into_owned().into_iter().map_into().collect(),
-            },
-            TypeEnum::Tuple(inner) => SerSimpleType::Tuple {
-                inner: inner.into_owned().into_iter().map_into().collect(),
-            },
+            TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
+            TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }
     }
 }
@@ -54,13 +48,9 @@ impl From<SerSimpleType> for Type {
         match value {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
-            SerSimpleType::G(sig) => Type::new_graph(*sig),
-            SerSimpleType::Tuple { inner } => {
-                Type::new_tuple(inner.into_iter().map_into().collect_vec())
-            }
-            SerSimpleType::Sum { inner } => {
-                Type::new_sum(inner.into_iter().map_into().collect_vec())
-            }
+            SerSimpleType::G(sig) => Type::new_function(*sig),
+            SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
+            SerSimpleType::Sum(sum) => sum.into(),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
@@ -70,15 +60,15 @@ impl From<SerSimpleType> for Type {
 
 #[cfg(test)]
 mod test {
+    use crate::extension::prelude::USIZE_T;
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::resource::prelude::USIZE_T;
     use crate::types::test::COPYABLE_T;
-    use crate::types::AbstractSignature;
+    use crate::types::FunctionType;
     use crate::types::Type;
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_graph(AbstractSignature::new_linear(vec![]));
+        let g: Type = Type::new_function(FunctionType::new_linear(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 
@@ -88,6 +78,10 @@ mod test {
 
         // A Classic sum
         let t = Type::new_sum(vec![USIZE_T, COPYABLE_T]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        // A simple predicate
+        let t = Type::new_simple_predicate(4);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

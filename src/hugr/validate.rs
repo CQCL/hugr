@@ -12,10 +12,9 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::{InferExtensionError, validate::{ExtensionError, ExtensionValidator}};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
-use crate::resource::validate::{ResourceError, ResourceValidator};
-use crate::resource::InferResourceError;
 use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -31,8 +30,8 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Context for the resource validation.
-    resource_validator: ResourceValidator,
+    /// Context for the extension validation.
+    extension_validator: ExtensionValidator,
 }
 
 impl Hugr {
@@ -49,7 +48,7 @@ impl<'a> ValidationContext<'a> {
         Self {
             hugr,
             dominators: HashMap::new(),
-            resource_validator: ResourceValidator::new(hugr),
+            extension_validator: ExtensionValidator::new(hugr),
         }
     }
 
@@ -138,11 +137,11 @@ impl<'a> ValidationContext<'a> {
         // Check operation-specific constraints
         self.validate_operation(node, node_type)?;
 
-        // If this is a container with I/O nodes, check that the resources they
-        // define match the resources of the container.
+        // If this is a container with I/O nodes, check that the extension they
+        // define match the extensions of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
-            self.resource_validator
-                .validate_io_resources(node, input, output)?;
+            self.extension_validator
+                .validate_io_extensions(node, input, output)?;
         }
 
         Ok(())
@@ -200,8 +199,8 @@ impl<'a> ValidationContext<'a> {
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
-            self.resource_validator
-                .check_resources_compatible(&(node, port), &(other_node, other_offset))?;
+            self.extension_validator
+                .check_extensions_compatible(&(node, port), &(other_node, other_offset))?;
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
@@ -592,11 +591,11 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// There are errors in the resource declarations.
+    /// There are errors in the extension declarations.
     #[error(transparent)]
-    ResourceError(#[from] ResourceError),
+    ExtensionError(#[from] ExtensionError),
     #[error(transparent)]
-    CantInfer(#[from] InferResourceError),
+    CantInfer(#[from] InferExtensionError),
 }
 
 #[cfg(feature = "pyo3")]
@@ -675,17 +674,19 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder,
         ModuleBuilder,
     };
+    use crate::extension::prelude::BOOL_T;
+    use crate::extension::ExtensionSet;
     use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
-    use crate::resource::ResourceSet;
-    use crate::types::{AbstractSignature, Type};
+    use crate::std_extensions::logic;
+    use crate::std_extensions::logic::test::and_op;
+    use crate::types::{FunctionType, Type};
     use crate::Direction;
     use crate::{type_row, Node};
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const B: Type = crate::resource::prelude::USIZE_T;
-    const Q: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const Q: Type = crate::extension::prelude::QB_T;
 
     /// Creates a hugr with a single function definition that copies a bit `copies` times.
     ///
@@ -693,7 +694,7 @@ mod test {
     fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
         let def_op: OpType = ops::FuncDefn {
             name: "main".into(),
-            signature: AbstractSignature::new_df(type_row![B], vec![B; copies]),
+            signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]),
         }
         .into();
 
@@ -706,18 +707,18 @@ mod test {
         (b, def)
     }
 
-    /// Adds an input{B}, copy{B -> B^copies}, and output{B^copies} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, copy{BOOL_T -> BOOL_T^copies}, and output{BOOL_T^copies} operation to a dataflow container.
     ///
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
+            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![B; copies]))
+            .add_op_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop { ty: NAT })
+            .add_op_with_parent(parent, LeafOp::Noop { ty: BOOL_T })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -728,8 +729,8 @@ mod test {
         (input, copy, output)
     }
 
-    /// Adds an input{B}, tag_constant(0, B^pred_size), tag(B^pred_size), and
-    /// output{Sum{unit^pred_size}, B} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^pred_size), tag(BOOL_T^pred_size), and
+    /// output{Sum{unit^pred_size}, BOOL_T} operation to a dataflow container.
     /// Intended to be used to populate a BasicBlock node in a CFG.
     ///
     /// Returns the node indices of each of the operations.
@@ -738,14 +739,14 @@ mod test {
         parent: Node,
         predicate_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::simple_predicate(0, predicate_size);
-        let tag_type = Type::new_simple_predicate(predicate_size);
+        let const_op = ops::Const::simple_predicate(0, predicate_size as u8);
+        let tag_type = Type::new_simple_predicate(predicate_size as u8);
 
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![B]))
+            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), B]))
+            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
             .unwrap();
         let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
         let tag = b
@@ -808,7 +809,7 @@ mod test {
     #[test]
     fn dfg_root() {
         let dfg_op: OpType = ops::DFG {
-            signature: AbstractSignature::new_linear(type_row![B]),
+            signature: FunctionType::new_linear(type_row![BOOL_T]),
         }
         .into();
 
@@ -837,7 +838,7 @@ mod test {
             .unwrap();
 
         // Add a definition without children
-        let def_sig = AbstractSignature::new_df(type_row![B], type_row![B, B]);
+        let def_sig = FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
         let new_def = b
             .add_op_with_parent(
                 root,
@@ -891,16 +892,22 @@ mod test {
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![B])));
+        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])));
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![B, B])));
+        b.replace_op(
+            output,
+            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+        );
 
         // After fixing the output back, replace the copy with an output op
-        b.replace_op(copy, NodeType::pure(ops::Output::new(type_row![B, B])));
+        b.replace_op(
+            copy,
+            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+        );
         assert_matches!(
             b.validate(),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -922,8 +929,8 @@ mod test {
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
-                inputs: type_row![B],
-                outputs: type_row![B],
+                inputs: type_row![BOOL_T],
+                outputs: type_row![BOOL_T],
             }),
         );
         assert_matches!(
@@ -937,9 +944,9 @@ mod test {
             .add_op_with_parent(
                 cfg,
                 ops::BasicBlock::DFB {
-                    inputs: type_row![B],
+                    inputs: type_row![BOOL_T],
                     predicate_variants: vec![type_row![]],
-                    other_outputs: type_row![B],
+                    other_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -948,7 +955,7 @@ mod test {
             .add_op_with_parent(
                 cfg,
                 ops::BasicBlock::Exit {
-                    cfg_outputs: type_row![B],
+                    cfg_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -962,7 +969,7 @@ mod test {
             .add_op_after(
                 exit,
                 ops::BasicBlock::Exit {
-                    cfg_outputs: type_row![B],
+                    cfg_outputs: type_row![BOOL_T],
                 },
             )
             .unwrap();
@@ -988,7 +995,10 @@ mod test {
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(vec![Type::new_simple_predicate(1), Q])),
+            NodeType::pure(ops::Output::new(type_row![
+                Type::new_simple_predicate(1),
+                Q
+            ])),
         );
         assert_matches!(
             b.validate(),
@@ -1000,22 +1010,22 @@ mod test {
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B, B], type_row![B]),
+            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B, B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
-        // Nested DFG B -> B
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        // Nested DFG BOOL_T -> BOOL_T
         let sub_dfg = h.add_op_with_parent(
             h.root(),
             ops::DFG {
-                signature: AbstractSignature::new_linear(type_row![B]),
+                signature: FunctionType::new_linear(type_row![BOOL_T]),
             },
         )?;
         // this Xor has its 2nd input unconnected
         let sub_op = {
-            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![B]))?;
-            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![B]))?;
-            let sub_op = h.add_op_with_parent(sub_dfg, LeafOp::Xor)?;
+            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]))?;
+            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]))?;
+            let sub_op = h.add_op_with_parent(sub_dfg, and_op())?;
             h.connect(sub_input, 0, sub_op, 0)?;
             h.connect(sub_op, 0, sub_output, 0)?;
             sub_op
@@ -1042,26 +1052,31 @@ mod test {
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: AbstractSignature::new_df(type_row![B], type_row![B]),
+            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
         }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![B]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![B]))?;
-        let xor = h.add_op_with_parent(h.root(), LeafOp::Xor)?;
-        h.connect(input, 0, xor, 0)?;
-        h.connect(xor, 0, output, 0)?;
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, output, 0)?;
         assert_eq!(
             h.validate(),
             Err(ValidationError::UnconnectedPort {
-                node: xor,
+                node: and,
                 port: Port::new_incoming(1),
-                port_kind: EdgeKind::Value(B)
+                port_kind: EdgeKind::Value(BOOL_T)
             })
         );
+        let const_op: ops::Const = logic::EXTENSION
+            .get_value(logic::TRUE_NAME)
+            .unwrap()
+            .typed_value()
+            .clone();
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), ops::Const::usize(1))?;
-        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: NAT })?;
+        let cst = h.add_op_with_parent(h.root(), const_op)?;
+        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
-        h.connect(lcst, 0, xor, 1)?;
+        h.connect(lcst, 0, and, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:
         assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
         // Now include the LoadConstant node in the causal cone
@@ -1071,24 +1086,24 @@ mod test {
     }
 
     #[test]
-    /// A wire with no resource requirements is wired into a node which has
-    /// [A,B] resources required on its inputs and outputs. This could be fixed
+    /// A wire with no extension requirements is wired into a node which has
+    /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let mut main = module_builder.define_function(
             "main",
-            AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+            FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
         )?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            // Inner DFG has resource requirements that the wire wont satisfy
-            .with_input_resources(ResourceSet::from_iter(["A".into(), "B".into()]));
+        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
+            // Inner DFG has extension requirements that the wire wont satisfy
+            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
-            Some(inner_sig.input_resources),
+            Some(inner_sig.input_extensions),
             [main_input],
         )?;
         let f_inputs = f_builder.input_wires();
@@ -1099,33 +1114,33 @@ mod test {
 
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensions { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirement `[A]` is wired into a an output with no
-    /// resource req. In the validation resource typechecking, we don't do any
-    /// unification, so don't allow open resource variables on the function
+    /// A wire with extension requirement `[A]` is wired into a an output with no
+    /// extension req. In the validation extension typechecking, we don't do any
+    /// unification, so don't allow open extension variables on the function
     /// signature, so this fails.
-    fn too_many_resources() -> Result<(), BuildError> {
+    fn too_many_extension() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let main_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure();
+        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).pure();
 
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            .with_resource_delta(&ResourceSet::singleton(&"A".into()))
-            .with_input_resources(ResourceSet::new());
+        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&"A".into()))
+            .with_input_extensions(ExtensionSet::new());
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
-            Some(inner_sig.input_resources),
+            Some(inner_sig.input_extensions),
             [main_input],
         )?;
         let f_inputs = f_builder.input_wires();
@@ -1135,42 +1150,42 @@ mod test {
         let handle = module_builder.finish_hugr();
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::SrcExceedsTgtResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::SrcExceedsTgtExtensions { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirements `[A]` and another with requirements
-    /// `[B]` are both wired into a node which requires its inputs to have
-    /// requirements `[A,B]`. A slightly more complex test of the error from
+    /// A wire with extension requirements `[A]` and another with requirements
+    /// `[BOOL_T]` are both wired into a node which requires its inputs to have
+    /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
     /// `missing_lift_node`.
-    fn resource_mismatch() -> Result<(), BuildError> {
+    fn extensions_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let all_rs = ResourceSet::from_iter(["A".into(), "B".into()]);
+        let all_rs = ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]);
 
-        let main_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_resource_delta(&all_rs)
-            .with_input_resources(ResourceSet::new());
+        let main_sig = FunctionType::new(type_row![], type_row![NAT])
+            .with_extension_delta(&all_rs)
+            .with_input_extensions(ExtensionSet::new());
 
         let mut main = module_builder.define_function("main", main_sig)?;
 
-        let inner_left_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_input_resources(ResourceSet::singleton(&"A".into()));
+        let inner_left_sig = FunctionType::new(type_row![], type_row![NAT])
+            .with_input_extensions(ExtensionSet::singleton(&"A".into()));
 
-        let inner_right_sig = AbstractSignature::new_df(type_row![], type_row![NAT])
-            .with_input_resources(ResourceSet::singleton(&"B".into()));
+        let inner_right_sig = FunctionType::new(type_row![], type_row![NAT])
+            .with_input_extensions(ExtensionSet::singleton(&"BOOL_T".into()));
 
-        let inner_mult_sig = AbstractSignature::new_df(type_row![NAT, NAT], type_row![NAT])
-            .with_input_resources(all_rs);
+        let inner_mult_sig =
+            FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_input_extensions(all_rs);
 
         let [left_wire] = main
             .dfg_builder(
                 inner_left_sig.signature,
-                Some(inner_left_sig.input_resources),
+                Some(inner_left_sig.input_extensions),
                 [],
             )?
             .finish_with_outputs([])?
@@ -1179,7 +1194,7 @@ mod test {
         let [right_wire] = main
             .dfg_builder(
                 inner_right_sig.signature,
-                Some(inner_right_sig.input_resources),
+                Some(inner_right_sig.input_extensions),
                 [],
             )?
             .finish_with_outputs([])?
@@ -1187,7 +1202,7 @@ mod test {
 
         let builder = main.dfg_builder(
             inner_mult_sig.signature,
-            Some(inner_mult_sig.input_resources),
+            Some(inner_mult_sig.input_extensions),
             [left_wire, right_wire],
         )?;
         let [_left, _right] = builder.input_wires_arr();
@@ -1197,8 +1212,8 @@ mod test {
         let handle = module_builder.finish_hugr();
         assert_matches!(
             handle,
-            Err(ValidationError::ResourceError(
-                ResourceError::ParentIOResourceMismatch { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::ParentIOExtensionMismatch { .. }
             ))
         );
         Ok(())
@@ -1206,8 +1221,8 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let main_signature = AbstractSignature::new_df(type_row![NAT], type_row![NAT])
-            .with_resource_delta(&ResourceSet::singleton(&"R".into()));
+        let main_signature = FunctionType::new(type_row![NAT], type_row![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
 
         let mut builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
@@ -1216,8 +1231,8 @@ mod test {
 
         assert_matches!(
             hugr,
-            Err(ValidationError::ResourceError(
-                ResourceError::TgtExceedsSrcResources { .. }
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensions { .. }
             ))
         );
         Ok(())

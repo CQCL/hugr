@@ -473,15 +473,16 @@ where
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{handle::NodeHandle, LeafOp},
+        ops::handle::NodeHandle,
+        std_extensions::quantum::test::h_gate,
         type_row,
-        types::{AbstractSignature, Type},
+        types::{FunctionType, Type},
     };
 
     use super::*;
 
-    const NAT: Type = crate::resource::prelude::USIZE_T;
-    const QB: Type = crate::resource::prelude::QB_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     /// Make a module hugr with a fn definition containing an inner dfg node.
     ///
@@ -492,16 +493,16 @@ mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT, QB], type_row![NAT, QB]).pure(),
+                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).pure(),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
 
-            let q_out = func_builder.add_dataflow_op(LeafOp::H, vec![qb])?;
+            let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(
-                    AbstractSignature::new_df(type_row![NAT], type_row![NAT]),
+                    FunctionType::new(type_row![NAT], type_row![NAT]),
                     None,
                     [int],
                 )?;
