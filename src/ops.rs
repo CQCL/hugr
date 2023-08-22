@@ -9,25 +9,23 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{EdgeKind, Signature, SignatureDescription};
+use crate::types::{EdgeKind, FunctionType, SignatureDescription, Type};
 use crate::{Direction, Port};
-
-pub use custom::{CustomOp, OpDef, OpaqueOp};
 
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
 
-use self::tag::OpTag;
 use enum_dispatch::enum_dispatch;
 
-pub use constant::{Const, ConstValue};
+pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
-pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
+pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
+pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, OpName, ValidateOp)]
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
 #[non_exhaustive]
@@ -35,10 +33,10 @@ pub use module::{AliasDeclare, AliasDef, Declare, Def, Module};
 #[serde(tag = "op")]
 pub enum OpType {
     Module,
-    Def,
-    Declare,
-    AliasDeclare,
-    AliasDef,
+    FuncDefn,
+    FuncDecl,
+    AliasDecl,
+    AliasDefn,
     Const,
     Input,
     Output,
@@ -78,9 +76,17 @@ impl OpType {
         let signature = self.signature();
         let port = port.into();
         let dir = port.direction();
-        match port.index() < signature.port_count(dir) {
-            true => signature.get(port),
-            false => self.other_port(dir),
+
+        let port_count = signature.port_count(dir);
+        if port.index() < port_count {
+            signature.get(port).cloned().map(EdgeKind::Value)
+        } else if port.index() == port_count
+            && dir == Direction::Incoming
+            && self.static_input().is_some()
+        {
+            self.static_input().map(EdgeKind::Static)
+        } else {
+            self.other_port(dir)
         }
     }
 
@@ -91,7 +97,14 @@ impl OpType {
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
-            Some(Port::new(dir, self.signature().port_count(dir)))
+            // if there is a static input it comes before the non_df_ports
+            let static_input =
+                (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+
+            Some(Port::new(
+                dir,
+                self.signature().port_count(dir) + static_input,
+            ))
         } else {
             None
         }
@@ -105,7 +118,9 @@ impl OpType {
             .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
-        signature.port_count(dir) + non_df_count
+        // if there is a static input it comes before the non_df_ports
+        let static_input = (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+        signature.port_count(dir) + non_df_count + static_input
     }
 
     /// Returns the number of inputs ports for the operation.
@@ -141,17 +156,28 @@ pub trait OpName {
     fn name(&self) -> SmolStr;
 }
 
+/// Trait statically querying the tag of an operation.
+///
+/// This is implemented by all OpType variants, and always contains the dynamic
+/// tag returned by `OpType::tag(&self)`.
+pub trait StaticTag {
+    /// The name of the operation.
+    const TAG: OpTag;
+}
+
 #[enum_dispatch]
 /// Trait implemented by all OpType variants.
 pub trait OpTrait {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
+
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         Default::default()
     }
     /// Optional description of the ports in the signature.
@@ -159,6 +185,13 @@ pub trait OpTrait {
     /// Only dataflow operations have a non-empty signature.
     fn signature_desc(&self) -> SignatureDescription {
         Default::default()
+    }
+
+    /// Get the static input type of this operation if it has one (only Some for
+    /// [`LoadConstant`] and [`Call`])
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        None
     }
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,

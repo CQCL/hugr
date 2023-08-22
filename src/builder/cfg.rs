@@ -5,17 +5,20 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
-
-use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
+use crate::types::FunctionType;
+use crate::{hugr::views::HugrView, types::TypeRow};
+use crate::{ops::handle::NodeHandle, types::Type};
 
 use crate::Node;
-use crate::{hugr::HugrMut, types::TypeRow, Hugr};
+use crate::{
+    hugr::{HugrInternalsMut, NodeType},
+    type_row, Hugr,
+};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
+#[derive(Debug, PartialEq)]
 pub struct CFGBuilder<T> {
     pub(super) base: T,
     pub(super) cfg_node: Node,
@@ -59,7 +62,8 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        let base = Hugr::new(cfg_op);
+        // TODO: Allow input extensions to be specified
+        let base = Hugr::new(NodeType::pure(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
@@ -85,6 +89,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
+            // Make the extensions a parameter
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -94,6 +99,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: Some(input),
         })
     }
+
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching predicate Sum value
     /// specified by `predicate_variants`.
@@ -125,8 +131,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
@@ -230,15 +238,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         inputs: TypeRow,
     ) -> Result<Self, BuildError> {
         // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = SimpleType::new_predicate(predicate_variants);
+        let predicate_type = Type::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = Signature::new_df(inputs, TypeRow::from(node_outputs));
-        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
+        let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
+        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
-}
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
@@ -269,19 +276,29 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        let base = Hugr::new(op);
+        // TODO: Allow input extensions to be specified
+        let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
+    }
+
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    pub fn finish_hugr_with_outputs(
+        mut self,
+        branch_wire: Wire,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError> {
+        self.set_outputs(branch_wire, outputs)?;
+        self.finish_hugr().map_err(BuildError::InvalidHUGR)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
-
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+    use crate::{builder::test::NAT, type_row};
+    use cool_asserts::assert_matches;
 
     use super::*;
     #[test]
@@ -289,7 +306,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).pure())?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
@@ -318,6 +335,7 @@ mod test {
 
         Ok(())
     }
+
     fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
@@ -331,7 +349,7 @@ mod test {
         };
         let mut middle_b = cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ConstValue::simple_unary_predicate())?;
+            let c = middle_b.add_load_const(ops::Const::simple_unary_predicate())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

@@ -1,62 +1,108 @@
-//! Opaque types, used to represent a user-defined [`SimpleType`].
+//! Opaque types, used to represent a user-defined [`Type`].
+//!
+//! [`Type`]: super::Type
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use super::{ClassicType, SimpleType, TypeRow};
+use crate::extension::ExtensionId;
 
-/// An opaque type element. Contains an unique identifier and a reference to its definition.
-//
-// TODO: We could replace the `Box` with an `Arc` to reduce memory usage,
-// but it adds atomic ops and a serialization-deserialization roundtrip
-// would still generate copies.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+use super::{type_param::TypeArg, TypeBound};
+
+/// An opaque type element. Contains the unique identifier of its definition.
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
+    extension: ExtensionId,
     /// Unique identifier of the opaque type.
+    /// Same as the corresponding [`TypeDef`]
+    ///
+    /// [`TypeDef`]: crate::extension::TypeDef
     id: SmolStr,
-    params: Box<TypeRow>,
+    /// Arguments that fit the [`TypeParam`]s declared by the typedef
+    ///
+    /// [`TypeParam`]: super::type_param::TypeParam
+    args: Vec<TypeArg>,
+    /// The [TypeBound] describing what can be done to instances of this type
+    bound: TypeBound,
 }
 
 impl CustomType {
     /// Creates a new opaque type.
-    pub fn new(id: SmolStr, params: impl Into<TypeRow>) -> Self {
+    pub fn new(
+        id: impl Into<SmolStr>,
+        args: impl Into<Vec<TypeArg>>,
+        extension: impl Into<ExtensionId>,
+        bound: TypeBound,
+    ) -> Self {
         Self {
-            id,
-            params: Box::new(params.into()),
+            id: id.into(),
+            args: args.into(),
+            extension: extension.into(),
+            bound,
         }
     }
 
-    /// Returns the unique identifier of the opaque type.
-    pub fn id(&self) -> &str {
-        &self.id
+    /// Creates a new opaque type (constant version, no type arguments)
+    pub const fn new_simple(id: SmolStr, extension: ExtensionId, bound: TypeBound) -> Self {
+        Self {
+            id,
+            args: vec![],
+            extension,
+            bound,
+        }
     }
 
-    /// Returns the parameters of the opaque type.
-    pub fn params(&self) -> &TypeRow {
-        &self.params
-    }
-
-    /// Returns a [`ClassicType`] containing this opaque type.
-    pub const fn classic_type(self) -> ClassicType {
-        ClassicType::Opaque(self)
+    /// Returns the bound of this [`CustomType`].
+    pub const fn bound(&self) -> TypeBound {
+        self.bound
     }
 }
 
-impl PartialEq for CustomType {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+impl CustomType {
+    /// unique name of the type.
+    pub fn name(&self) -> &SmolStr {
+        &self.id
+    }
+
+    /// Type arguments.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
+
+    /// Parent extension.
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
     }
 }
 
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.id, self.params.as_ref())
+        write!(f, "{}({:?})", self.id, self.args)
     }
 }
 
-impl Eq for CustomType {}
+#[cfg(test)]
+pub(crate) mod test {
+    use smol_str::SmolStr;
 
-impl From<CustomType> for SimpleType {
-    fn from(ty: CustomType) -> Self {
-        SimpleType::Classic(ty.classic_type())
-    }
+    use crate::types::TypeBound;
+
+    use super::CustomType;
+
+    pub(crate) const EQ_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyEqType"),
+        SmolStr::new_inline("MyRsrc"),
+        TypeBound::Eq,
+    );
+
+    pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyCopyableType"),
+        SmolStr::new_inline("MyRsrc"),
+        TypeBound::Copyable,
+    );
+
+    pub(crate) const ANY_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyAnyType"),
+        SmolStr::new_inline("MyRsrc"),
+        TypeBound::Any,
+    );
 }

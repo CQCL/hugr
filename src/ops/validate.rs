@@ -10,10 +10,10 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{SimpleType, TypeRow};
+use crate::types::{Type, TypeRow};
 use crate::Direction;
 
-use super::{impl_validate_op, tag::OpTag, BasicBlock, OpTrait, OpType, ValidateOp};
+use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -81,7 +81,7 @@ impl ValidateOp for super::Module {
     }
 }
 
-impl ValidateOp for super::Def {
+impl ValidateOp for super::FuncDefn {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_children: OpTag::DataflowChild,
@@ -123,8 +123,8 @@ impl ValidateOp for super::DFG {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         validate_io_nodes(
-            &self.signature.input,
-            &self.signature.output,
+            &self.signature().input,
+            &self.signature().output,
             "nested graph",
             children,
         )
@@ -162,11 +162,7 @@ impl ValidateOp for super::Conditional {
         for (i, (child, optype)) in children.into_iter().enumerate() {
             let OpType::Case(case_op) = optype else {panic!("Child check should have already checked valid ops.")};
             let sig = &case_op.signature;
-            let predicate_value = &self.predicate_inputs[i];
-            if sig.input[0..predicate_value.len()] != predicate_value[..]
-                || sig.input[predicate_value.len()..] != self.other_inputs[..]
-                || sig.output != self.outputs
-            {
+            if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
                     optype: optype.clone(),
@@ -194,20 +190,9 @@ impl ValidateOp for super::TailLoop {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        let expected_output = SimpleType::new_sum(vec![
-            SimpleType::new_tuple(self.just_inputs.clone()),
-            SimpleType::new_tuple(self.just_outputs.clone()),
-        ]);
-        let mut expected_output = vec![expected_output];
-        expected_output.extend_from_slice(&self.rest);
-        let expected_output: TypeRow = expected_output.into();
-
-        let mut expected_input = self.just_inputs.clone();
-        expected_input.to_mut().extend_from_slice(&self.rest);
-
         validate_io_nodes(
-            &expected_input,
-            &expected_output,
+            &self.body_input_row(),
+            &self.body_output_row(),
             "tail-controlled loop graph",
             children,
         )
@@ -217,7 +202,8 @@ impl ValidateOp for super::TailLoop {
 impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
-            allowed_children: OpTag::BasicBlock,
+            allowed_children: OpTag::ControlFlowChild,
+            allowed_first_child: OpTag::BasicBlock,
             allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,
@@ -239,7 +225,7 @@ impl ValidateOp for super::CFG {
     }
 }
 /// Errors that can occur while checking the children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum ChildrenValidationError {
     /// An CFG graph has an exit operation as a non-second child.
@@ -288,7 +274,7 @@ impl ChildrenValidationError {
 }
 
 /// Errors that can occur while checking the edges between children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
@@ -309,7 +295,7 @@ impl EdgeValidationError {
 }
 
 /// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChildrenEdgeData {
     /// Source child.
     pub source: NodeIndex,
@@ -356,7 +342,7 @@ impl ValidateOp for BasicBlock {
                 predicate_variants,
                 other_outputs: outputs,
             } => {
-                let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
+                let predicate_type = Type::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
@@ -465,30 +451,21 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::ops;
-    use crate::{
-        ops::dataflow::IOTrait,
-        ops::LeafOp,
-        type_row,
-        types::{ClassicType, SimpleType},
-    };
+    use crate::extension::prelude::USIZE_T;
+    use crate::{ops, type_row};
+    use crate::{ops::dataflow::IOTrait, ops::LeafOp};
     use cool_asserts::assert_matches;
 
     use super::*;
 
     #[test]
     fn test_validate_io_nodes() {
-        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-
-        let in_types = type_row![B];
-        let out_types = type_row![B, B];
+        let in_types: TypeRow = type_row![USIZE_T];
+        let out_types: TypeRow = type_row![USIZE_T, USIZE_T];
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = LeafOp::Noop {
-            ty: ClassicType::bit().into(),
-        }
-        .into();
+        let leaf_node = LeafOp::Noop { ty: USIZE_T }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
@@ -532,15 +509,15 @@ mod test {
 }
 
 use super::{
-    AliasDeclare, AliasDef, Call, CallIndirect, Const, Declare, Input, LeafOp, LoadConstant, Output,
+    AliasDecl, AliasDefn, Call, CallIndirect, Const, FuncDecl, Input, LeafOp, LoadConstant, Output,
 };
-impl_validate_op!(Declare);
-impl_validate_op!(AliasDeclare);
-impl_validate_op!(AliasDef);
+impl_validate_op!(FuncDecl);
+impl_validate_op!(AliasDecl);
+impl_validate_op!(AliasDefn);
 impl_validate_op!(Input);
 impl_validate_op!(Output);
 impl_validate_op!(Const);
 impl_validate_op!(Call);
-impl_validate_op!(CallIndirect);
 impl_validate_op!(LoadConstant);
+impl_validate_op!(CallIndirect);
 impl_validate_op!(LeafOp);

@@ -1,12 +1,12 @@
 //! Handles to nodes in HUGR.
 //!
-use crate::types::{ClassicType, Container, LinearType, SimpleType};
+use crate::types::{Type, TypeBound};
 use crate::Node;
 
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::tag::OpTag;
+use super::{AliasDecl, OpTag};
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].
@@ -25,7 +25,7 @@ pub trait NodeHandle: Clone {
 
     /// Cast the handle to a different more general tag.
     fn try_cast<T: NodeHandle + From<Node>>(&self) -> Option<T> {
-        T::TAG.contains(Self::TAG).then(|| self.node().into())
+        T::TAG.is_superset(Self::TAG).then(|| self.node().into())
     }
 }
 
@@ -58,38 +58,34 @@ pub struct ModuleRootID(Node);
 pub struct ModuleID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [def](crate::ops::OpType::Def)
-/// or [declare](crate::ops::OpType::Declare) node.
+/// Handle to a [def](crate::ops::OpType::FuncDefn)
+/// or [declare](crate::ops::OpType::FuncDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct FuncID<const DEF: bool>(Node);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [AliasDef](crate::ops::OpType::AliasDef)
-/// or [AliasDeclare](crate::ops::OpType::AliasDeclare) node.
+/// Handle to an [AliasDefn](crate::ops::OpType::AliasDefn)
+/// or [AliasDecl](crate::ops::OpType::AliasDecl) node.
 ///
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct AliasID<const DEF: bool> {
     node: Node,
     name: SmolStr,
-    linear: bool,
+    bound: TypeBound,
 }
 
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
-    pub fn new(node: Node, name: SmolStr, linear: bool) -> Self {
-        Self { node, name, linear }
+    pub fn new(node: Node, name: SmolStr, bound: TypeBound) -> Self {
+        Self { node, name, bound }
     }
 
     /// Construct new AliasID
-    pub fn get_alias_type(&self) -> SimpleType {
-        if self.linear {
-            Container::<LinearType>::Alias(self.name.clone()).into()
-        } else {
-            Container::<ClassicType>::Alias(self.name.clone()).into()
-        }
+    pub fn get_alias_type(&self) -> Type {
+        Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
     }
     /// Retrieve the underlying core type
     pub fn get_name(&self) -> &SmolStr {
@@ -99,14 +95,7 @@ impl<const DEF: bool> AliasID<DEF> {
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
 /// Handle to a [Const](crate::ops::OpType::Const) node.
-pub struct ConstID(Node, ClassicType);
-
-impl ConstID {
-    /// Return the type of the constant.
-    pub fn const_type(&self) -> ClassicType {
-        self.1.clone()
-    }
-}
+pub struct ConstID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [BasicBlock](crate::ops::BasicBlock) node.

@@ -2,11 +2,11 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, Signature, SimpleType, TypeRow};
+use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
-use super::tag::OpTag;
-use super::{impl_op_name, OpName, OpTrait};
+use super::OpTag;
+use super::{impl_op_name, OpName, OpTrait, StaticTag};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -22,29 +22,23 @@ pub struct TailLoop {
 impl_op_name!(TailLoop);
 
 impl DataflowOpTrait for TailLoop {
+    const TAG: OpTag = OpTag::TailLoop;
+
     fn description(&self) -> &str {
         "A tail-controlled loop"
     }
 
-    fn tag(&self) -> OpTag {
-        OpTag::TailLoop
-    }
-
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let [inputs, outputs] =
-            [self.just_inputs.clone(), self.just_outputs.clone()].map(|mut row| {
-                row.to_mut().extend(self.rest.iter().cloned());
-                row
-            });
-        Signature::new_df(inputs, outputs)
+            [&self.just_inputs, &self.just_outputs].map(|row| predicate_first(row, &self.rest));
+        FunctionType::new(inputs, outputs)
     }
 }
 
 impl TailLoop {
     /// Build the output TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let predicate =
-            SimpleType::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
+        let predicate = Type::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
         let mut outputs = vec![predicate];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
@@ -52,9 +46,7 @@ impl TailLoop {
 
     /// Build the input TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
-        let mut inputs = self.just_inputs.clone();
-        inputs.to_mut().extend_from_slice(&self.rest);
-        inputs
+        predicate_first(&self.just_inputs, &self.rest)
     }
 }
 
@@ -71,31 +63,29 @@ pub struct Conditional {
 impl_op_name!(Conditional);
 
 impl DataflowOpTrait for Conditional {
+    const TAG: OpTag = OpTag::Conditional;
+
     fn description(&self) -> &str {
         "HUGR conditional operation"
     }
 
-    fn tag(&self) -> OpTag {
-        OpTag::Conditional
-    }
-
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let mut inputs = self.other_inputs.clone();
         inputs.to_mut().insert(
             0,
-            SimpleType::new_predicate(self.predicate_inputs.clone().into_iter()),
+            Type::new_predicate(self.predicate_inputs.clone().into_iter()),
         );
-        Signature::new_df(inputs, self.outputs.clone())
+        FunctionType::new(inputs, self.outputs.clone())
     }
 }
 
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
-        let mut inputs = self.predicate_inputs.get(case)?.clone();
-
-        inputs.to_mut().extend_from_slice(&self.other_inputs);
-        Some(inputs)
+        Some(predicate_first(
+            self.predicate_inputs.get(case)?,
+            &self.other_inputs,
+        ))
     }
 }
 
@@ -110,16 +100,14 @@ pub struct CFG {
 impl_op_name!(CFG);
 
 impl DataflowOpTrait for CFG {
+    const TAG: OpTag = OpTag::Cfg;
+
     fn description(&self) -> &str {
         "A dataflow node defined by a child CFG"
     }
 
-    fn tag(&self) -> OpTag {
-        OpTag::Cfg
-    }
-
-    fn signature(&self) -> Signature {
-        Signature::new_df(self.inputs.clone(), self.outputs.clone())
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(self.inputs.clone(), self.outputs.clone())
     }
 }
 
@@ -147,6 +135,10 @@ impl OpName for BasicBlock {
             BasicBlock::Exit { .. } => "Exit".into(),
         }
     }
+}
+
+impl StaticTag for BasicBlock {
+    const TAG: OpTag = OpTag::BasicBlock;
 }
 
 impl OpTrait for BasicBlock {
@@ -191,11 +183,7 @@ impl BasicBlock {
                 predicate_variants,
                 other_outputs: outputs,
                 ..
-            } => {
-                let mut row = predicate_variants.get(successor)?.clone();
-                row.to_mut().extend_from_slice(outputs);
-                Some(row)
-            }
+            } => Some(predicate_first(predicate_variants.get(successor)?, outputs)),
             BasicBlock::Exit { .. } => panic!("Exit should have no successors"),
         }
     }
@@ -205,10 +193,14 @@ impl BasicBlock {
 /// Case ops - nodes valid inside Conditional nodes.
 pub struct Case {
     /// The signature of the contained dataflow graph.
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(Case);
+
+impl StaticTag for Case {
+    const TAG: OpTag = OpTag::Case;
+}
 
 impl OpTrait for Case {
     fn description(&self) -> &str {
@@ -216,7 +208,7 @@ impl OpTrait for Case {
     }
 
     fn tag(&self) -> OpTag {
-        OpTag::Case
+        <Self as StaticTag>::TAG
     }
 }
 
@@ -230,4 +222,13 @@ impl Case {
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
     }
+}
+
+fn predicate_first(pred: &TypeRow, rest: &TypeRow) -> TypeRow {
+    TypeRow::from(
+        pred.iter()
+            .cloned()
+            .chain(rest.iter().cloned())
+            .collect::<Vec<_>>(),
+    )
 }

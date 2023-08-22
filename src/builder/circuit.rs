@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use crate::hugr::CircuitUnit;
+
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
@@ -10,30 +12,10 @@ use crate::Wire;
 /// Builder to build regions of dataflow graphs that look like Circuits,
 /// where some inputs of operations directly correspond to some outputs.
 /// Allows appending operations by indexing a vector of input wires.
+#[derive(Debug, PartialEq)]
 pub struct CircuitBuilder<'a, T: ?Sized> {
     wires: Vec<Wire>,
     builder: &'a mut T,
-}
-
-/// Enum for specifying a [`CircuitBuilder`] input wire using either an index to
-/// the builder vector of wires, or an arbitrary other wire.
-pub enum AppendWire {
-    /// Arbitrary input wire.
-    W(Wire),
-    /// Index to CircuitBuilder vector of wires.
-    I(usize),
-}
-
-impl From<usize> for AppendWire {
-    fn from(value: usize) -> Self {
-        AppendWire::I(value)
-    }
-}
-
-impl From<Wire> for AppendWire {
-    fn from(value: Wire) -> Self {
-        AppendWire::W(value)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -74,7 +56,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[inline]
     /// The same as [`CircuitBuilder::append_with_outputs`] except it assumes no outputs and
     /// instead returns a reference to self to allow chaining.
-    pub fn append_and_consume<A: Into<AppendWire>>(
+    pub fn append_and_consume<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -85,7 +67,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     }
 
     /// Append an `op` with some inputs being the stored wires.
-    /// Any inputs of the form [`AppendWire::I`] are used to index the
+    /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
     /// stored wires.
     /// The outputs at those indices are used to replace the stored wire.
     /// The remaining outputs are returned.
@@ -93,7 +75,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// # Errors
     ///
     /// This function will return an error if an index is invalid.
-    pub fn append_with_outputs<A: Into<AppendWire>>(
+    pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -105,9 +87,9 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
             .into_iter()
             .map(Into::into)
             .enumerate()
-            .map(|(input_port, a_w): (usize, AppendWire)| match a_w {
-                AppendWire::W(wire) => Some(wire),
-                AppendWire::I(wire_index) => {
+            .map(|(input_port, a_w): (usize, CircuitUnit)| match a_w {
+                CircuitUnit::Wire(wire) => Some(wire),
+                CircuitUnit::Linear(wire_index) => {
                     linear_inputs.insert(input_port, wire_index);
                     self.wires.get(wire_index).copied()
                 }
@@ -116,7 +98,13 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         let input_wires = input_wires.ok_or(CircuitBuildError::InvalidWireIndex)?;
 
-        let output_wires = self.builder.add_dataflow_op(op, input_wires)?.outputs();
+        let output_wires = self
+            .builder
+            .add_dataflow_op(
+                op, // TODO: Add extension param
+                input_wires,
+            )?
+            .outputs();
         let nonlinear_outputs: Vec<Wire> = output_wires
             .enumerate()
             .filter_map(|(output_port, wire)| {
@@ -148,18 +136,20 @@ mod test {
 
     use crate::{
         builder::{
-            test::{build_main, BIT, F64, QB},
+            test::{build_main, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
-        ops::LeafOp,
+        extension::prelude::BOOL_T,
+        ops::{custom::OpaqueOp, LeafOp},
+        std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
-        types::Signature,
+        types::FunctionType,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB], type_row![QB, QB]),
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).pure(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -171,9 +161,9 @@ mod test {
                 assert_eq!(linear.n_wires(), 2);
 
                 linear
-                    .append(LeafOp::H, [0])?
-                    .append(LeafOp::CX, [0, 1])?
-                    .append(LeafOp::CX, [1, 0])?;
+                    .append(h_gate(), [0])?
+                    .append(cx_gate(), [0, 1])?
+                    .append(cx_gate(), [1, 0])?;
 
                 let outs = linear.finish();
                 f_build.finish_with_outputs(outs)
@@ -185,18 +175,30 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
-        use AppendWire::{I, W};
+        let my_custom_op = LeafOp::CustomOp(
+            crate::ops::custom::ExternalOp::Opaque(OpaqueOp::new(
+                "MissingRsrc".into(),
+                "MyOp",
+                "unknown op".to_string(),
+                vec![],
+                Some(FunctionType::new(vec![QB, NAT], vec![QB])),
+            ))
+            .into(),
+        );
         let build_res = build_main(
-            Signature::new_df(type_row![QB, QB, F64], type_row![QB, QB, BIT]),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
                 let mut linear = f_build.as_circuit(vec![q0, q1]);
 
                 let measure_out = linear
-                    .append(LeafOp::CX, [0, 1])?
-                    .append_and_consume(LeafOp::RzF64, [I(0), W(angle)])?
-                    .append_with_outputs(LeafOp::Measure, [0])?;
+                    .append(cx_gate(), [0, 1])?
+                    .append_and_consume(
+                        my_custom_op,
+                        [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                    )?
+                    .append_with_outputs(measure(), [0])?;
 
                 let out_qbs = linear.finish();
                 f_build.finish_with_outputs(out_qbs.into_iter().chain(measure_out))

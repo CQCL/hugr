@@ -2,10 +2,13 @@
 //!
 use thiserror::Error;
 
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-
-use crate::types::LinearType;
+use crate::types::ConstTypeError;
+use crate::types::Type;
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -18,8 +21,8 @@ pub use build_traits::{
 mod dataflow;
 pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
 
-mod module_builder;
-pub use module_builder::ModuleBuilder;
+mod module;
+pub use module::ModuleBuilder;
 
 mod cfg;
 pub use cfg::{BlockBuilder, CFGBuilder};
@@ -30,15 +33,20 @@ pub use tail_loop::TailLoopBuilder;
 mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
-mod circuit_builder;
-pub use circuit_builder::{AppendWire, CircuitBuilder};
+mod circuit;
+pub use circuit::CircuitBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 /// Error while building the HUGR.
 pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
+    /// Tried to add a malformed [Const]
+    ///
+    /// [Const]: crate::ops::constant::Const
+    #[error("Constant failed typechecking: {0}")]
+    BadConstant(#[from] ConstTypeError),
     /// HUGR construction error.
     #[error("Error when mutating HUGR: {0}.")]
     ConstructError(#[from] HugrError),
@@ -63,26 +71,33 @@ pub enum BuildError {
 
     /// Can't copy a linear type
     #[error("Can't copy linear type: {0:?}.")]
-    NoCopyLinear(LinearType),
+    NoCopyLinear(Type),
 
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
-    CircuitError(#[from] circuit_builder::CircuitBuildError),
+    CircuitError(#[from] circuit::CircuitBuildError),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<BuildError> for PyErr {
+    fn from(err: BuildError) -> Self {
+        // We may want to define more specific python-level errors at some point.
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::types::{ClassicType, LinearType, Signature, SimpleType};
+    use crate::types::{Signature, Type};
     use crate::Hugr;
 
     use super::handle::BuildHandle;
     use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
     use super::{DataflowSubContainer, HugrBuilder};
 
-    pub(super) const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    pub(super) const F64: SimpleType = SimpleType::Classic(ClassicType::F64);
-    pub(super) const BIT: SimpleType = SimpleType::Classic(ClassicType::bit());
-    pub(super) const QB: SimpleType = SimpleType::Linear(LinearType::Qubit);
+    pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const BIT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
     pub(super) fn n_identity<T: DataflowSubContainer>(

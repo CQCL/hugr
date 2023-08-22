@@ -43,9 +43,8 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::view::HugrView;
-use crate::ops::handle::{CfgID, NodeHandle};
-use crate::ops::tag::OpTag;
+use crate::hugr::views::HugrView;
+use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
 
@@ -133,8 +132,8 @@ pub struct SimpleCfgView<'a, H> {
 }
 impl<'a, H: HugrView> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub fn new(h: &'a H, cfg: CfgID) -> Self {
-        let mut children = h.children(cfg.node());
+    pub fn new(h: &'a H) -> Self {
+        let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -398,17 +397,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::builder::{
-        BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder, SubContainer,
-    };
-    use crate::ops::{
-        handle::{BasicBlockID, CfgID, ConstID, NodeHandle},
-        ConstValue,
-    };
-    use crate::types::{ClassicType, Signature, SimpleType};
+    use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use crate::hugr::views::{HierarchyView, SiblingGraph};
+    use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
+    use crate::ops::Const;
+    use crate::types::test::EQ_T;
+    use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = EQ_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -429,15 +425,11 @@ pub(crate) mod test {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
-        let mut module_builder = ModuleBuilder::new();
-        let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let mut func_builder = module_builder.define_declaration(&main)?;
-        let [int] = func_builder.input_wires_arr();
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
 
-        let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
             &const_unit,
@@ -449,15 +441,15 @@ pub(crate) mod test {
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish_sub_container()?;
 
-        func_builder.finish_with_outputs(cfg_id.outputs())?;
-        let h = module_builder.finish_hugr()?;
+        let h = cfg_builder.finish_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes =
-            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        // There's no need to use a FlatRegionView here but we do so just to check
+        // that we *can* (as we'll need to for "real" module Hugr's).
+        let v: SiblingGraph = SiblingGraph::new(&h, h.root());
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -481,34 +473,16 @@ pub(crate) mod test {
         //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let mut module_builder = ModuleBuilder::new();
-        let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
-
-        let mut func_builder = module_builder.define_declaration(&main)?;
-        let [int] = func_builder.input_wires_arr();
-
-        let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
-        let entry = n_identity(
-            cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
-            &pred_const,
-        )?;
-        let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, merge)?;
-        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
-        let exit = cfg_builder.exit_block();
-        cfg_builder.branch(&tail, 0, &exit)?;
-        let cfg_id = cfg_builder.finish_sub_container()?;
-
-        func_builder.finish_with_outputs(cfg_id.outputs())?;
-
-        let h = module_builder.finish_hugr()?;
-
-        let (entry, exit) = (entry.node(), exit.node());
+        let (h, merge, tail) = build_cond_then_loop_cfg(false)?;
         let (merge, tail) = (merge.node(), tail.node());
-        let edge_classes =
-            EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h, *cfg_id.handle()));
+        let [entry, exit]: [Node; 2] = h
+            .children(h.root())
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
 
         let classes = group_by(edge_classes);
@@ -527,30 +501,21 @@ pub(crate) mod test {
 
     #[test]
     fn test_cond_in_loop_separate_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, head, tail) = build_conditional_in_loop_cfg(true)?;
+        let (h, head, tail) = build_conditional_in_loop_cfg(true)?;
         let head = head.node();
         let tail = tail.node();
         //                        /-> left --\
         //  entry -> head -> split            > merge -> tail -> exit
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
-        let v = SimpleCfgView::new(&h, cfg_id);
+        // split is unique successor of head
+        let split = h.output_neighbours(head).exactly_one().unwrap();
+        // merge is unique predecessor of tail
+        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+
+        let v = SimpleCfgView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
-        // split is unique successor of head
-        let split = *edge_classes
-            .keys()
-            .filter(|(s, _)| *s == head)
-            .map(|(_, t)| t)
-            .exactly_one()
-            .unwrap();
-        // merge is unique predecessor of tail
-        let merge = *edge_classes
-            .keys()
-            .filter(|(_, t)| *t == tail)
-            .map(|(s, _)| s)
-            .exactly_one()
-            .unwrap();
         let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -568,7 +533,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (h, cfg_id, head, tail) = build_conditional_in_loop_cfg(false)?;
+        let (h, head, tail) = build_conditional_in_loop_cfg(false)?;
         let head = head.node();
         let tail = tail.node();
         //               /-> left --\
@@ -577,7 +542,7 @@ pub(crate) mod test {
         //             \---<---<---<---<---<--<---/
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
-        let v = SimpleCfgView::new(&h, cfg_id);
+        let v = SimpleCfgView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
@@ -676,21 +641,49 @@ pub(crate) mod test {
         Ok((header, tail))
     }
 
+    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
+    pub fn build_cond_then_loop_cfg(
+        separate: bool,
+    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
+
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
+            &pred_const,
+        )?;
+        let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
+        let head = if separate {
+            let h = n_identity(
+                cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?,
+                &const_unit,
+            )?;
+            cfg_builder.branch(&merge, 0, &h)?;
+            h
+        } else {
+            merge
+        };
+        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
+        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&tail, 0, &exit)?;
+
+        let h = cfg_builder.finish_hugr()?;
+        Ok((h, merge, tail))
+    }
+
     // Build a CFG, returning the Hugr
     pub fn build_conditional_in_loop_cfg(
         separate_headers: bool,
-    ) -> Result<(Hugr, CfgID, BasicBlockID, BasicBlockID), BuildError> {
-        //let sum2_type = SimpleType::new_predicate(2);
+    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+        //let sum2_type = Type::new_predicate(2);
 
-        let mut module_builder = ModuleBuilder::new();
-        let main = module_builder.declare("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
-        let pred_const = module_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = module_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let mut func_builder = module_builder.define_declaration(&main)?;
-        let [int] = func_builder.input_wires_arr();
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
 
-        let mut cfg_builder = func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
             &const_unit,
@@ -713,12 +706,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let cfg_id = cfg_builder.finish_sub_container()?;
-
-        func_builder.finish_with_outputs(cfg_id.outputs())?;
-
-        let h = module_builder.finish_hugr()?;
-
-        Ok((h, *cfg_id.handle(), head, tail))
+        let h = cfg_builder.finish_hugr()?;
+        Ok((h, head, tail))
     }
 }
