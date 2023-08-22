@@ -41,9 +41,10 @@ use super::{sealed::HugrInternals, HugrView};
 /// The ordering of the nodes in the subgraph is irrelevant to define the convex
 /// subgraph, but it determines the ordering of the boundary signature.
 ///
-/// At the moment we do not treat state order edges in any special way. If any
-/// are present in the induced subgraph they will be included. However, state
-/// order edges are not supported in replacements.
+/// At the moment we do not support state order edges at the subgraph boundary.
+/// The `boundary_port` and `signature` methods will panic if any are found.
+/// State order edges are also unsupported in replacements in
+/// `create_simple_replacement`.
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph<'g, Base> {
     /// The underlying Hugr.
@@ -213,6 +214,9 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
+        if self.base.get_optype(n).signature().get(p).is_some() {
+            unimplemented!("State order edges not supported at boundary")
+        }
         self.nodes.contains(&n)
             && self
                 .base
@@ -318,17 +322,22 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let mut rep_order_edges = rep_inputs
-            .clone()
-            .chain(rep_outputs.clone())
-            .filter(|&(n, p)| replacement.get_optype(n).signature().get(p).is_none());
-        if rep_order_edges.any(|(n, p)| replacement.linked_ports(n, p).count() > 0) {
+        let (rep_inputs, in_order_edges): (Vec<_>, Vec<_>) =
+            rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
+        let (rep_outputs, out_order_edges): (Vec<_>, Vec<_>) =
+            rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
+        if in_order_edges
+            .into_iter()
+            .chain(out_order_edges)
+            .any(|(n, p)| replacement.linked_ports(n, p).count() > 0)
+        {
             unimplemented!("Found state order edges in replacement graph");
         }
 
         let self_inputs = self.incoming_ports();
         let self_outputs = self.outgoing_ports();
         let nu_inp = rep_inputs
+            .into_iter()
             .zip_eq(self_inputs)
             .flat_map(|((rep_source_n, rep_source_p), self_target)| {
                 replacement
