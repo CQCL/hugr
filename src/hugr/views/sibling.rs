@@ -99,7 +99,7 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///  - it is in $B_O$ if and only if it has a source inside of the subgraph
     ///    and a target outside of it.
     ///
-    /// This function fails if the subgraph if it is not convex, if the nodes
+    /// This function fails if the subgraph is not convex, if the nodes
     /// do not share a common parent or if the subgraph is empty.
     ///
     /// The order of the boundary edges is used to determine the order of the
