@@ -57,7 +57,7 @@ where
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView + Clone,
+    Base: HugrInternals + HugrView,
 {
     fn clone(&self) -> Self {
         SiblingGraph::new(self.hugr, self.root)
@@ -384,7 +384,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -410,7 +410,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -433,7 +433,7 @@ where
     }
 }
 
-impl<'g, Root, Base> super::sealed::HugrInternals for SiblingGraph<'g, Root, Base>
+impl<'g, Root, Base> HugrInternals for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
     Base: HugrInternals,

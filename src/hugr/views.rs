@@ -1,8 +1,10 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod hierarchy;
+pub mod sibling;
 
 pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
+pub use sibling::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
@@ -10,11 +12,11 @@ use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, NodeMetadata, NodeType};
-use super::{Node, Port};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpName, OpTag, OpType};
 use crate::types::EdgeKind;
 use crate::Direction;
+use crate::{Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
