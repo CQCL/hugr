@@ -536,6 +536,8 @@ impl UnificationContext {
             .collect()
     }
 
+    /// Iterates over a set of metas (the argument) and tries to solve
+    /// them.
     /// Returns the metas that we solved
     fn solve_constraints(
         &mut self,
@@ -605,8 +607,8 @@ mod test {
     const BIT: Type = crate::extension::prelude::USIZE_T;
 
     #[test]
-    // Build up a graph with some holes in its extensions, and infer them
-    // See if it works!
+    // Build up a graph with some holes in its extension requirements, and infer
+    // them.
     fn from_graph() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let main_sig =
