@@ -429,18 +429,13 @@ pub(crate) mod test {
 
     #[test]
     fn lift_node() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-
         let ab_extensions = ExtensionSet::from_iter(["A".into(), "B".into()]);
         let c_extensions = ExtensionSet::singleton(&"C".into());
         let abc_extensions = ab_extensions.clone().union(&c_extensions);
 
         let parent_sig =
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&abc_extensions);
-        let mut parent = module_builder.define_function(
-            "parent",
-            parent_sig.with_input_extensions(ExtensionSet::new()),
-        )?;
+        let mut parent = DFGBuilder::new(parent_sig)?;
 
         let add_c_sig = FunctionType::new(type_row![BIT], type_row![BIT])
             .with_extension_delta(&c_extensions)
@@ -498,8 +493,7 @@ pub(crate) mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_with_outputs([w])?;
-        module_builder.finish_hugr()?;
+        parent.finish_hugr_with_outputs([w])?;
 
         Ok(())
     }

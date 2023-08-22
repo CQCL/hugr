@@ -1211,7 +1211,7 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::ParentIOExtensionMismatch { .. }
             ))
         );
         Ok(())

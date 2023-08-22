@@ -314,7 +314,7 @@ where
     #[inline]
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         let op = self.get_nodetype(node);
-        if op.tag().is_superset(OpTag::DataflowParent) {
+        if OpTag::DataflowParent.is_superset(op.tag()) {
             self.children(node).take(2).collect_vec().try_into().ok()
         } else {
             None
