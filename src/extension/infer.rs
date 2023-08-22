@@ -782,7 +782,7 @@ mod test {
         ctx.add_constraint(m2, Constraint::Equal(m1));
         ctx.add_constraint(m3, Constraint::Equal(m0));
         ctx.variables.insert(m0);
-        let results = ctx.main_loop()?;
+        ctx.main_loop()?;
 
         Ok(())
     }
