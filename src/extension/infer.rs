@@ -175,7 +175,7 @@ impl UnificationContext {
 
     /// Declare that a meta has been solved
     fn add_solution(&mut self, m: Meta, rs: ExtensionSet) {
-        assert!(self.solved.insert(m, rs).is_none());
+        dbg_assert!(self.solved.insert(m, rs).is_none());
     }
 
     /// If a metavariable has been merged, return the new meta
