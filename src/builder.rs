@@ -87,12 +87,17 @@ impl From<BuildError> for PyErr {
 }
 
 #[cfg(test)]
-mod test {
-    use crate::types::{Signature, Type};
-    use crate::Hugr;
+pub(crate) mod test {
+    use rstest::fixture;
+
+    use crate::types::{FunctionType, Signature, Type};
+    use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
-    use super::{BuildError, Container, FuncID, FunctionBuilder, ModuleBuilder};
+    use super::{
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID, FunctionBuilder,
+        ModuleBuilder,
+    };
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -116,5 +121,13 @@ mod test {
 
         f(f_builder)?;
         Ok(module_builder.finish_hugr()?)
+    }
+
+    #[fixture]
+    pub(crate) fn simple_dfg_hugr() -> Hugr {
+        let dfg_builder =
+            DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
+        let [i1] = dfg_builder.input_wires_arr();
+        dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
     }
 }

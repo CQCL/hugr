@@ -13,6 +13,7 @@ use crate::{
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
+// TODO: use `SiblingSubgraph` to define the replacement.
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
     /// The common DataflowParent of all nodes to be replaced.

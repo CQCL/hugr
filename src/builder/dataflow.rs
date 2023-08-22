@@ -212,8 +212,9 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use cool_asserts::assert_matches;
+    use rstest::rstest;
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
@@ -233,6 +234,7 @@ mod test {
         type_row, Wire,
     };
 
+    use super::super::test::simple_dfg_hugr;
     use super::*;
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
@@ -392,17 +394,10 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn dfg_hugr() -> Result<(), BuildError> {
-        let dfg_builder = DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT]))?;
-
-        let [i1] = dfg_builder.input_wires_arr();
-        let hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
-
-        assert_eq!(hugr.node_count(), 3);
-        assert_matches!(hugr.root_type().tag(), OpTag::Dfg);
-
-        Ok(())
+    #[rstest]
+    fn dfg_hugr(simple_dfg_hugr: Hugr) {
+        assert_eq!(simple_dfg_hugr.node_count(), 3);
+        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
     }
 
     #[test]
