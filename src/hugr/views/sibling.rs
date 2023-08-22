@@ -695,7 +695,7 @@ mod tests {
             &func,
             hugr.node_outputs(inp)
                 .map(|p| hugr.linked_ports(inp, p).collect_vec())
-                .filter(|ps| ps.len() > 0)
+                .filter(|ps| !ps.is_empty())
                 .collect(),
             hugr.node_inputs(out)
                 .filter_map(|p| hugr.linked_ports(out, p).exactly_one().ok())
