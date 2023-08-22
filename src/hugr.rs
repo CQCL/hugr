@@ -369,6 +369,6 @@ mod test {
         use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();
-        assert_matches!((&hugr).get_io(hugr.root()), Some(_));
+        assert_matches!(hugr.get_io(hugr.root()), Some(_));
     }
 }
