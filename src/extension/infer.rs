@@ -183,14 +183,20 @@ impl UnificationContext {
         self.shunted.get(&m).cloned().map_or(m, |m| self.resolve(m))
     }
 
+    /// Get the relevant constraints for a metavariable. If it's been merged,
+    /// get the constraints for the merged metavariable
     fn get_constraints(&self, m: &Meta) -> Option<&HashSet<Constraint>> {
         self.constraints.get(&self.resolve(*m))
     }
 
+    /// Get the relevant solution for a metavariable. If it's been merged, get
+    /// the solution for the merged metavariable
     fn get_solution(&self, m: &Meta) -> Option<&ExtensionSet> {
         self.solved.get(&self.resolve(*m))
     }
 
+    /// Convert an extension *set* difference in terms of a sequence of fresh
+    /// metas with `Plus` constraints which each add only one extension req.
     fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
         let mut last_meta = input;
         // Create fresh metavariables with `Plus` constraints for
@@ -483,7 +489,9 @@ impl UnificationContext {
             let rs = match self.get_solution(meta) {
                 Some(rs) => Ok(rs.clone()),
                 None => {
-                    // Cut through the riff raff
+                    // If it depends on some other live meta, that's bad news.
+                    // If it only depends on graph variables, then we don't have
+                    // a *solution*, but it's fine
                     if self.live_var(meta).is_some() {
                         Err(InferExtensionError::Unsolved { location: *loc })
                     } else {
@@ -559,23 +567,32 @@ impl UnificationContext {
     pub fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
-        // Keep going as long as we're making progress (= merging nodes)
+        // Keep going as long as we're making progress (= merging and solving nodes)
         loop {
+            // Try to solve metas with the information we have now. This may
+            // register new equalities on the EqGraph
             let to_delete = self.solve_constraints(&remaining)?;
+            // Merge metas based on the equalities we just registered
             let (new, merged) = self.merge_equal_metas()?;
+            // All of the metas for which we've made progress
             let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).cloned());
 
             for m in delta.iter() {
                 if !merged.contains(m) {
+                    // Cleanup the context by removing constraint lists for
+                    // metas which are now solved
                     self.constraints.remove(m);
                 }
+                // Remove solved and merged metas from remaining "to solve" list
                 remaining.remove(m);
             }
 
+            // If we made no progress, we're done!
             if delta.is_empty() && new.is_empty() {
                 break;
             }
 
+            // Add all of the new nodes we made (by merging old ones) to the pile
             new.into_iter().for_each(|m| {
                 remaining.insert(m);
             });
