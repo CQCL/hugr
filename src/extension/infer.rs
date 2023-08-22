@@ -21,8 +21,6 @@ use petgraph::graph as pg;
 
 use std::collections::{HashMap, HashSet};
 
-use std::cmp::{Ord, Ordering};
-use std::collections::BTreeSet;
 use thiserror::Error;
 
 /// A mapping from locations on the hugr to extension requirement sets which
@@ -38,32 +36,13 @@ pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, Infer
 /// Metavariables don't need much
 type Meta = usize;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 /// Things we know about metavariables
 enum Constraint {
     /// A variable has the same value as another variable
     Equal(Meta),
     /// Variable extends the value of another by one extension
     Plus(ExtensionId, Meta),
-}
-
-// Implement ordering for constraints so that we can get to the most useful
-// constraints first in `solve_constraints`
-impl PartialOrd for Constraint {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Self::Plus(_, m1), Self::Plus(_, m2)) => Some(m1.cmp(m2)),
-            (Self::Plus(_, _), _) => Some(Ordering::Greater),
-            (_, Self::Plus(_, _)) => Some(Ordering::Less),
-            (Self::Equal(m1), Self::Equal(m2)) => m1.partial_cmp(m2),
-        }
-    }
-}
-
-impl Ord for Constraint {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -142,7 +121,7 @@ impl EqGraph {
 /// Our current knowledge about the extensions of the graph
 struct UnificationContext {
     /// A list of constraints for each metavariable
-    constraints: HashMap<Meta, BTreeSet<Constraint>>,
+    constraints: HashMap<Meta, HashSet<Constraint>>,
     /// A map which says which nodes correspond to which metavariables
     extensions: HashMap<(Node, Direction), Meta>,
     /// Solutions to metavariables
@@ -180,7 +159,7 @@ impl UnificationContext {
     fn fresh_meta(&mut self) -> Meta {
         let fresh = self.fresh_name;
         self.fresh_name += 1;
-        self.constraints.insert(fresh, BTreeSet::new());
+        self.constraints.insert(fresh, HashSet::new());
         fresh
     }
 
@@ -191,7 +170,7 @@ impl UnificationContext {
             .and_modify(|cs| {
                 cs.insert(c.clone());
             })
-            .or_insert(BTreeSet::from_iter([c]));
+            .or_insert(HashSet::from_iter([c]));
     }
 
     /// Declare that a meta has been solved
@@ -204,7 +183,7 @@ impl UnificationContext {
         self.shunted.get(&m).cloned().map_or(m, |m| self.resolve(m))
     }
 
-    fn get_constraints(&self, m: &Meta) -> Option<&BTreeSet<Constraint>> {
+    fn get_constraints(&self, m: &Meta) -> Option<&HashSet<Constraint>> {
         self.constraints.get(&self.resolve(*m))
     }
 
