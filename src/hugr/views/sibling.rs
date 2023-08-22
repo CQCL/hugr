@@ -150,7 +150,6 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         });
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
         // Ordering of the edges here is preserved and becomes ordering of the signature.
-        // TODO: handle state order edges
         let subpg = Subgraph::new_subgraph(pg, incoming.chain(outgoing).map(to_pg));
         if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
@@ -214,7 +213,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     where
         Base: HugrView,
     {
-        if self.base.get_optype(n).signature().get(p).is_some() {
+        // TODO: handle state order edges
+        if is_order_edge(self.base, n, p) {
             unimplemented!("State order edges not supported at boundary")
         }
         self.nodes.contains(&n)
@@ -260,11 +260,17 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     {
         let input = self
             .incoming_ports()
-            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p).cloned())
+            .map(|(n, p)| {
+                let sig = self.base.get_optype(n).signature();
+                sig.get(p).cloned().expect("must be dataflow edge")
+            })
             .collect_vec();
         let output = self
             .outgoing_ports()
-            .filter_map(|(n, p)| self.base.get_optype(n).signature().get(p).cloned())
+            .map(|(n, p)| {
+                let sig = self.base.get_optype(n).signature();
+                sig.get(p).cloned().expect("must be dataflow edge")
+            })
             .collect_vec();
         FunctionType::new(input, output)
     }
@@ -322,15 +328,12 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let (rep_inputs, in_order_edges): (Vec<_>, Vec<_>) =
+        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) =
             rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        let (rep_outputs, out_order_edges): (Vec<_>, Vec<_>) =
+        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
             rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        if in_order_edges
-            .into_iter()
-            .chain(out_order_edges)
-            .any(|(n, p)| replacement.linked_ports(n, p).count() > 0)
-        {
+        let mut order_ports = in_order_ports.into_iter().chain(out_order_ports);
+        if order_ports.any(|(n, p)| is_order_edge(&replacement, n, p)) {
             unimplemented!("Found state order edges in replacement graph");
         }
 
@@ -362,6 +365,12 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
             nu_out,
         ))
     }
+}
+
+/// Whether a port is linked to a state order edge.
+fn is_order_edge<H: HugrView>(hugr: &H, node: Node, port: Port) -> bool {
+    hugr.get_optype(node).signature().get(port).is_none()
+        && hugr.linked_ports(node, port).count() > 0
 }
 
 /// Errors that can occur while constructing a [`SimpleReplacement`].
