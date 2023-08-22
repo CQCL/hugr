@@ -371,7 +371,6 @@ impl UnificationContext {
         for cc in self.eq_graph.ccs().into_iter() {
             // Within a connected component everything is equal
             let combined_meta = self.fresh_meta();
-            println!("Made: {:?}", combined_meta);
             for m in cc.iter() {
                 if self.shunted.contains_key(m) {
                     continue;
@@ -390,7 +389,6 @@ impl UnificationContext {
                     // bother recording a new meta if we don't add any
                     // constraints. It should be safe to call this multiple times
                     new_metas.insert(combined_meta);
-                    println!("Coalesce Merged {:?}", m);
                 }
                 if let Some(solution) = self.solved.get(m) {
                     match self.solved.get(&combined_meta) {
@@ -413,7 +411,6 @@ impl UnificationContext {
                     self.variables.insert(combined_meta);
                 }
                 self.shunted.insert(*m, combined_meta);
-                println!("Shunting {:?} -> {:?}", m, combined_meta);
             }
             // This doesn't do anything, but if it did it would just be
             // implementing the same mechanism as provided by `resolve`
@@ -546,7 +543,6 @@ impl UnificationContext {
         let mut solved = HashSet::new();
         for m in vars.iter() {
             if self.solve_meta(*m)? {
-                println!("Solved {:?}", m);
                 solved.insert(*m);
             }
         }
@@ -769,17 +765,7 @@ mod test {
         ctx.add_constraint(m2, Constraint::Equal(m1));
         ctx.add_constraint(m3, Constraint::Equal(m0));
         ctx.variables.insert(m0);
-        println!("Constraints before processing");
-        for r in ctx.extensions.iter() {
-            println!("     {:?}", r);
-        }
-        for r in ctx.constraints.iter() {
-            println!("     {:?}", r);
-        }
-
         let results = ctx.main_loop()?;
-
-        println!("results: {:?}", results);
 
         Ok(())
     }
