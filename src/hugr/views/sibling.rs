@@ -297,11 +297,10 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
         if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph);
         }
-        let Some((rep_input, rep_output)) = replacement
-            .children(rep_root)
-            .take(2)
-            .collect_tuple()
-        else { return Err(InvalidReplacement::InvalidDataflowParent) };
+        let Some((rep_input, rep_output)) = replacement.children(rep_root).take(2).collect_tuple()
+        else {
+            return Err(InvalidReplacement::InvalidDataflowParent);
+        };
         if dfg_optype.signature() != self.signature() {
             return Err(InvalidReplacement::InvalidSignature);
         }
