@@ -464,9 +464,6 @@ impl UnificationContext {
                         // I.e. If we have a concrete solution for this
                         // metavariable, we can then work out what `other_meta`
                         // should be by subtracting the extension that's `Plus`d
-                        //
-                        // N.B. This could be the case of Plus(r, a) where a
-                        // parameterises the whole graph, in which case we're done
                     }
                 }
             }
