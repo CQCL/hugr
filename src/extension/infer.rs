@@ -501,7 +501,7 @@ impl UnificationContext {
             }?;
             results.insert(*loc, rs);
         }
-        assert!(self.live_metas().is_empty());
+        debug_assert!(self.live_metas().is_empty());
         Ok(results)
     }
 
