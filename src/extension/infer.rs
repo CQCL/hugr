@@ -811,7 +811,7 @@ mod test {
     }
 
     #[test]
-    // Infer an the extensions on a child node with no inputs
+    // Infer the extensions on a child node with no inputs
     fn dangling_src() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::singleton(&"R".into());
         let root_signature =
