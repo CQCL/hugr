@@ -200,7 +200,7 @@ impl UnificationContext {
     }
 
     /// If a metavariable has been merged, return the new meta
-    fn resolve<'a>(&self, m: Meta) -> Meta {
+    fn resolve(&self, m: Meta) -> Meta {
         self.shunted.get(&m).cloned().map_or(m, |m| self.resolve(m))
     }
 
@@ -249,7 +249,7 @@ impl UnificationContext {
     {
         // The toplevel sibling graph can be open, and we should note what those variables are
         let toplevel: SiblingGraph<Node, T> = SiblingGraph::new(hugr, hugr.root());
-        for toplevel_node in toplevel.nodes().into_iter() {
+        for toplevel_node in toplevel.nodes() {
             let m_input = self.make_or_get_meta(toplevel_node, Direction::Incoming);
             self.variables.insert(m_input);
         }
@@ -322,14 +322,12 @@ impl UnificationContext {
         let loc1 = self
             .resources
             .iter()
-            .filter(|(_, m)| **m == m1 || self.resolve(**m) == m1)
-            .next()
+            .find(|(_, m)| **m == m1 || self.resolve(**m) == m1)
             .map(|a| a.0);
         let loc2 = self
             .resources
             .iter()
-            .filter(|(_, m)| **m == m2 || self.resolve(**m) == m2)
-            .next()
+            .find(|(_, m)| **m == m2 || self.resolve(**m) == m2)
             .map(|a| a.0);
         let err = if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
             // N.B. We're looking for the case where an equality constraint
@@ -396,7 +394,7 @@ impl UnificationContext {
             let combined_meta = self.fresh_meta();
             println!("Made: {:?}", combined_meta);
             for m in cc.iter() {
-                if self.shunted.contains_key(&m) {
+                if self.shunted.contains_key(m) {
                     continue;
                 }
 
@@ -464,26 +462,25 @@ impl UnificationContext {
                     self.eq_graph.register_eq(meta, *other_meta);
                 }
                 Constraint::Plus(r, other_meta) => {
-                    match self.get_solution(other_meta) {
-                        Some(rs) => {
-                            let mut rrs = rs.clone();
-                            rrs.insert(r);
-                            match self.get_solution(&meta) {
-                                // Let's check that this is right?
-                                Some(rs) => {
-                                    if rs != &rrs {
-                                        return Err(self.report_mismatch(
-                                            meta,
-                                            *other_meta,
-                                            rs.clone(),
-                                            rrs,
-                                        ));
-                                    }
+                    if let Some(rs) = self.get_solution(other_meta) {
+                        let mut rrs = rs.clone();
+                        rrs.insert(r);
+                        match self.get_solution(&meta) {
+                            // Let's check that this is right?
+                            Some(rs) => {
+                                if rs != &rrs {
+                                    return Err(self.report_mismatch(
+                                        meta,
+                                        *other_meta,
+                                        rs.clone(),
+                                        rrs,
+                                    ));
                                 }
-                                None => self.add_solution(meta, rrs),
-                            };
-                            solved = true;
-                        }
+                            }
+                            None => self.add_solution(meta, rrs),
+                        };
+                        solved = true;
+                    } else {
                         // TODO: Try and go backwards with a `Minus` constraint
                         // I.e. If we have a concrete solution for this
                         // metavariable, we can then work out what `other_meta`
@@ -491,7 +488,6 @@ impl UnificationContext {
                         //
                         // N.B. This could be the case of Plus(r, a) where a
                         // parameterises the whole graph, in which case we're done
-                        None => {}
                     }
                 }
             }
@@ -515,7 +511,7 @@ impl UnificationContext {
                 Some(rs) => Ok(rs.clone()),
                 None => {
                     // Cut through the riff raff
-                    if !self.live_var(meta).is_none() {
+                    if self.live_var(meta).is_some() {
                         Err(InferResourceError::Unsolved { location: *loc })
                     } else {
                         continue;
@@ -537,7 +533,7 @@ impl UnificationContext {
 
         // TODO: We should be doing something to ensure that these are the same check...
         if self.get_solution(m).is_none() {
-            if !self.get_constraints(m).is_none() {
+            if self.get_constraints(m).is_some() {
                 for c in self.get_constraints(m).unwrap().iter() {
                     match c {
                         Constraint::Plus(_, m) => return self.live_var(m),
@@ -545,7 +541,7 @@ impl UnificationContext {
                     }
                 }
             }
-            Some(m.clone())
+            Some(*m)
         } else {
             None
         }
@@ -570,7 +566,7 @@ impl UnificationContext {
         vars: &HashSet<Meta>,
     ) -> Result<HashSet<Meta>, InferResourceError> {
         let mut solved = HashSet::new();
-        for m in vars.into_iter() {
+        for m in vars.iter() {
             if self.solve_meta(*m)? {
                 println!("Solved {:?}", m);
                 solved.insert(*m);
@@ -593,11 +589,10 @@ impl UnificationContext {
         loop {
             let to_delete = self.solve_constraints(&remaining)?;
             let (new, merged) = self.coalesce()?;
-            let delta: HashSet<Meta> =
-                HashSet::from_iter(to_delete.union(&merged).into_iter().cloned());
+            let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).cloned());
 
             for m in delta.iter() {
-                if !merged.contains(&m) {
+                if !merged.contains(m) {
                     self.constraints.remove(m);
                 }
                 remaining.remove(m);
@@ -637,8 +632,6 @@ mod test {
     // Build up a graph with some holes in its resources, and infer them
     // See if it works!
     fn from_graph() -> Result<(), Box<dyn Error>> {
-        
-
         let rs = ResourceSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let main_sig =
             AbstractSignature::new_df(type_row![BIT, BIT], type_row![BIT]).with_resource_delta(&rs);
@@ -725,7 +718,8 @@ mod test {
             })
             .collect();
 
-        ctx.solved.insert(metas[2], ResourceSet::singleton(&"A".into()));
+        ctx.solved
+            .insert(metas[2], ResourceSet::singleton(&"A".into()));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
         ctx.add_constraint(metas[0], Constraint::Plus("B".into(), metas[2]));
         ctx.add_constraint(metas[4], Constraint::Plus("C".into(), metas[0]));
