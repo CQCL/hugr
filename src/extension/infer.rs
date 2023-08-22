@@ -365,7 +365,7 @@ impl UnificationContext {
     ///
     /// Returns the set of new metas created and the set of metas that were
     /// merged.
-    fn coalesce(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
+    fn merge_equal_metas(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
         let mut merged: HashSet<Meta> = HashSet::new();
         let mut new_metas: HashSet<Meta> = HashSet::new();
         for cc in self.eq_graph.ccs().into_iter() {
@@ -562,7 +562,7 @@ impl UnificationContext {
         // Keep going as long as we're making progress (= merging nodes)
         loop {
             let to_delete = self.solve_constraints(&remaining)?;
-            let (new, merged) = self.coalesce()?;
+            let (new, merged) = self.merge_equal_metas()?;
             let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).cloned());
 
             for m in delta.iter() {
