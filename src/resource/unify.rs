@@ -25,6 +25,8 @@ use std::cmp::{Ord, Ordering};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
+/// A mapping from locations on the hugr to extension requirement sets which
+/// have been inferred for them
 pub type ResourceSolution = HashMap<(Node, Direction), ResourceSet>;
 
 /// Infer resources for a hugr. This is the main API exposed by this module
@@ -71,13 +73,15 @@ pub enum InferResourceError {
     /// We've solved a metavariable, then encountered a constraint
     /// that says it should be something other than our solution
     MismatchedConcrete {
-        //loc: (Node, Direction),
+        /// The solution we were trying to insert for this meta
         expected: ResourceSet,
+        /// The incompatible solution that we found was already there
         actual: ResourceSet,
     },
     /// A variable went unsolved that wasn't related to a parameter
     #[error("Unsolved variable at location {:?}", location)]
     Unsolved {
+        /// The location on the hugr that's associated to the unsolved meta
         location: (Node, Direction),
         //constraints: Vec<Constraint>,
     },
