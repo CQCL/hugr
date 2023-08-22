@@ -698,12 +698,11 @@ mod test {
         hugr.connect(mult_c, 0, output, 0)?;
 
         hugr.infer_extensions()?;
-        // TODO: Add a more sensible validation check
-        //hugr.validate()?;
         Ok(())
     }
 
     #[test]
+    // Basic test that the `Plus` constraint works
     fn plus() -> Result<(), InferExtensionError> {
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
@@ -772,8 +771,6 @@ mod test {
        m3 = x;
     */
     fn open() -> Result<(), InferExtensionError> {
-        println!("awefiawef");
-
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
         let m0 = ctx.fresh_meta();
@@ -810,20 +807,9 @@ mod test {
     }
 
     #[test]
-    fn simple_dumb() -> Result<(), InferExtensionError> {
-        let mut ctx = UnificationContext::new(&Hugr::default());
-        let m0 = ctx.fresh_meta();
-        let m1 = ctx.fresh_meta();
-        let m2 = ctx.fresh_meta();
-        ctx.add_constraint(m1, Constraint::Plus("A".into(), m0));
-        ctx.add_constraint(m2, Constraint::Plus("B".into(), m0));
-        ctx.main_loop()?;
-        Ok(())
-    }
-
-    #[test]
-    // The dual of the thing in the previous test
-    fn simple_dumb_2() -> Result<(), InferExtensionError> {
+    // Tests that we can succeed even when all variables don't have concrete
+    // extension sets, and we have an open variable at the start of the graph.
+    fn open_variables() -> Result<(), InferExtensionError> {
         let mut ctx = UnificationContext::new(&Hugr::default());
         let a = ctx.fresh_meta();
         let b = ctx.fresh_meta();
