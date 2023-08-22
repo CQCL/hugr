@@ -15,8 +15,8 @@ use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::CustomType;
 
-mod unify;
-pub use unify::{infer_resources, InferResourceError, ResourceSolution};
+mod infer;
+pub use infer::{infer_resources, InferResourceError, ResourceSolution};
 
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
