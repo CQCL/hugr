@@ -33,10 +33,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        match self.contains_node(parent) {
-            true => self.hugr_mut().add_op_with_parent(parent, op),
-            false => Err(HugrError::InvalidNode { node: parent }),
-        }
+        self.valid_node(parent)?;
+        self.hugr_mut().add_op_with_parent(parent, op)
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -44,10 +42,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// The node becomes the parent's last child.
     #[inline]
     fn add_node_with_parent(&mut self, parent: Node, op: NodeType) -> Result<Node, HugrError> {
-        match self.contains_node(parent) {
-            true => self.hugr_mut().add_node_with_parent(parent, op),
-            false => Err(HugrError::InvalidNode { node: parent }),
-        }
+        self.valid_node(parent)?;
+        self.hugr_mut().add_node_with_parent(parent, op)
     }
 
     /// Add a node to the graph as the previous sibling of another node.
@@ -60,10 +56,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     ///  - If the attachment would introduce a cycle.
     #[inline]
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        match self.contains_node(sibling) {
-            true => self.hugr_mut().add_op_before(sibling, op),
-            false => Err(HugrError::InvalidNode { node: sibling }),
-        }
+        self.valid_node(sibling)?;
+        self.hugr_mut().add_op_before(sibling, op)
     }
 
     /// Add a node to the graph as the next sibling of another node.
@@ -76,10 +70,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     ///  - If the attachment would introduce a cycle.
     #[inline]
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        match self.contains_node(sibling) {
-            true => self.hugr_mut().add_op_after(sibling, op),
-            false => Err(HugrError::InvalidNode { node: sibling }),
-        }
+        self.valid_node(sibling)?;
+        self.hugr_mut().add_op_after(sibling, op)
     }
 
     /// Remove a node from the graph.
@@ -89,10 +81,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// Panics if the node is the root node.
     #[inline]
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
-        match self.contains_node(node) {
-            true => self.hugr_mut().remove_node(node),
-            false => Err(HugrError::InvalidNode { node }),
-        }
+        self.valid_node(node)?;
+        self.hugr_mut().remove_node(node)
     }
 
     /// Connect two nodes at the given ports.
@@ -109,11 +99,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         dst: Node,
         dst_port: usize,
     ) -> Result<(), HugrError> {
-        match (self.contains_node(src), self.contains_node(dst)) {
-            (true, true) => self.hugr_mut().connect(src, src_port, dst, dst_port),
-            (false, _) => Err(HugrError::InvalidNode { node: src }),
-            (_, false) => Err(HugrError::InvalidNode { node: dst }),
-        }
+        self.valid_node(src)?;
+        self.valid_node(dst)?;
+        self.hugr_mut().connect(src, src_port, dst, dst_port)
     }
 
     /// Disconnects all edges from the given port.
@@ -121,10 +109,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// The port is left in place.
     #[inline]
     fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
-        match self.contains_node(node) {
-            true => self.hugr_mut().disconnect(node, port),
-            false => Err(HugrError::InvalidNode { node }),
-        }
+        self.valid_node(node)?;
+        self.hugr_mut().disconnect(node, port)
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the
@@ -136,11 +122,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// [`OpTrait::other_input`]: crate::ops::OpTrait::other_input
     /// [`OpTrait::other_output`]: crate::ops::OpTrait::other_output
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
-        match (self.contains_node(src), self.contains_node(dst)) {
-            (true, true) => self.hugr_mut().add_other_edge(src, dst),
-            (false, _) => Err(HugrError::InvalidNode { node: src }),
-            (_, false) => Err(HugrError::InvalidNode { node: dst }),
-        }
+        self.valid_node(src)?;
+        self.valid_node(dst)?;
+        self.hugr_mut().add_other_edge(src, dst)
     }
 
     /// Insert another hugr into this one, under a given root node.
@@ -148,10 +132,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// Returns the root node of the inserted hugr.
     #[inline]
     fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
-        match self.contains_node(root) {
-            true => self.hugr_mut().insert_hugr(root, other),
-            false => Err(HugrError::InvalidNode { node: root }),
-        }
+        self.valid_node(root)?;
+        self.hugr_mut().insert_hugr(root, other)
     }
 
     /// Copy another hugr into this one, under a given root node.
@@ -159,10 +141,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// Returns the root node of the inserted hugr.
     #[inline]
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
-        match self.contains_node(root) {
-            true => self.hugr_mut().insert_from_view(root, other),
-            false => Err(HugrError::InvalidNode { node: root }),
-        }
+        self.valid_node(root)?;
+        self.hugr_mut().insert_from_view(root, other)
     }
 }
 
@@ -332,6 +312,17 @@ pub(crate) mod sealed {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
 
+        /// Validates that a node is valid in the graph.
+        ///
+        /// Returns a [`HugrError::InvalidNode`] otherwise.
+        #[inline]
+        fn valid_node(&self, node: Node) -> Result<(), HugrError> {
+            match self.contains_node(node) {
+                true => Ok(()),
+                false => Err(HugrError::InvalidNode { node }),
+            }
+        }
+
         /// Add a node to the graph, with the default conversion from OpType to NodeType
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
             // TODO: Default to `NodeType::open_extensions` once we can infer extensions
@@ -350,10 +341,8 @@ pub(crate) mod sealed {
 
         /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
         fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
-            match self.contains_node(node) {
-                true => self.hugr_mut().set_num_ports(node, incoming, outgoing),
-                false => panic!("Invalid node"),
-            }
+            self.valid_node(node).unwrap_or_else(|e| panic!("{}", e));
+            self.hugr_mut().set_num_ports(node, incoming, outgoing)
         }
 
         /// Alter the number of ports on a node and returns a range with the new
@@ -362,21 +351,16 @@ pub(crate) mod sealed {
         /// The `direction` parameter specifies whether to add ports to the incoming
         /// or outgoing list.
         fn add_ports(&mut self, node: Node, direction: Direction, amount: isize) -> Range<usize> {
-            match self.contains_node(node) {
-                true => self.hugr_mut().add_ports(node, direction, amount),
-                false => panic!("Invalid node"),
-            }
+            self.valid_node(node).unwrap_or_else(|e| panic!("{}", e));
+            self.hugr_mut().add_ports(node, direction, amount)
         }
 
         /// Sets the parent of a node.
         ///
         /// The node becomes the parent's last child.
         fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
-            match (self.contains_node(node), self.contains_node(parent)) {
-                (true, true) => self.hugr_mut().set_parent(node, parent),
-                (false, _) => Err(HugrError::InvalidNode { node }),
-                (_, false) => Err(HugrError::InvalidNode { node: parent }),
-            }
+            self.valid_node(node)?;
+            self.hugr_mut().set_parent(node, parent)
         }
 
         /// Move a node in the hierarchy to be the subsequent sibling of another
@@ -386,11 +370,9 @@ pub(crate) mod sealed {
         ///
         /// The node becomes the parent's last child.
         fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-            match (self.contains_node(node), self.contains_node(after)) {
-                (true, true) => self.hugr_mut().move_after_sibling(node, after),
-                (false, _) => Err(HugrError::InvalidNode { node }),
-                (_, false) => Err(HugrError::InvalidNode { node: after }),
-            }
+            self.valid_node(node)?;
+            self.valid_node(after)?;
+            self.hugr_mut().move_after_sibling(node, after)
         }
 
         /// Move a node in the hierarchy to be the prior sibling of another node.
@@ -399,11 +381,9 @@ pub(crate) mod sealed {
         ///
         /// The node becomes the parent's last child.
         fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
-            match (self.contains_node(node), self.contains_node(before)) {
-                (true, true) => self.hugr_mut().move_before_sibling(node, before),
-                (false, _) => Err(HugrError::InvalidNode { node }),
-                (_, false) => Err(HugrError::InvalidNode { node: before }),
-            }
+            self.valid_node(node)?;
+            self.valid_node(before)?;
+            self.hugr_mut().move_before_sibling(node, before)
         }
 
         /// Replace the OpType at node and return the old OpType.
@@ -411,10 +391,8 @@ pub(crate) mod sealed {
         /// match the OpType signature.
         /// TODO: Add a version which ignores input extensions
         fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
-            match self.contains_node(node) {
-                true => self.hugr_mut().replace_op(node, op),
-                false => panic!("Invalid node"),
-            }
+            self.valid_node(node).unwrap_or_else(|e| panic!("{}", e));
+            self.hugr_mut().replace_op(node, op)
         }
     }
 
