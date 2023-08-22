@@ -54,11 +54,11 @@ pub struct SiblingSubgraph<'g, Base> {
     /// The input ports of the subgraph.
     ///
     /// Grouped by input parameter. Each port must be unique.
-    inputs: Vec<Vec<(Node, Port)>>,
+    inputs: IncomingPorts,
     /// The output ports of the subgraph.
     ///
     /// Repeated ports are allowed and correspond to copying the output.
-    outputs: Vec<(Node, Port)>,
+    outputs: OutgoingPorts,
 }
 
 impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
@@ -134,8 +134,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// do not share a common parent or if the subgraph is empty.
     pub fn try_from_boundary_ports(
         base: &'g Base,
-        incoming: Vec<Vec<(Node, Port)>>,
-        outgoing: Vec<(Node, Port)>,
+        incoming: IncomingPorts,
+        outgoing: OutgoingPorts,
     ) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView,
@@ -154,8 +154,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     /// documentation.
     pub fn try_from_boundary_ports_with_checker(
         base: &'g Base,
-        inputs: Vec<Vec<(Node, Port)>>,
-        outputs: Vec<(Node, Port)>,
+        inputs: IncomingPorts,
+        outputs: OutgoingPorts,
         checker: &mut ConvexChecker<&'g Base::Portgraph>,
     ) -> Result<Self, InvalidSubgraph>
     where
@@ -197,8 +197,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     pub fn try_new(
         base: &'g Base,
         nodes: Vec<Node>,
-        inputs: Vec<Vec<(Node, Port)>>,
-        outputs: Vec<(Node, Port)>,
+        inputs: IncomingPorts,
+        outputs: OutgoingPorts,
     ) -> Result<Self, InvalidSubgraph>
     where
         Base: HugrView,
@@ -217,8 +217,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     pub fn try_new_with_checker(
         base: &'g Base,
         nodes: Vec<Node>,
-        inputs: Vec<Vec<(Node, Port)>>,
-        outputs: Vec<(Node, Port)>,
+        inputs: IncomingPorts,
+        outputs: OutgoingPorts,
         checker: &mut ConvexChecker<&'g Base::Portgraph>,
     ) -> Result<Self, InvalidSubgraph>
     where
@@ -370,8 +370,8 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
 fn validate_subgraph<H: HugrView>(
     hugr: &H,
     nodes: &[Node],
-    inputs: &[Vec<(Node, Port)>],
-    outputs: &[(Node, Port)],
+    inputs: &IncomingPorts,
+    outputs: &OutgoingPorts,
 ) -> Result<(), InvalidSubgraph> {
     // Check nodes is not empty
     if nodes.is_empty() {
@@ -441,7 +441,10 @@ fn validate_subgraph<H: HugrView>(
     Ok(())
 }
 
-fn get_input_output_ports<H: HugrView>(hugr: &H) -> (Vec<Vec<(Node, Port)>>, Vec<(Node, Port)>) {
+type IncomingPorts = Vec<Vec<(Node, Port)>>;
+type OutgoingPorts = Vec<(Node, Port)>;
+
+fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPorts) {
     let (inp, out) = hugr
         .children(hugr.root())
         .take(2)
