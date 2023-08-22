@@ -672,21 +672,21 @@ fn wire_up<T: Dataflow + ?Sized>(
             }
 
             let src_parent = src_parent.expect("Node has no parent");
-            let Some(src_sibling) =
-                        iter::successors(dst_parent, |&p| base.get_parent(p))
-                            .tuple_windows()
-                            .find_map(|(ancestor, ancestor_parent)| {
-                                (ancestor_parent == src_parent).then_some(ancestor)
-                            })
-                    else {
-                        let val_err: ValidationError = InterGraphEdgeError::NoRelation {
-                            from: src,
-                            from_offset: Port::new_outgoing(src_port),
-                            to: dst,
-                            to_offset: Port::new_incoming(dst_port),
-                        }.into();
-                        return Err(val_err.into());
-                    };
+            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.get_parent(p))
+                .tuple_windows()
+                .find_map(|(ancestor, ancestor_parent)| {
+                    (ancestor_parent == src_parent).then_some(ancestor)
+                })
+            else {
+                let val_err: ValidationError = InterGraphEdgeError::NoRelation {
+                    from: src,
+                    from_offset: Port::new_outgoing(src_port),
+                    to: dst,
+                    to_offset: Port::new_incoming(dst_port),
+                }
+                .into();
+                return Err(val_err.into());
+            };
 
             // TODO: Avoid adding duplicate edges
             // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130

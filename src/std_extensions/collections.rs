@@ -44,7 +44,7 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type(t)] =  typ.args() else {
+        let [TypeArg::Type(t)] = typ.args() else {
             return Err(error());
         };
 
@@ -118,7 +118,9 @@ fn get_type(name: &str) -> &TypeDef {
 
 fn list_types(args: &[TypeArg]) -> Result<(Type, Type), SignatureError> {
     let list_custom_type = get_type(&LIST_TYPENAME).instantiate_concrete(args)?;
-    let [TypeArg::Type(element_type)] = args else {panic!("should be checked by def.")};
+    let [TypeArg::Type(element_type)] = args else {
+        panic!("should be checked by def.")
+    };
 
     let list_type: Type = Type::new_extension(list_custom_type);
     Ok((list_type, element_type.clone()))
