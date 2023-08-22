@@ -6,6 +6,8 @@
 
 use thiserror::Error;
 
+use crate::extension::ExtensionSet;
+
 use super::CustomType;
 use super::Type;
 use super::TypeBound;
@@ -25,6 +27,8 @@ pub enum TypeParam {
     List(Box<TypeParam>),
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
     Tuple(Vec<TypeParam>),
+    /// Argument is a [TypeArg::Extensions]. A set of extension (ids)
+    Extensions,
 }
 
 /// A statically-known argument value to an operation.
@@ -40,6 +44,8 @@ pub enum TypeArg {
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of arguments.
     Sequence(Vec<TypeArg>),
+    /// Instance of [TypeParam::Extensions], providing the extension ids.
+    Extensions(ExtensionSet),
 }
 
 /// A serialized representation of a value of a [CustomType]
@@ -90,7 +96,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-
+        (TypeArg::Extensions(_), TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),
