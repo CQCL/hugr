@@ -6,7 +6,10 @@ use smol_str::SmolStr;
 use crate::{
     extension::{prelude::BOOL_T, ExtensionSet},
     ops, type_row,
-    types::type_param::{TypeArg, TypeArgError, TypeParam},
+    types::{
+        type_param::{TypeArg, TypeArgError, TypeParam},
+        FunctionType,
+    },
     Extension,
 };
 use lazy_static::lazy_static;
@@ -36,11 +39,11 @@ fn extension() -> Extension {
             "logical 'not'".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                Ok((
-                    type_row![BOOL_T],
-                    type_row![BOOL_T],
-                    ExtensionSet::default(),
-                ))
+                Ok(FunctionType {
+                    input: type_row![BOOL_T],
+                    output: type_row![BOOL_T],
+                    extension_reqs: ExtensionSet::default(),
+                })
             },
         )
         .unwrap();
@@ -62,11 +65,11 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok((
-                    vec![BOOL_T; n as usize].into(),
-                    type_row![BOOL_T],
-                    ExtensionSet::default(),
-                ))
+                Ok(FunctionType {
+                    input: vec![BOOL_T; n as usize].into(),
+                    output: type_row![BOOL_T],
+                    extension_reqs: ExtensionSet::default(),
+                })
             },
         )
         .unwrap();
@@ -88,11 +91,11 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok((
-                    vec![BOOL_T; n as usize].into(),
-                    type_row![BOOL_T],
-                    ExtensionSet::default(),
-                ))
+                Ok(FunctionType {
+                    input: vec![BOOL_T; n as usize].into(),
+                    output: type_row![BOOL_T],
+                    extension_reqs: ExtensionSet::default(),
+                })
             },
         )
         .unwrap();

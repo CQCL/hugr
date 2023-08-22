@@ -9,7 +9,7 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        Type, TypeRow,
+        FunctionType, Type,
     },
     utils::collect_array,
     Extension,
@@ -21,28 +21,28 @@ use super::int_types::{get_width, int_type};
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
-fn ftoi_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok((
-        type_row![FLOAT64_TYPE],
-        vec![Type::new_sum(vec![
+    Ok(FunctionType {
+        input: type_row![FLOAT64_TYPE],
+        output: vec![Type::new_sum(vec![
             int_type(n),
             crate::extension::prelude::ERROR_TYPE,
         ])]
         .into(),
-        ExtensionSet::default(),
-    ))
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn itof_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn itof_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok((
-        vec![int_type(n)].into(),
-        type_row![FLOAT64_TYPE],
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n)].into(),
+        output: type_row![FLOAT64_TYPE],
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
 /// Extension for basic arithmetic operations.

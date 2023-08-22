@@ -6,23 +6,27 @@ use crate::extension::prelude::{BOOL_T, QB_T};
 use crate::extension::{ExtensionSet, SignatureError};
 use crate::type_row;
 use crate::types::type_param::TypeArg;
-use crate::types::TypeRow;
+use crate::types::FunctionType;
 use crate::Extension;
 
 use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("quantum");
-fn one_qb_func(_: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((type_row![QB_T], type_row![QB_T], ExtensionSet::new()))
+fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType {
+        input: type_row![QB_T],
+        output: type_row![QB_T],
+        extension_reqs: ExtensionSet::new(),
+    })
 }
 
-fn two_qb_func(_: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
-        type_row![QB_T, QB_T],
-        type_row![QB_T, QB_T],
-        ExtensionSet::new(),
-    ))
+fn two_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType {
+        input: type_row![QB_T, QB_T],
+        output: type_row![QB_T, QB_T],
+        extension_reqs: ExtensionSet::new(),
+    })
 }
 
 fn extension() -> Extension {
@@ -47,14 +51,14 @@ fn extension() -> Extension {
             "Measure a qubit, returning the qubit and the measurement result.".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                Ok((
-                    type_row![QB_T],
-                    type_row![QB_T, BOOL_T],
+                Ok(FunctionType {
+                    input: type_row![QB_T],
+                    output: type_row![QB_T, BOOL_T],
                     // TODO add logic as an extension delta when inference is
                     // done?
                     // https://github.com/CQCL-DEV/hugr/issues/425
-                    ExtensionSet::new(),
-                ))
+                    extension_reqs: ExtensionSet::new(),
+                })
             },
         )
         .unwrap();

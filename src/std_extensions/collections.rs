@@ -8,7 +8,7 @@ use crate::{
     extension::{ExtensionSet, SignatureError, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, Type, TypeBound, TypeRow,
+        CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow,
     },
     values::{CustomConst, Value},
     Extension,
@@ -80,11 +80,11 @@ fn extension() -> Extension {
             vec![],
             move |args: &[TypeArg]| {
                 let (list_type, element_type) = list_types(args)?;
-
-                let inputs = TypeRow::from(vec![list_type.clone()]);
-                let outputs = TypeRow::from(vec![list_type, element_type]);
-                let extension_set = ExtensionSet::singleton(&EXTENSION_NAME);
-                Ok((inputs, outputs, extension_set))
+                Ok(FunctionType {
+                    input: TypeRow::from(vec![list_type.clone()]),
+                    output: TypeRow::from(vec![list_type, element_type]),
+                    extension_reqs: ExtensionSet::singleton(&EXTENSION_NAME),
+                })
             },
         )
         .unwrap();
@@ -97,11 +97,11 @@ fn extension() -> Extension {
             vec![],
             move |args: &[TypeArg]| {
                 let (list_type, element_type) = list_types(args)?;
-
-                let outputs = TypeRow::from(vec![list_type.clone()]);
-                let inputs = TypeRow::from(vec![list_type, element_type]);
-                let extension_set = ExtensionSet::singleton(&EXTENSION_NAME);
-                Ok((inputs, outputs, extension_set))
+                Ok(FunctionType {
+                    output: TypeRow::from(vec![list_type.clone()]),
+                    input: TypeRow::from(vec![list_type, element_type]),
+                    extension_reqs: ExtensionSet::singleton(&EXTENSION_NAME),
+                })
             },
         )
         .unwrap();

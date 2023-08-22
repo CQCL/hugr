@@ -6,6 +6,7 @@ use super::int_types::{get_width, int_type};
 use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
 use crate::type_row;
 use crate::types::type_param::TypeParam;
+use crate::types::FunctionType;
 use crate::utils::collect_array;
 use crate::{
     extension::{ExtensionSet, SignatureError},
@@ -16,123 +17,123 @@ use crate::{
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
-fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn iwiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok((
-        vec![int_type(m)].into(),
-        vec![int_type(n)].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(m)].into(),
+        output: vec![int_type(n)].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn inarrow_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_width(arg0)?;
     let n: u8 = get_width(arg1)?;
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok((
-        vec![int_type(m)].into(),
-        vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(m)].into(),
+        output: vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
-        vec![int_type(1)].into(),
-        type_row![BOOL_T],
-        ExtensionSet::default(),
-    ))
+fn itob_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType {
+        input: vec![int_type(1)].into(),
+        output: type_row![BOOL_T],
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
-        type_row![BOOL_T],
-        vec![int_type(1)].into(),
-        ExtensionSet::default(),
-    ))
+fn btoi_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType {
+        input: type_row![BOOL_T],
+        output: vec![int_type(1)].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn icmp_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok((
-        vec![int_type(n); 2].into(),
-        type_row![BOOL_T],
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n); 2].into(),
+        output: type_row![BOOL_T],
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn ibinop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn ibinop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok((
-        vec![int_type(n); 2].into(),
-        vec![int_type(n)].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n); 2].into(),
+        output: vec![int_type(n)].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn iunop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
     let n: u8 = get_width(arg)?;
-    Ok((
-        vec![int_type(n)].into(),
-        vec![int_type(n)].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n)].into(),
+        output: vec![int_type(n)].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn idivmod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
     let intpair: TypeRow = vec![int_type(n), int_type(m)].into();
-    Ok((
-        intpair.clone(),
-        vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: intpair.clone(),
+        output: vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn idiv_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
-    Ok((
-        vec![int_type(n), int_type(m)].into(),
-        vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n), int_type(m)].into(),
+        output: vec![Type::new_sum(vec![int_type(n), ERROR_TYPE])].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn imod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
-    Ok((
-        vec![int_type(n), int_type(m)].into(),
-        vec![Type::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n), int_type(m)].into(),
+        output: vec![Type::new_sum(vec![int_type(m), ERROR_TYPE])].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
-fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn ish_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let n: u8 = get_width(arg0)?;
     let m: u8 = get_width(arg1)?;
-    Ok((
-        vec![int_type(n), int_type(m)].into(),
-        vec![int_type(n)].into(),
-        ExtensionSet::default(),
-    ))
+    Ok(FunctionType {
+        input: vec![int_type(n), int_type(m)].into(),
+        output: vec![int_type(n)].into(),
+        extension_reqs: ExtensionSet::default(),
+    })
 }
 
 /// Extension for basic integer operations.
