@@ -197,6 +197,10 @@ where
             None
         }
     }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
+    }
 }
 
 type RegionGraph<'g, Base> = portgraph::view::Region<'g, <Base as HugrInternals>::Portgraph>;
@@ -357,6 +361,10 @@ where
     #[inline]
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         self.base_hugr().get_io(node)
+    }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
     }
 }
 
