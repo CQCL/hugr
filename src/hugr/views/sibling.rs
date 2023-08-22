@@ -148,9 +148,9 @@ impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
     ///
     /// Provide a [`ConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
-    /// [`SiblingSubgraph::from_boundary_edges`].
+    /// [`SiblingSubgraph::try_from_boundary_ports`].
     ///
-    /// Refer to [`SiblingSubgraph::from_boundary_edges`] for the full
+    /// Refer to [`SiblingSubgraph::try_from_boundary_ports`] for the full
     /// documentation.
     pub fn try_from_boundary_ports_with_checker(
         base: &'g Base,
