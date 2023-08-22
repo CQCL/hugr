@@ -39,8 +39,6 @@ type Meta = usize;
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Things we know about metavariables
 enum Constraint {
-    /// Constrain a variable to a specific value
-    Exactly(ResourceSet),
     /// A variable has the same value as another variable
     Equal(Meta),
     /// Variable extends the value of another by one resource
@@ -52,22 +50,6 @@ enum Constraint {
 impl PartialOrd for Constraint {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (Self::Exactly(a), Self::Exactly(b)) => {
-                let a_len = a.iter().count();
-                let b_len = b.iter().count();
-                if a_len == b_len {
-                    for (a, b) in a.iter().zip(b.iter()) {
-                        if a != b {
-                            return Some((*a).cmp(b));
-                        }
-                    }
-                    Some(Ordering::Equal)
-                } else {
-                    Some(a_len.cmp(&b_len))
-                }
-            }
-            (Self::Exactly(_), _) => Some(Ordering::Greater),
-            (_, Self::Exactly(_)) => Some(Ordering::Less),
             (Self::Plus(_, m1), Self::Plus(_, m2)) => Some(m1.cmp(m2)),
             (Self::Plus(_, _), _) => Some(Ordering::Greater),
             (_, Self::Plus(_, _)) => Some(Ordering::Less),
@@ -473,23 +455,6 @@ impl UnificationContext {
         let mut solved = false;
         for c in self.get_constraints(&meta).unwrap().clone().iter() {
             match c {
-                Constraint::Exactly(rs2) => {
-                    match self.get_solution(&meta) {
-                        None => {
-                            self.add_solution(meta, rs2.clone());
-                        }
-                        Some(rs) => {
-                            // If they're the same then we're happy
-                            if *rs != *rs2 {
-                                return Err(InferResourceError::MismatchedConcrete {
-                                    expected: rs2.clone(),
-                                    actual: rs.clone(),
-                                });
-                            }
-                        }
-                    };
-                    solved = true;
-                }
                 // Just register the equality in the EqGraph, we'll process it later
                 Constraint::Equal(other_meta) => {
                     self.eq_graph.register_eq(meta, *other_meta);
@@ -756,10 +721,7 @@ mod test {
             })
             .collect();
 
-        ctx.add_constraint(
-            metas[2],
-            Constraint::Exactly(ResourceSet::singleton(&"A".into())),
-        );
+        ctx.solved.insert(metas[2], ResourceSet::singleton(&"A".into()));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
         ctx.add_constraint(metas[0], Constraint::Plus("B".into(), metas[2]));
         ctx.add_constraint(metas[4], Constraint::Plus("C".into(), metas[0]));
