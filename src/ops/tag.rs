@@ -67,6 +67,7 @@ pub enum OpTag {
     BasicBlockExit,
 }
 
+pub type TagChar = char;
 impl OpTag {
     /// Returns true if the tag is more general than the given tag.
     #[inline]
@@ -85,6 +86,21 @@ impl OpTag {
             i += 1;
         }
         false
+    }
+
+    #[inline]
+    pub const fn char(&self) -> TagChar {
+        match self {
+            _ => 'M',
+        }
+    }
+
+    #[inline]
+    pub const fn from_char(c: TagChar) -> Self {
+        match c {
+            'M' => Self::ModuleRoot,
+            _ => panic!(),
+        }
     }
 
     /// Returns the infimum of the set of tags that strictly contain this tag

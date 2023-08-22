@@ -33,7 +33,7 @@ use delegate::delegate;
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "pyo3", pyclass)]
-pub struct Hugr {
+pub struct Hugr<const C: crate::ops::tag::TagChar = 'M'> {
     /// The graph encoding the adjacency structure of the HUGR.
     graph: MultiPortGraph,
 
