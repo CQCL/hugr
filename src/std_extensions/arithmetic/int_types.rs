@@ -29,10 +29,10 @@ pub fn int_type(width_arg: TypeArg) -> Type {
 }
 
 const fn is_valid_log_width(n: u8) -> bool {
-    n < POWERS_OF_TWO
+    n <= POWERS_OF_TWO
 }
 
-const POWERS_OF_TWO: u8 = 8;
+const POWERS_OF_TWO: u8 = 7;
 /// Type parameter for the log width of the integer.
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO as u64);
 

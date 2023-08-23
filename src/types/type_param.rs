@@ -19,7 +19,7 @@ use super::TypeBound;
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
     Type(TypeBound),
-    /// Argument is a [TypeArg::USize] that is less than the stated bound.
+    /// Argument is a [TypeArg::BoundedUSize] that is at most the stated maximum.
     BoundedUSize(u64),
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
     Opaque(CustomType),
@@ -46,7 +46,7 @@ impl TypeParam {
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
     Type(Type),
-    /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
+    /// Instance of [TypeParam::BoundedUSize]. 64-bit unsigned integer.
     BoundedUSize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque(CustomTypeArg),
@@ -99,7 +99,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::BoundedUSize(val), TypeParam::BoundedUSize(bound)) if val < bound => Ok(()),
+        (TypeArg::BoundedUSize(val), TypeParam::BoundedUSize(max)) if val <= max => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param))
             if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
