@@ -60,9 +60,9 @@ pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
     TypeBound::Any,
 );
 
-pub(crate) const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
-pub(crate) const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
-pub(crate) const BOOL_T: Type = Type::new_simple_predicate(2);
+pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
+pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
+pub const BOOL_T: Type = Type::new_simple_predicate(2);
 
 /// Initialize a new array of type `typ` of length `size`
 pub fn new_array(typ: Type, size: u64) -> Type {
