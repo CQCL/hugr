@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use smol_str::SmolStr;
 
-use super::{ExtensionId, ExtensionSet, TypeDefBound, TypeParametrised};
+use super::{ExtensionId, ExtensionSet, SignatureError, TypeDefBound, TypeParametrised};
+use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::TypeBound;
 use crate::{ops::AliasDecl, Extension};
 
@@ -17,6 +18,7 @@ struct VariableRef(usize);
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 enum ExtensionSetTemplate {
+    // TODO possibly allow union of ExtensionSet with any number of vars?
     Concrete(ExtensionSet),
     TypeVar(VariableRef),
 }
@@ -27,10 +29,17 @@ enum ExtensionSetTemplate {
 enum TypeTemplate {
     Extension(CustomTypeTemplate),
     Alias(AliasDecl),
-    Function(Vec<TypeTemplate>, Vec<TypeTemplate>, ExtensionSetTemplate),
+    Function(FunctionTypeTemplate),
     Tuple(Vec<TypeTemplate>),
     Sum(Vec<TypeTemplate>),
     TypeVar(VariableRef),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+struct FunctionTypeTemplate {
+    input: Vec<TypeTemplate>,
+    output: Vec<TypeTemplate>,
+    extension_reqs: ExtensionSetTemplate,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -51,31 +60,14 @@ enum TypeArgTemplate {
     TypeVar(VariableRef),
 }
 
+struct SignatureTemplate(pub Vec<TypeParam>, FunctionTypeTemplate);
+
 impl TypeTemplate {
     fn substitute(&self, exts: &HashMap<SmolStr, Extension>, vars: &Vec<TypeArg>) -> Type {
         match self {
             TypeTemplate::Extension(ctt) => Type::new_extension(ctt.substitute(exts, vars)),
             TypeTemplate::Alias(decl) => Type::new_alias(decl.clone()),
-            TypeTemplate::Function(ins, outs, es) => Type::new_function(FunctionType {
-                input: TypeRow::from(
-                    ins.iter()
-                        .map(|tt| tt.substitute(exts, vars))
-                        .collect::<Vec<_>>(),
-                ),
-                output: TypeRow::from(
-                    outs.iter()
-                        .map(|tt| tt.substitute(exts, vars))
-                        .collect::<Vec<_>>(),
-                ),
-                extension_reqs: match es {
-                    ExtensionSetTemplate::Concrete(c) => c.clone(),
-                    ExtensionSetTemplate::TypeVar(VariableRef(i)) => {
-                        let TypeArg::Extensions(e) = vars.get(*i).unwrap()
-                            else {panic!("Variable was not Extension");};
-                        e.clone()
-                    }
-                },
-            }),
+            TypeTemplate::Function(ftt) => Type::new_function(ftt.substitute(exts, vars)),
             TypeTemplate::Tuple(elems) => Type::new_tuple(
                 elems
                     .iter()
@@ -109,19 +101,11 @@ impl TypeTemplate {
                     return Err(());
                 };
             }
-            TypeTemplate::Function(ins, outs, es) => {
+            TypeTemplate::Function(ftt) => {
                 if !bound.contains(TypeBound::Copyable) {
                     return Err(());
                 };
-                ins.iter()
-                    .try_for_each(|tt| tt.validate(exts, binders, bound))?;
-                outs.iter()
-                    .try_for_each(|tt| tt.validate(exts, binders, bound))?;
-                if let ExtensionSetTemplate::TypeVar(VariableRef(i)) = es {
-                    if binders.get(*i) != Some(&TypeParam::Extensions) {
-                        return Err(());
-                    }
-                };
+                ftt.validate(exts, binders)?;
             }
             TypeTemplate::Tuple(elems) => elems
                 .iter()
@@ -132,8 +116,52 @@ impl TypeTemplate {
             TypeTemplate::TypeVar(VariableRef(i)) => {
                 match binders.get(*i) {
                     Some(TypeParam::Type(decl_bound)) if bound.contains(*decl_bound) => (),
-                    _ => return Err(())
+                    _ => return Err(()),
                 }
+                return Err(());
+            }
+        };
+        Ok(())
+    }
+}
+
+impl FunctionTypeTemplate {
+    fn substitute(&self, exts: &HashMap<SmolStr, Extension>, vars: &Vec<TypeArg>) -> FunctionType {
+        FunctionType {
+            input: TypeRow::from(
+                self.input
+                    .iter()
+                    .map(|tt| tt.substitute(exts, vars))
+                    .collect::<Vec<_>>(),
+            ),
+            output: TypeRow::from(
+                self.output
+                    .iter()
+                    .map(|tt| tt.substitute(exts, vars))
+                    .collect::<Vec<_>>(),
+            ),
+            extension_reqs: match &self.extension_reqs {
+                ExtensionSetTemplate::Concrete(c) => c.clone(),
+                ExtensionSetTemplate::TypeVar(VariableRef(i)) => {
+                    let TypeArg::Extensions(e) = vars.get(*i).unwrap()
+                        else {panic!("Variable was not Extension");};
+                    e.clone()
+                }
+            },
+        }
+    }
+
+    fn validate(
+        &self,
+        exts: &HashMap<SmolStr, Extension>,
+        binders: &Vec<TypeParam>,
+    ) -> Result<(), ()> {
+        self.input
+            .iter()
+            .chain(&self.output)
+            .try_for_each(|tt| tt.validate(exts, binders, TypeBound::Any))?;
+        if let ExtensionSetTemplate::TypeVar(VariableRef(i)) = self.extension_reqs {
+            if binders.get(i) != Some(&TypeParam::Extensions) {
                 return Err(());
             }
         };
@@ -278,5 +306,35 @@ impl TypeArgTemplate {
             (TypeParam::Extensions, TypeArgTemplate::Extensions(_)) => Ok(()),
             _ => Err(()),
         }
+    }
+}
+
+impl SignatureTemplate {
+    /// Validates the definition, i.e. that every set of arguments passing [check_args]
+    /// will produce a valid type in [substitute]
+    pub fn validate(&self, exts: &HashMap<SmolStr, Extension>) -> Result<(), ()> {
+        self.1.validate(exts, &self.0)
+    }
+
+    /// Copied from [TypeParametrised::check_args_impl] - perhaps we can implement [TypeParametrised]
+    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
+        let binders = &self.0;
+        if args.len() != binders.len() {
+            return Err(SignatureError::TypeArgMismatch(
+                TypeArgError::WrongNumberArgs(args.len(), binders.len()),
+            ));
+        }
+        for (a, p) in args.iter().zip(binders.iter()) {
+            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
+        }
+        Ok(())
+    }
+
+    pub fn instantiate_concrete(
+        &self,
+        exts: &HashMap<SmolStr, Extension>,
+        vars: &Vec<TypeArg>,
+    ) -> FunctionType {
+        self.1.substitute(exts, vars)
     }
 }
