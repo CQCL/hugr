@@ -1,6 +1,9 @@
 //! Tags for sets of operation kinds.
 
 use std::{cmp, fmt::Display};
+use strum_macros::FromRepr;
+
+pub type TagRepr = u8;
 
 /// Tags for sets of operation kinds.
 ///
@@ -9,65 +12,65 @@ use std::{cmp, fmt::Display};
 ///
 /// Uses a flat representation for all the variants, in contrast to the complex
 /// `OpType` structures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, FromRepr)]
+#[repr(u8)]
 #[non_exhaustive]
 pub enum OpTag {
     /// All operations allowed.
     #[default]
-    Any,
+    Any = 0,
     /// No valid operation types.
-    None,
+    None = 1,
 
     /// Non-root module operations.
-    ModuleOp,
+    ModuleOp = 2,
     /// Root module operation.
-    ModuleRoot,
+    ModuleRoot = 3,
     /// A function definition or declaration.
-    Function,
+    Function = 4,
     /// A type alias.
-    Alias,
+    Alias = 5,
     /// A constant declaration.
-    Const,
+    Const = 6,
     /// A function definition.
-    FuncDefn,
+    FuncDefn = 7,
 
     /// Node in a Control-flow Sibling Graph.
-    ControlFlowChild,
+    ControlFlowChild = 8,
     /// Node in a Dataflow Sibling Graph.
-    DataflowChild,
+    DataflowChild = 9,
     /// Parent node of a Dataflow Sibling Graph.
-    DataflowParent,
+    DataflowParent = 10,
 
     /// A nested data-flow operation.
-    Dfg,
+    Dfg = 11,
     /// A nested control-flow operation.
-    Cfg,
+    Cfg = 12,
     /// A dataflow input.
-    Input,
+    Input = 13,
     /// A dataflow output.
-    Output,
+    Output = 14,
     /// A function call.
-    FnCall,
+    FnCall = 15,
     /// A constant load operation.
-    LoadConst,
+    LoadConst = 16,
     /// A definition that could be at module level or inside a DSG.
-    ScopedDefn,
+    ScopedDefn = 17,
     /// A tail-recursive loop.
-    TailLoop,
+    TailLoop = 18,
     /// A conditional operation.
-    Conditional,
+    Conditional = 19,
     /// A case op inside a conditional.
-    Case,
+    Case = 20,
     /// A leaf operation.
-    Leaf,
+    Leaf = 21,
 
     /// A control flow basic block.
-    BasicBlock,
+    BasicBlock = 22,
     /// A control flow exit node.
-    BasicBlockExit,
+    BasicBlockExit = 23,
 }
 
-pub type TagChar = char;
 impl OpTag {
     /// Returns true if the tag is more general than the given tag.
     #[inline]
@@ -89,18 +92,8 @@ impl OpTag {
     }
 
     #[inline]
-    pub const fn char(&self) -> TagChar {
-        match self {
-            _ => 'M',
-        }
-    }
-
-    #[inline]
-    pub const fn from_char(c: TagChar) -> Self {
-        match c {
-            'M' => Self::ModuleRoot,
-            _ => panic!(),
-        }
+    pub const fn repr(&self) -> TagRepr {
+        *self as u8
     }
 
     /// Returns the infimum of the set of tags that strictly contain this tag

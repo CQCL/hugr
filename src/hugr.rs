@@ -25,15 +25,16 @@ use pyo3::prelude::*;
 
 pub use self::views::HugrView;
 use crate::extension::ExtensionSet;
+use crate::ops::tag::TagRepr;
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
-
+const ROOT_REPR: TagRepr = OpTag::ModuleRoot.repr();
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "pyo3", pyclass)]
-pub struct Hugr<const C: crate::ops::tag::TagChar = 'M'> {
+pub struct Hugr<const C: TagRepr = ROOT_REPR> {
     /// The graph encoding the adjacency structure of the HUGR.
     graph: MultiPortGraph,
 

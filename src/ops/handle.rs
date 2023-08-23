@@ -6,7 +6,7 @@ use crate::Node;
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::tag::TagChar;
+use super::tag::TagRepr;
 use super::{AliasDecl, OpTag};
 
 /// Common trait for handles to a node.
@@ -77,11 +77,11 @@ pub struct AliasID<const DEF: bool> {
     name: SmolStr,
     bound: TypeBound,
 }
-pub struct NewHandle<const C: TagChar>(Node);
+pub struct NewHandle<const C: TagRepr>(Node);
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
     pub fn new(node: Node, name: SmolStr, bound: TypeBound) -> Self {
-        const c: TagChar = OpTag::ModuleRoot.char();
+        const c: TagRepr = OpTag::ModuleRoot.repr();
         let h: NewHandle<c> = NewHandle(node);
         Self { node, name, bound }
     }
