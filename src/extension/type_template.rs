@@ -217,7 +217,7 @@ impl CustomTypeTemplate {
                         return Err(()) // Index says to compute CustomType bound from non-type parameter!
                     };
                     // so require the corresponding arg to meet the bound (intersect with existing bound on arg)
-                    if b.contains(bound) {
+                    if !bound.contains(b) {
                         params[*i] = TypeParam::Type(bound);
                     }
                 }
