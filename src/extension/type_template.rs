@@ -103,13 +103,11 @@ impl TypeTemplate {
         bound: TypeBound,
     ) -> Result<(), ()> {
         match self {
-            TypeTemplate::Extension(ctt) => ctt.validate(exts, binders, bound),
+            TypeTemplate::Extension(ctt) => ctt.validate(exts, binders, bound)?,
             TypeTemplate::Alias(decl) => {
-                if bound.contains(decl.bound) {
-                    Ok(())
-                } else {
-                    Err(())
-                }
+                if !bound.contains(decl.bound) {
+                    return Err(());
+                };
             }
             TypeTemplate::Function(ins, outs, es) => {
                 if !bound.contains(TypeBound::Copyable) {
@@ -120,27 +118,26 @@ impl TypeTemplate {
                 outs.iter()
                     .try_for_each(|tt| tt.validate(exts, binders, bound))?;
                 if let ExtensionSetTemplate::TypeVar(VariableRef(i)) = es {
-                    if binders.get(*i) == Some(&TypeParam::Extensions) {
-                        return Ok(());
+                    if binders.get(*i) != Some(&TypeParam::Extensions) {
+                        return Err(());
                     }
-                }
-                Err(())
+                };
             }
             TypeTemplate::Tuple(elems) => elems
                 .iter()
-                .try_for_each(|tt| tt.validate(exts, binders, bound)),
+                .try_for_each(|tt| tt.validate(exts, binders, bound))?,
             TypeTemplate::Sum(elems) => elems
                 .iter()
-                .try_for_each(|tt| tt.validate(exts, binders, bound)),
+                .try_for_each(|tt| tt.validate(exts, binders, bound))?,
             TypeTemplate::TypeVar(VariableRef(i)) => {
-                if let Some(TypeParam::Type(decl_bound)) = binders.get(*i) {
-                    if bound.contains(*decl_bound) {
-                        return Ok(());
-                    }
+                match binders.get(*i) {
+                    Some(TypeParam::Type(decl_bound)) if bound.contains(*decl_bound) => (),
+                    _ => return Err(())
                 }
-                Err(())
+                return Err(());
             }
-        }
+        };
+        Ok(())
     }
 }
 
