@@ -10,7 +10,7 @@ use crate::{
     values::CustomConst,
     Extension,
 };
-
+use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
@@ -21,22 +21,33 @@ fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Copyable)
 }
 
-/// Integer type of a given bit width.
+/// Integer type of a given bit width (specified by the TypeArg).
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub fn int_type(width_arg: TypeArg) -> Type {
+pub(super) fn int_type(width_arg: TypeArg) -> Type {
     Type::new_extension(int_custom_type(width_arg))
+}
+
+lazy_static! {
+    /// Array of valid integer types, indexed by log width of the integer.
+    pub static ref INT_TYPES: [Type; (MAX_LOG_WIDTH + 1) as usize] = (0..MAX_LOG_WIDTH + 1)
+        .map(|i| int_type(TypeArg::BoundedUSize(i as u64)))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 }
 
 const fn is_valid_log_width(n: u8) -> bool {
     n <= MAX_LOG_WIDTH
 }
 
-const MAX_LOG_WIDTH: u8 = 7;
+/// The largest allowed log width.
+pub const MAX_LOG_WIDTH: u8 = 7;
 /// Type parameter for the log width of the integer.
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(MAX_LOG_WIDTH as u64);
 
-/// Get the bit width of the specified integer type, or error if the width is not supported.
+/// Get the log width  of the specified type argument or error if the argument
+/// is invalid..
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
         TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
