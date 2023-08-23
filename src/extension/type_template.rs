@@ -112,10 +112,7 @@ impl TypeTemplate {
                 };
                 ftt.validate(exts, binders)?;
             }
-            TypeTemplate::Tuple(elems) => elems
-                .iter()
-                .try_for_each(|tt| tt.validate(exts, binders, bound))?,
-            TypeTemplate::Sum(elems) => elems
+            TypeTemplate::Tuple(elems) | TypeTemplate::Sum(elems) => elems
                 .iter()
                 .try_for_each(|tt| tt.validate(exts, binders, bound))?,
             TypeTemplate::TypeVar(VariableRef(i)) => match binders.get(*i) {
