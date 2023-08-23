@@ -118,13 +118,10 @@ impl TypeTemplate {
             TypeTemplate::Sum(elems) => elems
                 .iter()
                 .try_for_each(|tt| tt.validate(exts, binders, bound))?,
-            TypeTemplate::TypeVar(VariableRef(i)) => {
-                match binders.get(*i) {
-                    Some(TypeParam::Type(decl_bound)) if bound.contains(*decl_bound) => (),
-                    _ => return Err(()),
-                }
-                return Err(());
-            }
+            TypeTemplate::TypeVar(VariableRef(i)) => match binders.get(*i) {
+                Some(TypeParam::Type(decl_bound)) if bound.contains(*decl_bound) => (),
+                _ => return Err(()),
+            },
         };
         Ok(())
     }
