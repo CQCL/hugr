@@ -599,7 +599,7 @@ mod test {
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrInternalsMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
-    use crate::ops::{self, dataflow::IOTrait};
+    use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -795,7 +795,10 @@ mod test {
         ctx.variables.insert(b);
         ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
         ctx.add_constraint(ab, Constraint::Plus("B".into(), a));
-        ctx.main_loop()?;
+        let solution = ctx.main_loop()?;
+        // We'll only find concrete solutions for the Incoming/Outgoing sides of
+        // the main node created by `Hugr::default`
+        assert_eq!(solution.len(), 2);
         Ok(())
     }
 
@@ -838,7 +841,23 @@ mod test {
         )?;
         let [w] = mult.outputs_arr();
 
-        builder.finish_hugr_with_outputs([w])?;
+        let hugr = builder.finish_hugr_with_outputs([w])?;
+        // Run inference _again_ so that we can look at the results
+        // TODO: when we put new extensions onto the graph after inference, we
+        // can omit this extra step and just look at the graph
+        let solution = infer_extensions(&hugr)?;
+        assert_eq!(
+            *solution.get(&(src.node(), Direction::Outgoing)).unwrap(),
+            rs
+        );
+        assert_eq!(
+            *solution.get(&(mult.node(), Direction::Incoming)).unwrap(),
+            rs
+        );
+        assert_eq!(
+            *solution.get(&(mult.node(), Direction::Outoing)).unwrap(),
+            rs
+        );
         Ok(())
     }
 }
