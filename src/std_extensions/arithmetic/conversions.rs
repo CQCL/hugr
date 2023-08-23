@@ -7,16 +7,13 @@ use smol_str::SmolStr;
 use crate::{
     extension::{ExtensionSet, SignatureError},
     type_row,
-    types::{
-        type_param::{TypeArg, TypeParam},
-        Type, TypeRow,
-    },
+    types::{type_param::TypeArg, Type, TypeRow},
     utils::collect_array,
     Extension,
 };
 
-use super::float_types::FLOAT64_TYPE;
 use super::int_types::int_type;
+use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
@@ -57,7 +54,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
-            vec![TypeParam::max_usize()],
+            vec![LOG_WIDTH_TYPE_PARAM],
             ftoi_sig,
         )
         .unwrap();
@@ -65,7 +62,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
-            vec![TypeParam::max_usize()],
+            vec![LOG_WIDTH_TYPE_PARAM],
             ftoi_sig,
         )
         .unwrap();
@@ -73,7 +70,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
-            vec![TypeParam::max_usize()],
+            vec![LOG_WIDTH_TYPE_PARAM],
             itof_sig,
         )
         .unwrap();
@@ -81,7 +78,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
-            vec![TypeParam::max_usize()],
+            vec![LOG_WIDTH_TYPE_PARAM],
             itof_sig,
         )
         .unwrap();
