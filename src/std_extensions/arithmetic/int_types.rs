@@ -33,18 +33,18 @@ pub fn int_type(width_power: u8) -> Type {
     Type::new_extension(int_custom_type(width_power))
 }
 
-const fn is_valid_width(n: u8) -> bool {
-    (n <= (1u8 << (POWERS_OF_TWO - 1))) && ((n & (n - 1)) == 0)
+const fn is_valid_log_width(n: u8) -> bool {
+    n < POWERS_OF_TWO
 }
 
-const POWERS_OF_TWO: u64 = 8;
+const POWERS_OF_TWO: u8 = 8;
 /// Type parameter for the log width of the integer.
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO);
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO as u64);
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
 pub fn get_width_power(arg: &TypeArg) -> u8 {
     match arg {
-        TypeArg::BoundedUSize(n) if *n < POWERS_OF_TWO => *n as u8,
+        TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => *n as u8,
         _ => panic!("type check should prevent this."),
     }
 }
@@ -52,62 +52,64 @@ pub fn get_width_power(arg: &TypeArg) -> u8 {
 /// An unsigned integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntU {
-    width: u8,
+    log_width: u8,
     value: u128,
 }
 
 /// A signed integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntS {
-    width: u8,
+    log_width: u8,
     value: i128,
 }
 
 impl ConstIntU {
     /// Create a new [`ConstIntU`]
-    pub fn new(width: u8, value: u128) -> Result<Self, ConstTypeError> {
-        if !is_valid_width(width) {
+    pub fn new(log_width: u8, value: u128) -> Result<Self, ConstTypeError> {
+        if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
             ));
         }
-        if (width <= 64) && (value >= (1u128 << width)) {
+        if (log_width <= 6) && (value >= (1u128 << (1u8 << log_width))) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
                     "Invalid unsigned integer value.".to_owned(),
                 ),
             ));
         }
-        Ok(Self { width, value })
+        Ok(Self { log_width, value })
     }
 }
 
 impl ConstIntS {
     /// Create a new [`ConstIntS`]
-    pub fn new(width: u8, value: i128) -> Result<Self, ConstTypeError> {
-        if !is_valid_width(width) {
+    pub fn new(log_width: u8, value: i128) -> Result<Self, ConstTypeError> {
+        if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
             ));
         }
-        if (width <= 64) && (value >= (1i128 << (width - 1)) || value < -(1i128 << (width - 1))) {
+        let width = 1u8 << log_width;
+        if (log_width <= 6) && (value >= (1i128 << (width - 1)) || value < -(1i128 << (width - 1)))
+        {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
                     "Invalid signed integer value.".to_owned(),
                 ),
             ));
         }
-        Ok(Self { width, value })
+        Ok(Self { log_width, value })
     }
 }
 
 #[typetag::serde]
 impl CustomConst for ConstIntU {
     fn name(&self) -> SmolStr {
-        format!("u{}({})", self.width, self.value).into()
+        format!("u{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(self.width) {
+        if typ.clone() == int_custom_type(self.log_width) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -123,10 +125,10 @@ impl CustomConst for ConstIntU {
 #[typetag::serde]
 impl CustomConst for ConstIntS {
     fn name(&self) -> SmolStr {
-        format!("i{}({})", self.width, self.value).into()
+        format!("i{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(self.width) {
+        if typ.clone() == int_custom_type(self.log_width) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -182,14 +184,14 @@ mod test {
 
     #[test]
     fn test_int_consts() {
-        let const_u32_7 = ConstIntU::new(32, 7);
-        let const_u64_7 = ConstIntU::new(64, 7);
-        let const_u32_8 = ConstIntU::new(32, 8);
+        let const_u32_7 = ConstIntU::new(5, 7);
+        let const_u64_7 = ConstIntU::new(6, 7);
+        let const_u32_8 = ConstIntU::new(5, 8);
         assert_ne!(const_u32_7, const_u64_7);
         assert_ne!(const_u32_7, const_u32_8);
-        assert_eq!(const_u32_7, ConstIntU::new(32, 7));
+        assert_eq!(const_u32_7, ConstIntU::new(5, 7));
         assert_matches!(
-            ConstIntU::new(8, 256),
+            ConstIntU::new(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
@@ -197,9 +199,9 @@ mod test {
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
-            ConstIntS::new(8, 128),
+            ConstIntS::new(3, 128),
             Err(ConstTypeError::CustomCheckFail(_))
         );
-        assert_matches!(ConstIntS::new(8, -128), Ok(_));
+        assert_matches!(ConstIntS::new(3, -128), Ok(_));
     }
 }
