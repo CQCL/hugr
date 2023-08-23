@@ -317,8 +317,8 @@ impl TypeArgTemplate {
 impl SignatureTemplate {
     /// Validates the definition, i.e. that every set of arguments passing [SignatureTemplate::check_args]
     /// will produce a valid type in [SignatureTemplate::instantiate_concrete]
-    pub fn validate(&self, exts: &HashMap<SmolStr, Extension>) -> Result<(), ()> {
-        self.1.validate(exts, &self.0)
+    pub fn validate(&self, exts: &HashMap<SmolStr, Extension>) -> Result<(), &str> {
+        self.1.validate(exts, &self.0).map_err(|()| "invalid")
     }
 
     /// Check some [TypeArg]s are legal arguments.
