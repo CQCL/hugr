@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use smol_str::SmolStr;
 
-use super::{ExtensionId, ExtensionSet, TypeParametrised};
-use crate::types::{least_upper_bound, TypeBound};
+use super::{ExtensionId, ExtensionSet, TypeDefBound, TypeParametrised};
+use crate::types::TypeBound;
 use crate::{ops::AliasDecl, Extension};
 
 use crate::types::{
@@ -38,8 +38,6 @@ struct CustomTypeTemplate {
     extension: ExtensionId,
     id: SmolStr,
     args: Vec<TypeArgTemplate>,
-    // Should this be min_bound? It might be narrower after substitution
-    //bound: TypeBound,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -98,35 +96,29 @@ impl TypeTemplate {
         }
     }
 
-    fn bound(&self, exts: &HashMap<SmolStr, Extension>, binders: &Vec<TypeParam>) -> TypeBound {
-        match self {
-            TypeTemplate::Extension(ctt) => ctt.bound(exts, binders),
-            TypeTemplate::Alias(decl) => decl.bound,
-            TypeTemplate::Function(_, _, _) => TypeBound::Copyable,
-            TypeTemplate::Tuple(elems) => {
-                least_upper_bound(elems.iter().map(|e| e.bound(exts, binders)))
-            }
-            TypeTemplate::Sum(elems) => {
-                least_upper_bound(elems.iter().map(|e| e.bound(exts, binders)))
-            }
-            TypeTemplate::TypeVar(VariableRef(i)) => match binders.get(*i) {
-                Some(TypeParam::Type(bound)) => bound.clone(),
-                _ => panic!("Variable is not a Type, should not occur inside a Type"),
-            },
-        }
-    }
-
     fn validate(
         &self,
         exts: &HashMap<SmolStr, Extension>,
         binders: &Vec<TypeParam>,
+        bound: TypeBound,
     ) -> Result<(), ()> {
         match self {
-            TypeTemplate::Extension(ctt) => ctt.validate(exts, binders),
-            TypeTemplate::Alias(_) => Ok(()),
+            TypeTemplate::Extension(ctt) => ctt.validate(exts, binders, bound),
+            TypeTemplate::Alias(decl) => {
+                if bound.contains(decl.bound) {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            }
             TypeTemplate::Function(ins, outs, es) => {
-                ins.iter().try_for_each(|tt| tt.validate(exts, binders))?;
-                outs.iter().try_for_each(|tt| tt.validate(exts, binders))?;
+                if !bound.contains(TypeBound::Copyable) {
+                    return Err(());
+                };
+                ins.iter()
+                    .try_for_each(|tt| tt.validate(exts, binders, bound))?;
+                outs.iter()
+                    .try_for_each(|tt| tt.validate(exts, binders, bound))?;
                 if let ExtensionSetTemplate::TypeVar(VariableRef(i)) = es {
                     if binders.get(*i) == Some(&TypeParam::Extensions) {
                         return Ok(());
@@ -134,16 +126,19 @@ impl TypeTemplate {
                 }
                 Err(())
             }
-            TypeTemplate::Tuple(elems) => {
-                elems.iter().try_for_each(|tt| tt.validate(exts, binders))
-            }
-            TypeTemplate::Sum(elems) => elems.iter().try_for_each(|tt| tt.validate(exts, binders)),
+            TypeTemplate::Tuple(elems) => elems
+                .iter()
+                .try_for_each(|tt| tt.validate(exts, binders, bound)),
+            TypeTemplate::Sum(elems) => elems
+                .iter()
+                .try_for_each(|tt| tt.validate(exts, binders, bound)),
             TypeTemplate::TypeVar(VariableRef(i)) => {
-                if let Some(TypeParam::Type(_)) = binders.get(*i) {
-                    Ok(())
-                } else {
-                    Err(())
+                if let Some(TypeParam::Type(decl_bound)) = binders.get(*i) {
+                    if bound.contains(*decl_bound) {
+                        return Ok(());
+                    }
                 }
+                Err(())
             }
         }
     }
@@ -167,66 +162,73 @@ impl CustomTypeTemplate {
             .unwrap()
     }
 
-    fn bound(&self, exts: &HashMap<SmolStr, Extension>, binders: &Vec<TypeParam>) -> TypeBound {
-        if self.validate(exts, binders).is_err() {
-            // Raise err here, don't return TypeBound
-        };
-        let typdef = exts
-            .get(&self.extension)
-            .unwrap()
-            .get_type(self.id.as_str())
-            .unwrap();
-
-        match &typdef.bound {
-            super::TypeDefBound::Explicit(b) => *b,
-            super::TypeDefBound::FromParams(indices) => least_upper_bound(indices.iter().map(|idx| match self.args.get(*idx) {
-                Some(TypeArgTemplate::Type(tt)) => tt.bound(exts, binders),
-                Some(TypeArgTemplate::TypeVar(VariableRef(i))) => match binders.get(*i) {
-                    Some(TypeParam::Type(bound)) => *bound,
-                    _ => panic!("Trying to instantiate CustomType with a variable that does not hold a Type")
-                }
-                _ => panic!("TypeDef's bound definition refers to non-type") // we've validated, so the TypeArgTemplate must fit the param
-
-            }))
-        }
-    }
-
     fn validate(
         &self,
         exts: &HashMap<SmolStr, Extension>,
         binders: &Vec<TypeParam>,
+        bound: TypeBound,
     ) -> Result<(), ()> {
-        let params = exts
+        let typdef = exts
             .get(&self.extension)
             .ok_or(())?
             .get_type(self.id.as_str())
-            .ok_or(())?
-            .params();
-        if params.len() == self.args.len()
-            && self
-                .args
-                .iter()
-                .zip(params)
-                .all(|(arg, param)| arg.will_fit(param, exts, binders))
-        {
-            Ok(())
-        } else {
-            Err(())
-        }
+            .ok_or(())?;
+        // Check args fit the params.
+        let params = typdef.params();
+        if params.len() != self.args.len() {
+            return Err(());
+        };
+        let mut params: Vec<_> = params.into();
+        match &typdef.bound {
+            TypeDefBound::Explicit(b) => {
+                if !bound.contains(*b) {
+                    return Err(());
+                };
+                // Just check args are valid for the params
+            }
+            TypeDefBound::FromParams(indices) => {
+                for i in indices {
+                    // Bound of the CustomType depends upon this index
+                    let TypeParam::Type(b) = params[*i] else {
+                        return Err(()) // Index says to compute CustomType bound from non-type parameter!
+                    };
+                    // so require the corresponding arg to meet the bound (intersect with existing bound on arg)
+                    if b.contains(bound) {
+                        params[*i] = TypeParam::Type(bound);
+                    }
+                }
+            }
+        };
+        self.args
+            .iter()
+            .zip(params)
+            .try_for_each(|(arg, param)| arg.validate(exts, binders, &param))
     }
 }
 
-fn check_type_param_fits(tps: (&TypeParam, &TypeParam)) -> bool {
+fn check_type_param_fits(tps: (&TypeParam, &TypeParam)) -> Result<(), ()> {
     match tps {
-        (TypeParam::Type(hbound), TypeParam::Type(pbound)) => hbound.contains(*pbound),
-        (TypeParam::USize, TypeParam::USize) => true,
-        (TypeParam::Opaque(t1), TypeParam::Opaque(t2)) => t1 == t2,
-        (TypeParam::List(hs), TypeParam::List(ps)) => check_type_param_fits((hs, ps)),
-        (TypeParam::Tuple(hs), TypeParam::Tuple(ps)) => {
-            hs.len() == ps.len() && hs.iter().zip(ps).all(check_type_param_fits)
+        (TypeParam::Type(hbound), TypeParam::Type(pbound)) => {
+            if hbound.contains(*pbound) {
+                Ok(())
+            } else {
+                Err(())
+            }
         }
-        (TypeParam::Extensions, TypeParam::Extensions) => true,
-        _ => false,
+        (TypeParam::USize, TypeParam::USize) => Ok(()),
+        (TypeParam::Opaque(t1), TypeParam::Opaque(t2)) => {
+            if t1 == t2 {
+                Ok(())
+            } else {
+                Err(())
+            }
+        }
+        (TypeParam::List(hs), TypeParam::List(ps)) => check_type_param_fits((hs, ps)),
+        (TypeParam::Tuple(hs), TypeParam::Tuple(ps)) if hs.len() == ps.len() => {
+            hs.iter().zip(ps).try_for_each(check_type_param_fits)
+        }
+        (TypeParam::Extensions, TypeParam::Extensions) => Ok(()),
+        _ => Err(()),
     }
 }
 
@@ -244,61 +246,40 @@ impl TypeArgTemplate {
         }
     }
 
-    fn will_fit(
+    fn validate(
         &self,
-        into: &TypeParam,
         exts: &HashMap<SmolStr, Extension>,
         binders: &Vec<TypeParam>,
-    ) -> bool {
+        bound: &TypeParam,
+    ) -> Result<(), ()> {
         if let TypeArgTemplate::TypeVar(VariableRef(i)) = self {
             return match binders.get(*i) {
-                Some(vdecl) => check_type_param_fits((into, vdecl)),
-                None => false, // Error: undeclared variable
+                Some(vdecl) => check_type_param_fits((bound, vdecl)),
+                None => Err(()), // Error: undeclared variable
             };
         };
         // self is not a TypeVar!
-        match (into, self) {
-            (TypeParam::Type(pbound), TypeArgTemplate::Type(tt)) => {
-                pbound.contains(tt.bound(exts, binders))
+        match (bound, self) {
+            (TypeParam::Type(bound), TypeArgTemplate::Type(tt)) => {
+                tt.validate(exts, binders, *bound)
             }
-            (TypeParam::USize, TypeArgTemplate::USize(_)) => true,
-            (TypeParam::Opaque(custy), TypeArgTemplate::Opaque(cusarg)) => &cusarg.typ == custy,
-            (TypeParam::List(ety), TypeArgTemplate::Sequence(elems)) => {
-                elems.iter().all(|e| e.will_fit(ety, exts, binders))
+            (TypeParam::USize, TypeArgTemplate::USize(_)) => Ok(()),
+            (TypeParam::Opaque(custy), TypeArgTemplate::Opaque(cusarg)) if &cusarg.typ == custy => {
+                Ok(())
             }
-            (TypeParam::Tuple(etys), TypeArgTemplate::Sequence(elems)) => {
-                etys.len() == elems.len()
-                    && elems
-                        .iter()
-                        .zip(etys)
-                        .all(|(val, ty)| val.will_fit(ty, exts, binders))
+            (TypeParam::List(ety), TypeArgTemplate::Sequence(elems)) => elems
+                .iter()
+                .try_for_each(|e| e.validate(exts, binders, ety)),
+            (TypeParam::Tuple(etys), TypeArgTemplate::Sequence(elems))
+                if etys.len() == elems.len() =>
+            {
+                elems
+                    .iter()
+                    .zip(etys)
+                    .try_for_each(|(val, ty)| val.validate(exts, binders, ty))
             }
-            (TypeParam::Extensions, TypeArgTemplate::Extensions(_)) => true,
-            _ => false,
+            (TypeParam::Extensions, TypeArgTemplate::Extensions(_)) => Ok(()),
+            _ => Err(()),
         }
     }
-
-    // TODO ensure we make all these checks in will_fit
-    /*fn validate(
-        &self,
-        exts: &HashMap<SmolStr, Extension>,
-        binders: &Vec<TypeParam>,
-    ) -> Result<(), ()> {
-        match self {
-            TypeArgTemplate::Type(tt) => tt.validate(exts, binders),
-            TypeArgTemplate::USize(_) => Ok(()),
-            TypeArgTemplate::Opaque(_) => Ok(()),
-            TypeArgTemplate::Sequence(elems) => {
-                elems.iter().try_for_each(|tat| tat.validate(exts, binders))
-            }
-            TypeArgTemplate::Extensions(_) => Ok(()),
-            TypeArgTemplate::TypeVar(VariableRef(i)) => {
-                if binders.get(*i).is_some() {
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            }
-        }
-    }*/
 }
