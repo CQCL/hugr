@@ -20,7 +20,7 @@ use crate::types::CustomType;
 mod op_def;
 pub use op_def::{CustomSignatureFunc, OpDef};
 mod type_def;
-mod type_template;
+pub mod type_template;
 pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
 pub mod validate;

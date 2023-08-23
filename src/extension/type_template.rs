@@ -1,3 +1,6 @@
+//! Type schemes that can be turned into [FunctionType]s by applying
+//! them to [TypeArg]s
+
 use std::collections::HashMap;
 
 use smol_str::SmolStr;
@@ -60,7 +63,9 @@ enum TypeArgTemplate {
     TypeVar(VariableRef),
 }
 
-struct SignatureTemplate(pub Vec<TypeParam>, FunctionTypeTemplate);
+/// Representation of the type scheme for an Op with declared TypeParams.
+/// This should be the result of YAML parsing.
+pub struct SignatureTemplate(pub Vec<TypeParam>, FunctionTypeTemplate);
 
 impl TypeTemplate {
     fn substitute(&self, exts: &HashMap<SmolStr, Extension>, vars: &Vec<TypeArg>) -> Type {
@@ -310,13 +315,17 @@ impl TypeArgTemplate {
 }
 
 impl SignatureTemplate {
-    /// Validates the definition, i.e. that every set of arguments passing [check_args]
-    /// will produce a valid type in [substitute]
+    /// Validates the definition, i.e. that every set of arguments passing [SignatureTemplate::check_args]
+    /// will produce a valid type in [SignatureTemplate::instantiate_concrete]
     pub fn validate(&self, exts: &HashMap<SmolStr, Extension>) -> Result<(), ()> {
         self.1.validate(exts, &self.0)
     }
 
-    /// Copied from [TypeParametrised::check_args_impl] - perhaps we can implement [TypeParametrised]
+    /// Check some [TypeArg]s are legal arguments.
+    // Copied from [TypeParametrised::check_args_impl] - either perhaps we can implement [TypeParametrised], or
+    /// If this is merely hidden inside an [OpDef], the [OpDef]'s `check_args` will do this.
+    ///
+    /// [OpDef]: super::OpDef
     pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
         let binders = &self.0;
         if args.len() != binders.len() {
@@ -330,6 +339,10 @@ impl SignatureTemplate {
         Ok(())
     }
 
+    /// Create a concrete signature from some type args.
+    /// Call [SignatureTemplate::validate] first (once only)
+    /// and [SignatureTemplate::check_args] with the arguments
+    /// - if those return Ok, this should be guaranteed to succeed.
     pub fn instantiate_concrete(
         &self,
         exts: &HashMap<SmolStr, Extension>,
