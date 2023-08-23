@@ -566,25 +566,20 @@ impl UnificationContext {
             // All of the metas for which we've made progress
             let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).cloned());
 
-            for m in delta.iter() {
-                if !merged.contains(m) {
-                    // Cleanup the context by removing constraint lists for
-                    // metas which are now solved
-                    self.constraints.remove(m);
-                }
-                // Remove solved and merged metas from remaining "to solve" list
+            // Clean up dangling constraints on solved metavariables
+            to_delete.iter().for_each(|m| {
+                self.constraints.remove(m);
+            });
+            // Remove solved and merged metas from remaining "to solve" list
+            delta.iter().for_each(|m| {
                 remaining.remove(m);
-            }
+            });
 
             // If we made no progress, we're done!
             if delta.is_empty() && new.is_empty() {
                 break;
             }
-
-            // Add all of the new nodes we made (by merging old ones) to the pile
-            new.into_iter().for_each(|m| {
-                remaining.insert(m);
-            });
+            remaining.extend(new.into_iter())
         }
         self.results()
     }
@@ -855,7 +850,7 @@ mod test {
             rs
         );
         assert_eq!(
-            *solution.get(&(mult.node(), Direction::Outoing)).unwrap(),
+            *solution.get(&(mult.node(), Direction::Outgoing)).unwrap(),
             rs
         );
         Ok(())
