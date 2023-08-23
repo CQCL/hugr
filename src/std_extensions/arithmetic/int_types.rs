@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::{
     types::{
-        type_param::{TypeArg, TypeParam},
+        type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::CustomConst,
@@ -14,23 +14,18 @@ use crate::{
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
 
-/// Identfier for the integer type.
+/// Identifier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
-fn int_custom_type(n: u8) -> CustomType {
-    CustomType::new(
-        INT_TYPE_ID,
-        [TypeArg::BoundedUSize(n as u64)],
-        EXTENSION_ID,
-        TypeBound::Copyable,
-    )
+fn int_custom_type(width_arg: TypeArg) -> CustomType {
+    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Copyable)
 }
 
 /// Integer type of a given bit width.
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub fn int_type(width_power: u8) -> Type {
-    Type::new_extension(int_custom_type(width_power))
+pub fn int_type(width_arg: TypeArg) -> Type {
+    Type::new_extension(int_custom_type(width_arg))
 }
 
 const fn is_valid_log_width(n: u8) -> bool {
@@ -42,13 +37,19 @@ const POWERS_OF_TWO: u8 = 8;
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO as u64);
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
-pub fn get_width_power(arg: &TypeArg) -> u8 {
+pub(super) fn get_width_power(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
-        TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => *n as u8,
-        _ => panic!("type check should prevent this."),
+        TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
+        _ => Err(TypeArgError::TypeMismatch {
+            arg: arg.clone(),
+            param: LOG_WIDTH_TYPE_PARAM,
+        }),
     }
 }
 
+pub(super) const fn type_arg(log_width: u8) -> TypeArg {
+    TypeArg::BoundedUSize(log_width as u64)
+}
 /// An unsigned integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntU {
@@ -109,7 +110,7 @@ impl CustomConst for ConstIntU {
         format!("u{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(self.log_width) {
+        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -128,7 +129,7 @@ impl CustomConst for ConstIntS {
         format!("i{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(self.log_width) {
+        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -159,7 +160,7 @@ pub fn extension() -> Extension {
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::{assert_matches, assert_panics};
+    use cool_asserts::assert_matches;
 
     use super::*;
 
@@ -174,12 +175,15 @@ mod test {
     #[test]
     fn test_int_widths() {
         let type_arg_32 = TypeArg::BoundedUSize(5);
-        assert_matches!(get_width_power(&type_arg_32), 5);
+        assert_matches!(get_width_power(&type_arg_32), Ok(5));
 
         let type_arg_128 = TypeArg::BoundedUSize(7);
-        assert_matches!(get_width_power(&type_arg_128), 7);
-
-        assert_panics!(get_width_power(&TypeArg::BoundedUSize(8)));
+        assert_matches!(get_width_power(&type_arg_128), Ok(7));
+        let type_arg_256 = TypeArg::BoundedUSize(8);
+        assert_matches!(
+            get_width_power(&type_arg_256),
+            Err(TypeArgError::TypeMismatch { .. })
+        );
     }
 
     #[test]
