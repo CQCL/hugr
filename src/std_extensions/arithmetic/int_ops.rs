@@ -89,7 +89,7 @@ fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet),
 
 fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let intpair: TypeRow = vec![int_type(arg1.clone()), int_type(arg0.clone())].into();
+    let intpair: TypeRow = vec![int_type(arg0.clone()), int_type(arg1.clone())].into();
     Ok((
         intpair.clone(),
         vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),
@@ -100,8 +100,8 @@ fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet
 fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     Ok((
-        vec![int_type(arg1.clone()), int_type(arg0.clone())].into(),
-        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])].into(),
+        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
+        vec![Type::new_sum(vec![int_type(arg0.clone()), ERROR_TYPE])].into(),
         ExtensionSet::default(),
     ))
 }
@@ -109,8 +109,8 @@ fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     Ok((
-        vec![int_type(arg1.clone()), int_type(arg0.clone())].into(),
-        vec![Type::new_sum(vec![int_type(arg0.clone()), ERROR_TYPE])].into(),
+        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
+        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])].into(),
         ExtensionSet::default(),
     ))
 }
@@ -118,8 +118,8 @@ fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), 
 fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     Ok((
-        vec![int_type(arg1.clone()), int_type(arg0.clone())].into(),
-        vec![int_type(arg1.clone())].into(),
+        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
+        vec![int_type(arg0.clone())].into(),
         ExtensionSet::default(),
     ))
 }
