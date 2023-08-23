@@ -29,15 +29,15 @@ pub fn int_type(width_arg: TypeArg) -> Type {
 }
 
 const fn is_valid_log_width(n: u8) -> bool {
-    n <= POWERS_OF_TWO
+    n <= MAX_LOG_WIDTH
 }
 
-const POWERS_OF_TWO: u8 = 7;
+const MAX_LOG_WIDTH: u8 = 7;
 /// Type parameter for the log width of the integer.
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO as u64);
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(MAX_LOG_WIDTH as u64);
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
-pub(super) fn get_width_power(arg: &TypeArg) -> Result<u8, TypeArgError> {
+pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
         TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TypeArgError::TypeMismatch {
@@ -175,13 +175,13 @@ mod test {
     #[test]
     fn test_int_widths() {
         let type_arg_32 = TypeArg::BoundedUSize(5);
-        assert_matches!(get_width_power(&type_arg_32), Ok(5));
+        assert_matches!(get_log_width(&type_arg_32), Ok(5));
 
         let type_arg_128 = TypeArg::BoundedUSize(7);
-        assert_matches!(get_width_power(&type_arg_128), Ok(7));
+        assert_matches!(get_log_width(&type_arg_128), Ok(7));
         let type_arg_256 = TypeArg::BoundedUSize(8);
         assert_matches!(
-            get_width_power(&type_arg_256),
+            get_log_width(&type_arg_256),
             Err(TypeArgError::TypeMismatch { .. })
         );
     }

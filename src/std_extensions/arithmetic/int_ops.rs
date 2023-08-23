@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use super::int_types::{get_width_power, int_type, type_arg};
+use super::int_types::{get_log_width, int_type, type_arg};
 use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
 use crate::type_row;
 use crate::types::type_param::TypeParam;
@@ -18,8 +18,8 @@ pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
 fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_width_power(arg0)?;
-    let n: u8 = get_width_power(arg1)?;
+    let m: u8 = get_log_width(arg0)?;
+    let n: u8 = get_log_width(arg1)?;
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
@@ -32,8 +32,8 @@ fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet)
 
 fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_width_power(arg0)?;
-    let n: u8 = get_width_power(arg1)?;
+    let m: u8 = get_log_width(arg0)?;
+    let n: u8 = get_log_width(arg1)?;
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
