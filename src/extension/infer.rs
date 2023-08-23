@@ -34,7 +34,14 @@ pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, Infer
 }
 
 /// Metavariables don't need much
-type Meta = usize;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct Meta(u32);
+
+impl Meta {
+    pub fn new(m: u32) -> Self {
+        Meta(m)
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 /// Things we know about metavariables
@@ -133,7 +140,7 @@ struct UnificationContext {
     /// Variables we're allowed to include in solutionss
     variables: HashSet<Meta>,
     /// A name for the next metavariable we create
-    fresh_name: usize,
+    fresh_name: u32,
 }
 
 /// Invariant: Constraint::Plus always points to a fresh metavariable
@@ -156,7 +163,7 @@ impl UnificationContext {
 
     /// Create a fresh metavariable, and increment `fresh_name` for next time
     fn fresh_meta(&mut self) -> Meta {
-        let fresh = self.fresh_name;
+        let fresh = Meta::new(self.fresh_name);
         self.fresh_name += 1;
         self.constraints.insert(fresh, HashSet::new());
         fresh
