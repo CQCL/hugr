@@ -77,12 +77,9 @@ pub struct AliasID<const DEF: bool> {
     name: SmolStr,
     bound: TypeBound,
 }
-pub struct NewHandle<const C: TagRepr>(Node);
 impl<const DEF: bool> AliasID<DEF> {
     /// Construct new AliasID
     pub fn new(node: Node, name: SmolStr, bound: TypeBound) -> Self {
-        const c: TagRepr = OpTag::ModuleRoot.repr();
-        let h: NewHandle<c> = NewHandle(node);
         Self { node, name, bound }
     }
 

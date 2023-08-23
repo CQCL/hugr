@@ -202,7 +202,18 @@ impl PartialOrd for OpTag {
 
 #[cfg(test)]
 mod test {
+    use crate::Node;
+
     use super::*;
+    pub struct NewHandle<const C: TagRepr>(Node);
+
+    impl<const C: TagRepr> std::fmt::Debug for NewHandle<C> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_tuple(&format!("NewHandle<{:?}>", OpTag::from_repr(C).unwrap()))
+                .field(&self.0)
+                .finish()
+        }
+    }
 
     #[test]
     fn tag_contains() {
@@ -221,5 +232,14 @@ mod test {
         assert!(!OpTag::None.is_superset(OpTag::ModuleOp));
         assert!(!OpTag::None.is_superset(OpTag::DataflowChild));
         assert!(!OpTag::None.is_superset(OpTag::BasicBlock));
+
+        const c: TagRepr = OpTag::ModuleRoot.repr();
+        let node = Node::from(portgraph::NodeIndex::new(1));
+        let h: NewHandle<c> = NewHandle(node);
+
+        assert_eq!(
+            format!("{:?}", h),
+            "NewHandle<ModuleRoot>(Node { index: NodeIndex(1) })"
+        )
     }
 }
