@@ -62,7 +62,6 @@ pub enum InferExtensionError {
     Unsolved {
         /// The location on the hugr that's associated to the unsolved meta
         location: (Node, Direction),
-        //constraints: Vec<Constraint>,
     },
     /// An extension mismatch between two nodes which are connected by an edge.
     /// This should mirror (or reuse) `ValidationError`'s SrcExceedsTgtExtensions
@@ -417,16 +416,6 @@ impl UnificationContext {
                     self.variables.insert(combined_meta);
                 }
                 self.shunted.insert(*m, combined_meta);
-            }
-            // This doesn't do anything, but if it did it would just be
-            // implementing the same mechanism as provided by `resolve`
-            let mut updates = HashMap::<(Node, Direction), Meta>::new();
-            for (loc, meta) in self.extensions.iter() {
-                // If there's any node in this CC which equals `meta`, they are
-                // all equal to meta
-                if cc.iter().filter(|cc_meta| meta == *cc_meta).count() > 0 {
-                    updates.insert(*loc, combined_meta);
-                }
             }
         }
         Ok((new_metas, merged))
