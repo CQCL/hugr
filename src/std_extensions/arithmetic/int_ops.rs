@@ -46,7 +46,7 @@ fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet
 
 fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
-        vec![int_type(type_arg(1))].into(),
+        vec![int_type(type_arg(0))].into(),
         type_row![BOOL_T],
         ExtensionSet::default(),
     ))
@@ -55,7 +55,7 @@ fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet),
 fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
     Ok((
         type_row![BOOL_T],
-        vec![int_type(type_arg(1))].into(),
+        vec![int_type(type_arg(0))].into(),
         ExtensionSet::default(),
     ))
 }
