@@ -233,26 +233,15 @@ impl CustomTypeTemplate {
     }
 }
 
-fn check_type_param_fits(tps: (&TypeParam, &TypeParam)) -> Result<(), ()> {
+/// Check the first element of the pair contains the second
+fn check_type_param_contains(tps: (&TypeParam, &TypeParam)) -> Result<(), ()> {
     match tps {
-        (TypeParam::Type(hbound), TypeParam::Type(pbound)) => {
-            if hbound.contains(*pbound) {
-                Ok(())
-            } else {
-                Err(())
-            }
-        }
+        (TypeParam::Type(gt), TypeParam::Type(lt)) if gt.contains(*lt) => Ok(()),
         (TypeParam::USize, TypeParam::USize) => Ok(()),
-        (TypeParam::Opaque(t1), TypeParam::Opaque(t2)) => {
-            if t1 == t2 {
-                Ok(())
-            } else {
-                Err(())
-            }
-        }
-        (TypeParam::List(hs), TypeParam::List(ps)) => check_type_param_fits((hs, ps)),
-        (TypeParam::Tuple(hs), TypeParam::Tuple(ps)) if hs.len() == ps.len() => {
-            hs.iter().zip(ps).try_for_each(check_type_param_fits)
+        (TypeParam::Opaque(t1), TypeParam::Opaque(t2)) if t1 == t2 => Ok(()),
+        (TypeParam::List(gt), TypeParam::List(lt)) => check_type_param_contains((gt, lt)),
+        (TypeParam::Tuple(gt), TypeParam::Tuple(lt)) if gt.len() == lt.len() => {
+            gt.iter().zip(lt).try_for_each(check_type_param_contains)
         }
         (TypeParam::Extensions, TypeParam::Extensions) => Ok(()),
         _ => Err(()),
@@ -281,7 +270,7 @@ impl TypeArgTemplate {
     ) -> Result<(), ()> {
         if let TypeArgTemplate::TypeVar(VariableRef(i)) = self {
             return match binders.get(*i) {
-                Some(vdecl) => check_type_param_fits((bound, vdecl)),
+                Some(vdecl) => check_type_param_contains((bound, vdecl)),
                 None => Err(()), // Error: undeclared variable
             };
         };
