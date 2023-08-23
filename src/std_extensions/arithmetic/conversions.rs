@@ -59,7 +59,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ftoi_sig,
         )
         .unwrap();
@@ -67,7 +67,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ftoi_sig,
         )
         .unwrap();
@@ -75,7 +75,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             itof_sig,
         )
         .unwrap();
@@ -83,7 +83,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             itof_sig,
         )
         .unwrap();

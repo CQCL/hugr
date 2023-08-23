@@ -20,7 +20,7 @@ const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 fn int_custom_type(n: u8) -> CustomType {
     CustomType::new(
         INT_TYPE_ID,
-        [TypeArg::SimplePredicate(n as usize)],
+        [TypeArg::BoundedUSize(n as u64)],
         EXTENSION_ID,
         TypeBound::Copyable,
     )
@@ -37,12 +37,14 @@ const fn is_valid_width(n: u8) -> bool {
     (n <= (1u8 << (POWERS_OF_TWO - 1))) && ((n & (n - 1)) == 0)
 }
 
-const POWERS_OF_TWO: usize = 8;
+const POWERS_OF_TWO: u64 = 8;
+/// Type parameter for the log width of the integer.
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(POWERS_OF_TWO);
 
 /// Get the bit width of the specified integer type, or error if the width is not supported.
 pub fn get_width_power(arg: &TypeArg) -> u8 {
     match arg {
-        TypeArg::SimplePredicate(n) if *n < POWERS_OF_TWO => *n as u8,
+        TypeArg::BoundedUSize(n) if *n < POWERS_OF_TWO => *n as u8,
         _ => panic!("type check should prevent this."),
     }
 }
@@ -144,7 +146,7 @@ pub fn extension() -> Extension {
     extension
         .add_type(
             INT_TYPE_ID,
-            vec![TypeParam::SimplePredicate(POWERS_OF_TWO)],
+            vec![LOG_WIDTH_TYPE_PARAM],
             "integral value of a given bit width".to_owned(),
             TypeBound::Copyable.into(),
         )
@@ -169,13 +171,13 @@ mod test {
 
     #[test]
     fn test_int_widths() {
-        let type_arg_32 = TypeArg::SimplePredicate(5);
+        let type_arg_32 = TypeArg::BoundedUSize(5);
         assert_matches!(get_width_power(&type_arg_32), 5);
 
-        let type_arg_128 = TypeArg::SimplePredicate(7);
+        let type_arg_128 = TypeArg::BoundedUSize(7);
         assert_matches!(get_width_power(&type_arg_128), 7);
 
-        assert_panics!(get_width_power(&TypeArg::SimplePredicate(8)));
+        assert_panics!(get_width_power(&TypeArg::BoundedUSize(8)));
     }
 
     #[test]

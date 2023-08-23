@@ -199,7 +199,12 @@ mod test {
 
     #[test]
     fn test_yaml_const() {
-        let typ_int = CustomType::new("mytype", vec![TypeArg::USize(8)], "myrsrc", TypeBound::Eq);
+        let typ_int = CustomType::new(
+            "mytype",
+            vec![TypeArg::BoundedUSize(8)],
+            "myrsrc",
+            TypeBound::Eq,
+        );
         let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);

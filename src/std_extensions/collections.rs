@@ -159,7 +159,9 @@ mod test {
             .instantiate_concrete([TypeArg::Type(USIZE_T)])
             .unwrap();
 
-        assert!(list_def.instantiate_concrete([TypeArg::USize(3)]).is_err());
+        assert!(list_def
+            .instantiate_concrete([TypeArg::BoundedUSize(3)])
+            .is_err());
 
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()]);

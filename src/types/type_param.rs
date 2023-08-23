@@ -19,11 +19,8 @@ use super::TypeBound;
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
     Type(TypeBound),
-    /// Argument is a [TypeArg::USize].
-    USize,
-    /// Argument is a [TypeArg::SimplePredicate] which is bounded by the size
-    /// specified here.
-    SimplePredicate(usize),
+    /// Argument is a [TypeArg::USize] that is less than the stated bound.
+    BoundedUSize(u64),
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
     Opaque(CustomType),
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
@@ -36,6 +33,13 @@ pub enum TypeParam {
     Extensions,
 }
 
+impl TypeParam {
+    /// [`TypeParam::BoundedUSize`] with the maximum bound (`u64::MAX`)
+    pub const fn max_usize() -> Self {
+        Self::BoundedUSize(u64::MAX)
+    }
+}
+
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
@@ -43,10 +47,7 @@ pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
     Type(Type),
     /// Instance of [TypeParam::USize]. 64-bit unsigned integer.
-    USize(u64),
-    /// Instance of [TypeParam::SimplePredicate]. A Sum over unit types with
-    /// specified tag.
-    SimplePredicate(usize),
+    BoundedUSize(u64),
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque(CustomTypeArg),
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -98,14 +99,13 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::USize(_), TypeParam::USize) => Ok(()),
+        (TypeArg::BoundedUSize(val), TypeParam::BoundedUSize(bound)) if val < bound => Ok(()),
         (TypeArg::Opaque(arg), TypeParam::Opaque(param))
             if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())
         }
         (TypeArg::Extensions(_), TypeParam::Extensions) => Ok(()),
-        (TypeArg::SimplePredicate(tag), TypeParam::SimplePredicate(size)) if tag < size => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),

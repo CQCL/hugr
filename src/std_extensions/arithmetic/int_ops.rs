@@ -146,7 +146,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iwiden_u".into(),
             "widen an unsigned integer to a wider one with the same value".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             iwiden_sig,
         )
         .unwrap();
@@ -154,7 +154,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iwiden_s".into(),
             "widen a signed integer to a wider one with the same value".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             iwiden_sig,
         )
         .unwrap();
@@ -163,7 +163,7 @@ pub fn extension() -> Extension {
             "inarrow_u".into(),
             "narrow an unsigned integer to a narrower one with the same value if possible"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             inarrow_sig,
         )
         .unwrap();
@@ -171,7 +171,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "inarrow_s".into(),
             "narrow a signed integer to a narrower one with the same value if possible".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             inarrow_sig,
         )
         .unwrap();
@@ -195,7 +195,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ieq".into(),
             "equality test".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -203,7 +203,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ine".into(),
             "inequality test".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -211,7 +211,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ilt_u".into(),
             "\"less than\" as unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -219,7 +219,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ilt_s".into(),
             "\"less than\" as signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -227,7 +227,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "igt_u".into(),
             "\"greater than\" as unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -235,7 +235,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "igt_s".into(),
             "\"greater than\" as signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -243,7 +243,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ile_u".into(),
             "\"less than or equal\" as unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -251,7 +251,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ile_s".into(),
             "\"less than or equal\" as signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -259,7 +259,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ige_u".into(),
             "\"greater than or equal\" as unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -267,7 +267,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ige_s".into(),
             "\"greater than or equal\" as signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             icmp_sig,
         )
         .unwrap();
@@ -275,7 +275,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imax_u".into(),
             "maximum of unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -283,7 +283,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imax_s".into(),
             "maximum of signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -291,7 +291,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imin_u".into(),
             "minimum of unsigned integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -299,7 +299,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imin_s".into(),
             "minimum of signed integers".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -307,7 +307,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iadd".into(),
             "addition modulo 2^N (signed and unsigned versions are the same op)".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -315,7 +315,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "isub".into(),
             "subtraction modulo 2^N (signed and unsigned versions are the same op)".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -323,7 +323,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ineg".into(),
             "negation modulo 2^N (signed and unsigned versions are the same op)".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             iunop_sig,
         )
         .unwrap();
@@ -331,7 +331,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imul".into(),
             "multiplication modulo 2^N (signed and unsigned versions are the same op)".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -341,7 +341,7 @@ pub fn extension() -> Extension {
             "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 is an error)"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             idivmod_sig,
         )
         .unwrap();
@@ -351,7 +351,7 @@ pub fn extension() -> Extension {
             "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             idivmod_sig,
         )
         .unwrap();
@@ -359,7 +359,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "idiv_u".into(),
             "as idivmod_u but discarding the second output".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             idiv_sig,
         )
         .unwrap();
@@ -367,7 +367,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imod_u".into(),
             "as idivmod_u but discarding the first output".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             idiv_sig,
         )
         .unwrap();
@@ -375,7 +375,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "idiv_s".into(),
             "as idivmod_s but discarding the second output".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             imod_sig,
         )
         .unwrap();
@@ -383,7 +383,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "imod_s".into(),
             "as idivmod_s but discarding the first output".to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             imod_sig,
         )
         .unwrap();
@@ -391,7 +391,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iabs".into(),
             "convert signed to unsigned by taking absolute value".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             iunop_sig,
         )
         .unwrap();
@@ -399,7 +399,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iand".into(),
             "bitwise AND".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -407,7 +407,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ior".into(),
             "bitwise OR".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -415,7 +415,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "ixor".into(),
             "bitwise XOR".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             ibinop_sig,
         )
         .unwrap();
@@ -423,7 +423,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "inot".into(),
             "bitwise NOT".to_owned(),
-            vec![TypeParam::USize],
+            vec![TypeParam::max_usize()],
             iunop_sig,
         )
         .unwrap();
@@ -433,7 +433,7 @@ pub fn extension() -> Extension {
             "shift first input left by k bits where k is unsigned interpretation of second input \
             (leftmost bits dropped, rightmost bits set to zero"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             ish_sig,
         )
         .unwrap();
@@ -443,7 +443,7 @@ pub fn extension() -> Extension {
             "shift first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits dropped, leftmost bits set to zero)"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             ish_sig,
         )
         .unwrap();
@@ -453,7 +453,7 @@ pub fn extension() -> Extension {
             "rotate first input left by k bits where k is unsigned interpretation of second input \
             (leftmost bits replace rightmost bits)"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             ish_sig,
         )
         .unwrap();
@@ -463,7 +463,7 @@ pub fn extension() -> Extension {
             "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)"
                 .to_owned(),
-            vec![TypeParam::USize, TypeParam::USize],
+            vec![TypeParam::max_usize(), TypeParam::max_usize()],
             ish_sig,
         )
         .unwrap();
