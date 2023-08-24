@@ -104,7 +104,7 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
         vec![]
     };
     cfg.successors(n)
-        .chain(extra.into_iter())
+        .chain(extra)
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
         .unique()
@@ -389,7 +389,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
-            .chain(min_dfs_target[0].into_iter());
+            .chain(min_dfs_target[0]);
         (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
