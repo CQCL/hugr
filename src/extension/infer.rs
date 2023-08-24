@@ -184,7 +184,8 @@ impl UnificationContext {
         debug_assert!(self.solved.insert(m, rs).is_none());
     }
 
-    /// If a metavariable has been merged, return the new meta
+    /// If a metavariable has been merged, return the new meta, otherwise return
+    /// the same meta.
     ///
     /// This could loop if there were a cycle in the `shunted` list, but there
     /// shouldn't be, because we only ever shunt to *new* metas.
