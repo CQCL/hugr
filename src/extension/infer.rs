@@ -595,7 +595,7 @@ impl UnificationContext {
             if delta.is_empty() && new.is_empty() {
                 break;
             }
-            remaining.extend(new.into_iter())
+            remaining.extend(new)
         }
         self.results()
     }
