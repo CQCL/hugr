@@ -56,7 +56,7 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     ///  - If the attachment would introduce a cycle.
     #[inline]
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.valid_node(sibling)?;
+        self.valid_descendant(sibling)?;
         self.hugr_mut().add_op_before(sibling, op)
     }
 
@@ -70,7 +70,7 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     ///  - If the attachment would introduce a cycle.
     #[inline]
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.valid_node(sibling)?;
+        self.valid_descendant(sibling)?;
         self.hugr_mut().add_op_after(sibling, op)
     }
 
@@ -81,7 +81,7 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// Panics if the node is the root node.
     #[inline]
     fn remove_node(&mut self, node: Node) -> Result<(), HugrError> {
-        self.valid_node(node)?;
+        self.valid_descendant(node)?;
         self.hugr_mut().remove_node(node)
     }
 
@@ -323,6 +323,19 @@ pub(crate) mod sealed {
             }
         }
 
+        /// Validates that a node is a valid root descendant in the graph.
+        ///
+        /// To include the root node use [`HugrMutInternals::valid_node`] instead.
+        ///
+        /// Returns a [`HugrError::InvalidNode`] otherwise.
+        #[inline]
+        fn valid_descendant(&self, node: Node) -> Result<(), HugrError> {
+            match self.root() == node {
+                true => Err(HugrError::InvalidNode { node }),
+                false => self.valid_node(node),
+            }
+        }
+
         /// Add a node to the graph, with the default conversion from OpType to NodeType
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
             // TODO: Default to `NodeType::open_extensions` once we can infer extensions
@@ -359,7 +372,8 @@ pub(crate) mod sealed {
         ///
         /// The node becomes the parent's last child.
         fn set_parent(&mut self, node: Node, parent: Node) -> Result<(), HugrError> {
-            self.valid_node(node)?;
+            self.valid_node(parent)?;
+            self.valid_descendant(node)?;
             self.hugr_mut().set_parent(node, parent)
         }
 
@@ -370,8 +384,8 @@ pub(crate) mod sealed {
         ///
         /// The node becomes the parent's last child.
         fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-            self.valid_node(node)?;
-            self.valid_node(after)?;
+            self.valid_descendant(node)?;
+            self.valid_descendant(after)?;
             self.hugr_mut().move_after_sibling(node, after)
         }
 
@@ -381,8 +395,8 @@ pub(crate) mod sealed {
         ///
         /// The node becomes the parent's last child.
         fn move_before_sibling(&mut self, node: Node, before: Node) -> Result<(), HugrError> {
-            self.valid_node(node)?;
-            self.valid_node(before)?;
+            self.valid_descendant(node)?;
+            self.valid_descendant(before)?;
             self.hugr_mut().move_before_sibling(node, before)
         }
 
