@@ -276,8 +276,8 @@ impl UnificationContext {
                 }
                 // We have a solution for everything!
                 Some(sig) => {
-                    self.add_solution(m_input, sig.input_extensions.clone());
                     self.add_solution(m_output, sig.output_extensions());
+                    self.add_solution(m_input, sig.input_extensions);
                 }
             }
         }
@@ -393,10 +393,13 @@ impl UnificationContext {
                     continue;
                 }
 
-                if let Some(cs) = self.constraints.get(m).cloned() {
+                if let Some(cs) = self.constraints.get(m) {
                     for c in cs
                         .into_iter()
                         .filter(|c| !matches!(c, Constraint::Equal(_)))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .into_iter()
                     {
                         self.add_constraint(combined_meta, c.clone());
                     }
@@ -865,6 +868,24 @@ mod test {
             *solution.get(&(mult.node(), Direction::Outgoing)).unwrap(),
             rs
         );
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_test() -> Result<(), InferExtensionError> {
+        let mut ctx = UnificationContext::new(&Hugr::default());
+        let m0 = ctx.fresh_meta();
+        let m1 = ctx.fresh_meta();
+        let m2 = ctx.fresh_meta();
+        ctx.add_constraint(m0, Constraint::Equal(m1));
+        ctx.main_loop()?;
+        let mid0 = ctx.resolve(m0);
+        assert_eq!(ctx.resolve(m0), ctx.resolve(m1));
+        ctx.add_constraint(mid0, Constraint::Equal(m2));
+        ctx.main_loop()?;
+        assert_eq!(ctx.resolve(m0), ctx.resolve(m2));
+        assert_eq!(ctx.resolve(m1), ctx.resolve(m2));
+        assert!(ctx.resolve(m0) != mid0);
         Ok(())
     }
 }
