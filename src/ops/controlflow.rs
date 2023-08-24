@@ -73,7 +73,7 @@ impl DataflowOpTrait for Conditional {
         let mut inputs = self.other_inputs.clone();
         inputs.to_mut().insert(
             0,
-            Type::new_predicate(self.predicate_inputs.clone().into_iter()),
+            Type::new_predicate(self.predicate_inputs.clone()),
         );
         FunctionType::new(inputs, self.outputs.clone())
     }

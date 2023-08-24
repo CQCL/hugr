@@ -32,7 +32,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         out_variant: Wire,
         rest: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest.into_iter()))
+        Dataflow::set_outputs(self, [out_variant].into_iter().chain(rest))
     }
 
     /// Get a reference to the [`ops::TailLoop`]
