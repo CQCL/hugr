@@ -20,7 +20,7 @@ mod test {
         for i in 0..MAX_LOG_WIDTH + 1 {
             assert_eq!(
                 INT_TYPES[i as usize],
-                int_type(TypeArg::BoundedUSize(i as u64))
+                int_type(TypeArg::BoundedNat(i as u64))
             )
         }
     }

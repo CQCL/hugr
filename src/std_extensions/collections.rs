@@ -160,7 +160,7 @@ mod test {
             .unwrap();
 
         assert!(list_def
-            .instantiate_concrete([TypeArg::BoundedUSize(3)])
+            .instantiate_concrete([TypeArg::BoundedNat(3)])
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();

@@ -33,7 +33,7 @@ pub(super) fn int_type(width_arg: TypeArg) -> Type {
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
     pub static ref INT_TYPES: [Type; (MAX_LOG_WIDTH + 1) as usize] = (0..MAX_LOG_WIDTH + 1)
-        .map(|i| int_type(TypeArg::BoundedUSize(i as u64)))
+        .map(|i| int_type(TypeArg::BoundedNat(i as u64)))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
@@ -47,15 +47,15 @@ const fn is_valid_log_width(n: u8) -> bool {
 pub const MAX_LOG_WIDTH: u8 = 7;
 
 /// Type parameter for the log width of the integer.
-// unsafe block should be ok as the value is definitely not zero.
+// SAFETY: unsafe block should be ok as the value is definitely not zero.
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam =
-    TypeParam::bounded_usize(unsafe { NonZeroU64::new_unchecked(MAX_LOG_WIDTH as u64 + 1) });
+    TypeParam::bounded_nat(unsafe { NonZeroU64::new_unchecked(MAX_LOG_WIDTH as u64 + 1) });
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
-        TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
+        TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: LOG_WIDTH_TYPE_PARAM,
@@ -64,7 +64,7 @@ pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
 }
 
 pub(super) const fn type_arg(log_width: u8) -> TypeArg {
-    TypeArg::BoundedUSize(log_width as u64)
+    TypeArg::BoundedNat(log_width as u64)
 }
 /// An unsigned integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -190,12 +190,12 @@ mod test {
 
     #[test]
     fn test_int_widths() {
-        let type_arg_32 = TypeArg::BoundedUSize(5);
+        let type_arg_32 = TypeArg::BoundedNat(5);
         assert_matches!(get_log_width(&type_arg_32), Ok(5));
 
-        let type_arg_128 = TypeArg::BoundedUSize(7);
+        let type_arg_128 = TypeArg::BoundedNat(7);
         assert_matches!(get_log_width(&type_arg_128), Ok(7));
-        let type_arg_256 = TypeArg::BoundedUSize(8);
+        let type_arg_256 = TypeArg::BoundedNat(8);
         assert_matches!(
             get_log_width(&type_arg_256),
             Err(TypeArgError::TypeMismatch { .. })
