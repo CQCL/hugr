@@ -13,11 +13,11 @@ mod test {
         types::type_param::TypeArg,
     };
 
-    use super::int_types::MAX_LOG_WIDTH;
+    use super::int_types::LOG_WIDTH_BOUND;
 
     #[test]
     fn test_int_types() {
-        for i in 0..MAX_LOG_WIDTH + 1 {
+        for i in 0..LOG_WIDTH_BOUND {
             assert_eq!(
                 INT_TYPES[i as usize],
                 int_type(TypeArg::BoundedNat(i as u64))
