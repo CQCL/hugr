@@ -8,7 +8,7 @@
 
 use super::{ExtensionId, ExtensionSet};
 use crate::{
-    hugr::views::{HierarchyView, HugrView, SiblingGraph},
+    hugr::views::HugrView,
     hugr::{Node, Port},
     ops::OpType,
     types::EdgeKind,
@@ -394,7 +394,7 @@ impl UnificationContext {
 
                 if let Some(cs) = self.constraints.get(m) {
                     for c in cs
-                        .into_iter()
+                        .iter()
                         .filter(|c| !matches!(c, Constraint::Equal(_)))
                         .cloned()
                         .collect::<Vec<_>>()
