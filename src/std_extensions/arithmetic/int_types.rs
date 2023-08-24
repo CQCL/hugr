@@ -1,5 +1,7 @@
 //! Basic integer types
 
+use std::num::NonZeroU64;
+
 use smol_str::SmolStr;
 
 use crate::{
@@ -43,8 +45,11 @@ const fn is_valid_log_width(n: u8) -> bool {
 
 /// The largest allowed log width.
 pub const MAX_LOG_WIDTH: u8 = 7;
+
 /// Type parameter for the log width of the integer.
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(MAX_LOG_WIDTH as u64);
+// unsafe block should be ok as the value is definitely not zero.
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam =
+    TypeParam::bounded_usize(unsafe { NonZeroU64::new_unchecked(MAX_LOG_WIDTH as u64 + 1) });
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
