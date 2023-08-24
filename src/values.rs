@@ -30,7 +30,7 @@ impl PrimValue {
         match self {
             PrimValue::Extension(e) => format!("const:custom:{}", e.0.name()),
             PrimValue::Function(h) => {
-                let Some(t) =  h.get_function_type() else {
+                let Some(t) = h.get_function_type() else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
                 format!("const:function:[{}]", t)

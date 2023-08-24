@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 
 use crate::extension::prelude::{BOOL_T, QB_T};
 use crate::extension::{ExtensionSet, SignatureError};
+use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::type_row;
 use crate::types::type_param::TypeArg;
 use crate::types::TypeRow;
@@ -34,6 +35,20 @@ fn extension() -> Extension {
             "Hadamard".into(),
             vec![],
             one_qb_func,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            SmolStr::new_inline("RzF64"),
+            "Rotation specified by float".into(),
+            vec![],
+            |_: &[_]| {
+                Ok((
+                    type_row![QB_T, FLOAT64_TYPE],
+                    type_row![QB_T],
+                    ExtensionSet::new(),
+                ))
+            },
         )
         .unwrap();
 
