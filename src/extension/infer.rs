@@ -852,10 +852,11 @@ mod test {
         )?;
         let [w] = mult.outputs_arr();
 
-        builder.set_outputs([w]);
+        builder.set_outputs([w])?;
         let hugr = builder.base;
         // TODO: when we put new extensions onto the graph after inference, we
         // can call `finish_hugr` and just look at the graph
+        let solution = infer_extensions(&hugr)?;
         assert_eq!(
             *solution.get(&(src.node(), Direction::Outgoing)).unwrap(),
             rs
