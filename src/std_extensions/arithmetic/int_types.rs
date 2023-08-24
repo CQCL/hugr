@@ -32,7 +32,7 @@ pub(super) fn int_type(width_arg: TypeArg) -> Type {
 
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
-    pub static ref INT_TYPES: [Type; (MAX_LOG_WIDTH + 1) as usize] = (0..MAX_LOG_WIDTH + 1)
+    pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
         .map(|i| int_type(TypeArg::BoundedNat(i as u64)))
         .collect::<Vec<_>>()
         .try_into()
@@ -40,16 +40,16 @@ lazy_static! {
 }
 
 const fn is_valid_log_width(n: u8) -> bool {
-    n <= MAX_LOG_WIDTH
+    n < LOG_WIDTH_BOUND
 }
 
-/// The largest allowed log width.
-pub const MAX_LOG_WIDTH: u8 = 7;
+/// The smallest forbidden log width.
+pub const LOG_WIDTH_BOUND: u8 = 8;
 
 /// Type parameter for the log width of the integer.
 // SAFETY: unsafe block should be ok as the value is definitely not zero.
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam =
-    TypeParam::bounded_nat(unsafe { NonZeroU64::new_unchecked(MAX_LOG_WIDTH as u64 + 1) });
+    TypeParam::bounded_nat(unsafe { NonZeroU64::new_unchecked(LOG_WIDTH_BOUND as u64) });
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
