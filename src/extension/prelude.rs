@@ -30,7 +30,7 @@ lazy_static! {
         prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![TypeParam::Type(TypeBound::Any), TypeParam::USize],
+                vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 "array".into(),
                 TypeDefBound::FromParams(vec![0]),
             )
@@ -68,7 +68,7 @@ pub(crate) const BOOL_T: Type = Type::new_simple_predicate(2);
 pub fn new_array(typ: Type, size: u64) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
-        .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::USize(size)])
+        .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::BoundedNat(size)])
         .unwrap();
     Type::new_extension(custom_t)
 }
