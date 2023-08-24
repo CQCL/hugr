@@ -20,9 +20,12 @@ pub struct ExtensionValidator {
 impl ExtensionValidator {
     /// Initialise a new extension validator, pre-computing the extension
     /// requirements for each node in the Hugr.
-    pub fn new(hugr: &Hugr) -> Self {
+    ///
+    /// The `closure` argument is a set of extensions which doesn't actually
+    /// live on the graph, but is used to close the graph for validation
+    pub fn new(hugr: &Hugr, closure: HashMap<(Node, Direction), ExtensionSet>) -> Self {
         let mut validator = ExtensionValidator {
-            extensions: HashMap::new(),
+            extensions: closure,
         };
 
         for node in hugr.nodes() {
