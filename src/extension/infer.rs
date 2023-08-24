@@ -95,7 +95,7 @@ impl EqGraph {
 
     /// Add a metavariable to the graph as a node and return the `NodeIndex`.
     /// If it's already there, just return the existing `NodeIndex`
-    pub fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
+    fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
         self.node_map.get(&m).cloned().unwrap_or_else(|| {
             let ix = self.equalities.add_node(m);
             self.node_map.insert(m, ix);
@@ -185,6 +185,9 @@ impl UnificationContext {
     }
 
     /// If a metavariable has been merged, return the new meta
+    ///
+    /// This could loop if there were a cycle in the `shunted` list, but there
+    /// shouldn't be, because we only ever shunt to *new* metas.
     fn resolve(&self, m: Meta) -> Meta {
         self.shunted.get(&m).cloned().map_or(m, |m| self.resolve(m))
     }
@@ -384,6 +387,8 @@ impl UnificationContext {
             // Within a connected component everything is equal
             let combined_meta = self.fresh_meta();
             for m in cc.iter() {
+                // The same meta shouldn't be shunted twice directly. Only
+                // transitively, as we still process the meta it was shunted to
                 if self.shunted.contains_key(m) {
                     continue;
                 }
