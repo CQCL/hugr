@@ -47,7 +47,7 @@ pub const MAX_LOG_WIDTH: u8 = 7;
 pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::BoundedUSize(MAX_LOG_WIDTH as u64);
 
 /// Get the log width  of the specified type argument or error if the argument
-/// is invalid..
+/// is invalid.
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
         TypeArg::BoundedUSize(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
