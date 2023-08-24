@@ -53,20 +53,6 @@ where
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root, Base> SiblingGraph<'g, Root, Base>
-where
-    Base: HugrInternals,
-{
-    /// Helper function to initialize the internal portgraph view.
-    fn init_graph(hugr: &Base, root: Node) -> FlatRegionGraph<'_> {
-        FlatRegionGraph::new_flat_region(
-            &hugr.base_hugr().graph,
-            &hugr.base_hugr().hierarchy,
-            root.index,
-        )
-    }
-}
-
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
@@ -252,20 +238,6 @@ where
     }
 }
 
-impl<'g, Root, Base> DescendantsGraph<'g, Root, Base>
-where
-    Base: HugrInternals,
-{
-    /// Helper function to initialize the internal portgraph view.
-    fn init_graph(hugr: &Base, root: Node) -> RegionGraph<'_> {
-        RegionGraph::new_region(
-            &hugr.base_hugr().graph,
-            &hugr.base_hugr().hierarchy,
-            root.index,
-        )
-    }
-}
-
 impl<'g, Root, Base> HugrView for DescendantsGraph<'g, Root, Base>
 where
     Root: NodeHandle,
@@ -431,7 +403,11 @@ where
         }
         Self {
             root,
-            graph: Self::init_graph(hugr, root),
+            graph: FlatRegionGraph::new_flat_region(
+                &hugr.base_hugr().graph,
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -453,7 +429,11 @@ where
         }
         Self {
             root,
-            graph: Self::init_graph(hugr, root),
+            graph: RegionGraph::new_region(
+                &hugr.base_hugr().graph,
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
             hugr,
             _phantom: std::marker::PhantomData,
         }
