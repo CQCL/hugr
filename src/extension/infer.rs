@@ -409,6 +409,8 @@ impl UnificationContext {
                     // constraints. It should be safe to call this multiple times
                     new_metas.insert(combined_meta);
                 }
+                // Here, solved.get is equivalent to get_solution, because if
+                // `m` had already been shunted, we wouldn't skipped it
                 if let Some(solution) = self.solved.get(m) {
                     match self.solved.get(&combined_meta) {
                         Some(existing_solution) => {
