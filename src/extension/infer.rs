@@ -242,10 +242,8 @@ impl UnificationContext {
     where
         T: HugrView,
     {
-        // The toplevel sibling graph can be open, and we should note what those variables are
-        let toplevel: SiblingGraph<Node, T> = SiblingGraph::new(hugr, hugr.root());
-        for toplevel_node in toplevel.nodes() {
-            let m_input = self.make_or_get_meta(toplevel_node, Direction::Incoming);
+        if hugr.root_type().signature().is_none() {
+            let m_input = self.make_or_get_meta(hugr.root(), Direction::Incoming);
             self.variables.insert(m_input);
         }
 
