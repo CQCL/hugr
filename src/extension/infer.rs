@@ -1,10 +1,14 @@
 //! Inference for extension requirements on nodes of a hugr.
 //!
-//! Checks if the extensions requirements are sane, and comes up with concrete
-//! solutions when possible. Inference operates when toplevel nodes can be open
-//! variables. When extension requirements of nodes depend on these open
-//! variables, then the validation check for extensions will succeed regardless
-//! of what the variable is instantiated to.
+//! Checks if the extensions requirements have a solution in terms of some
+//! number of starting variables, and comes up with concrete solutions when
+//! possible.
+//!
+//! Open extension variables can come from toplevel nodes: notionally "inputs"
+//! to the graph where being wired up to a larger hugr would provide the
+//! information needed to solve variables. When extension requirements of nodes
+//! depend on these open variables, then the validation check for extensions
+//! will succeed regardless of what the variable is instantiated to.
 
 use super::{ExtensionId, ExtensionSet};
 use crate::{
