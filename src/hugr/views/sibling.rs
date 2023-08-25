@@ -61,7 +61,7 @@ pub struct SiblingSubgraph<'g, Base> {
     outputs: OutgoingPorts,
 }
 
-impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
     /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted HUGR.
     ///
     /// The subgraph is given by the nodes between the input and output
