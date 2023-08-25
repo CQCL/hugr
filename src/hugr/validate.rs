@@ -38,7 +38,10 @@ struct ValidationContext<'a> {
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR.
+    /// Check the validity of the HUGR, assuming that it has no open extension
+    /// variables.
+    /// TODO: Add a version of validation which allows for open extension
+    /// variables (see github issue #457)
     pub fn validate(&self) -> Result<(), ValidationError> {
         self.validate_with_extension_closure(HashMap::new())
     }
