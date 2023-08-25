@@ -478,15 +478,16 @@ impl UnificationContext {
                                     ));
                                 }
                             }
-                            None => self.add_solution(meta, rrs),
+                            None => {
+                                self.add_solution(meta, rrs);
+                                solved = true;
+                            }
                         };
+                    } else if let Some(superset) = self.get_solution(&meta) {
+                        let subset = ExtensionSet::singleton(r).missing_from(superset);
+                        self.add_solution(self.resolve(*other_meta), subset);
                         solved = true;
-                    } else {
-                        // TODO: Try and go backwards with a `Minus` constraint
-                        // I.e. If we have a concrete solution for this
-                        // metavariable, we can then work out what `other_meta`
-                        // should be by subtracting the extension that's `Plus`d
-                    }
+                    };
                 }
             }
         }
@@ -912,6 +913,72 @@ mod test {
         assert_eq!(ctx.resolve(m0), ctx.resolve(m2));
         assert_eq!(ctx.resolve(m1), ctx.resolve(m2));
         assert!(ctx.resolve(m0) != mid0);
+        Ok(())
+    }
+
+    #[test]
+    fn minus_test() -> Result<(), Box<dyn Error>> {
+        let const_true = ops::Const::true_val();
+        const BOOLEAN: Type = Type::new_simple_predicate(2);
+        let just_bool = type_row![BOOLEAN];
+
+        let abc = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
+
+        // Parent graph is closed
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
+        }));
+
+        let _input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::Input { types: type_row![] }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::Output {
+                types: just_bool.clone(),
+            }),
+        )?;
+
+        let child = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::DFG {
+                signature: FunctionType::new(type_row![], just_bool.clone())
+                    .with_extension_delta(&abc),
+            }),
+        )?;
+        let _ichild = hugr.add_node_with_parent(
+            child,
+            NodeType::open_extensions(ops::Input { types: type_row![] }),
+        )?;
+        let ochild = hugr.add_node_with_parent(
+            child,
+            NodeType::open_extensions(ops::Output {
+                types: just_bool.clone(),
+            }),
+        )?;
+
+        let const_node = hugr.add_node_with_parent(child, NodeType::open_extensions(const_true))?;
+        let lift_node = hugr.add_node_with_parent(
+            child,
+            NodeType::open_extensions(ops::LeafOp::Lift {
+                type_row: just_bool.clone(),
+                new_extension: "C".into(),
+            }),
+        )?;
+
+        hugr.connect(const_node, 0, lift_node, 0)?;
+        hugr.connect(lift_node, 0, ochild, 0)?;
+        hugr.connect(child, 0, output, 0)?;
+
+        let (sol, _) = infer_extensions(&hugr)?;
+
+        // The solution for the const node should be {A, B}!
+        assert_eq!(
+            *sol.get(&(const_node, Direction::Outgoing)).unwrap(),
+            ExtensionSet::from_iter(["A".into(), "B".into()])
+        );
+
         Ok(())
     }
 }
