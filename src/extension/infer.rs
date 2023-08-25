@@ -713,7 +713,27 @@ mod test {
 
         hugr.connect(mult_c, 0, output, 0)?;
 
-        hugr.infer_extensions()?;
+        let (_, closure) = infer_extensions(&hugr)?;
+        let empty = ExtensionSet::new();
+        let ab = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let abc = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        assert_eq!(
+            *closure.get(&(hugr.root(), Direction::Incoming)).unwrap(),
+            empty
+        );
+        assert_eq!(
+            *closure.get(&(hugr.root(), Direction::Outgoing)).unwrap(),
+            abc
+        );
+        assert_eq!(*closure.get(&(mult_c, Direction::Incoming)).unwrap(), ab);
+        assert_eq!(*closure.get(&(mult_c, Direction::Outgoing)).unwrap(), abc);
+        assert_eq!(*closure.get(&(add_ab, Direction::Incoming)).unwrap(), empty);
+        assert_eq!(*closure.get(&(add_ab, Direction::Outgoing)).unwrap(), ab);
+        assert_eq!(*closure.get(&(add_ab, Direction::Incoming)).unwrap(), empty);
+        assert_eq!(
+            *closure.get(&(add_b, Direction::Incoming)).unwrap(),
+            ExtensionSet::singleton(&"A".into())
+        );
         Ok(())
     }
 
