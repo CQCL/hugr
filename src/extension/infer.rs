@@ -227,9 +227,9 @@ impl UnificationContext {
         // > mb = fresh_meta()
         // > add_constraint(mb, Plus(b, ma)
         // > add_constraint(output, Equal(mb))
-        for r in delta.iter() {
+        for r in delta.0.into_iter() {
             let curr_meta = self.fresh_meta();
-            self.add_constraint(curr_meta, Constraint::Plus(r.clone(), last_meta));
+            self.add_constraint(curr_meta, Constraint::Plus(r, last_meta));
             last_meta = curr_meta;
         }
         self.add_constraint(output, Constraint::Equal(last_meta));
