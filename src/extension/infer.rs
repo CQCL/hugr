@@ -799,40 +799,6 @@ mod test {
     }
 
     #[test]
-    /* We should be able to find a solution for this, of the form
-     forall x.
-       m0 = x;
-       m1 = A, x;
-       m2 = A, x;
-       m3 = x;
-    */
-    fn open() -> Result<(), InferExtensionError> {
-        let hugr = Hugr::default();
-        let mut ctx = UnificationContext::new(&hugr);
-        let m0 = ctx.fresh_meta();
-        let m1 = ctx.fresh_meta();
-        let m2 = ctx.fresh_meta();
-        let m3 = ctx.fresh_meta();
-        // Attach the metavariables to dummy nodes so that they're considered important
-        ctx.extensions
-            .insert((NodeIndex::new(1).into(), Direction::Incoming), m0);
-        ctx.extensions
-            .insert((NodeIndex::new(2).into(), Direction::Incoming), m1);
-        ctx.extensions
-            .insert((NodeIndex::new(3).into(), Direction::Incoming), m2);
-        ctx.extensions
-            .insert((NodeIndex::new(4).into(), Direction::Incoming), m3);
-
-        ctx.add_constraint(m1, Constraint::Plus("A".into(), m0));
-        ctx.add_constraint(m2, Constraint::Equal(m1));
-        ctx.add_constraint(m3, Constraint::Equal(m0));
-        ctx.variables.insert(m0);
-        ctx.main_loop()?;
-
-        Ok(())
-    }
-
-    #[test]
     // Tests that we can succeed even when all variables don't have concrete
     // extension sets, and we have an open variable at the start of the graph.
     fn open_variables() -> Result<(), InferExtensionError> {
