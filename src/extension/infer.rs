@@ -438,6 +438,7 @@ impl UnificationContext {
                 }
                 if self.variables.contains(m) {
                     self.variables.insert(combined_meta);
+                    self.variables.remove(m);
                 }
                 self.shunted.insert(*m, combined_meta);
             }
