@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 
 use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
-    InferExtensionError,
+    ExtensionSet, InferExtensionError,
 };
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
@@ -38,20 +38,35 @@ struct ValidationContext<'a> {
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR.
+    /// Check the validity of the HUGR, assuming that it has no open extension
+    /// variables.
+    /// TODO: Add a version of validation which allows for open extension
+    /// variables (see github issue #457)
     pub fn validate(&self) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self);
+        self.validate_with_extension_closure(HashMap::new())
+    }
+
+    /// Check the validity of a hugr, taking an argument of a closure for the
+    /// free extension variables
+    pub fn validate_with_extension_closure(
+        &self,
+        closure: HashMap<(Node, Direction), ExtensionSet>,
+    ) -> Result<(), ValidationError> {
+        let mut validator = ValidationContext::new(self, closure);
         validator.validate()
     }
 }
 
 impl<'a> ValidationContext<'a> {
     /// Create a new validation context.
-    pub fn new(hugr: &'a Hugr) -> Self {
+    pub fn new(
+        hugr: &'a Hugr,
+        extension_closure: HashMap<(Node, Direction), ExtensionSet>,
+    ) -> Self {
         Self {
             hugr,
             dominators: HashMap::new(),
-            extension_validator: ExtensionValidator::new(hugr),
+            extension_validator: ExtensionValidator::new(hugr, extension_closure),
         }
     }
 

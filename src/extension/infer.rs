@@ -28,9 +28,23 @@ use thiserror::Error;
 pub type ExtensionSolution = HashMap<(Node, Direction), ExtensionSet>;
 
 /// Infer extensions for a hugr. This is the main API exposed by this module
-pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
+///
+/// Return a tuple of the solutions found for locations on the graph, and a
+/// closure: a solution which would be valid if all of the variables in the graph
+/// were instantiated to an empty extension set. This is used (by validation) to
+/// concretise the extension requirements of the whole hugr.
+pub fn infer_extensions(
+    hugr: &impl HugrView,
+) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
-    ctx.main_loop()
+    let solution = ctx.main_loop()?;
+    ctx.instantiate_variables();
+    let closed_solution = ctx.main_loop()?;
+    let closure: HashMap<(Node, Direction), ExtensionSet> = closed_solution
+        .into_iter()
+        .filter(|(loc, _)| !solution.contains_key(loc))
+        .collect();
+    Ok((solution, closure))
 }
 
 /// Metavariables don't need much
@@ -599,6 +613,16 @@ impl UnificationContext {
         }
         self.results()
     }
+
+    /// Instantiate all variables in the graph with the empty extension set.
+    /// This is done to solve metas which depend on variables, which allows
+    /// us to come up with a fully concrete solution to pass into validation.
+    pub fn instantiate_variables(&mut self) {
+        for m in self.variables.clone().into_iter() {
+            self.add_solution(m, ExtensionSet::new());
+        }
+        self.variables = HashSet::new();
+    }
 }
 
 #[cfg(test)]
@@ -856,7 +880,8 @@ mod test {
         let hugr = builder.base;
         // TODO: when we put new extensions onto the graph after inference, we
         // can call `finish_hugr` and just look at the graph
-        let solution = infer_extensions(&hugr)?;
+        let (solution, extra) = infer_extensions(&hugr)?;
+        assert!(extra.is_empty());
         assert_eq!(
             *solution.get(&(src.node(), Direction::Outgoing)).unwrap(),
             rs
