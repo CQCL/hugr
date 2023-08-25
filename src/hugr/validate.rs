@@ -12,7 +12,10 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::validate::{ExtensionError, ExtensionValidator};
+use crate::extension::{
+    validate::{ExtensionError, ExtensionValidator},
+    ExtensionSet, InferExtensionError,
+};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -30,25 +33,40 @@ struct ValidationContext<'a> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Context for the resource validation.
+    /// Context for the extension validation.
     extension_validator: ExtensionValidator,
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR.
+    /// Check the validity of the HUGR, assuming that it has no open extension
+    /// variables.
+    /// TODO: Add a version of validation which allows for open extension
+    /// variables (see github issue #457)
     pub fn validate(&self) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self);
+        self.validate_with_extension_closure(HashMap::new())
+    }
+
+    /// Check the validity of a hugr, taking an argument of a closure for the
+    /// free extension variables
+    pub fn validate_with_extension_closure(
+        &self,
+        closure: HashMap<(Node, Direction), ExtensionSet>,
+    ) -> Result<(), ValidationError> {
+        let mut validator = ValidationContext::new(self, closure);
         validator.validate()
     }
 }
 
 impl<'a> ValidationContext<'a> {
     /// Create a new validation context.
-    pub fn new(hugr: &'a Hugr) -> Self {
+    pub fn new(
+        hugr: &'a Hugr,
+        extension_closure: HashMap<(Node, Direction), ExtensionSet>,
+    ) -> Self {
         Self {
             hugr,
             dominators: HashMap::new(),
-            extension_validator: ExtensionValidator::new(hugr),
+            extension_validator: ExtensionValidator::new(hugr, extension_closure),
         }
     }
 
@@ -137,8 +155,8 @@ impl<'a> ValidationContext<'a> {
         // Check operation-specific constraints
         self.validate_operation(node, node_type)?;
 
-        // If this is a container with I/O nodes, check that the resources they
-        // define match the resources of the container.
+        // If this is a container with I/O nodes, check that the extension they
+        // define match the extensions of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
             self.extension_validator
                 .validate_io_extensions(node, input, output)?;
@@ -591,9 +609,11 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// There are errors in the resource declarations.
+    /// There are errors in the extension declarations.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    #[error(transparent)]
+    CantInfer(#[from] InferExtensionError),
 }
 
 #[cfg(feature = "pyo3")]
@@ -669,8 +689,8 @@ mod test {
 
     use super::*;
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
     use crate::extension::ExtensionSet;
@@ -1084,8 +1104,8 @@ mod test {
     }
 
     #[test]
-    /// A wire with no resource requirements is wired into a node which has
-    /// [A,BOOL_T] resources required on its inputs and outputs. This could be fixed
+    /// A wire with no extension requirements is wired into a node which has
+    /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
@@ -1096,7 +1116,7 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            // Inner DFG has resource requirements that the wire wont satisfy
+            // Inner DFG has extension requirements that the wire wont satisfy
             .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
 
         let f_builder = main.dfg_builder(
@@ -1113,18 +1133,18 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirement `[A]` is wired into a an output with no
-    /// resource req. In the validation resource typechecking, we don't do any
-    /// unification, so don't allow open resource variables on the function
+    /// A wire with extension requirement `[A]` is wired into a an output with no
+    /// extension req. In the validation extension typechecking, we don't do any
+    /// unification, so don't allow open extension variables on the function
     /// signature, so this fails.
-    fn too_many_resources() -> Result<(), BuildError> {
+    fn too_many_extension() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
         let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).pure();
@@ -1149,14 +1169,14 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::SrcExceedsTgtExtensions { .. }
+                ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirements `[A]` and another with requirements
+    /// A wire with extension requirements `[A]` and another with requirements
     /// `[BOOL_T]` are both wired into a node which requires its inputs to have
     /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
     /// `missing_lift_node`.
@@ -1222,15 +1242,16 @@ mod test {
         let main_signature = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
 
-        let builder = DFGBuilder::new(main_signature)?;
+        let mut builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        builder.set_outputs([w])?;
+        let hugr = builder.base.validate(); // finish_hugr_with_outputs([w]);
 
         assert_matches!(
             hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
-            )))
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
+            ))
         );
         Ok(())
     }
