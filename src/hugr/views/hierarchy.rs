@@ -94,6 +94,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <FlatRegionGraph<'g, Base> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+       [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn root(&self) -> Node {
         self.root
@@ -163,6 +170,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link.into()).unwrap();
+                    offset.into()
+                })
             })
     }
 
@@ -269,6 +288,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <RegionGraph<'g, Base> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+        [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn root(&self) -> Node {
         self.root
@@ -332,6 +358,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link.into()).unwrap();
+                    offset.into()
+                })
             })
     }
 

@@ -3,6 +3,9 @@
 pub mod hierarchy;
 pub mod sibling;
 
+#[cfg(test)]
+mod tests;
+
 pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
 pub use sibling::SiblingSubgraph;
 
@@ -49,6 +52,11 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over the children of a node
     type PortLinks<'a>: Iterator<Item = (Node, Port)>
+    where
+        Self: 'a;
+
+    /// Iterator over the links between two nodes.
+    type NodeConnections<'a>: Iterator<Item = [Port; 2]>
     where
         Self: 'a;
 
@@ -103,6 +111,9 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
+
+    /// Iterator the links between two nodes.
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
 
     /// Returns whether a port is connected.
     fn is_linked(&self, node: Node, port: Port) -> bool {
@@ -231,6 +242,8 @@ where
     where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
+
     #[inline]
     fn root(&self) -> Node {
         self.as_ref().root.into()
@@ -288,6 +301,21 @@ where
                 let node = hugr.graph.port_node(port).unwrap();
                 let offset = hugr.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    #[inline]
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        let hugr = self.as_ref();
+
+        hugr.graph
+            .get_connections(node.index, other.index)
+            .with_context(hugr)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link.port()).unwrap();
+                    offset.into()
+                })
             })
     }
 
