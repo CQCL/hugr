@@ -185,10 +185,8 @@ impl UnificationContext {
     fn add_constraint(&mut self, m: Meta, c: Constraint) {
         self.constraints
             .entry(m)
-            .and_modify(|cs| {
-                cs.insert(c.clone());
-            })
-            .or_insert(HashSet::from_iter([c]));
+            .or_insert(HashSet::new())
+            .insert(c);
     }
 
     /// Declare that a meta has been solved
