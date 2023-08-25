@@ -7,7 +7,7 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrInternalsMut;
@@ -24,7 +24,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::ExtensionSet;
+use crate::extension::{infer_extensions, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
@@ -191,6 +191,20 @@ impl Hugr {
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
         rw.apply(self)
+    }
+
+    /// Infer extension requirements
+    pub fn infer_extensions(
+        &mut self,
+    ) -> Result<HashMap<(Node, Direction), ExtensionSet>, InferExtensionError> {
+        let (solution, extension_closure) = infer_extensions(self)?;
+        self.instantiate_extensions(solution);
+        Ok(extension_closure)
+    }
+
+    /// TODO: Write this
+    fn instantiate_extensions(&mut self, _solution: ExtensionSolution) {
+        //todo!()
     }
 }
 
