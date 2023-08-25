@@ -1133,7 +1133,7 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
         );
         Ok(())
@@ -1169,7 +1169,7 @@ mod test {
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::SrcExceedsTgtExtensions { .. }
+                ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
             ))
         );
         Ok(())
@@ -1250,7 +1250,7 @@ mod test {
         assert_matches!(
             hugr,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
         );
         Ok(())

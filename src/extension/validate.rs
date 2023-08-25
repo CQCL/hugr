@@ -85,7 +85,7 @@ impl ExtensionValidator {
         } else if rs_src.is_subset(rs_tgt) {
             // The extra extension requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
-            Err(ExtensionError::TgtExceedsSrcExtensions {
+            Err(ExtensionError::TgtExceedsSrcExtensionsAtPort {
                 from: src.0,
                 from_offset: src.1,
                 from_extensions: rs_src.clone(),
@@ -94,7 +94,7 @@ impl ExtensionValidator {
                 to_extensions: rs_tgt.clone(),
             })
         } else {
-            Err(ExtensionError::SrcExceedsTgtExtensions {
+            Err(ExtensionError::SrcExceedsTgtExtensionsAtPort {
                 from: src.0,
                 from_offset: src.1,
                 from_extensions: rs_src.clone(),
@@ -144,8 +144,16 @@ impl ExtensionValidator {
 #[allow(missing_docs)]
 pub enum ExtensionError {
     /// Missing lift node
-    #[error("Extensions at target node {to:?} ({to_offset:?}) ({to_extensions}) exceed those at source {from:?} ({from_offset:?}) ({from_extensions})")]
+    #[error("Extensions at target node {to:?} ({to_extensions}) exceed those at source {from:?} ({from_extensions})")]
     TgtExceedsSrcExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
+    /// A version of the above which includes port info
+    #[error("Extensions at target node {to:?} ({to_offset:?}) ({to_extensions}) exceed those at source {from:?} ({from_offset:?}) ({from_extensions})")]
+    TgtExceedsSrcExtensionsAtPort {
         from: Node,
         from_offset: Port,
         from_extensions: ExtensionSet,
@@ -154,8 +162,16 @@ pub enum ExtensionError {
         to_extensions: ExtensionSet,
     },
     /// Too many extension requirements coming from src
-    #[error("Extensions at source node {from:?} ({from_offset:?}) ({from_extensions}) exceed those at target {to:?} ({to_offset:?}) ({to_extensions})")]
+    #[error("Extensions at source node {from:?} ({from_extensions}) exceed those at target {to:?} ({to_extensions})")]
     SrcExceedsTgtExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
+    /// A version of the above which includes port info
+    #[error("Extensions at source node {from:?} ({from_offset:?}) ({from_extensions}) exceed those at target {to:?} ({to_offset:?}) ({to_extensions})")]
+    SrcExceedsTgtExtensionsAtPort {
         from: Node,
         from_offset: Port,
         from_extensions: ExtensionSet,

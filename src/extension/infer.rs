@@ -11,13 +11,7 @@
 //! will succeed regardless of what the variable is instantiated to.
 
 use super::{ExtensionId, ExtensionSet};
-use crate::{
-    hugr::views::HugrView,
-    hugr::{Node, Port},
-    ops::OpType,
-    types::EdgeKind,
-    Direction,
-};
+use crate::{hugr::views::HugrView, hugr::Node, ops::OpType, types::EdgeKind, Direction};
 
 use super::validate::ExtensionError;
 
@@ -362,10 +356,8 @@ impl UnificationContext {
                     Some(InferExtensionError::EdgeMismatch(
                         ExtensionError::TgtExceedsSrcExtensions {
                             from: *src,
-                            from_offset: Port::new(Direction::Outgoing, 0),
                             from_extensions: src_rs,
                             to: *tgt,
-                            to_offset: Port::new(Direction::Incoming, 0),
                             to_extensions: tgt_rs,
                         },
                     ))
@@ -373,10 +365,8 @@ impl UnificationContext {
                     Some(InferExtensionError::EdgeMismatch(
                         ExtensionError::SrcExceedsTgtExtensions {
                             from: *src,
-                            from_offset: Port::new(Direction::Outgoing, 0),
                             from_extensions: src_rs,
                             to: *tgt,
-                            to_offset: Port::new(Direction::Incoming, 0),
                             to_extensions: tgt_rs,
                         },
                     ))
