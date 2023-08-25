@@ -100,7 +100,7 @@ struct EqGraph {
 
 impl EqGraph {
     /// Create a new `EqGraph`
-    pub fn new() -> Self {
+    fn new() -> Self {
         EqGraph {
             equalities: pg::Graph::new_undirected(),
             node_map: HashMap::new(),
@@ -119,14 +119,14 @@ impl EqGraph {
 
     /// Create an edge between two nodes on the graph, declaring that they stand
     /// for metavariables which should be equal.
-    pub fn register_eq(&mut self, src: Meta, tgt: Meta) {
+    fn register_eq(&mut self, src: Meta, tgt: Meta) {
         let src_ix = self.add_or_retrieve(src);
         let tgt_ix = self.add_or_retrieve(tgt);
         self.equalities.add_edge(src_ix, tgt_ix, ());
     }
 
     /// Return the connected components of the graph in terms of metavariables
-    pub fn ccs(&self) -> Vec<Vec<Meta>> {
+    fn ccs(&self) -> Vec<Vec<Meta>> {
         petgraph::algo::tarjan_scc(&self.equalities)
             .into_iter()
             .map(|cc| {
