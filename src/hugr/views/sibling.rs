@@ -24,7 +24,7 @@ use crate::{
     Hugr, Node, Port, SimpleReplacement,
 };
 
-use super::{sealed::HugrInternals, HugrView};
+use super::HugrView;
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
