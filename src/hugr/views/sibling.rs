@@ -561,7 +561,7 @@ mod tests {
 
     use super::*;
 
-    impl<'g, Base: HugrInternals> SiblingSubgraph<'g, Base> {
+    impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
         /// A sibling subgraph from a HUGR.
         ///
         /// The subgraph is given by the sibling graph of the root. If you wish to
