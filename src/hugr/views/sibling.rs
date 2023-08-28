@@ -439,7 +439,7 @@ fn validate_subgraph<H: HugrView>(
     }
     // Check incoming & outgoing ports have source resp. target outside
     if ports_outside.any(|(n, _)| nodes.contains(&n)) {
-        return Err(InvalidSubgraph::InvalidBoundary);
+        return Err(InvalidSubgraph::NotConvex);
     }
 
     // Check inputs are unique
