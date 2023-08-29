@@ -736,7 +736,7 @@ mod tests {
                 vec![hugr.linked_ports(inp, first_cx_edge).collect()],
                 vec![(inp, first_cx_edge)],
             ),
-            Err(InvalidSubgraph::InvalidBoundary)
+            Err(InvalidSubgraph::NotConvex)
         ));
     }
 
