@@ -4,9 +4,9 @@ use super::{
     BuildError, Container,
 };
 
-use crate::{extension::ExtensionRegistry, hugr::hugrmut::sealed::HugrMutInternals};
 use crate::{
-    hugr::{views::HugrView, ValidationError},
+    extension::ExtensionRegistry,
+    hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
     types::{Type, TypeBound},
 };
@@ -174,7 +174,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
-        extension::ExtensionRegistry,
+        extension::EMPTY_REG,
         type_row,
         types::FunctionType,
     };
@@ -194,7 +194,7 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -217,7 +217,7 @@ mod test {
                 .pure(),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -242,7 +242,7 @@ mod test {
             let call = f_build.call(f_id.handle(), f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

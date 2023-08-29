@@ -90,7 +90,7 @@ impl From<BuildError> for PyErr {
 pub(crate) mod test {
     use rstest::fixture;
 
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::EMPTY_REG;
     use crate::types::{FunctionType, Signature, Type};
     use crate::{type_row, Hugr};
 
@@ -121,7 +121,7 @@ pub(crate) mod test {
         let f_builder = module_builder.define_function("main", signature)?;
 
         f(f_builder)?;
-        Ok(module_builder.finish_hugr(&ExtensionRegistry::new())?)
+        Ok(module_builder.finish_hugr(&EMPTY_REG)?)
     }
 
     #[fixture]
@@ -130,7 +130,7 @@ pub(crate) mod test {
             DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder
-            .finish_hugr_with_outputs([i1], &ExtensionRegistry::new())
+            .finish_hugr_with_outputs([i1], &EMPTY_REG)
             .unwrap()
     }
 }

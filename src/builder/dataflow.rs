@@ -225,7 +225,7 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::EMPTY_REG;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
@@ -267,7 +267,7 @@ pub(crate) mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
 
         assert_eq!(build_result.err(), None);
@@ -290,7 +290,7 @@ pub(crate) mod test {
 
             f(f_build)?;
 
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -341,7 +341,7 @@ pub(crate) mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            Ok(module_builder.finish_hugr(&ExtensionRegistry::new())?)
+            Ok(module_builder.finish_hugr(&EMPTY_REG)?)
         };
 
         assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
@@ -366,7 +366,7 @@ pub(crate) mod test {
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &ExtensionRegistry::new())
+            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &EMPTY_REG)
         };
 
         assert_matches!(builder(), Ok(_));
@@ -412,7 +412,7 @@ pub(crate) mod test {
         let mut dfg_builder = DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata(json!(42));
-        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &ExtensionRegistry::new())?;
+        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &EMPTY_REG)?;
 
         // Create a module, and insert the DFG into it
         let mut module_builder = ModuleBuilder::new();
@@ -428,12 +428,7 @@ pub(crate) mod test {
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 
-        assert_eq!(
-            module_builder
-                .finish_hugr(&ExtensionRegistry::new())?
-                .node_count(),
-            7
-        );
+        assert_eq!(module_builder.finish_hugr(&EMPTY_REG)?.node_count(), 7);
 
         Ok(())
     }
@@ -504,7 +499,7 @@ pub(crate) mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_hugr_with_outputs([w], &ExtensionRegistry::new())?;
+        parent.finish_hugr_with_outputs([w], &EMPTY_REG)?;
 
         Ok(())
     }

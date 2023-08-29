@@ -4,7 +4,7 @@
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -29,16 +29,18 @@ pub mod validate;
 
 pub use prelude::PRELUDE;
 
-/// Type of Extension Registries.
-pub struct ExtensionRegistry(HashMap<SmolStr, Extension>);
+/// Extension Registries store extensions to be looked up e.g. during validation.
+pub struct ExtensionRegistry(BTreeMap<SmolStr, Extension>);
 
 impl ExtensionRegistry {
     /// Makes a new (empty) registry.
-    /// Ideally this would be `const` but HashMap doesn't have a const constructor.
-    pub fn new() -> Self {
-        Self(HashMap::default())
+    pub const fn new() -> Self {
+        Self(BTreeMap::new())
     }
 }
+
+/// An Extension Registry containing no extensions.
+pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes

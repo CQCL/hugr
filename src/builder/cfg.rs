@@ -5,11 +5,8 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::types::FunctionType;
-use crate::{
-    extension::ExtensionRegistry,
-    ops::{self, BasicBlock, OpType},
-};
+use crate::ops::{self, BasicBlock, OpType};
+use crate::{extension::ExtensionRegistry, types::FunctionType};
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{ops::handle::NodeHandle, types::Type};
 
@@ -305,7 +302,7 @@ impl BlockBuilder<Hugr> {
 mod test {
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::EMPTY_REG;
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
@@ -329,7 +326,7 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
 
         assert_eq!(build_result.err(), None);
@@ -340,7 +337,7 @@ mod test {
     fn basic_cfg_hugr() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_hugr(&ExtensionRegistry::new()), Ok(_));
+        assert_matches!(cfg_builder.finish_hugr(&EMPTY_REG), Ok(_));
 
         Ok(())
     }

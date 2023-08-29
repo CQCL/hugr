@@ -12,10 +12,9 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::ExtensionRegistry;
 use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
-    ExtensionSet, InferExtensionError,
+    ExtensionRegistry, ExtensionSet, InferExtensionError,
 };
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
@@ -699,7 +698,7 @@ mod test {
         ModuleBuilder,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{ExtensionRegistry, ExtensionSet};
+    use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
@@ -796,25 +795,25 @@ mod test {
 
         let mut b = Hugr::default();
         let root = b.root();
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Add another hierarchy root
         let other = b.add_op(ops::Module);
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, NodeType::pure(declare_op));
         b.add_ports(other, Direction::Outgoing, 1);
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Make the hugr root not a hierarchy root
         {
             let mut hugr = b.clone();
             hugr.root = other.index;
             assert_matches!(
-                hugr.validate(&ExtensionRegistry::new()),
+                hugr.validate(&EMPTY_REG),
                 Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
             );
         }
@@ -825,7 +824,7 @@ mod test {
         let leaf_op: OpType = LeafOp::Noop { ty: USIZE_T }.into();
 
         let b = Hugr::new(NodeType::pure(leaf_op));
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -838,13 +837,13 @@ mod test {
         let mut b = Hugr::new(NodeType::pure(dfg_op));
         let root = b.root();
         add_df_children(&mut b, root, 1);
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
     fn simple_hugr() {
         let b = make_simple_hugr(2).0;
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -871,7 +870,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
         );
 
@@ -879,7 +878,7 @@ mod test {
         add_df_children(&mut b, new_def, 2);
         b.set_parent(new_def, copy).unwrap();
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
         );
         b.set_parent(new_def, root).unwrap();
@@ -890,7 +889,7 @@ mod test {
             .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
     }
@@ -909,14 +908,14 @@ mod test {
         // Replace the output operation of the df subgraph with a copy
         b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }));
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
         );
 
         // Revert it back to an output, but with the wrong number of ports
         b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])));
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
@@ -931,7 +930,7 @@ mod test {
             NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
         );
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, copy.index)}
         );
@@ -956,7 +955,7 @@ mod test {
             }),
         );
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
         );
         let cfg = copy;
@@ -982,7 +981,7 @@ mod test {
             )
             .unwrap();
         b.add_other_edge(block, exit).unwrap();
-        assert_eq!(b.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Test malformed errors
 
@@ -996,7 +995,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
                 => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
         );
@@ -1023,7 +1022,7 @@ mod test {
             ])),
         );
         assert_matches!(
-            b.validate(&ExtensionRegistry::new()),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
@@ -1057,20 +1056,20 @@ mod test {
         h.connect(sub_dfg, 0, output, 0)?;
 
         assert_matches!(
-            h.validate(&ExtensionRegistry::new()),
+            h.validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort { .. })
         );
 
         h.connect(input, 1, sub_op, 1)?;
         assert_matches!(
-            h.validate(&ExtensionRegistry::new()),
+            h.validate(&EMPTY_REG),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::MissingOrderEdge { .. }
             ))
         );
         //Order edge. This will need metadata indicating its purpose.
         h.add_other_edge(input, sub_dfg)?;
-        h.validate(&ExtensionRegistry::new()).unwrap();
+        h.validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
@@ -1085,7 +1084,7 @@ mod test {
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, output, 0)?;
         assert_eq!(
-            h.validate(&ExtensionRegistry::new()),
+            h.validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
                 port: Port::new_incoming(1),
@@ -1104,12 +1103,12 @@ mod test {
         h.connect(lcst, 0, and, 1)?;
         // We are missing the edge from Input to LoadConstant, hence:
         assert_matches!(
-            h.validate(&ExtensionRegistry::new()),
+            h.validate(&EMPTY_REG),
             Err(ValidationError::NotABoundedDag { .. })
         );
         // Now include the LoadConstant node in the causal cone
         h.add_other_edge(input, lcst)?;
-        h.validate(&ExtensionRegistry::new()).unwrap();
+        h.validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
@@ -1138,7 +1137,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&ExtensionRegistry::new());
+        let handle = module_builder.finish_hugr(&EMPTY_REG);
 
         assert_matches!(
             handle,
@@ -1175,7 +1174,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&ExtensionRegistry::new());
+        let handle = module_builder.finish_hugr(&EMPTY_REG);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1237,7 +1236,7 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.finish_hugr(&ExtensionRegistry::new());
+        let handle = module_builder.finish_hugr(&EMPTY_REG);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1255,7 +1254,7 @@ mod test {
         let mut builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
         builder.set_outputs([w])?;
-        let hugr = builder.base.validate(&ExtensionRegistry::new()); // finish_hugr_with_outputs([w]);
+        let hugr = builder.base.validate(&EMPTY_REG); // finish_hugr_with_outputs([w]);
 
         assert_matches!(
             hugr,

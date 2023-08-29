@@ -199,7 +199,7 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::EMPTY_REG;
     use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
@@ -253,7 +253,7 @@ mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        Ok(module_builder.finish_hugr(&ExtensionRegistry::new())?)
+        Ok(module_builder.finish_hugr(&EMPTY_REG)?)
     }
 
     /// Creates a hugr with a DFG root like the following:
@@ -270,7 +270,7 @@ mod test {
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
             dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-        dfg_builder.finish_hugr_with_outputs(wire45.outputs(), &ExtensionRegistry::new())
+        dfg_builder.finish_hugr_with_outputs(wire45.outputs(), &EMPTY_REG)
     }
 
     /// Creates a hugr with a DFG root like the following:
@@ -285,7 +285,7 @@ mod test {
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
-        dfg_builder.finish_hugr_with_outputs(wireoutvec, &ExtensionRegistry::new())
+        dfg_builder.finish_hugr_with_outputs(wireoutvec, &EMPTY_REG)
     }
 
     #[test]
@@ -372,7 +372,7 @@ mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(h.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -449,7 +449,7 @@ mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(&ExtensionRegistry::new()), Ok(()));
+        assert_eq!(h.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -461,9 +461,7 @@ mod test {
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
-        let mut h = builder
-            .finish_hugr_with_outputs(wires, &ExtensionRegistry::new())
-            .unwrap();
+        let mut h = builder.finish_hugr_with_outputs(wires, &EMPTY_REG).unwrap();
         let replacement = h.clone();
         let orig = h.clone();
 
@@ -511,17 +509,13 @@ mod test {
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
-        let mut h = builder
-            .finish_hugr_with_outputs(outw, &ExtensionRegistry::new())
-            .unwrap();
+        let mut h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
 
         let mut builder = DFGBuilder::new(FunctionType::new(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
-        let repl = builder
-            .finish_hugr_with_outputs(outw, &ExtensionRegistry::new())
-            .unwrap();
+        let repl = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
 
         let orig = h.clone();
 

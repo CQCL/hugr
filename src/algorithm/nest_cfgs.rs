@@ -399,7 +399,7 @@ pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::EMPTY_REG;
     use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
@@ -443,7 +443,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr(&ExtensionRegistry::new())?;
+        let h = cfg_builder.finish_hugr(&EMPTY_REG)?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -698,7 +698,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr(&ExtensionRegistry::new())?;
+        let h = cfg_builder.finish_hugr(&EMPTY_REG)?;
         Ok((h, merge, tail))
     }
 
@@ -735,7 +735,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr(&ExtensionRegistry::new())?;
+        let h = cfg_builder.finish_hugr(&EMPTY_REG)?;
         Ok((h, head, tail))
     }
 }

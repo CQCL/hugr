@@ -551,7 +551,7 @@ mod tests {
         },
         extension::{
             prelude::{BOOL_T, QB_T},
-            ExtensionRegistry,
+            EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::{
@@ -604,7 +604,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&ExtensionRegistry::new())
+            .finish_hugr(&EMPTY_REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -623,7 +623,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&ExtensionRegistry::new())
+            .finish_hugr(&EMPTY_REG)
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -650,7 +650,7 @@ mod tests {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder
-                .finish_hugr_with_outputs(inputs, &ExtensionRegistry::new())
+                .finish_hugr_with_outputs(inputs, &EMPTY_REG)
                 .unwrap()
         };
 
@@ -687,7 +687,7 @@ mod tests {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder
-                .finish_hugr_with_outputs(inputs, &ExtensionRegistry::new())
+                .finish_hugr_with_outputs(inputs, &EMPTY_REG)
                 .unwrap()
         };
 

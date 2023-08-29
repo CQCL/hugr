@@ -99,7 +99,7 @@ mod test {
         },
         extension::{
             prelude::{ConstUsize, USIZE_T},
-            ExtensionRegistry,
+            EMPTY_REG,
         },
         hugr::ValidationError,
         ops::Const,
@@ -116,7 +116,7 @@ mod test {
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
-            loop_b.finish_hugr(&ExtensionRegistry::new())
+            loop_b.finish_hugr(&EMPTY_REG)
         };
 
         assert_matches!(build_result, Ok(_));
@@ -169,7 +169,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_hugr(&ExtensionRegistry::new())
+            module_builder.finish_hugr(&EMPTY_REG)
         };
 
         assert_matches!(build_result, Ok(_));
