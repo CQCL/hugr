@@ -42,7 +42,7 @@ impl TypeRow {
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
-            pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Type>;
+            pub fn iter(&self) -> impl Iterator<Item = &Type>;
 
             /// Returns the number of types in the row.
             pub fn len(&self) -> usize;

@@ -7,11 +7,7 @@ use super::{CustomType, FunctionType, TypeBound};
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-
-/// Primitive leaves of a [Type]
-///
-/// [Type]: super::Type
-pub enum PrimType {
+pub(super) enum PrimType {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
     Extension(CustomType),

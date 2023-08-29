@@ -17,11 +17,12 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
-pub use self::primitive::PrimType;
+use self::primitive::PrimType;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -252,21 +253,25 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
-    /// Returns an iterator over the [PrimType] leaves of this type.
-    /// Duplicates will be returned once per occurrence.
-    pub fn iter_prims(&self) -> impl Iterator<Item = &PrimType> + '_ {
-        itertools::unfold(vec![self], |v| {
-            while let Some(ty) = v.pop() {
-                match &ty.0 {
-                    TypeEnum::Prim(pr) => return Some(pr),
-                    TypeEnum::Sum(SumType::Simple(_)) => (), // No Prim's in there
-                    TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General(row)) => {
-                        v.extend(row.iter().rev());
-                    }
-                }
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        // There is no need to check the components against the bound,
+        // that is guaranteed by construction (even for deserialization)
+        match &self.0 {
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General(row)) => {
+                row.iter().try_for_each(|t| t.validate(extension_registry))
             }
-            None
-        })
+            TypeEnum::Sum(SumType::Simple(_)) => Ok(()), // No leaves there
+            TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
+            TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
+            TypeEnum::Prim(PrimType::Function(ft)) => (*ft)
+                .input
+                .iter()
+                .chain((*ft).output.iter())
+                .try_for_each(|t| t.validate(extension_registry)),
+        }
     }
 }
 
@@ -319,24 +324,5 @@ pub(crate) mod test {
 
         let pred_direct = SumType::Simple(2);
         assert_eq!(pred1, pred_direct.into())
-    }
-
-    #[test]
-    fn iter_prims() {
-        let ft = Type::new_function(FunctionType::new_linear(type_row![USIZE_T]));
-        let t2 = Type::new_tuple(vec![
-            USIZE_T,
-            Type::new_sum(vec![Type::new_tuple(vec![ft.clone(), EQ_T]), COPYABLE_T]),
-            Type::new_sum(type_row![EQ_T, ANY_T]),
-        ]);
-        let prims: Vec<PrimType> = t2.iter_prims().cloned().collect();
-        let expected: Vec<PrimType> = [USIZE_T, ft, EQ_T, COPYABLE_T, EQ_T, ANY_T]
-            .into_iter()
-            .map(|t| match t.0 {
-                TypeEnum::Prim(p) => p,
-                _ => panic!("Not a PrimType?!"),
-            })
-            .collect();
-        assert_eq!(prims, expected);
     }
 }

@@ -8,7 +8,9 @@ use std::num::NonZeroU64;
 
 use thiserror::Error;
 
+use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
+use crate::extension::SignatureError;
 
 use super::CustomType;
 use super::Type;
@@ -76,6 +78,25 @@ pub enum TypeArg {
     Sequence(Vec<TypeArg>),
     /// Instance of [TypeParam::Extensions], providing the extension ids.
     Extensions(ExtensionSet),
+}
+
+impl TypeArg {
+    pub(super) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        match self {
+            TypeArg::Type(ty) => ty.validate(extension_registry),
+            TypeArg::BoundedNat(_) => Ok(()),
+            TypeArg::Opaque(custarg) => {
+                // We could also add a facility to Extension to validate that the constant *value*
+                // here is a valid instance of the type.
+                custarg.typ.validate(extension_registry)
+            }
+            TypeArg::Sequence(args) => args.iter().try_for_each(|a| a.validate(extension_registry)),
+            TypeArg::Extensions(_) => Ok(()),
+        }
+    }
 }
 
 /// A serialized representation of a value of a [CustomType]

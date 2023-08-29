@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::extension::ExtensionId;
+use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError};
 
 use super::{type_param::TypeArg, TypeBound};
 
@@ -54,6 +54,28 @@ impl CustomType {
     /// Returns the bound of this [`CustomType`].
     pub const fn bound(&self) -> TypeBound {
         self.bound
+    }
+
+    pub(super) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        // Check the args are individually ok
+        self.args
+            .iter()
+            .try_for_each(|a| a.validate(extension_registry))?;
+        // And check they fit into the TypeParams declared by the TypeDef
+        let ex = extension_registry.get(&self.extension);
+        // Even if OpDef's (+binaries) are not available, the part of the Extension definition
+        // describing the TypeDefs can easily be passed around (serialized), so should be available.
+        let ex = ex.ok_or(SignatureError::ExtensionNotFound(self.extension.clone()))?;
+        let def = ex
+            .get_type(&self.id)
+            .ok_or(SignatureError::ExtensionTypeNotFound {
+                exn: self.extension.clone(),
+                typ: self.id.clone(),
+            })?;
+        def.check_custom(self)
     }
 }
 
