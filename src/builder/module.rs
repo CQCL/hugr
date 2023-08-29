@@ -4,7 +4,7 @@ use super::{
     BuildError, Container,
 };
 
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::{extension::ExtensionRegistry, hugr::hugrmut::sealed::HugrMutInternals};
 use crate::{
     hugr::{views::HugrView, ValidationError},
     ops,
@@ -56,8 +56,8 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.0.validate()?;
+    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError> {
+        self.0.validate(extension_registry)?;
         Ok(self.0)
     }
 }
@@ -174,6 +174,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
+        extension::ExtensionRegistry,
         type_row,
         types::FunctionType,
     };
@@ -193,7 +194,7 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&ExtensionRegistry::new())
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -216,7 +217,7 @@ mod test {
                 .pure(),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&ExtensionRegistry::new())
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -241,7 +242,7 @@ mod test {
             let call = f_build.call(f_id.handle(), f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&ExtensionRegistry::new())
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

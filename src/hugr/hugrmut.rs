@@ -474,6 +474,7 @@ pub(crate) mod sealed {
 mod test {
     use crate::{
         extension::prelude::USIZE_T,
+        extension::ExtensionRegistry,
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
@@ -522,6 +523,6 @@ mod test {
         }
 
         // Finish the construction and create the HUGR
-        builder.validate().unwrap();
+        builder.validate(&ExtensionRegistry::new()).unwrap();
     }
 }

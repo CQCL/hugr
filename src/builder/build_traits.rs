@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -128,7 +128,7 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError>;
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -720,12 +720,13 @@ pub trait DataflowHugr: HugrBuilder + Dataflow {
     fn finish_hugr_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(outputs)?;
-        Ok(self.finish_hugr()?)
+        Ok(self.finish_hugr(extension_registry)?)
     }
 }
 

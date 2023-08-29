@@ -29,6 +29,17 @@ pub mod validate;
 
 pub use prelude::PRELUDE;
 
+/// Type of Extension Registries.
+pub struct ExtensionRegistry(HashMap<SmolStr, Extension>);
+
+impl ExtensionRegistry {
+    /// Makes a new (empty) registry.
+    /// Ideally this would be `const` but HashMap doesn't have a const constructor.
+    pub fn new() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]

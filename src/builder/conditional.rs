@@ -1,3 +1,4 @@
+use crate::extension::ExtensionRegistry;
 use crate::hugr::views::HugrView;
 use crate::types::{FunctionType, TypeRow};
 
@@ -143,8 +144,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 }
 
 impl HugrBuilder for ConditionalBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.validate()?;
+    fn finish_hugr(
+        self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, crate::hugr::ValidationError> {
+        self.base.validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -204,6 +208,7 @@ mod test {
 
     use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
 
+    use crate::extension::ExtensionRegistry;
     use crate::{
         builder::{
             test::{n_identity, NAT},
@@ -256,7 +261,7 @@ mod test {
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            Ok(module_builder.finish_hugr()?)
+            Ok(module_builder.finish_hugr(&ExtensionRegistry::new())?)
         };
 
         assert_matches!(build_result, Ok(_));

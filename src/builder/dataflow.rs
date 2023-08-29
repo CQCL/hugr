@@ -9,7 +9,7 @@ use crate::ops;
 
 use crate::types::{FunctionType, Signature};
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
@@ -96,9 +96,13 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, ValidationError> {
         let closure = self.base.infer_extensions()?;
-        self.base.validate_with_extension_closure(closure)?;
+        self.base
+            .validate_with_extension_closure(closure, extension_registry)?;
         Ok(self.base)
     }
 }
@@ -207,8 +211,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T: From<BuildHandle<DfgID>>> SubContainer for
 }
 
 impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.0.finish_hugr()
+    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError> {
+        self.0.finish_hugr(extension_registry)
     }
 }
 
@@ -221,6 +225,7 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
+    use crate::extension::ExtensionRegistry;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
@@ -262,7 +267,7 @@ pub(crate) mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&ExtensionRegistry::new())
         };
 
         assert_eq!(build_result.err(), None);
@@ -285,7 +290,7 @@ pub(crate) mod test {
 
             f(f_build)?;
 
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&ExtensionRegistry::new())
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -336,7 +341,7 @@ pub(crate) mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            Ok(module_builder.finish_hugr()?)
+            Ok(module_builder.finish_hugr(&ExtensionRegistry::new())?)
         };
 
         assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
@@ -361,7 +366,7 @@ pub(crate) mod test {
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)])
+            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &ExtensionRegistry::new())
         };
 
         assert_matches!(builder(), Ok(_));
@@ -407,7 +412,7 @@ pub(crate) mod test {
         let mut dfg_builder = DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata(json!(42));
-        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
+        let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &ExtensionRegistry::new())?;
 
         // Create a module, and insert the DFG into it
         let mut module_builder = ModuleBuilder::new();
@@ -423,7 +428,12 @@ pub(crate) mod test {
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 
-        assert_eq!(module_builder.finish_hugr()?.node_count(), 7);
+        assert_eq!(
+            module_builder
+                .finish_hugr(&ExtensionRegistry::new())?
+                .node_count(),
+            7
+        );
 
         Ok(())
     }
@@ -494,7 +504,7 @@ pub(crate) mod test {
 
         let add_c = add_c.finish_with_outputs(wires)?;
         let [w] = add_c.outputs_arr();
-        parent.finish_hugr_with_outputs([w])?;
+        parent.finish_hugr_with_outputs([w], &ExtensionRegistry::new())?;
 
         Ok(())
     }

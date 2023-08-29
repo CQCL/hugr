@@ -528,6 +528,7 @@ where
 mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        extension::ExtensionRegistry,
         ops::handle::NodeHandle,
         std_extensions::quantum::test::h_gate,
         type_row,
@@ -569,7 +570,7 @@ mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_hugr()?;
+        let hugr = module_builder.finish_hugr(&ExtensionRegistry::new())?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 

@@ -625,7 +625,7 @@ mod test {
 
     use super::*;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::ExtensionSet;
+    use crate::extension::{ExtensionRegistry, ExtensionSet};
     use crate::hugr::HugrMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
@@ -779,7 +779,7 @@ mod test {
                 .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
         )?;
         let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        let hugr = builder.finish_hugr_with_outputs([w], &ExtensionRegistry::new());
 
         // Fail to catch the actual error because it's a difference between I/O
         // nodes and their parents and `report_mismatch` isn't yet smart enough

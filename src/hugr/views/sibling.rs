@@ -549,7 +549,10 @@ mod tests {
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,
         },
-        extension::prelude::{BOOL_T, QB_T},
+        extension::{
+            prelude::{BOOL_T, QB_T},
+            ExtensionRegistry,
+        },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::{
             handle::{FuncID, NodeHandle},
@@ -601,7 +604,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr()
+            .finish_hugr(&ExtensionRegistry::new())
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -620,7 +623,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr()
+            .finish_hugr(&ExtensionRegistry::new())
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }
@@ -646,7 +649,9 @@ mod tests {
         let empty_dfg = {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
-            builder.finish_hugr_with_outputs(inputs).unwrap()
+            builder
+                .finish_hugr_with_outputs(inputs, &ExtensionRegistry::new())
+                .unwrap()
         };
 
         let rep = sub.create_simple_replacement(empty_dfg).unwrap();
@@ -681,7 +686,9 @@ mod tests {
         let empty_dfg = {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
-            builder.finish_hugr_with_outputs(inputs).unwrap()
+            builder
+                .finish_hugr_with_outputs(inputs, &ExtensionRegistry::new())
+                .unwrap()
         };
 
         assert_eq!(

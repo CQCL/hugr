@@ -267,6 +267,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::extension::ExtensionRegistry;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
@@ -381,7 +382,9 @@ pub mod test {
             f_build.set_metadata(json!(42));
             f_build.finish_with_outputs(outputs).unwrap();
 
-            module_builder.finish_hugr().unwrap()
+            module_builder
+                .finish_hugr(&ExtensionRegistry::new())
+                .unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -415,7 +418,9 @@ pub mod test {
                 .collect_vec();
 
             f_build.finish_with_outputs(outputs).unwrap();
-            module_builder.finish_hugr().unwrap()
+            module_builder
+                .finish_hugr(&ExtensionRegistry::new())
+                .unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -435,7 +440,7 @@ pub mod test {
                 .unwrap()
                 .out_wire(0);
         }
-        let h = dfg.finish_hugr_with_outputs(params)?;
+        let h = dfg.finish_hugr_with_outputs(params, &ExtensionRegistry::new())?;
 
         let ser = serde_json::to_string(&h)?;
         let h_deser: Hugr = serde_json::from_str(&ser)?;
@@ -457,7 +462,9 @@ pub mod test {
         let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
-        let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
+        let mut hugr = dfg
+            .finish_hugr_with_outputs(w, &ExtensionRegistry::new())
+            .unwrap();
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
@@ -465,11 +472,11 @@ pub mod test {
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-        hugr.validate().unwrap();
+        hugr.validate(&ExtensionRegistry::new()).unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
-        new_hugr.validate().unwrap();
+        new_hugr.validate(&ExtensionRegistry::new()).unwrap();
 
         // Check the canonicalization works
         let mut h_canon = hugr.clone();
