@@ -112,7 +112,7 @@ impl SumType {
     fn new(types: impl Into<TypeRow>) -> Self {
         let row: TypeRow = types.into();
 
-        let len = row.len();
+        let len: usize = row.len();
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
             Self::Simple { size: len as u8 }
         } else {
@@ -133,7 +133,7 @@ impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
             SumType::Simple { size } => Type::new_simple_predicate(size),
-            SumType::General { row: types } => Type::new_sum(types),
+            SumType::General { row } => Type::new_sum(row),
         }
     }
 }
@@ -153,8 +153,8 @@ impl TypeEnum {
         match self {
             TypeEnum::Prim(p) => p.bound(),
             TypeEnum::Sum(SumType::Simple { size: _ }) => TypeBound::Eq,
-            TypeEnum::Sum(SumType::General { row: ts }) => {
-                least_upper_bound(ts.iter().map(Type::least_upper_bound))
+            TypeEnum::Sum(SumType::General { row }) => {
+                least_upper_bound(row.iter().map(Type::least_upper_bound))
             }
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
