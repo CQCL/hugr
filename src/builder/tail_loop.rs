@@ -98,6 +98,7 @@ mod test {
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
         extension::prelude::{ConstUsize, USIZE_T},
+        extension::ExtensionSet,
         hugr::ValidationError,
         ops::Const,
         type_row, Hugr,
@@ -143,6 +144,7 @@ mod test {
                             (predicate_inputs, const_wire),
                             vec![(BIT, b1)],
                             output_row,
+                            ExtensionSet::new(),
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;
