@@ -1,30 +1,30 @@
 //! The Hugr data structure, and its basic component handles.
 
-mod hugrmut;
+pub mod hugrmut;
 
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::iter;
 
-pub(crate) use self::hugrmut::HugrInternalsMut;
+pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::ExtensionSet;
+use crate::extension::{infer_extensions, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
@@ -192,6 +192,20 @@ impl Hugr {
     pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
         rw.apply(self)
     }
+
+    /// Infer extension requirements
+    pub fn infer_extensions(
+        &mut self,
+    ) -> Result<HashMap<(Node, Direction), ExtensionSet>, InferExtensionError> {
+        let (solution, extension_closure) = infer_extensions(self)?;
+        self.instantiate_extensions(solution);
+        Ok(extension_closure)
+    }
+
+    /// TODO: Write this
+    fn instantiate_extensions(&mut self, _solution: ExtensionSolution) {
+        //todo!()
+    }
 }
 
 /// Arbitrary metadata for a node.
@@ -224,12 +238,31 @@ impl Hugr {
         }
     }
 
-    /// Produce a canonical ordering of the nodes.
+    /// Add a node to the graph, with the default conversion from OpType to NodeType
+    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
+        self.add_node(NodeType::pure(op))
+    }
+
+    /// Add a node to the graph.
+    pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
+        let node = self
+            .graph
+            .add_node(nodetype.input_count(), nodetype.output_count());
+        self.op_types[node] = nodetype;
+        node.into()
+    }
+
+    /// Produce a canonical ordering of the descendant nodes of a root,
+    /// following the graph hierarchy.
+    ///
+    /// This starts with the root, and then proceeds in BFS order through the
+    /// contained regions.
     ///
     /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
-    fn canonical_order(&self) -> impl Iterator<Item = Node> + '_ {
+    fn canonical_order(&self, root: Node) -> impl Iterator<Item = Node> + '_ {
         // Generate a BFS-ordered list of nodes based on the hierarchy
-        let mut queue = VecDeque::from([self.root.into()]);
+        let mut queue = VecDeque::from([root]);
         iter::from_fn(move || {
             let node = queue.pop_front()?;
             for child in self.children(node) {
@@ -237,6 +270,46 @@ impl Hugr {
             }
             Some(node)
         })
+    }
+
+    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
+    /// traversal of the hierarchy.
+    ///
+    /// The rekey function is called for each moved node with the old and new indices.
+    ///
+    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
+    /// preserve the indices.
+    pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        // Generate the ordered list of nodes
+        let mut ordered = Vec::with_capacity(self.node_count());
+        let root = self.root();
+        ordered.extend(self.as_mut().canonical_order(root));
+
+        // Permute the nodes in the graph to match the order.
+        //
+        // Invariant: All the elements before `position` are in the correct place.
+        for position in 0..ordered.len() {
+            // Find the element's location. If it originally came from a previous position
+            // then it has been swapped somewhere else, so we follow the permutation chain.
+            let mut source: Node = ordered[position];
+            while position > source.index.index() {
+                source = ordered[source.index.index()];
+            }
+
+            let target: Node = NodeIndex::new(position).into();
+            if target != source {
+                self.graph.swap_nodes(target.index, source.index);
+                self.op_types.swap(target.index, source.index);
+                self.hierarchy.swap_nodes(target.index, source.index);
+                rekey(source, target);
+            }
+        }
+        self.root = NodeIndex::new(0);
+
+        // Finish by compacting the copy nodes.
+        // The operation nodes will be left in place.
+        // This step is not strictly necessary.
+        self.graph.compact_nodes(|_, _| {});
     }
 }
 
@@ -340,6 +413,9 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+    /// The node doesn't exist.
+    #[error("Invalid node {0:?}.")]
+    InvalidNode(Node),
 }
 
 #[cfg(feature = "pyo3")]

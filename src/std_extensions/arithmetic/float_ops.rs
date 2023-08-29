@@ -5,7 +5,7 @@ use smol_str::SmolStr;
 use crate::{
     extension::{ExtensionSet, SignatureError},
     type_row,
-    types::{type_param::TypeArg, TypeRow},
+    types::{type_param::TypeArg, FunctionType},
     Extension,
 };
 
@@ -14,27 +14,24 @@ use super::float_types::FLOAT64_TYPE;
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
 
-fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
+fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
         type_row![FLOAT64_TYPE; 2],
         type_row![crate::extension::prelude::BOOL_T],
-        ExtensionSet::default(),
     ))
 }
 
-fn fbinop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
+fn fbinop_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
         type_row![FLOAT64_TYPE; 2],
         type_row![FLOAT64_TYPE],
-        ExtensionSet::default(),
     ))
 }
 
-fn funop_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
+fn funop_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
         type_row![FLOAT64_TYPE],
         type_row![FLOAT64_TYPE],
-        ExtensionSet::default(),
     ))
 }
 

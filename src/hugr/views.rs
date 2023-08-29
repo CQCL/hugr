@@ -60,13 +60,22 @@ pub trait HugrView: sealed::HugrInternals {
     where
         Self: 'a;
 
-    /// Return index of HUGR root node.
-    fn root(&self) -> Node;
+    /// Return the root node of this view.
+    #[inline]
+    fn root(&self) -> Node {
+        self.root_node()
+    }
 
     /// Return the type of the HUGR root node.
+    #[inline]
     fn root_type(&self) -> &NodeType {
-        self.get_nodetype(self.root())
+        let node_type = self.get_nodetype(self.root());
+        debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
+        node_type
     }
+
+    /// Returns whether the node exists.
+    fn contains_node(&self, node: Node) -> bool;
 
     /// Returns the parent of a node.
     fn get_parent(&self, node: Node) -> Option<Node>;
@@ -245,8 +254,8 @@ where
     type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
 
     #[inline]
-    fn root(&self) -> Node {
-        self.as_ref().root.into()
+    fn contains_node(&self, node: Node) -> bool {
+        self.as_ref().graph.contains_node(node.index)
     }
 
     #[inline]
@@ -380,6 +389,9 @@ pub(crate) mod sealed {
 
         /// Returns the Hugr at the base of a chain of views.
         fn base_hugr(&self) -> &Hugr;
+
+        /// Return the root node of this view.
+        fn root_node(&self) -> Node;
     }
 
     impl<T> HugrInternals for T
@@ -396,6 +408,11 @@ pub(crate) mod sealed {
         #[inline]
         fn base_hugr(&self) -> &Hugr {
             self.as_ref()
+        }
+
+        #[inline]
+        fn root_node(&self) -> Node {
+            self.as_ref().root.into()
         }
     }
 }

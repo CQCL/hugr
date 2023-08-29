@@ -5,8 +5,9 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
-use crate::hugr::{HugrInternalsMut, HugrView};
+use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
 use crate::{type_row, Hugr, Node};
