@@ -88,7 +88,6 @@ impl FunctionType {
 impl FunctionType {
     /// Create a new signature with specified inputs and outputs.
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        // TODO rename to just "new"
         Self {
             input: input.into(),
             output: output.into(),

@@ -9,6 +9,7 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
+use crate::{Hugr, HugrView};
 
 use crate::types::{CustomCheckFailure, CustomType};
 
@@ -20,15 +21,20 @@ pub enum PrimValue {
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Extension((Box<dyn CustomConst>,)),
     /// A higher-order function value.
-    // TODO add  HUGR<DFG> payload
-    Function,
+    // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
+    Function(Box<Hugr>),
 }
 
 impl PrimValue {
     fn name(&self) -> String {
         match self {
             PrimValue::Extension(e) => format!("const:custom:{}", e.0.name()),
-            PrimValue::Function => todo!(),
+            PrimValue::Function(h) => {
+                let Some(t) = h.get_function_type() else {
+                    panic!("HUGR root node isn't a valid function parent.");
+                };
+                format!("const:function:[{}]", t)
+            }
         }
     }
 }
@@ -201,9 +207,13 @@ impl PartialEq for dyn CustomConst {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::types::{custom::test::COPYABLE_CUST, TypeBound};
+    use rstest::rstest;
 
     use super::*;
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::type_row;
+    use crate::types::{custom::test::COPYABLE_CUST, TypeBound};
+    use crate::types::{FunctionType, Type};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
@@ -232,5 +242,16 @@ pub(crate) mod test {
             typ: COPYABLE_CUST,
             value: serde_yaml::Value::Number(f.into()),
         })
+    }
+
+    #[rstest]
+    fn function_value(simple_dfg_hugr: Hugr) {
+        let v = Value::Prim(PrimValue::Function(Box::new(simple_dfg_hugr)));
+
+        let correct_type = Type::new_function(FunctionType::new_linear(type_row![
+            crate::extension::prelude::USIZE_T
+        ]));
+
+        assert!(correct_type.check_type(&v).is_ok());
     }
 }

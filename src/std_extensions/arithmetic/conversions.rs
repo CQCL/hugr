@@ -7,27 +7,23 @@ use smol_str::SmolStr;
 use crate::{
     extension::{ExtensionSet, SignatureError},
     type_row,
-    types::{
-        type_param::{TypeArg, TypeParam},
-        FunctionType, Type,
-    },
+    types::{type_param::TypeArg, FunctionType, Type},
     utils::collect_array,
     Extension,
 };
 
-use super::float_types::FLOAT64_TYPE;
-use super::int_types::{get_width, int_type};
+use super::int_types::int_type;
+use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
     Ok(FunctionType::new(
         type_row![FLOAT64_TYPE],
         vec![Type::new_sum(vec![
-            int_type(n),
+            int_type(arg.clone()),
             crate::extension::prelude::ERROR_TYPE,
         ])],
     ))
@@ -35,9 +31,8 @@ fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
 
 fn itof_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    let n: u8 = get_width(arg)?;
     Ok(FunctionType::new(
-        vec![int_type(n)],
+        vec![int_type(arg.clone())],
         type_row![FLOAT64_TYPE],
     ))
 }
@@ -56,7 +51,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
-            vec![TypeParam::USize],
+            vec![LOG_WIDTH_TYPE_PARAM],
             ftoi_sig,
         )
         .unwrap();
@@ -64,7 +59,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
-            vec![TypeParam::USize],
+            vec![LOG_WIDTH_TYPE_PARAM],
             ftoi_sig,
         )
         .unwrap();
@@ -72,7 +67,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
-            vec![TypeParam::USize],
+            vec![LOG_WIDTH_TYPE_PARAM],
             itof_sig,
         )
         .unwrap();
@@ -80,7 +75,7 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
-            vec![TypeParam::USize],
+            vec![LOG_WIDTH_TYPE_PARAM],
             itof_sig,
         )
         .unwrap();

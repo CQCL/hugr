@@ -57,7 +57,7 @@ where
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView + Clone,
+    Base: HugrInternals + HugrView,
 {
     fn clone(&self) -> Self {
         SiblingGraph::new(self.hugr, self.root)
@@ -196,6 +196,10 @@ where
         } else {
             None
         }
+    }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
     }
 }
 
@@ -358,6 +362,10 @@ where
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         self.base_hugr().get_io(node)
     }
+
+    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
+        self.base_hugr().get_function_type()
+    }
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
@@ -384,7 +392,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -410,7 +418,7 @@ where
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
+    Base: HugrView,
 {
     type Base = Base;
 
@@ -433,7 +441,7 @@ where
     }
 }
 
-impl<'g, Root, Base> super::sealed::HugrInternals for SiblingGraph<'g, Root, Base>
+impl<'g, Root, Base> HugrInternals for SiblingGraph<'g, Root, Base>
 where
     Root: NodeHandle,
     Base: HugrInternals,

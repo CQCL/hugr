@@ -118,6 +118,11 @@ impl ExtensionOp {
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
+
+    /// Returns a reference to the [`OpDef`] of this [`ExtensionOp`].
+    pub fn def(&self) -> &OpDef {
+        self.def.as_ref()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -219,8 +224,11 @@ pub fn resolve_extension_ops(
                 if let Some(r) = extension_registry.get(&opaque.extension) {
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
-                    return Err(CustomOpError::OpNotFoundInExtension(opaque.op_name.to_string(), r.name().to_string()));
-                };
+                        return Err(CustomOpError::OpNotFoundInExtension(
+                            opaque.op_name.to_string(),
+                            r.name().to_string(),
+                        ));
+                    };
                     // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
                     let op = ExternalOp::Extension(
                         ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),

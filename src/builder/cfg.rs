@@ -228,7 +228,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
+        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(
         base: B,

@@ -104,7 +104,7 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
         vec![]
     };
     cfg.successors(n)
-        .chain(extra.into_iter())
+        .chain(extra)
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
         .unique()
@@ -389,7 +389,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
-            .chain(min_dfs_target[0].into_iter());
+            .chain(min_dfs_target[0]);
         (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
@@ -450,7 +450,14 @@ pub(crate) mod test {
         // that we *can* (as we'll need to for "real" module Hugr's).
         let v: SiblingGraph = SiblingGraph::new(&h, h.root());
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -483,7 +490,14 @@ pub(crate) mod test {
             .unwrap();
 
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == entry)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Entry node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -516,7 +530,14 @@ pub(crate) mod test {
         let v = SimpleCfgView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -552,7 +573,14 @@ pub(crate) mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Loop header should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == head)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Loop header should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
