@@ -27,7 +27,7 @@ pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
 pub mod validate;
 
-pub use prelude::PRELUDE;
+pub use prelude::{prelude_registry, PRELUDE};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
 pub struct ExtensionRegistry(BTreeMap<SmolStr, Extension>);
@@ -46,6 +46,17 @@ impl ExtensionRegistry {
 
 /// An Extension Registry containing no extensions.
 pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
+
+impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
+    fn from(value: T) -> Self {
+        let mut reg = Self::new();
+        for ext in value.into_iter() {
+            let prev = reg.0.insert(ext.name.clone(), ext);
+            assert!(prev.is_none());
+        }
+        reg
+    }
+}
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes

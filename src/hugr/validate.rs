@@ -709,7 +709,7 @@ mod test {
         ModuleBuilder,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{ExtensionSet, EMPTY_REG};
+    use crate::extension::{prelude_registry, ExtensionSet, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
@@ -1148,7 +1148,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&EMPTY_REG);
+        let handle = module_builder.finish_hugr(&prelude_registry());
 
         assert_matches!(
             handle,
@@ -1185,7 +1185,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&EMPTY_REG);
+        let handle = module_builder.finish_hugr(&prelude_registry());
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1247,7 +1247,7 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.finish_hugr(&EMPTY_REG);
+        let handle = module_builder.finish_hugr(&prelude_registry());
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1265,7 +1265,7 @@ mod test {
         let mut builder = DFGBuilder::new(main_signature)?;
         let [w] = builder.input_wires_arr();
         builder.set_outputs([w])?;
-        let hugr = builder.base.validate(&EMPTY_REG); // finish_hugr_with_outputs([w]);
+        let hugr = builder.base.validate(&prelude_registry()); // finish_hugr_with_outputs([w]);
 
         assert_matches!(
             hugr,

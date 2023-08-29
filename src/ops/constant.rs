@@ -122,12 +122,9 @@ mod test {
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-        extension::{
-            prelude::{ConstUsize, USIZE_T},
-            EMPTY_REG,
-        },
+        extension::prelude::{ConstUsize, USIZE_T},
         type_row,
-        types::test::COPYABLE_T,
+        types::test::{test_registry, COPYABLE_T},
         types::type_param::TypeArg,
         types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
         values::{
@@ -156,12 +153,12 @@ mod test {
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w], &EMPTY_REG).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
         let c = b.add_constant(Const::predicate(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w], &EMPTY_REG).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         Ok(())
     }

@@ -208,7 +208,7 @@ mod test {
 
     use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
 
-    use crate::extension::EMPTY_REG;
+    use crate::extension::prelude_registry;
     use crate::{
         builder::{
             test::{n_identity, NAT},
@@ -261,7 +261,7 @@ mod test {
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            Ok(module_builder.finish_hugr(&EMPTY_REG)?)
+            Ok(module_builder.finish_hugr(&prelude_registry())?)
         };
 
         assert_matches!(build_result, Ok(_));

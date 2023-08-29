@@ -2,7 +2,7 @@ use portgraph::PortOffset;
 
 use crate::{
     builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-    extension::{prelude::QB_T, EMPTY_REG},
+    extension::{prelude::QB_T, prelude_registry},
     ops::handle::NodeHandle,
     std_extensions::quantum::test::cx_gate,
     type_row,
@@ -23,7 +23,7 @@ fn node_connections() -> Result<(), BuildError> {
     let [q1, q2] = n1.outputs_arr();
     let n2 = dfg.add_dataflow_op(cx_gate(), [q2, q1])?;
 
-    let h = dfg.finish_hugr_with_outputs(n2.outputs(), &EMPTY_REG)?;
+    let h = dfg.finish_hugr_with_outputs(n2.outputs(), &prelude_registry())?;
 
     let connections: Vec<_> = h.node_connections(n1.node(), n2.node()).collect();
 

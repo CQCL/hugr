@@ -212,8 +212,8 @@ pub(crate) mod test {
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
     use crate::type_row;
-    use crate::types::{custom::test::COPYABLE_CUST, TypeBound};
-    use crate::types::{FunctionType, Type};
+    use crate::types::test::COPYABLE_CUST;
+    use crate::types::{FunctionType, Type, TypeBound};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 

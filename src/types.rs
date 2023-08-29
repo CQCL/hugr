@@ -291,10 +291,37 @@ where
 #[cfg(test)]
 pub(crate) mod test {
 
-    use super::{custom::test::COPYABLE_CUST, *};
-    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
+    use super::*;
+    use crate::{
+        extension::{prelude::USIZE_T, PRELUDE},
+        ops::AliasDecl,
+        Extension,
+    };
+
+    use smol_str::SmolStr;
+
+    use crate::types::TypeBound;
+
+    use super::CustomType;
+
+    pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
+        SmolStr::new_inline("MyCopyableType"),
+        SmolStr::new_inline("MyRsrc"),
+        TypeBound::Copyable,
+    );
 
     pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
+    pub(crate) fn test_registry() -> ExtensionRegistry {
+        let mut ext = Extension::new(COPYABLE_CUST.extension().clone());
+        ext.add_type(
+            COPYABLE_CUST.name().clone(),
+            vec![],
+            "test typedef".into(),
+            crate::extension::TypeDefBound::Explicit(COPYABLE_CUST.bound()),
+        )
+        .unwrap();
+        vec![PRELUDE.to_owned(), ext].into()
+    }
 
     #[test]
     fn construct() {

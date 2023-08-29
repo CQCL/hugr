@@ -267,7 +267,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
-    use crate::extension::EMPTY_REG;
+    use crate::extension::{prelude_registry, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
@@ -382,7 +382,7 @@ pub mod test {
             f_build.set_metadata(json!(42));
             f_build.finish_with_outputs(outputs).unwrap();
 
-            module_builder.finish_hugr(&EMPTY_REG).unwrap()
+            module_builder.finish_hugr(&prelude_registry()).unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -416,7 +416,7 @@ pub mod test {
                 .collect_vec();
 
             f_build.finish_with_outputs(outputs).unwrap();
-            module_builder.finish_hugr(&EMPTY_REG).unwrap()
+            module_builder.finish_hugr(&prelude_registry()).unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -458,7 +458,9 @@ pub mod test {
         let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
-        let mut hugr = dfg.finish_hugr_with_outputs(w, &EMPTY_REG).unwrap();
+        let mut hugr = dfg
+            .finish_hugr_with_outputs(w, &prelude_registry())
+            .unwrap();
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
@@ -466,11 +468,12 @@ pub mod test {
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-        hugr.validate(&EMPTY_REG).unwrap();
+        hugr.validate(&prelude_registry()).unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
-        new_hugr.validate(&EMPTY_REG).unwrap();
+        new_hugr.validate(&EMPTY_REG).unwrap_err();
+        new_hugr.validate(&prelude_registry()).unwrap();
 
         // Check the canonicalization works
         let mut h_canon = hugr.clone();

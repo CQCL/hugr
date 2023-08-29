@@ -225,7 +225,7 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::EMPTY_REG;
+    use crate::extension::{prelude_registry, EMPTY_REG};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
@@ -267,7 +267,7 @@ pub(crate) mod test {
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
             };
-            module_builder.finish_hugr(&EMPTY_REG)
+            module_builder.finish_hugr(&prelude_registry())
         };
 
         assert_eq!(build_result.err(), None);
@@ -341,7 +341,7 @@ pub(crate) mod test {
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
 
-            Ok(module_builder.finish_hugr(&EMPTY_REG)?)
+            Ok(module_builder.finish_hugr(&prelude_registry())?)
         };
 
         assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
@@ -428,7 +428,12 @@ pub(crate) mod test {
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 
-        assert_eq!(module_builder.finish_hugr(&EMPTY_REG)?.node_count(), 7);
+        assert_eq!(
+            module_builder
+                .finish_hugr(&EMPTY_REG)?
+                .node_count(),
+            7
+        );
 
         Ok(())
     }

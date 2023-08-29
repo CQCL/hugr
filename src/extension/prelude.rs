@@ -13,6 +13,8 @@ use crate::{
     Extension,
 };
 
+use super::ExtensionRegistry;
+
 lazy_static! {
     /// Prelude extension
     pub static ref PRELUDE: Extension = {
@@ -46,6 +48,11 @@ lazy_static! {
             .unwrap();
         prelude
     };
+}
+
+/// An extension registry containing only the prelude
+pub fn prelude_registry() -> ExtensionRegistry {
+    [PRELUDE.to_owned()].into()
 }
 
 pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
