@@ -21,7 +21,7 @@ use std::iter;
 use ::petgraph::visit as pv;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{LinkView, PortIndex, PortView};
+use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
@@ -29,8 +29,7 @@ use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
 use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
-type FlatRegionGraph<'g, Base> =
-    portgraph::view::FlatRegion<'g, <Base as HugrInternals>::Portgraph>;
+type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
 /// View of a HUGR sibling graph.
 ///
@@ -45,7 +44,7 @@ where
     root: Node,
 
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
-    graph: FlatRegionGraph<'g, Base>,
+    graph: FlatRegionGraph<'g>,
 
     /// The rest of the HUGR.
     hugr: &'g Base,
@@ -75,7 +74,7 @@ where
     where
         Self: 'a;
 
-    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g, Base> as PortView>::NodePortOffsets<'a>, Port>
+    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
     where
         Self: 'a;
 
@@ -83,20 +82,27 @@ where
     where
         Self: 'a;
 
-    type Neighbours<'a> = MapInto<<FlatRegionGraph<'g, Base> as LinkView>::Neighbours<'a>, Node>
+    type Neighbours<'a> = MapInto<<FlatRegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
 
     type PortLinks<'a> = MapWithCtx<
-        <FlatRegionGraph<'g, Base> as LinkView>::PortLinks<'a>,
+        <FlatRegionGraph<'g> as LinkView>::PortLinks<'a>,
         &'a Self,
         (Node, Port),
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <FlatRegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+       [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
-    fn root(&self) -> Node {
-        self.root
+    fn contains_node(&self, node: Node) -> bool {
+        self.graph.contains_node(node.index)
     }
 
     #[inline]
@@ -166,6 +172,18 @@ where
             })
     }
 
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
+            })
+    }
+
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.graph.num_ports(node.index, dir)
@@ -203,7 +221,7 @@ where
     }
 }
 
-type RegionGraph<'g, Base> = portgraph::view::Region<'g, <Base as HugrInternals>::Portgraph>;
+type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
 
 /// View of a HUGR descendants graph.
 ///
@@ -220,7 +238,7 @@ where
     root: Node,
 
     /// The graph encoding the adjacency structure of the HUGR.
-    graph: RegionGraph<'g, Base>,
+    graph: RegionGraph<'g>,
 
     /// The node hierarchy.
     hugr: &'g Base,
@@ -246,11 +264,11 @@ where
 {
     type RootHandle = Root;
 
-    type Nodes<'a> = MapInto<<RegionGraph<'g, Base> as PortView>::Nodes<'a>, Node>
+    type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
     where
         Self: 'a;
 
-    type NodePorts<'a> = MapInto<<RegionGraph<'g, Base> as PortView>::NodePortOffsets<'a>, Port>
+    type NodePorts<'a> = MapInto<<RegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
     where
         Self: 'a;
 
@@ -258,20 +276,27 @@ where
     where
         Self: 'a;
 
-    type Neighbours<'a> = MapInto<<RegionGraph<'g, Base> as LinkView>::Neighbours<'a>, Node>
+    type Neighbours<'a> = MapInto<<RegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
 
     type PortLinks<'a> = MapWithCtx<
-        <RegionGraph<'g, Base> as LinkView>::PortLinks<'a>,
+        <RegionGraph<'g> as LinkView>::PortLinks<'a>,
         &'a Self,
         (Node, Port),
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <RegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+        [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
-    fn root(&self) -> Node {
-        self.root
+    fn contains_node(&self, node: Node) -> bool {
+        self.graph.contains_node(node.index)
     }
 
     #[inline]
@@ -332,6 +357,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
             })
     }
 
@@ -404,8 +441,8 @@ where
         }
         Self {
             root,
-            graph: FlatRegionGraph::<Base>::new_flat_region(
-                hugr.portgraph(),
+            graph: FlatRegionGraph::new_flat_region(
+                &hugr.base_hugr().graph,
                 &hugr.base_hugr().hierarchy,
                 root.index,
             ),
@@ -430,8 +467,8 @@ where
         }
         Self {
             root,
-            graph: RegionGraph::<Base>::new_region(
-                hugr.portgraph(),
+            graph: RegionGraph::new_region(
+                &hugr.base_hugr().graph,
                 &hugr.base_hugr().hierarchy,
                 root.index,
             ),
@@ -446,7 +483,7 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = FlatRegionGraph<'g, Base>;
+    type Portgraph = FlatRegionGraph<'g>;
 
     #[inline]
     fn portgraph(&self) -> &Self::Portgraph {
@@ -456,6 +493,11 @@ where
     #[inline]
     fn base_hugr(&self) -> &Hugr {
         self.hugr.base_hugr()
+    }
+
+    #[inline]
+    fn root_node(&self) -> Node {
+        self.root
     }
 }
 
@@ -464,7 +506,7 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = RegionGraph<'g, Base>;
+    type Portgraph = RegionGraph<'g>;
 
     #[inline]
     fn portgraph(&self) -> &Self::Portgraph {
@@ -474,6 +516,11 @@ where
     #[inline]
     fn base_hugr(&self) -> &Hugr {
         self.hugr.base_hugr()
+    }
+
+    #[inline]
+    fn root_node(&self) -> Node {
+        self.root
     }
 }
 

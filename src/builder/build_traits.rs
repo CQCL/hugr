@@ -29,7 +29,7 @@ use super::{
 
 use crate::Hugr;
 
-use crate::hugr::HugrInternalsMut;
+use crate::hugr::HugrMut;
 
 /// Trait for HUGR container builders.
 /// Containers are nodes that are parents of sibling graphs.
@@ -378,7 +378,7 @@ pub trait Dataflow: Container {
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
             inputs_outputs.into_iter().unzip();
-        input_wires.extend(rest_input_wires.into_iter());
+        input_wires.extend(rest_input_wires);
 
         let tail_loop = ops::TailLoop {
             just_inputs: input_types.into(),

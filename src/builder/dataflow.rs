@@ -11,7 +11,7 @@ use crate::types::{FunctionType, Signature};
 
 use crate::extension::ExtensionSet;
 use crate::Node;
-use crate::{hugr::HugrInternalsMut, Hugr};
+use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -96,8 +96,9 @@ impl DFGBuilder<Hugr> {
 }
 
 impl HugrBuilder for DFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.base.validate()?;
+    fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
+        let closure = self.base.infer_extensions()?;
+        self.base.validate_with_extension_closure(closure)?;
         Ok(self.base)
     }
 }
