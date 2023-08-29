@@ -11,7 +11,7 @@ use crate::types::{FunctionType, Signature};
 
 use crate::extension::ExtensionSet;
 use crate::Node;
-use crate::{hugr::HugrInternalsMut, Hugr};
+use crate::{hugr::HugrMut, Hugr};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]

@@ -694,7 +694,8 @@ mod test {
     };
     use crate::extension::prelude::BOOL_T;
     use crate::extension::ExtensionSet;
-    use crate::hugr::{HugrError, HugrInternalsMut, NodeType};
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;

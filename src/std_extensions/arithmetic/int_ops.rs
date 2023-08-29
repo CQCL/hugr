@@ -5,6 +5,7 @@ use smol_str::SmolStr;
 use super::int_types::{get_log_width, int_type, type_arg, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
 use crate::type_row;
+use crate::types::FunctionType;
 use crate::utils::collect_array;
 use crate::{
     extension::{ExtensionSet, SignatureError},
@@ -15,111 +16,100 @@ use crate::{
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
 
-fn iwiden_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn iwiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_log_width(arg0)?;
     let n: u8 = get_log_width(arg1)?;
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok((
-        vec![int_type(arg0.clone())].into(),
-        vec![int_type(arg1.clone())].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone())],
+        vec![int_type(arg1.clone())],
     ))
 }
 
-fn inarrow_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn inarrow_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_log_width(arg0)?;
     let n: u8 = get_log_width(arg1)?;
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok((
-        vec![int_type(arg0.clone())].into(),
-        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone())],
+        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])],
     ))
 }
 
-fn itob_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
-        vec![int_type(type_arg(0))].into(),
+fn itob_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
+        vec![int_type(type_arg(0))],
         type_row![BOOL_T],
-        ExtensionSet::default(),
     ))
 }
 
-fn btoi_sig(_arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
+fn btoi_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
         type_row![BOOL_T],
-        vec![int_type(type_arg(0))].into(),
-        ExtensionSet::default(),
+        vec![int_type(type_arg(0))],
     ))
 }
 
-fn icmp_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn icmp_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg.clone()); 2].into(),
+    Ok(FunctionType::new(
+        vec![int_type(arg.clone()); 2],
         type_row![BOOL_T],
-        ExtensionSet::default(),
     ))
 }
 
-fn ibinop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn ibinop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg.clone()); 2].into(),
-        vec![int_type(arg.clone())].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg.clone()); 2],
+        vec![int_type(arg.clone())],
     ))
 }
 
-fn iunop_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn iunop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg.clone())].into(),
-        vec![int_type(arg.clone())].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg.clone())],
+        vec![int_type(arg.clone())],
     ))
 }
 
-fn idivmod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn idivmod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let intpair: TypeRow = vec![int_type(arg0.clone()), int_type(arg1.clone())].into();
-    Ok((
+    Ok(FunctionType::new(
         intpair.clone(),
-        vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
+        vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])],
     ))
 }
 
-fn idiv_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn idiv_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
-        vec![Type::new_sum(vec![int_type(arg0.clone()), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone()), int_type(arg1.clone())],
+        vec![Type::new_sum(vec![int_type(arg0.clone()), ERROR_TYPE])],
     ))
 }
 
-fn imod_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn imod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
-        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone()), int_type(arg1.clone())],
+        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])],
     ))
 }
 
-fn ish_sig(arg_values: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+fn ish_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    Ok((
-        vec![int_type(arg0.clone()), int_type(arg1.clone())].into(),
-        vec![int_type(arg0.clone())].into(),
-        ExtensionSet::default(),
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone()), int_type(arg1.clone())],
+        vec![int_type(arg0.clone())],
     ))
 }
 
