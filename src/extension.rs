@@ -37,6 +37,11 @@ impl ExtensionRegistry {
     pub const fn new() -> Self {
         Self(BTreeMap::new())
     }
+
+    /// Gets the Extension with the given name
+    pub fn get(&self, name: &SmolStr) -> Option<&Extension> {
+        self.0.get(name)
+    }
 }
 
 /// An Extension Registry containing no extensions.
@@ -45,6 +50,7 @@ pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -58,6 +64,12 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
+    /// The Extension Registry did not contain an Extension referenced by the Signature
+    #[error("Extension '{0}' not found")]
+    ExtensionNotFound(SmolStr),
+    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
+    #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
+    ExtensionTypeNotFound { exn: SmolStr, typ: SmolStr },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.
