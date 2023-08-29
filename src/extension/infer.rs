@@ -326,7 +326,10 @@ impl UnificationContext {
         }
     }
 
-    /// Try to turn mismatches into `ExtensionError` when possible
+    /// When trying to unify two metas, check if they both correspond to
+    /// different ends of the same wire. If so, return an `ExtensionError`.
+    /// Otherwise check whether they both correspond to *some* location on the
+    /// graph and include that info the otherwise generic `MismatchedConcrete`.
     fn report_mismatch(
         &self,
         m1: Meta,
