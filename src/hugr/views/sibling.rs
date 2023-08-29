@@ -754,7 +754,7 @@ mod tests {
                 vec![vec![(out, snd_cx_edge)]],
                 vec![(inp, first_cx_edge)],
             ),
-            Err(InvalidSubgraph::InvalidBoundary)
+            Err(InvalidSubgraph::NotConvex)
         ));
     }
 
