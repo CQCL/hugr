@@ -116,7 +116,7 @@ impl SumType {
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
             Self::Simple { size: len as u8 }
         } else {
-            Self::General { row: row }
+            Self::General { row }
         }
     }
 
@@ -242,7 +242,7 @@ impl Type {
     /// New simple predicate with empty Tuple variants
     pub const fn new_simple_predicate(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Simple { size: size }), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
