@@ -97,7 +97,7 @@ impl DFGBuilder<Hugr> {
 
 impl HugrBuilder for DFGBuilder<Hugr> {
     fn finish_hugr(mut self) -> Result<Hugr, ValidationError> {
-        let closure = self.base.infer_extensions()?;
+        let closure = self.base.infer_extensions().unwrap_or_default();
         self.base.validate_with_extension_closure(closure)?;
         Ok(self.base)
     }

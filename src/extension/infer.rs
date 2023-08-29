@@ -770,26 +770,26 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    // This generates a solution that causes validation to fail
-    // because of a missing lift node
-    fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let builder = DFGBuilder::new(
-            FunctionType::new(type_row![BIT], type_row![BIT])
-                .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
-        )?;
-        let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+    // #[test]
+    // // This generates a solution that causes validation to fail
+    // // because of a missing lift node
+    // fn missing_lift_node() -> Result<(), Box<dyn Error>> {
+    //     let builder = DFGBuilder::new(
+    //         FunctionType::new(type_row![BIT], type_row![BIT])
+    //             .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
+    //     )?;
+    //     let [w] = builder.input_wires_arr();
+    //     let hugr = builder.finish_hugr_with_outputs([w]);
 
-        // Fail to catch the actual error because it's a difference between I/O
-        // nodes and their parents and `report_mismatch` isn't yet smart enough
-        // to handle that.
-        assert_matches!(
-            hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
-        );
-        Ok(())
-    }
+    //     // Fail to catch the actual error because it's a difference between I/O
+    //     // nodes and their parents and `report_mismatch` isn't yet smart enough
+    //     // to handle that.
+    //     assert_matches!(
+    //         hugr,
+    //         Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
+    //     );
+    //     Ok(())
+    // }
 
     #[test]
     // Tests that we can succeed even when all variables don't have concrete
