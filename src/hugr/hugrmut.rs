@@ -319,7 +319,7 @@ pub(crate) mod sealed {
         fn valid_node(&self, node: Node) -> Result<(), HugrError> {
             match self.contains_node(node) {
                 true => Ok(()),
-                false => Err(HugrError::InvalidNode { node }),
+                false => Err(HugrError::InvalidNode(node)),
             }
         }
 
@@ -331,7 +331,7 @@ pub(crate) mod sealed {
         #[inline]
         fn valid_non_root(&self, node: Node) -> Result<(), HugrError> {
             match self.root() == node {
-                true => Err(HugrError::InvalidNode { node }),
+                true => Err(HugrError::InvalidNode(node)),
                 false => self.valid_node(node),
             }
         }

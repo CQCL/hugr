@@ -414,11 +414,8 @@ pub enum HugrError {
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
     /// The node doesn't exist.
-    #[error("Invalid node {node:?}.")]
-    InvalidNode {
-        /// The missing node
-        node: Node,
-    },
+    #[error("Invalid node {0:?}.")]
+    InvalidNode(Node),
 }
 
 #[cfg(feature = "pyo3")]
