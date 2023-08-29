@@ -100,8 +100,12 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 /// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
 enum SumType {
     #[display(fmt = "SimplePredicate({})", "size")]
-    Simple { size: u8 },
-    General { row: TypeRow },
+    Simple {
+        size: u8,
+    },
+    General {
+        row: TypeRow,
+    },
 }
 
 impl SumType {
