@@ -88,21 +88,9 @@ pub(crate) mod test {
 
     use super::CustomType;
 
-    pub(crate) const EQ_CUST: CustomType = CustomType::new_simple(
-        SmolStr::new_inline("MyEqType"),
-        SmolStr::new_inline("MyRsrc"),
-        TypeBound::Eq,
-    );
-
     pub(crate) const COPYABLE_CUST: CustomType = CustomType::new_simple(
         SmolStr::new_inline("MyCopyableType"),
         SmolStr::new_inline("MyRsrc"),
         TypeBound::Copyable,
-    );
-
-    pub(crate) const ANY_CUST: CustomType = CustomType::new_simple(
-        SmolStr::new_inline("MyAnyType"),
-        SmolStr::new_inline("MyRsrc"),
-        TypeBound::Any,
     );
 }

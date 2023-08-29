@@ -269,15 +269,10 @@ where
 #[cfg(test)]
 pub(crate) mod test {
 
-    use super::{
-        custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
-        *,
-    };
+    use super::{custom::test::COPYABLE_CUST, *};
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
-    pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
     pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
-    pub(crate) const ANY_T: Type = Type::new_extension(ANY_CUST);
 
     #[test]
     fn construct() {

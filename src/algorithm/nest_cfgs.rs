@@ -398,13 +398,13 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use crate::extension::prelude::USIZE_T;
     use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
-    use crate::types::test::EQ_T;
     use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: Type = EQ_T;
+    const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();

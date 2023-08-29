@@ -147,8 +147,9 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
+    use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::SignatureError;
-    use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
+    use crate::types::test::COPYABLE_T;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{FunctionType, Type, TypeBound};
 
@@ -171,15 +172,15 @@ mod test {
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(EQ_T)]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(USIZE_T)]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(ANY_T)]),
+            def.instantiate_concrete([TypeArg::Type(QB_T)]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type(ANY_T),
+                    arg: TypeArg::Type(QB_T),
                     param: TypeParam::Type(TypeBound::Copyable)
                 }
             ))

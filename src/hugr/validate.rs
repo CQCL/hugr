@@ -692,7 +692,7 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder,
         ModuleBuilder,
     };
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::ExtensionSet;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
@@ -816,10 +816,7 @@ mod test {
 
     #[test]
     fn leaf_root() {
-        let leaf_op: OpType = LeafOp::Noop {
-            ty: crate::types::test::EQ_T,
-        }
-        .into();
+        let leaf_op: OpType = LeafOp::Noop { ty: USIZE_T }.into();
 
         let b = Hugr::new(NodeType::pure(leaf_op));
         assert_eq!(b.validate(), Ok(()));

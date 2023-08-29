@@ -124,9 +124,9 @@ mod test {
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{ConstUsize, USIZE_T},
         type_row,
-        types::{test::COPYABLE_T, TypeRow},
-        types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},
-        types::{CustomType, FunctionType, Type, TypeBound},
+        types::test::COPYABLE_T,
+        types::type_param::TypeArg,
+        types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
         values::{
             test::{serialized_float, CustomTestValue},
             CustomSerialized, Value,
@@ -140,7 +140,7 @@ mod test {
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![EQ_T, COPYABLE_T], type_row![]];
+        let pred_rows = vec![type_row![USIZE_T, COPYABLE_T], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
@@ -165,7 +165,7 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = [type_row![EQ_T, COPYABLE_T], type_row![]];
+        let pred_rows = [type_row![USIZE_T, COPYABLE_T], type_row![]];
 
         let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
