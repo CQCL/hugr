@@ -94,6 +94,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+#[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
