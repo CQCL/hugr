@@ -19,7 +19,8 @@ use crate::extension::{
 };
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
-use crate::types::{EdgeKind, Type};
+use crate::types::type_param::TypeArg;
+use crate::types::{CustomType, EdgeKind, PrimType, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -209,6 +210,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         }
 
+        match &port_kind {
+            EdgeKind::Value(ty) | EdgeKind::Static(ty) => self
+                .validate_type(ty)
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            _ => (),
+        }
+
         let mut link_cnt = 0;
         for (_, link) in links {
             link_cnt += 1;
@@ -248,6 +256,56 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         Ok(())
+    }
+
+    fn validate_type(&self, ty: &Type) -> Result<(), SignatureError> {
+        for prim in ty.iter_prims() {
+            match prim {
+                PrimType::Alias(_) => (),
+                PrimType::Extension(custy) => self.validate_custom_type(custy)?,
+                PrimType::Function(ft) => (**ft)
+                    .input
+                    .iter()
+                    .chain((**ft).output.iter())
+                    .try_for_each(|t| self.validate_type(t))?,
+            };
+        }
+        Ok(())
+    }
+
+    fn validate_custom_type(&self, ty: &CustomType) -> Result<(), SignatureError> {
+        // Check the args are individually ok
+        ty.args()
+            .iter()
+            .try_for_each(|a| self.validate_type_arg(a))?;
+        // And check they fit into the TypeParams declared by the TypeDef
+        let exn = ty.extension();
+        let ex = self.extension_registry.get(exn);
+        // Even if OpDef's (+binaries) are not available, the part of the Extension definition
+        // describing the TypeDefs can easily be passed around (serialized), so should be available.
+        let ex = ex.ok_or(SignatureError::ExtensionNotFound(exn.clone()))?;
+        let def = ex
+            .get_type(&ty.name())
+            .ok_or(SignatureError::ExtensionTypeNotFound {
+                exn: exn.clone(),
+                typ: ty.name().clone(),
+            })?;
+        def.check_custom(ty)
+    }
+
+    fn validate_type_arg(&self, arg: &TypeArg) -> Result<(), SignatureError> {
+        match arg {
+            TypeArg::Type(ty) => self.validate_type(ty),
+            TypeArg::BoundedNat(_) => Ok(()),
+            TypeArg::Opaque(custarg) =>
+            // We could also add a facility to Extension to validate that the constant *value*
+            // here is a valid instance of the type.
+            {
+                self.validate_custom_type(&custarg.typ)
+            }
+            TypeArg::Sequence(args) => args.iter().try_for_each(|a| self.validate_type_arg(a)),
+            TypeArg::Extensions(_) => Ok(()),
+        }
     }
 
     /// Check operation-specific constraints.

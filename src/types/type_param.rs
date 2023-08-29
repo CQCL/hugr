@@ -84,7 +84,7 @@ pub enum TypeArg {
 pub struct CustomTypeArg {
     /// The type of the constant.
     /// (Exact matches only - the constant is exactly this type.)
-    typ: CustomType,
+    pub typ: CustomType,
     /// Serialized representation.
     pub value: serde_yaml::Value,
 }
