@@ -15,7 +15,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::CustomType;
+use crate::types::{CustomType, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -81,6 +81,12 @@ pub enum SignatureError {
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: SmolStr, typ: SmolStr },
+    /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
+    #[error("Bound on CustomType did not match TypeDef")]
+    WrongBound {
+        actual: TypeBound,
+        expected: TypeBound,
+    },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.

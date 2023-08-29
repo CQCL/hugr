@@ -61,7 +61,16 @@ impl TypeDef {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        self.check_concrete_impl(custom)
+        self.check_concrete_impl(custom)?;
+        let calc_bound = self.bound(custom.args());
+        if calc_bound == custom.bound() {
+            Ok(())
+        } else {
+            Err(SignatureError::WrongBound {
+                expected: calc_bound,
+                actual: custom.bound(),
+            })
+        }
     }
 
     /// Instantiate a concrete [`CustomType`] by providing type arguments.

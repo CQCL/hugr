@@ -428,12 +428,7 @@ pub(crate) mod test {
             f_build.finish_with_outputs([id.out_wire(0)])?;
         }
 
-        assert_eq!(
-            module_builder
-                .finish_hugr(&EMPTY_REG)?
-                .node_count(),
-            7
-        );
+        assert_eq!(module_builder.finish_hugr(&EMPTY_REG)?.node_count(), 7);
 
         Ok(())
     }
