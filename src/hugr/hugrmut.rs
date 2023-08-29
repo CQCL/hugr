@@ -338,18 +338,12 @@ pub(crate) mod sealed {
 
         /// Add a node to the graph, with the default conversion from OpType to NodeType
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-            // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-            self.add_node(NodeType::pure(op))
+            self.hugr_mut().add_op(op)
         }
 
         /// Add a node to the graph.
         fn add_node(&mut self, nodetype: NodeType) -> Node {
-            let node = self
-                .hugr_mut()
-                .graph
-                .add_node(nodetype.input_count(), nodetype.output_count());
-            self.hugr_mut().op_types[node] = nodetype;
-            node.into()
+            self.hugr_mut().add_node(nodetype)
         }
 
         /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
