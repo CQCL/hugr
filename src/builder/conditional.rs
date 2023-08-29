@@ -15,7 +15,7 @@ use super::{
 
 use crate::Node;
 use crate::{
-    hugr::{HugrInternalsMut, NodeType},
+    hugr::{HugrMut, NodeType},
     Hugr,
 };
 

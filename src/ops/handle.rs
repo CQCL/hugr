@@ -27,6 +27,11 @@ pub trait NodeHandle: Clone {
     fn try_cast<T: NodeHandle + From<Node>>(&self) -> Option<T> {
         T::TAG.is_superset(Self::TAG).then(|| self.node().into())
     }
+
+    /// Checks whether the handle can hold an operation with the given tag.
+    fn can_hold(tag: OpTag) -> bool {
+        Self::TAG.is_superset(tag)
+    }
 }
 
 /// Trait for handles that contain children.

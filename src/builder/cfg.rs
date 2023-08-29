@@ -12,7 +12,7 @@ use crate::{ops::handle::NodeHandle, types::Type};
 
 use crate::Node;
 use crate::{
-    hugr::{HugrInternalsMut, NodeType},
+    hugr::{HugrMut, NodeType},
     type_row, Hugr,
 };
 

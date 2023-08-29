@@ -6,7 +6,8 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::extension::{ExtensionId, OpDef, SignatureError};
-use crate::hugr::{HugrInternalsMut, HugrView, NodeType};
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
 use crate::{Extension, Hugr, Node};
 
