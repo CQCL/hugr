@@ -473,15 +473,16 @@ pub(crate) mod sealed {
 #[cfg(test)]
 mod test {
     use crate::{
+        extension::prelude::USIZE_T,
         hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{test::COPYABLE_T, FunctionType, Type},
+        types::{FunctionType, Type},
     };
 
     use super::*;
 
-    const NAT: Type = COPYABLE_T;
+    const NAT: Type = USIZE_T;
 
     #[test]
     fn simple_function() {
@@ -512,7 +513,7 @@ mod test {
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = builder
-                .add_op_with_parent(f, LeafOp::Noop { ty: COPYABLE_T })
+                .add_op_with_parent(f, LeafOp::Noop { ty: NAT })
                 .unwrap();
 
             assert!(builder.connect(f_in, 0, noop, 0).is_ok());
