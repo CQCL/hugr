@@ -11,7 +11,13 @@
 //! will succeed regardless of what the variable is instantiated to.
 
 use super::{ExtensionId, ExtensionSet};
-use crate::{hugr::views::HugrView, hugr::Node, ops::OpType, types::EdgeKind, Direction};
+use crate::{
+    hugr::views::HugrView,
+    hugr::Node,
+    ops::{OpTag, OpTrait, OpType},
+    types::EdgeKind,
+    Direction,
+};
 
 use super::validate::ExtensionError;
 
@@ -271,6 +277,15 @@ impl UnificationContext {
                     self.add_constraint(m_input_node, Constraint::Equal(m_input));
                     let m_output_node = self.make_or_get_meta(output, dir);
                     self.add_constraint(m_output_node, Constraint::Equal(m_output));
+                }
+            }
+
+            if hugr.get_optype(node).tag() == OpTag::Conditional {
+                for case in hugr.children(node) {
+                    let m_case_in = self.make_or_get_meta(case, Direction::Incoming);
+                    let m_case_out = self.make_or_get_meta(case, Direction::Outgoing);
+                    self.add_constraint(m_case_in, Constraint::Equal(m_input));
+                    self.add_constraint(m_case_out, Constraint::Equal(m_output));
                 }
             }
 
@@ -624,7 +639,10 @@ mod test {
     use std::error::Error;
 
     use super::*;
-    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{
+        BuildError, CaseBuilder, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer,
+    };
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
@@ -965,6 +983,68 @@ mod test {
             ExtensionSet::from_iter(["A".into(), "B".into()])
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
+        fn build_case(
+            mut case_builder: CaseBuilder<&mut Hugr>,
+            first_ext: ExtensionId,
+            second_ext: ExtensionId,
+        ) -> Result<Node, Box<dyn Error>> {
+            let [w] = case_builder.input_wires_arr();
+            let lift1 = case_builder.add_dataflow_node(
+                NodeType::open_extensions(ops::LeafOp::Lift {
+                    type_row: type_row![BIT],
+                    new_extension: first_ext,
+                }),
+                [w],
+            )?;
+            let [w] = lift1.outputs_arr();
+            let lift2 = case_builder.add_dataflow_node(
+                NodeType::open_extensions(ops::LeafOp::Lift {
+                    type_row: type_row![BIT],
+                    new_extension: second_ext,
+                }),
+                [w],
+            )?;
+            let [w] = lift2.outputs_arr();
+            let handle = case_builder.finish_with_outputs([w])?;
+            Ok(handle.node())
+        }
+
+        let predicate_inputs = vec![type_row![]; 2];
+        let rs = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let mut conditional_builder =
+            ConditionalBuilder::new(predicate_inputs, type_row![BIT], type_row![BIT], rs)?;
+        let case_builder = conditional_builder.case_builder(0)?;
+        let case0_node = build_case(case_builder, "A".into(), "B".into())?;
+
+        let case_builder = conditional_builder.case_builder(1)?;
+        let case1_node = build_case(case_builder, "B".into(), "A".into())?;
+
+        let conditional_node = conditional_builder.container_node();
+        let hugr = conditional_builder.hugr_mut();
+
+        hugr.infer_extensions()?;
+
+        for node in [case0_node, case1_node, conditional_node] {
+            assert_eq!(
+                hugr.get_nodetype(node)
+                    .signature()
+                    .unwrap()
+                    .input_extensions,
+                ExtensionSet::new()
+            );
+            assert_eq!(
+                hugr.get_nodetype(node)
+                    .signature()
+                    .unwrap()
+                    .input_extensions,
+                ExtensionSet::new()
+            );
+        }
         Ok(())
     }
 }
