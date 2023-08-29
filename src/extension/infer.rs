@@ -76,6 +76,18 @@ pub enum InferExtensionError {
         /// The incompatible solution that we found was already there
         actual: ExtensionSet,
     },
+    #[error("Solved extensions {expected} at {expected_loc:?} and {actual} at {actual_loc:?} should be equal.")]
+    /// A version of the above with info about which nodes failed to unify
+    MismatchedConcreteWithLocations {
+        /// Where the solution we want to insert came from
+        expected_loc: (Node, Direction),
+        /// The solution we were trying to insert for this meta
+        expected: ExtensionSet,
+        /// Which node we're trying to add a solution for
+        actual_loc: (Node, Direction),
+        /// The incompatible solution that we found was already there
+        actual: ExtensionSet,
+    },
     /// A variable went unsolved that wasn't related to a parameter
     #[error("Unsolved variable at location {:?}", location)]
     Unsolved {
@@ -375,10 +387,19 @@ impl UnificationContext {
         } else {
             None
         };
-        err.unwrap_or(InferExtensionError::MismatchedConcrete {
-            expected: rs1,
-            actual: rs2,
-        })
+        if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
+            err.unwrap_or(InferExtensionError::MismatchedConcreteWithLocations {
+                expected_loc: *loc1,
+                expected: rs1,
+                actual_loc: *loc2,
+                actual: rs2,
+            })
+        } else {
+            err.unwrap_or(InferExtensionError::MismatchedConcrete {
+                expected: rs1,
+                actual: rs2,
+            })
+        }
     }
 
     /// Take a group of equal metas and merge them into a new, single meta.
