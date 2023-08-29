@@ -7,7 +7,7 @@ use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionSet, SignatureError, TypeParametrised,
 };
 
-use crate::types::{SignatureDescription, TypeRow};
+use crate::types::SignatureDescription;
 
 use crate::types::FunctionType;
 
@@ -31,8 +31,8 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
-        // TODO: Make return type an FunctionType
-    ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError>;
+    ) -> Result<FunctionType, SignatureError>;
+
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML.
@@ -48,14 +48,14 @@ pub trait CustomSignatureFunc: Send + Sync {
 
 impl<F> CustomSignatureFunc for F
 where
-    F: Fn(&[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> + Send + Sync,
+    F: Fn(&[TypeArg]) -> Result<FunctionType, SignatureError> + Send + Sync,
 {
     fn compute_signature(
         &self,
         _name: &SmolStr,
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
+    ) -> Result<FunctionType, SignatureError> {
         self(arg_values)
     }
 }
@@ -217,7 +217,7 @@ impl OpDef {
     /// OpDef with statically-provided [TypeArg]s.
     pub fn compute_signature(&self, args: &[TypeArg]) -> Result<FunctionType, SignatureError> {
         self.check_args(args)?;
-        let (ins, outs, res) = match &self.signature_func {
+        let res = match &self.signature_func {
             SignatureFunc::FromDecl { .. } => {
                 // Sig should be computed solely from inputs + outputs + args.
                 todo!()
@@ -227,7 +227,7 @@ impl OpDef {
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
-        Ok(FunctionType::new(ins, outs).with_extension_delta(&res))
+        Ok(res)
     }
 
     /// Optional description of the ports in the signature.
