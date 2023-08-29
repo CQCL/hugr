@@ -24,6 +24,14 @@ pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
 /// A floating-point value.
 pub struct ConstF64(f64);
 
+impl std::ops::Deref for ConstF64 {
+    type Target = f64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl ConstF64 {
     /// Create a new [`ConstF64`]
     pub fn new(value: f64) -> Self {

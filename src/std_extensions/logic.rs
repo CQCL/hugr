@@ -4,9 +4,12 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, ExtensionSet},
+    extension::prelude::BOOL_T,
     ops, type_row,
-    types::type_param::{TypeArg, TypeArgError, TypeParam},
+    types::{
+        type_param::{TypeArg, TypeArgError, TypeParam},
+        FunctionType,
+    },
     Extension,
 };
 use lazy_static::lazy_static;
@@ -27,7 +30,7 @@ pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
 
 /// Extension for basic logical operations.
 fn extension() -> Extension {
-    const H_INT: TypeParam = TypeParam::USize;
+    const H_INT: TypeParam = TypeParam::max_nat();
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
@@ -35,13 +38,7 @@ fn extension() -> Extension {
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
-            |_arg_values: &[TypeArg]| {
-                Ok((
-                    type_row![BOOL_T],
-                    type_row![BOOL_T],
-                    ExtensionSet::default(),
-                ))
-            },
+            |_arg_values: &[TypeArg]| Ok(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])),
         )
         .unwrap();
 
@@ -53,7 +50,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::USize(n) => *n,
+                    TypeArg::BoundedNat(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -62,10 +59,9 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok((
-                    vec![BOOL_T; n as usize].into(),
+                Ok(FunctionType::new(
+                    vec![BOOL_T; n as usize],
                     type_row![BOOL_T],
-                    ExtensionSet::default(),
                 ))
             },
         )
@@ -79,7 +75,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::USize(n) => *n,
+                    TypeArg::BoundedNat(n) => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -88,10 +84,9 @@ fn extension() -> Extension {
                         .into());
                     }
                 };
-                Ok((
-                    vec![BOOL_T; n as usize].into(),
+                Ok(FunctionType::new(
+                    vec![BOOL_T; n as usize],
                     type_row![BOOL_T],
-                    ExtensionSet::default(),
                 ))
             },
         )
@@ -139,7 +134,7 @@ pub(crate) mod test {
     /// Generate a logic extension and operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(AND_NAME, [TypeArg::USize(2)])
+            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat(2)])
             .unwrap()
             .into()
     }

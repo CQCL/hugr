@@ -119,6 +119,11 @@ impl ExtensionOp {
     pub fn args(&self) -> &[TypeArg] {
         &self.args
     }
+
+    /// Returns a reference to the [`OpDef`] of this [`ExtensionOp`].
+    pub fn def(&self) -> &OpDef {
+        self.def.as_ref()
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {

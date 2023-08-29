@@ -68,7 +68,7 @@ pub enum OpTag {
 }
 
 impl OpTag {
-    /// Returns true if the tag is more general than the given tag.
+    /// Returns true if this tag is more general than `other`.
     #[inline]
     pub const fn is_superset(self, other: OpTag) -> bool {
         // We cannot call iter().any() or even do for loops in const fn yet.

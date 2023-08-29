@@ -30,7 +30,7 @@ lazy_static! {
         prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![TypeParam::Type(TypeBound::Any), TypeParam::USize],
+                vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 "array".into(),
                 TypeDefBound::FromParams(vec![0]),
             )
@@ -60,15 +60,18 @@ pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
     TypeBound::Any,
 );
 
-pub(crate) const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
-pub(crate) const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
-pub(crate) const BOOL_T: Type = Type::new_simple_predicate(2);
+/// Qubit type.
+pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
+/// Unsigned size type.
+pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
+/// Boolean type - Sum of two units.
+pub const BOOL_T: Type = Type::new_simple_predicate(2);
 
 /// Initialize a new array of type `typ` of length `size`
 pub fn new_array(typ: Type, size: u64) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
-        .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::USize(size)])
+        .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::BoundedNat(size)])
         .unwrap();
     Type::new_extension(custom_t)
 }

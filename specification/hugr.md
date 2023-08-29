@@ -907,17 +907,17 @@ The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "USize" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
 
 Opaque ::= string<[TypeArgs]>
 
-TypeArgs ::= Type(Type) | USize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
+TypeArgs ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
 
 Type ::= Name<[TypeArg]>
 ```
 (We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
 
-To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a constant usize, a set of extensions, a list or tuple of arguments.
+To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments.
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
