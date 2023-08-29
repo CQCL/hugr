@@ -941,7 +941,7 @@ mod test {
         let lift_node = hugr.add_node_with_parent(
             child,
             NodeType::open_extensions(ops::LeafOp::Lift {
-                type_row: just_bool.clone(),
+                type_row: just_bool,
                 new_extension: "C".into(),
             }),
         )?;

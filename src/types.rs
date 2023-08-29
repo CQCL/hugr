@@ -266,10 +266,10 @@ impl Type {
             TypeEnum::Sum(SumType::Simple(_)) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
             TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
-            TypeEnum::Prim(PrimType::Function(ft)) => (*ft)
+            TypeEnum::Prim(PrimType::Function(ft)) => ft
                 .input
                 .iter()
-                .chain((*ft).output.iter())
+                .chain(ft.output.iter())
                 .try_for_each(|t| t.validate(extension_registry)),
         }
     }
