@@ -857,21 +857,28 @@ mod test {
         let [w] = mult.outputs_arr();
 
         builder.set_outputs([w])?;
-        let hugr = builder.base;
-        // TODO: when we put new extensions onto the graph after inference, we
-        // can call `finish_hugr` and just look at the graph
-        let (solution, extra) = infer_extensions(&hugr)?;
-        assert!(extra.is_empty());
+        let mut hugr = builder.base;
+        let closure = hugr.infer_extensions()?;
+        assert!(closure.is_empty());
         assert_eq!(
-            *solution.get(&(src.node(), Direction::Outgoing)).unwrap(),
+            hugr.get_nodetype(src.node())
+                .signature()
+                .unwrap()
+                .output_extensions(),
             rs
         );
         assert_eq!(
-            *solution.get(&(mult.node(), Direction::Incoming)).unwrap(),
+            hugr.get_nodetype(mult.node())
+                .signature()
+                .unwrap()
+                .input_extensions,
             rs
         );
         assert_eq!(
-            *solution.get(&(mult.node(), Direction::Outgoing)).unwrap(),
+            hugr.get_nodetype(mult.node())
+                .signature()
+                .unwrap()
+                .output_extensions(),
             rs
         );
         Ok(())
