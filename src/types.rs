@@ -99,8 +99,8 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 /// Either store the types of the variants, or in the special (but common) case
 /// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
 enum SumType {
-    #[display(fmt = "SimplePredicate({})", "_0")]
-    Simple(u8),
+    #[display(fmt = "SimplePredicate({})", "size")]
+    Simple { size: u8 },
     General { row: TypeRow },
 }
 
@@ -110,7 +110,7 @@ impl SumType {
 
         let len = row.len();
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
-            Self::Simple(len as u8)
+            Self::Simple { size: len as u8 }
         } else {
             Self::General { row: row }
         }
@@ -118,7 +118,7 @@ impl SumType {
 
     fn get_variant(&self, tag: usize) -> Option<&Type> {
         match self {
-            SumType::Simple(size) if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::Simple { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
             SumType::General { row } => row.get(tag),
             _ => None,
         }
@@ -128,7 +128,7 @@ impl SumType {
 impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
-            SumType::Simple(size) => Type::new_simple_predicate(size),
+            SumType::Simple { size } => Type::new_simple_predicate(size),
             SumType::General { row: types } => Type::new_sum(types),
         }
     }
@@ -148,7 +148,7 @@ impl TypeEnum {
     fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
-            TypeEnum::Sum(SumType::Simple(_)) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::Simple { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { row: ts }) => {
                 least_upper_bound(ts.iter().map(Type::least_upper_bound))
             }
@@ -238,7 +238,7 @@ impl Type {
     /// New simple predicate with empty Tuple variants
     pub const fn new_simple_predicate(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Simple(size)), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::Simple { size: size }), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -306,7 +306,7 @@ pub(crate) mod test {
 
         assert_eq!(pred1, pred2);
 
-        let pred_direct = SumType::Simple(2);
+        let pred_direct = SumType::Simple { size: 2 };
         assert_eq!(pred1, pred_direct.into())
     }
 }
