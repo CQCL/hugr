@@ -101,7 +101,7 @@ pub(crate) mod test {
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
-    pub(super) const BIT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const BIT: Type = crate::extension::prelude::BOOL_T;
     pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.

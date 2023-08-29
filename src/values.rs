@@ -249,7 +249,7 @@ pub(crate) mod test {
         let v = Value::Prim(PrimValue::Function(Box::new(simple_dfg_hugr)));
 
         let correct_type = Type::new_function(FunctionType::new_linear(type_row![
-            crate::extension::prelude::USIZE_T
+            crate::extension::prelude::BOOL_T
         ]));
 
         assert!(correct_type.check_type(&v).is_ok());

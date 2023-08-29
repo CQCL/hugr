@@ -132,7 +132,7 @@ mod test {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b =
-                        fbuild.tail_loop_builder(vec![(USIZE_T, b1)], vec![], type_row![NAT])?;
+                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(Const::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
