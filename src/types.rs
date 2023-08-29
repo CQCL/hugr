@@ -95,31 +95,36 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+#[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
 enum SumType {
-    #[display(fmt = "SimplePredicate({})", "_0")]
-    Simple(u8),
-    General(TypeRow),
+    #[display(fmt = "SimplePredicate({})", "size")]
+    Simple {
+        size: u8,
+    },
+    General {
+        row: TypeRow,
+    },
 }
 
 impl SumType {
     fn new(types: impl Into<TypeRow>) -> Self {
         let row: TypeRow = types.into();
 
-        let len = row.len();
+        let len: usize = row.len();
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
-            Self::Simple(len as u8)
+            Self::Simple { size: len as u8 }
         } else {
-            Self::General(row)
+            Self::General { row }
         }
     }
 
     fn get_variant(&self, tag: usize) -> Option<&Type> {
         match self {
-            SumType::Simple(size) if tag < (*size as usize) => Some(Type::UNIT_REF),
-            SumType::General(row) => row.get(tag),
+            SumType::Simple { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::General { row } => row.get(tag),
             _ => None,
         }
     }
@@ -128,8 +133,8 @@ impl SumType {
 impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
-            SumType::Simple(size) => Type::new_simple_predicate(size),
-            SumType::General(types) => Type::new_sum(types),
+            SumType::Simple { size } => Type::new_simple_predicate(size),
+            SumType::General { row } => Type::new_sum(row),
         }
     }
 }
@@ -148,9 +153,9 @@ impl TypeEnum {
     fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
-            TypeEnum::Sum(SumType::Simple(_)) => TypeBound::Eq,
-            TypeEnum::Sum(SumType::General(ts)) => {
-                least_upper_bound(ts.iter().map(Type::least_upper_bound))
+            TypeEnum::Sum(SumType::Simple { size: _ }) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::General { row }) => {
+                least_upper_bound(row.iter().map(Type::least_upper_bound))
             }
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
@@ -238,7 +243,7 @@ impl Type {
     /// New simple predicate with empty Tuple variants
     pub const fn new_simple_predicate(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Simple(size)), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -260,10 +265,10 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General(row)) => {
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
                 row.iter().try_for_each(|t| t.validate(extension_registry))
             }
-            TypeEnum::Sum(SumType::Simple(_)) => Ok(()), // No leaves there
+            TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
             TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
             TypeEnum::Prim(PrimType::Function(ft)) => ft
@@ -349,7 +354,7 @@ pub(crate) mod test {
 
         assert_eq!(pred1, pred2);
 
-        let pred_direct = SumType::Simple(2);
+        let pred_direct = SumType::Simple { size: 2 };
         assert_eq!(pred1, pred_direct.into())
     }
 }
