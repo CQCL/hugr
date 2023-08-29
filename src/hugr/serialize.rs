@@ -9,7 +9,7 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 use crate::extension::ExtensionSet;
-use crate::hugr::{Hugr, HugrInternalsMut, NodeType};
+use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::Node;
@@ -18,7 +18,7 @@ use portgraph::{Direction, LinkError, NodeIndex, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrError, HugrView};
+use super::{HugrError, HugrMut, HugrView};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -129,7 +129,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
-        for (order, node) in hugr.canonical_order().enumerate() {
+        for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
             node_rekey.insert(node, NodeIndex::new(order).into());
         }
 
@@ -267,6 +267,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,

@@ -626,7 +626,7 @@ mod test {
     use super::*;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::ExtensionSet;
-    use crate::hugr::HugrInternalsMut;
+    use crate::hugr::HugrMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
     use crate::type_row;
