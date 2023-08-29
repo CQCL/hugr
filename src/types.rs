@@ -101,7 +101,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 enum SumType {
     #[display(fmt = "SimplePredicate({})", "_0")]
     Simple(u8),
-    General(TypeRow),
+    General { row: TypeRow },
 }
 
 impl SumType {
@@ -112,14 +112,14 @@ impl SumType {
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
             Self::Simple(len as u8)
         } else {
-            Self::General(row)
+            Self::General { row: row }
         }
     }
 
     fn get_variant(&self, tag: usize) -> Option<&Type> {
         match self {
             SumType::Simple(size) if tag < (*size as usize) => Some(Type::UNIT_REF),
-            SumType::General(row) => row.get(tag),
+            SumType::General { row } => row.get(tag),
             _ => None,
         }
     }
@@ -129,7 +129,7 @@ impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
             SumType::Simple(size) => Type::new_simple_predicate(size),
-            SumType::General(types) => Type::new_sum(types),
+            SumType::General { row: types } => Type::new_sum(types),
         }
     }
 }
@@ -149,7 +149,7 @@ impl TypeEnum {
         match self {
             TypeEnum::Prim(p) => p.bound(),
             TypeEnum::Sum(SumType::Simple(_)) => TypeBound::Eq,
-            TypeEnum::Sum(SumType::General(ts)) => {
+            TypeEnum::Sum(SumType::General { row: ts }) => {
                 least_upper_bound(ts.iter().map(Type::least_upper_bound))
             }
             TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
