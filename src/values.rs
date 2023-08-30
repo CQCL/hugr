@@ -211,8 +211,8 @@ pub(crate) mod test {
 
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::std_extensions::arithmetic::float_types::FLOAT64_CUSTOM_TYPE;
     use crate::type_row;
-    use crate::types::test::COPYABLE_CUST;
     use crate::types::{FunctionType, Type, TypeBound};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -239,7 +239,7 @@ pub(crate) mod test {
 
     pub(crate) fn serialized_float(f: f64) -> Value {
         Value::custom(CustomSerialized {
-            typ: COPYABLE_CUST,
+            typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
         })
     }

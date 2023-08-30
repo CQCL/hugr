@@ -158,7 +158,7 @@ impl Extension {
 mod test {
     use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::SignatureError;
-    use crate::types::test::COPYABLE_T;
+    use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{FunctionType, Type, TypeBound};
 
@@ -201,7 +201,7 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(COPYABLE_T), TypeArg::Type(COPYABLE_T),])
+            def.instantiate_concrete([TypeArg::Type(FLOAT64_TYPE), TypeArg::Type(FLOAT64_TYPE),])
                 .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );

@@ -123,8 +123,9 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{ConstUsize, USIZE_T},
+        std_extensions::arithmetic::float_types::FLOAT64_TYPE,
         type_row,
-        types::test::{test_registry, COPYABLE_T},
+        types::test::test_registry,
         types::type_param::TypeArg,
         types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
         values::{
@@ -140,7 +141,7 @@ mod test {
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![USIZE_T, COPYABLE_T], type_row![]];
+        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
@@ -165,7 +166,7 @@ mod test {
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = [type_row![USIZE_T, COPYABLE_T], type_row![]];
+        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
         let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
@@ -175,14 +176,14 @@ mod test {
     fn test_constant_values() {
         let int_value: Value = ConstUsize::new(257).into();
         USIZE_T.check_type(&int_value).unwrap();
-        COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
+        FLOAT64_TYPE.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
-            COPYABLE_T.check_type(&int_value),
+            FLOAT64_TYPE.check_type(&int_value),
             Err(ConstTypeError::CustomCheckFail(
                 CustomCheckFailure::TypeMismatch { .. }
             ))
         );
-        let tuple_ty = Type::new_tuple(vec![USIZE_T, COPYABLE_T]);
+        let tuple_ty = Type::new_tuple(vec![USIZE_T, FLOAT64_TYPE]);
         let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
         tuple_ty.check_type(&tuple_val).unwrap();
         let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);
