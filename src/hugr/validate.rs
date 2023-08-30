@@ -699,7 +699,7 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::{FunctionType, Type};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -1254,6 +1254,26 @@ mod test {
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn dfg_with_cycles() -> Result<(), HugrError> {
+        let mut h = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
+        }));
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        let not1 = h.add_op_with_parent(h.root(), not_op())?;
+        let not2 = h.add_op_with_parent(h.root(), not_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, not1, 0)?;
+        h.connect(not1, 0, and, 1)?;
+        h.connect(input, 1, not2, 0)?;
+        h.connect(not2, 0, output, 0)?;
+        // The graph contains a cycle:
+        assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
         Ok(())
     }
 }
