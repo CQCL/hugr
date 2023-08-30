@@ -5,7 +5,7 @@ use std::iter;
 
 use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
-use petgraph::visit::{DfsPostOrder, Walker};
+use petgraph::visit::{DfsPostOrder, Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
@@ -356,6 +356,7 @@ impl<'a> ValidationContext<'a> {
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
 
+        // Check that graph is bounded (single source, single sink).
         let postorder = DfsPostOrder::new(&region, entry_node);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
         // Local ScopedDefn's should not be reachable from the Input node, so discount them
@@ -365,6 +366,17 @@ impl<'a> ValidationContext<'a> {
             .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).tag()))
             .count();
         if nodes_visited != non_defn_count {
+            return Err(ValidationError::NotABoundedDag {
+                node: parent,
+                optype: op_type.clone(),
+            });
+        }
+
+        // Check that graph is acyclic.
+        let postorder = Topo::new(&region);
+        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let node_count = self.hugr.children(parent).count();
+        if nodes_visited != node_count {
             return Err(ValidationError::NotABoundedDag {
                 node: parent,
                 optype: op_type.clone(),
