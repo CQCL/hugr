@@ -708,15 +708,16 @@ mod test {
         BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder,
         ModuleBuilder,
     };
-    use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{prelude_registry, ExtensionSet, EMPTY_REG};
+    use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
+    use crate::extension::{prelude_registry, Extension, ExtensionSet, TypeDefBound, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::{FunctionType, Type};
+    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -1274,5 +1275,126 @@ mod test {
             ))
         );
         Ok(())
+    }
+
+    fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
+        let mut b = Hugr::default();
+        let row: TypeRow = vec![t].into();
+
+        let def = b
+            .add_op_with_parent(
+                b.root(),
+                ops::FuncDefn {
+                    name: "main".into(),
+                    signature: FunctionType::new(row.clone(), row.clone()),
+                },
+            )
+            .unwrap();
+
+        let input = b
+            .add_op_with_parent(def, ops::Input::new(row.clone()))
+            .unwrap();
+        let output = b.add_op_with_parent(def, ops::Output::new(row)).unwrap();
+        b.connect(input, 0, output, 0).unwrap();
+        (b, def)
+    }
+    #[test]
+    fn unregistered_extension() {
+        let (h, def) = identity_hugr_with_type(USIZE_T);
+        assert_eq!(
+            h.validate(&EMPTY_REG),
+            Err(ValidationError::SignatureError {
+                node: def,
+                cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
+            })
+        );
+        h.validate(&prelude_registry()).unwrap();
+    }
+
+    #[test]
+    fn invalid_types() {
+        let mut e = Extension::new("MyExt".into());
+        e.add_type(
+            "MyContainer".into(),
+            vec![TypeParam::Type(TypeBound::Copyable)],
+            "".into(),
+            TypeDefBound::Explicit(TypeBound::Any),
+        )
+        .unwrap();
+        let reg: ExtensionRegistry = [e, PRELUDE.to_owned()].into();
+
+        let validate_to_sig_error = |t: CustomType| {
+            let (h, def) = identity_hugr_with_type(Type::new_extension(t));
+            match h.validate(&reg) {
+                Err(ValidationError::SignatureError { node, cause }) if node == def => cause,
+                e => panic!("Expected SignatureError at def node, got {:?}", e),
+            }
+        };
+
+        let valid = Type::new_extension(CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T)],
+            "MyExt",
+            TypeBound::Any,
+        ));
+        assert_eq!(
+            identity_hugr_with_type(valid.clone()).0.validate(&reg),
+            Ok(())
+        );
+
+        // valid is Any, so is not allowed as an element of an outer MyContainer.
+        let element_outside_bound = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(valid.clone())],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(element_outside_bound),
+            SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+                param: TypeParam::Type(TypeBound::Copyable),
+                arg: TypeArg::Type(valid)
+            })
+        );
+
+        let bad_bound = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T)],
+            "MyExt",
+            TypeBound::Copyable,
+        );
+        assert_eq!(
+            validate_to_sig_error(bad_bound.clone()),
+            SignatureError::WrongBound {
+                actual: TypeBound::Copyable,
+                expected: TypeBound::Any
+            }
+        );
+
+        // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
+        let nested = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(Type::new_extension(bad_bound))],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(nested),
+            SignatureError::WrongBound {
+                actual: TypeBound::Copyable,
+                expected: TypeBound::Any
+            }
+        );
+
+        let too_many_type_args = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T), TypeArg::BoundedNat(3)],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(too_many_type_args),
+            SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
+        );
     }
 }
