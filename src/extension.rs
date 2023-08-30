@@ -82,7 +82,7 @@ pub enum SignatureError {
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: SmolStr, typ: SmolStr },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
-    #[error("Bound on CustomType did not match TypeDef")]
+    #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
         actual: TypeBound,
         expected: TypeBound,
