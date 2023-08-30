@@ -50,6 +50,7 @@ impl Rewrite for IdentityInsertion {
             .exactly_one()
             .unwrap();
         h.disconnect(self.post_node, self.post_port).unwrap();
+        // TODO Check type, insert Noop...
         h.connect(
             pre_node,
             pre_port.index(),
