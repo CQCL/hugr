@@ -38,30 +38,6 @@ fn extension() -> Extension {
         .unwrap();
     extension
         .add_op_custom_sig_simple(
-            SmolStr::new_inline("T"),
-            "T gate".into(),
-            vec![],
-            one_qb_func,
-        )
-        .unwrap();
-    extension
-        .add_op_custom_sig_simple(
-            SmolStr::new_inline("Tdg"),
-            "T-adjoint gate".into(),
-            vec![],
-            one_qb_func,
-        )
-        .unwrap();
-    extension
-        .add_op_custom_sig_simple(
-            SmolStr::new_inline("X"),
-            "X gate".into(),
-            vec![],
-            one_qb_func,
-        )
-        .unwrap();
-    extension
-        .add_op_custom_sig_simple(
             SmolStr::new_inline("RzF64"),
             "Rotation specified by float".into(),
             vec![],
