@@ -382,7 +382,7 @@ pub mod test {
             f_build.set_metadata(json!(42));
             f_build.finish_with_outputs(outputs).unwrap();
 
-            module_builder.finish_hugr(&prelude_registry()).unwrap()
+            module_builder.finish_prelude_hugr().unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -416,7 +416,7 @@ pub mod test {
                 .collect_vec();
 
             f_build.finish_with_outputs(outputs).unwrap();
-            module_builder.finish_hugr(&prelude_registry()).unwrap()
+            module_builder.finish_prelude_hugr().unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();

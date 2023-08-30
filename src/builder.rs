@@ -121,7 +121,7 @@ pub(crate) mod test {
         let f_builder = module_builder.define_function("main", signature)?;
 
         f(f_builder)?;
-        Ok(module_builder.finish_hugr(&prelude_registry())?)
+        Ok(module_builder.finish_prelude_hugr()?)
     }
 
     #[fixture]

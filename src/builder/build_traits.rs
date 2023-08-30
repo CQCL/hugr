@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::{prelude_registry, ExtensionRegistry, ExtensionSet};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -129,6 +129,17 @@ pub trait Container {
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
     fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError>;
+
+    /// Finish building the HUGR (as [HugrBuilder::finish_hugr]),
+    /// validating against the [prelude] extension only
+    ///
+    /// [prelude]: crate::extension::prelude
+    fn finish_prelude_hugr(self) -> Result<Hugr, ValidationError>
+    where
+        Self: Sized,
+    {
+        self.finish_hugr(&prelude_registry())
+    }
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR

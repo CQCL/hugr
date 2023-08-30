@@ -253,7 +253,7 @@ mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        Ok(module_builder.finish_hugr(&prelude_registry())?)
+        Ok(module_builder.finish_prelude_hugr()?)
     }
 
     /// Creates a hugr with a DFG root like the following:

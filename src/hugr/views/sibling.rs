@@ -604,7 +604,7 @@ mod tests {
             dfg.finish_with_outputs(outs.outputs())?
         };
         let hugr = mod_builder
-            .finish_hugr(&prelude_registry())
+            .finish_prelude_hugr()
             .map_err(|e| -> BuildError { e.into() })?;
         Ok((hugr, func_id.node()))
     }

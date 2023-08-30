@@ -97,10 +97,7 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
-        extension::{
-            prelude::{ConstUsize, USIZE_T},
-            prelude_registry,
-        },
+        extension::prelude::{ConstUsize, USIZE_T},
         hugr::ValidationError,
         ops::Const,
         type_row, Hugr,
@@ -116,7 +113,7 @@ mod test {
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
-            loop_b.finish_hugr(&prelude_registry())
+            loop_b.finish_prelude_hugr()
         };
 
         assert_matches!(build_result, Ok(_));
@@ -169,7 +166,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_hugr(&prelude_registry())
+            module_builder.finish_prelude_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

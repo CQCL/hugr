@@ -174,7 +174,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
-        extension::{prelude_registry, EMPTY_REG},
+        extension::EMPTY_REG,
         type_row,
         types::FunctionType,
     };
@@ -194,7 +194,7 @@ mod test {
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr(&prelude_registry())
+            module_builder.finish_prelude_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -242,7 +242,7 @@ mod test {
             let call = f_build.call(f_id.handle(), f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr(&prelude_registry())
+            module_builder.finish_prelude_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

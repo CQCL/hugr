@@ -1148,7 +1148,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&prelude_registry());
+        let handle = module_builder.finish_prelude_hugr();
 
         assert_matches!(
             handle,
@@ -1185,7 +1185,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr(&prelude_registry());
+        let handle = module_builder.finish_prelude_hugr();
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1247,7 +1247,7 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.finish_hugr(&prelude_registry());
+        let handle = module_builder.finish_prelude_hugr();
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
