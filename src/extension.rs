@@ -52,7 +52,9 @@ impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
         let mut reg = Self::new();
         for ext in value.into_iter() {
             let prev = reg.0.insert(ext.name.clone(), ext);
-            assert!(prev.is_none());
+            if let Some(prev) = prev {
+                panic!("Multiple extensions with same name: {}", prev.name)
+            };
         }
         reg
     }
