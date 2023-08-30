@@ -110,7 +110,7 @@ lazy_static! {
 pub(crate) mod test {
     use crate::{extension::prelude::BOOL_T, ops::LeafOp, types::type_param::TypeArg, Extension};
 
-    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, TRUE_NAME};
+    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, NOT_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
@@ -131,10 +131,18 @@ pub(crate) mod test {
         }
     }
 
-    /// Generate a logic extension and operation over [`crate::prelude::BOOL_T`]
+    /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> LeafOp {
         EXTENSION
             .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat(2)])
+            .unwrap()
+            .into()
+    }
+
+    /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn not_op() -> LeafOp {
+        EXTENSION
+            .instantiate_extension_op(NOT_NAME, [])
             .unwrap()
             .into()
     }
