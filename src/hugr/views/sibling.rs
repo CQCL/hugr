@@ -551,7 +551,7 @@ mod tests {
         },
         extension::{
             prelude::{BOOL_T, QB_T},
-            prelude_registry, EMPTY_REG,
+            EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::{
@@ -649,9 +649,7 @@ mod tests {
         let empty_dfg = {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
-            builder
-                .finish_hugr_with_outputs(inputs, &prelude_registry())
-                .unwrap()
+            builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
 
         let rep = sub.create_simple_replacement(empty_dfg).unwrap();
@@ -686,9 +684,7 @@ mod tests {
         let empty_dfg = {
             let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
-            builder
-                .finish_hugr_with_outputs(inputs, &prelude_registry())
-                .unwrap()
+            builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
 
         assert_eq!(

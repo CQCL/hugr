@@ -458,9 +458,7 @@ pub mod test {
         let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
         let [old_in, out] = dfg.io();
         let w = dfg.input_wires();
-        let mut hugr = dfg
-            .finish_hugr_with_outputs(w, &prelude_registry())
-            .unwrap();
+        let mut hugr = dfg.finish_prelude_hugr_with_outputs(w).unwrap();
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));

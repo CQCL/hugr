@@ -270,7 +270,7 @@ mod test {
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
             dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-        dfg_builder.finish_hugr_with_outputs(wire45.outputs(), &prelude_registry())
+        dfg_builder.finish_prelude_hugr_with_outputs(wire45.outputs())
     }
 
     /// Creates a hugr with a DFG root like the following:
@@ -285,7 +285,7 @@ mod test {
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
-        dfg_builder.finish_hugr_with_outputs(wireoutvec, &prelude_registry())
+        dfg_builder.finish_prelude_hugr_with_outputs(wireoutvec)
     }
 
     #[test]
@@ -461,9 +461,7 @@ mod test {
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
-        let mut h = builder
-            .finish_hugr_with_outputs(wires, &prelude_registry())
-            .unwrap();
+        let mut h = builder.finish_prelude_hugr_with_outputs(wires).unwrap();
         let replacement = h.clone();
         let orig = h.clone();
 
