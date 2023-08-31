@@ -23,7 +23,7 @@ fn node_connections() -> Result<(), BuildError> {
     let [q1, q2] = n1.outputs_arr();
     let n2 = dfg.add_dataflow_op(cx_gate(), [q2, q1])?;
 
-    let h = dfg.finish_hugr_with_outputs(n2.outputs())?;
+    let h = dfg.finish_prelude_hugr_with_outputs(n2.outputs())?;
 
     let connections: Vec<_> = h.node_connections(n1.node(), n2.node()).collect();
 
