@@ -695,10 +695,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
-    use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder,
-        ModuleBuilder,
-    };
+    use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
     use crate::extension::{prelude_registry, Extension, ExtensionSet, TypeDefBound, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
@@ -1134,7 +1131,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_prelude_hugr();
+        let handle = module_builder.hugr().validate(&prelude_registry());
 
         assert_matches!(
             handle,
@@ -1171,7 +1168,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_prelude_hugr();
+        let handle = module_builder.hugr().validate(&prelude_registry());
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1233,7 +1230,7 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.finish_prelude_hugr();
+        let handle = module_builder.hugr().validate(&prelude_registry());
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1245,16 +1242,33 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let main_signature = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
+        let rs = ExtensionSet::singleton(&"R".into());
 
-        let mut builder = DFGBuilder::new(main_signature)?;
-        let [w] = builder.input_wires_arr();
-        builder.set_outputs([w])?;
-        let hugr = builder.base.validate(&prelude_registry()); // finish_hugr_with_outputs([w]);
+        let main_signature =
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
+
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: main_signature,
+        }));
+        let input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Input {
+                types: type_row![NAT],
+            }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::new(
+                ops::Output {
+                    types: type_row![NAT],
+                },
+                rs,
+            ),
+        )?;
+        hugr.connect(input, 0, output, 0)?;
 
         assert_matches!(
-            hugr,
+            hugr.validate(&prelude_registry()),
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
