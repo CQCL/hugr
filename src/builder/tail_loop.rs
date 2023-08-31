@@ -98,6 +98,7 @@ mod test {
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
         extension::prelude::{ConstUsize, USIZE_T},
+        extension::ExtensionSet,
         hugr::ValidationError,
         ops::Const,
         type_row, Hugr,
@@ -113,7 +114,7 @@ mod test {
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
-            loop_b.finish_hugr()
+            loop_b.finish_prelude_hugr()
         };
 
         assert_matches!(build_result, Ok(_));
@@ -132,7 +133,7 @@ mod test {
                 let [b1] = fbuild.input_wires_arr();
                 let loop_id = {
                     let mut loop_b =
-                        fbuild.tail_loop_builder(vec![(USIZE_T, b1)], vec![], type_row![NAT])?;
+                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_wire = loop_b.add_load_const(Const::true_val())?;
                     let [b1] = loop_b.input_wires_arr();
@@ -143,6 +144,7 @@ mod test {
                             (predicate_inputs, const_wire),
                             vec![(BIT, b1)],
                             output_row,
+                            ExtensionSet::new(),
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;
@@ -166,7 +168,7 @@ mod test {
 
                 fbuild.finish_with_outputs(loop_id.outputs())?
             };
-            module_builder.finish_hugr()
+            module_builder.finish_prelude_hugr()
         };
 
         assert_matches!(build_result, Ok(_));

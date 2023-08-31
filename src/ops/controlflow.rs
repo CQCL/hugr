@@ -2,6 +2,7 @@
 
 use smol_str::SmolStr;
 
+use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
@@ -59,6 +60,8 @@ pub struct Conditional {
     pub other_inputs: TypeRow,
     /// Output types
     pub outputs: TypeRow,
+    /// Extensions used to produce the outputs
+    pub extension_delta: ExtensionSet,
 }
 impl_op_name!(Conditional);
 
@@ -74,7 +77,7 @@ impl DataflowOpTrait for Conditional {
         inputs
             .to_mut()
             .insert(0, Type::new_predicate(self.predicate_inputs.clone()));
-        FunctionType::new(inputs, self.outputs.clone())
+        FunctionType::new(inputs, self.outputs.clone()).with_extension_delta(&self.extension_delta)
     }
 }
 
@@ -208,6 +211,10 @@ impl OpTrait for Case {
 
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
+    }
+
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
     }
 }
 

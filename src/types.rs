@@ -17,6 +17,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
@@ -256,6 +257,27 @@ impl Type {
     pub const fn copyable(&self) -> bool {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        // There is no need to check the components against the bound,
+        // that is guaranteed by construction (even for deserialization)
+        match &self.0 {
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
+                row.iter().try_for_each(|t| t.validate(extension_registry))
+            }
+            TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
+            TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
+            TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
+            TypeEnum::Prim(PrimType::Function(ft)) => ft
+                .input
+                .iter()
+                .chain(ft.output.iter())
+                .try_for_each(|t| t.validate(extension_registry)),
+        }
+    }
 }
 
 /// Return the type row of variants required to define a Sum of Tuples type
@@ -274,15 +296,18 @@ where
 #[cfg(test)]
 pub(crate) mod test {
 
-    use super::{
-        custom::test::{ANY_CUST, COPYABLE_CUST, EQ_CUST},
-        *,
+    use super::*;
+    use crate::{
+        extension::{prelude::USIZE_T, PRELUDE},
+        ops::AliasDecl,
+        std_extensions::arithmetic::float_types,
     };
-    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
-    pub(crate) const EQ_T: Type = Type::new_extension(EQ_CUST);
-    pub(crate) const COPYABLE_T: Type = Type::new_extension(COPYABLE_CUST);
-    pub(crate) const ANY_T: Type = Type::new_extension(ANY_CUST);
+    use crate::types::TypeBound;
+
+    pub(crate) fn test_registry() -> ExtensionRegistry {
+        vec![PRELUDE.to_owned(), float_types::extension()].into()
+    }
 
     #[test]
     fn construct() {
