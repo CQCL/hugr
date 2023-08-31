@@ -1,6 +1,8 @@
 //! Implementation of the `InsertIdentity` operation.
 
+use crate::extension::prelude::QB_T;
 use crate::hugr::{HugrMut, Node};
+use crate::ops::LeafOp;
 use crate::{Hugr, HugrView, Port};
 
 use super::Rewrite;
@@ -40,6 +42,8 @@ pub enum IdentityInsertionError {
 
 impl Rewrite for IdentityInsertion {
     type Error = IdentityInsertionError;
+    /// The inserted node.
+    type ApplyResult = Node;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, _h: &Hugr) -> Result<(), IdentityInsertionError> {
         /*
@@ -52,12 +56,13 @@ impl Rewrite for IdentityInsertion {
 
         unimplemented!()
     }
-    fn apply(self, h: &mut Hugr) -> Result<(), IdentityInsertionError> {
+    fn apply(self, h: &mut Hugr) -> Result<Self::ApplyResult, IdentityInsertionError> {
         let (pre_node, pre_port) = h
             .linked_ports(self.post_node, self.post_port)
             .exactly_one()
             .expect("Value kind input can only have one connection.");
         h.disconnect(self.post_node, self.post_port).unwrap();
+        let new_node = h.add_op(LeafOp::Noop { ty: QB_T });
         // TODO Check type, insert Noop...
         h.connect(
             pre_node,
@@ -66,6 +71,6 @@ impl Rewrite for IdentityInsertion {
             self.post_port.index(),
         )
         .unwrap();
-        Ok(())
+        Ok(new_node)
     }
 }
