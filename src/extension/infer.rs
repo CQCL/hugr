@@ -637,7 +637,9 @@ impl UnificationContext {
     /// us to come up with a fully concrete solution to pass into validation.
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
-            self.add_solution(m, ExtensionSet::new());
+            if !self.solved.contains_key(&m) {
+                self.add_solution(m, ExtensionSet::new());
+            }
         }
         self.variables = HashSet::new();
     }
