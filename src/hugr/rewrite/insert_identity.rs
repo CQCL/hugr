@@ -42,13 +42,21 @@ impl Rewrite for IdentityInsertion {
     type Error = IdentityInsertionError;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, _h: &Hugr) -> Result<(), IdentityInsertionError> {
+        /*
+        Assumptions:
+        1. Value kind inputs can only have one connection.
+        Conditions:
+        1. post_port is Value kind
+        2. post_port is connected to a sibling of post_node
+         */
+
         unimplemented!()
     }
     fn apply(self, h: &mut Hugr) -> Result<(), IdentityInsertionError> {
         let (pre_node, pre_port) = h
             .linked_ports(self.post_node, self.post_port)
             .exactly_one()
-            .unwrap();
+            .expect("Value kind input can only have one connection.");
         h.disconnect(self.post_node, self.post_port).unwrap();
         // TODO Check type, insert Noop...
         h.connect(
