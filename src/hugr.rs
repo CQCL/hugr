@@ -7,7 +7,7 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
@@ -197,9 +197,9 @@ impl Hugr {
     }
 
     /// Infer extension requirements and add new information to `op_types` field
-    pub fn infer_extensions(
-        &mut self,
-    ) -> Result<HashMap<(Node, Direction), ExtensionSet>, InferExtensionError> {
+    ///
+    /// See [`infer_extensions`] for details on the "closure" value
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let (solution, extension_closure) = infer_extensions(self)?;
         self.instantiate_extensions(solution);
         Ok(extension_closure)
@@ -214,10 +214,10 @@ impl Hugr {
             .filter(|((_, dir), _)| *dir == Direction::Incoming)
         {
             let nodetype = self.op_types.try_get_mut(node.index).unwrap();
-            match nodetype.signature() {
+            match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
                 Some(existing_ext_reqs) => {
-                    debug_assert_eq!(existing_ext_reqs.input_extensions, *input_extensions)
+                    debug_assert_eq!(existing_ext_reqs, input_extensions)
                 }
             }
         }
