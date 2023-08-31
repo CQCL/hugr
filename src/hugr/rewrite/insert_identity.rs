@@ -82,14 +82,55 @@ impl Rewrite for IdentityInsertion {
 
 #[cfg(test)]
 mod tests {
-    use rstest::{fixture, rstest};
+    use rstest::rstest;
 
-    use crate::Hugr;
+    use super::super::simple_replace::test::dfg_hugr;
+    use super::*;
+    use crate::{
+        algorithm::nest_cfgs::test::build_conditional_in_loop_cfg, extension::prelude::QB_T,
+        ops::handle::NodeHandle, Hugr,
+    };
 
-    #[fixture]
-    fn sample() -> Hugr {
-        todo!()
-    }
     #[rstest]
-    fn correct_insertion() {}
+    fn correct_insertion(dfg_hugr: Hugr) {
+        let mut h = dfg_hugr;
+
+        assert_eq!(h.node_count(), 6);
+
+        let final_node = h
+            .input_neighbours(h.get_io(h.root()).unwrap()[1])
+            .next()
+            .unwrap();
+
+        let final_node_port = h.node_inputs(final_node).next().unwrap();
+
+        let rw = IdentityInsertion::new(final_node, final_node_port);
+
+        let noop_node = h.apply_rewrite(rw).unwrap();
+
+        assert_eq!(h.node_count(), 7);
+
+        let noop: LeafOp = h.get_optype(noop_node).clone().try_into().unwrap();
+
+        assert_eq!(noop, LeafOp::Noop { ty: QB_T });
+    }
+
+    #[test]
+    fn incorrect_insertion() {
+        let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
+
+        let final_node = tail.node();
+
+        let final_node_port = h.node_inputs(final_node).next().unwrap();
+
+        let rw = IdentityInsertion::new(final_node, final_node_port);
+
+        let apply_result = h.apply_rewrite(rw);
+        assert_eq!(
+            apply_result,
+            Err(IdentityInsertionError::InvalidPortKind(Some(
+                EdgeKind::ControlFlow
+            )))
+        );
+    }
 }
