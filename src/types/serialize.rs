@@ -62,7 +62,7 @@ impl From<SerSimpleType> for Type {
 mod test {
     use crate::extension::prelude::USIZE_T;
     use crate::hugr::serialize::test::ser_roundtrip;
-    use crate::types::test::COPYABLE_T;
+    use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::types::FunctionType;
     use crate::types::Type;
 
@@ -77,7 +77,7 @@ mod test {
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum(vec![USIZE_T, COPYABLE_T]);
+        let t = Type::new_sum(vec![USIZE_T, FLOAT64_TYPE]);
         assert_eq!(ser_roundtrip(&t), t);
 
         // A simple predicate

@@ -637,7 +637,9 @@ impl UnificationContext {
     /// us to come up with a fully concrete solution to pass into validation.
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
-            self.add_solution(m, ExtensionSet::new());
+            if !self.solved.contains_key(&m) {
+                self.add_solution(m, ExtensionSet::new());
+            }
         }
         self.variables = HashSet::new();
     }
@@ -649,7 +651,7 @@ mod test {
 
     use super::*;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::ExtensionSet;
+    use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::HugrMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
@@ -803,7 +805,7 @@ mod test {
                 .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
         )?;
         let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        let hugr = builder.finish_hugr_with_outputs([w], &EMPTY_REG);
 
         // Fail to catch the actual error because it's a difference between I/O
         // nodes and their parents and `report_mismatch` isn't yet smart enough
@@ -972,7 +974,7 @@ mod test {
         let lift_node = hugr.add_node_with_parent(
             child,
             NodeType::open_extensions(ops::LeafOp::Lift {
-                type_row: just_bool.clone(),
+                type_row: just_bool,
                 new_extension: "C".into(),
             }),
         )?;

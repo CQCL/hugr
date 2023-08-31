@@ -61,7 +61,16 @@ impl TypeDef {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        self.check_concrete_impl(custom)
+        self.check_concrete_impl(custom)?;
+        let calc_bound = self.bound(custom.args());
+        if calc_bound == custom.bound() {
+            Ok(())
+        } else {
+            Err(SignatureError::WrongBound {
+                expected: calc_bound,
+                actual: custom.bound(),
+            })
+        }
     }
 
     /// Instantiate a concrete [`CustomType`] by providing type arguments.
@@ -147,8 +156,9 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
+    use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::SignatureError;
-    use crate::types::test::{ANY_T, COPYABLE_T, EQ_T};
+    use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{FunctionType, Type, TypeBound};
 
@@ -171,15 +181,15 @@ mod test {
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(EQ_T)]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(USIZE_T)]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(ANY_T)]),
+            def.instantiate_concrete([TypeArg::Type(QB_T)]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type(ANY_T),
+                    arg: TypeArg::Type(QB_T),
                     param: TypeParam::Type(TypeBound::Copyable)
                 }
             ))
@@ -191,7 +201,7 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(COPYABLE_T), TypeArg::Type(COPYABLE_T),])
+            def.instantiate_concrete([TypeArg::Type(FLOAT64_TYPE), TypeArg::Type(FLOAT64_TYPE),])
                 .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );

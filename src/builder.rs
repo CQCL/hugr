@@ -101,7 +101,7 @@ pub(crate) mod test {
     use super::{DataflowSubContainer, HugrBuilder};
 
     pub(super) const NAT: Type = crate::extension::prelude::USIZE_T;
-    pub(super) const BIT: Type = crate::extension::prelude::USIZE_T;
+    pub(super) const BIT: Type = crate::extension::prelude::BOOL_T;
     pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
@@ -120,7 +120,7 @@ pub(crate) mod test {
         let f_builder = module_builder.define_function("main", signature)?;
 
         f(f_builder)?;
-        Ok(module_builder.finish_hugr()?)
+        Ok(module_builder.finish_prelude_hugr()?)
     }
 
     #[fixture]
@@ -128,6 +128,6 @@ pub(crate) mod test {
         let dfg_builder =
             DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
-        dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
+        dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
 }
