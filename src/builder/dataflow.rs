@@ -100,9 +100,7 @@ impl HugrBuilder for DFGBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, ValidationError> {
-        let closure = self.base.infer_extensions()?;
-        self.base
-            .validate_with_extension_closure(closure, extension_registry)?;
+        self.base.infer_and_validate(extension_registry)?;
         Ok(self.base)
     }
 }

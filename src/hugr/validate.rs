@@ -695,10 +695,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
-    use crate::builder::{
-        BuildError, Container, Dataflow, DataflowSubContainer,
-        ModuleBuilder,
-    };
+    use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
     use crate::extension::{prelude_registry, Extension, ExtensionSet, TypeDefBound, EMPTY_REG};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;

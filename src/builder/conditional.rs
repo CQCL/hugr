@@ -151,8 +151,7 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.infer_extensions()?;
-        self.base.validate(extension_registry)?;
+        self.base.infer_and_validate(extension_registry)?;
         Ok(self.base)
     }
 }

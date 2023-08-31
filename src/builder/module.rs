@@ -56,8 +56,11 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError> {
-        self.0.validate(extension_registry)?;
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, ValidationError> {
+        self.0.infer_and_validate(extension_registry)?;
         Ok(self.0)
     }
 }

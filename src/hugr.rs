@@ -24,7 +24,9 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::{infer_extensions, ExtensionSet, ExtensionSolution, InferExtensionError};
+use crate::extension::{
+    infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
+};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
@@ -194,6 +196,16 @@ impl Hugr {
         rw: impl Rewrite<ApplyResult = R, Error = E>,
     ) -> Result<R, E> {
         rw.apply(self)
+    }
+
+    /// Run resource inference and pass the closure into validation
+    pub fn infer_and_validate(
+        &mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), ValidationError> {
+        let closure = self.infer_extensions()?;
+        self.validate_with_extension_closure(closure, extension_registry)?;
+        Ok(())
     }
 
     /// Infer extension requirements and add new information to `op_types` field
