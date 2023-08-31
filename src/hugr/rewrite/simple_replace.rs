@@ -190,7 +190,7 @@ pub enum SimpleReplacementError {
 }
 
 #[cfg(test)]
-pub(super) mod test {
+pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
     use rstest::{fixture, rstest};
@@ -258,7 +258,7 @@ pub(super) mod test {
     }
 
     #[fixture]
-    fn simple_hugr() -> Hugr {
+    pub(in crate::hugr::rewrite) fn simple_hugr() -> Hugr {
         make_hugr().unwrap()
     }
     /// Creates a hugr with a DFG root like the following:
@@ -279,7 +279,7 @@ pub(super) mod test {
     }
 
     #[fixture]
-    fn dfg_hugr() -> Hugr {
+    pub(in crate::hugr::rewrite) fn dfg_hugr() -> Hugr {
         make_dfg_hugr().unwrap()
     }
 
@@ -299,7 +299,7 @@ pub(super) mod test {
     }
 
     #[fixture]
-    fn dfg_hugr2() -> Hugr {
+    pub(in crate::hugr::rewrite) fn dfg_hugr2() -> Hugr {
         make_dfg_hugr2().unwrap()
     }
 
