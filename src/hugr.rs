@@ -189,7 +189,10 @@ pub type Direction = portgraph::Direction;
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
+    pub fn apply_rewrite<R, E>(
+        &mut self,
+        rw: impl Rewrite<Error = E, ApplyResult = R>,
+    ) -> Result<R, E> {
         rw.apply(self)
     }
 

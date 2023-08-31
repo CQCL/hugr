@@ -51,6 +51,8 @@ impl SimpleReplacement {
 
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
+    type ApplyResult = ();
+
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, _h: &Hugr) -> Result<(), SimpleReplacementError> {
