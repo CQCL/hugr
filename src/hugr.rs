@@ -194,9 +194,7 @@ impl Hugr {
     }
 
     /// Infer extension requirements and add new information to `op_types` field
-    pub fn infer_extensions(
-        &mut self,
-    ) -> Result<HashMap<(Node, Direction), ExtensionSet>, InferExtensionError> {
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let (solution, extension_closure) = infer_extensions(self)?;
         self.instantiate_extensions(solution);
         Ok(extension_closure)
