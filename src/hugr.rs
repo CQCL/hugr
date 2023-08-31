@@ -209,10 +209,7 @@ impl Hugr {
     fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
         // We only care about inferred _input_ extensions, because `NodeType`
         // uses those to infer the output extensions
-        for ((node, _), input_extensions) in solution
-            .iter()
-            .filter(|((_, dir), _)| *dir == Direction::Incoming)
-        {
+        for (node, input_extensions) in solution.iter() {
             let nodetype = self.op_types.try_get_mut(node.index).unwrap();
             match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
@@ -504,16 +501,14 @@ mod test {
         hugr.infer_extensions()?;
 
         assert_eq!(
-            hugr.op_types
-                .get(lift.index)
+            hugr.get_nodetype(lift)
                 .signature()
                 .unwrap()
                 .input_extensions,
             ExtensionSet::new()
         );
         assert_eq!(
-            hugr.op_types
-                .get(output.index)
+            hugr.get_nodetype(output)
                 .signature()
                 .unwrap()
                 .input_extensions,

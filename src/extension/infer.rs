@@ -21,9 +21,9 @@ use std::collections::{HashMap, HashSet};
 
 use thiserror::Error;
 
-/// A mapping from locations on the hugr to extension requirement sets which
-/// have been inferred for them
-pub type ExtensionSolution = HashMap<(Node, Direction), ExtensionSet>;
+/// A mapping from nodes on the hugr to extension requirement sets which have
+/// been inferred for their inputs.
+pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 
 /// Infer extensions for a hugr. This is the main API exposed by this module
 ///
@@ -38,9 +38,9 @@ pub fn infer_extensions(
     let solution = ctx.main_loop()?;
     ctx.instantiate_variables();
     let closed_solution = ctx.main_loop()?;
-    let closure: HashMap<(Node, Direction), ExtensionSet> = closed_solution
+    let closure: ExtensionSolution = closed_solution
         .into_iter()
-        .filter(|(loc, _)| !solution.contains_key(loc))
+        .filter(|(node, _)| !solution.contains_key(node))
         .collect();
     Ok((solution, closure))
 }
@@ -536,7 +536,9 @@ impl UnificationContext {
                     }
                 }
             }?;
-            results.insert(*loc, rs);
+            if loc.1 == Direction::Incoming {
+                results.insert(loc.0, rs);
+            }
         }
         debug_assert!(self.live_metas().is_empty());
         Ok(results)
@@ -735,22 +737,11 @@ mod test {
         let (_, closure) = infer_extensions(&hugr)?;
         let empty = ExtensionSet::new();
         let ab = ExtensionSet::from_iter(["A".into(), "B".into()]);
-        let abc = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        assert_eq!(*closure.get(&(hugr.root())).unwrap(), empty);
+        assert_eq!(*closure.get(&(mult_c)).unwrap(), ab);
+        assert_eq!(*closure.get(&(add_ab)).unwrap(), empty);
         assert_eq!(
-            *closure.get(&(hugr.root(), Direction::Incoming)).unwrap(),
-            empty
-        );
-        assert_eq!(
-            *closure.get(&(hugr.root(), Direction::Outgoing)).unwrap(),
-            abc
-        );
-        assert_eq!(*closure.get(&(mult_c, Direction::Incoming)).unwrap(), ab);
-        assert_eq!(*closure.get(&(mult_c, Direction::Outgoing)).unwrap(), abc);
-        assert_eq!(*closure.get(&(add_ab, Direction::Incoming)).unwrap(), empty);
-        assert_eq!(*closure.get(&(add_ab, Direction::Outgoing)).unwrap(), ab);
-        assert_eq!(*closure.get(&(add_ab, Direction::Incoming)).unwrap(), empty);
-        assert_eq!(
-            *closure.get(&(add_b, Direction::Incoming)).unwrap(),
+            *closure.get(&add_b).unwrap(),
             ExtensionSet::singleton(&"A".into())
         );
         Ok(())
@@ -837,9 +828,9 @@ mod test {
         ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
         ctx.add_constraint(ab, Constraint::Plus("B".into(), a));
         let solution = ctx.main_loop()?;
-        // We'll only find concrete solutions for the Incoming/Outgoing sides of
+        // We'll only find concrete solutions for the Incoming extension reqs of
         // the main node created by `Hugr::default`
-        assert_eq!(solution.len(), 2);
+        assert_eq!(solution.len(), 1);
         Ok(())
     }
 
@@ -983,11 +974,14 @@ mod test {
         hugr.connect(lift_node, 0, ochild, 0)?;
         hugr.connect(child, 0, output, 0)?;
 
-        let (sol, _) = infer_extensions(&hugr)?;
+        hugr.infer_extensions()?;
 
         // The solution for the const node should be {A, B}!
         assert_eq!(
-            *sol.get(&(const_node, Direction::Outgoing)).unwrap(),
+            hugr.get_nodetype(const_node)
+                .signature()
+                .unwrap()
+                .output_extensions(),
             ExtensionSet::from_iter(["A".into(), "B".into()])
         );
 

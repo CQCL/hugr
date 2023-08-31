@@ -5,10 +5,9 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use super::{ExtensionSet, ExtensionSolution};
 use crate::hugr::NodeType;
 use crate::{Direction, Hugr, HugrView, Node, Port};
-
-use super::ExtensionSet;
 
 /// Context for validating the extension requirements defined in a Hugr.
 #[derive(Debug, Clone, Default)]
@@ -23,10 +22,17 @@ impl ExtensionValidator {
     ///
     /// The `closure` argument is a set of extensions which doesn't actually
     /// live on the graph, but is used to close the graph for validation
-    pub fn new(hugr: &Hugr, closure: HashMap<(Node, Direction), ExtensionSet>) -> Self {
-        let mut validator = ExtensionValidator {
-            extensions: closure,
-        };
+    pub fn new(hugr: &Hugr, closure: ExtensionSolution) -> Self {
+        let mut extensions: HashMap<(Node, Direction), ExtensionSet> = HashMap::new();
+        for (node, incoming_sol) in closure.into_iter() {
+            let op_signature = hugr.get_nodetype(node).op_signature();
+            let outgoing_sol = op_signature.extension_reqs.union(&incoming_sol);
+
+            extensions.insert((node, Direction::Incoming), incoming_sol);
+            extensions.insert((node, Direction::Outgoing), outgoing_sol);
+        }
+
+        let mut validator = ExtensionValidator { extensions };
 
         for node in hugr.nodes() {
             validator.gather_extensions(&node, hugr.get_nodetype(node));

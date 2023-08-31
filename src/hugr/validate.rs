@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 use crate::extension::SignatureError;
 use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
-    ExtensionRegistry, ExtensionSet, InferExtensionError,
+    ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
@@ -53,7 +53,7 @@ impl Hugr {
     /// free extension variables
     pub fn validate_with_extension_closure(
         &self,
-        closure: HashMap<(Node, Direction), ExtensionSet>,
+        closure: ExtensionSolution,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
         let mut validator = ValidationContext::new(self, closure, extension_registry);
@@ -65,7 +65,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Create a new validation context.
     pub fn new(
         hugr: &'a Hugr,
-        extension_closure: HashMap<(Node, Direction), ExtensionSet>,
+        extension_closure: ExtensionSolution,
         extension_registry: &'b ExtensionRegistry,
     ) -> Self {
         Self {
