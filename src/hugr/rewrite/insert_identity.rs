@@ -106,8 +106,10 @@ mod tests {
     use super::super::simple_replace::test::dfg_hugr;
     use super::*;
     use crate::{
-        algorithm::nest_cfgs::test::build_conditional_in_loop_cfg, extension::prelude::QB_T,
-        ops::handle::NodeHandle, Hugr,
+        algorithm::nest_cfgs::test::build_conditional_in_loop_cfg,
+        extension::{prelude::QB_T, prelude_registry},
+        ops::handle::NodeHandle,
+        Hugr,
     };
 
     #[rstest]
@@ -133,7 +135,7 @@ mod tests {
 
         assert_eq!(noop, LeafOp::Noop { ty: QB_T });
 
-        h.validate().unwrap();
+        h.validate(&prelude_registry()).unwrap();
     }
 
     #[test]
