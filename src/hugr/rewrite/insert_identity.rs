@@ -66,15 +66,16 @@ impl Rewrite for IdentityInsertion {
         if self.post_port.direction() != Direction::Incoming {
             return Err(IdentityInsertionError::PortIsOutput);
         }
-        let (pre_node, pre_port) = h
-            .linked_ports(self.post_node, self.post_port)
-            .exactly_one()
-            .expect("Value kind input can only have one connection.");
 
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));
         };
+
+        let (pre_node, pre_port) = h
+            .linked_ports(self.post_node, self.post_port)
+            .exactly_one()
+            .expect("Value kind input can only have one connection.");
 
         h.disconnect(self.post_node, self.post_port).unwrap();
         let new_node = h.add_op(LeafOp::Noop { ty });
