@@ -1,7 +1,7 @@
 //! Implementation of the `InsertIdentity` operation.
 
 use crate::hugr::{HugrMut, Node};
-use crate::ops::LeafOp;
+use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, Port};
 
@@ -32,6 +32,9 @@ impl IdentityInsertion {
 /// Error from an [`IdentityInsertion`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum IdentityInsertionError {
+    /// Invalid parent node.
+    #[error("Parent node is invalid.")]
+    InvalidParentNode,
     /// Invalid node.
     #[error("Node is invalid.")]
     InvalidNode(),
@@ -78,7 +81,15 @@ impl Rewrite for IdentityInsertion {
             .expect("Value kind input can only have one connection.");
 
         h.disconnect(self.post_node, self.post_port).unwrap();
-        let new_node = h.add_op(LeafOp::Noop { ty });
+        let parent = h
+            .get_parent(self.post_node)
+            .ok_or(IdentityInsertionError::InvalidParentNode)?;
+        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
+            return Err(IdentityInsertionError::InvalidParentNode);
+        }
+        let new_node = h
+            .add_op_with_parent(parent, LeafOp::Noop { ty })
+            .expect("Parent validity already checked.");
         h.connect(pre_node, pre_port.index(), new_node, 0)
             .expect("Should only fail if ports don't exist.");
 
@@ -121,6 +132,8 @@ mod tests {
         let noop: LeafOp = h.get_optype(noop_node).clone().try_into().unwrap();
 
         assert_eq!(noop, LeafOp::Noop { ty: QB_T });
+
+        h.validate().unwrap();
     }
 
     #[test]
