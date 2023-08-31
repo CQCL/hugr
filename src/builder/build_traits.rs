@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::ExtensionSet;
+use crate::extension::{prelude_registry, ExtensionRegistry, ExtensionSet};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -128,7 +128,18 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError>;
+
+    /// Finish building the HUGR (as [HugrBuilder::finish_hugr]),
+    /// validating against the [prelude] extension only
+    ///
+    /// [prelude]: crate::extension::prelude
+    fn finish_prelude_hugr(self) -> Result<Hugr, ValidationError>
+    where
+        Self: Sized,
+    {
+        self.finish_hugr(&prelude_registry())
+    }
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -701,19 +712,35 @@ fn wire_up<T: Dataflow + ?Sized>(
 
 /// Trait implemented by builders of Dataflow Hugrs
 pub trait DataflowHugr: HugrBuilder + Dataflow {
-    /// Set outputs of dataflow HUGR and return HUGR
+    /// Set outputs of dataflow HUGR and return validated HUGR
     /// # Errors
     ///
-    /// This function will return an error if there is an error when setting outputs.
+    /// * if there is an error when setting outputs
+    /// * if the Hugr does not validate
     fn finish_hugr_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(outputs)?;
-        Ok(self.finish_hugr()?)
+        Ok(self.finish_hugr(extension_registry)?)
+    }
+
+    /// Sets the outputs of a dataflow Hugr, validates against
+    /// the [prelude] extension only, and return the Hugr
+    ///
+    /// [prelude]: crate::extension::prelude
+    fn finish_prelude_hugr_with_outputs(
+        self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError>
+    where
+        Self: Sized,
+    {
+        self.finish_hugr_with_outputs(outputs, &prelude_registry())
     }
 }
 

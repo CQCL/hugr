@@ -4,7 +4,7 @@
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_arg, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::CustomType;
+use crate::types::{CustomType, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -27,11 +27,43 @@ pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
 pub mod validate;
 
-pub use prelude::PRELUDE;
+pub use prelude::{prelude_registry, PRELUDE};
+
+/// Extension Registries store extensions to be looked up e.g. during validation.
+pub struct ExtensionRegistry(BTreeMap<SmolStr, Extension>);
+
+impl ExtensionRegistry {
+    /// Makes a new (empty) registry.
+    pub const fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    /// Gets the Extension with the given name
+    pub fn get(&self, name: &SmolStr) -> Option<&Extension> {
+        self.0.get(name)
+    }
+}
+
+/// An Extension Registry containing no extensions.
+pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
+
+impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
+    fn from(value: T) -> Self {
+        let mut reg = Self::new();
+        for ext in value.into_iter() {
+            let prev = reg.0.insert(ext.name.clone(), ext);
+            if let Some(prev) = prev {
+                panic!("Multiple extensions with same name: {}", prev.name)
+            };
+        }
+        reg
+    }
+}
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
@@ -45,6 +77,18 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
+    /// The Extension Registry did not contain an Extension referenced by the Signature
+    #[error("Extension '{0}' not found")]
+    ExtensionNotFound(SmolStr),
+    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
+    #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
+    ExtensionTypeNotFound { exn: SmolStr, typ: SmolStr },
+    /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
+    #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
+    WrongBound {
+        actual: TypeBound,
+        expected: TypeBound,
+    },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.

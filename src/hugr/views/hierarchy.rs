@@ -569,7 +569,7 @@ mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_hugr()?;
+        let hugr = module_builder.finish_prelude_hugr()?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 
