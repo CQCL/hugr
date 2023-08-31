@@ -191,7 +191,7 @@ impl Hugr {
     /// Applies a rewrite to the graph.
     pub fn apply_rewrite<R, E>(
         &mut self,
-        rw: impl Rewrite<Error = E, ApplyResult = R>,
+        rw: impl Rewrite<ApplyResult = R, Error = E>,
     ) -> Result<R, E> {
         rw.apply(self)
     }
