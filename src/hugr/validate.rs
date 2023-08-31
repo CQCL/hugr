@@ -5,7 +5,7 @@ use std::iter;
 
 use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
-use petgraph::visit::{DfsPostOrder, Walker};
+use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
@@ -343,9 +343,7 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Ensure that the children of a node form a direct acyclic graph with a
-    /// single source and source. That is, their edges do not form cycles in the
-    /// graph and there are no dangling nodes.
+    /// Ensure that the children of a node form a directed acyclic graph.
     ///
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
@@ -356,18 +354,11 @@ impl<'a> ValidationContext<'a> {
         };
 
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
-        let entry_node = self.hugr.children(parent).next().unwrap();
-
-        let postorder = DfsPostOrder::new(&region, entry_node);
+        let postorder = Topo::new(&region);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
-        // Local ScopedDefn's should not be reachable from the Input node, so discount them
-        let non_defn_count = self
-            .hugr
-            .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).tag()))
-            .count();
-        if nodes_visited != non_defn_count {
-            return Err(ValidationError::NotABoundedDag {
+        let node_count = self.hugr.children(parent).count();
+        if nodes_visited != node_count {
+            return Err(ValidationError::NotADag {
                 node: parent,
                 optype: op_type.clone(),
             });
@@ -605,9 +596,9 @@ pub enum ValidationError {
     /// The node must have children, but has none.
     #[error("The node {node:?} with optype {optype:?} must have children, but has none.")]
     ContainerWithoutChildren { node: Node, optype: OpType },
-    /// The children of a node do not form a dag with single source and sink.
-    #[error("The children of an operation {optype:?} must form a dag with single source and sink. Loops are not allowed, nor are dangling nodes not in the path between the input and output. In node {node:?}.")]
-    NotABoundedDag { node: Node, optype: OpType },
+    /// The children of a node do not form a DAG.
+    #[error("The children of an operation {optype:?} must form a DAG. Loops are not allowed. In node {node:?}.")]
+    NotADag { node: Node, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
@@ -701,7 +692,7 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
-    use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::{FunctionType, Type};
     use crate::Direction;
     use crate::{type_row, Node};
@@ -1098,10 +1089,7 @@ mod test {
         let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, and, 1)?;
-        // We are missing the edge from Input to LoadConstant, hence:
-        assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
-        // Now include the LoadConstant node in the causal cone
-        h.add_other_edge(input, lcst)?;
+        // There is no edge from Input to LoadConstant, but that's OK:
         h.validate().unwrap();
         Ok(())
     }
@@ -1258,4 +1246,24 @@ mod test {
     //     );
     //     Ok(())
     // }
+
+    #[test]
+    fn dfg_with_cycles() -> Result<(), HugrError> {
+        let mut h = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
+        }));
+        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
+        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        let not1 = h.add_op_with_parent(h.root(), not_op())?;
+        let not2 = h.add_op_with_parent(h.root(), not_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, not1, 0)?;
+        h.connect(not1, 0, and, 1)?;
+        h.connect(input, 1, not2, 0)?;
+        h.connect(not2, 0, output, 0)?;
+        // The graph contains a cycle:
+        assert_matches!(h.validate(), Err(ValidationError::NotADag { .. }));
+        Ok(())
+    }
 }

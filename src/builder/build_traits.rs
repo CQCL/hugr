@@ -210,9 +210,8 @@ pub trait Dataflow: Container {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr(hugr)?;
 
-        let [inp, _] = self.io();
         let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self, inp)?;
+        wire_up_inputs(inputs, node, self)?;
 
         Ok((node, num_outputs).into())
     }
@@ -232,9 +231,8 @@ pub trait Dataflow: Container {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr_view(hugr)?;
 
-        let [inp, _] = self.io();
         let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self, inp)?;
+        wire_up_inputs(inputs, node, self)?;
 
         Ok((node, num_outputs).into())
     }
@@ -248,8 +246,8 @@ pub trait Dataflow: Container {
         &mut self,
         output_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        let [inp, out] = self.io();
-        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self, inp)
+        let [_, out] = self.io();
+        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self)
     }
 
     /// Return an array of the input wires.
@@ -605,12 +603,10 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: NodeType,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let [inp, _] = data_builder.io();
-
     let op_node = data_builder.add_child_node(nodetype.clone())?;
     let sig = nodetype.op_signature();
 
-    wire_up_inputs(inputs, op_node, data_builder, inp)?;
+    wire_up_inputs(inputs, op_node, data_builder)?;
 
     Ok((op_node, sig.output().len()))
 }
@@ -619,11 +615,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     inputs: Vec<Wire>,
     op_node: Node,
     data_builder: &mut T,
-    inp: Node,
 ) -> Result<(), BuildError> {
-    let mut any_local_df_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        any_local_df_inputs |= wire_up(
+        wire_up(
             data_builder,
             wire.node(),
             wire.source().index(),
@@ -631,14 +625,6 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-    let base = data_builder.hugr_mut();
-    let op = base.get_optype(op_node);
-    let some_df_outputs = !op.signature().output.is_empty();
-    if !any_local_df_inputs && some_df_outputs {
-        // If op has no inputs add a StateOrder edge from input to place in
-        // causal cone of Input node
-        data_builder.add_other_wire(inp, op_node)?;
-    };
     Ok(())
 }
 
