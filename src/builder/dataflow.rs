@@ -52,8 +52,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         base.as_mut().add_node_with_parent(
             parent,
             match &input_extensions {
-                // TODO: Make this NodeType::open_extensions
-                None => NodeType::pure(input),
+                None => NodeType::open_extensions(input),
                 Some(rs) => NodeType::new(input, rs.clone()),
             },
         )?;
@@ -61,7 +60,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             parent,
             match input_extensions.map(|inp| inp.union(&signature.extension_reqs)) {
                 // TODO: Make this NodeType::open_extensions
-                None => NodeType::new(output, signature.extension_reqs),
+                None => NodeType::open_extensions(output),
                 Some(rs) => NodeType::new(output, rs),
             },
         )?;

@@ -293,8 +293,7 @@ pub trait Dataflow: Container {
             signature: signature.clone(),
         };
         let nodetype = match &input_extensions {
-            // TODO: Make this NodeType::open_extensions
-            None => NodeType::pure(op),
+            None => NodeType::open_extensions(op),
             Some(rs) => NodeType::new(op, rs.clone()),
         };
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
