@@ -211,10 +211,10 @@ impl Hugr {
             .filter(|((_, dir), _)| *dir == Direction::Incoming)
         {
             let nodetype = self.op_types.try_get_mut(node.index).unwrap();
-            match nodetype.signature() {
+            match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
                 Some(existing_ext_reqs) => {
-                    debug_assert_eq!(existing_ext_reqs.input_extensions, *input_extensions)
+                    debug_assert_eq!(existing_ext_reqs, input_extensions)
                 }
             }
         }
