@@ -417,6 +417,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
@@ -433,6 +434,7 @@ pub trait Dataflow: Container {
                 predicate_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
+                extension_delta,
             },
             input_wires,
         )?;

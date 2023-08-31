@@ -83,6 +83,8 @@ impl OutlineCfg {
 
 impl Rewrite for OutlineCfg {
     type Error = OutlineCfgError;
+    type ApplyResult = ();
+
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &Hugr) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside(h)?;
