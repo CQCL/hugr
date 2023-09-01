@@ -697,7 +697,7 @@ mod test {
     use super::*;
     use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-    use crate::extension::{prelude_registry, Extension, ExtensionSet, TypeDefBound, EMPTY_REG};
+    use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
@@ -1131,7 +1131,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&prelude_registry());
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
 
         assert_matches!(
             handle,
@@ -1168,7 +1168,7 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&prelude_registry());
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1230,7 +1230,7 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.hugr().validate(&prelude_registry());
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -1268,7 +1268,7 @@ mod test {
         hugr.connect(input, 0, output, 0)?;
 
         assert_matches!(
-            hugr.validate(&prelude_registry()),
+            hugr.validate(&PRELUDE_REGISTRY),
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
@@ -1327,7 +1327,7 @@ mod test {
                 cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
             })
         );
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]

@@ -27,7 +27,7 @@ pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
 pub mod validate;
 
-pub use prelude::{prelude_registry, PRELUDE};
+pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
 pub struct ExtensionRegistry(BTreeMap<SmolStr, Extension>);
@@ -39,7 +39,7 @@ impl ExtensionRegistry {
     }
 
     /// Gets the Extension with the given name
-    pub fn get(&self, name: &SmolStr) -> Option<&Extension> {
+    pub fn get(&self, name: &str) -> Option<&Extension> {
         self.0.get(name)
     }
 }

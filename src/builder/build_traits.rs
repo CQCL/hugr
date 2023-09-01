@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{prelude_registry, ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -138,7 +138,7 @@ pub trait HugrBuilder: Container {
     where
         Self: Sized,
     {
-        self.finish_hugr(&prelude_registry())
+        self.finish_hugr(&PRELUDE_REGISTRY)
     }
 }
 
@@ -739,7 +739,7 @@ pub trait DataflowHugr: HugrBuilder + Dataflow {
     where
         Self: Sized,
     {
-        self.finish_hugr_with_outputs(outputs, &prelude_registry())
+        self.finish_hugr_with_outputs(outputs, &PRELUDE_REGISTRY)
     }
 }
 
