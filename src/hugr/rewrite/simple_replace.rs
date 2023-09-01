@@ -201,7 +201,7 @@ pub(in crate::hugr::rewrite) mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::{prelude_registry, EMPTY_REG};
+    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
@@ -388,7 +388,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(&prelude_registry()), Ok(()));
+        assert_eq!(h.validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[rstest]
@@ -466,7 +466,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(&prelude_registry()), Ok(()));
+        assert_eq!(h.validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[test]

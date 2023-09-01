@@ -267,7 +267,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
-    use crate::extension::{prelude_registry, EMPTY_REG};
+    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
@@ -466,12 +466,12 @@ pub mod test {
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-        hugr.validate(&prelude_registry()).unwrap();
+        hugr.validate(&PRELUDE_REGISTRY).unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
         new_hugr.validate(&EMPTY_REG).unwrap_err();
-        new_hugr.validate(&prelude_registry()).unwrap();
+        new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
 
         // Check the canonicalization works
         let mut h_canon = hugr.clone();
