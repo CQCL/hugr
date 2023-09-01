@@ -11,7 +11,8 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::{Type, TypeRow};
+use super::type_param::TypeArg;
+use super::{subst_row, Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -58,6 +59,14 @@ impl FunctionType {
     /// Instantiate a signature with the empty set of extensions
     pub fn pure(self) -> Signature {
         self.with_input_extensions(ExtensionSet::new())
+    }
+
+    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+        FunctionType {
+            input: subst_row(&self.input, args),
+            output: subst_row(&self.output, args),
+            extension_reqs: self.extension_reqs.clone(), // TODO extension variables
+        }
     }
 }
 

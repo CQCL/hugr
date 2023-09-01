@@ -23,7 +23,7 @@ use crate::type_row;
 use std::fmt::Debug;
 
 use self::primitive::PrimType;
-use self::type_param::TypeParam;
+use self::type_param::{TypeArg, TypeParam};
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -299,6 +299,35 @@ impl Type {
             }
         }
     }
+
+    /// Could make this public, but easier to panic if the TypeArg's don't match the TypeParams
+    /// (should be checked when the args are first given to the type scheme).
+    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+        match &self.0 {
+            TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
+                self.clone()
+            }
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(*idx) {
+                Some(TypeArg::Type(t)) => t.clone(),
+                Some(v) => panic!(
+                    "Value of variable {:?} did not match cached param {}",
+                    v, bound
+                ),
+                None => panic!("No value found for variable"), // No need to support partial substitution for just type schemes
+            },
+            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(args)),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(args)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, args)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, args)),
+        }
+    }
+}
+
+fn subst_row(row: &TypeRow, args: &[TypeArg]) -> TypeRow {
+    row.iter()
+        .map(|t| t.substitute(args))
+        .collect::<Vec<_>>()
+        .into()
 }
 
 /// Return the type row of variants required to define a Sum of Tuples type

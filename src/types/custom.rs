@@ -81,6 +81,15 @@ impl CustomType {
             })?;
         def.check_custom(self)
     }
+
+    pub(super) fn substitute(&self, args: &[TypeArg]) -> Self {
+        Self {
+            args: self.args.iter().map(|arg| arg.substitute(args)).collect(),
+            ..self.clone()
+        }
+        // TODO the bound could get narrower as a result of substitution.
+        // But, we need the TypeDefBound (from the TypeDef in the Extension) to recalculate correctly...
+    }
 }
 
 impl CustomType {

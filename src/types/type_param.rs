@@ -139,6 +139,27 @@ impl TypeArg {
             }
         }
     }
+
+    pub(super) fn substitute(&self, args: &[TypeArg]) -> Self {
+        match self {
+            TypeArg::Type(t) => TypeArg::Type(t.substitute(args)),
+            TypeArg::BoundedNat(_) => self.clone(), // We do not allow variables as bounds on BoundedNat's
+            TypeArg::Opaque(CustomTypeArg { typ, value }) => {
+                // Allow substitution (e.g. empty list)...note TODO above:
+                //       is there demand for this, is it actually correct?
+                TypeArg::Opaque(CustomTypeArg {
+                    typ: typ.substitute(args),
+                    value: value.clone(),
+                })
+            }
+            TypeArg::Sequence(elems) => {
+                TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(args)).collect())
+            }
+            TypeArg::Extensions(_) => self.clone(), // TODO extension variables
+            // Caller should already have checked arg against bound (cached here):
+            TypeArg::Variable(idx, _) => args.get(*idx).unwrap().clone(),
+        }
+    }
 }
 
 /// A serialized representation of a value of a [CustomType]
