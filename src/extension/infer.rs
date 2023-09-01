@@ -209,7 +209,8 @@ impl UnificationContext {
 
     /// Declare that a meta has been solved
     fn add_solution(&mut self, m: Meta, rs: ExtensionSet) {
-        debug_assert!(self.solved.insert(m, rs).is_none());
+        let existing_sol = self.solved.insert(m, rs);
+        debug_assert!(existing_sol.is_none());
     }
 
     /// If a metavariable has been merged, return the new meta, otherwise return
