@@ -61,6 +61,24 @@ impl TypeParam {
     pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNat(UpperBound(Some(upper_bound)))
     }
+
+    fn contains(&self, other: &TypeParam) -> bool {
+        match (self, other) {
+            (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
+            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => match (b1.0, b2.0) {
+                (None, _) => true,
+                (Some(b1), Some(b2)) if b1 >= b2 => true,
+                _ => false,
+            },
+            (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
+            (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
+            (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+            }
+            (TypeParam::Extensions, TypeParam::Extensions) => true,
+            _ => false,
+        }
+    }
 }
 
 /// A statically-known argument value to an operation.
@@ -78,6 +96,12 @@ pub enum TypeArg {
     Sequence(Vec<TypeArg>),
     /// Instance of [TypeParam::Extensions], providing the extension ids.
     Extensions(ExtensionSet),
+    /// Type variable (used in type schemes only), with cache of the declaration.
+    // Note that if the type variable is declared as a TypeParam::Type, we can represent
+    // the typevar as *either* a TypeArg::Variable *or* a TypeArg::Type(Type::Variable),
+    // and these two will behave equivalently.
+    // This probably means we should not declare TypeArg as 'Eq'...
+    Variable(usize, TypeParam),
 }
 
 impl TypeArg {
@@ -103,6 +127,16 @@ impl TypeArg {
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, type_vars)),
             TypeArg::Extensions(_) => Ok(()),
+            TypeArg::Variable(idx, cache) => {
+                if type_vars.get(*idx) == Some(cache) {
+                    Ok(())
+                } else {
+                    Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                        used: cache.clone(),
+                        decl: type_vars.get(*idx).cloned(),
+                    })
+                }
+            }
         }
     }
 }
@@ -133,6 +167,7 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
+        (TypeArg::Variable(_, bound), _) if param.contains(bound) => Ok(()),
         (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
             Ok(())
         }
