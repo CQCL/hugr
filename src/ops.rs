@@ -132,6 +132,11 @@ impl OpType {
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
+
+    /// Checks whether the operation can contain children nodes.
+    pub fn is_container(&self) -> bool {
+        self.validity_flags().allowed_children != OpTag::None
+    }
 }
 
 /// Macro used by operations that want their
