@@ -417,6 +417,18 @@ pub enum CircuitUnit {
     Linear(usize),
 }
 
+impl CircuitUnit {
+    /// Check if this is a wire.
+    pub fn is_wire(&self) -> bool {
+        matches!(self, CircuitUnit::Wire(_))
+    }
+
+    /// Check if this is a linear unit.
+    pub fn is_linear(&self) -> bool {
+        matches!(self, CircuitUnit::Linear(_))
+    }
+}
+
 impl From<usize> for CircuitUnit {
     fn from(value: usize) -> Self {
         CircuitUnit::Linear(value)
