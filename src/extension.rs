@@ -25,6 +25,7 @@ pub use op_def::{CustomSignatureFunc, OpDef};
 mod type_def;
 pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
+pub mod type_scheme;
 pub mod validate;
 
 pub use prelude::{prelude_registry, PRELUDE};
