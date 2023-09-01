@@ -398,13 +398,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use crate::extension::prelude::USIZE_T;
+
     use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
-    use crate::types::test::EQ_T;
     use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: Type = EQ_T;
+    const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -442,7 +443,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
@@ -697,7 +698,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, merge, tail))
     }
 
@@ -734,7 +735,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, head, tail))
     }
 }

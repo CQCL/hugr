@@ -82,6 +82,18 @@ pub enum InferExtensionError {
         /// The incompatible solution that we found was already there
         actual: ExtensionSet,
     },
+    #[error("Solved extensions {expected} at {expected_loc:?} and {actual} at {actual_loc:?} should be equal.")]
+    /// A version of the above with info about which nodes failed to unify
+    MismatchedConcreteWithLocations {
+        /// Where the solution we want to insert came from
+        expected_loc: (Node, Direction),
+        /// The solution we were trying to insert for this meta
+        expected: ExtensionSet,
+        /// Which node we're trying to add a solution for
+        actual_loc: (Node, Direction),
+        /// The incompatible solution that we found was already there
+        actual: ExtensionSet,
+    },
     /// A variable went unsolved that wasn't related to a parameter
     #[error("Unsolved variable at location {:?}", location)]
     Unsolved {
@@ -329,7 +341,10 @@ impl UnificationContext {
         }
     }
 
-    /// Try to turn mismatches into `ExtensionError` when possible
+    /// When trying to unify two metas, check if they both correspond to
+    /// different ends of the same wire. If so, return an `ExtensionError`.
+    /// Otherwise check whether they both correspond to *some* location on the
+    /// graph and include that info the otherwise generic `MismatchedConcrete`.
     fn report_mismatch(
         &self,
         m1: Meta,
@@ -390,10 +405,19 @@ impl UnificationContext {
         } else {
             None
         };
-        err.unwrap_or(InferExtensionError::MismatchedConcrete {
-            expected: rs1,
-            actual: rs2,
-        })
+        if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
+            err.unwrap_or(InferExtensionError::MismatchedConcreteWithLocations {
+                expected_loc: *loc1,
+                expected: rs1,
+                actual_loc: *loc2,
+                actual: rs2,
+            })
+        } else {
+            err.unwrap_or(InferExtensionError::MismatchedConcrete {
+                expected: rs1,
+                actual: rs2,
+            })
+        }
     }
 
     /// Take a group of equal metas and merge them into a new, single meta.
@@ -628,7 +652,9 @@ impl UnificationContext {
     /// us to come up with a fully concrete solution to pass into validation.
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
-            self.add_solution(m, ExtensionSet::new());
+            if !self.solved.contains_key(&m) {
+                self.add_solution(m, ExtensionSet::new());
+            }
         }
         self.variables = HashSet::new();
     }
@@ -643,7 +669,7 @@ mod test {
         BuildError, CaseBuilder, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer,
     };
-    use crate::extension::ExtensionSet;
+    use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::HugrMut;
     use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
@@ -797,7 +823,7 @@ mod test {
                 .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
         )?;
         let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        let hugr = builder.finish_hugr_with_outputs([w], &EMPTY_REG);
 
         // Fail to catch the actual error because it's a difference between I/O
         // nodes and their parents and `report_mismatch` isn't yet smart enough
@@ -966,7 +992,7 @@ mod test {
         let lift_node = hugr.add_node_with_parent(
             child,
             NodeType::open_extensions(ops::LeafOp::Lift {
-                type_row: just_bool.clone(),
+                type_row: just_bool,
                 new_extension: "C".into(),
             }),
         )?;

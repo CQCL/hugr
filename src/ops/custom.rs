@@ -276,7 +276,7 @@ pub enum CustomOpError {
 #[cfg(test)]
 mod test {
 
-    use crate::types::test::EQ_T;
+    use crate::extension::prelude::USIZE_T;
 
     use super::*;
 
@@ -286,12 +286,12 @@ mod test {
             "res".into(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type(EQ_T)],
+            vec![TypeArg::Type(USIZE_T)],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type(EQ_T)]);
+        assert_eq!(op.args(), &[TypeArg::Type(USIZE_T)]);
     }
 }

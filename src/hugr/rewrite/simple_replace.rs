@@ -51,6 +51,8 @@ impl SimpleReplacement {
 
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
+    type ApplyResult = ();
+
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, _h: &Hugr) -> Result<(), SimpleReplacementError> {
@@ -188,17 +190,18 @@ pub enum SimpleReplacementError {
 }
 
 #[cfg(test)]
-mod test {
-    use std::collections::{HashMap, HashSet};
-
+pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
+    use rstest::{fixture, rstest};
+    use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
+    use crate::extension::{prelude_registry, EMPTY_REG};
     use crate::hugr::views::HugrView;
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
@@ -252,9 +255,13 @@ mod test {
 
             func_builder.finish_with_outputs(inner_graph.outputs().chain(q_out.outputs()))?
         };
-        Ok(module_builder.finish_hugr()?)
+        Ok(module_builder.finish_prelude_hugr()?)
     }
 
+    #[fixture]
+    pub(in crate::hugr::rewrite) fn simple_hugr() -> Hugr {
+        make_hugr().unwrap()
+    }
     /// Creates a hugr with a DFG root like the following:
     /// ┌───┐
     /// ┤ H ├──■──
@@ -269,7 +276,12 @@ mod test {
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire45 =
             dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-        dfg_builder.finish_hugr_with_outputs(wire45.outputs())
+        dfg_builder.finish_prelude_hugr_with_outputs(wire45.outputs())
+    }
+
+    #[fixture]
+    pub(in crate::hugr::rewrite) fn dfg_hugr() -> Hugr {
+        make_dfg_hugr().unwrap()
     }
 
     /// Creates a hugr with a DFG root like the following:
@@ -284,10 +296,15 @@ mod test {
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
         let wireoutvec = vec![wire0, wire2out];
-        dfg_builder.finish_hugr_with_outputs(wireoutvec)
+        dfg_builder.finish_prelude_hugr_with_outputs(wireoutvec)
     }
 
-    #[test]
+    #[fixture]
+    pub(in crate::hugr::rewrite) fn dfg_hugr2() -> Hugr {
+        make_dfg_hugr2().unwrap()
+    }
+
+    #[rstest]
     /// Replace the
     ///      ┌───┐
     /// ──■──┤ H ├
@@ -306,8 +323,8 @@ mod test {
     /// ├───┤┌─┴─┐
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
-    fn test_simple_replacement() {
-        let mut h: Hugr = make_hugr().unwrap();
+    fn test_simple_replacement(simple_hugr: Hugr, dfg_hugr: Hugr) {
+        let mut h: Hugr = simple_hugr;
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
@@ -321,7 +338,7 @@ mod test {
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
         let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
-        let n: Hugr = make_dfg_hugr().unwrap();
+        let n: Hugr = dfg_hugr;
         // 4. Construct the input and output matchings
         // 4.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
@@ -371,10 +388,10 @@ mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(), Ok(()));
+        assert_eq!(h.validate(&prelude_registry()), Ok(()));
     }
 
-    #[test]
+    #[rstest]
     /// Replace the
     ///
     /// ──■──
@@ -392,8 +409,9 @@ mod test {
     /// ┌───┐
     /// ┤ H ├
     /// └───┘
-    fn test_simple_replacement_with_empty_wires() {
-        let mut h: Hugr = make_hugr().unwrap();
+    fn test_simple_replacement_with_empty_wires(simple_hugr: Hugr, dfg_hugr2: Hugr) {
+        let mut h: Hugr = simple_hugr;
+
         // 1. Find the DFG node for the inner circuit
         let p: Node = h
             .nodes()
@@ -406,7 +424,7 @@ mod test {
             .unwrap();
         let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
         // 3. Construct a new DFG-rooted hugr for the replacement
-        let n: Hugr = make_dfg_hugr2().unwrap();
+        let n: Hugr = dfg_hugr2;
         // 4. Construct the input and output matchings
         // 4.1. Locate the Output and its predecessor H in n
         let n_node_output = n
@@ -448,7 +466,7 @@ mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.validate(), Ok(()));
+        assert_eq!(h.validate(&prelude_registry()), Ok(()));
     }
 
     #[test]
@@ -460,7 +478,7 @@ mod test {
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();
         let [input, output] = builder.io();
-        let mut h = builder.finish_hugr_with_outputs(wires).unwrap();
+        let mut h = builder.finish_prelude_hugr_with_outputs(wires).unwrap();
         let replacement = h.clone();
         let orig = h.clone();
 
@@ -508,13 +526,13 @@ mod test {
             .unwrap()
             .outputs();
         let [input, _] = builder.io();
-        let mut h = builder.finish_hugr_with_outputs(outw).unwrap();
+        let mut h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
 
         let mut builder = DFGBuilder::new(FunctionType::new(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();
-        let repl = builder.finish_hugr_with_outputs(outw).unwrap();
+        let repl = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
 
         let orig = h.clone();
 

@@ -7,7 +7,7 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
@@ -24,7 +24,9 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::{infer_extensions, ExtensionSet, ExtensionSolution, InferExtensionError};
+use crate::extension::{
+    infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
+};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
@@ -189,14 +191,27 @@ pub type Direction = portgraph::Direction;
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
+    pub fn apply_rewrite<R, E>(
+        &mut self,
+        rw: impl Rewrite<ApplyResult = R, Error = E>,
+    ) -> Result<R, E> {
         rw.apply(self)
     }
 
-    /// Infer extension requirements and add new information to `op_types` field
-    pub fn infer_extensions(
+    /// Run resource inference and pass the closure into validation
+    pub fn infer_and_validate(
         &mut self,
-    ) -> Result<HashMap<(Node, Direction), ExtensionSet>, InferExtensionError> {
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), ValidationError> {
+        let closure = self.infer_extensions()?;
+        self.validate_with_extension_closure(closure, extension_registry)?;
+        Ok(())
+    }
+
+    /// Infer extension requirements and add new information to `op_types` field
+    ///
+    /// See [`infer_extensions`] for details on the "closure" value
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let (solution, extension_closure) = infer_extensions(self)?;
         self.instantiate_extensions(solution);
         Ok(extension_closure)
@@ -211,10 +226,10 @@ impl Hugr {
             .filter(|((_, dir), _)| *dir == Direction::Incoming)
         {
             let nodetype = self.op_types.try_get_mut(node.index).unwrap();
-            match nodetype.signature() {
+            match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
                 Some(existing_ext_reqs) => {
-                    debug_assert_eq!(existing_ext_reqs.input_extensions, *input_extensions)
+                    debug_assert_eq!(existing_ext_reqs, input_extensions)
                 }
             }
         }

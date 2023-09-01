@@ -93,6 +93,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <FlatRegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+       [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
@@ -162,6 +169,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
             })
     }
 
@@ -268,6 +287,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <RegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+        [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
@@ -331,6 +357,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
             })
     }
 
@@ -531,7 +569,7 @@ mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_hugr()?;
+        let hugr = module_builder.finish_prelude_hugr()?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 
