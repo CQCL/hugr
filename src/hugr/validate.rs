@@ -211,7 +211,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         match &port_kind {
             EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
-                .validate(self.extension_registry)
+                .validate(self.extension_registry, &[]) // no type vars inside the Hugr
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }

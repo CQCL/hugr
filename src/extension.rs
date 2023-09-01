@@ -89,6 +89,12 @@ pub enum SignatureError {
         actual: TypeBound,
         expected: TypeBound,
     },
+    /// A Type Variable is either not declared, or the usage does not match the declaration
+    #[error("Type Variable used as {used:?} but declared as {decl:?}")]
+    TypeVarDoesNotMatchDeclaration {
+        used: TypeParam,
+        decl: Option<TypeParam>,
+    },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.

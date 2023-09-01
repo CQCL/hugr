@@ -23,6 +23,7 @@ use crate::type_row;
 use std::fmt::Debug;
 
 use self::primitive::PrimType;
+use self::type_param::TypeParam;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -246,6 +247,13 @@ impl Type {
         Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
 
+    /// New type variable (for use in type schemes only),
+    /// with bound matching that in the type scheme
+    /// (i.e. the variable must be declared as a [TypeParam::Type])
+    pub fn new_variable(idx: usize, bound: TypeBound) -> Self {
+        Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
+    }
+
     /// Report the least upper TypeBound, if there is one.
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
@@ -261,21 +269,34 @@ impl Type {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
-                row.iter().try_for_each(|t| t.validate(extension_registry))
-            }
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
+                .iter()
+                .try_for_each(|t| t.validate(extension_registry, type_vars)),
             TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
-            TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
+            TypeEnum::Prim(PrimType::Extension(custy)) => {
+                custy.validate(extension_registry, type_vars)
+            }
             TypeEnum::Prim(PrimType::Function(ft)) => ft
                 .input
                 .iter()
                 .chain(ft.output.iter())
-                .try_for_each(|t| t.validate(extension_registry)),
+                .try_for_each(|t| t.validate(extension_registry, type_vars)),
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
+                if type_vars.get(*idx) == Some(&TypeParam::Type(*bound)) {
+                    Ok(())
+                } else {
+                    Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                        decl: type_vars.get(*idx).cloned(),
+                        used: TypeParam::Type(*bound),
+                    })
+                }
+            }
         }
     }
 }

@@ -84,16 +84,24 @@ impl TypeArg {
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type(ty) => ty.validate(extension_registry),
+            TypeArg::Type(ty) => ty.validate(extension_registry, type_vars),
             TypeArg::BoundedNat(_) => Ok(()),
             TypeArg::Opaque(custarg) => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
-                custarg.typ.validate(extension_registry)
+                // Moreover, passing the type_vars here means the constant could itself have a
+                // type polymorphic in those vars - e.g. empty lists. User beware?!
+                // TODO are we going deeper than we *need* here - would it be ok (not too restrictive) to insist,
+                // no type vars here? Or,
+                // TODO are we going deeper than *is correct* here, i.e. allowing dependent type(params) or something?
+                custarg.typ.validate(extension_registry, type_vars)
             }
-            TypeArg::Sequence(args) => args.iter().try_for_each(|a| a.validate(extension_registry)),
+            TypeArg::Sequence(args) => args
+                .iter()
+                .try_for_each(|a| a.validate(extension_registry, type_vars)),
             TypeArg::Extensions(_) => Ok(()),
         }
     }

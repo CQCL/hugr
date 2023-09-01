@@ -1,4 +1,4 @@
-use super::{SumType, Type, TypeEnum, TypeRow};
+use super::{SumType, Type, TypeBound, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 
@@ -19,6 +19,7 @@ pub(super) enum SerSimpleType {
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
+    V { i: usize, b: TypeBound },
 }
 
 impl From<Type> for SerSimpleType {
@@ -36,6 +37,7 @@ impl From<Type> for SerSimpleType {
                 PrimType::Extension(c) => SerSimpleType::Opaque(c),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Function(sig) => SerSimpleType::G(Box::new(*sig)),
+                PrimType::Variable(i, b) => SerSimpleType::V { i, b },
             },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
@@ -54,6 +56,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
+            SerSimpleType::V { i, b } => Type::new_variable(i, b),
         }
     }
 }

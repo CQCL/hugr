@@ -15,6 +15,9 @@ pub(super) enum PrimType {
     Alias(AliasDecl),
     #[display(fmt = "Function({})", "_0")]
     Function(Box<FunctionType>),
+    // DeBruijn index, and cache of TypeBound (checked in validation)
+    #[display(fmt = "Variable({})", _0)]
+    Variable(usize, TypeBound),
 }
 
 impl PrimType {
@@ -23,6 +26,7 @@ impl PrimType {
             PrimType::Extension(c) => c.bound(),
             PrimType::Alias(a) => a.bound,
             PrimType::Function(_) => TypeBound::Copyable,
+            PrimType::Variable(_, b) => *b,
         }
     }
 }

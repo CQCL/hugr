@@ -6,7 +6,10 @@ use std::fmt::{self, Display};
 
 use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError};
 
-use super::{type_param::TypeArg, TypeBound};
+use super::{
+    type_param::{TypeArg, TypeParam},
+    TypeBound,
+};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -59,11 +62,12 @@ impl CustomType {
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // Check the args are individually ok
         self.args
             .iter()
-            .try_for_each(|a| a.validate(extension_registry))?;
+            .try_for_each(|a| a.validate(extension_registry, type_vars))?;
         // And check they fit into the TypeParams declared by the TypeDef
         let ex = extension_registry.get(&self.extension);
         // Even if OpDef's (+binaries) are not available, the part of the Extension definition
