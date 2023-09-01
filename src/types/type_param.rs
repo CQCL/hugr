@@ -96,15 +96,31 @@ pub enum TypeArg {
     Sequence(Vec<TypeArg>),
     /// Instance of [TypeParam::Extensions], providing the extension ids.
     Extensions(ExtensionSet),
-    /// Type variable (used in type schemes only), with cache of the declaration.
-    // Note that if the type variable is declared as a TypeParam::Type, we can represent
-    // the typevar as *either* a TypeArg::Variable *or* a TypeArg::Type(Type::Variable),
-    // and these two will behave equivalently.
-    // This probably means we should not declare TypeArg as 'Eq'...
-    Variable(usize, TypeParam),
+    /// Type variable (used in type schemes only)
+    Variable(TypeArgVariable),
+}
+
+/// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct TypeArgVariable {
+    idx: usize,
+    cached_decl: TypeParam,
 }
 
 impl TypeArg {
+    /// Makes a TypeArg representing the type variable with the specified (DeBruijn) index
+    /// and declared [TypeParam].
+    pub fn new_type_variable(idx: usize, decl: TypeParam) -> Self {
+        match decl {
+            TypeParam::Type(b) => TypeArg::Type(Type::new_variable(idx, b)),
+            TypeParam::Extensions => TypeArg::Extensions(ExtensionSet::type_var(idx)),
+            _ => TypeArg::Variable(TypeArgVariable {
+                idx,
+                cached_decl: decl,
+            }),
+        }
+    }
+
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -127,12 +143,12 @@ impl TypeArg {
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, type_vars)),
             TypeArg::Extensions(_) => Ok(()),
-            TypeArg::Variable(idx, cache) => {
-                if type_vars.get(*idx) == Some(cache) {
+            TypeArg::Variable(TypeArgVariable { idx, cached_decl }) => {
+                if type_vars.get(*idx) == Some(cached_decl) {
                     Ok(())
                 } else {
                     Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                        used: cache.clone(),
+                        used: cached_decl.clone(),
                         decl: type_vars.get(*idx).cloned(),
                     })
                 }
@@ -157,7 +173,7 @@ impl TypeArg {
             }
             TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
             // Caller should already have checked arg against bound (cached here):
-            TypeArg::Variable(idx, _) => args.get(*idx).unwrap().clone(),
+            TypeArg::Variable(TypeArgVariable { idx, .. }) => args.get(*idx).unwrap().clone(),
         }
     }
 }
@@ -188,7 +204,11 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Variable(_, bound), _) if param.contains(bound) => Ok(()),
+        (TypeArg::Variable(TypeArgVariable { cached_decl, .. }), _)
+            if param.contains(cached_decl) =>
+        {
+            Ok(())
+        }
         (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
             Ok(())
         }
