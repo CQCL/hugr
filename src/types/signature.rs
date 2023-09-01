@@ -69,15 +69,15 @@ impl FunctionType {
         self.input
             .iter()
             .chain(self.output.iter())
-            .try_for_each(|t| t.validate(extension_registry, type_vars))
-        // TODO extension variables
+            .try_for_each(|t| t.validate(extension_registry, type_vars))?;
+        self.extension_reqs.validate(type_vars)
     }
 
     pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
         FunctionType {
             input: subst_row(&self.input, args),
             output: subst_row(&self.output, args),
-            extension_reqs: self.extension_reqs.clone(), // TODO extension variables
+            extension_reqs: self.extension_reqs.substitute(args),
         }
     }
 }

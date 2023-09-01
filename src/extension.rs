@@ -324,22 +324,27 @@ pub enum ExtensionBuildError {
 
 /// A set of extensions identified by their unique [`ExtensionId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionSet(HashSet<ExtensionId>);
+pub struct ExtensionSet(HashSet<ExtensionId>, HashSet<usize>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
     pub fn new() -> Self {
-        Self(HashSet::new())
+        Self(HashSet::new(), HashSet::new())
     }
 
     /// Creates a new extension set from some extensions.
     pub fn new_from_extensions(extensions: impl Into<HashSet<ExtensionId>>) -> Self {
-        Self(extensions.into())
+        Self(extensions.into(), HashSet::new())
     }
 
     /// Adds a extension to the set.
     pub fn insert(&mut self, extension: &ExtensionId) {
         self.0.insert(extension.clone());
+    }
+
+    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
+    pub fn insert_type_var(&mut self, idx: usize) {
+        self.1.insert(idx);
     }
 
     /// Returns `true` if the set contains the given extension.
@@ -349,6 +354,9 @@ impl ExtensionSet {
 
     /// Returns `true` if the set is a subset of `other`.
     pub fn is_subset(&self, other: &Self) -> bool {
+        if !other.1.is_empty() {
+            panic!("ExtensionSet contains Type Variables?")
+        }
         self.0.is_subset(&other.0)
     }
 
@@ -364,20 +372,61 @@ impl ExtensionSet {
         set
     }
 
+    /// An ExtensionSet containing a single type variable
+    /// (which must have been declared as a [TypeParam::Extensions])
+    pub fn type_var(idx: usize) -> Self {
+        let mut set = Self::new();
+        set.1.insert(idx);
+        set
+    }
+
     /// Returns the union of two extension sets.
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
+        self.1.extend(other.1.iter().cloned());
         self
     }
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+        if !self.1.is_empty() || !other.1.is_empty() {
+            panic!("Should only do inference on ExtensionSets in Hugrs (not those in type schemes), which should not contain type variables")
+        }
+        ExtensionSet(
+            HashSet::from_iter(other.0.difference(&self.0).cloned()),
+            HashSet::new(),
+        )
     }
 
     /// Iterate over the contained ExtensionIds
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
+        if !self.1.is_empty() {
+            panic!("Contained type variables!")
+        }
         self.0.iter()
+    }
+
+    pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
+        for &tv in self.1.iter() {
+            if params.get(tv) != Some(&TypeParam::Extensions) {
+                return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    used: TypeParam::Extensions,
+                    decl: params.get(tv).cloned(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+        let mut res = ExtensionSet::new_from_extensions(self.0.clone());
+        for tv in self.1.iter() {
+            let Some(TypeArg::Extensions(es)) = args.get(*tv) else {
+                panic!("value for type var was not extension set")
+            };
+            res = res.union(es);
+        }
+        res
     }
 }
 
@@ -389,6 +438,6 @@ impl Display for ExtensionSet {
 
 impl FromIterator<ExtensionId> for ExtensionSet {
     fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
-        Self(HashSet::from_iter(iter))
+        Self(HashSet::from_iter(iter), HashSet::new())
     }
 }

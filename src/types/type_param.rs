@@ -155,7 +155,7 @@ impl TypeArg {
             TypeArg::Sequence(elems) => {
                 TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(args)).collect())
             }
-            TypeArg::Extensions(_) => self.clone(), // TODO extension variables
+            TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
             // Caller should already have checked arg against bound (cached here):
             TypeArg::Variable(idx, _) => args.get(*idx).unwrap().clone(),
         }
