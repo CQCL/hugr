@@ -282,11 +282,7 @@ impl Type {
             TypeEnum::Prim(PrimType::Extension(custy)) => {
                 custy.validate(extension_registry, type_vars)
             }
-            TypeEnum::Prim(PrimType::Function(ft)) => ft
-                .input
-                .iter()
-                .chain(ft.output.iter())
-                .try_for_each(|t| t.validate(extension_registry, type_vars)),
+            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, type_vars),
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
                 if type_vars.get(*idx) == Some(&TypeParam::Type(*bound)) {
                     Ok(())

@@ -11,12 +11,12 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::type_param::TypeArg;
+use super::type_param::{TypeArg, TypeParam};
 use super::{subst_row, Type, TypeRow};
 
 use crate::hugr::Port;
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use delegate::delegate;
 
 #[cfg_attr(feature = "pyo3", pyclass)]
@@ -59,6 +59,18 @@ impl FunctionType {
     /// Instantiate a signature with the empty set of extensions
     pub fn pure(self) -> Signature {
         self.with_input_extensions(ExtensionSet::new())
+    }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        type_vars: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .try_for_each(|t| t.validate(extension_registry, type_vars))
+        // TODO extension variables
     }
 
     pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {

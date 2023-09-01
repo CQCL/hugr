@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomType, TypeBound};
 
@@ -144,15 +144,7 @@ trait TypeParametrised {
     fn extension(&self) -> &ExtensionId;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        if args.len() != self.params().len() {
-            return Err(SignatureError::TypeArgMismatch(
-                TypeArgError::WrongNumberArgs(args.len(), self.params().len()),
-            ));
-        }
-        for (a, p) in args.iter().zip(self.params().iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
-        Ok(())
+        check_type_args(args, self.params()).map_err(SignatureError::TypeArgMismatch)
     }
 
     /// Check custom instance is a valid instantiation of this definition.

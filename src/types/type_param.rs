@@ -222,6 +222,17 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
     }
 }
 
+/// Check a list of type arguments match a list of required type parameters
+pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), TypeArgError> {
+    if args.len() != params.len() {
+        return Err(TypeArgError::WrongNumberArgs(args.len(), params.len()));
+    }
+    for (a, p) in args.iter().zip(params.iter()) {
+        check_type_arg(a, p)?;
+    }
+    Ok(())
+}
+
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum TypeArgError {
