@@ -679,7 +679,7 @@ mod test {
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
 
-    const BIT: Type = crate::extension::prelude::USIZE_T;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
 
     #[test]
     // Build up a graph with some holes in its extension requirements, and infer
@@ -687,7 +687,7 @@ mod test {
     fn from_graph() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
         let main_sig =
-            FunctionType::new(type_row![BIT, BIT], type_row![BIT]).with_extension_delta(&rs);
+            FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(&rs);
 
         let op = ops::DFG {
             signature: main_sig,
@@ -696,24 +696,24 @@ mod test {
         let root_node = NodeType::open_extensions(op);
         let mut hugr = Hugr::new(root_node);
 
-        let input = NodeType::open_extensions(ops::Input::new(type_row![BIT, BIT]));
-        let output = NodeType::open_extensions(ops::Output::new(type_row![BIT]));
+        let input = NodeType::open_extensions(ops::Input::new(type_row![NAT, NAT]));
+        let output = NodeType::open_extensions(ops::Output::new(type_row![NAT]));
 
         let input = hugr.add_node_with_parent(hugr.root(), input)?;
         let output = hugr.add_node_with_parent(hugr.root(), output)?;
 
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
-        let add_a_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+        let add_a_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"A".into()));
 
-        let add_b_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+        let add_b_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"B".into()));
 
-        let add_ab_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+        let add_ab_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::from_iter(["A".into(), "B".into()]));
 
-        let mult_c_sig = FunctionType::new(type_row![BIT, BIT], type_row![BIT])
+        let mult_c_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&"C".into()));
 
         let add_a = hugr.add_node_with_parent(
@@ -819,7 +819,7 @@ mod test {
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
         let builder = DFGBuilder::new(
-            FunctionType::new(type_row![BIT], type_row![BIT])
+            FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
         )?;
         let [w] = builder.input_wires_arr();
@@ -866,11 +866,11 @@ mod test {
     fn dangling_src() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::singleton(&"R".into());
         let root_signature =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
         let mut builder = DFGBuilder::new(root_signature)?;
         let [input_wire] = builder.input_wires_arr();
 
-        let add_r_sig = FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&rs);
+        let add_r_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
         let add_r = builder.add_dataflow_node(
             NodeType::open_extensions(ops::DFG {
@@ -881,7 +881,7 @@ mod test {
         let [wl] = add_r.outputs_arr();
 
         // Dangling thingy
-        let src_sig = FunctionType::new(type_row![], type_row![BIT])
+        let src_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&ExtensionSet::new());
         let src = builder.add_dataflow_node(
             NodeType::open_extensions(ops::DFG { signature: src_sig }),
@@ -889,7 +889,7 @@ mod test {
         )?;
         let [wr] = src.outputs_arr();
 
-        let mult_sig = FunctionType::new(type_row![BIT, BIT], type_row![BIT])
+        let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::new());
         // Mult has open extension requirements, which we should solve to be "R"
         let mult = builder.add_dataflow_node(
@@ -1022,7 +1022,7 @@ mod test {
             let [w] = case_builder.input_wires_arr();
             let lift1 = case_builder.add_dataflow_node(
                 NodeType::open_extensions(ops::LeafOp::Lift {
-                    type_row: type_row![BIT],
+                    type_row: type_row![NAT],
                     new_extension: first_ext,
                 }),
                 [w],
@@ -1030,7 +1030,7 @@ mod test {
             let [w] = lift1.outputs_arr();
             let lift2 = case_builder.add_dataflow_node(
                 NodeType::open_extensions(ops::LeafOp::Lift {
-                    type_row: type_row![BIT],
+                    type_row: type_row![NAT],
                     new_extension: second_ext,
                 }),
                 [w],
@@ -1043,7 +1043,7 @@ mod test {
         let predicate_inputs = vec![type_row![]; 2];
         let rs = ExtensionSet::from_iter(["A".into(), "B".into()]);
         let mut conditional_builder =
-            ConditionalBuilder::new(predicate_inputs, type_row![BIT], type_row![BIT], rs)?;
+            ConditionalBuilder::new(predicate_inputs, type_row![NAT], type_row![NAT], rs)?;
         let case_builder = conditional_builder.case_builder(0)?;
         let case0_node = build_case(case_builder, "A".into(), "B".into())?;
 
