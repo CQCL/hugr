@@ -133,6 +133,9 @@ pub(crate) mod test {
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
 
+    /// A helper method which creates a DFG rooted hugr with closed resources,
+    /// for tests which want to avoid having open extension variables after
+    /// inference.
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
         let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
             signature: signature.clone(),
