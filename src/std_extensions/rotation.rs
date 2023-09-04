@@ -10,6 +10,7 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
+use crate::extension::ExtensionId;
 use crate::types::type_param::TypeArg;
 use crate::types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow};
 use crate::values::CustomConst;
@@ -18,7 +19,7 @@ use crate::{ops, Extension};
 pub const PI_NAME: &str = "PI";
 pub const ANGLE_T_NAME: &str = "angle";
 pub const QUAT_T_NAME: &str = "quat";
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("rotations");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("rotations");
 
 pub const ANGLE_T: Type = Type::new_extension(CustomType::new_simple(
     SmolStr::new_inline(ANGLE_T_NAME),
@@ -330,8 +331,9 @@ mod test {
 
     use rstest::{fixture, rstest};
 
-    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, PI_NAME};
+    use super::{AngleValue, RotationValue, ANGLE_T, ANGLE_T_NAME, EXTENSION_ID, PI_NAME};
     use crate::{
+        extension::ExtensionId,
         extension::SignatureError,
         types::{CustomType, Type, TypeBound},
         values::CustomConst,
@@ -351,18 +353,17 @@ mod test {
 
         angle.check_custom(&custom).unwrap();
 
+        let wrong_ext = ExtensionId::new("wrong_extensions").unwrap();
+
         let false_custom = CustomType::new(
             custom.name().clone(),
             vec![],
-            "wrong_extension",
+            wrong_ext.clone(),
             TypeBound::Copyable,
         );
         assert_eq!(
             angle.check_custom(&false_custom),
-            Err(SignatureError::ExtensionMismatch(
-                "rotations".into(),
-                "wrong_extension".into(),
-            ))
+            Err(SignatureError::ExtensionMismatch(EXTENSION_ID, wrong_ext,))
         );
 
         assert_eq!(Type::new_extension(custom), ANGLE_T);

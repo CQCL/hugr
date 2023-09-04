@@ -222,7 +222,7 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::EMPTY_REG;
+    use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
@@ -432,8 +432,11 @@ pub(crate) mod test {
 
     #[test]
     fn lift_node() -> Result<(), BuildError> {
-        let ab_extensions = ExtensionSet::from_iter(["A".into(), "B".into()]);
-        let c_extensions = ExtensionSet::singleton(&"C".into());
+        let xa: ExtensionId = "A".try_into().unwrap();
+        let xb: ExtensionId = "B".try_into().unwrap();
+        let xc = "C".try_into().unwrap();
+        let ab_extensions = ExtensionSet::from_iter([xa.clone(), xb.clone()]);
+        let c_extensions = ExtensionSet::singleton(&xc);
         let abc_extensions = ab_extensions.clone().union(&c_extensions);
 
         let parent_sig =
@@ -456,7 +459,7 @@ pub(crate) mod test {
         let lift_a = add_ab.add_dataflow_op(
             LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_extension: "A".into(),
+                new_extension: xa.clone(),
             },
             [w],
         )?;
@@ -466,9 +469,9 @@ pub(crate) mod test {
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],
-                    new_extension: "B".into(),
+                    new_extension: xb,
                 },
-                ExtensionSet::from_iter(["A".into()]),
+                ExtensionSet::from_iter([xa]),
             ),
             [w],
         )?;
@@ -486,7 +489,7 @@ pub(crate) mod test {
             NodeType::new(
                 LeafOp::Lift {
                     type_row: type_row![BIT],
-                    new_extension: "C".into(),
+                    new_extension: xc,
                 },
                 ab_extensions,
             ),

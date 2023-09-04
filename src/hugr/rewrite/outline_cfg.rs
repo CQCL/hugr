@@ -5,7 +5,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
-use crate::extension::prelude_registry;
+use crate::extension::PRELUDE_REGISTRY;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
@@ -118,7 +118,7 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
             let new_block_hugr = new_block_bldr
-                .finish_hugr_with_outputs(pred_wire, cfg_outputs, &prelude_registry())
+                .finish_hugr_with_outputs(pred_wire, cfg_outputs, &PRELUDE_REGISTRY)
                 .unwrap();
             h.insert_hugr(outer_cfg, new_block_hugr).unwrap()
         };
@@ -211,7 +211,7 @@ mod test {
     use crate::algorithm::nest_cfgs::test::{
         build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
     };
-    use crate::extension::prelude_registry;
+    use crate::extension::PRELUDE_REGISTRY;
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
     use cool_asserts::assert_matches;
@@ -237,7 +237,7 @@ mod test {
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let backup = h.clone();
         let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
@@ -270,10 +270,10 @@ mod test {
         for n in [head, tail, merge] {
             assert_eq!(depth(&h, n), 1);
         }
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         for n in blocks {
             assert_eq!(depth(&h, n), 3);
         }
@@ -300,7 +300,7 @@ mod test {
         let (merge, tail) = (merge.node(), tail.node());
         let head = h.output_neighbours(merge).exactly_one().unwrap();
 
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let blocks_to_move = [entry, left, right, merge];
         let other_blocks = [head, tail, exit];
         for &n in blocks_to_move.iter().chain(other_blocks.iter()) {
@@ -308,7 +308,7 @@ mod test {
         }
         h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let new_entry = h.children(h.root()).next().unwrap();
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);

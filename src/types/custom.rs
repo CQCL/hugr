@@ -33,13 +33,13 @@ impl CustomType {
     pub fn new(
         id: impl Into<SmolStr>,
         args: impl Into<Vec<TypeArg>>,
-        extension: impl Into<ExtensionId>,
+        extension: ExtensionId,
         bound: TypeBound,
     ) -> Self {
         Self {
             id: id.into(),
             args: args.into(),
-            extension: extension.into(),
+            extension,
             bound,
         }
     }

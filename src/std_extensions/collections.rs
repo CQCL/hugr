@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionSet, SignatureError, TypeDef, TypeDefBound},
+    extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow,
@@ -21,7 +21,7 @@ pub const POP_NAME: SmolStr = SmolStr::new_inline("pop");
 /// Push operation name.
 pub const PUSH_NAME: SmolStr = SmolStr::new_inline("push");
 /// Reported unique name of the extension
-pub const EXTENSION_NAME: SmolStr = SmolStr::new_inline("Collections");
+pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections");
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.

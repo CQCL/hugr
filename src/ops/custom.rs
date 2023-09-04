@@ -222,7 +222,10 @@ pub fn resolve_extension_ops(
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&opaque.extension) {
+                if let Some(r) = extension_registry.get({
+                    let k: &str = &opaque.extension;
+                    k
+                }) {
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                         return Err(CustomOpError::OpNotFoundInExtension(
@@ -283,7 +286,7 @@ mod test {
     #[test]
     fn new_opaque_op() {
         let op = OpaqueOp::new(
-            "res".into(),
+            "res".try_into().unwrap(),
             "op",
             "desc".into(),
             vec![TypeArg::Type(USIZE_T)],

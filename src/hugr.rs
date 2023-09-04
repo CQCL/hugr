@@ -2,6 +2,7 @@
 
 pub mod hugrmut;
 
+mod ident;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -14,6 +15,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
+pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
@@ -221,10 +223,7 @@ impl Hugr {
     fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
         // We only care about inferred _input_ extensions, because `NodeType`
         // uses those to infer the output extensions
-        for ((node, _), input_extensions) in solution
-            .iter()
-            .filter(|((_, dir), _)| *dir == Direction::Incoming)
-        {
+        for (node, input_extensions) in solution.iter() {
             let nodetype = self.op_types.try_get_mut(node.index).unwrap();
             match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
@@ -417,6 +416,18 @@ pub enum CircuitUnit {
     Linear(usize),
 }
 
+impl CircuitUnit {
+    /// Check if this is a wire.
+    pub fn is_wire(&self) -> bool {
+        matches!(self, CircuitUnit::Wire(_))
+    }
+
+    /// Check if this is a linear unit.
+    pub fn is_linear(&self) -> bool {
+        matches!(self, CircuitUnit::Linear(_))
+    }
+}
+
 impl From<usize> for CircuitUnit {
     fn from(value: usize) -> Self {
         CircuitUnit::Linear(value)
@@ -457,6 +468,7 @@ impl From<HugrError> for PyErr {
 #[cfg(test)]
 mod test {
     use super::{Hugr, HugrView, NodeType};
+    use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
     use crate::ops;
@@ -486,29 +498,17 @@ mod test {
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
         const BIT: Type = crate::extension::prelude::USIZE_T;
-        let r = ExtensionSet::singleton(&"R".into());
+        let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
-        let root = NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
-        });
-        let mut hugr = Hugr::new(root);
-        let input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::pure(ops::Input {
-                types: type_row![BIT],
-            }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Output {
-                types: type_row![BIT],
-            }),
-        )?;
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+        );
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
             hugr.root(),
             NodeType::open_extensions(ops::LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_extension: "R".into(),
+                new_extension: "R".try_into().unwrap(),
             }),
         )?;
         hugr.connect(input, 0, lift, 0)?;
@@ -516,16 +516,14 @@ mod test {
         hugr.infer_extensions()?;
 
         assert_eq!(
-            hugr.op_types
-                .get(lift.index)
+            hugr.get_nodetype(lift)
                 .signature()
                 .unwrap()
                 .input_extensions,
             ExtensionSet::new()
         );
         assert_eq!(
-            hugr.op_types
-                .get(output.index)
+            hugr.get_nodetype(output)
                 .signature()
                 .unwrap()
                 .input_extensions,

@@ -107,7 +107,7 @@ mod tests {
     use super::*;
     use crate::{
         algorithm::nest_cfgs::test::build_conditional_in_loop_cfg,
-        extension::{prelude::QB_T, prelude_registry},
+        extension::{prelude::QB_T, PRELUDE_REGISTRY},
         ops::handle::NodeHandle,
         Hugr,
     };
@@ -135,7 +135,7 @@ mod tests {
 
         assert_eq!(noop, LeafOp::Noop { ty: QB_T });
 
-        h.validate(&prelude_registry()).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]
