@@ -277,6 +277,7 @@ pub mod test {
         extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
+        type_row,
         types::{FunctionType, Type},
         Port,
     };
@@ -455,10 +456,26 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let dfg = DFGBuilder::new(FunctionType::new(vec![QB], vec![QB])).unwrap();
-        let [old_in, out] = dfg.io();
-        let w = dfg.input_wires();
-        let mut hugr = dfg.finish_prelude_hugr_with_outputs(w).unwrap();
+        let mut hugr = Hugr::new(NodeType::pure(DFG {
+            signature: FunctionType::new(vec![QB], vec![QB]),
+        }));
+        let old_in = hugr
+            .add_node_with_parent(
+                hugr.root(),
+                NodeType::pure(Input {
+                    types: type_row![QB],
+                }),
+            )
+            .unwrap();
+        let out = hugr
+            .add_node_with_parent(
+                hugr.root(),
+                NodeType::pure(Output {
+                    types: type_row![QB],
+                }),
+            )
+            .unwrap();
+        hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
