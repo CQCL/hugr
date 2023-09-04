@@ -695,6 +695,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
+    use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
     use crate::extension::{
@@ -1031,11 +1032,12 @@ mod test {
 
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
-        }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let mut h = closed_dfg_root_hugr(FunctionType::new(
+            type_row![BOOL_T, BOOL_T],
+            type_row![BOOL_T],
+        ));
+        let [input, output] = h.get_io(h.root()).unwrap();
+
         // Nested DFG BOOL_T -> BOOL_T
         let sub_dfg = h.add_op_with_parent(
             h.root(),
@@ -1057,20 +1059,20 @@ mod test {
         h.connect(sub_dfg, 0, output, 0)?;
 
         assert_matches!(
-            h.validate(&EMPTY_REG),
+            h.infer_and_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort { .. })
         );
 
         h.connect(input, 1, sub_op, 1)?;
         assert_matches!(
-            h.validate(&EMPTY_REG),
+            h.infer_and_validate(&EMPTY_REG),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::MissingOrderEdge { .. }
             ))
         );
         //Order edge. This will need metadata indicating its purpose.
         h.add_other_edge(input, sub_dfg)?;
-        h.validate(&EMPTY_REG).unwrap();
+        h.infer_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
@@ -1079,16 +1081,13 @@ mod test {
 
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
-        }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
+        let [input, output] = h.get_io(h.root()).unwrap();
         let and = h.add_op_with_parent(h.root(), and_op())?;
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, output, 0)?;
         assert_eq!(
-            h.validate(&EMPTY_REG),
+            h.infer_and_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
                 port: Port::new_incoming(1),
@@ -1106,7 +1105,7 @@ mod test {
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, and, 1)?;
         // There is no edge from Input to LoadConstant, but that's OK:
-        h.validate(&EMPTY_REG).unwrap();
+        h.infer_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
@@ -1282,11 +1281,11 @@ mod test {
 
     #[test]
     fn dfg_with_cycles() -> Result<(), HugrError> {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
-        }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let mut h = closed_dfg_root_hugr(FunctionType::new(
+            type_row![BOOL_T, BOOL_T],
+            type_row![BOOL_T],
+        ));
+        let [input, output] = h.get_io(h.root()).unwrap();
         let and = h.add_op_with_parent(h.root(), and_op())?;
         let not1 = h.add_op_with_parent(h.root(), not_op())?;
         let not2 = h.add_op_with_parent(h.root(), not_op())?;

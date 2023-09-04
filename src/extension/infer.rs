@@ -668,6 +668,7 @@ mod test {
     use std::error::Error;
 
     use super::*;
+    use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
@@ -853,43 +854,44 @@ mod test {
     // Infer the extensions on a child node with no inputs
     fn dangling_src() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::singleton(&"R".try_into().unwrap());
-        let root_signature =
-            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
-        let mut builder = DFGBuilder::new(root_signature)?;
-        let [input_wire] = builder.input_wires_arr();
 
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs),
+        );
+
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let add_r_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
-        let add_r = builder.add_dataflow_node(
+        let add_r = hugr.add_node_with_parent(
+            hugr.root(),
             NodeType::open_extensions(ops::DFG {
                 signature: add_r_sig,
             }),
-            [input_wire],
         )?;
-        let [wl] = add_r.outputs_arr();
 
         // Dangling thingy
         let src_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&ExtensionSet::new());
-        let src = builder.add_dataflow_node(
-            NodeType::open_extensions(ops::DFG { signature: src_sig }),
-            [],
-        )?;
-        let [wr] = src.outputs_arr();
 
-        let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::new());
+        let src = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::DFG { signature: src_sig }),
+        )?;
+
+        let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
         // Mult has open extension requirements, which we should solve to be "R"
-        let mult = builder.add_dataflow_node(
+        let mult = hugr.add_node_with_parent(
+            hugr.root(),
             NodeType::open_extensions(ops::DFG {
                 signature: mult_sig,
             }),
-            [wl, wr],
         )?;
-        let [w] = mult.outputs_arr();
 
-        builder.set_outputs([w])?;
-        let mut hugr = builder.base;
+        hugr.connect(input, 0, add_r, 0)?;
+        hugr.connect(add_r, 0, mult, 0)?;
+        hugr.connect(src, 0, mult, 1)?;
+        hugr.connect(mult, 0, output, 0)?;
+
         let closure = hugr.infer_extensions()?;
         assert!(closure.is_empty());
         assert_eq!(
@@ -943,37 +945,20 @@ mod test {
         let abc = ExtensionSet::from_iter([A, B, C]);
 
         // Parent graph is closed
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
-        }));
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
+        );
 
-        let _input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Input { types: type_row![] }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Output {
-                types: just_bool.clone(),
-            }),
-        )?;
+        let [_, output] = hugr.get_io(hugr.root()).unwrap();
 
-        let child = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+        let root = hugr.root();
+        let [child, _, ochild] = create_with_io(
+            &mut hugr,
+            root,
+            ops::DFG {
                 signature: FunctionType::new(type_row![], just_bool.clone())
                     .with_extension_delta(&abc),
-            }),
-        )?;
-        let _ichild = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::Input { types: type_row![] }),
-        )?;
-        let ochild = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::Output {
-                types: just_bool.clone(),
-            }),
+            },
         )?;
 
         let const_node = hugr.add_node_with_parent(child, NodeType::open_extensions(const_true))?;
