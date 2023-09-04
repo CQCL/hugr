@@ -253,8 +253,7 @@ pub(crate) mod test {
 
                 let inner_builder = func_builder.dfg_builder(
                     FunctionType::new(type_row![NAT], type_row![NAT]),
-                    // TODO: This should be None
-                    Some(ExtensionSet::new()),
+                    None,
                     [int],
                 )?;
                 let inner_id = n_identity(inner_builder)?;

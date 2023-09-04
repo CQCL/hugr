@@ -129,7 +129,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
                 // TODO: Allow this to be non-pure
                 self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
-                // TODO: Allow this to be non-pure
                 self.add_child_op(case_op)?
             };
 
