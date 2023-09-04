@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use super::nest_cfgs::CfgView;
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
@@ -126,7 +126,14 @@ mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,

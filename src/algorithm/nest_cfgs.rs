@@ -43,7 +43,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Node};
@@ -104,7 +104,7 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
         vec![]
     };
     cfg.successors(n)
-        .chain(extra.into_iter())
+        .chain(extra)
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
         .unique()
@@ -389,7 +389,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
-            .chain(min_dfs_target[0].into_iter());
+            .chain(min_dfs_target[0]);
         (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
@@ -398,12 +398,14 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::hugr::region::{FlatRegionView, Region};
+    use crate::extension::prelude::USIZE_T;
+
+    use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
-    use crate::types::{ClassicType, SimpleType};
+    use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -441,15 +443,22 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's).
-        let v = FlatRegionView::new(&h, h.root());
+        let v: SiblingGraph = SiblingGraph::new(&h, h.root());
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -482,7 +491,14 @@ pub(crate) mod test {
             .unwrap();
 
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == entry)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Entry node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -515,7 +531,14 @@ pub(crate) mod test {
         let v = SimpleCfgView::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -551,7 +574,14 @@ pub(crate) mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Loop header should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == head)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Loop header should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -668,7 +698,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, merge, tail))
     }
 
@@ -676,7 +706,7 @@ pub(crate) mod test {
     pub fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        //let sum2_type = SimpleType::new_predicate(2);
+        //let sum2_type = Type::new_predicate(2);
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
@@ -705,7 +735,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, head, tail))
     }
 }

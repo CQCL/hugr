@@ -1,8 +1,9 @@
-use crate::hugr::view::HugrView;
-use crate::types::{AbstractSignature, ClassicRow, SimpleRow};
+use crate::extension::ExtensionRegistry;
+use crate::hugr::views::HugrView;
+use crate::types::{FunctionType, TypeRow};
 
-use crate::ops;
 use crate::ops::handle::CaseID;
+use crate::ops::{self, OpTrait};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
@@ -15,6 +16,7 @@ use super::{
 
 use crate::Node;
 use crate::{
+    extension::ExtensionSet,
     hugr::{HugrMut, NodeType},
     Hugr,
 };
@@ -102,6 +104,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
     pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut Hugr>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node);
+        let extension_delta = control_op.signature().extension_reqs;
 
         let cond: ops::Conditional = control_op
             .clone()
@@ -117,7 +120,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: AbstractSignature::new_df(inputs.clone(), outputs.clone()),
+            signature: FunctionType::new(inputs.clone(), outputs.clone())
+                .with_extension_delta(&extension_delta),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -134,7 +138,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            AbstractSignature::new_df(inputs, outputs),
+            FunctionType::new(inputs, outputs).with_extension_delta(&extension_delta),
             None,
         )?;
 
@@ -143,8 +147,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 }
 
 impl HugrBuilder for ConditionalBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.validate()?;
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, crate::hugr::ValidationError> {
+        self.base.infer_and_validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -152,9 +159,10 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = ClassicRow>,
-        other_inputs: impl Into<SimpleRow>,
-        outputs: impl Into<SimpleRow>,
+        predicate_inputs: impl IntoIterator<Item = TypeRow>,
+        other_inputs: impl Into<TypeRow>,
+        outputs: impl Into<TypeRow>,
+        extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
         let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
         let other_inputs = other_inputs.into();
@@ -167,8 +175,9 @@ impl ConditionalBuilder<Hugr> {
             predicate_inputs,
             other_inputs,
             outputs,
+            extension_delta,
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let conditional_node = base.root();
 
@@ -183,17 +192,11 @@ impl ConditionalBuilder<Hugr> {
 
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
-    pub fn new(
-        input: impl Into<SimpleRow>,
-        output: impl Into<SimpleRow>,
-    ) -> Result<Self, BuildError> {
-        let input = input.into();
-        let output = output.into();
-        let signature = AbstractSignature::new_df(input, output);
+    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let op = ops::Case {
             signature: signature.clone(),
         };
-        // TODO: Allow input resources to be specified
+        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::pure(op));
         let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
@@ -212,6 +215,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow,
         },
+        extension::ExtensionSet,
         ops::Const,
         type_row,
     };
@@ -221,11 +225,15 @@ mod test {
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
         let predicate_inputs = vec![type_row![]; 2];
-        let mut conditional_b =
-            ConditionalBuilder::new(predicate_inputs, type_row![NAT], type_row![NAT])?;
+        let mut conditional_b = ConditionalBuilder::new(
+            predicate_inputs,
+            type_row![NAT],
+            type_row![NAT],
+            ExtensionSet::new(),
+        )?;
 
-        n_identity(conditional_b.case_builder(0)?)?;
         n_identity(conditional_b.case_builder(1)?)?;
+        n_identity(conditional_b.case_builder(0)?)?;
         Ok(())
     }
 
@@ -235,7 +243,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                AbstractSignature::new_df(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
             let tru_const = fbuild.add_constant(Const::true_val())?;
             let _fdef = {
@@ -249,6 +257,7 @@ mod test {
                         (predicate_inputs, const_wire),
                         other_inputs,
                         outputs,
+                        ExtensionSet::new(),
                     )?;
 
                     n_identity(conditional_b.case_builder(0)?)?;
@@ -259,11 +268,49 @@ mod test {
                 let [int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
-            Ok(module_builder.finish_hugr()?)
+            Ok(module_builder.finish_prelude_hugr()?)
         };
 
         assert_matches!(build_result, Ok(_));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_not_all_cases() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(
+            predicate_inputs,
+            type_row![],
+            type_row![],
+            ExtensionSet::new(),
+        )?;
+        n_identity(builder.case_builder(0)?)?;
+        assert_matches!(
+            builder.finish_sub_container().map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::NotAllCasesBuilt { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_case_already_built() -> Result<(), BuildError> {
+        let predicate_inputs = vec![type_row![]; 2];
+        let mut builder = ConditionalBuilder::new(
+            predicate_inputs,
+            type_row![],
+            type_row![],
+            ExtensionSet::new(),
+        )?;
+        n_identity(builder.case_builder(0)?)?;
+        assert_matches!(
+            builder.case_builder(0).map(|_| ()),
+            Err(BuildError::ConditionalError(
+                ConditionalBuildError::CaseBuilt { .. }
+            ))
+        );
         Ok(())
     }
 }

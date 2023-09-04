@@ -39,6 +39,7 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -56,15 +57,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          #- rust: 1.70.0  # Update once MSRV != stable
-          - rust: stable
-            cache: true
+        rust: ['1.70', stable, beta, nightly]
+        # workaround to ignore non-stable tests when running the merge queue checks
+        # see: https://github.community/t/how-to-conditionally-include-exclude-items-in-matrix-eg-based-on-branch/16853/6
+        isMerge:
+            - ${{ github.event_name == 'merge_group' }}
+        exclude:
+          - rust: '1.70'
+            isMerge: true
           - rust: beta
-            cache: true
+            isMerge: true
           - rust: nightly
-            cache: true
-
+            isMerge: true
+    name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v3
       - id: toolchain
@@ -74,7 +79,6 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: Swatinem/rust-cache@v2
-        if: ${{ matrix.cache }}
         with:
           prefix-key: v0-rust-${{ matrix.rust }}
       - name: Build with no features

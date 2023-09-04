@@ -1,12 +1,11 @@
 //! The Hugr data structure, and its basic component handles.
 
-mod hugrmut;
+pub mod hugrmut;
 
-pub mod region;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
-pub mod view;
+pub mod views;
 
 use std::collections::VecDeque;
 use std::iter;
@@ -18,16 +17,18 @@ use derive_more::From;
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-pub use self::view::HugrView;
+pub use self::views::HugrView;
+use crate::extension::{
+    infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
+};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::resource::ResourceSet;
-use crate::types::{AbstractSignature, Signature};
+use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
 
@@ -52,70 +53,89 @@ pub struct Hugr {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The type of a node on a graph
+/// The type of a node on a graph. In addition to the [`OpType`], it also
+/// describes the extensions inferred to be used by the node.
 pub struct NodeType {
     /// The underlying OpType
     op: OpType,
-    /// The resources that the signature has been specialised to
-    input_resources: Option<ResourceSet>,
+    /// The extensions that the signature has been specialised to
+    input_extensions: Option<ExtensionSet>,
 }
 
 impl NodeType {
-    /// Create a new optype with some ResourceSet
-    pub fn new(op: impl Into<OpType>, input_resources: ResourceSet) -> Self {
+    /// Create a new optype with some ExtensionSet
+    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(input_resources),
+            input_extensions: Some(input_extensions),
         }
     }
 
-    /// Instantiate an OpType with no input resources
+    /// Instantiate an OpType with no input extensions
     pub fn pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: Some(ResourceSet::new()),
+            input_extensions: Some(ExtensionSet::new()),
         }
     }
 
-    /// Instantiate an OpType with an unknown set of input resources
+    /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
-    pub fn open_resources(op: impl Into<OpType>) -> Self {
+    pub fn open_extensions(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
-            input_resources: None,
+            input_extensions: None,
         }
     }
 
-    /// Use the input resources to calculate the concrete signature of the node
+    /// Use the input extensions to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
-        self.input_resources
+        self.input_extensions
             .as_ref()
-            .map(|rs| self.op.signature().with_input_resources(rs.clone()))
+            .map(|rs| self.op.signature().with_input_extensions(rs.clone()))
     }
 
-    /// Get the abstract signature from the embedded op
-    pub fn op_signature(&self) -> AbstractSignature {
+    /// Get the function type from the embedded op
+    pub fn op_signature(&self) -> FunctionType {
         self.op.signature()
+    }
+
+    /// The input extensions defined for this node.
+    ///
+    /// The output extensions will correspond to the input extensions plus any
+    /// extension delta defined by the operation type.
+    ///
+    /// If the input extensions are not known, this will return None.
+    pub fn input_extensions(&self) -> Option<&ExtensionSet> {
+        self.input_extensions.as_ref()
     }
 }
 
 impl NodeType {
-    #![allow(missing_docs)]
     delegate! {
         to self.op {
+            /// Tag identifying the operation.
             pub fn tag(&self) -> OpTag;
+            /// Returns the number of inputs ports for the operation.
             pub fn input_count(&self) -> usize;
+            /// Returns the number of outputs ports for the operation.
             pub fn output_count(&self) -> usize;
         }
     }
 }
 
+impl<'a> From<&'a NodeType> for &'a OpType {
+    fn from(nt: &'a NodeType) -> Self {
+        &nt.op
+    }
+}
+
 impl OpType {
-    /// Convert an OpType to a NodeType by giving it some input resources
-    pub fn with_resources(self, rs: ResourceSet) -> NodeType {
+    /// Convert an OpType to a NodeType by giving it some input extensions
+    pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
         NodeType {
             op: self,
-            input_resources: Some(rs),
+            input_extensions: Some(rs),
         }
     }
 }
@@ -171,8 +191,45 @@ pub type Direction = portgraph::Direction;
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
+    pub fn apply_rewrite<R, E>(
+        &mut self,
+        rw: impl Rewrite<ApplyResult = R, Error = E>,
+    ) -> Result<R, E> {
         rw.apply(self)
+    }
+
+    /// Run resource inference and pass the closure into validation
+    pub fn infer_and_validate(
+        &mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), ValidationError> {
+        let closure = self.infer_extensions()?;
+        self.validate_with_extension_closure(closure, extension_registry)?;
+        Ok(())
+    }
+
+    /// Infer extension requirements and add new information to `op_types` field
+    ///
+    /// See [`infer_extensions`] for details on the "closure" value
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+        let (solution, extension_closure) = infer_extensions(self)?;
+        self.instantiate_extensions(solution);
+        Ok(extension_closure)
+    }
+
+    /// Add extension requirement information to the hugr in place.
+    fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
+        // We only care about inferred _input_ extensions, because `NodeType`
+        // uses those to infer the output extensions
+        for (node, input_extensions) in solution.iter() {
+            let nodetype = self.op_types.try_get_mut(node.index).unwrap();
+            match &nodetype.input_extensions {
+                None => nodetype.input_extensions = Some(input_extensions.clone()),
+                Some(existing_ext_reqs) => {
+                    debug_assert_eq!(existing_ext_reqs, input_extensions)
+                }
+            }
+        }
     }
 }
 
@@ -193,8 +250,8 @@ impl Hugr {
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
         let root = graph.add_node(0, 0);
-        // TODO: These resources should be open in principle, but lets wait
-        // until resources can be inferred for open sets until changing this
+        // TODO: These extensions should be open in principle, but lets wait
+        // until extensions can be inferred for open sets until changing this
         op_types[root] = root_node;
 
         Self {
@@ -206,12 +263,31 @@ impl Hugr {
         }
     }
 
-    /// Produce a canonical ordering of the nodes.
+    /// Add a node to the graph, with the default conversion from OpType to NodeType
+    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
+        self.add_node(NodeType::pure(op))
+    }
+
+    /// Add a node to the graph.
+    pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
+        let node = self
+            .graph
+            .add_node(nodetype.input_count(), nodetype.output_count());
+        self.op_types[node] = nodetype;
+        node.into()
+    }
+
+    /// Produce a canonical ordering of the descendant nodes of a root,
+    /// following the graph hierarchy.
+    ///
+    /// This starts with the root, and then proceeds in BFS order through the
+    /// contained regions.
     ///
     /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
-    fn canonical_order(&self) -> impl Iterator<Item = Node> + '_ {
+    fn canonical_order(&self, root: Node) -> impl Iterator<Item = Node> + '_ {
         // Generate a BFS-ordered list of nodes based on the hierarchy
-        let mut queue = VecDeque::from([self.root.into()]);
+        let mut queue = VecDeque::from([root]);
         iter::from_fn(move || {
             let node = queue.pop_front()?;
             for child in self.children(node) {
@@ -219,6 +295,46 @@ impl Hugr {
             }
             Some(node)
         })
+    }
+
+    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
+    /// traversal of the hierarchy.
+    ///
+    /// The rekey function is called for each moved node with the old and new indices.
+    ///
+    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
+    /// preserve the indices.
+    pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        // Generate the ordered list of nodes
+        let mut ordered = Vec::with_capacity(self.node_count());
+        let root = self.root();
+        ordered.extend(self.as_mut().canonical_order(root));
+
+        // Permute the nodes in the graph to match the order.
+        //
+        // Invariant: All the elements before `position` are in the correct place.
+        for position in 0..ordered.len() {
+            // Find the element's location. If it originally came from a previous position
+            // then it has been swapped somewhere else, so we follow the permutation chain.
+            let mut source: Node = ordered[position];
+            while position > source.index.index() {
+                source = ordered[source.index.index()];
+            }
+
+            let target: Node = NodeIndex::new(position).into();
+            if target != source {
+                self.graph.swap_nodes(target.index, source.index);
+                self.op_types.swap(target.index, source.index);
+                self.hierarchy.swap_nodes(target.index, source.index);
+                rekey(source, target);
+            }
+        }
+        self.root = NodeIndex::new(0);
+
+        // Finish by compacting the copy nodes.
+        // The operation nodes will be left in place.
+        // This step is not strictly necessary.
+        self.graph.compact_nodes(|_, _| {});
     }
 }
 
@@ -298,6 +414,18 @@ pub enum CircuitUnit {
     Linear(usize),
 }
 
+impl CircuitUnit {
+    /// Check if this is a wire.
+    pub fn is_wire(&self) -> bool {
+        matches!(self, CircuitUnit::Wire(_))
+    }
+
+    /// Check if this is a linear unit.
+    pub fn is_linear(&self) -> bool {
+        matches!(self, CircuitUnit::Linear(_))
+    }
+}
+
 impl From<usize> for CircuitUnit {
     fn from(value: usize) -> Self {
         CircuitUnit::Linear(value)
@@ -322,6 +450,9 @@ pub enum HugrError {
     /// An error occurred while manipulating the hierarchy.
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
+    /// The node doesn't exist.
+    #[error("Invalid node {0:?}.")]
+    InvalidNode(Node),
 }
 
 #[cfg(feature = "pyo3")]
@@ -334,7 +465,15 @@ impl From<HugrError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use super::Hugr;
+    use super::{Hugr, HugrView, NodeType};
+    use crate::builder::test::closed_dfg_root_hugr;
+    use crate::extension::ExtensionSet;
+    use crate::hugr::HugrMut;
+    use crate::ops;
+    use crate::type_row;
+    use crate::types::{FunctionType, Type};
+
+    use std::error::Error;
 
     #[test]
     fn impls_send_and_sync() {
@@ -342,5 +481,52 @@ mod test {
         // This test will fail to compile if that wasn't possible.
         trait Test: Send + Sync {}
         impl Test for Hugr {}
+    }
+
+    #[test]
+    fn io_node() {
+        use crate::builder::test::simple_dfg_hugr;
+        use crate::hugr::views::HugrView;
+        use cool_asserts::assert_matches;
+
+        let hugr = simple_dfg_hugr();
+        assert_matches!(hugr.get_io(hugr.root()), Some(_));
+    }
+
+    #[test]
+    fn extension_instantiation() -> Result<(), Box<dyn Error>> {
+        const BIT: Type = crate::extension::prelude::USIZE_T;
+        let r = ExtensionSet::singleton(&"R".into());
+
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+        );
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
+        let lift = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::LeafOp::Lift {
+                type_row: type_row![BIT],
+                new_extension: "R".into(),
+            }),
+        )?;
+        hugr.connect(input, 0, lift, 0)?;
+        hugr.connect(lift, 0, output, 0)?;
+        hugr.infer_extensions()?;
+
+        assert_eq!(
+            hugr.get_nodetype(lift)
+                .signature()
+                .unwrap()
+                .input_extensions,
+            ExtensionSet::new()
+        );
+        assert_eq!(
+            hugr.get_nodetype(output)
+                .signature()
+                .unwrap()
+                .input_extensions,
+            r
+        );
+        Ok(())
     }
 }

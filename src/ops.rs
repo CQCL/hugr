@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{AbstractSignature, EdgeKind, SignatureDescription};
+use crate::types::{EdgeKind, FunctionType, SignatureDescription, Type};
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;
@@ -17,7 +17,7 @@ use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
-pub use constant::{Const, ConstValue};
+pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
@@ -76,9 +76,17 @@ impl OpType {
         let signature = self.signature();
         let port = port.into();
         let dir = port.direction();
-        match port.index() < signature.port_count(dir) {
-            true => signature.get(port),
-            false => self.other_port(dir),
+
+        let port_count = signature.port_count(dir);
+        if port.index() < port_count {
+            signature.get(port).cloned().map(EdgeKind::Value)
+        } else if port.index() == port_count
+            && dir == Direction::Incoming
+            && self.static_input().is_some()
+        {
+            self.static_input().map(EdgeKind::Static)
+        } else {
+            self.other_port(dir)
         }
     }
 
@@ -89,7 +97,14 @@ impl OpType {
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
         let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
-            Some(Port::new(dir, self.signature().port_count(dir)))
+            // if there is a static input it comes before the non_df_ports
+            let static_input =
+                (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+
+            Some(Port::new(
+                dir,
+                self.signature().port_count(dir) + static_input,
+            ))
         } else {
             None
         }
@@ -103,7 +118,9 @@ impl OpType {
             .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
-        signature.port_count(dir) + non_df_count
+        // if there is a static input it comes before the non_df_ports
+        let static_input = (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+        signature.port_count(dir) + non_df_count + static_input
     }
 
     /// Returns the number of inputs ports for the operation.
@@ -114,6 +131,11 @@ impl OpType {
     /// Returns the number of outputs ports for the operation.
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
+    }
+
+    /// Checks whether the operation can contain children nodes.
+    pub fn is_container(&self) -> bool {
+        self.validity_flags().allowed_children != OpTag::None
     }
 }
 
@@ -160,7 +182,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a non-empty signature.
-    fn signature(&self) -> AbstractSignature {
+    fn signature(&self) -> FunctionType {
         Default::default()
     }
     /// Optional description of the ports in the signature.
@@ -168,6 +190,13 @@ pub trait OpTrait {
     /// Only dataflow operations have a non-empty signature.
     fn signature_desc(&self) -> SignatureDescription {
         Default::default()
+    }
+
+    /// Get the static input type of this operation if it has one (only Some for
+    /// [`LoadConstant`] and [`Call`])
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        None
     }
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,

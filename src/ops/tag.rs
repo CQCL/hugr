@@ -31,10 +31,13 @@ pub enum OpTag {
     /// A function definition.
     FuncDefn,
 
-    /// Node in a Control-flow Sibling Graph
+    /// Node in a Control-flow Sibling Graph.
     ControlFlowChild,
     /// Node in a Dataflow Sibling Graph.
     DataflowChild,
+    /// Parent node of a Dataflow Sibling Graph.
+    DataflowParent,
+
     /// A nested data-flow operation.
     Dfg,
     /// A nested control-flow operation.
@@ -65,7 +68,7 @@ pub enum OpTag {
 }
 
 impl OpTag {
-    /// Returns true if the tag is more general than the given tag.
+    /// Returns true if this tag is more general than `other`.
     #[inline]
     pub const fn is_superset(self, other: OpTag) -> bool {
         // We cannot call iter().any() or even do for loops in const fn yet.
@@ -103,24 +106,25 @@ impl OpTag {
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp],
             OpTag::Alias => &[OpTag::ScopedDefn],
-            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn],
-            OpTag::BasicBlock => &[OpTag::ControlFlowChild],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
+            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
-            OpTag::Case => &[OpTag::Any],
+            OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
             OpTag::Const => &[OpTag::ScopedDefn],
-            OpTag::Dfg => &[OpTag::DataflowChild],
+            OpTag::Dfg => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Cfg => &[OpTag::DataflowChild],
             OpTag::ScopedDefn => &[
                 OpTag::DataflowChild,
                 OpTag::ControlFlowChild,
                 OpTag::ModuleOp,
             ],
-            OpTag::TailLoop => &[OpTag::DataflowChild],
+            OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::FnCall => &[OpTag::DataflowChild],
             OpTag::LoadConst => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
+            OpTag::DataflowParent => &[OpTag::Any],
         }
     }
 
@@ -150,6 +154,7 @@ impl OpTag {
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
+            OpTag::DataflowParent => "Operation whose children form a Dataflow Sibling Graph",
         }
     }
 

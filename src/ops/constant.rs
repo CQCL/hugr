@@ -1,42 +1,36 @@
 //! Constant value definitions.
 
-use std::any::Any;
-
 use crate::{
-    macros::impl_box_clone,
-    types::{ClassicRow, ClassicType, CustomType, EdgeKind},
+    types::{ConstTypeError, EdgeKind, Type, TypeRow},
+    values::{CustomConst, KnownTypeConst, Value},
 };
 
-use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
-
-use self::typecheck::{typecheck_const, ConstTypeError};
 
 use super::OpTag;
 use super::{OpName, OpTrait, StaticTag};
 
-pub mod typecheck;
 /// A constant value definition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Const {
-    value: ConstValue,
-    typ: ClassicType,
+    value: Value,
+    typ: Type,
 }
 
 impl Const {
     /// Creates a new Const, type-checking the value.
-    pub fn new(value: ConstValue, typ: ClassicType) -> Result<Self, ConstTypeError> {
-        value.check_type(&typ)?;
+    pub fn new(value: Value, typ: Type) -> Result<Self, ConstTypeError> {
+        typ.check_type(&value)?;
         Ok(Self { value, typ })
     }
 
     /// Returns a reference to the value of this [`Const`].
-    pub fn value(&self) -> &ConstValue {
+    pub fn value(&self) -> &Value {
         &self.value
     }
 
     /// Returns a reference to the type of this [`Const`].
-    pub fn const_type(&self) -> &ClassicType {
+    pub fn const_type(&self) -> &Type {
         &self.typ
     }
 
@@ -44,27 +38,26 @@ impl Const {
     /// Tuple rows are defined in order by input rows.
     pub fn predicate(
         tag: usize,
-        value: ConstValue,
-        variant_rows: impl IntoIterator<Item = ClassicRow>,
+        value: Value,
+        variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Result<Self, ConstTypeError> {
-        let typ = ClassicType::new_predicate(variant_rows);
-
-        Self::new(ConstValue::Sum(tag, Box::new(value)), typ)
+        let typ = Type::new_predicate(variant_rows);
+        Self::new(Value::sum(tag, value), typ)
     }
 
     /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, size: usize) -> Self {
+    pub fn simple_predicate(tag: usize, size: u8) -> Self {
         Self {
-            value: ConstValue::simple_predicate(tag),
-            typ: ClassicType::new_simple_predicate(size),
+            value: Value::simple_predicate(tag),
+            typ: Type::new_simple_predicate(size),
         }
     }
 
     /// Constant Sum over units, with only one variant.
     pub fn simple_unary_predicate() -> Self {
         Self {
-            value: ConstValue::simple_unary_predicate(),
-            typ: ClassicType::new_simple_predicate(1),
+            value: Value::simple_unary_predicate(),
+            typ: Type::new_simple_predicate(1),
         }
     }
 
@@ -78,20 +71,19 @@ impl Const {
         Self::simple_predicate(0, 2)
     }
 
-    /// Fixed width integer
-    pub fn int<const N: u8>(value: HugrIntValueStore) -> Result<Self, ConstTypeError> {
-        Self::new(ConstValue::Int(value), ClassicType::int::<N>())
-    }
-
-    /// 64-bit integer
-    pub fn i64(value: i64) -> Result<Self, ConstTypeError> {
-        Self::int::<64>(value as HugrIntValueStore)
+    /// Tuple of values
+    pub fn new_tuple(items: impl IntoIterator<Item = Const>) -> Self {
+        let (values, types): (Vec<Value>, Vec<Type>) = items
+            .into_iter()
+            .map(|Const { value, typ }| (value, typ))
+            .unzip();
+        Self::new(Value::tuple(values), Type::new_tuple(types)).unwrap()
     }
 }
 
 impl OpName for Const {
     fn name(&self) -> SmolStr {
-        self.value.name()
+        self.value.name().into()
     }
 }
 impl StaticTag for Const {
@@ -111,169 +103,119 @@ impl OpTrait for Const {
     }
 }
 
-pub(crate) type HugrIntValueStore = u128;
-pub(crate) type HugrIntWidthStore = u8;
-pub(crate) const HUGR_MAX_INT_WIDTH: HugrIntWidthStore =
-    HugrIntValueStore::BITS as HugrIntWidthStore;
-
-/// Value constants
-///
-/// TODO: Add more constants
-/// TODO: bigger/smaller integers.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[non_exhaustive]
-#[allow(missing_docs)]
-pub enum ConstValue {
-    /// An arbitrary length integer constant.
-    Int(HugrIntValueStore),
-    /// Double precision float
-    F64(f64),
-    /// A constant specifying a variant of a Sum type.
-    Sum(usize, Box<ConstValue>),
-    /// A tuple of constant values.
-    Tuple(Vec<ConstValue>),
-    /// An opaque constant value, with cached type
-    // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
-    Opaque((CustomType, Box<dyn CustomConst>)),
-}
-
-impl PartialEq for dyn CustomConst {
-    fn eq(&self, other: &Self) -> bool {
-        (*self).equal_consts(other)
-    }
-}
-
-impl Default for ConstValue {
-    fn default() -> Self {
-        Self::Int(0)
-    }
-}
-
-impl ConstValue {
-    /// Returns the datatype of the constant.
-    pub fn check_type(&self, typ: &ClassicType) -> Result<(), ConstTypeError> {
-        typecheck_const(typ, self)
-    }
-    /// Unique name of the constant.
-    pub fn name(&self) -> SmolStr {
-        match self {
-            Self::Int(value) => format!("const:int{value}"),
-            Self::F64(f) => format!("const:float:{f}"),
-            Self::Opaque((_, v)) => format!("const:{}", v.name()),
-            Self::Sum(tag, val) => {
-                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
-            }
-            Self::Tuple(vals) => {
-                let valstr: Vec<_> = vals.iter().map(|v| v.name()).collect();
-                let valstr = valstr.join(", ");
-                format!("const:tuple:{{{valstr}}}")
-            }
-        }
-        .into()
-    }
-
-    /// Description of the constant.
-    pub fn description(&self) -> &str {
-        "Constant value"
-    }
-
-    /// Constant unit type (empty Tuple).
-    pub const fn unit() -> ConstValue {
-        ConstValue::Tuple(vec![])
-    }
-
-    /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize) -> Self {
-        Self::predicate(tag, Self::unit())
-    }
-
-    /// Constant Sum over Tuples, used as predicates.
-    pub fn predicate(tag: usize, val: ConstValue) -> Self {
-        ConstValue::Sum(tag, Box::new(val))
-    }
-
-    /// Constant Sum over Tuples with just one variant of unit type
-    pub fn simple_unary_predicate() -> Self {
-        Self::simple_predicate(0)
-    }
-}
-
-impl<T: CustomConst> From<T> for ConstValue {
-    fn from(v: T) -> Self {
-        Self::Opaque((v.custom_type(), Box::new(v)))
-    }
-}
-
-/// Constant value for opaque [`CustomType`]s.
-///
-/// When implementing this trait, include the `#[typetag::serde]` attribute to
-/// enable serialization.
-#[typetag::serde]
-pub trait CustomConst:
-    Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
+// [KnownTypeConst] is guaranteed to be the right type, so can be constructed
+// without initial type check.
+impl<T> From<T> for Const
+where
+    T: KnownTypeConst + CustomConst,
 {
-    /// An identifier for the constant.
-    fn name(&self) -> SmolStr;
-
-    /// Returns the type of the constant.
-    // TODO it would be good to ensure that this is a *classic* CustomType not a linear one!
-    fn custom_type(&self) -> CustomType;
-
-    /// Compare two constants for equality, using downcasting and comparing the definitions.
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        let _ = other;
-        false
+    fn from(value: T) -> Self {
+        Const {
+            value: Value::custom(value),
+            typ: Type::new_extension(T::TYPE),
+        }
     }
 }
-
-impl_downcast!(CustomConst);
-impl_box_clone!(CustomConst, CustomConstBoxClone);
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
-
-    use super::ConstValue;
-    use super::{typecheck::ConstTypeError, Const};
+    use super::Const;
     use crate::{
-        builder::{BuildError, Container, DFGBuilder, Dataflow, DataflowHugr},
-        classic_row, type_row,
-        types::{ClassicType, SimpleRow, SimpleType},
+        builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
+        extension::prelude::{ConstUsize, USIZE_T},
+        std_extensions::arithmetic::float_types::FLOAT64_TYPE,
+        type_row,
+        types::test::test_registry,
+        types::type_param::TypeArg,
+        types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
+        values::{
+            test::{serialized_float, CustomTestValue},
+            CustomSerialized, Value,
+        },
     };
+    use cool_asserts::assert_matches;
+    use serde_yaml::Value as YamlValue;
+
+    use super::*;
 
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
-        let pred_rows = vec![
-            classic_row![ClassicType::i64(), ClassicType::F64],
-            type_row![],
-        ];
-        let pred_ty = SimpleType::new_predicate(pred_rows.clone());
+        use crate::builder::Container;
+        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
+        let pred_ty = Type::new_predicate(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty.clone()]))?;
+        let mut b = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            TypeRow::from(vec![pred_ty.clone()]),
+        ))?;
         let c = b.add_constant(Const::predicate(
             0,
-            ConstValue::Tuple(vec![ConstValue::Int(3), ConstValue::F64(3.15)]),
+            Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w]).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
-        let mut b = DFGBuilder::new(type_row![], SimpleRow::from(vec![pred_ty]))?;
-        let c = b.add_constant(Const::predicate(1, ConstValue::unit(), pred_rows)?)?;
+        let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
+        let c = b.add_constant(Const::predicate(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w]).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         Ok(())
     }
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = vec![
-            classic_row![ClassicType::i64(), ClassicType::F64],
-            type_row![],
-        ];
+        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
-        let res = Const::predicate(0, ConstValue::Tuple(vec![]), pred_rows);
+        let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
+    }
+
+    #[test]
+    fn test_constant_values() {
+        let int_value: Value = ConstUsize::new(257).into();
+        USIZE_T.check_type(&int_value).unwrap();
+        FLOAT64_TYPE.check_type(&serialized_float(17.4)).unwrap();
+        assert_matches!(
+            FLOAT64_TYPE.check_type(&int_value),
+            Err(ConstTypeError::CustomCheckFail(
+                CustomCheckFailure::TypeMismatch { .. }
+            ))
+        );
+        let tuple_ty = Type::new_tuple(vec![USIZE_T, FLOAT64_TYPE]);
+        let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
+        tuple_ty.check_type(&tuple_val).unwrap();
+        let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);
+        assert_matches!(
+            tuple_ty.check_type(&tuple_val2),
+            Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
+        );
+        let tuple_val3 = Value::tuple([int_value, serialized_float(3.3), serialized_float(2.0)]);
+        assert_eq!(
+            tuple_ty.check_type(&tuple_val3),
+            Err(ConstTypeError::TupleWrongLength)
+        );
+    }
+
+    #[test]
+    fn test_yaml_const() {
+        let typ_int = CustomType::new(
+            "mytype",
+            vec![TypeArg::BoundedNat(8)],
+            "myrsrc",
+            TypeBound::Eq,
+        );
+        let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
+        let classic_t = Type::new_extension(typ_int.clone());
+        assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
+        classic_t.check_type(&val).unwrap();
+
+        let typ_qb = CustomType::new("mytype", vec![], "myrsrc", TypeBound::Eq);
+        let t = Type::new_extension(typ_qb.clone());
+        assert_matches!(t.check_type(&val),
+            Err(ConstTypeError::CustomCheckFail(CustomCheckFailure::TypeMismatch{expected, found})) => expected == typ_int && found == typ_qb);
+
+        assert_eq!(val, val);
     }
 }

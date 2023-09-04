@@ -1,23 +1,35 @@
-#![allow(unused)]
-//! A Trait for "read-only" HUGRs.
+//! Read-only access into HUGR graphs and subgraphs.
 
-use std::iter::FusedIterator;
-use std::ops::Deref;
+pub mod hierarchy;
+pub mod sibling;
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapCtx, MapWithCtx, WithCtx};
+#[cfg(test)]
+mod tests;
+
+pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
+pub use sibling::SiblingSubgraph;
+
+use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, NodeMetadata, NodeType};
-use super::{Node, Port};
-use crate::ops::{OpName, OpType};
-use crate::types::EdgeKind;
+use crate::ops::handle::NodeHandle;
+use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
+use crate::types::{EdgeKind, FunctionType};
 use crate::Direction;
+use crate::{Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: sealed::HugrInternals {
+    /// The kind of handle that can be used to refer to the root node.
+    ///
+    /// The handle is guaranteed to be able to contain the operation returned by
+    /// [`HugrView::root_type`].
+    type RootHandle: NodeHandle;
+
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -43,13 +55,27 @@ pub trait HugrView: sealed::HugrInternals {
     where
         Self: 'a;
 
-    /// Return index of HUGR root node.
-    fn root(&self) -> Node;
+    /// Iterator over the links between two nodes.
+    type NodeConnections<'a>: Iterator<Item = [Port; 2]>
+    where
+        Self: 'a;
+
+    /// Return the root node of this view.
+    #[inline]
+    fn root(&self) -> Node {
+        self.root_node()
+    }
 
     /// Return the type of the HUGR root node.
+    #[inline]
     fn root_type(&self) -> &NodeType {
-        self.get_nodetype(self.root())
+        let node_type = self.get_nodetype(self.root());
+        debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
+        node_type
     }
+
+    /// Returns whether the node exists.
+    fn contains_node(&self, node: Node) -> bool;
 
     /// Returns the parent of a node.
     fn get_parent(&self, node: Node) -> Option<Node>;
@@ -94,6 +120,9 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
+
+    /// Iterator the links between two nodes.
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
 
     /// Returns whether a port is connected.
     fn is_linked(&self, node: Node, port: Port) -> bool {
@@ -140,6 +169,14 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterates over the input and output neighbours of the `node` in sequence.
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
+
+    /// Get the input and output child nodes of a dataflow parent.
+    /// If the node isn't a dataflow parent, then return None
+    fn get_io(&self, node: Node) -> Option<[Node; 2]>;
+
+    /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
+    /// type. Otherwise return None.
+    fn get_function_type(&self) -> Option<&FunctionType>;
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
@@ -195,6 +232,8 @@ impl<T> HugrView for T
 where
     T: AsRef<Hugr>,
 {
+    type RootHandle = Node;
+
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
@@ -212,9 +251,11 @@ where
     where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
+
     #[inline]
-    fn root(&self) -> Node {
-        self.as_ref().root.into()
+    fn contains_node(&self, node: Node) -> bool {
+        self.as_ref().graph.contains_node(node.index)
     }
 
     #[inline]
@@ -273,6 +314,21 @@ where
     }
 
     #[inline]
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        let hugr = self.as_ref();
+
+        hugr.graph
+            .get_connections(node.index, other.index)
+            .with_context(hugr)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link.port()).unwrap();
+                    offset.into()
+                })
+            })
+    }
+
+    #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.as_ref().graph.num_ports(node.index, dir)
     }
@@ -292,6 +348,25 @@ where
         self.as_ref().graph.all_neighbours(node.index).map_into()
     }
 
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        let op = self.get_nodetype(node);
+        if OpTag::DataflowParent.is_superset(op.tag()) {
+            self.children(node).take(2).collect_vec().try_into().ok()
+        } else {
+            None
+        }
+    }
+
+    fn get_function_type(&self) -> Option<&FunctionType> {
+        let op = self.get_nodetype(self.root());
+        match &op.op {
+            OpType::DFG(DFG { signature })
+            | OpType::FuncDecl(FuncDecl { signature, .. })
+            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
+            _ => None,
+        }
+    }
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.as_ref().metadata.get(node.index)
@@ -314,6 +389,9 @@ pub(crate) mod sealed {
 
         /// Returns the Hugr at the base of a chain of views.
         fn base_hugr(&self) -> &Hugr;
+
+        /// Return the root node of this view.
+        fn root_node(&self) -> Node;
     }
 
     impl<T> HugrInternals for T
@@ -330,6 +408,11 @@ pub(crate) mod sealed {
         #[inline]
         fn base_hugr(&self) -> &Hugr {
             self.as_ref()
+        }
+
+        #[inline]
+        fn root_node(&self) -> Node {
+            self.as_ref().root.into()
         }
     }
 }
