@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 lazy_static! {
-    pub static ref NAME_REGEX: Regex = Regex::new(r"^[\w--\d]\w*$").unwrap();
+    pub static ref PATH_REGEX: Regex = Regex::new(r"^[\w--\d]\w*(\.[\w--\d]\w*)*$").unwrap();
 }
 
 #[derive(
@@ -22,35 +22,35 @@ lazy_static! {
     serde::Serialize,
     serde::Deserialize,
 )]
-/// A well-formed identifier
-pub struct Ident(SmolStr);
+/// A non-empty dot-separated list of valid identifiers
+pub struct IdentList(SmolStr);
 
-impl Ident {
-    /// Makes an Ident, checking the supplied string is well-formed
+impl IdentList {
+    /// Makes an IdentList, checking the supplied string is well-formed
     pub fn new(n: impl Into<SmolStr>) -> Result<Self, InvalidIdentifier> {
         let n = n.into();
-        if NAME_REGEX.is_match(n.as_str()) {
-            Ok(Ident(n))
+        if PATH_REGEX.is_match(n.as_str()) {
+            Ok(IdentList(n))
         } else {
             Err(InvalidIdentifier(n))
         }
     }
 
-    /// Create a new Ident *without* doing the well-formedness check.
+    /// Create a new [IdentList] *without* doing the well-formedness check.
     /// Useful because we want to have static 'const'ants inside the crate,
     /// but to be used sparingly.
     pub(crate) const fn new_unchecked(n: &str) -> Self {
-        Ident(SmolStr::new_inline(n))
+        IdentList(SmolStr::new_inline(n))
     }
 }
 
-impl Borrow<str> for Ident {
+impl Borrow<str> for IdentList {
     fn borrow(&self) -> &str {
         self.0.borrow()
     }
 }
 
-impl std::ops::Deref for Ident {
+impl std::ops::Deref for IdentList {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -58,37 +58,41 @@ impl std::ops::Deref for Ident {
     }
 }
 
-impl PartialEq<str> for Ident {
+impl PartialEq<str> for IdentList {
     fn eq(&self, other: &str) -> bool {
         self.0.eq(other)
     }
 }
 
-impl TryInto<Ident> for &str {
+impl TryInto<IdentList> for &str {
     type Error = InvalidIdentifier;
 
-    fn try_into(self) -> Result<Ident, Self::Error> {
-        Ident::new(SmolStr::new(self))
+    fn try_into(self) -> Result<IdentList, InvalidIdentifier> {
+        IdentList::new(SmolStr::new(self))
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[error("Invalid identifier {0}")]
-/// Error indicating a string was not valid as an Ident
+/// Error indicating a string was not valid as an [IdentList]
 pub struct InvalidIdentifier(SmolStr);
 
 #[cfg(test)]
 mod test {
-    use super::Ident;
+    use super::IdentList;
 
     #[test]
     fn test_idents() {
-        Ident::new("foo").unwrap();
-        Ident::new("_foo").unwrap();
-        Ident::new("Bar_xyz67").unwrap();
+        IdentList::new("foo").unwrap();
+        IdentList::new("_foo").unwrap();
+        IdentList::new("Bar_xyz67").unwrap();
+        IdentList::new("foo.bar").unwrap();
+        IdentList::new("foo.bar.baz").unwrap();
 
-        Ident::new("foo.bar").unwrap_err();
-        Ident::new("42").unwrap_err();
-        Ident::new("xyz-5").unwrap_err();
+        IdentList::new("42").unwrap_err();
+        IdentList::new("foo.42").unwrap_err();
+        IdentList::new("xyz-5").unwrap_err();
+        IdentList::new("foo..bar").unwrap_err();
+        IdentList::new(".foo").unwrap_err();
     }
 }

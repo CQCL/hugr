@@ -11,7 +11,7 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::hugr::Ident;
+use crate::hugr::IdentList;
 use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_arg, TypeArgError};
@@ -205,7 +205,7 @@ impl ExtensionValue {
 /// A unique identifier for a extension.
 ///
 /// The actual [`Extension`] is stored externally.
-pub type ExtensionId = Ident;
+pub type ExtensionId = IdentList;
 
 /// A extension is a set of capabilities required to execute a graph.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

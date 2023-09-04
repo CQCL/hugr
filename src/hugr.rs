@@ -15,7 +15,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
-pub use ident::{Ident, InvalidIdentifier};
+pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
