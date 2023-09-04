@@ -393,22 +393,3 @@ impl FromIterator<ExtensionId> for ExtensionSet {
         Self(HashSet::from_iter(iter))
     }
 }
-
-#[cfg(test)]
-mod test {
-    #[macro_export]
-    /// Declares a 'const' member of a test module that's a new ExtensionId.
-    /// field_name should be an UPPERCASE i.e. name of a const.
-    macro_rules! test_const_ext_id {
-        ($field_name:ident, $ext_name:expr) => {
-            const $field_name: ExtensionId = ExtensionId::new_unchecked($ext_name);
-
-            paste::paste! {
-                #[test]
-                fn [<check_ $field_name:lower _wellformed>]() {
-                    ExtensionId::new($ext_name).unwrap();
-                }
-            }
-        };
-    }
-}

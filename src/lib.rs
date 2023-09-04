@@ -9,6 +9,26 @@
 //!   structures.
 //!
 
+// Declares a 'const' member of a test module that's a new ExtensionId.
+// field_name should be an UPPERCASE i.e. name of a const.
+// This is here so that it is usable throughout the crate, but is not
+// visible from outside (as it would be if we used macro_export)
+// - as it won't *work* from outside because of the call to new_unchecked.
+#[allow(unused_macros)] // Because not used *in this file*
+macro_rules! test_const_ext_id {
+    ($field_name:ident, $ext_name:expr) => {
+        const $field_name: crate::extension::ExtensionId =
+            crate::extension::ExtensionId::new_unchecked($ext_name);
+
+        paste::paste! {
+            #[test]
+            fn [<check_ $field_name:lower _wellformed>]() {
+                ExtensionId::new($ext_name).unwrap();
+            }
+        }
+    };
+}
+
 pub mod algorithm;
 pub mod builder;
 pub mod extension;

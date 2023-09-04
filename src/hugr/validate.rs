@@ -708,8 +708,7 @@ mod test {
     use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
-    use crate::{test_const_ext_id, Direction};
-    use crate::{type_row, Node};
+    use crate::{type_row, Direction, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;

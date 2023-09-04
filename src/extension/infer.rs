@@ -672,8 +672,8 @@ mod test {
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
+    use crate::type_row;
     use crate::types::{FunctionType, Type};
-    use crate::{test_const_ext_id, type_row};
 
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
