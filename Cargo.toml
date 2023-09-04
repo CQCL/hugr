@@ -28,6 +28,7 @@ portgraph = { version = "0.8.0", features = ["serde", "petgraph"] }
 pyo3 = { version = "0.19.0", optional = true, features = [
     "multiple-pymethods",
 ] }
+regex = "1.9.5"
 cgmath = { version = "0.18.0", features = ["serde"] }
 num-rational = { version = "0.4.1", features = ["serde"] }
 downcast-rs = "1.2.0"

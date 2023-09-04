@@ -2,6 +2,7 @@
 
 pub mod hugrmut;
 
+mod ident;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -14,6 +15,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
+pub use ident::{Ident, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
