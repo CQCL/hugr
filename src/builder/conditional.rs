@@ -178,7 +178,7 @@ impl ConditionalBuilder<Hugr> {
             extension_delta,
         };
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -197,7 +197,7 @@ impl CaseBuilder<Hugr> {
             signature: signature.clone(),
         };
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
 
