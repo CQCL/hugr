@@ -324,17 +324,17 @@ pub enum ExtensionBuildError {
 
 /// A set of extensions identified by their unique [`ExtensionId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionSet(HashSet<ExtensionId>, HashSet<usize>);
+pub struct ExtensionSet(HashSet<ExtensionId>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
     pub fn new() -> Self {
-        Self(HashSet::new(), HashSet::new())
+        Self(HashSet::new())
     }
 
     /// Creates a new extension set from some extensions.
     pub fn new_from_extensions(extensions: impl Into<HashSet<ExtensionId>>) -> Self {
-        Self(extensions.into(), HashSet::new())
+        Self(extensions.into())
     }
 
     /// Adds a extension to the set.
@@ -344,7 +344,10 @@ impl ExtensionSet {
 
     /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
     pub fn insert_type_var(&mut self, idx: usize) {
-        self.1.insert(idx);
+        // Represent type vars as string representation of DeBruijn index.
+        // This is not a legal IdentList or ExtensionId so should not conflict.
+        self.0
+            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
     }
 
     /// Returns `true` if the set contains the given extension.
@@ -354,9 +357,6 @@ impl ExtensionSet {
 
     /// Returns `true` if the set is a subset of `other`.
     pub fn is_subset(&self, other: &Self) -> bool {
-        if !other.1.is_empty() {
-            panic!("ExtensionSet contains Type Variables?")
-        }
         self.0.is_subset(&other.0)
     }
 
@@ -376,57 +376,55 @@ impl ExtensionSet {
     /// (which must have been declared as a [TypeParam::Extensions])
     pub fn type_var(idx: usize) -> Self {
         let mut set = Self::new();
-        set.1.insert(idx);
+        set.insert_type_var(idx);
         set
     }
 
     /// Returns the union of two extension sets.
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
-        self.1.extend(other.1.iter().cloned());
         self
     }
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        if !self.1.is_empty() || !other.1.is_empty() {
-            panic!("Should only do inference on ExtensionSets in Hugrs (not those in type schemes), which should not contain type variables")
-        }
-        ExtensionSet(
-            HashSet::from_iter(other.0.difference(&self.0).cloned()),
-            HashSet::new(),
-        )
+        ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
     }
 
     /// Iterate over the contained ExtensionIds
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
-        if !self.1.is_empty() {
-            panic!("Contained type variables!")
-        }
         self.0.iter()
     }
 
     pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        for &tv in self.1.iter() {
-            if params.get(tv) != Some(&TypeParam::Extensions) {
-                return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: TypeParam::Extensions,
-                    decl: params.get(tv).cloned(),
-                });
+        for e in self.iter() {
+            if let Some(i) = as_typevar(e) {
+                if params.get(i) != Some(&TypeParam::Extensions) {
+                    return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                        used: TypeParam::Extensions,
+                        decl: params.get(i).cloned(),
+                    });
+                }
             }
         }
         Ok(())
     }
 
     pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
-        let mut res = ExtensionSet::new_from_extensions(self.0.clone());
-        for tv in self.1.iter() {
-            let Some(TypeArg::Extensions(es)) = args.get(*tv) else {
-                panic!("value for type var was not extension set")
-            };
-            res = res.union(es);
-        }
-        res
+        Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
+            None => vec![e.clone()].into_iter(),
+            Some(i) => match args.get(i) {
+                Some(TypeArg::Extensions(es)) => es.iter().cloned().collect::<Vec<_>>().into_iter(),
+                _ => panic!("value for type var was not extension set"),
+            },
+        }))
+    }
+}
+
+fn as_typevar(e: &ExtensionId) -> Option<usize> {
+    match e.chars().next() {
+        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
+        _ => None,
     }
 }
 
@@ -438,6 +436,6 @@ impl Display for ExtensionSet {
 
 impl FromIterator<ExtensionId> for ExtensionSet {
     fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
-        Self(HashSet::from_iter(iter), HashSet::new())
+        Self(HashSet::from_iter(iter))
     }
 }
