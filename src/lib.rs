@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! `hugr` is the Hierarchical Unified Graph Representation of quantum circuits
 //! and operations in the Quantinuum ecosystem.
 //!
@@ -8,6 +6,11 @@
 //! - `serde` enables serialization and deserialization of the components and
 //!   structures.
 //!
+
+#![warn(missing_docs)]
+// Unstable check, may cause false positives.
+// https://github.com/rust-lang/rust-clippy/issues/5112
+#![warn(clippy::debug_assert_with_mut_call)]
 
 pub mod algorithm;
 pub mod builder;
