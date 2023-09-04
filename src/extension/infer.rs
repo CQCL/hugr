@@ -668,6 +668,7 @@ mod test {
     use std::error::Error;
 
     use super::*;
+    use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::HugrMut;
@@ -854,26 +855,12 @@ mod test {
     // Infer the extensions on a child node with no inputs
     fn dangling_src() -> Result<(), Box<dyn Error>> {
         let rs = ExtensionSet::singleton(&"R".into());
-        let root_signature =
-            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
-            signature: root_signature,
-        }));
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs),
+        );
 
-        let input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Input {
-                types: type_row![NAT],
-            }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Output {
-                types: type_row![NAT],
-            }),
-        )?;
-
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let add_r_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
         let add_r = hugr.add_node_with_parent(
@@ -959,37 +946,20 @@ mod test {
         let abc = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
 
         // Parent graph is closed
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
-        }));
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
+        );
 
-        let _input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Input { types: type_row![] }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Output {
-                types: just_bool.clone(),
-            }),
-        )?;
+        let [_, output] = hugr.get_io(hugr.root()).unwrap();
 
-        let child = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+        let root = hugr.root();
+        let [child, _, ochild] = create_with_io(
+            &mut hugr,
+            root,
+            ops::DFG {
                 signature: FunctionType::new(type_row![], just_bool.clone())
                     .with_extension_delta(&abc),
-            }),
-        )?;
-        let _ichild = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::Input { types: type_row![] }),
-        )?;
-        let ochild = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::Output {
-                types: just_bool.clone(),
-            }),
+            },
         )?;
 
         let const_node = hugr.add_node_with_parent(child, NodeType::open_extensions(const_true))?;

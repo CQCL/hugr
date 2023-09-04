@@ -271,13 +271,12 @@ pub mod test {
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
-            Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-            ModuleBuilder,
+            test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+            DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
         extension::prelude::BOOL_T,
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        type_row,
         types::{FunctionType, Type},
         Port,
     };
@@ -456,25 +455,8 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let mut hugr = Hugr::new(NodeType::pure(DFG {
-            signature: FunctionType::new(vec![QB], vec![QB]),
-        }));
-        let old_in = hugr
-            .add_node_with_parent(
-                hugr.root(),
-                NodeType::pure(Input {
-                    types: type_row![QB],
-                }),
-            )
-            .unwrap();
-        let out = hugr
-            .add_node_with_parent(
-                hugr.root(),
-                NodeType::pure(Output {
-                    types: type_row![QB],
-                }),
-            )
-            .unwrap();
+        let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
+        let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
         hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
@@ -483,7 +465,7 @@ pub mod test {
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-        hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
