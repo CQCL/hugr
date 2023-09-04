@@ -5,7 +5,11 @@ use serde_json::json;
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::hugr::{Hugr, HugrMut};
+#[cfg(feature = "pyo3")]
+use pyo3::prelude::*;
+
+use crate::extension::ExtensionSet;
+use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::Node;
@@ -14,7 +18,7 @@ use portgraph::{Direction, LinkError, NodeIndex, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrError, HugrView};
+use super::{HugrError, HugrMut, HugrView};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -37,6 +41,7 @@ enum Versioned {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
+    input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
 }
@@ -54,7 +59,7 @@ struct SerHugrV0 {
 }
 
 /// Errors that can occur while serializing a HUGR.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum HUGRSerializationError {
     /// Unexpected hierarchy error.
     #[error("Failed to attach child to parent: {0:?}.")]
@@ -82,6 +87,13 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
+}
+
+#[cfg(feature = "pyo3")]
+impl From<HUGRSerializationError> for PyErr {
+    fn from(err: HUGRSerializationError) -> Self {
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+    }
 }
 
 impl Serialize for Hugr {
@@ -117,7 +129,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
-        for (order, node) in hugr.canonical_order().enumerate() {
+        for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
             node_rekey.insert(node, NodeIndex::new(order).into());
         }
 
@@ -125,11 +137,12 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         let mut metadata = vec![json!(null); hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
-            let opt = hugr.get_optype(n);
+            let opt = hugr.get_nodetype(n);
             let new_node = node_rekey[&n].index.index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.clone(),
+                input_extensions: opt.input_extensions.clone(),
+                op: opt.op.clone(),
             });
             metadata[new_node] = hugr.get_metadata(n).clone();
         }
@@ -188,6 +201,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
+            input_extensions,
             op: root_type,
         } = nodes.next().unwrap();
         if root_parent.index.index() != 0 {
@@ -195,10 +209,23 @@ impl TryFrom<SerHugrV0> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
+        let mut hugr = Hugr::with_capacity(
+            match input_extensions {
+                None => NodeType::open_extensions(root_type),
+                Some(rs) => NodeType::new(root_type, rs),
+            },
+            nodes.len(),
+            edges.len() * 2,
+        );
 
         for node_ser in nodes {
-            hugr.add_op_with_parent(node_ser.parent, node_ser.op)?;
+            hugr.add_node_with_parent(
+                node_ser.parent,
+                match node_ser.input_extensions {
+                    None => NodeType::open_extensions(node_ser.op),
+                    Some(rs) => NodeType::new(node_ser.op, rs),
+                },
+            )?;
         }
 
         for (node, metadata) in metadata.into_iter().enumerate() {
@@ -240,13 +267,17 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::{
         builder::{
-            Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-            ModuleBuilder,
+            test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+            DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
+        extension::prelude::BOOL_T,
+        hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{ClassicType, Signature, SimpleType},
+        types::{FunctionType, Type},
         Port,
     };
     use itertools::Itertools;
@@ -254,8 +285,8 @@ pub mod test {
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
 
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
-    const QB: SimpleType = SimpleType::Qubit;
+    const NAT: Type = crate::extension::prelude::USIZE_T;
+    const QB: Type = crate::extension::prelude::QB_T;
 
     #[test]
     fn empty_hugr_serialize() {
@@ -274,14 +305,11 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: Signature::new_df(
-                    vec![ClassicType::bit().into(); inputs - 1],
-                    vec![ClassicType::bit().into(); outputs - 1],
-                ),
+                signature: FunctionType::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
             }
             .into(),
-            (true, false) => Input::new(vec![ClassicType::bit().into(); outputs - 1]).into(),
-            (false, true) => Output::new(vec![ClassicType::bit().into(); inputs - 1]).into(),
+            (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
+            (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
             (true, true) => Module.into(),
         }
     }
@@ -305,9 +333,11 @@ pub mod test {
         let mut h = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::new();
 
+        op_types[root] = NodeType::open_extensions(gen_optype(&g, root));
+
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
-            op_types[n] = gen_optype(&g, n);
+            op_types[n] = NodeType::pure(gen_optype(&g, n));
         }
 
         let hg = Hugr {
@@ -330,9 +360,9 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             module_builder.set_metadata(json!({"name": "test"}));
 
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", Signature::new_df(t_row.clone(), t_row))
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -352,7 +382,7 @@ pub mod test {
             f_build.set_metadata(json!(42));
             f_build.finish_with_outputs(outputs).unwrap();
 
-            module_builder.finish_hugr().unwrap()
+            module_builder.finish_prelude_hugr().unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -365,9 +395,9 @@ pub mod test {
     fn metadata_hugr_ser() {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
-            let t_row = vec![SimpleType::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", Signature::new_df(t_row.clone(), t_row))
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
                 .unwrap();
 
             let outputs = f_build
@@ -386,7 +416,7 @@ pub mod test {
                 .collect_vec();
 
             f_build.finish_with_outputs(outputs).unwrap();
-            module_builder.finish_hugr().unwrap()
+            module_builder.finish_prelude_hugr().unwrap()
         };
 
         let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
@@ -397,16 +427,16 @@ pub mod test {
 
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let tp: Vec<SimpleType> = vec![ClassicType::bit().into(); 2];
-        let mut dfg = DFGBuilder::new(tp.clone(), tp)?;
+        let tp: Vec<Type> = vec![BOOL_T; 2];
+        let mut dfg = DFGBuilder::new(FunctionType::new(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Xor, [*p, *p])
+                .add_dataflow_op(LeafOp::Noop { ty: BOOL_T }, [*p])
                 .unwrap()
                 .out_wire(0);
         }
-        let h = dfg.finish_hugr_with_outputs(params)?;
+        let h = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
         let ser = serde_json::to_string(&h)?;
         let h_deser: Hugr = serde_json::from_str(&ser)?;
@@ -425,23 +455,22 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() {
-        let qb = SimpleType::Qubit;
-        let dfg = DFGBuilder::new([qb.clone()].to_vec(), [qb.clone()].to_vec()).unwrap();
-        let [old_in, out] = dfg.io();
-        let w = dfg.input_wires();
-        let mut hugr = dfg.finish_hugr_with_outputs(w).unwrap();
+        let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
+        let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
+        hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([qb].to_vec()));
+        let new_in = hugr.add_op(Input::new([QB].to_vec()));
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
-        hugr.validate().unwrap();
+        hugr.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
 
         let ser = serde_json::to_vec(&hugr).unwrap();
         let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
-        new_hugr.validate().unwrap();
+        new_hugr.validate(&EMPTY_REG).unwrap_err();
+        new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
 
         // Check the canonicalization works
         let mut h_canon = hugr.clone();

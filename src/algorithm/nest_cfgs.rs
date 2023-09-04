@@ -43,8 +43,9 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
+use crate::hugr::{HugrMut, Rewrite};
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node};
@@ -169,7 +170,7 @@ fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
         vec![]
     };
     cfg.successors(n)
-        .chain(extra.into_iter())
+        .chain(extra)
         .map(EdgeDest::Forward)
         .chain(cfg.predecessors(n).map(EdgeDest::Backward))
         .unique()
@@ -190,19 +191,19 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 }
 
 /// A straightforward view of a Cfg as it appears in a Hugr
-pub struct SimpleCfgView<'a> {
-    h: &'a mut Hugr,
+pub struct SimpleCfgView<'a, T: HugrMut> {
+    h: &'a mut T,
     entry: Node,
     exit: Node,
 }
-impl<'a> SimpleCfgView<'a> {
+impl<'a, T: HugrMut> SimpleCfgView<'a, T> {
     /// Creates a SimpleCfgView for a CFG-rooted Hugr
-    pub fn new(h: &'a mut Hugr) -> Self {
+    pub fn new(h: &'a mut T) -> Self {
         Self::new_subtree(h, h.root())
     }
 
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub fn new_subtree(h: &'a mut Hugr, n: Node) -> Self {
+    pub fn new_subtree(h: &'a mut T, n: Node) -> Self {
         let mut children = h.children(n);
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
@@ -210,7 +211,7 @@ impl<'a> SimpleCfgView<'a> {
         Self { h, entry, exit }
     }
 }
-impl CfgView<Node> for SimpleCfgView<'_> {
+impl<T: HugrMut> CfgView<Node> for SimpleCfgView<'_, T> {
     fn entry_node(&self) -> Node {
         self.entry
     }
@@ -219,7 +220,7 @@ impl CfgView<Node> for SimpleCfgView<'_> {
         self.exit
     }
 
-    type Iterator<'c> = <Hugr as HugrView>::Neighbours<'c>
+    type Iterator<'c> = <T as HugrView>::Neighbours<'c>
     where
         Self: 'c;
 
@@ -244,7 +245,7 @@ impl CfgView<Node> for SimpleCfgView<'_> {
             .unwrap()
             == cfg));
         // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
-        self.h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
+        OutlineCfg::new(blocks).apply(self.h).unwrap();
         // Hmmm, no way to get the node created out from the rewrite...
         assert!([entry_edge.0, exit_edge.1]
             .iter()
@@ -526,7 +527,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
         let highest_target = be_up
             .into_iter()
             .map(|(dfs, _)| dfs)
-            .chain(min_dfs_target[0].into_iter());
+            .chain(min_dfs_target[0]);
         (highest_target.min().unwrap_or(usize::MAX), bs)
     }
 }
@@ -535,13 +536,15 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::ops::{
-        handle::{BasicBlockID, ConstID, NodeHandle},
-        ConstValue,
-    };
-    use crate::types::{ClassicType, SimpleType};
+    use crate::extension::PRELUDE_REGISTRY;
+    use crate::extension::prelude::USIZE_T;
+
+    use crate::hugr::views::{HierarchyView, SiblingGraph};
+    use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
+    use crate::ops::Const;
+    use crate::types::Type;
     use crate::{type_row, Hugr};
-    const NAT: SimpleType = SimpleType::Classic(ClassicType::i64());
+    const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
@@ -564,8 +567,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
@@ -579,15 +582,22 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let mut h = cfg_builder.finish_hugr()?;
+        let mut h = cfg_builder.finish_prelude_hugr()?;
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
-        // that we *can* (as we'll need to for "real" module Hugr's). TODO reinstate when we can apply_rewrite on (some kind of) View.
-        // let v = FlatRegionView::new(&h, h.root());
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut h)); //&SimpleCfgView::new(&v));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        // that we *can* (as we'll need to for "real" module Hugr's).
+        let v: SiblingGraph = SiblingGraph::new(&h, h.root());
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut v));
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -601,7 +611,7 @@ pub(crate) mod test {
             ])
         );
         transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
@@ -639,8 +649,15 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut h));
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == entry).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Entry node should have two successors");};
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == entry)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Entry node should have two successors");
+        };
 
         let classes = group_by(edge_classes);
         assert_eq!(
@@ -673,7 +690,14 @@ pub(crate) mod test {
         let v = SimpleCfgView::new(&mut h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -686,7 +710,7 @@ pub(crate) mod test {
             ])
         );
         transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
         for n in [split, left, right, merge] {
@@ -718,7 +742,14 @@ pub(crate) mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == head).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Loop header should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == head)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Loop header should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,
@@ -812,8 +843,8 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2)?,
@@ -835,7 +866,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, merge, tail))
     }
 
@@ -843,12 +874,12 @@ pub(crate) mod test {
     pub fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        //let sum2_type = SimpleType::new_predicate(2);
+        //let sum2_type = Type::new_predicate(2);
 
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
 
-        let pred_const = cfg_builder.add_constant(ConstValue::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(ConstValue::simple_unary_predicate())?;
+        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1)?,
@@ -872,7 +903,7 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_hugr()?;
+        let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, head, tail))
     }
 

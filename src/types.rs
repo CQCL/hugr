@@ -1,23 +1,28 @@
 //! General wire types used in the compiler
 
+mod check;
 pub mod custom;
-pub mod simple;
+mod primitive;
+mod serialize;
+mod signature;
 pub mod type_param;
+pub mod type_row;
 
-use std::fmt::{self, Display, Write};
-use std::ops::Index;
-
-#[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
-
+pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
-pub use simple::{ClassicType, Container, SimpleType, TypeRow};
+pub use signature::{FunctionType, Signature, SignatureDescription};
+pub use type_row::TypeRow;
 
-use smol_str::SmolStr;
+use itertools::FoldWhile::{Continue, Done};
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
-use crate::hugr::{Direction, Port};
-use crate::utils::display_list;
-use crate::{resource::ResourceSet, type_row};
+use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::ops::AliasDecl;
+use crate::type_row;
+use std::fmt::Debug;
+
+use self::primitive::PrimType;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 //#[cfg_attr(feature = "pyo3", pyclass)] # TODO: Manually derive pyclass with non-unit variants
@@ -27,9 +32,9 @@ pub enum EdgeKind {
     /// Control edges of a CFG region.
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
-    Value(SimpleType),
+    Value(Type),
     /// A reference to a static value definition.
-    Static(ClassicType),
+    Static(Type),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }
@@ -37,334 +42,300 @@ pub enum EdgeKind {
 impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
-        match self {
-            EdgeKind::Value(t) => !t.is_classical(),
-            _ => false,
-        }
+        matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 }
 
-/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
-/// and also the target (value) of a call (static).
-#[cfg_attr(feature = "pyo3", pyclass)]
-#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Signature {
-    /// Value inputs of the function.
-    pub input: TypeRow,
-    /// Value outputs of the function.
-    pub output: TypeRow,
-    /// Possible static input (for call / load-constant).
-    pub static_input: TypeRow,
-    /// The resource requirements of all the inputs
-    pub input_resources: ResourceSet,
-    /// The resource requirements of all the outputs
-    pub output_resources: ResourceSet,
+#[derive(
+    Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
+)]
+/// Bounds on the valid operations on a type in a HUGR program.
+pub enum TypeBound {
+    /// The equality operation is valid on this type.
+    #[serde(rename = "E")]
+    Eq,
+    /// The type can be copied in the program.
+    #[serde(rename = "C")]
+    Copyable,
+    /// No bound on the type.
+    #[serde(rename = "A")]
+    #[default]
+    Any,
 }
 
-#[cfg_attr(feature = "pyo3", pymethods)]
-impl Signature {
-    /// The number of wires in the signature.
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
-    }
-
-    /// Returns whether the data wires in the signature are purely classical.
-    #[inline(always)]
-    pub fn purely_classical(&self) -> bool {
-        self.input.purely_classical() && self.output.purely_classical()
-    }
-}
-impl Signature {
-    /// Returns the type of a [`Port`]. Returns `None` if the port is out of bounds.
-    pub fn get(&self, port: Port) -> Option<EdgeKind> {
-        if port.direction() == Direction::Incoming && port.index() >= self.input.len() {
-            self.static_input
-                .get(port.index() - self.input.len())?
-                .clone()
-                .try_into()
-                .ok()
-                .map(EdgeKind::Static)
+impl TypeBound {
+    /// Returns the smallest TypeTag containing both the receiver and argument.
+    /// (This will be one of the receiver or the argument.)
+    pub fn union(self, other: Self) -> Self {
+        if self.contains(other) {
+            self
         } else {
-            self.get_df(port).cloned().map(EdgeKind::Value)
+            debug_assert!(other.contains(self));
+            other
         }
     }
 
-    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
-    #[inline]
-    pub fn get_df(&self, port: Port) -> Option<&SimpleType> {
-        match port.direction() {
-            Direction::Incoming => self.input.get(port.index()),
-            Direction::Outgoing => self.output.get(port.index()),
-        }
-    }
-
-    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds or if it is not a value.
-    #[inline]
-    pub fn get_df_mut(&mut self, port: Port) -> Option<&mut SimpleType> {
-        match port.direction() {
-            Direction::Incoming => self.input.get_mut(port.index()),
-            Direction::Outgoing => self.output.get_mut(port.index()),
-        }
-    }
-
-    /// Returns the number of value and static ports in the signature.
-    #[inline]
-    pub fn port_count(&self, dir: Direction) -> usize {
-        match dir {
-            Direction::Incoming => self.input.len() + self.static_input.len(),
-            Direction::Outgoing => self.output.len(),
-        }
-    }
-
-    /// Returns the number of input value and static ports in the signature.
-    #[inline]
-    pub fn input_count(&self) -> usize {
-        self.port_count(Direction::Incoming)
-    }
-
-    /// Returns the number of output value and static ports in the signature.
-    #[inline]
-    pub fn output_count(&self) -> usize {
-        self.port_count(Direction::Outgoing)
-    }
-
-    /// Returns the number of value ports in the signature.
-    #[inline]
-    pub fn df_port_count(&self, dir: Direction) -> usize {
-        match dir {
-            Direction::Incoming => self.input.len(),
-            Direction::Outgoing => self.output.len(),
-        }
-    }
-
-    /// Returns a reference to the resource set for the ports of the
-    /// signature in a given direction
-    pub fn get_resources(&self, dir: &Direction) -> &ResourceSet {
-        match dir {
-            Direction::Incoming => &self.input_resources,
-            Direction::Outgoing => &self.output_resources,
-        }
-    }
-
-    /// Returns the value `Port`s in the signature for a given direction.
-    #[inline]
-    pub fn ports_df(&self, dir: Direction) -> impl Iterator<Item = Port> {
-        (0..self.df_port_count(dir)).map(move |i| Port::new(dir, i))
-    }
-
-    /// Returns the incoming value `Port`s in the signature.
-    #[inline]
-    pub fn input_ports_df(&self) -> impl Iterator<Item = Port> {
-        self.ports_df(Direction::Incoming)
-    }
-
-    /// Returns the outgoing value `Port`s in the signature.
-    #[inline]
-    pub fn output_ports_df(&self) -> impl Iterator<Item = Port> {
-        self.ports_df(Direction::Outgoing)
-    }
-
-    /// Returns the `Port`s in the signature for a given direction.
-    #[inline]
-    pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
-        (0..self.port_count(dir)).map(move |i| Port::new(dir, i))
-    }
-
-    /// Returns the incoming `Port`s in the signature.
-    #[inline]
-    pub fn input_ports(&self) -> impl Iterator<Item = Port> {
-        self.ports(Direction::Incoming)
-    }
-
-    /// Returns the outgoing `Port`s in the signature.
-    #[inline]
-    pub fn output_ports(&self) -> impl Iterator<Item = Port> {
-        self.ports(Direction::Outgoing)
-    }
-
-    /// Returns a slice of the value types for the given direction.
-    #[inline]
-    pub fn df_types(&self, dir: Direction) -> &[SimpleType] {
-        match dir {
-            Direction::Incoming => &self.input,
-            Direction::Outgoing => &self.output,
-        }
-    }
-
-    /// Returns a slice of the input value types.
-    #[inline]
-    pub fn input_df_types(&self) -> &[SimpleType] {
-        self.df_types(Direction::Incoming)
-    }
-
-    /// Returns a slice of the output value types.
-    #[inline]
-    pub fn output_df_types(&self) -> &[SimpleType] {
-        self.df_types(Direction::Outgoing)
+    /// Report if this bound contains another.
+    pub const fn contains(&self, other: TypeBound) -> bool {
+        use TypeBound::*;
+        matches!((self, other), (Any, _) | (_, Eq) | (Copyable, Copyable))
     }
 }
 
-impl Signature {
-    /// Create a new signature.
-    pub fn new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-        static_input: impl Into<TypeRow>,
-    ) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            static_input: static_input.into(),
-            input_resources: ResourceSet::new(),
-            output_resources: ResourceSet::new(),
+/// Calculate the least upper bound for an iterator of bounds
+pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
+    tags.fold_while(TypeBound::Eq, |acc, new| {
+        if acc == TypeBound::Any || new == TypeBound::Any {
+            Done(TypeBound::Any)
+        } else {
+            Continue(acc.union(new))
+        }
+    })
+    .into_inner()
+}
+
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+#[serde(tag = "s")]
+/// Representation of a Sum type.
+/// Either store the types of the variants, or in the special (but common) case
+/// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
+enum SumType {
+    #[display(fmt = "SimplePredicate({})", "size")]
+    Simple {
+        size: u8,
+    },
+    General {
+        row: TypeRow,
+    },
+}
+
+impl SumType {
+    fn new(types: impl Into<TypeRow>) -> Self {
+        let row: TypeRow = types.into();
+
+        let len: usize = row.len();
+        if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
+            Self::Simple { size: len as u8 }
+        } else {
+            Self::General { row }
         }
     }
 
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
-        let linear = linear.into();
-        Signature::new_df(linear.clone(), linear)
-    }
-
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Signature::new(input, output, type_row![])
+    fn get_variant(&self, tag: usize) -> Option<&Type> {
+        match self {
+            SumType::Simple { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::General { row } => row.get(tag),
+            _ => None,
+        }
     }
 }
 
-impl Display for Signature {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let has_inputs = !(self.static_input.is_empty() && self.input.is_empty());
-        if has_inputs {
-            self.input.fmt(f)?;
-            if !self.static_input.is_empty() {
-                f.write_char('<')?;
-                display_list(&self.static_input, f)?;
-                f.write_char('>')?;
+impl From<SumType> for Type {
+    fn from(sum: SumType) -> Type {
+        match sum {
+            SumType::Simple { size } => Type::new_simple_predicate(size),
+            SumType::General { row } => Type::new_sum(row),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+/// Core types: primitive (leaf), tuple (product) or sum (co-product).
+enum TypeEnum {
+    Prim(PrimType),
+    #[display(fmt = "Tuple({})", "_0")]
+    Tuple(TypeRow),
+    #[display(fmt = "Sum({})", "_0")]
+    Sum(SumType),
+}
+impl TypeEnum {
+    /// The smallest type bound that covers the whole type.
+    fn least_upper_bound(&self) -> TypeBound {
+        match self {
+            TypeEnum::Prim(p) => p.bound(),
+            TypeEnum::Sum(SumType::Simple { size: _ }) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::General { row }) => {
+                least_upper_bound(row.iter().map(Type::least_upper_bound))
             }
-            f.write_str(" -> ")?;
+            TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
-        self.output.fmt(f)
     }
 }
 
-/// Descriptive names for the ports in a [`Signature`].
+#[derive(
+    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+)]
+#[display(fmt = "{}", "_0")]
+#[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
+/// Such an edge is valid if the ports on either end agree on the [Type].
+/// Types have an optional [TypeBound] which places limits on the valid
+/// operations on a type.
 ///
-/// This is a separate type from [`Signature`] as it is not normally used during the compiler operations.
-#[cfg_attr(feature = "pyo3", pyclass)]
-#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct SignatureDescription {
-    /// Input of the function.
-    pub input: Vec<SmolStr>,
-    /// Output of the function.
-    pub output: Vec<SmolStr>,
-    /// Static data references used by the function.
-    pub static_input: Vec<SmolStr>,
-}
+/// Examples:
+/// ```
+/// # use hugr::types::{Type, TypeBound};
+/// # use hugr::type_row;
+///
+/// let sum = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
+/// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
+///
+/// ```
+///
+/// ```
+/// # use hugr::types::{Type, TypeBound, FunctionType};
+///
+/// let func_type = Type::new_function(FunctionType::new_linear(vec![]));
+/// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
+///
+/// ```
+///
+pub struct Type(TypeEnum, TypeBound);
 
-#[cfg_attr(feature = "pyo3", pymethods)]
-impl SignatureDescription {
-    /// The number of wires in the signature.
+impl Type {
+    /// Unit type (empty tuple).
+    pub const UNIT: Self = Self(TypeEnum::Tuple(type_row![]), TypeBound::Eq);
+    const UNIT_REF: &'static Self = &Self::UNIT;
+
+    /// Initialize a new function type.
+    pub fn new_function(signature: FunctionType) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(signature))))
+    }
+
+    /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.static_input.is_empty() && self.input.is_empty() && self.output.is_empty()
-    }
-}
-
-impl SignatureDescription {
-    /// Create a new signature.
-    pub fn new(
-        input: impl Into<Vec<SmolStr>>,
-        output: impl Into<Vec<SmolStr>>,
-        static_input: impl Into<Vec<SmolStr>>,
-    ) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            static_input: static_input.into(),
-        }
+    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+        Self::new(TypeEnum::Tuple(types.into()))
     }
 
-    /// Create a new signature with only linear dataflow inputs and outputs.
-    pub fn new_linear(linear: impl Into<Vec<SmolStr>>) -> Self {
-        let linear = linear.into();
-        SignatureDescription::new_df(linear.clone(), linear)
+    /// Initialize a new sum type by providing the possible variant types.
+    #[inline(always)]
+    pub fn new_sum(types: impl Into<TypeRow>) -> Self {
+        Self::new(TypeEnum::Sum(SumType::new(types)))
     }
 
-    /// Create a new signature with only dataflow inputs and outputs.
-    pub fn new_df(input: impl Into<Vec<SmolStr>>, output: impl Into<Vec<SmolStr>>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            ..Default::default()
-        }
+    /// Initialize a new custom type.
+    // TODO remove? Extensions/TypeDefs should just provide `Type` directly
+    pub const fn new_extension(opaque: CustomType) -> Self {
+        let bound = opaque.bound();
+        Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
     }
 
-    fn row_zip<'a>(
-        type_row: &'a TypeRow,
-        name_row: &'a [SmolStr],
-    ) -> impl Iterator<Item = (&'a SmolStr, &'a SimpleType)> {
-        name_row
-            .iter()
-            .chain(&EmptyStringIterator)
-            .zip(type_row.iter())
+    /// Initialize a new alias.
+    pub fn new_alias(alias: AliasDecl) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Alias(alias)))
     }
 
-    /// Iterate over the input wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
-    ///
-    /// TODO: Return Option<&String> instead of &String for the description.
-    pub fn input_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.input, &self.input)
+    fn new(type_e: TypeEnum) -> Self {
+        let bound = type_e.least_upper_bound();
+        Self(type_e, bound)
     }
 
-    /// Iterate over the output wires of the signature and their names.
-    ///
-    /// Unnamed wires are given an empty string name.
-    pub fn output_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.output, &self.output)
+    /// New Sum of Tuple types, used as predicates in branching.
+    /// Tuple rows are defined in order by input rows.
+    pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
+    where
+        V: Into<TypeRow>,
+    {
+        Self::new_sum(predicate_variants_row(variant_rows))
     }
 
-    /// Iterate over the static input wires of the signature and their names.
-    pub fn static_input_zip<'a>(
-        &'a self,
-        signature: &'a Signature,
-    ) -> impl Iterator<Item = (&SmolStr, &SimpleType)> {
-        Self::row_zip(&signature.static_input, &self.static_input)
+    /// New simple predicate with empty Tuple variants
+    pub const fn new_simple_predicate(size: u8) -> Self {
+        // should be the only way to avoid going through SumType::new
+        Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
-}
 
-impl Index<Port> for SignatureDescription {
-    type Output = SmolStr;
+    /// Report the least upper TypeBound, if there is one.
+    #[inline(always)]
+    pub const fn least_upper_bound(&self) -> TypeBound {
+        self.1
+    }
 
-    fn index(&self, index: Port) -> &Self::Output {
-        match index.direction() {
-            Direction::Incoming => self.input.get(index.index()).unwrap_or(EMPTY_STRING_REF),
-            Direction::Outgoing => self.output.get(index.index()).unwrap_or(EMPTY_STRING_REF),
+    /// Report if the type is copyable - i.e.the least upper bound of the type
+    /// is contained by the copyable bound.
+    pub const fn copyable(&self) -> bool {
+        TypeBound::Copyable.contains(self.least_upper_bound())
+    }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        // There is no need to check the components against the bound,
+        // that is guaranteed by construction (even for deserialization)
+        match &self.0 {
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
+                row.iter().try_for_each(|t| t.validate(extension_registry))
+            }
+            TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
+            TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
+            TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
+            TypeEnum::Prim(PrimType::Function(ft)) => ft
+                .input
+                .iter()
+                .chain(ft.output.iter())
+                .try_for_each(|t| t.validate(extension_registry)),
         }
     }
 }
 
-/// An iterator that always returns the an empty string.
-struct EmptyStringIterator;
+/// Return the type row of variants required to define a Sum of Tuples type
+/// given the rows of each tuple
+pub(crate) fn predicate_variants_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
+where
+    V: Into<TypeRow>,
+{
+    variant_rows
+        .into_iter()
+        .map(Type::new_tuple)
+        .collect_vec()
+        .into()
+}
 
-/// A reference to an empty string. Used by [`EmptyStringIterator`].
-const EMPTY_STRING_REF: &SmolStr = &SmolStr::new_inline("");
+#[cfg(test)]
+pub(crate) mod test {
 
-impl<'a> Iterator for &'a EmptyStringIterator {
-    type Item = &'a SmolStr;
+    use super::*;
+    use crate::{
+        extension::{prelude::USIZE_T, PRELUDE},
+        ops::AliasDecl,
+        std_extensions::arithmetic::float_types,
+    };
 
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(EMPTY_STRING_REF)
+    use crate::types::TypeBound;
+
+    pub(crate) fn test_registry() -> ExtensionRegistry {
+        vec![PRELUDE.to_owned(), float_types::extension()].into()
+    }
+
+    #[test]
+    fn construct() {
+        let t: Type = Type::new_tuple(vec![
+            USIZE_T,
+            Type::new_function(FunctionType::new_linear(vec![])),
+            Type::new_extension(CustomType::new(
+                "my_custom",
+                [],
+                "my_extension",
+                TypeBound::Copyable,
+            )),
+            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
+        ]);
+        assert_eq!(
+            t.to_string(),
+            "Tuple([usize([]), Function([[]][]), my_custom([]), Alias(my_alias)])".to_string()
+        );
+    }
+
+    #[test]
+    fn sum_construct() {
+        let pred1 = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
+        let pred2 = Type::new_simple_predicate(2);
+
+        assert_eq!(pred1, pred2);
+
+        let pred_direct = SumType::Simple { size: 2 };
+        assert_eq!(pred1, pred_direct.into())
     }
 }

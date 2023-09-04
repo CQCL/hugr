@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{SimpleType, TypeRow};
+use crate::types::{Type, TypeRow};
 use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -123,8 +123,8 @@ impl ValidateOp for super::DFG {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         validate_io_nodes(
-            &self.signature.input,
-            &self.signature.output,
+            &self.signature().input,
+            &self.signature().output,
             "nested graph",
             children,
         )
@@ -160,7 +160,9 @@ impl ValidateOp for super::Conditional {
         // Each child must have its predicate variant's row and the rest of `inputs` as input,
         // and matching output
         for (i, (child, optype)) in children.into_iter().enumerate() {
-            let OpType::Case(case_op) = optype else {panic!("Child check should have already checked valid ops.")};
+            let OpType::Case(case_op) = optype else {
+                panic!("Child check should have already checked valid ops.")
+            };
             let sig = &case_op.signature;
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
@@ -225,7 +227,7 @@ impl ValidateOp for super::CFG {
     }
 }
 /// Errors that can occur while checking the children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum ChildrenValidationError {
     /// An CFG graph has an exit operation as a non-second child.
@@ -274,7 +276,7 @@ impl ChildrenValidationError {
 }
 
 /// Errors that can occur while checking the edges between children of a node.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
@@ -295,7 +297,7 @@ impl EdgeValidationError {
 }
 
 /// Auxiliary structure passed as data to [`OpValidityFlags::edge_check`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChildrenEdgeData {
     /// Source child.
     pub source: NodeIndex,
@@ -342,7 +344,7 @@ impl ValidateOp for BasicBlock {
                 predicate_variants,
                 other_outputs: outputs,
             } => {
-                let predicate_type = SimpleType::new_predicate(predicate_variants.clone());
+                let predicate_type = Type::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
@@ -437,9 +439,10 @@ fn validate_io_nodes<'a>(
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
     let [source, target]: [&BasicBlock; 2] = [&edge.source_op, &edge.target_op].map(|op| {
-        let OpType::BasicBlock(block_op) = op else {panic!("CFG sibling graphs can only contain basic block operations.")};
+        let OpType::BasicBlock(block_op) = op else {
+            panic!("CFG sibling graphs can only contain basic block operations.")
+        };
         block_op
-
     });
 
     if source.successor_input(edge.source_port.index()).as_ref() != Some(target.dataflow_input()) {
@@ -451,30 +454,21 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::ops;
-    use crate::{
-        ops::dataflow::IOTrait,
-        ops::LeafOp,
-        type_row,
-        types::{ClassicType, SimpleType},
-    };
+    use crate::extension::prelude::USIZE_T;
+    use crate::{ops, type_row};
+    use crate::{ops::dataflow::IOTrait, ops::LeafOp};
     use cool_asserts::assert_matches;
 
     use super::*;
 
     #[test]
     fn test_validate_io_nodes() {
-        const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-
-        let in_types = type_row![B];
-        let out_types = type_row![B, B];
+        let in_types: TypeRow = type_row![USIZE_T];
+        let out_types: TypeRow = type_row![USIZE_T, USIZE_T];
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = LeafOp::Noop {
-            ty: ClassicType::bit().into(),
-        }
-        .into();
+        let leaf_node = LeafOp::Noop { ty: USIZE_T }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
@@ -527,6 +521,6 @@ impl_validate_op!(Input);
 impl_validate_op!(Output);
 impl_validate_op!(Const);
 impl_validate_op!(Call);
-impl_validate_op!(CallIndirect);
 impl_validate_op!(LoadConstant);
+impl_validate_op!(CallIndirect);
 impl_validate_op!(LeafOp);

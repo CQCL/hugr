@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use super::{
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
@@ -7,14 +5,16 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{hugr::view::HugrView, type_row, types::SimpleType};
-
-use crate::ops::handle::NodeHandle;
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::Signature;
+use crate::{extension::ExtensionRegistry, types::FunctionType};
+use crate::{hugr::views::HugrView, types::TypeRow};
+use crate::{ops::handle::NodeHandle, types::Type};
 
 use crate::Node;
-use crate::{hugr::HugrMut, types::TypeRow, Hugr};
+use crate::{
+    hugr::{HugrMut, NodeType},
+    type_row, Hugr,
+};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph
@@ -62,15 +62,19 @@ impl CFGBuilder<Hugr> {
             outputs: output.clone(),
         };
 
-        let base = Hugr::new(cfg_op);
+        // TODO: Allow input extensions to be specified
+        let base = Hugr::new(NodeType::open_extensions(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.validate()?;
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, crate::hugr::ValidationError> {
+        self.base.infer_and_validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -88,6 +92,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         });
         let exit_node = base
             .as_mut()
+            // Make the extensions a parameter
             .add_op_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
@@ -95,21 +100,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             n_out_wires,
             exit_node,
             inputs: Some(input),
-        })
-    }
-
-    /// Create a CFGBuilder for an existing CFG node (that already has entry + exit nodes)
-    pub(crate) fn from_existing(base: B, cfg_node: Node) -> Result<Self, BuildError> {
-        let OpType::CFG(crate::ops::controlflow::CFG {outputs, ..}) = base.get_optype(cfg_node)
-            else {return Err(BuildError::UnexpectedType{node: cfg_node, op_desc: "Any CFG"});};
-        let n_out_wires = outputs.len();
-        let (_, exit_node) = base.children(cfg_node).take(2).collect_tuple().unwrap();
-        Ok(Self {
-            base,
-            cfg_node,
-            inputs: None, // This will prevent creating an entry node
-            exit_node,
-            n_out_wires,
         })
     }
 
@@ -144,8 +134,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let parent = self.container_node();
         let block_n = if entry {
             let exit = self.exit_node;
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
+            // TODO: Make extensions a parameter
             self.hugr_mut().add_op_with_parent(parent, op)
         }?;
 
@@ -239,7 +231,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
+        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(
         base: B,
@@ -249,15 +241,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         inputs: TypeRow,
     ) -> Result<Self, BuildError> {
         // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = SimpleType::new_predicate(predicate_variants);
+        let predicate_type = Type::new_predicate(predicate_variants);
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
-        let signature = Signature::new_df(inputs, TypeRow::from(node_outputs));
-        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
+        let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
+        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
-}
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+
     /// [Set outputs](BlockBuilder::set_outputs) and [finish](`BlockBuilder::finish_sub_container`).
     pub fn finish_with_outputs(
         mut self,
@@ -288,21 +279,32 @@ impl BlockBuilder<Hugr> {
             predicate_variants: predicate_variants.clone(),
         };
 
-        let base = Hugr::new(op);
+        // TODO: Allow input extensions to be specified
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
+    }
+
+    /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
+    pub fn finish_hugr_with_outputs(
+        mut self,
+        branch_wire: Wire,
+        outputs: impl IntoIterator<Item = Wire>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, BuildError> {
+        self.set_outputs(branch_wire, outputs)?;
+        self.finish_hugr(extension_registry)
+            .map_err(BuildError::InvalidHUGR)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
-
-    use cool_asserts::assert_matches;
-
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
-    use crate::{builder::test::NAT, ops::ConstValue, type_row, types::Signature};
+
+    use crate::{builder::test::NAT, type_row};
+    use cool_asserts::assert_matches;
 
     use super::*;
     #[test]
@@ -310,7 +312,7 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", Signature::new_df(vec![NAT], type_row![NAT]))?;
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).pure())?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
@@ -324,7 +326,7 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_hugr()
+            module_builder.finish_prelude_hugr()
         };
 
         assert_eq!(build_result.err(), None);
@@ -335,36 +337,7 @@ mod test {
     fn basic_cfg_hugr() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
-
-        Ok(())
-    }
-    #[test]
-    fn from_existing() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
-        build_basic_cfg(&mut cfg_builder)?;
-        let h = cfg_builder.finish_hugr()?;
-
-        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
-        assert_matches!(new_builder.simple_entry_builder(type_row![NAT], 1), Err(_));
-        let h2 = new_builder.finish_hugr()?;
-        assert_eq!(h, h2); // No new nodes added
-
-        let mut new_builder = CFGBuilder::from_existing(h.clone(), h.root())?;
-        let block_builder = new_builder.simple_block_builder(
-            vec![SimpleType::new_simple_predicate(1), NAT].into(),
-            type_row![NAT],
-            1,
-        )?;
-        let new_bb = block_builder.container_node();
-        let [pred, nat]: [Wire; 2] = block_builder.input_wires_arr();
-        block_builder.finish_with_outputs(pred, [nat])?;
-        let h2 = new_builder.finish_hugr()?;
-        let expected_nodes = h
-            .children(h.root())
-            .chain([new_bb])
-            .collect::<HashSet<Node>>();
-        assert_eq!(expected_nodes, HashSet::from_iter(h2.children(h2.root())));
+        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
 
         Ok(())
     }
@@ -382,7 +355,7 @@ mod test {
         };
         let mut middle_b = cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ConstValue::simple_unary_predicate())?;
+            let c = middle_b.add_load_const(ops::Const::simple_unary_predicate())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

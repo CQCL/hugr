@@ -1,15 +1,20 @@
 //! Dataflow operations.
 
-use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
 
-use crate::resource::ResourceSet;
-use crate::types::{ClassicType, EdgeKind, Signature, SimpleType, TypeRow};
+use crate::extension::ExtensionSet;
+use crate::ops::StaticTag;
+use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 
 pub(super) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> FunctionType;
+
+    /// Get the static input type of this operation if it has one.
+    fn static_input(&self) -> Option<Type> {
+        None
+    }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -30,10 +35,8 @@ pub(super) trait DataflowOpTrait {
 
 /// Helpers to construct input and output nodes
 pub trait IOTrait {
-    /// Construct a new I/O node from a type row with no resource requirements
+    /// Construct a new I/O node from a type row with no extension requirements
     fn new(types: impl Into<TypeRow>) -> Self;
-    /// Helper method to add resource requirements to an I/O node
-    fn with_resources(self, rs: ResourceSet) -> Self;
 }
 
 /// An input node.
@@ -42,8 +45,6 @@ pub trait IOTrait {
 pub struct Input {
     /// Input value types
     pub types: TypeRow,
-    /// Resources attached to output wires
-    pub resources: ResourceSet,
 }
 
 impl_op_name!(Input);
@@ -52,13 +53,7 @@ impl IOTrait for Input {
     fn new(types: impl Into<TypeRow>) -> Self {
         Input {
             types: types.into(),
-            resources: ResourceSet::new(),
         }
-    }
-
-    fn with_resources(mut self, resources: ResourceSet) -> Self {
-        self.resources = resources;
-        self
     }
 }
 
@@ -67,8 +62,6 @@ impl IOTrait for Input {
 pub struct Output {
     /// Output value types
     pub types: TypeRow,
-    /// Resources expected from input wires
-    pub resources: ResourceSet,
 }
 
 impl_op_name!(Output);
@@ -77,13 +70,7 @@ impl IOTrait for Output {
     fn new(types: impl Into<TypeRow>) -> Self {
         Output {
             types: types.into(),
-            resources: ResourceSet::new(),
         }
-    }
-
-    fn with_resources(mut self, resources: ResourceSet) -> Self {
-        self.resources = resources;
-        self
     }
 }
 
@@ -98,10 +85,9 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> Signature {
-        let mut sig = Signature::new_df(TypeRow::new(), self.types.clone());
-        sig.output_resources = self.resources.clone();
-        sig
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(TypeRow::new(), self.types.clone())
+            .with_extension_delta(&ExtensionSet::new())
     }
 }
 impl DataflowOpTrait for Output {
@@ -111,10 +97,10 @@ impl DataflowOpTrait for Output {
         "The output node for this dataflow subgraph"
     }
 
-    fn signature(&self) -> Signature {
-        let mut sig = Signature::new_df(self.types.clone(), TypeRow::new());
-        sig.input_resources = self.resources.clone();
-        sig
+    // Note: We know what the input extensions should be, so we *could* give an
+    // instantiated Signature instead
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -129,7 +115,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         DataflowOpTrait::signature(self)
     }
     fn other_input(&self) -> Option<EdgeKind> {
@@ -138,6 +124,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
+    }
+
+    fn static_input(&self) -> Option<Type> {
+        DataflowOpTrait::static_input(self)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -152,7 +142,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 impl_op_name!(Call);
 
@@ -163,11 +153,13 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn signature(&self) -> Signature {
-        Signature {
-            static_input: vec![ClassicType::graph_from_sig(self.signature.clone()).into()].into(),
-            ..self.signature.clone()
-        }
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        Some(Type::new_function(self.signature.clone()))
     }
 }
 
@@ -175,7 +167,7 @@ impl DataflowOpTrait for Call {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
     /// Signature of function being called
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 impl_op_name!(CallIndirect);
 
@@ -186,12 +178,11 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let mut s = self.signature.clone();
-        s.input.to_mut().insert(
-            0,
-            ClassicType::graph_from_sig(self.signature.clone()).into(),
-        );
+        s.input
+            .to_mut()
+            .insert(0, Type::new_function(self.signature.clone()));
         s
     }
 }
@@ -200,7 +191,7 @@ impl DataflowOpTrait for CallIndirect {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LoadConstant {
     /// Constant type
-    pub datatype: ClassicType,
+    pub datatype: Type,
 }
 impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
@@ -210,12 +201,13 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(
-            TypeRow::new(),
-            vec![SimpleType::Classic(self.datatype.clone())],
-            vec![SimpleType::Classic(self.datatype.clone())],
-        )
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
+    }
+
+    #[inline]
+    fn static_input(&self) -> Option<Type> {
+        Some(self.datatype.clone())
     }
 }
 
@@ -223,7 +215,7 @@ impl DataflowOpTrait for LoadConstant {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DFG {
     /// Signature of DFG node
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(DFG);
@@ -234,7 +226,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }

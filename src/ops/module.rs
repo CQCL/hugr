@@ -2,7 +2,8 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{ClassicType, EdgeKind, Signature, SimpleType};
+use crate::types::{EdgeKind, FunctionType};
+use crate::types::{Type, TypeBound};
 
 use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
@@ -35,7 +36,7 @@ pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(FuncDefn);
@@ -52,9 +53,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(ClassicType::graph_from_sig(
-            self.signature.clone(),
-        )))
+        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }
 
@@ -64,7 +63,7 @@ pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(FuncDecl);
@@ -81,9 +80,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(ClassicType::graph_from_sig(
-            self.signature.clone(),
-        )))
+        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }
 
@@ -93,7 +90,7 @@ pub struct AliasDefn {
     /// Alias name
     pub name: SmolStr,
     /// Aliased type
-    pub definition: SimpleType,
+    pub definition: Type,
 }
 impl_op_name!(AliasDefn);
 impl StaticTag for AliasDefn {
@@ -115,7 +112,22 @@ pub struct AliasDecl {
     /// Alias name
     pub name: SmolStr,
     /// Flag to signify type is classical
-    pub classical: bool,
+    pub bound: TypeBound,
+}
+
+impl AliasDecl {
+    /// Construct a new Alias declaration.
+    pub fn new(name: impl Into<SmolStr>, bound: TypeBound) -> Self {
+        Self {
+            name: name.into(),
+            bound,
+        }
+    }
+
+    /// Returns a reference to the name of this [`AliasDecl`].
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
 }
 
 impl_op_name!(AliasDecl);

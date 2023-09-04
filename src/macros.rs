@@ -31,26 +31,26 @@ pub(crate) use impl_box_clone;
 /// Creates a [`TypeRow`] backed by statically defined data, avoiding
 /// allocations.
 ///
-/// The parameters must be constants of type [`SimpleType`].
+/// The parameters must be constants of type [`Type`].
 ///
 /// For type rows that cannot be statically defined, use a vector or slice with
 /// [`TypeRow::from`] instead.
 ///
-/// [`SimpleType`]: crate::types::SimpleType
+/// [`Type`]: crate::types::Type
 /// [`TypeRow`]: crate::types::TypeRow
 /// [`TypeRow::from`]: crate::types::TypeRow::from
 ///
 /// Example:
 /// ```
 /// # use hugr::macros::type_row;
-/// # use hugr::types::{ClassicType, SimpleType, Signature, TypeRow};
-/// const B: SimpleType = SimpleType::Classic(ClassicType::bit());
-/// let static_row: TypeRow = type_row![B, B];
-/// let dynamic_row: TypeRow = vec![B, B, B].into();
-/// let sig: Signature = Signature::new_df(static_row.clone(), dynamic_row);
+/// # use hugr::types::{FunctionType, Type, TypeRow};
+/// const U: Type = Type::UNIT;
+/// let static_row: TypeRow = type_row![U, U];
+/// let dynamic_row: TypeRow = vec![U, U, U].into();
+/// let sig = FunctionType::new(static_row, dynamic_row).pure();
 ///
-/// let repeated_row: TypeRow = type_row![B; 2];
-/// assert_eq!(repeated_row, static_row);
+/// let repeated_row: TypeRow = type_row![U; 3];
+/// assert_eq!(repeated_row, *sig.output());
 /// ```
 #[allow(unused_macros)]
 #[macro_export]
@@ -63,7 +63,7 @@ macro_rules! type_row {
     ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
-            static ROW: &[types::SimpleType] = &[$($t),*];
+            static ROW: &[types::Type] = &[$($t),*];
             let row: types::TypeRow = ROW.into();
             row
         }
@@ -71,11 +71,12 @@ macro_rules! type_row {
     ($t:expr; $n:expr) => {
         {
             use $crate::types;
-            static ROW: &[types::SimpleType] = &[$t; $n];
+            static ROW: &[types::Type] = &[$t; $n];
             let row: types::TypeRow = ROW.into();
             row
         }
     };
 }
+
 #[allow(unused_imports)]
 pub use type_row;

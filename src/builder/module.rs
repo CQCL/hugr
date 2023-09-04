@@ -5,9 +5,10 @@ use super::{
 };
 
 use crate::{
-    hugr::{view::HugrView, ValidationError},
+    extension::ExtensionRegistry,
+    hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
-    types::SimpleType,
+    types::{Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -18,7 +19,7 @@ use crate::types::Signature;
 use crate::Node;
 use smol_str::SmolStr;
 
-use crate::{hugr::HugrMut, Hugr};
+use crate::{hugr::NodeType, Hugr};
 
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
@@ -55,8 +56,11 @@ impl Default for ModuleBuilder<Hugr> {
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, ValidationError> {
-        self.0.validate()?;
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, ValidationError> {
+        self.0.infer_and_validate(extension_registry)?;
         Ok(self.0)
     }
 }
@@ -86,13 +90,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            ops::FuncDefn {
+            NodeType::pure(ops::FuncDefn {
                 name,
                 signature: signature.clone(),
-            },
+            }),
         );
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -108,10 +112,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: Signature,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_op(ops::FuncDecl {
-            signature,
-            name: name.into(),
-        })?;
+        let rs = signature.input_extensions.clone();
+        let declare_n = self.add_child_node(NodeType::new(
+            ops::FuncDecl {
+                signature: signature.into(),
+                name: name.into(),
+            },
+            rs,
+        ))?;
 
         Ok(declare_n.into())
     }
@@ -124,7 +132,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
-        typ: SimpleType,
+        typ: Type,
     ) -> Result<AliasID<true>, BuildError> {
         // TODO: add AliasDefn in other containers
         // This is currently tricky as they are not connected to anything so do
@@ -132,13 +140,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // Could be fixed by removing single-entry requirement and sorting from
         // every 0-input node.
         let name: SmolStr = name.into();
-        let classical = typ.is_classical();
+        let bound = typ.least_upper_bound();
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         })?;
 
-        Ok(AliasID::new(node, name, classical))
+        Ok(AliasID::new(node, name, bound))
     }
 
     /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
@@ -148,15 +156,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
-        classical: bool,
+        bound: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
-            classical,
+            bound,
         })?;
 
-        Ok(AliasID::new(node, name, classical))
+        Ok(AliasID::new(node, name, bound))
     }
 }
 
@@ -169,7 +177,9 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
+        extension::EMPTY_REG,
         type_row,
+        types::FunctionType,
     };
 
     use super::*;
@@ -178,14 +188,16 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_id = module_builder
-                .declare("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let f_id = module_builder.declare(
+                "main",
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+            )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
             let call = f_build.call(&f_id, f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
+            module_builder.finish_prelude_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -196,17 +208,19 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let qubit_state_type = module_builder.add_alias_declare("qubit_state", false)?;
+            let qubit_state_type =
+                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new_df(
+                FunctionType::new(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
-                ),
+                )
+                .pure(),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr()
+            module_builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
@@ -217,17 +231,21 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new_df(type_row![NAT], type_row![NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new_df(type_row![NAT], type_row![NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;
 
             let call = f_build.call(f_id.handle(), f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
+            module_builder.finish_prelude_hugr()
         };
         assert_matches!(build_result, Ok(_));
         Ok(())

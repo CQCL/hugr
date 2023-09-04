@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use super::nest_cfgs::{CfgView, SimpleCfgView};
 use crate::builder::{BuildError, CFGBuilder, Dataflow, SubContainer};
-use crate::hugr::view::HugrView;
+use crate::hugr::views::HugrView;
 use crate::hugr::HugrMut;
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTag;
@@ -236,7 +236,14 @@ mod test {
             .map(|(s, _)| s)
             .exactly_one()
             .unwrap();
-        let [&left,&right] = edge_classes.keys().filter(|(s,_)| *s == split).map(|(_,t)|t).collect::<Vec<_>>()[..] else {panic!("Split node should have two successors");};
+        let [&left, &right] = edge_classes
+            .keys()
+            .filter(|(s, _)| *s == split)
+            .map(|(_, t)| t)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("Split node should have two successors");
+        };
         let classes = group_by(edge_classes);
         assert_eq!(
             classes,

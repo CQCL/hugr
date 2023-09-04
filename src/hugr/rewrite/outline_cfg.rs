@@ -4,12 +4,13 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::builder::{CFGBuilder, Container, Dataflow, SubContainer};
+use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
+use crate::extension::PRELUDE_REGISTRY;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{BasicBlock, ConstValue, OpType};
-use crate::{type_row, Hugr, Node};
+use crate::ops;
+use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
+use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
 /// that is the only child of a new Basic Block in the original CSG.
@@ -25,7 +26,10 @@ impl OutlineCfg {
         }
     }
 
-    fn compute_entry_exit_outside(&self, h: &Hugr) -> Result<(Node, Node, Node), OutlineCfgError> {
+    fn compute_entry_exit_outside(
+        &self,
+        h: &impl HugrView,
+    ) -> Result<(Node, Node, Node), OutlineCfgError> {
         let cfg_n = match self
             .blocks
             .iter()
@@ -81,53 +85,58 @@ impl OutlineCfg {
 
 impl Rewrite for OutlineCfg {
     type Error = OutlineCfgError;
+    type ApplyResult = ();
+
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, h: &Hugr) -> Result<(), OutlineCfgError> {
+    fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut Hugr) -> Result<(), OutlineCfgError> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<(), OutlineCfgError> {
         let (entry, exit, outside) = self.compute_entry_exit_outside(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let OpType::BasicBlock(BasicBlock::DFB {inputs, ..}) = h.get_optype(entry)
-            else {panic!("Entry node is not a basic block")};
+        let OpType::BasicBlock(BasicBlock::DFB { inputs, .. }) = h.get_optype(entry) else {
+            panic!("Entry node is not a basic block")
+        };
         let inputs = inputs.clone();
         let outputs = match h.get_optype(outside) {
             OpType::BasicBlock(b) => b.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };
-        let is_outer_entry = h.children(h.get_parent(entry).unwrap()).next().unwrap() == entry;
+        let outer_cfg = h.get_parent(entry).unwrap();
+        let outer_entry = h.children(outer_cfg).next().unwrap();
 
-        // 2. New CFG node will be contained in new single-successor BB
-        let mut existing_cfg = {
-            let parent = h.get_parent(entry).unwrap();
-            CFGBuilder::from_existing(h, parent).unwrap()
+        // 2. new_block contains input node, sub-cfg, exit node all connected
+        let new_block = {
+            let mut new_block_bldr =
+                BlockBuilder::new(inputs.clone(), vec![type_row![]], outputs.clone()).unwrap();
+            let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
+            let cfg = new_block_bldr.cfg_builder(wires_in, outputs).unwrap();
+            cfg.exit_block(); // Makes inner exit block (but no entry block)
+            let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+            let predicate = new_block_bldr
+                .add_constant(ops::Const::simple_unary_predicate())
+                .unwrap();
+            let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
+            let new_block_hugr = new_block_bldr
+                .finish_hugr_with_outputs(pred_wire, cfg_outputs, &PRELUDE_REGISTRY)
+                .unwrap();
+            h.insert_hugr(outer_cfg, new_block_hugr).unwrap()
         };
-        let mut new_block = existing_cfg
-            .block_builder(inputs.clone(), vec![type_row![]], outputs.clone())
-            .unwrap();
 
-        // 3. new_block contains input node, sub-cfg, exit node all connected
-        let wires_in = inputs.iter().cloned().zip(new_block.input_wires());
-        let cfg = new_block.cfg_builder(wires_in, outputs).unwrap();
-        let cfg_node = cfg.container_node();
-        let inner_exit = cfg.exit_block().node();
-        let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
-        let predicate = new_block
-            .add_constant(ConstValue::simple_predicate(0, 1))
+        // 3. Extract Cfg node created above (it moved when we called insert_hugr)
+        let cfg_node = h
+            .children(new_block)
+            .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
+            .exactly_one()
+            .ok() // HugrMut::Children is not Debug
             .unwrap();
-        let pred_wire = new_block.load_const(&predicate).unwrap();
-        let new_block = new_block
-            .finish_with_outputs(pred_wire, cfg_outputs)
-            .unwrap()
-            .node();
+        let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
-        let h = existing_cfg.hugr_mut();
-
         let preds: Vec<_> = h
-            .linked_ports(entry, h.node_inputs(entry).exactly_one().unwrap())
+            .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
@@ -135,27 +144,20 @@ impl Rewrite for OutlineCfg {
                 h.connect(pred, br.index(), new_block, 0).unwrap();
             }
         }
-        if is_outer_entry {
+        if entry == outer_entry {
             // new_block must be the entry node, i.e. first child, of the enclosing CFG
             // (the current entry node will be reparented inside new_block below)
-            let parent = h.hierarchy.detach(new_block.index).unwrap();
-            h.hierarchy
-                .push_front_child(new_block.index, parent)
-                .unwrap();
+            h.move_before_sibling(new_block, outer_entry).unwrap();
         }
 
         // 5. Children of new CFG.
         // Entry node must be first
-        h.hierarchy.detach(entry.index);
-        h.hierarchy
-            .insert_before(entry.index, inner_exit.index)
-            .unwrap();
+        h.move_before_sibling(entry, inner_exit).unwrap();
         // And remaining nodes
         for n in self.blocks {
             // Do not move the entry node, as we have already
             if n != entry {
-                h.hierarchy.detach(n.index);
-                h.hierarchy.push_child(n.index, cfg_node.index).unwrap();
+                h.set_parent(n, cfg_node).unwrap();
             }
         }
 
@@ -169,6 +171,7 @@ impl Rewrite for OutlineCfg {
                 t == outside
             })
             .exactly_one()
+            .ok() // NodePorts does not implement Debug
             .unwrap();
         h.disconnect(exit, exit_port).unwrap();
         h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
@@ -212,6 +215,7 @@ mod test {
     use crate::algorithm::nest_cfgs::test::{
         build_cond_then_loop_cfg, build_conditional_in_loop_cfg, depth,
     };
+    use crate::extension::PRELUDE_REGISTRY;
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
     use cool_asserts::assert_matches;
@@ -230,7 +234,7 @@ mod test {
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let backup = h.clone();
         let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
@@ -263,10 +267,10 @@ mod test {
         for n in [head, tail, merge] {
             assert_eq!(depth(&h, n), 1);
         }
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         for n in blocks {
             assert_eq!(depth(&h, n), 3);
         }
@@ -293,7 +297,7 @@ mod test {
         let (merge, tail) = (merge.node(), tail.node());
         let head = h.output_neighbours(merge).exactly_one().unwrap();
 
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let blocks_to_move = [entry, left, right, merge];
         let other_blocks = [head, tail, exit];
         for &n in blocks_to_move.iter().chain(other_blocks.iter()) {
@@ -301,7 +305,7 @@ mod test {
         }
         h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.validate().unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let new_entry = h.children(h.root()).next().unwrap();
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
