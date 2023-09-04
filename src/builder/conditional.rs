@@ -129,7 +129,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
                 // TODO: Allow this to be non-pure
                 self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
-                // TODO: Allow this to be non-pure
                 self.add_child_op(case_op)?
             };
 
@@ -178,7 +177,7 @@ impl ConditionalBuilder<Hugr> {
             extension_delta,
         };
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -196,8 +195,7 @@ impl CaseBuilder<Hugr> {
         let op = ops::Case {
             signature: signature.clone(),
         };
-        // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
 

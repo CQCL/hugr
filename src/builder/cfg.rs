@@ -63,7 +63,7 @@ impl CFGBuilder<Hugr> {
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(cfg_op));
+        let base = Hugr::new(NodeType::open_extensions(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
@@ -280,7 +280,7 @@ impl BlockBuilder<Hugr> {
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }
