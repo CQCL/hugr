@@ -132,12 +132,9 @@ impl TypeArg {
             TypeArg::Opaque(custarg) => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
-                // Moreover, passing the type_vars here means the constant could itself have a
-                // type polymorphic in those vars - e.g. empty lists. User beware?!
-                // TODO are we going deeper than we *need* here - would it be ok (not too restrictive) to insist,
-                // no type vars here? Or,
-                // TODO are we going deeper than *is correct* here, i.e. allowing dependent type(params) or something?
-                custarg.typ.validate(extension_registry, type_vars)
+                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
+                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
+                custarg.typ.validate(extension_registry, &[])
             }
             TypeArg::Sequence(args) => args
                 .iter()
@@ -160,13 +157,11 @@ impl TypeArg {
         match self {
             TypeArg::Type(t) => TypeArg::Type(t.substitute(args)),
             TypeArg::BoundedNat(_) => self.clone(), // We do not allow variables as bounds on BoundedNat's
-            TypeArg::Opaque(CustomTypeArg { typ, value }) => {
-                // Allow substitution (e.g. empty list)...note TODO above:
-                //       is there demand for this, is it actually correct?
-                TypeArg::Opaque(CustomTypeArg {
-                    typ: typ.substitute(args),
-                    value: value.clone(),
-                })
+            TypeArg::Opaque(CustomTypeArg { typ, .. }) => {
+                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
+                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
+                debug_assert_eq!(&typ.substitute(args), typ);
+                self.clone()
             }
             TypeArg::Sequence(elems) => {
                 TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(args)).collect())
