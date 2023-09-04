@@ -1,7 +1,6 @@
 //! The Hugr data structure, and its basic component handles.
 
 pub mod hugrmut;
-//pub mod lens;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -24,7 +23,9 @@ use thiserror::Error;
 use pyo3::prelude::*;
 
 pub use self::views::HugrView;
-use crate::extension::ExtensionSet;
+use crate::extension::{
+    infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
+};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Signature};
 
@@ -189,8 +190,45 @@ pub type Direction = portgraph::Direction;
 /// Public API for HUGRs.
 impl Hugr {
     /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<E>(&mut self, rw: impl Rewrite<Error = E>) -> Result<(), E> {
+    pub fn apply_rewrite<R, E>(
+        &mut self,
+        rw: impl Rewrite<ApplyResult = R, Error = E>,
+    ) -> Result<R, E> {
         rw.apply(self)
+    }
+
+    /// Run resource inference and pass the closure into validation
+    pub fn infer_and_validate(
+        &mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), ValidationError> {
+        let closure = self.infer_extensions()?;
+        self.validate_with_extension_closure(closure, extension_registry)?;
+        Ok(())
+    }
+
+    /// Infer extension requirements and add new information to `op_types` field
+    ///
+    /// See [`infer_extensions`] for details on the "closure" value
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+        let (solution, extension_closure) = infer_extensions(self)?;
+        self.instantiate_extensions(solution);
+        Ok(extension_closure)
+    }
+
+    /// Add extension requirement information to the hugr in place.
+    fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
+        // We only care about inferred _input_ extensions, because `NodeType`
+        // uses those to infer the output extensions
+        for (node, input_extensions) in solution.iter() {
+            let nodetype = self.op_types.try_get_mut(node.index).unwrap();
+            match &nodetype.input_extensions {
+                None => nodetype.input_extensions = Some(input_extensions.clone()),
+                Some(existing_ext_reqs) => {
+                    debug_assert_eq!(existing_ext_reqs, input_extensions)
+                }
+            }
+        }
     }
 }
 
@@ -222,6 +260,21 @@ impl Hugr {
             op_types,
             metadata: UnmanagedDenseMap::with_capacity(nodes),
         }
+    }
+
+    /// Add a node to the graph, with the default conversion from OpType to NodeType
+    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
+        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
+        self.add_node(NodeType::pure(op))
+    }
+
+    /// Add a node to the graph.
+    pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
+        let node = self
+            .graph
+            .add_node(nodetype.input_count(), nodetype.output_count());
+        self.op_types[node] = nodetype;
+        node.into()
     }
 
     /// Produce a canonical ordering of the descendant nodes of a root,
@@ -360,6 +413,18 @@ pub enum CircuitUnit {
     Linear(usize),
 }
 
+impl CircuitUnit {
+    /// Check if this is a wire.
+    pub fn is_wire(&self) -> bool {
+        matches!(self, CircuitUnit::Wire(_))
+    }
+
+    /// Check if this is a linear unit.
+    pub fn is_linear(&self) -> bool {
+        matches!(self, CircuitUnit::Linear(_))
+    }
+}
+
 impl From<usize> for CircuitUnit {
     fn from(value: usize) -> Self {
         CircuitUnit::Linear(value)
@@ -385,11 +450,8 @@ pub enum HugrError {
     #[error("An error occurred while manipulating the hierarchy.")]
     HierarchyError(#[from] portgraph::hierarchy::AttachError),
     /// The node doesn't exist.
-    #[error("Invalid node {node:?}.")]
-    InvalidNode {
-        /// The missing node
-        node: Node,
-    },
+    #[error("Invalid node {0:?}.")]
+    InvalidNode(Node),
 }
 
 #[cfg(feature = "pyo3")]
@@ -402,7 +464,15 @@ impl From<HugrError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use super::Hugr;
+    use super::{Hugr, HugrView, NodeType};
+    use crate::builder::test::closed_dfg_root_hugr;
+    use crate::extension::ExtensionSet;
+    use crate::hugr::HugrMut;
+    use crate::ops;
+    use crate::type_row;
+    use crate::types::{FunctionType, Type};
+
+    use std::error::Error;
 
     #[test]
     fn impls_send_and_sync() {
@@ -410,5 +480,52 @@ mod test {
         // This test will fail to compile if that wasn't possible.
         trait Test: Send + Sync {}
         impl Test for Hugr {}
+    }
+
+    #[test]
+    fn io_node() {
+        use crate::builder::test::simple_dfg_hugr;
+        use crate::hugr::views::HugrView;
+        use cool_asserts::assert_matches;
+
+        let hugr = simple_dfg_hugr();
+        assert_matches!(hugr.get_io(hugr.root()), Some(_));
+    }
+
+    #[test]
+    fn extension_instantiation() -> Result<(), Box<dyn Error>> {
+        const BIT: Type = crate::extension::prelude::USIZE_T;
+        let r = ExtensionSet::singleton(&"R".into());
+
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+        );
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
+        let lift = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::LeafOp::Lift {
+                type_row: type_row![BIT],
+                new_extension: "R".into(),
+            }),
+        )?;
+        hugr.connect(input, 0, lift, 0)?;
+        hugr.connect(lift, 0, output, 0)?;
+        hugr.infer_extensions()?;
+
+        assert_eq!(
+            hugr.get_nodetype(lift)
+                .signature()
+                .unwrap()
+                .input_extensions,
+            ExtensionSet::new()
+        );
+        assert_eq!(
+            hugr.get_nodetype(output)
+                .signature()
+                .unwrap()
+                .input_extensions,
+            r
+        );
+        Ok(())
     }
 }

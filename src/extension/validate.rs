@@ -5,10 +5,9 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use super::{ExtensionSet, ExtensionSolution};
 use crate::hugr::NodeType;
 use crate::{Direction, Hugr, HugrView, Node, Port};
-
-use super::ExtensionSet;
 
 /// Context for validating the extension requirements defined in a Hugr.
 #[derive(Debug, Clone, Default)]
@@ -20,10 +19,20 @@ pub struct ExtensionValidator {
 impl ExtensionValidator {
     /// Initialise a new extension validator, pre-computing the extension
     /// requirements for each node in the Hugr.
-    pub fn new(hugr: &Hugr) -> Self {
-        let mut validator = ExtensionValidator {
-            extensions: HashMap::new(),
-        };
+    ///
+    /// The `closure` argument is a set of extensions which doesn't actually
+    /// live on the graph, but is used to close the graph for validation
+    pub fn new(hugr: &Hugr, closure: ExtensionSolution) -> Self {
+        let mut extensions: HashMap<(Node, Direction), ExtensionSet> = HashMap::new();
+        for (node, incoming_sol) in closure.into_iter() {
+            let op_signature = hugr.get_nodetype(node).op_signature();
+            let outgoing_sol = op_signature.extension_reqs.union(&incoming_sol);
+
+            extensions.insert((node, Direction::Incoming), incoming_sol);
+            extensions.insert((node, Direction::Outgoing), outgoing_sol);
+        }
+
+        let mut validator = ExtensionValidator { extensions };
 
         for node in hugr.nodes() {
             validator.gather_extensions(&node, hugr.get_nodetype(node));
@@ -82,7 +91,7 @@ impl ExtensionValidator {
         } else if rs_src.is_subset(rs_tgt) {
             // The extra extension requirements reside in the target node.
             // If so, we can fix this mismatch with a lift node
-            Err(ExtensionError::TgtExceedsSrcExtensions {
+            Err(ExtensionError::TgtExceedsSrcExtensionsAtPort {
                 from: src.0,
                 from_offset: src.1,
                 from_extensions: rs_src.clone(),
@@ -91,7 +100,7 @@ impl ExtensionValidator {
                 to_extensions: rs_tgt.clone(),
             })
         } else {
-            Err(ExtensionError::SrcExceedsTgtExtensions {
+            Err(ExtensionError::SrcExceedsTgtExtensionsAtPort {
                 from: src.0,
                 from_offset: src.1,
                 from_extensions: rs_src.clone(),
@@ -141,8 +150,16 @@ impl ExtensionValidator {
 #[allow(missing_docs)]
 pub enum ExtensionError {
     /// Missing lift node
-    #[error("Extensions at target node {to:?} ({to_offset:?}) ({to_extensions}) exceed those at source {from:?} ({from_offset:?}) ({from_extensions})")]
+    #[error("Extensions at target node {to:?} ({to_extensions}) exceed those at source {from:?} ({from_extensions})")]
     TgtExceedsSrcExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
+    /// A version of the above which includes port info
+    #[error("Extensions at target node {to:?} ({to_offset:?}) ({to_extensions}) exceed those at source {from:?} ({from_offset:?}) ({from_extensions})")]
+    TgtExceedsSrcExtensionsAtPort {
         from: Node,
         from_offset: Port,
         from_extensions: ExtensionSet,
@@ -151,8 +168,16 @@ pub enum ExtensionError {
         to_extensions: ExtensionSet,
     },
     /// Too many extension requirements coming from src
-    #[error("Extensions at source node {from:?} ({from_offset:?}) ({from_extensions}) exceed those at target {to:?} ({to_offset:?}) ({to_extensions})")]
+    #[error("Extensions at source node {from:?} ({from_extensions}) exceed those at target {to:?} ({to_extensions})")]
     SrcExceedsTgtExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
+    /// A version of the above which includes port info
+    #[error("Extensions at source node {from:?} ({from_offset:?}) ({from_extensions}) exceed those at target {to:?} ({to_offset:?}) ({to_extensions})")]
+    SrcExceedsTgtExtensionsAtPort {
         from: Node,
         from_offset: Port,
         from_extensions: ExtensionSet,

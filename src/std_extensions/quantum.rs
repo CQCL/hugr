@@ -3,25 +3,25 @@
 use smol_str::SmolStr;
 
 use crate::extension::prelude::{BOOL_T, QB_T};
-use crate::extension::{ExtensionSet, SignatureError};
+use crate::extension::SignatureError;
+use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::type_row;
 use crate::types::type_param::TypeArg;
-use crate::types::TypeRow;
+use crate::types::FunctionType;
 use crate::Extension;
 
 use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("quantum");
-fn one_qb_func(_: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((type_row![QB_T], type_row![QB_T], ExtensionSet::new()))
+fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(type_row![QB_T], type_row![QB_T]))
 }
 
-fn two_qb_func(_: &[TypeArg]) -> Result<(TypeRow, TypeRow, ExtensionSet), SignatureError> {
-    Ok((
+fn two_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    Ok(FunctionType::new(
         type_row![QB_T, QB_T],
         type_row![QB_T, QB_T],
-        ExtensionSet::new(),
     ))
 }
 
@@ -36,6 +36,19 @@ fn extension() -> Extension {
             one_qb_func,
         )
         .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            SmolStr::new_inline("RzF64"),
+            "Rotation specified by float".into(),
+            vec![],
+            |_: &[_]| {
+                Ok(FunctionType::new(
+                    type_row![QB_T, FLOAT64_TYPE],
+                    type_row![QB_T],
+                ))
+            },
+        )
+        .unwrap();
 
     extension
         .add_op_custom_sig_simple(SmolStr::new_inline("CX"), "CX".into(), vec![], two_qb_func)
@@ -47,14 +60,10 @@ fn extension() -> Extension {
             "Measure a qubit, returning the qubit and the measurement result.".into(),
             vec![],
             |_arg_values: &[TypeArg]| {
-                Ok((
-                    type_row![QB_T],
-                    type_row![QB_T, BOOL_T],
-                    // TODO add logic as an extension delta when inference is
-                    // done?
-                    // https://github.com/CQCL-DEV/hugr/issues/425
-                    ExtensionSet::new(),
-                ))
+                Ok(FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]))
+                // TODO add logic as an extension delta when inference is
+                // done?
+                // https://github.com/CQCL-DEV/hugr/issues/425
             },
         )
         .unwrap();

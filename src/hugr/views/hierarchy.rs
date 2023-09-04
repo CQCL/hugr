@@ -29,7 +29,7 @@ use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
 use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
-type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
+type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
 
 /// View of a HUGR sibling graph.
 ///
@@ -107,6 +107,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <FlatRegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+       [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
@@ -179,6 +186,18 @@ where
             })
     }
 
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
+            })
+    }
+
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.graph.num_ports(node.index, dir)
@@ -216,7 +235,7 @@ where
     }
 }
 
-type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
+type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
 
 /// View of a HUGR descendants graph.
 ///
@@ -296,6 +315,13 @@ where
     > where
         Self: 'a;
 
+    type NodeConnections<'a> = MapWithCtx<
+        <RegionGraph<'g> as LinkView>::NodeConnections<'a>,
+        &'a Self,
+        [Port; 2],
+    > where
+        Self: 'a;
+
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
@@ -359,6 +385,18 @@ where
                 let node = region.graph.port_node(port).unwrap();
                 let offset = region.graph.port_offset(port).unwrap();
                 (node.into(), offset.into())
+            })
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.graph
+            .get_connections(node.index, other.index)
+            .with_context(self)
+            .map_with_context(|(p1, p2), hugr| {
+                [p1, p2].map(|link| {
+                    let offset = hugr.graph.port_offset(link).unwrap();
+                    offset.into()
+                })
             })
     }
 
@@ -431,7 +469,11 @@ where
         }
         Self {
             root,
-            graph: Self::init_graph(hugr, root),
+            graph: FlatRegionGraph::new_flat_region(
+                &hugr.base_hugr().graph,
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -453,7 +495,11 @@ where
         }
         Self {
             root,
-            graph: Self::init_graph(hugr, root),
+            graph: RegionGraph::new_region(
+                &hugr.base_hugr().graph,
+                &hugr.base_hugr().hierarchy,
+                root.index,
+            ),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -465,7 +511,7 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph<'p> = FlatRegionGraph<'p> where Self: 'p;
+    type Portgraph = FlatRegionGraph<'g>;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -488,7 +534,7 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph<'p> = RegionGraph<'p> where Self: 'p;
+    type Portgraph = RegionGraph<'g>;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -551,7 +597,7 @@ mod test {
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?;
             (f_id, inner_id)
         };
-        let hugr = module_builder.finish_hugr()?;
+        let hugr = module_builder.finish_prelude_hugr()?;
         Ok((hugr, f_id.handle().node(), inner_id.handle().node()))
     }
 

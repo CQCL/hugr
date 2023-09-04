@@ -10,9 +10,8 @@ use smol_str::SmolStr;
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::ExtensionSet;
 use crate::types::type_param::TypeArg;
-use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound, TypeRow};
+use crate::types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow};
 use crate::values::CustomConst;
 use crate::{ops, Extension};
 
@@ -47,7 +46,7 @@ pub fn extension() -> Extension {
             |_arg_values: &[TypeArg]| {
                 let t: TypeRow =
                     vec![Type::new_extension(RotationType::Angle.custom_type())].into();
-                Ok((t.clone(), t, ExtensionSet::default()))
+                Ok(FunctionType::new(t.clone(), t))
             },
         )
         .unwrap();

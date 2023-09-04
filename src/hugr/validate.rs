@@ -5,14 +5,18 @@ use std::iter;
 
 use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
-use petgraph::visit::{DfsPostOrder, Walker};
+use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 
-use crate::extension::validate::{ExtensionError, ExtensionValidator};
+use crate::extension::SignatureError;
+use crate::extension::{
+    validate::{ExtensionError, ExtensionValidator},
+    ExtensionRegistry, ExtensionSolution, InferExtensionError,
+};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -26,29 +30,49 @@ use super::NodeType;
 ///
 /// TODO: Consider implementing updatable dominator trees and storing it in the
 /// Hugr to avoid recomputing it every time.
-struct ValidationContext<'a> {
+struct ValidationContext<'a, 'b> {
     hugr: &'a Hugr,
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
-    /// Context for the resource validation.
+    /// Context for the extension validation.
     extension_validator: ExtensionValidator,
+    /// Registry of available Extensions
+    extension_registry: &'b ExtensionRegistry,
 }
 
 impl Hugr {
-    /// Check the validity of the HUGR.
-    pub fn validate(&self) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self);
+    /// Check the validity of the HUGR, assuming that it has no open extension
+    /// variables.
+    /// TODO: Add a version of validation which allows for open extension
+    /// variables (see github issue #457)
+    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
+        self.validate_with_extension_closure(HashMap::new(), extension_registry)
+    }
+
+    /// Check the validity of a hugr, taking an argument of a closure for the
+    /// free extension variables
+    pub fn validate_with_extension_closure(
+        &self,
+        closure: ExtensionSolution,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), ValidationError> {
+        let mut validator = ValidationContext::new(self, closure, extension_registry);
         validator.validate()
     }
 }
 
-impl<'a> ValidationContext<'a> {
+impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Create a new validation context.
-    pub fn new(hugr: &'a Hugr) -> Self {
+    pub fn new(
+        hugr: &'a Hugr,
+        extension_closure: ExtensionSolution,
+        extension_registry: &'b ExtensionRegistry,
+    ) -> Self {
         Self {
             hugr,
             dominators: HashMap::new(),
-            extension_validator: ExtensionValidator::new(hugr),
+            extension_validator: ExtensionValidator::new(hugr, extension_closure),
+            extension_registry,
         }
     }
 
@@ -137,8 +161,8 @@ impl<'a> ValidationContext<'a> {
         // Check operation-specific constraints
         self.validate_operation(node, node_type)?;
 
-        // If this is a container with I/O nodes, check that the resources they
-        // define match the resources of the container.
+        // If this is a container with I/O nodes, check that the extension they
+        // define match the extensions of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
             self.extension_validator
                 .validate_io_extensions(node, input, output)?;
@@ -183,6 +207,13 @@ impl<'a> ValidationContext<'a> {
         // Avoid double checking connected port types.
         if dir == Direction::Incoming {
             return Ok(());
+        }
+
+        match &port_kind {
+            EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
+                .validate(self.extension_registry)
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            _ => (),
         }
 
         let mut link_cnt = 0;
@@ -323,9 +354,7 @@ impl<'a> ValidationContext<'a> {
         Ok(())
     }
 
-    /// Ensure that the children of a node form a direct acyclic graph with a
-    /// single source and source. That is, their edges do not form cycles in the
-    /// graph and there are no dangling nodes.
+    /// Ensure that the children of a node form a directed acyclic graph.
     ///
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
@@ -336,18 +365,11 @@ impl<'a> ValidationContext<'a> {
         };
 
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
-        let entry_node = self.hugr.children(parent).next().unwrap();
-
-        let postorder = DfsPostOrder::new(&region, entry_node);
+        let postorder = Topo::new(&region);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
-        // Local ScopedDefn's should not be reachable from the Input node, so discount them
-        let non_defn_count = self
-            .hugr
-            .children(parent)
-            .filter(|n| !OpTag::ScopedDefn.is_superset(self.hugr.get_optype(*n).tag()))
-            .count();
-        if nodes_visited != non_defn_count {
-            return Err(ValidationError::NotABoundedDag {
+        let node_count = self.hugr.children(parent).count();
+        if nodes_visited != node_count {
+            return Err(ValidationError::NotADag {
                 node: parent,
                 optype: op_type.clone(),
             });
@@ -585,15 +607,20 @@ pub enum ValidationError {
     /// The node must have children, but has none.
     #[error("The node {node:?} with optype {optype:?} must have children, but has none.")]
     ContainerWithoutChildren { node: Node, optype: OpType },
-    /// The children of a node do not form a dag with single source and sink.
-    #[error("The children of an operation {optype:?} must form a dag with single source and sink. Loops are not allowed, nor are dangling nodes not in the path between the input and output. In node {node:?}.")]
-    NotABoundedDag { node: Node, optype: OpType },
+    /// The children of a node do not form a DAG.
+    #[error("The children of an operation {optype:?} must form a DAG. Loops are not allowed. In node {node:?}.")]
+    NotADag { node: Node, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// There are errors in the resource declarations.
+    /// There are errors in the extension declarations.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    #[error(transparent)]
+    CantInfer(#[from] InferExtensionError),
+    /// Error in a node signature
+    #[error("Error in signature of node {node:?}: {cause}")]
+    SignatureError { node: Node, cause: SignatureError },
 }
 
 #[cfg(feature = "pyo3")]
@@ -668,19 +695,18 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
-    use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder,
-    };
-    use crate::extension::prelude::BOOL_T;
-    use crate::extension::ExtensionSet;
+    use crate::builder::test::closed_dfg_root_hugr;
+    use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+    use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
+    use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
-    use crate::std_extensions::logic::test::and_op;
-    use crate::types::{FunctionType, Type};
+    use crate::std_extensions::logic::test::{and_op, not_op};
+    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
     use crate::Direction;
     use crate::{type_row, Node};
 
@@ -770,25 +796,25 @@ mod test {
 
         let mut b = Hugr::default();
         let root = b.root();
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Add another hierarchy root
         let other = b.add_op(ops::Module);
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
         b.replace_op(other, NodeType::pure(declare_op));
         b.add_ports(other, Direction::Outgoing, 1);
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Make the hugr root not a hierarchy root
         {
             let mut hugr = b.clone();
             hugr.root = other.index;
             assert_matches!(
-                hugr.validate(),
+                hugr.validate(&EMPTY_REG),
                 Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
             );
         }
@@ -796,13 +822,10 @@ mod test {
 
     #[test]
     fn leaf_root() {
-        let leaf_op: OpType = LeafOp::Noop {
-            ty: crate::types::test::EQ_T,
-        }
-        .into();
+        let leaf_op: OpType = LeafOp::Noop { ty: USIZE_T }.into();
 
         let b = Hugr::new(NodeType::pure(leaf_op));
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -815,13 +838,13 @@ mod test {
         let mut b = Hugr::new(NodeType::pure(dfg_op));
         let root = b.root();
         add_df_children(&mut b, root, 1);
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
     fn simple_hugr() {
         let b = make_simple_hugr(2).0;
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -848,7 +871,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
         );
 
@@ -856,7 +879,7 @@ mod test {
         add_df_children(&mut b, new_def, 2);
         b.set_parent(new_def, copy).unwrap();
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
         );
         b.set_parent(new_def, root).unwrap();
@@ -867,7 +890,7 @@ mod test {
             .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
     }
@@ -886,14 +909,14 @@ mod test {
         // Replace the output operation of the df subgraph with a copy
         b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }));
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
         );
 
         // Revert it back to an output, but with the wrong number of ports
         b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])));
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, output.index)}
         );
@@ -908,7 +931,7 @@ mod test {
             NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
         );
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
                 => {assert_eq!(parent, def); assert_eq!(child, copy.index)}
         );
@@ -933,7 +956,7 @@ mod test {
             }),
         );
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
         );
         let cfg = copy;
@@ -959,7 +982,7 @@ mod test {
             )
             .unwrap();
         b.add_other_edge(block, exit).unwrap();
-        assert_eq!(b.validate(), Ok(()));
+        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Test malformed errors
 
@@ -973,7 +996,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
                 => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
         );
@@ -1000,7 +1023,7 @@ mod test {
             ])),
         );
         assert_matches!(
-            b.validate(),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
@@ -1008,11 +1031,12 @@ mod test {
 
     #[test]
     fn test_ext_edge() -> Result<(), HugrError> {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]),
-        }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T, BOOL_T]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let mut h = closed_dfg_root_hugr(FunctionType::new(
+            type_row![BOOL_T, BOOL_T],
+            type_row![BOOL_T],
+        ));
+        let [input, output] = h.get_io(h.root()).unwrap();
+
         // Nested DFG BOOL_T -> BOOL_T
         let sub_dfg = h.add_op_with_parent(
             h.root(),
@@ -1033,33 +1057,33 @@ mod test {
         h.connect(input, 0, sub_dfg, 0)?;
         h.connect(sub_dfg, 0, output, 0)?;
 
-        assert_matches!(h.validate(), Err(ValidationError::UnconnectedPort { .. }));
+        assert_matches!(
+            h.infer_and_validate(&EMPTY_REG),
+            Err(ValidationError::UnconnectedPort { .. })
+        );
 
         h.connect(input, 1, sub_op, 1)?;
         assert_matches!(
-            h.validate(),
+            h.infer_and_validate(&EMPTY_REG),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::MissingOrderEdge { .. }
             ))
         );
         //Order edge. This will need metadata indicating its purpose.
         h.add_other_edge(input, sub_dfg)?;
-        h.validate().unwrap();
+        h.infer_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
-        }));
-        let input = h.add_op_with_parent(h.root(), ops::Input::new(type_row![BOOL_T]))?;
-        let output = h.add_op_with_parent(h.root(), ops::Output::new(type_row![BOOL_T]))?;
+        let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
+        let [input, output] = h.get_io(h.root()).unwrap();
         let and = h.add_op_with_parent(h.root(), and_op())?;
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, output, 0)?;
         assert_eq!(
-            h.validate(),
+            h.infer_and_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
                 port: Port::new_incoming(1),
@@ -1076,17 +1100,14 @@ mod test {
         let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, and, 1)?;
-        // We are missing the edge from Input to LoadConstant, hence:
-        assert_matches!(h.validate(), Err(ValidationError::NotABoundedDag { .. }));
-        // Now include the LoadConstant node in the causal cone
-        h.add_other_edge(input, lcst)?;
-        h.validate().unwrap();
+        // There is no edge from Input to LoadConstant, but that's OK:
+        h.infer_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
     #[test]
-    /// A wire with no resource requirements is wired into a node which has
-    /// [A,BOOL_T] resources required on its inputs and outputs. This could be fixed
+    /// A wire with no extension requirements is wired into a node which has
+    /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
     /// by adding a lift node, but for validation this is an error.
     fn missing_lift_node() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
@@ -1097,7 +1118,7 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            // Inner DFG has resource requirements that the wire wont satisfy
+            // Inner DFG has extension requirements that the wire wont satisfy
             .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
 
         let f_builder = main.dfg_builder(
@@ -1109,23 +1130,23 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr();
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
 
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirement `[A]` is wired into a an output with no
-    /// resource req. In the validation resource typechecking, we don't do any
-    /// unification, so don't allow open resource variables on the function
+    /// A wire with extension requirement `[A]` is wired into a an output with no
+    /// extension req. In the validation extension typechecking, we don't do any
+    /// unification, so don't allow open extension variables on the function
     /// signature, so this fails.
-    fn too_many_resources() -> Result<(), BuildError> {
+    fn too_many_extension() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
         let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).pure();
@@ -1146,18 +1167,18 @@ mod test {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.finish_hugr();
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::SrcExceedsTgtExtensions { .. }
+                ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
             ))
         );
         Ok(())
     }
 
     #[test]
-    /// A wire with resource requirements `[A]` and another with requirements
+    /// A wire with extension requirements `[A]` and another with requirements
     /// `[BOOL_T]` are both wired into a node which requires its inputs to have
     /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
     /// `missing_lift_node`.
@@ -1208,11 +1229,11 @@ mod test {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.finish_hugr();
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
+                ExtensionError::ParentIOExtensionMismatch { .. }
             ))
         );
         Ok(())
@@ -1220,19 +1241,178 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let main_signature = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"R".into()));
+        let rs = ExtensionSet::singleton(&"R".into());
 
-        let builder = DFGBuilder::new(main_signature)?;
-        let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w]);
+        let main_signature =
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
+
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: main_signature,
+        }));
+        let input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Input {
+                types: type_row![NAT],
+            }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::new(
+                ops::Output {
+                    types: type_row![NAT],
+                },
+                rs,
+            ),
+        )?;
+        hugr.connect(input, 0, output, 0)?;
 
         assert_matches!(
-            hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensions { .. }
-            )))
+            hugr.validate(&PRELUDE_REGISTRY),
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
+            ))
         );
         Ok(())
+    }
+
+    #[test]
+    fn dfg_with_cycles() -> Result<(), HugrError> {
+        let mut h = closed_dfg_root_hugr(FunctionType::new(
+            type_row![BOOL_T, BOOL_T],
+            type_row![BOOL_T],
+        ));
+        let [input, output] = h.get_io(h.root()).unwrap();
+        let and = h.add_op_with_parent(h.root(), and_op())?;
+        let not1 = h.add_op_with_parent(h.root(), not_op())?;
+        let not2 = h.add_op_with_parent(h.root(), not_op())?;
+        h.connect(input, 0, and, 0)?;
+        h.connect(and, 0, not1, 0)?;
+        h.connect(not1, 0, and, 1)?;
+        h.connect(input, 1, not2, 0)?;
+        h.connect(not2, 0, output, 0)?;
+        // The graph contains a cycle:
+        assert_matches!(h.validate(&EMPTY_REG), Err(ValidationError::NotADag { .. }));
+        Ok(())
+    }
+
+    fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
+        let mut b = Hugr::default();
+        let row: TypeRow = vec![t].into();
+
+        let def = b
+            .add_op_with_parent(
+                b.root(),
+                ops::FuncDefn {
+                    name: "main".into(),
+                    signature: FunctionType::new(row.clone(), row.clone()),
+                },
+            )
+            .unwrap();
+
+        let input = b
+            .add_op_with_parent(def, ops::Input::new(row.clone()))
+            .unwrap();
+        let output = b.add_op_with_parent(def, ops::Output::new(row)).unwrap();
+        b.connect(input, 0, output, 0).unwrap();
+        (b, def)
+    }
+    #[test]
+    fn unregistered_extension() {
+        let (h, def) = identity_hugr_with_type(USIZE_T);
+        assert_eq!(
+            h.validate(&EMPTY_REG),
+            Err(ValidationError::SignatureError {
+                node: def,
+                cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
+            })
+        );
+        h.validate(&PRELUDE_REGISTRY).unwrap();
+    }
+
+    #[test]
+    fn invalid_types() {
+        let mut e = Extension::new("MyExt".into());
+        e.add_type(
+            "MyContainer".into(),
+            vec![TypeParam::Type(TypeBound::Copyable)],
+            "".into(),
+            TypeDefBound::Explicit(TypeBound::Any),
+        )
+        .unwrap();
+        let reg: ExtensionRegistry = [e, PRELUDE.to_owned()].into();
+
+        let validate_to_sig_error = |t: CustomType| {
+            let (h, def) = identity_hugr_with_type(Type::new_extension(t));
+            match h.validate(&reg) {
+                Err(ValidationError::SignatureError { node, cause }) if node == def => cause,
+                e => panic!("Expected SignatureError at def node, got {:?}", e),
+            }
+        };
+
+        let valid = Type::new_extension(CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T)],
+            "MyExt",
+            TypeBound::Any,
+        ));
+        assert_eq!(
+            identity_hugr_with_type(valid.clone()).0.validate(&reg),
+            Ok(())
+        );
+
+        // valid is Any, so is not allowed as an element of an outer MyContainer.
+        let element_outside_bound = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(valid.clone())],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(element_outside_bound),
+            SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+                param: TypeParam::Type(TypeBound::Copyable),
+                arg: TypeArg::Type(valid)
+            })
+        );
+
+        let bad_bound = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T)],
+            "MyExt",
+            TypeBound::Copyable,
+        );
+        assert_eq!(
+            validate_to_sig_error(bad_bound.clone()),
+            SignatureError::WrongBound {
+                actual: TypeBound::Copyable,
+                expected: TypeBound::Any
+            }
+        );
+
+        // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
+        let nested = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(Type::new_extension(bad_bound))],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(nested),
+            SignatureError::WrongBound {
+                actual: TypeBound::Copyable,
+                expected: TypeBound::Any
+            }
+        );
+
+        let too_many_type_args = CustomType::new(
+            "MyContainer",
+            vec![TypeArg::Type(USIZE_T), TypeArg::BoundedNat(3)],
+            "MyExt",
+            TypeBound::Any,
+        );
+        assert_eq!(
+            validate_to_sig_error(too_many_type_args),
+            SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
+        );
     }
 }

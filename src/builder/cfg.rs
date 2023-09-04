@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::ops::{self, BasicBlock, OpType};
-use crate::types::FunctionType;
+use crate::{extension::ExtensionRegistry, types::FunctionType};
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{ops::handle::NodeHandle, types::Type};
 
@@ -63,15 +63,18 @@ impl CFGBuilder<Hugr> {
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(cfg_op));
+        let base = Hugr::new(NodeType::open_extensions(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
 }
 
 impl HugrBuilder for CFGBuilder<Hugr> {
-    fn finish_hugr(self) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.validate()?;
+    fn finish_hugr(
+        mut self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Hugr, crate::hugr::ValidationError> {
+        self.base.infer_and_validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -228,7 +231,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs.into_iter()))
+        Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(
         base: B,
@@ -277,7 +280,7 @@ impl BlockBuilder<Hugr> {
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }
@@ -287,9 +290,11 @@ impl BlockBuilder<Hugr> {
         mut self,
         branch_wire: Wire,
         outputs: impl IntoIterator<Item = Wire>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError> {
         self.set_outputs(branch_wire, outputs)?;
-        self.finish_hugr().map_err(BuildError::InvalidHUGR)
+        self.finish_hugr(extension_registry)
+            .map_err(BuildError::InvalidHUGR)
     }
 }
 
@@ -297,6 +302,7 @@ impl BlockBuilder<Hugr> {
 mod test {
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
+
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
@@ -320,7 +326,7 @@ mod test {
 
                 func_builder.finish_with_outputs(cfg_id.outputs())?
             };
-            module_builder.finish_hugr()
+            module_builder.finish_prelude_hugr()
         };
 
         assert_eq!(build_result.err(), None);
@@ -331,7 +337,7 @@ mod test {
     fn basic_cfg_hugr() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_hugr(), Ok(_));
+        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
 
         Ok(())
     }

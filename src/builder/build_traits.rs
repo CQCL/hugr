@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -128,7 +128,18 @@ pub trait Container {
 /// (with varying root node types)
 pub trait HugrBuilder: Container {
     /// Finish building the HUGR, perform any validation checks and return it.
-    fn finish_hugr(self) -> Result<Hugr, ValidationError>;
+    fn finish_hugr(self, extension_registry: &ExtensionRegistry) -> Result<Hugr, ValidationError>;
+
+    /// Finish building the HUGR (as [HugrBuilder::finish_hugr]),
+    /// validating against the [prelude] extension only
+    ///
+    /// [prelude]: crate::extension::prelude
+    fn finish_prelude_hugr(self) -> Result<Hugr, ValidationError>
+    where
+        Self: Sized,
+    {
+        self.finish_hugr(&PRELUDE_REGISTRY)
+    }
 }
 
 /// Types implementing this trait build a container graph region by borrowing a HUGR
@@ -210,9 +221,8 @@ pub trait Dataflow: Container {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr(hugr)?;
 
-        let [inp, _] = self.io();
         let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self, inp)?;
+        wire_up_inputs(inputs, node, self)?;
 
         Ok((node, num_outputs).into())
     }
@@ -232,9 +242,8 @@ pub trait Dataflow: Container {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr_view(hugr)?;
 
-        let [inp, _] = self.io();
         let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self, inp)?;
+        wire_up_inputs(inputs, node, self)?;
 
         Ok((node, num_outputs).into())
     }
@@ -248,8 +257,8 @@ pub trait Dataflow: Container {
         &mut self,
         output_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
-        let [inp, out] = self.io();
-        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self, inp)
+        let [_, out] = self.io();
+        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self)
     }
 
     /// Return an array of the input wires.
@@ -284,8 +293,7 @@ pub trait Dataflow: Container {
             signature: signature.clone(),
         };
         let nodetype = match &input_extensions {
-            // TODO: Make this NodeType::open_extensions
-            None => NodeType::pure(op),
+            None => NodeType::open_extensions(op),
             Some(rs) => NodeType::new(op, rs.clone()),
         };
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
@@ -314,8 +322,7 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            // TODO: Make input extensions a parameter
-            NodeType::pure(ops::CFG {
+            NodeType::open_extensions(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
             }),
@@ -378,7 +385,7 @@ pub trait Dataflow: Container {
             just_inputs.into_iter().unzip();
         let (rest_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
             inputs_outputs.into_iter().unzip();
-        input_wires.extend(rest_input_wires.into_iter());
+        input_wires.extend(rest_input_wires);
 
         let tail_loop = ops::TailLoop {
             just_inputs: input_types.into(),
@@ -408,6 +415,7 @@ pub trait Dataflow: Container {
         (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![predicate_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
@@ -424,6 +432,7 @@ pub trait Dataflow: Container {
                 predicate_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
+                extension_delta,
             },
             input_wires,
         )?;
@@ -596,8 +605,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    // TODO: Make this NodeType::open_extensions
-    add_node_with_wires(data_builder, NodeType::pure(optype), inputs)
+    add_node_with_wires(data_builder, NodeType::open_extensions(optype), inputs)
 }
 
 fn add_node_with_wires<T: Dataflow + ?Sized>(
@@ -605,12 +613,10 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: NodeType,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let [inp, _] = data_builder.io();
-
     let op_node = data_builder.add_child_node(nodetype.clone())?;
     let sig = nodetype.op_signature();
 
-    wire_up_inputs(inputs, op_node, data_builder, inp)?;
+    wire_up_inputs(inputs, op_node, data_builder)?;
 
     Ok((op_node, sig.output().len()))
 }
@@ -619,11 +625,9 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     inputs: Vec<Wire>,
     op_node: Node,
     data_builder: &mut T,
-    inp: Node,
 ) -> Result<(), BuildError> {
-    let mut any_local_df_inputs = false;
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        any_local_df_inputs |= wire_up(
+        wire_up(
             data_builder,
             wire.node(),
             wire.source().index(),
@@ -631,14 +635,6 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
             dst_port,
         )?;
     }
-    let base = data_builder.hugr_mut();
-    let op = base.get_optype(op_node);
-    let some_df_outputs = !op.signature().output.is_empty();
-    if !any_local_df_inputs && some_df_outputs {
-        // If op has no inputs add a StateOrder edge from input to place in
-        // causal cone of Input node
-        data_builder.add_other_wire(inp, op_node)?;
-    };
     Ok(())
 }
 
@@ -713,19 +709,35 @@ fn wire_up<T: Dataflow + ?Sized>(
 
 /// Trait implemented by builders of Dataflow Hugrs
 pub trait DataflowHugr: HugrBuilder + Dataflow {
-    /// Set outputs of dataflow HUGR and return HUGR
+    /// Set outputs of dataflow HUGR and return validated HUGR
     /// # Errors
     ///
-    /// This function will return an error if there is an error when setting outputs.
+    /// * if there is an error when setting outputs
+    /// * if the Hugr does not validate
     fn finish_hugr_with_outputs(
         mut self,
         outputs: impl IntoIterator<Item = Wire>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(outputs)?;
-        Ok(self.finish_hugr()?)
+        Ok(self.finish_hugr(extension_registry)?)
+    }
+
+    /// Sets the outputs of a dataflow Hugr, validates against
+    /// the [prelude] extension only, and return the Hugr
+    ///
+    /// [prelude]: crate::extension::prelude
+    fn finish_prelude_hugr_with_outputs(
+        self,
+        outputs: impl IntoIterator<Item = Wire>,
+    ) -> Result<Hugr, BuildError>
+    where
+        Self: Sized,
+    {
+        self.finish_hugr_with_outputs(outputs, &PRELUDE_REGISTRY)
     }
 }
 

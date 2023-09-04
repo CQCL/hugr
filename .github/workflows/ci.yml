@@ -21,7 +21,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -42,7 +42,7 @@ jobs:
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -71,7 +71,7 @@ jobs:
             isMerge: true
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:

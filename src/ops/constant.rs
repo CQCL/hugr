@@ -123,10 +123,11 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{ConstUsize, USIZE_T},
+        std_extensions::arithmetic::float_types::FLOAT64_TYPE,
         type_row,
-        types::{test::COPYABLE_T, TypeRow},
-        types::{test::EQ_T, type_param::TypeArg, CustomCheckFailure},
-        types::{CustomType, FunctionType, Type, TypeBound},
+        types::test::test_registry,
+        types::type_param::TypeArg,
+        types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
         values::{
             test::{serialized_float, CustomTestValue},
             CustomSerialized, Value,
@@ -140,7 +141,7 @@ mod test {
     #[test]
     fn test_predicate() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![EQ_T, COPYABLE_T], type_row![]];
+        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
         let pred_ty = Type::new_predicate(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
@@ -153,19 +154,19 @@ mod test {
             pred_rows.clone(),
         )?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w]).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
         let c = b.add_constant(Const::predicate(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
-        b.finish_hugr_with_outputs([w]).unwrap();
+        b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         Ok(())
     }
 
     #[test]
     fn test_bad_predicate() {
-        let pred_rows = [type_row![EQ_T, COPYABLE_T], type_row![]];
+        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
         let res = Const::predicate(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
@@ -175,14 +176,14 @@ mod test {
     fn test_constant_values() {
         let int_value: Value = ConstUsize::new(257).into();
         USIZE_T.check_type(&int_value).unwrap();
-        COPYABLE_T.check_type(&serialized_float(17.4)).unwrap();
+        FLOAT64_TYPE.check_type(&serialized_float(17.4)).unwrap();
         assert_matches!(
-            COPYABLE_T.check_type(&int_value),
+            FLOAT64_TYPE.check_type(&int_value),
             Err(ConstTypeError::CustomCheckFail(
                 CustomCheckFailure::TypeMismatch { .. }
             ))
         );
-        let tuple_ty = Type::new_tuple(vec![USIZE_T, COPYABLE_T]);
+        let tuple_ty = Type::new_tuple(vec![USIZE_T, FLOAT64_TYPE]);
         let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
         tuple_ty.check_type(&tuple_val).unwrap();
         let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);
@@ -199,7 +200,12 @@ mod test {
 
     #[test]
     fn test_yaml_const() {
-        let typ_int = CustomType::new("mytype", vec![TypeArg::USize(8)], "myrsrc", TypeBound::Eq);
+        let typ_int = CustomType::new(
+            "mytype",
+            vec![TypeArg::BoundedNat(8)],
+            "myrsrc",
+            TypeBound::Eq,
+        );
         let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);

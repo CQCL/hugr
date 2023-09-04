@@ -30,7 +30,7 @@ impl PrimValue {
         match self {
             PrimValue::Extension(e) => format!("const:custom:{}", e.0.name()),
             PrimValue::Function(h) => {
-                let Some(t) =  h.get_function_type() else {
+                let Some(t) = h.get_function_type() else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
                 format!("const:function:[{}]", t)
@@ -211,9 +211,9 @@ pub(crate) mod test {
 
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::std_extensions::arithmetic::float_types::FLOAT64_CUSTOM_TYPE;
     use crate::type_row;
-    use crate::types::{custom::test::COPYABLE_CUST, TypeBound};
-    use crate::types::{FunctionType, Type};
+    use crate::types::{FunctionType, Type, TypeBound};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
@@ -239,7 +239,7 @@ pub(crate) mod test {
 
     pub(crate) fn serialized_float(f: f64) -> Value {
         Value::custom(CustomSerialized {
-            typ: COPYABLE_CUST,
+            typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
         })
     }
@@ -249,7 +249,7 @@ pub(crate) mod test {
         let v = Value::Prim(PrimValue::Function(Box::new(simple_dfg_hugr)));
 
         let correct_type = Type::new_function(FunctionType::new_linear(type_row![
-            crate::extension::prelude::USIZE_T
+            crate::extension::prelude::BOOL_T
         ]));
 
         assert!(correct_type.check_type(&v).is_ok());
