@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![warn(clippy::debug_assert_with_mut_call)]
 
 //! `hugr` is the Hierarchical Unified Graph Representation of quantum circuits
 //! and operations in the Quantinuum ecosystem.
