@@ -207,7 +207,7 @@ impl ExtensionValue {
 pub type ExtensionId = SmolStr;
 
 /// A extension is a set of capabilities required to execute a graph.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Extension {
     /// Unique identifier for the extension.
     pub name: ExtensionId,
@@ -232,10 +232,7 @@ pub struct Extension {
 impl Extension {
     /// Creates a new extension with the given name.
     pub fn new(name: ExtensionId) -> Self {
-        Self {
-            name,
-            ..Default::default()
-        }
+        Self::new_with_reqs(name, Default::default())
     }
 
     /// Creates a new extension with the given name and requirements.
@@ -243,7 +240,9 @@ impl Extension {
         Self {
             name,
             extension_reqs,
-            ..Default::default()
+            types: Default::default(),
+            values: Default::default(),
+            operations: Default::default()
         }
     }
 
