@@ -4,7 +4,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::prelude::BOOL_T,
+    extension::{prelude::BOOL_T, ExtensionId},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
@@ -26,7 +26,7 @@ pub const AND_NAME: &str = "And";
 /// Name of the "or" operation.
 pub const OR_NAME: &str = "Or";
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 
 /// Extension for basic logical operations.
 fn extension() -> Extension {

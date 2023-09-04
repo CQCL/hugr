@@ -317,7 +317,7 @@ pub(crate) mod test {
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                "my_extension",
+                "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),

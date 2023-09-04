@@ -497,7 +497,7 @@ mod test {
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
         const BIT: Type = crate::extension::prelude::USIZE_T;
-        let r = ExtensionSet::singleton(&"R".into());
+        let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let root = NodeType::pure(ops::DFG {
             signature: FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
@@ -519,7 +519,7 @@ mod test {
             hugr.root(),
             NodeType::open_extensions(ops::LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_extension: "R".into(),
+                new_extension: "R".try_into().unwrap(),
             }),
         )?;
         hugr.connect(input, 0, lift, 0)?;

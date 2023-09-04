@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::TypeDefBound,
+    extension::{ExtensionId, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, Type, TypeBound,
@@ -16,10 +16,10 @@ use crate::{
 use super::ExtensionRegistry;
 
 /// Name of prelude extension.
-pub const PRELUDE_ID: &str = "prelude";
+pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 lazy_static! {
     static ref PRELUDE_DEF: Extension = {
-        let mut prelude = Extension::new(SmolStr::new_inline(PRELUDE_ID));
+        let mut prelude = Extension::new(PRELUDE_ID);
         prelude
             .add_type(
                 SmolStr::new_inline("usize"),
@@ -53,21 +53,15 @@ lazy_static! {
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry = [PRELUDE_DEF.to_owned()].into();
 
     /// Prelude extension
-    pub static ref PRELUDE: &'static Extension = PRELUDE_REGISTRY.get(PRELUDE_ID).unwrap();
+    pub static ref PRELUDE: &'static Extension = PRELUDE_REGISTRY.get(&PRELUDE_ID).unwrap();
 
 }
 
-pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
-    SmolStr::new_inline("usize"),
-    SmolStr::new_inline(PRELUDE_ID),
-    TypeBound::Eq,
-);
+pub(crate) const USIZE_CUSTOM_T: CustomType =
+    CustomType::new_simple(SmolStr::new_inline("usize"), PRELUDE_ID, TypeBound::Eq);
 
-pub(crate) const QB_CUSTOM_T: CustomType = CustomType::new_simple(
-    SmolStr::new_inline("qubit"),
-    SmolStr::new_inline(PRELUDE_ID),
-    TypeBound::Any,
-);
+pub(crate) const QB_CUSTOM_T: CustomType =
+    CustomType::new_simple(SmolStr::new_inline("qubit"), PRELUDE_ID, TypeBound::Any);
 
 /// Qubit type.
 pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
@@ -87,7 +81,7 @@ pub fn new_array(typ: Type, size: u64) -> Type {
 
 pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
     smol_str::SmolStr::new_inline("error"),
-    smol_str::SmolStr::new_inline(PRELUDE_ID),
+    PRELUDE_ID,
     TypeBound::Eq,
 ));
 

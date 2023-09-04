@@ -670,22 +670,25 @@ mod test {
     use super::*;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
-    use crate::hugr::HugrMut;
-    use crate::hugr::{validate::ValidationError, Hugr, HugrView, NodeType};
+    use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
-    use crate::type_row;
     use crate::types::{FunctionType, Type};
+    use crate::{test_const_ext_id, type_row};
 
     use cool_asserts::assert_matches;
     use portgraph::NodeIndex;
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
 
+    test_const_ext_id!(A, "A");
+    test_const_ext_id!(B, "B");
+    test_const_ext_id!(C, "C");
+
     #[test]
     // Build up a graph with some holes in its extension requirements, and infer
     // them.
     fn from_graph() -> Result<(), Box<dyn Error>> {
-        let rs = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        let rs = ExtensionSet::from_iter([A, B, C]);
         let main_sig =
             FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(&rs);
 
@@ -705,16 +708,16 @@ mod test {
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
         let add_a_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"A".into()));
+            .with_extension_delta(&ExtensionSet::singleton(&A));
 
         let add_b_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"B".into()));
+            .with_extension_delta(&ExtensionSet::singleton(&B));
 
         let add_ab_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::from_iter(["A".into(), "B".into()]));
+            .with_extension_delta(&ExtensionSet::from_iter([A, B]));
 
         let mult_c_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"C".into()));
+            .with_extension_delta(&ExtensionSet::singleton(&C));
 
         let add_a = hugr.add_node_with_parent(
             hugr.root(),
@@ -752,14 +755,11 @@ mod test {
 
         let (_, closure) = infer_extensions(&hugr)?;
         let empty = ExtensionSet::new();
-        let ab = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let ab = ExtensionSet::from_iter([A, B]);
         assert_eq!(*closure.get(&(hugr.root())).unwrap(), empty);
         assert_eq!(*closure.get(&(mult_c)).unwrap(), ab);
         assert_eq!(*closure.get(&(add_ab)).unwrap(), empty);
-        assert_eq!(
-            *closure.get(&add_b).unwrap(),
-            ExtensionSet::singleton(&"A".into())
-        );
+        assert_eq!(*closure.get(&add_b).unwrap(), ExtensionSet::singleton(&A));
         Ok(())
     }
 
@@ -778,20 +778,19 @@ mod test {
             })
             .collect();
 
-        ctx.solved
-            .insert(metas[2], ExtensionSet::singleton(&"A".into()));
+        ctx.solved.insert(metas[2], ExtensionSet::singleton(&A));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
-        ctx.add_constraint(metas[0], Constraint::Plus("B".into(), metas[2]));
-        ctx.add_constraint(metas[4], Constraint::Plus("C".into(), metas[0]));
+        ctx.add_constraint(metas[0], Constraint::Plus(B, metas[2]));
+        ctx.add_constraint(metas[4], Constraint::Plus(C, metas[0]));
         ctx.add_constraint(metas[3], Constraint::Equal(metas[4]));
         ctx.add_constraint(metas[5], Constraint::Equal(metas[0]));
         ctx.main_loop()?;
 
-        let a = ExtensionSet::singleton(&"A".into());
+        let a = ExtensionSet::singleton(&A);
         let mut ab = a.clone();
-        ab.insert(&"B".into());
+        ab.insert(&B);
         let mut abc = ab.clone();
-        abc.insert(&"C".into());
+        abc.insert(&C);
 
         assert_eq!(ctx.get_solution(&metas[0]).unwrap(), &ab);
         assert_eq!(ctx.get_solution(&metas[1]).unwrap(), &a);
@@ -809,7 +808,7 @@ mod test {
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
         let builder = DFGBuilder::new(
             FunctionType::new(type_row![NAT], type_row![NAT])
-                .with_extension_delta(&ExtensionSet::singleton(&"R".into())),
+                .with_extension_delta(&ExtensionSet::singleton(&"R".try_into().unwrap())),
         )?;
         let [w] = builder.input_wires_arr();
         let hugr = builder.finish_hugr_with_outputs([w], &EMPTY_REG);
@@ -841,8 +840,8 @@ mod test {
             .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
         ctx.variables.insert(a);
         ctx.variables.insert(b);
-        ctx.add_constraint(ab, Constraint::Plus("A".into(), b));
-        ctx.add_constraint(ab, Constraint::Plus("B".into(), a));
+        ctx.add_constraint(ab, Constraint::Plus(A, b));
+        ctx.add_constraint(ab, Constraint::Plus(B, a));
         let solution = ctx.main_loop()?;
         // We'll only find concrete solutions for the Incoming extension reqs of
         // the main node created by `Hugr::default`
@@ -853,7 +852,7 @@ mod test {
     #[test]
     // Infer the extensions on a child node with no inputs
     fn dangling_src() -> Result<(), Box<dyn Error>> {
-        let rs = ExtensionSet::singleton(&"R".into());
+        let rs = ExtensionSet::singleton(&"R".try_into().unwrap());
         let root_signature =
             FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
         let mut builder = DFGBuilder::new(root_signature)?;
@@ -941,7 +940,7 @@ mod test {
         const BOOLEAN: Type = Type::new_simple_predicate(2);
         let just_bool = type_row![BOOLEAN];
 
-        let abc = ExtensionSet::from_iter(["A".into(), "B".into(), "C".into()]);
+        let abc = ExtensionSet::from_iter([A, B, C]);
 
         // Parent graph is closed
         let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
@@ -982,7 +981,7 @@ mod test {
             child,
             NodeType::open_extensions(ops::LeafOp::Lift {
                 type_row: just_bool,
-                new_extension: "C".into(),
+                new_extension: C,
             }),
         )?;
 
@@ -998,7 +997,7 @@ mod test {
                 .signature()
                 .unwrap()
                 .output_extensions(),
-            ExtensionSet::from_iter(["A".into(), "B".into()])
+            ExtensionSet::from_iter([A, B])
         );
 
         Ok(())
@@ -1062,7 +1061,7 @@ mod test {
         }
 
         let predicate_inputs = vec![type_row![]; 2];
-        let rs = ExtensionSet::from_iter(["A".into(), "B".into()]);
+        let rs = ExtensionSet::from_iter([A, B]);
 
         let inputs = type_row![NAT];
         let outputs = type_row![NAT];
@@ -1080,15 +1079,9 @@ mod test {
         let case_op = ops::Case {
             signature: FunctionType::new(inputs, outputs).with_extension_delta(&rs),
         };
-        let case0_node = build_case(
-            &mut hugr,
-            conditional_node,
-            case_op.clone(),
-            "A".into(),
-            "B".into(),
-        )?;
+        let case0_node = build_case(&mut hugr, conditional_node, case_op.clone(), A, B)?;
 
-        let case1_node = build_case(&mut hugr, conditional_node, case_op, "B".into(), "A".into())?;
+        let case1_node = build_case(&mut hugr, conditional_node, case_op, B, A)?;
 
         hugr.infer_extensions()?;
 

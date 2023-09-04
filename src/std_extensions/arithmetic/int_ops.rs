@@ -1,20 +1,18 @@
 //! Basic integer operations.
 
-use smol_str::SmolStr;
-
 use super::int_types::{get_log_width, int_type, type_arg, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
 use crate::type_row;
 use crate::types::FunctionType;
 use crate::utils::collect_array;
 use crate::{
-    extension::{ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionSet, SignatureError},
     types::{type_param::TypeArg, Type, TypeRow},
     Extension,
 };
 
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
 fn iwiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);

@@ -122,7 +122,10 @@ mod test {
     use super::Const;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-        extension::prelude::{ConstUsize, USIZE_T},
+        extension::{
+            prelude::{ConstUsize, USIZE_T},
+            ExtensionId,
+        },
         std_extensions::arithmetic::float_types::FLOAT64_TYPE,
         type_row,
         types::test::test_registry,
@@ -200,10 +203,11 @@ mod test {
 
     #[test]
     fn test_yaml_const() {
+        let ex_id: ExtensionId = "myrsrc".try_into().unwrap();
         let typ_int = CustomType::new(
             "mytype",
             vec![TypeArg::BoundedNat(8)],
-            "myrsrc",
+            ex_id.clone(),
             TypeBound::Eq,
         );
         let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
@@ -211,7 +215,7 @@ mod test {
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();
 
-        let typ_qb = CustomType::new("mytype", vec![], "myrsrc", TypeBound::Eq);
+        let typ_qb = CustomType::new("mytype", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
         assert_matches!(t.check_type(&val),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFailure::TypeMismatch{expected, found})) => expected == typ_int && found == typ_qb);

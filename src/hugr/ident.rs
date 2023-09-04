@@ -1,14 +1,27 @@
+use std::borrow::Borrow;
+
+use derive_more::Display;
 use lazy_static::lazy_static;
 use regex::Regex;
 use smol_str::SmolStr;
 use thiserror::Error;
-use derive_more::Display;
 
 lazy_static! {
     pub static ref NAME_REGEX: Regex = Regex::new(r"^[\w--\d]\w*$").unwrap();
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    Display,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 /// A well-formed identifier
 pub struct Ident(SmolStr);
 
@@ -21,6 +34,41 @@ impl Ident {
         } else {
             Err(InvalidIdentifier(n))
         }
+    }
+
+    /// Create a new Ident *without* doing the well-formedness check.
+    /// Useful because we want to have static 'const'ants inside the crate,
+    /// but to be used sparingly.
+    pub(crate) const fn new_unchecked(n: &str) -> Self {
+        Ident(SmolStr::new_inline(n))
+    }
+}
+
+impl Borrow<str> for Ident {
+    fn borrow(&self) -> &str {
+        self.0.borrow()
+    }
+}
+
+impl std::ops::Deref for Ident {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        self.0.deref()
+    }
+}
+
+impl PartialEq<str> for Ident {
+    fn eq(&self, other: &str) -> bool {
+        self.0.eq(other)
+    }
+}
+
+impl TryInto<Ident> for &str {
+    type Error = InvalidIdentifier;
+
+    fn try_into(self) -> Result<Ident, Self::Error> {
+        Ident::new(SmolStr::new(self))
     }
 }
 
