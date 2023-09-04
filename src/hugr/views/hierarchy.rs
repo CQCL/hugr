@@ -29,7 +29,7 @@ use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
 use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
-type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
+type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
 /// View of a HUGR sibling graph.
 ///
@@ -51,20 +51,6 @@ where
 
     /// The operation type of the root node.
     _phantom: std::marker::PhantomData<Root>,
-}
-
-impl<'g, Root, Base> SiblingGraph<'g, Root, Base>
-where
-    Base: HugrInternals,
-{
-    /// Helper function to initialize the internal portgraph view.
-    fn init_graph(hugr: &Base, root: Node) -> FlatRegionGraph<'_> {
-        FlatRegionGraph::new_flat_region(
-            &hugr.base_hugr().graph,
-            &hugr.base_hugr().hierarchy,
-            root.index,
-        )
-    }
 }
 
 impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
@@ -235,7 +221,7 @@ where
     }
 }
 
-type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
+type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
 /// View of a HUGR descendants graph.
 ///
@@ -268,20 +254,6 @@ where
 {
     fn clone(&self) -> Self {
         DescendantsGraph::new(self.hugr, self.root)
-    }
-}
-
-impl<'g, Root, Base> DescendantsGraph<'g, Root, Base>
-where
-    Base: HugrInternals,
-{
-    /// Helper function to initialize the internal portgraph view.
-    fn init_graph(hugr: &Base, root: Node) -> RegionGraph<'_> {
-        RegionGraph::new_region(
-            &hugr.base_hugr().graph,
-            &hugr.base_hugr().hierarchy,
-            root.index,
-        )
     }
 }
 
@@ -511,11 +483,11 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = FlatRegionGraph<'g>;
+    type Portgraph<'p> = &'p FlatRegionGraph<'g> where Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        Self::init_graph(self.hugr, self.root)
+        &self.graph
     }
 
     #[inline]
@@ -534,11 +506,11 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = RegionGraph<'g>;
+    type Portgraph<'p> = &'p RegionGraph<'g> where Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        Self::init_graph(self.hugr, self.root)
+        &self.graph
     }
 
     #[inline]
