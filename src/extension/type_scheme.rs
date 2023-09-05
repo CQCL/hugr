@@ -60,6 +60,7 @@ impl<'a> CustomSignatureFunc for OpDefTypeScheme<'a> {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::num::NonZeroU64;
 
     use smol_str::SmolStr;
 
@@ -214,6 +215,85 @@ mod test {
             })
         );
 
+        Ok(())
+    }
+
+    fn decl_accepts_rejects_var(
+        bound: TypeParam,
+        accepted: &[TypeParam],
+        rejected: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        const EXT_ID: ExtensionId = ExtensionId::new_unchecked("my_ext");
+        const TYPE_NAME: SmolStr = SmolStr::new_inline("MyType");
+
+        let mut e = Extension::new(EXT_ID);
+        e.add_type(
+            TYPE_NAME,
+            vec![bound.clone()],
+            "".into(),
+            TypeDefBound::Explicit(TypeBound::Any),
+        )
+        .unwrap();
+
+        let reg: ExtensionRegistry = [e].into();
+
+        let make_scheme = |tp: TypeParam| {
+            OpDefTypeScheme::new(
+                [tp.clone()],
+                id_fn(Type::new_extension(CustomType::new(
+                    TYPE_NAME,
+                    [TypeArg::new_type_variable(0, tp)],
+                    EXT_ID,
+                    TypeBound::Any,
+                ))),
+                &reg,
+            )
+        };
+        for decl in accepted {
+            make_scheme(decl.clone())?;
+        }
+        for decl in rejected {
+            assert_eq!(
+                make_scheme(decl.clone()).err(),
+                Some(SignatureError::TypeArgMismatch(
+                    TypeArgError::TypeMismatch {
+                        param: bound.clone(),
+                        arg: TypeArg::new_type_variable(0, decl.clone())
+                    }
+                ))
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_bound_covariance() -> Result<(), SignatureError> {
+        decl_accepts_rejects_var(
+            TypeParam::Type(TypeBound::Copyable),
+            &[
+                TypeParam::Type(TypeBound::Copyable),
+                TypeParam::Type(TypeBound::Eq),
+            ],
+            &[TypeParam::Type(TypeBound::Any)],
+        )?;
+
+        let list_of_tys = |b| TypeParam::List(Box::new(TypeParam::Type(b)));
+        decl_accepts_rejects_var(
+            list_of_tys(TypeBound::Copyable),
+            &[list_of_tys(TypeBound::Copyable), list_of_tys(TypeBound::Eq)],
+            &[list_of_tys(TypeBound::Any)],
+        )?;
+
+        decl_accepts_rejects_var(
+            TypeParam::max_nat(),
+            &[TypeParam::bounded_nat(NonZeroU64::new(5).unwrap())],
+            &[],
+        )?;
+        decl_accepts_rejects_var(
+            TypeParam::bounded_nat(NonZeroU64::new(10).unwrap()),
+            &[TypeParam::bounded_nat(NonZeroU64::new(5).unwrap())],
+            &[TypeParam::max_nat()],
+        )?;
         Ok(())
     }
 }
