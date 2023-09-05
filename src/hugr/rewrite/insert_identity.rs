@@ -3,7 +3,7 @@
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
-use crate::{Direction, Hugr, HugrView, Port};
+use crate::{Direction, HugrView, Port};
 
 use super::Rewrite;
 
@@ -52,7 +52,7 @@ impl Rewrite for IdentityInsertion {
     /// The inserted node.
     type ApplyResult = Node;
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, _h: &Hugr) -> Result<(), IdentityInsertionError> {
+    fn verify(&self, _h: &impl HugrView) -> Result<(), IdentityInsertionError> {
         /*
         Assumptions:
         1. Value kind inputs can only have one connection.
@@ -65,7 +65,7 @@ impl Rewrite for IdentityInsertion {
 
         unimplemented!()
     }
-    fn apply(self, h: &mut Hugr) -> Result<Self::ApplyResult, IdentityInsertionError> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, IdentityInsertionError> {
         if self.post_port.direction() != Direction::Incoming {
             return Err(IdentityInsertionError::PortIsOutput);
         }
@@ -78,6 +78,7 @@ impl Rewrite for IdentityInsertion {
         let (pre_node, pre_port) = h
             .linked_ports(self.post_node, self.post_port)
             .exactly_one()
+            .ok()
             .expect("Value kind input can only have one connection.");
 
         h.disconnect(self.post_node, self.post_port).unwrap();

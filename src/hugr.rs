@@ -480,6 +480,7 @@ impl From<HugrError> for PyErr {
 #[cfg(test)]
 mod test {
     use super::{Hugr, HugrView, NodeType};
+    use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
     use crate::ops;
@@ -511,22 +512,10 @@ mod test {
         const BIT: Type = crate::extension::prelude::USIZE_T;
         let r = ExtensionSet::singleton(&"R".into());
 
-        let root = NodeType::pure(ops::DFG {
-            signature: FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
-        });
-        let mut hugr = Hugr::new(root);
-        let input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::pure(ops::Input {
-                types: type_row![BIT],
-            }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::Output {
-                types: type_row![BIT],
-            }),
-        )?;
+        let mut hugr = closed_dfg_root_hugr(
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+        );
+        let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
             hugr.root(),
             NodeType::open_extensions(ops::LeafOp::Lift {

@@ -90,6 +90,8 @@ impl From<BuildError> for PyErr {
 pub(crate) mod test {
     use rstest::fixture;
 
+    use crate::hugr::{views::HugrView, HugrMut, NodeType};
+    use crate::ops;
     use crate::types::{FunctionType, Signature, Type};
     use crate::{type_row, Hugr};
 
@@ -129,5 +131,30 @@ pub(crate) mod test {
             DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+    }
+
+    /// A helper method which creates a DFG rooted hugr with closed resources,
+    /// for tests which want to avoid having open extension variables after
+    /// inference. Using DFGBuilder will default to a root node with an open
+    /// extension variable
+    pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: signature.clone(),
+        }));
+        hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::Input {
+                types: signature.input,
+            }),
+        )
+        .unwrap();
+        hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::open_extensions(ops::Output {
+                types: signature.output,
+            }),
+        )
+        .unwrap();
+        hugr
     }
 }
