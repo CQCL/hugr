@@ -179,8 +179,21 @@ pub struct Node {
 }
 
 /// A handle to a port for a node in the HUGR.
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Ord,
+    Hash,
+    Default,
+    Debug,
+    From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[serde(transparent)]
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Port {
     offset: portgraph::PortOffset,
