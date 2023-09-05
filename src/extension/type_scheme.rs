@@ -78,7 +78,7 @@ mod test {
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let tyvar = TypeArg::new_type_variable(0, TypeParam::Type(TypeBound::Any));
+        let tyvar = TypeArg::use_var(0, TypeParam::Type(TypeBound::Any));
         let list_of_var = Type::new_extension(list_def.instantiate_concrete([tyvar.clone()])?);
         let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
         let list_len = OpDefTypeScheme::new(
@@ -132,8 +132,8 @@ mod test {
             .get_type(&ARRAY_TYPE_NAME)
             .unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
-        let tyvar = TypeArg::new_type_variable(0, typarams[0].clone());
-        let szvar = TypeArg::new_type_variable(1, typarams[1].clone());
+        let tyvar = TypeArg::use_var(0, typarams[0].clone());
+        let szvar = TypeArg::use_var(1, typarams[1].clone());
 
         // Valid schema...
         let good_array =
@@ -187,7 +187,7 @@ mod test {
     #[test]
     fn test_misused_variables() -> Result<(), SignatureError> {
         // Variables in args have different bounds from variable declaration
-        let tv = TypeArg::new_type_variable(0, TypeParam::Type(TypeBound::Copyable));
+        let tv = TypeArg::use_var(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let body_type = id_fn(Type::new_extension(list_def.instantiate_concrete([tv])?));
         let reg = [EXTENSION.to_owned()].into();
@@ -242,7 +242,7 @@ mod test {
                 [tp.clone()],
                 id_fn(Type::new_extension(CustomType::new(
                     TYPE_NAME,
-                    [TypeArg::new_type_variable(0, tp)],
+                    [TypeArg::use_var(0, tp)],
                     EXT_ID,
                     TypeBound::Any,
                 ))),
@@ -258,7 +258,7 @@ mod test {
                 Some(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
                         param: bound.clone(),
-                        arg: TypeArg::new_type_variable(0, decl.clone())
+                        arg: TypeArg::use_var(0, decl.clone())
                     }
                 ))
             );
