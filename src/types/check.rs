@@ -92,7 +92,7 @@ impl Type {
                     .try_for_each(|(elem, ty)| ty.check_type(elem))
                     .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
-            (TypeEnum::Sum(sum), Value::Sum(tag, value)) => sum
+            (TypeEnum::Sum(sum), Value::Sum { tag, value }) => sum
                 .get_variant(*tag)
                 .ok_or(ConstTypeError::InvalidSumTag)?
                 .check_type(value),

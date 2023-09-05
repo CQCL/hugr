@@ -15,6 +15,7 @@ use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "pty")]
 pub enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
@@ -42,6 +43,7 @@ impl PrimValue {
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "vty")]
 pub enum Value {
     /// A primitive (non-container) value.
     Prim(PrimValue),
@@ -49,7 +51,12 @@ pub enum Value {
     Tuple(Vec<Value>),
     /// A Sum variant -- for any Sum type where this value meets
     /// the type of the variant indicated by the tag
-    Sum(usize, Box<Value>), // Tag and value
+    Sum {
+        /// The tag index of the variant
+        tag: usize,
+        /// The value of the variant
+        value: Box<Value>,
+    },
 }
 
 impl Value {
@@ -61,7 +68,9 @@ impl Value {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
-            Value::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
+            Value::Sum { tag, value: val } => {
+                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            }
         }
     }
 
@@ -92,7 +101,10 @@ impl Value {
 
     /// Sum value (could be of any compatible type, e.g. a predicate)
     pub fn sum(tag: usize, value: Value) -> Self {
-        Self::Sum(tag, Box::new(value))
+        Self::Sum {
+            tag,
+            value: Box::new(value),
+        }
     }
 
     /// New custom value (of type that implements [`CustomConst`]).

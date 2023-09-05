@@ -66,6 +66,7 @@ impl TypeParam {
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
+#[serde(tag = "aty")]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
     Type(Type),
