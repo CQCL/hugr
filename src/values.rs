@@ -43,7 +43,7 @@ impl PrimValue {
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "vty")]
+#[serde(tag = "v")]
 pub enum Value {
     /// A primitive (non-container) value.
     Prim(PrimValue),
