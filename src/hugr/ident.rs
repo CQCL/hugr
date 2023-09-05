@@ -37,9 +37,11 @@ impl IdentList {
     }
 
     /// Create a new [IdentList] *without* doing the well-formedness check.
-    /// Useful because we want to have static 'const'ants inside the crate,
-    /// but to be used sparingly.
-    pub(crate) const fn new_unchecked(n: &str) -> Self {
+    /// This is a backdoor to be used sparingly, as we rely upon callers to
+    /// validate names themselves. In tests, instead the [crate::test_const_ext_id]
+    /// macro is strongly encouraged as this ensures the name validity check
+    /// is done properly.
+    pub const fn new_unchecked(n: &str) -> Self {
         IdentList(SmolStr::new_inline(n))
     }
 }

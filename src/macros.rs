@@ -81,23 +81,32 @@ macro_rules! type_row {
 #[allow(unused_imports)]
 pub use type_row;
 
-// Declare 'const' variables holding new ExtensionIds, validating
-// that they are well-formed as separate tests - hence, usable at the top level
-// of a test module only.
-// field_names should be UPPERCASE i.e. names of constants.
-#[allow(unused_macros)]
+/// Declare 'const' variables holding new ExtensionIds, validating
+/// that they are well-formed as separate tests - hence, usable at the top level
+/// of a test module only. Example:
+/// ```rust
+/// # mod test {
+/// # use hugr::macros::test_const_ext_id;
+///   test_const_ext_id! {
+///     const EXT_A: ExtensionId = "A";
+///     const EXT_A_B: ExtensionId = "A.B";
+///     const EXT_BAD: ExtensionId = "..55"; // this will generate a failing #[test] fn ....
+///   }
+/// # }
+/// ```
+#[macro_export]
 macro_rules! test_const_ext_id {
     ($(const $field_name:ident : ExtensionId = $ext_name:literal;)+) => {
-        $(const $field_name: crate::extension::ExtensionId =
-            crate::extension::ExtensionId::new_unchecked($ext_name);
+        $(const $field_name: $crate::extension::ExtensionId =
+            $crate::extension::ExtensionId::new_unchecked($ext_name);
 
         paste::paste! {
             #[test]
             fn [<check_ $field_name:lower _wellformed>]() {
-                ExtensionId::new($ext_name).unwrap();
+                $crate::extension::ExtensionId::new($ext_name).unwrap();
             }
         })*
     };
 }
-#[allow(unused_imports)]
-pub(crate) use test_const_ext_id;
+
+pub use test_const_ext_id;
