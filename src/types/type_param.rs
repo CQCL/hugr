@@ -153,22 +153,26 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(super) fn substitute(self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
         match self {
             TypeArg::Type(t) => TypeArg::Type(t.substitute(exts, args)),
-            TypeArg::BoundedNat(_) => self.clone(), // We do not allow variables as bounds on BoundedNat's
-            TypeArg::Opaque(CustomTypeArg { typ, .. }) => {
+            TypeArg::BoundedNat(_) => self, // We do not allow variables as bounds on BoundedNat's
+            TypeArg::Opaque(cta) => {
+                let typ = &cta.typ;
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(exts, args), typ);
-                self.clone()
+                debug_assert_eq!(&typ.clone().substitute(exts, args), typ);
+                TypeArg::Opaque(cta)
             }
-            TypeArg::Sequence(elems) => {
-                TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(exts, args)).collect())
-            }
+            TypeArg::Sequence(elems) => TypeArg::Sequence(
+                elems
+                    .into_iter()
+                    .map(|ta| ta.substitute(exts, args))
+                    .collect(),
+            ),
             TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
             TypeArg::Variable(TypeArgVariable { idx, .. }) => args
-                .get(*idx)
+                .get(idx)
                 .expect("validate + check_type_args should rule this out")
                 .clone(),
         }

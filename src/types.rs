@@ -312,12 +312,12 @@ impl Type {
     /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
     /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
     /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
-        match &self.0 {
+    pub(crate) fn substitute(self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+        match self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(*idx) {
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(idx) {
                 Some(TypeArg::Type(t)) => t.clone(),
                 Some(v) => panic!(
                     "Value of variable {:?} did not match cached param {}",
@@ -335,8 +335,9 @@ impl Type {
     }
 }
 
-fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
-    row.iter()
+fn subst_row(row: TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
+    row.into_owned()
+        .into_iter()
         .map(|t| t.substitute(exts, args))
         .collect::<Vec<_>>()
         .into()

@@ -88,7 +88,7 @@ impl CustomType {
             })
     }
 
-    pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(super) fn substitute(self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
         let bound = self
             .get_type_def(exts)
             .expect("validate should rule this out")
@@ -97,11 +97,11 @@ impl CustomType {
         Self {
             args: self
                 .args
-                .iter()
+                .into_iter()
                 .map(|arg| arg.substitute(exts, args))
                 .collect(),
             bound,
-            ..self.clone()
+            ..self
         }
     }
 }

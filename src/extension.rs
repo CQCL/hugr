@@ -410,7 +410,7 @@ impl ExtensionSet {
         Ok(())
     }
 
-    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+    pub(crate) fn substitute(self, args: &[TypeArg]) -> Self {
         Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
             None => vec![e.clone()].into_iter(),
             Some(i) => match args.get(i) {
