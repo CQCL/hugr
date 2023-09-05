@@ -89,7 +89,10 @@ impl CustomType {
     }
 
     pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
-        let bound = self.get_type_def(exts).unwrap().bound(args);
+        let bound = self
+            .get_type_def(exts)
+            .expect("validate should rule this out")
+            .bound(args);
         assert!(self.bound.contains(bound));
         Self {
             args: self

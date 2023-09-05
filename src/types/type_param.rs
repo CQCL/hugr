@@ -167,8 +167,10 @@ impl TypeArg {
                 TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(exts, args)).collect())
             }
             TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
-            // Caller should already have checked arg against bound (cached here):
-            TypeArg::Variable(TypeArgVariable { idx, .. }) => args.get(*idx).unwrap().clone(),
+            TypeArg::Variable(TypeArgVariable { idx, .. }) => args
+                .get(*idx)
+                .expect("validate + check_type_args should rule this out")
+                .clone(),
         }
     }
 }
