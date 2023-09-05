@@ -296,9 +296,23 @@ impl Type {
         }
     }
 
-    /// Could make this public, but easier to panic if the TypeArg's don't match the TypeParams
-    /// (should be checked when the args are first given to the type scheme).
-    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+    /// Substitute the specified [TypeArg]s for type variables in this type.
+    ///
+    /// # Arguments
+    ///
+    /// * `args`: values to substitute in; there must be at least enough for the
+    /// typevars in this type (partial substitution is not supported).
+    ///
+    /// * `extension_registry`: for looking up [TypeDef]s in order to recompute [TypeBound]s
+    /// as these may get narrower after substitution
+    ///
+    /// # Panics
+    ///
+    /// If a [TypeArg] (that is referenced by a typevar in this type) does not contain a [Type],
+    /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
+    /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
+    /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
+    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
@@ -311,17 +325,19 @@ impl Type {
                 ),
                 None => panic!("No value found for variable"), // No need to support partial substitution for just type schemes
             },
-            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(args)),
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(args)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, args)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, args)),
+            TypeEnum::Prim(PrimType::Extension(cty)) => {
+                Type::new_extension(cty.substitute(exts, args))
+            }
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, args)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, args)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, exts, args)),
         }
     }
 }
 
-fn subst_row(row: &TypeRow, args: &[TypeArg]) -> TypeRow {
+fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
     row.iter()
-        .map(|t| t.substitute(args))
+        .map(|t| t.substitute(exts, args))
         .collect::<Vec<_>>()
         .into()
 }

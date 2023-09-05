@@ -4,7 +4,7 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
 use super::{
     type_param::{TypeArg, TypeParam},
@@ -69,26 +69,37 @@ impl CustomType {
             .iter()
             .try_for_each(|a| a.validate(extension_registry, type_vars))?;
         // And check they fit into the TypeParams declared by the TypeDef
+        let def = self.get_type_def(extension_registry)?;
+        def.check_custom(self)
+    }
+
+    fn get_type_def<'a>(
+        &self,
+        extension_registry: &'a ExtensionRegistry,
+    ) -> Result<&'a TypeDef, SignatureError> {
         let ex = extension_registry.get(&self.extension);
         // Even if OpDef's (+binaries) are not available, the part of the Extension definition
         // describing the TypeDefs can easily be passed around (serialized), so should be available.
         let ex = ex.ok_or(SignatureError::ExtensionNotFound(self.extension.clone()))?;
-        let def = ex
-            .get_type(&self.id)
+        ex.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
                 typ: self.id.clone(),
-            })?;
-        def.check_custom(self)
+            })
     }
 
-    pub(super) fn substitute(&self, args: &[TypeArg]) -> Self {
+    pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+        let bound = self.get_type_def(exts).unwrap().bound(args);
+        assert!(self.bound.contains(bound));
         Self {
-            args: self.args.iter().map(|arg| arg.substitute(args)).collect(),
+            args: self
+                .args
+                .iter()
+                .map(|arg| arg.substitute(exts, args))
+                .collect(),
+            bound,
             ..self.clone()
         }
-        // TODO the bound could get narrower as a result of substitution.
-        // But, we need the TypeDefBound (from the TypeDef in the Extension) to recalculate correctly...
     }
 }
 

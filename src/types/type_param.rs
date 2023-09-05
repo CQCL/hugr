@@ -153,18 +153,18 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn substitute(&self, args: &[TypeArg]) -> Self {
+    pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
         match self {
-            TypeArg::Type(t) => TypeArg::Type(t.substitute(args)),
+            TypeArg::Type(t) => TypeArg::Type(t.substitute(exts, args)),
             TypeArg::BoundedNat(_) => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque(CustomTypeArg { typ, .. }) => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(args), typ);
+                debug_assert_eq!(&typ.substitute(exts, args), typ);
                 self.clone()
             }
             TypeArg::Sequence(elems) => {
-                TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(args)).collect())
+                TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(exts, args)).collect())
             }
             TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
             // Caller should already have checked arg against bound (cached here):

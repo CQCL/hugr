@@ -8,14 +8,23 @@ use crate::types::FunctionType;
 use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
 
 /// A polymorphic type scheme for an op
-pub struct OpDefTypeScheme {
+pub struct OpDefTypeScheme<'a> {
     /// The declared type parameters, i.e., every Op must provide [TypeArg]s for these
     pub params: Vec<TypeParam>,
     /// Template for the Op type. May contain variables up to length of [OpDefTypeScheme::params]
     body: FunctionType,
+    /// Extensions - the [TypeDefBound]s in here will be needed when we instantiate the [OpDefTypeScheme]
+    /// into a [FunctionType].
+    ///
+    /// [TypeDefBound]: super::type_def::TypeDefBound
+    // Note that if the lifetimes, etc., become too painful to store this reference in here,
+    // and we'd rather own the necessary data, we really only need the TypeDefBounds not the other parts,
+    // and the validation traversal in new() discovers the small subset of TypeDefBounds that
+    // each OpDefTypeScheme actually needs.
+    exts: &'a ExtensionRegistry,
 }
 
-impl OpDefTypeScheme {
+impl<'a> OpDefTypeScheme<'a> {
     /// Create a new OpDefTypeScheme.
     ///
     /// #Errors
@@ -24,15 +33,19 @@ impl OpDefTypeScheme {
     pub fn new(
         params: impl Into<Vec<TypeParam>>,
         body: FunctionType,
-        extension_registry: &ExtensionRegistry,
+        extension_registry: &'a ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let params = params.into();
         body.validate(extension_registry, &params)?;
-        Ok(Self { params, body })
+        Ok(Self {
+            params,
+            body,
+            exts: extension_registry,
+        })
     }
 }
 
-impl CustomSignatureFunc for OpDefTypeScheme {
+impl<'a> CustomSignatureFunc for OpDefTypeScheme<'a> {
     fn compute_signature(
         &self,
         _name: &smol_str::SmolStr,
@@ -40,6 +53,6 @@ impl CustomSignatureFunc for OpDefTypeScheme {
         _misc: &std::collections::HashMap<String, serde_yaml::Value>,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params).map_err(SignatureError::TypeArgMismatch)?;
-        Ok(self.body.substitute(args))
+        Ok(self.body.substitute(self.exts, args))
     }
 }
