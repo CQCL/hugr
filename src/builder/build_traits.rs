@@ -322,8 +322,7 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            // TODO: Make input extensions a parameter
-            NodeType::pure(ops::CFG {
+            NodeType::open_extensions(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
             }),
@@ -606,8 +605,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    // TODO: Make this NodeType::open_extensions
-    add_node_with_wires(data_builder, NodeType::pure(optype), inputs)
+    add_node_with_wires(data_builder, NodeType::open_extensions(optype), inputs)
 }
 
 fn add_node_with_wires<T: Dataflow + ?Sized>(

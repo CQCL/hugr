@@ -76,6 +76,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 
 impl DFGBuilder<Hugr> {
     /// Begin building a new DFG rooted HUGR.
+    /// Input extensions default to being an open variable
     ///
     /// # Errors
     ///
@@ -84,13 +85,9 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(dfg_op));
+        let base = Hugr::new(NodeType::open_extensions(dfg_op));
         let root = base.root();
-        DFGBuilder::create_with_io(
-            base, root, signature, // TODO: Make input extensions a parameter
-            None,
-        )
+        DFGBuilder::create_with_io(base, root, signature, None)
     }
 }
 
@@ -256,8 +253,7 @@ pub(crate) mod test {
 
                 let inner_builder = func_builder.dfg_builder(
                     FunctionType::new(type_row![NAT], type_row![NAT]),
-                    // TODO: This should be None
-                    Some(ExtensionSet::new()),
+                    None,
                     [int],
                 )?;
                 let inner_id = n_identity(inner_builder)?;

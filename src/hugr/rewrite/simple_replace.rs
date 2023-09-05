@@ -55,11 +55,11 @@ impl Rewrite for SimpleReplacement {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, _h: &Hugr) -> Result<(), SimpleReplacementError> {
+    fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
         unimplemented!()
     }
 
-    fn apply(self, h: &mut Hugr) -> Result<(), SimpleReplacementError> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
         // 1. Check the parent node exists and is a DataflowParent.
         if !OpTag::DataflowParent.is_superset(h.get_optype(self.parent).tag()) {
             return Err(SimpleReplacementError::InvalidParentNode());
@@ -114,6 +114,7 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .linked_ports(*rem_inp_node, *rem_inp_port)
                     .exactly_one()
+                    .ok() // PortLinks does not implement Debug
                     .unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
@@ -155,6 +156,7 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .linked_ports(*rem_inp_node, *rem_inp_port)
                     .exactly_one()
+                    .ok() // PortLinks does not implement Debug
                     .unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
