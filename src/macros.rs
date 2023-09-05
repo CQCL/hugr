@@ -80,3 +80,24 @@ macro_rules! type_row {
 
 #[allow(unused_imports)]
 pub use type_row;
+
+// Declare 'const' variables holding new ExtensionIds, validating
+// that they are well-formed as separate tests - hence, usable at the top level
+// of a test module only.
+// field_names should be UPPERCASE i.e. names of constants.
+#[allow(unused_macros)]
+macro_rules! test_const_ext_id {
+    ($(const $field_name:ident : ExtensionId = $ext_name:literal;)+) => {
+        $(const $field_name: crate::extension::ExtensionId =
+            crate::extension::ExtensionId::new_unchecked($ext_name);
+
+        paste::paste! {
+            #[test]
+            fn [<check_ $field_name:lower _wellformed>]() {
+                ExtensionId::new($ext_name).unwrap();
+            }
+        })*
+    };
+}
+#[allow(unused_imports)]
+pub(crate) use test_const_ext_id;

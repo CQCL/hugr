@@ -703,6 +703,7 @@ mod test {
     };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
+    use crate::macros::test_const_ext_id;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;

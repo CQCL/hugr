@@ -672,6 +672,7 @@ mod test {
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
+    use crate::macros::test_const_ext_id;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
