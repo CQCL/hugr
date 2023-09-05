@@ -15,7 +15,7 @@ use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "pty")]
+#[serde(tag = "pv")]
 pub enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
