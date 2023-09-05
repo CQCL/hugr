@@ -1076,8 +1076,10 @@ mod test {
         Ok(())
     }
 
-    test_const_ext_id!(XA, "A");
-    test_const_ext_id!(XB, "BOOL_EXT");
+    test_const_ext_id! {
+        const XA: ExtensionId = "A";
+        const XB: ExtensionId = "BOOL_EXT";
+    }
 
     #[test]
     fn test_local_const() -> Result<(), HugrError> {

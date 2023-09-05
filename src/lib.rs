@@ -9,15 +9,17 @@
 //!   structures.
 //!
 
-// Declares a 'const' member of a test module that's a new ExtensionId.
-// field_name should be an UPPERCASE i.e. name of a const.
-// This is here so that it is usable throughout the crate, but is not
+// Declare 'const' variables holding new ExtensionIds, validating
+// that they are well-formed as separate tests - hence, usable at the top level
+// of a test module only.
+// field_names should be UPPERCASE i.e. names of constants.
+// Note: this is here so that it is usable throughout the crate, but is not
 // visible from outside (as it would be if we used macro_export)
 // - as it won't *work* from outside because of the call to new_unchecked.
 #[allow(unused_macros)] // Because not used *in this file*
 macro_rules! test_const_ext_id {
-    ($field_name:ident, $ext_name:expr) => {
-        const $field_name: crate::extension::ExtensionId =
+    ($(const $field_name:ident : ExtensionId = $ext_name:literal;)+) => {
+        $(const $field_name: crate::extension::ExtensionId =
             crate::extension::ExtensionId::new_unchecked($ext_name);
 
         paste::paste! {
@@ -25,7 +27,7 @@ macro_rules! test_const_ext_id {
             fn [<check_ $field_name:lower _wellformed>]() {
                 ExtensionId::new($ext_name).unwrap();
             }
-        }
+        })*
     };
 }
 

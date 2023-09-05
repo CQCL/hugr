@@ -681,9 +681,11 @@ mod test {
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
 
-    test_const_ext_id!(A, "A");
-    test_const_ext_id!(B, "B");
-    test_const_ext_id!(C, "C");
+    test_const_ext_id! {
+        const A: ExtensionId = "A";
+        const B: ExtensionId = "B";
+        const C: ExtensionId = "C";
+    }
 
     #[test]
     // Build up a graph with some holes in its extension requirements, and infer
