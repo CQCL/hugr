@@ -56,3 +56,164 @@ impl<'a> CustomSignatureFunc for OpDefTypeScheme<'a> {
         Ok(self.body.substitute(self.exts, args))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use smol_str::SmolStr;
+
+    use crate::extension::prelude::USIZE_T;
+    use crate::extension::{
+        CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE,
+    };
+    use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound};
+    use crate::Extension;
+
+    use super::OpDefTypeScheme;
+
+    #[test]
+    fn test_opaque() -> Result<(), SignatureError> {
+        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let tyvar = TypeArg::new_type_variable(0, TypeParam::Type(TypeBound::Any));
+        let list_of_var = Type::new_extension(list_def.instantiate_concrete([tyvar.clone()])?);
+        let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let list_len = OpDefTypeScheme::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new(vec![list_of_var], vec![USIZE_T]),
+            &reg,
+        )?;
+
+        let t = list_len.compute_signature(
+            &SmolStr::new_inline(""),
+            &[TypeArg::Type(USIZE_T)],
+            &HashMap::new(),
+        )?;
+        assert_eq!(
+            t,
+            FunctionType::new(
+                vec![Type::new_extension(
+                    list_def
+                        .instantiate_concrete([TypeArg::Type(USIZE_T)])
+                        .unwrap()
+                )],
+                vec![USIZE_T]
+            )
+        );
+
+        Ok(())
+    }
+
+    fn id_fn(t: Type) -> FunctionType {
+        FunctionType::new(vec![t.clone()], vec![t])
+    }
+
+    #[test]
+    fn test_mismatched_args() -> Result<(), SignatureError> {
+        const ARRAY_EXT_ID: ExtensionId = ExtensionId::new_unchecked("array_ext");
+        const ARRAY_TYPE_NAME: SmolStr = SmolStr::new_inline("Array");
+
+        let mut e = Extension::new(ARRAY_EXT_ID);
+        e.add_type(
+            ARRAY_TYPE_NAME,
+            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+            "elemtype and size".to_string(),
+            TypeDefBound::FromParams(vec![0]),
+        )
+        .unwrap();
+
+        let reg: ExtensionRegistry = [e, PRELUDE.to_owned()].into();
+        let ar_def = reg
+            .get(&ARRAY_EXT_ID)
+            .unwrap()
+            .get_type(&ARRAY_TYPE_NAME)
+            .unwrap();
+        let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
+        let tyvar = TypeArg::new_type_variable(0, typarams[0].clone());
+        let szvar = TypeArg::new_type_variable(1, typarams[1].clone());
+
+        // Valid schema...
+        let good_array =
+            Type::new_extension(ar_def.instantiate_concrete([tyvar.clone(), szvar.clone()])?);
+        let good_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(good_array), &reg)?;
+
+        // Sanity check (good args)
+        good_ts.compute_signature(
+            &"reverse".into(),
+            &[TypeArg::Type(USIZE_T), TypeArg::BoundedNat(5)],
+            &HashMap::new(),
+        )?;
+
+        let wrong_args = good_ts.compute_signature(
+            &"reverse".into(),
+            &[TypeArg::BoundedNat(5), TypeArg::Type(USIZE_T)],
+            &HashMap::new(),
+        );
+        assert_eq!(
+            wrong_args,
+            Err(SignatureError::TypeArgMismatch(
+                TypeArgError::TypeMismatch {
+                    param: typarams[0].clone(),
+                    arg: TypeArg::BoundedNat(5)
+                }
+            ))
+        );
+
+        // (Try to) make a schema with bad args
+        let arg_err = SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+            param: typarams[0].clone(),
+            arg: szvar.clone(),
+        });
+        assert_eq!(
+            ar_def.instantiate_concrete([szvar.clone(), tyvar.clone()]),
+            Err(arg_err.clone())
+        );
+        // ok, so that doesn't work - well, it shouldn't! So let's say we just have this signature (with bad args)...
+        let bad_array = Type::new_extension(CustomType::new(
+            ARRAY_TYPE_NAME,
+            [szvar, tyvar],
+            ARRAY_EXT_ID,
+            TypeBound::Any,
+        ));
+        let bad_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(bad_array), &reg);
+        assert_eq!(bad_ts.err(), Some(arg_err));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_misused_variables() -> Result<(), SignatureError> {
+        // Variables in args have different bounds from variable declaration
+        let tv = TypeArg::new_type_variable(0, TypeParam::Type(TypeBound::Copyable));
+        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let body_type = id_fn(Type::new_extension(list_def.instantiate_concrete([tv])?));
+        let reg = [EXTENSION.to_owned()].into();
+        for decl in [
+            TypeParam::Extensions,
+            TypeParam::List(Box::new(TypeParam::max_nat())),
+            TypeParam::Type(TypeBound::Any),
+        ] {
+            let invalid_ts = OpDefTypeScheme::new([decl.clone()], body_type.clone(), &reg);
+            assert_eq!(
+                invalid_ts.err(),
+                Some(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    used: TypeParam::Type(TypeBound::Copyable),
+                    decl: Some(decl)
+                })
+            );
+        }
+        // Variable not declared at all
+        let invalid_ts = OpDefTypeScheme::new([], body_type, &reg);
+        assert_eq!(
+            invalid_ts.err(),
+            Some(SignatureError::TypeVarDoesNotMatchDeclaration {
+                used: TypeParam::Type(TypeBound::Copyable),
+                decl: None
+            })
+        );
+
+        Ok(())
+    }
+}

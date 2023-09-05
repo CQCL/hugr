@@ -336,10 +336,14 @@ impl Type {
 }
 
 fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
-    row.iter()
+    println!("ALAN subst_row {:?} with {:?}", row, args);
+    let res = row
+        .iter()
         .map(|t| t.substitute(exts, args))
         .collect::<Vec<_>>()
-        .into()
+        .into();
+    println!("ALAN ==> {:?}", res);
+    res
 }
 
 /// Return the type row of variants required to define a Sum of Tuples type
