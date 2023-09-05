@@ -53,6 +53,6 @@ impl<'a> CustomSignatureFunc for OpDefTypeScheme<'a> {
         _misc: &std::collections::HashMap<String, serde_yaml::Value>,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params).map_err(SignatureError::TypeArgMismatch)?;
-        Ok(self.body.clone().substitute(self.exts, args))
+        Ok(self.body.substitute(self.exts, args))
     }
 }
