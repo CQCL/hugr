@@ -11,7 +11,7 @@ jobs:
     outputs:
       msg: ${{ steps.make_msg.outputs.msg }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install llvm
