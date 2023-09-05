@@ -83,7 +83,7 @@ mod test {
     #[test]
     fn test_float_types_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.float.types");
+        assert_eq!(r.name() as &str, "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
     }

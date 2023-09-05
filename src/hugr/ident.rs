@@ -58,12 +58,6 @@ impl std::ops::Deref for IdentList {
     }
 }
 
-impl PartialEq<str> for IdentList {
-    fn eq(&self, other: &str) -> bool {
-        self.0.eq(other)
-    }
-}
-
 impl TryInto<IdentList> for &str {
     type Error = InvalidIdentifier;
 

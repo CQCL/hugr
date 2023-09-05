@@ -124,7 +124,7 @@ mod test {
     #[test]
     fn test_float_ops_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.float");
+        assert_eq!(r.name() as &str, "arithmetic.float");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.starts_with('f'));

@@ -115,7 +115,7 @@ pub(crate) mod test {
     #[test]
     fn test_logic_extension() {
         let r: Extension = extension();
-        assert_eq!(r.name(), "logic");
+        assert_eq!(r.name() as &str, "logic");
         assert_eq!(r.operations().count(), 3);
     }
 

@@ -454,7 +454,7 @@ mod test {
     #[test]
     fn test_int_ops_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.int");
+        assert_eq!(r.name() as &str, "arithmetic.int");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.starts_with('i'));
