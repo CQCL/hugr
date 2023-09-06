@@ -44,8 +44,10 @@ impl<'g> pv::IntoNodeReferences for &'g Hugr {
 macro_rules! impl_petgraph_into_noderefs {
     ($hugr:ident) => {
         impl<'g, 'a, Root, Base> pv::IntoNodeReferences for &'g $hugr<'a, Root, Base>
-        where 
-        Root:NodeHandle, 'g: 'a, Base: HugrInternals + HugrView
+        where
+            Root: NodeHandle,
+            'g: 'a,
+            Base: HugrInternals + HugrView,
         {
             type NodeRef = HugrNodeRef<'a>;
             type NodeReferences =
@@ -57,7 +59,7 @@ macro_rules! impl_petgraph_into_noderefs {
                     .map_with_context(|n, &hugr| HugrNodeRef::from_node(n, hugr))
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_region_petgraph_traits {
@@ -182,12 +184,15 @@ macro_rules! impl_region_petgraph_traits {
     };
 }
 
+#[rustfmt::skip]
 impl_region_petgraph_traits!(Hugr<>);
 
 impl_petgraph_into_noderefs!(SiblingGraph);
 impl_petgraph_into_noderefs!(DescendantsGraph);
-impl_region_petgraph_traits!(SiblingGraph<'a, Root:NodeHandle, Base: HugrInternals + HugrView>);
-impl_region_petgraph_traits!(DescendantsGraph<'a, Root: NodeHandle, Base: HugrInternals + HugrView>);
+impl_region_petgraph_traits!(SiblingGraph<'a, Root: NodeHandle, Base: HugrInternals + HugrView>);
+impl_region_petgraph_traits!(
+    DescendantsGraph<'a, Root: NodeHandle, Base: HugrInternals + HugrView>
+);
 
 /// Reference to a Hugr node and its associated OpType.
 #[derive(Debug, Clone, Copy)]
