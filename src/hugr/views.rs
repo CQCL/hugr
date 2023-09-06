@@ -1,13 +1,16 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
-pub mod hierarchy;
+pub mod descendants;
+mod petgraph;
 pub mod sibling;
+pub mod sibling_subgraph;
 
 #[cfg(test)]
 mod tests;
 
-pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
-pub use sibling::SiblingSubgraph;
+pub use descendants::DescendantsGraph;
+pub use sibling::SiblingGraph;
+pub use sibling_subgraph::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
@@ -18,8 +21,8 @@ use super::{Hugr, NodeMetadata, NodeType};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
-use crate::Direction;
-use crate::{Node, Port};
+use crate::{Direction, Node, Port};
+use ::petgraph::visit as pv;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -226,6 +229,27 @@ pub trait HugrView: sealed::HugrInternals {
             })
             .finish()
     }
+}
+
+/// A common trait for views of a HUGR hierarchical subgraph.
+pub trait HierarchyView<'a>:
+    HugrView
+    + pv::GraphBase<NodeId = Node>
+    + pv::GraphProp
+    + pv::NodeCount
+    + pv::NodeIndexable
+    + pv::EdgeCount
+    + pv::Visitable
+    + pv::GetAdjacencyMatrix
+    + pv::Visitable
+where
+    for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
+{
+    /// The base from which the subgraph is derived.
+    type Base;
+
+    /// Create a hierarchical view of a HUGR given a root node.
+    fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
 impl<T> HugrView for T
