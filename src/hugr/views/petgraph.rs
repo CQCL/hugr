@@ -30,54 +30,6 @@ where
 {
 }
 
-impl pv::GraphBase for Hugr {
-    type NodeId = Node;
-    type EdgeId = ((Node, Port), (Node, Port));
-}
-
-impl pv::GraphProp for Hugr {
-    type EdgeType = petgraph::Directed;
-}
-
-impl pv::NodeCount for Hugr {
-    fn node_count(&self) -> usize {
-        HugrView::node_count(self)
-    }
-}
-
-impl pv::NodeIndexable for Hugr {
-    fn node_bound(&self) -> usize {
-        HugrView::node_count(self)
-    }
-
-    fn to_index(&self, ix: Self::NodeId) -> usize {
-        ix.index.into()
-    }
-
-    fn from_index(&self, ix: usize) -> Self::NodeId {
-        NodeIndex::new(ix).into()
-    }
-}
-
-impl pv::EdgeCount for Hugr {
-    fn edge_count(&self) -> usize {
-        HugrView::edge_count(self)
-    }
-}
-
-impl pv::Data for Hugr {
-    type NodeWeight = OpType;
-    type EdgeWeight = EdgeKind;
-}
-
-impl<'g> pv::IntoNodeIdentifiers for &'g Hugr {
-    type NodeIdentifiers = <Hugr as HugrView>::Nodes<'g>;
-
-    fn node_identifiers(self) -> Self::NodeIdentifiers {
-        self.nodes()
-    }
-}
-
 impl<'g> pv::IntoNodeReferences for &'g Hugr {
     type NodeRef = HugrNodeRef<'g>;
     type NodeReferences = MapWithCtx<<Hugr as HugrView>::Nodes<'g>, Self, HugrNodeRef<'g>>;
@@ -88,58 +40,6 @@ impl<'g> pv::IntoNodeReferences for &'g Hugr {
             .map_with_context(|n, &hugr| HugrNodeRef::from_node(n, hugr))
     }
 }
-
-impl<'g> pv::IntoNeighbors for &'g Hugr {
-    type Neighbors = <Hugr as HugrView>::Neighbours<'g>;
-
-    fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
-        self.output_neighbours(n)
-    }
-}
-
-impl<'g> pv::IntoNeighborsDirected for &'g Hugr {
-    type NeighborsDirected = <Hugr as HugrView>::Neighbours<'g>;
-
-    fn neighbors_directed(
-        self,
-        n: Self::NodeId,
-        d: petgraph::Direction,
-    ) -> Self::NeighborsDirected {
-        self.neighbours(n, d.into())
-    }
-}
-
-impl pv::Visitable for Hugr {
-    type Map = std::collections::HashSet<Self::NodeId>;
-
-    fn visit_map(&self) -> Self::Map {
-        std::collections::HashSet::new()
-    }
-
-    fn reset_map(&self, map: &mut Self::Map) {
-        map.clear();
-    }
-}
-
-impl pv::GetAdjacencyMatrix for Hugr {
-    type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
-
-    fn adjacency_matrix(&self) -> Self::AdjMatrix {
-        let mut matrix = std::collections::HashSet::new();
-        for node in self.nodes() {
-            for neighbour in self.output_neighbours(node) {
-                matrix.insert((node, neighbour));
-            }
-        }
-        matrix
-    }
-
-    fn is_adjacent(&self, matrix: &Self::AdjMatrix, a: Self::NodeId, b: Self::NodeId) -> bool {
-        matrix.contains(&(a, b))
-    }
-}
-
-impl PetgraphHugr for Hugr {}
 
 macro_rules! impl_petgraph_into_noderefs {
     ($hugr:ident) => {
@@ -281,6 +181,8 @@ macro_rules! impl_region_petgraph_traits {
         }
     };
 }
+
+impl_region_petgraph_traits!(Hugr);
 
 impl_petgraph_into_noderefs!(SiblingGraph);
 impl_petgraph_into_noderefs!(DescendantsGraph);
