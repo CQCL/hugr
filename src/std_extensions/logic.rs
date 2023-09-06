@@ -50,7 +50,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::BoundedNat(n) => *n,
+                    TypeArg::BoundedNat { n } => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -75,7 +75,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::BoundedNat(n) => *n,
+                    TypeArg::BoundedNat { n } => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -134,7 +134,7 @@ pub(crate) mod test {
     /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat(2)])
+            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat { n: 2 }])
             .unwrap()
             .into()
     }
