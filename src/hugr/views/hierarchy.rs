@@ -14,11 +14,8 @@
 //! interchangeably. They implement [`HugrView`] as well as petgraph's _visit_
 //! traits.
 
-pub mod petgraph;
-
 use std::iter;
 
-use ::petgraph::visit as pv;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
@@ -27,7 +24,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HugrView, NodeMetadata};
+use super::{sealed::HugrInternals, HierarchyView, HugrView, NodeMetadata};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -403,27 +400,6 @@ where
     fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
         self.base_hugr().get_function_type()
     }
-}
-
-/// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>:
-    HugrView
-    + pv::GraphBase<NodeId = Node>
-    + pv::GraphProp
-    + pv::NodeCount
-    + pv::NodeIndexable
-    + pv::EdgeCount
-    + pv::Visitable
-    + pv::GetAdjacencyMatrix
-    + pv::Visitable
-where
-    for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
-{
-    /// The base from which the subgraph is derived.
-    type Base;
-
-    /// Create a hierarchical view of a HUGR given a root node.
-    fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
