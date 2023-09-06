@@ -1,6 +1,7 @@
 //! The Hugr data structure, and its basic component handles.
 
 pub mod hugrmut;
+
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;

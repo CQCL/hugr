@@ -4,10 +4,9 @@ use super::{
     BuildError, Container,
 };
 
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::{
     extension::ExtensionRegistry,
-    hugr::{views::HugrView, ValidationError},
+    hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
     types::{Type, TypeBound},
 };
