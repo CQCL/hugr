@@ -103,7 +103,7 @@ impl TypeArg {
     ) -> Result<(), SignatureError> {
         match self {
             TypeArg::Type { ty } => ty.validate(extension_registry),
-            TypeArg::BoundedNat { n: _ } => Ok(()),
+            TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
