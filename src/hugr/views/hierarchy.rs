@@ -29,7 +29,7 @@ use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
 
 use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
-type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, MultiPortGraph>;
+type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
 /// View of a HUGR sibling graph.
 ///
@@ -221,7 +221,7 @@ where
     }
 }
 
-type RegionGraph<'g> = portgraph::view::Region<'g, MultiPortGraph>;
+type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
 /// View of a HUGR descendants graph.
 ///
@@ -483,10 +483,10 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = FlatRegionGraph<'g>;
+    type Portgraph<'p> = &'p FlatRegionGraph<'g> where Self: 'p;
 
     #[inline]
-    fn portgraph(&self) -> &Self::Portgraph {
+    fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
     }
 
@@ -506,10 +506,10 @@ where
     Root: NodeHandle,
     Base: HugrInternals,
 {
-    type Portgraph = RegionGraph<'g>;
+    type Portgraph<'p> = &'p RegionGraph<'g> where Self: 'p;
 
     #[inline]
-    fn portgraph(&self) -> &Self::Portgraph {
+    fn portgraph(&self) -> Self::Portgraph<'_> {
         &self.graph
     }
 
