@@ -61,26 +61,26 @@ macro_rules! impl_petgraph_into_noderefs {
 }
 
 macro_rules! impl_region_petgraph_traits {
-    ($hugr:ident $(< $($l:lifetime,)? $($v:ident: $b:tt $(+ $b2:tt)*),* >)? ) => {
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GraphBase for $hugr$(<$($l,)? $($v),*>)?
+    ($hugr:ident $(< $($l:lifetime,)? $($v:ident $(:$b:tt $(+ $b2:tt)*)?),* >)? ) => {
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::GraphBase for $hugr$(<$($l,)? $($v),*>)?
         {
             type NodeId = Node;
             type EdgeId = ((Node, Port), (Node, Port));
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GraphProp for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::GraphProp for $hugr$(<$($l,)? $($v),*>)?
         {
             type EdgeType = petgraph::Directed;
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::NodeCount for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::NodeCount for $hugr$(<$($l,)? $($v),*>)?
         {
             fn node_count(&self) -> usize {
                 HugrView::node_count(self)
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::NodeIndexable for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::NodeIndexable for $hugr$(<$($l,)? $($v),*>)?
         {
             fn node_bound(&self) -> usize {
                 HugrView::node_count(self)
@@ -95,20 +95,20 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::EdgeCount for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::EdgeCount for $hugr$(<$($l,)? $($v),*>)?
         {
             fn edge_count(&self) -> usize {
                 HugrView::edge_count(self)
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::Data for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::Data for $hugr$(<$($l,)? $($v),*>)?
         {
             type NodeWeight = OpType;
             type EdgeWeight = EdgeKind;
         }
 
-        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNodeIdentifiers for &'g $hugr$(<$($l,)? $($v),*>)?
+        impl <'g $(, $($l,)? $($v $(:$b $(+ $b2)*)?),*)?> pv::IntoNodeIdentifiers for &'g $hugr$(<$($l,)? $($v),*>)?
         {
             type NodeIdentifiers = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Nodes<'g>;
 
@@ -117,7 +117,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNeighbors for &'g $hugr$(<$($l,)? $($v),*>)?
+        impl <'g $(, $($l,)? $($v $(:$b $(+ $b2)*)?),*)?> pv::IntoNeighbors for &'g $hugr$(<$($l,)? $($v),*>)?
         {
             type Neighbors = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Neighbours<'g>;
 
@@ -126,7 +126,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNeighborsDirected for &'g $hugr$(<$($l,)? $($v),*>)?
+        impl <'g $(, $($l,)? $($v $(:$b $(+ $b2)*)?),*)?> pv::IntoNeighborsDirected for &'g $hugr$(<$($l,)? $($v),*>)?
         {
             type NeighborsDirected = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Neighbours<'g>;
 
@@ -139,7 +139,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::Visitable for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::Visitable for $hugr$(<$($l,)? $($v),*>)?
         {
             type Map = std::collections::HashSet<Self::NodeId>;
 
@@ -152,7 +152,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GetAdjacencyMatrix for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? pv::GetAdjacencyMatrix for $hugr$(<$($l,)? $($v),*>)?
         {
             type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
 
@@ -176,7 +176,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? PetgraphHugr for $hugr$(<$($l,)? $($v),*>)?
+        impl $(<$($l,)? $($v $(:$b $(+ $b2)*)?),*>)? PetgraphHugr for $hugr$(<$($l,)? $($v),*>)?
         {
         }
     };
