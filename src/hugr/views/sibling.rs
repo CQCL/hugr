@@ -81,7 +81,7 @@ impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
     /// subgraph is empty.
     pub fn try_from_dataflow_graph<Root>(dfg_graph: &'g Base) -> Result<Self, InvalidSubgraph>
     where
-        Base: HugrView<RootHandle = Root>,
+        Base: Clone + HugrView<RootHandle = Root>,
         Root: ContainerHandle<ChildrenHandle = DataflowOpID>,
     {
         let parent = dfg_graph.root();
@@ -147,7 +147,7 @@ impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
         outgoing: OutgoingPorts,
     ) -> Result<Self, InvalidSubgraph>
     where
-        Base: HugrView,
+        Base: Clone + HugrView,
     {
         let mut checker = ConvexChecker::new(base);
         Self::try_from_boundary_ports_with_checker(base, incoming, outgoing, &mut checker)
@@ -168,14 +168,14 @@ impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
         checker: &mut ConvexChecker<'g, Base>,
     ) -> Result<Self, InvalidSubgraph>
     where
-        Base: HugrView,
+        Base: Clone + HugrView,
     {
         let pg = base.portgraph();
         let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
 
         // Ordering of the edges here is preserved and becomes ordering of the signature.
         let subpg = Subgraph::new_subgraph(
-            pg,
+            pg.clone(),
             inputs
                 .iter()
                 .flatten()
@@ -377,8 +377,8 @@ impl<'g, Base: HugrView> SiblingSubgraph<'g, Base> {
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct ConvexChecker<'g, Base: HugrView>(
-    portgraph::algorithms::ConvexChecker<&'g Base::Portgraph>,
+pub struct ConvexChecker<'g, Base: 'g + HugrView>(
+    portgraph::algorithms::ConvexChecker<Base::Portgraph<'g>>,
 );
 
 impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
