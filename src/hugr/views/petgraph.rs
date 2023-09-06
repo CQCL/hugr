@@ -141,39 +141,46 @@ impl pv::GetAdjacencyMatrix for Hugr {
 
 impl PetgraphHugr for Hugr {}
 
-macro_rules! impl_region_petgraph_traits {
+macro_rules! impl_petgraph_into_noderefs {
     ($hugr:ident) => {
-        impl<'a, Root, Base> pv::GraphBase for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl<'g, 'a, Root, Base> pv::IntoNodeReferences for &'g $hugr<'a, Root, Base>
+        where 
+        Root:NodeHandle, 'g: 'a, Base: HugrInternals + HugrView
+        {
+            type NodeRef = HugrNodeRef<'a>;
+            type NodeReferences =
+                MapWithCtx<<$hugr<'a, Root, Base> as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
+
+            fn node_references(self) -> Self::NodeReferences {
+                self.nodes()
+                    .with_context(self)
+                    .map_with_context(|n, &hugr| HugrNodeRef::from_node(n, hugr))
+            }
+        }
+    }
+}
+
+macro_rules! impl_region_petgraph_traits {
+    ($hugr:ident $(< $($l:lifetime,)? $($v:ident: $b:tt $(+ $b2:tt)*),* >)? ) => {
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GraphBase for $hugr$(<$($l,)? $($v),*>)?
         {
             type NodeId = Node;
             type EdgeId = ((Node, Port), (Node, Port));
         }
 
-        impl<'a, Root, Base> pv::GraphProp for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GraphProp for $hugr$(<$($l,)? $($v),*>)?
         {
             type EdgeType = petgraph::Directed;
         }
 
-        impl<'a, Root, Base> pv::NodeCount for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::NodeCount for $hugr$(<$($l,)? $($v),*>)?
         {
             fn node_count(&self) -> usize {
                 HugrView::node_count(self)
             }
         }
 
-        impl<'a, Root, Base> pv::NodeIndexable for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::NodeIndexable for $hugr$(<$($l,)? $($v),*>)?
         {
             fn node_bound(&self) -> usize {
                 HugrView::node_count(self)
@@ -188,72 +195,40 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Root, Base> pv::EdgeCount for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::EdgeCount for $hugr$(<$($l,)? $($v),*>)?
         {
             fn edge_count(&self) -> usize {
                 HugrView::edge_count(self)
             }
         }
 
-        impl<'a, Root, Base> pv::Data for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::Data for $hugr$(<$($l,)? $($v),*>)?
         {
             type NodeWeight = OpType;
             type EdgeWeight = EdgeKind;
         }
 
-        impl<'g, 'a, Root, Base> pv::IntoNodeIdentifiers for &'g $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNodeIdentifiers for &'g $hugr$(<$($l,)? $($v),*>)?
         {
-            type NodeIdentifiers = <$hugr<'a, Root, Base> as HugrView>::Nodes<'g>;
+            type NodeIdentifiers = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Nodes<'g>;
 
             fn node_identifiers(self) -> Self::NodeIdentifiers {
                 self.nodes()
             }
         }
 
-        impl<'g, 'a, Root, Base> pv::IntoNodeReferences for &'g $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            'g: 'a,
-            Base: HugrInternals + HugrView,
+        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNeighbors for &'g $hugr$(<$($l,)? $($v),*>)?
         {
-            type NodeRef = HugrNodeRef<'a>;
-            type NodeReferences =
-                MapWithCtx<<$hugr<'a, Root, Base> as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
-
-            fn node_references(self) -> Self::NodeReferences {
-                self.nodes()
-                    .with_context(self)
-                    .map_with_context(|n, &hugr| HugrNodeRef::from_node(n, hugr))
-            }
-        }
-
-        impl<'g, 'a, Root, Base> pv::IntoNeighbors for &'g $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
-        {
-            type Neighbors = <$hugr<'a, Root, Base> as HugrView>::Neighbours<'g>;
+            type Neighbors = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Neighbours<'g>;
 
             fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
                 self.output_neighbours(n)
             }
         }
 
-        impl<'g, 'a, Root, Base> pv::IntoNeighborsDirected for &'g $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl <'g $(, $($l,)? $($v: $b $(+ $b2)*),*)?> pv::IntoNeighborsDirected for &'g $hugr$(<$($l,)? $($v),*>)?
         {
-            type NeighborsDirected = <$hugr<'a, Root, Base> as HugrView>::Neighbours<'g>;
+            type NeighborsDirected = <$hugr$(<$($l,)? $($v),*>)? as HugrView>::Neighbours<'g>;
 
             fn neighbors_directed(
                 self,
@@ -264,10 +239,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Root, Base> pv::Visitable for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::Visitable for $hugr$(<$($l,)? $($v),*>)?
         {
             type Map = std::collections::HashSet<Self::NodeId>;
 
@@ -280,10 +252,7 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Root, Base> pv::GetAdjacencyMatrix for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? pv::GetAdjacencyMatrix for $hugr$(<$($l,)? $($v),*>)?
         {
             type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
 
@@ -307,17 +276,16 @@ macro_rules! impl_region_petgraph_traits {
             }
         }
 
-        impl<'a, Root, Base> PetgraphHugr for $hugr<'a, Root, Base>
-        where
-            Root: NodeHandle,
-            Base: HugrInternals + HugrView,
+        impl $(<$($l,)? $($v: $b $(+ $b2)*),*>)? PetgraphHugr for $hugr$(<$($l,)? $($v),*>)?
         {
         }
     };
 }
 
-impl_region_petgraph_traits!(SiblingGraph);
-impl_region_petgraph_traits!(DescendantsGraph);
+impl_petgraph_into_noderefs!(SiblingGraph);
+impl_petgraph_into_noderefs!(DescendantsGraph);
+impl_region_petgraph_traits!(SiblingGraph<'a, Root:NodeHandle, Base: HugrInternals + HugrView>);
+impl_region_petgraph_traits!(DescendantsGraph<'a, Root: NodeHandle, Base: HugrInternals + HugrView>);
 
 /// Reference to a Hugr node and its associated OpType.
 #[derive(Debug, Clone, Copy)]
