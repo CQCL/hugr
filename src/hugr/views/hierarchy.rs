@@ -14,8 +14,6 @@
 //! interchangeably. They implement [`HugrView`] as well as petgraph's _visit_
 //! traits.
 
-pub mod petgraph;
-
 use std::iter;
 
 use ::petgraph::visit as pv;
@@ -26,6 +24,8 @@ use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
+
+use super::petgraph::PetgraphHugr;
 
 use super::{sealed::HugrInternals, HugrView, NodeMetadata};
 
@@ -406,16 +406,7 @@ where
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>:
-    HugrView
-    + pv::GraphBase<NodeId = Node>
-    + pv::GraphProp
-    + pv::NodeCount
-    + pv::NodeIndexable
-    + pv::EdgeCount
-    + pv::Visitable
-    + pv::GetAdjacencyMatrix
-    + pv::Visitable
+pub trait HierarchyView<'a>: HugrView + PetgraphHugr
 where
     for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
 {

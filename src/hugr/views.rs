@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod hierarchy;
+pub mod petgraph;
 pub mod sibling;
 
 #[cfg(test)]
