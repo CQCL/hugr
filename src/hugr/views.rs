@@ -1,13 +1,15 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
-pub mod hierarchy;
+pub mod descendants;
 mod petgraph;
+pub mod sibling;
 pub mod sibling_subgraph;
 
 #[cfg(test)]
 mod tests;
 
-pub use hierarchy::{DescendantsGraph, SiblingGraph};
+pub use descendants::DescendantsGraph;
+pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
