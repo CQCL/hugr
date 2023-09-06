@@ -15,21 +15,28 @@ use crate::types::{CustomCheckFailure, CustomType};
 
 /// A constant value of a primitive (or leaf) type.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "pv")]
 pub enum PrimValue {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
-    Extension((Box<dyn CustomConst>,)),
+    Extension {
+        #[allow(missing_docs)]
+        c: (Box<dyn CustomConst>,),
+    },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
-    Function(Box<Hugr>),
+    Function {
+        #[allow(missing_docs)]
+        hugr: Box<Hugr>,
+    },
 }
 
 impl PrimValue {
     fn name(&self) -> String {
         match self {
-            PrimValue::Extension(e) => format!("const:custom:{}", e.0.name()),
-            PrimValue::Function(h) => {
+            PrimValue::Extension { c: e } => format!("const:custom:{}", e.0.name()),
+            PrimValue::Function { hugr: h } => {
                 let Some(t) = h.get_function_type() else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
@@ -42,26 +49,40 @@ impl PrimValue {
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "v")]
 pub enum Value {
     /// A primitive (non-container) value.
-    Prim(PrimValue),
+    Prim {
+        #[allow(missing_docs)]
+        val: PrimValue,
+    },
     /// A tuple
-    Tuple(Vec<Value>),
+    Tuple {
+        #[allow(missing_docs)]
+        vs: Vec<Value>,
+    },
     /// A Sum variant -- for any Sum type where this value meets
     /// the type of the variant indicated by the tag
-    Sum(usize, Box<Value>), // Tag and value
+    Sum {
+        /// The tag index of the variant
+        tag: usize,
+        /// The value of the variant
+        value: Box<Value>,
+    },
 }
 
 impl Value {
     /// Returns the name of this [`Value`].
     pub fn name(&self) -> String {
         match self {
-            Value::Prim(p) => p.name(),
-            Value::Tuple(vals) => {
+            Value::Prim { val: p } => p.name(),
+            Value::Tuple { vs: vals } => {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
-            Value::Sum(tag, val) => format!("const:sum:{{tag:{tag}, val:{}}}", val.name()),
+            Value::Sum { tag, value: val } => {
+                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            }
         }
     }
 
@@ -72,7 +93,7 @@ impl Value {
 
     /// Constant unit type (empty Tuple).
     pub const fn unit() -> Self {
-        Self::Tuple(vec![])
+        Self::Tuple { vs: vec![] }
     }
 
     /// Constant Sum over units, used as predicates.
@@ -87,17 +108,24 @@ impl Value {
 
     /// Tuple of values.
     pub fn tuple(items: impl IntoIterator<Item = Value>) -> Self {
-        Self::Tuple(items.into_iter().collect())
+        Self::Tuple {
+            vs: items.into_iter().collect(),
+        }
     }
 
     /// Sum value (could be of any compatible type, e.g. a predicate)
     pub fn sum(tag: usize, value: Value) -> Self {
-        Self::Sum(tag, Box::new(value))
+        Self::Sum {
+            tag,
+            value: Box::new(value),
+        }
     }
 
     /// New custom value (of type that implements [`CustomConst`]).
     pub fn custom<C: CustomConst>(c: C) -> Self {
-        Self::Prim(PrimValue::Extension((Box::new(c),)))
+        Self::Prim {
+            val: PrimValue::Extension { c: (Box::new(c),) },
+        }
     }
 }
 
@@ -246,7 +274,11 @@ pub(crate) mod test {
 
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
-        let v = Value::Prim(PrimValue::Function(Box::new(simple_dfg_hugr)));
+        let v = Value::Prim {
+            val: PrimValue::Function {
+                hugr: Box::new(simple_dfg_hugr),
+            },
+        };
 
         let correct_type = Type::new_function(FunctionType::new_linear(type_row![
             crate::extension::prelude::BOOL_T
