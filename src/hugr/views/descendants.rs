@@ -21,8 +21,8 @@ type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 /// its immediate children.  Prefer using [`SiblingGraph`] when possible,
 /// as it is more efficient.
 ///
-/// Implements the [`HierarchyView`] trait, as well as [`HugrView`] and petgraph's
-/// _visit_ traits, so can be  used interchangeably with [`SiblingGraph`].
+/// Implements the [`HierarchyView`] trait, as well as [`HugrView`], it can be
+/// used interchangeably with [`SiblingGraph`].
 ///
 /// [`SiblingGraph`]: super::SiblingGraph
 pub struct DescendantsGraph<'g, Root = Node, Base = Hugr>

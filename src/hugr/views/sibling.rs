@@ -21,8 +21,8 @@ type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 ///
 /// See [`DescendantsGraph`] for a view that includes all descendants of the root.
 ///
-/// Implements the [`HierarchyView`] trait, as well as [`HugrView`] and petgraph's
-/// _visit_ traits, so can be  used interchangeably with [`DescendantsGraph`].
+/// Implements the [`HierarchyView`] trait, as well as [`HugrView`], it can be
+/// used interchangeably with [`DescendantsGraph`].
 ///
 /// [`DescendantsGraph`]: super::DescendantsGraph
 pub struct SiblingGraph<'g, Root = Node, Base = Hugr>

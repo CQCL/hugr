@@ -1,13 +1,14 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 pub mod descendants;
-mod petgraph;
+pub mod petgraph;
 pub mod sibling;
 pub mod sibling_subgraph;
 
 #[cfg(test)]
 mod tests;
 
+pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
@@ -22,7 +23,6 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Node, Port};
-use ::petgraph::visit as pv;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -181,6 +181,15 @@ pub trait HugrView: sealed::HugrInternals {
     /// type. Otherwise return None.
     fn get_function_type(&self) -> Option<&FunctionType>;
 
+    /// Return a wrapper over the view that can be used in petgraph algorithms.
+    #[inline]
+    fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
+    where
+        Self: Sized,
+    {
+        PetgraphWrapper { hugr: self }
+    }
+
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
         let hugr = self.base_hugr();
@@ -232,19 +241,7 @@ pub trait HugrView: sealed::HugrInternals {
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>:
-    HugrView
-    + pv::GraphBase<NodeId = Node>
-    + pv::GraphProp
-    + pv::NodeCount
-    + pv::NodeIndexable
-    + pv::EdgeCount
-    + pv::Visitable
-    + pv::GetAdjacencyMatrix
-    + pv::Visitable
-where
-    for<'g> &'g Self: pv::IntoNeighborsDirected + pv::IntoNodeIdentifiers,
-{
+pub trait HierarchyView<'a>: HugrView {
     /// The base from which the subgraph is derived.
     type Base;
 

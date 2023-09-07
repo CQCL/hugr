@@ -101,7 +101,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region, entry_node)
+        dominators::simple_fast(&region.as_petgraph(), entry_node)
     }
 
     /// Check the constraints on a single node.
@@ -365,8 +365,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         };
 
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
-        let postorder = Topo::new(&region);
-        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let postorder = Topo::new(&region.as_petgraph());
+        let nodes_visited = postorder
+            .iter(&region.as_petgraph())
+            .filter(|n| *n != parent)
+            .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {
