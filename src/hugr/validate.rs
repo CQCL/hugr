@@ -22,6 +22,7 @@ use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
+use super::views::petgraph::PetgraphWrapper;
 use super::views::{HierarchyView, HugrView, SiblingGraph};
 use super::NodeType;
 
@@ -99,7 +100,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
+        let region: PetgraphWrapper<SiblingGraph> =
+            PetgraphWrapper::new(SiblingGraph::new(self.hugr, parent));
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region, entry_node)
     }
@@ -364,7 +366,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
+        let region: PetgraphWrapper<SiblingGraph> =
+            PetgraphWrapper::new(SiblingGraph::new(self.hugr, parent));
         let postorder = Topo::new(&region);
         let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
         let node_count = self.hugr.children(parent).count();
