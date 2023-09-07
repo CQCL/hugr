@@ -44,7 +44,7 @@ const fn is_valid_log_width(n: u8) -> bool {
 }
 
 /// The smallest forbidden log width.
-pub const LOG_WIDTH_BOUND: u8 = 8;
+pub const LOG_WIDTH_BOUND: u8 = 7;
 
 /// Type parameter for the log width of the integer.
 // SAFETY: unsafe block should be ok as the value is definitely not zero.
@@ -75,25 +75,25 @@ pub(super) const fn type_arg(log_width: u8) -> TypeArg {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntU {
     log_width: u8,
-    value: u128,
+    value: u64,
 }
 
 /// A signed integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntS {
     log_width: u8,
-    value: i128,
+    value: i64,
 }
 
 impl ConstIntU {
     /// Create a new [`ConstIntU`]
-    pub fn new(log_width: u8, value: u128) -> Result<Self, ConstTypeError> {
+    pub fn new(log_width: u8, value: u64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
             ));
         }
-        if (log_width <= 6) && (value >= (1u128 << (1u8 << log_width))) {
+        if (log_width <= 5) && (value >= (1u64 << (1u8 << log_width))) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
                     "Invalid unsigned integer value.".to_owned(),
@@ -106,14 +106,14 @@ impl ConstIntU {
 
 impl ConstIntS {
     /// Create a new [`ConstIntS`]
-    pub fn new(log_width: u8, value: i128) -> Result<Self, ConstTypeError> {
+    pub fn new(log_width: u8, value: i64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
             ));
         }
         let width = 1u8 << log_width;
-        if (log_width <= 6) && (value >= (1i128 << (width - 1)) || value < -(1i128 << (width - 1)))
+        if (log_width <= 6) && (value >= (1i64 << (width - 1)) || value < -(1i64 << (width - 1)))
         {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
@@ -199,10 +199,8 @@ mod test {
         assert_matches!(get_log_width(&type_arg_32), Ok(5));
 
         let type_arg_128 = TypeArg::BoundedNat { n: 7 };
-        assert_matches!(get_log_width(&type_arg_128), Ok(7));
-        let type_arg_256 = TypeArg::BoundedNat { n: 8 };
         assert_matches!(
-            get_log_width(&type_arg_256),
+            get_log_width(&type_arg_128),
             Err(TypeArgError::TypeMismatch { .. })
         );
     }
