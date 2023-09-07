@@ -204,10 +204,6 @@ where
             None
         }
     }
-
-    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
-        self.base_hugr().get_function_type()
-    }
 }
 
 impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>

@@ -194,10 +194,6 @@ where
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         self.base_hugr().get_io(node)
     }
-
-    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
-        self.base_hugr().get_function_type()
-    }
 }
 
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
