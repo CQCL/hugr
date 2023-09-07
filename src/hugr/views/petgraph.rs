@@ -187,7 +187,6 @@ macro_rules! impl_region_petgraph_traits {
     };
 }
 
-#[rustfmt::skip]
 impl_region_petgraph_traits!(Hugr);
 
 impl_petgraph_into_noderefs!(SiblingGraph);

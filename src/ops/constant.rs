@@ -202,7 +202,7 @@ mod test {
     fn test_yaml_const() {
         let typ_int = CustomType::new(
             "mytype",
-            vec![TypeArg::BoundedNat(8)],
+            vec![TypeArg::BoundedNat { n: 8 }],
             "myrsrc",
             TypeBound::Eq,
         );

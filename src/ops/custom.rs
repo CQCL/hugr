@@ -286,12 +286,12 @@ mod test {
             "res".into(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type(USIZE_T)]);
+        assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
     }
 }

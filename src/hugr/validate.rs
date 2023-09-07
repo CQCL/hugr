@@ -1351,7 +1351,7 @@ mod test {
 
         let valid = Type::new_extension(CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             "MyExt",
             TypeBound::Any,
         ));
@@ -1363,7 +1363,7 @@ mod test {
         // valid is Any, so is not allowed as an element of an outer MyContainer.
         let element_outside_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(valid.clone())],
+            vec![TypeArg::Type { ty: valid.clone() }],
             "MyExt",
             TypeBound::Any,
         );
@@ -1371,13 +1371,13 @@ mod test {
             validate_to_sig_error(element_outside_bound),
             SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
                 param: TypeParam::Type(TypeBound::Copyable),
-                arg: TypeArg::Type(valid)
+                arg: TypeArg::Type { ty: valid }
             })
         );
 
         let bad_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             "MyExt",
             TypeBound::Copyable,
         );
@@ -1392,7 +1392,9 @@ mod test {
         // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
         let nested = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(Type::new_extension(bad_bound))],
+            vec![TypeArg::Type {
+                ty: Type::new_extension(bad_bound),
+            }],
             "MyExt",
             TypeBound::Any,
         );
@@ -1406,7 +1408,7 @@ mod test {
 
         let too_many_type_args = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T), TypeArg::BoundedNat(3)],
+            vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
             "MyExt",
             TypeBound::Any,
         );
