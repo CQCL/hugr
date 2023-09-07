@@ -100,10 +100,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: PetgraphWrapper<SiblingGraph> =
-            PetgraphWrapper::new(SiblingGraph::new(self.hugr, parent));
+        let region = SiblingGraph::new(self.hugr, parent);
+        let graph: PetgraphWrapper<SiblingGraph> = PetgraphWrapper::new(&region);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region, entry_node)
+        dominators::simple_fast(&graph, entry_node)
     }
 
     /// Check the constraints on a single node.
@@ -366,10 +366,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         };
 
-        let region: PetgraphWrapper<SiblingGraph> =
-            PetgraphWrapper::new(SiblingGraph::new(self.hugr, parent));
-        let postorder = Topo::new(&region);
-        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let region = SiblingGraph::new(self.hugr, parent);
+        let graph: PetgraphWrapper<SiblingGraph> = PetgraphWrapper::new(&region);
+        let postorder = Topo::new(&graph);
+        let nodes_visited = postorder.iter(&graph).filter(|n| *n != parent).count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {

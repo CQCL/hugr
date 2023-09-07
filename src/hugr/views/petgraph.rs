@@ -16,21 +16,21 @@ use super::sealed::HugrInternals;
 ///
 /// It can be used to apply petgraph's algorithms to a Hugr.
 #[derive(Debug, Clone, Copy)]
-pub struct PetgraphWrapper<T> {
-    hugr: T,
+pub struct PetgraphWrapper<'a, T> {
+    hugr: &'a T,
 }
 
-impl<T> PetgraphWrapper<T>
+impl<'a, T> PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
     /// Wrap a HugrView in a PetgraphWrapper.
-    pub fn new(hugr: T) -> Self {
+    pub fn new(hugr: &'a T) -> Self {
         Self { hugr }
     }
 }
 
-impl<T> pv::GraphBase for PetgraphWrapper<T>
+impl<'a, T> pv::GraphBase for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -38,14 +38,14 @@ where
     type EdgeId = ((Node, Port), (Node, Port));
 }
 
-impl<T> pv::GraphProp for PetgraphWrapper<T>
+impl<'a, T> pv::GraphProp for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
     type EdgeType = petgraph::Directed;
 }
 
-impl<T> pv::NodeCount for PetgraphWrapper<T>
+impl<'a, T> pv::NodeCount for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<T> pv::NodeIndexable for PetgraphWrapper<T>
+impl<'a, T> pv::NodeIndexable for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<T> pv::EdgeCount for PetgraphWrapper<T>
+impl<'a, T> pv::EdgeCount for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<T> pv::Data for PetgraphWrapper<T>
+impl<'a, T> pv::Data for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -88,7 +88,7 @@ where
     type EdgeWeight = EdgeKind;
 }
 
-impl<'g, T> pv::IntoNodeReferences for &'g PetgraphWrapper<T>
+impl<'g, 'a, T> pv::IntoNodeReferences for &'g PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<'g, T> pv::IntoNodeIdentifiers for &'g PetgraphWrapper<T>
+impl<'g, 'a, T> pv::IntoNodeIdentifiers for &'g PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -113,7 +113,7 @@ where
     }
 }
 
-impl<'g, T> pv::IntoNeighbors for &'g PetgraphWrapper<T>
+impl<'g, 'a, T> pv::IntoNeighbors for &'g PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -124,7 +124,7 @@ where
     }
 }
 
-impl<'g, T> pv::IntoNeighborsDirected for &'g PetgraphWrapper<T>
+impl<'g, 'a, T> pv::IntoNeighborsDirected for &'g PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -139,7 +139,7 @@ where
     }
 }
 
-impl<T> pv::Visitable for PetgraphWrapper<T>
+impl<'a, T> pv::Visitable for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -154,7 +154,7 @@ where
     }
 }
 
-impl<T> pv::GetAdjacencyMatrix for PetgraphWrapper<T>
+impl<'a, T> pv::GetAdjacencyMatrix for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -175,7 +175,7 @@ where
     }
 }
 
-impl<T> HugrInternals for PetgraphWrapper<T>
+impl<'a, T> HugrInternals for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
@@ -192,7 +192,7 @@ where
     }
 }
 
-impl<T> HugrView for PetgraphWrapper<T>
+impl<'g, T> HugrView for PetgraphWrapper<'g, T>
 where
     T: HugrView,
 {
