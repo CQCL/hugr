@@ -181,6 +181,15 @@ pub trait HugrView: sealed::HugrInternals {
     /// type. Otherwise return None.
     fn get_function_type(&self) -> Option<&FunctionType>;
 
+    /// Return a wrapper over the view that can be used in petgraph algorithms.
+    #[inline]
+    fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
+    where
+        Self: Sized,
+    {
+        PetgraphWrapper::new(self)
+    }
+
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
         let hugr = self.base_hugr();
