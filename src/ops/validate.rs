@@ -343,6 +343,7 @@ impl ValidateOp for BasicBlock {
                 inputs,
                 predicate_variants,
                 other_outputs: outputs,
+                extension_delta: _,
             } => {
                 let predicate_type = Type::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();

@@ -953,6 +953,7 @@ mod test {
             NodeType::pure(ops::CFG {
                 inputs: type_row![BOOL_T],
                 outputs: type_row![BOOL_T],
+                extension_delta: ExtensionSet::new(),
             }),
         );
         assert_matches!(
@@ -969,6 +970,7 @@ mod test {
                     inputs: type_row![BOOL_T],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![BOOL_T],
+                    extension_delta: ExtensionSet::new(),
                 },
             )
             .unwrap();
@@ -1009,6 +1011,7 @@ mod test {
                 inputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
                 other_outputs: type_row![Q],
+                extension_delta: ExtensionSet::new(),
             }),
         );
         let mut block_children = b.hierarchy.children(block.index);
