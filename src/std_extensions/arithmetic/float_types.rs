@@ -24,7 +24,7 @@ pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.
 pub struct ConstF64 {
-    #[allow(missing_docs)]
+    /// The value.
     value: f64,
 }
 
