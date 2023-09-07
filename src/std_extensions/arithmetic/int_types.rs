@@ -113,8 +113,7 @@ impl ConstIntS {
             ));
         }
         let width = 1u8 << log_width;
-        if (log_width <= 6) && (value >= (1i64 << (width - 1)) || value < -(1i64 << (width - 1)))
-        {
+        if (log_width <= 6) && (value >= (1i64 << (width - 1)) || value < -(1i64 << (width - 1))) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
                     "Invalid signed integer value.".to_owned(),
