@@ -325,6 +325,8 @@ pub trait Dataflow: Container {
             NodeType::open_extensions(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
+                // TODO: Make this a parameter
+                extension_delta: ExtensionSet::new(),
             }),
             input_wires,
         )?;

@@ -1583,7 +1583,7 @@ below).
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
 
-The possible values of `N` are 2^i for i in the range [0,7].
+The possible values of `N` are 2^i for i in the range [0,6].
 
 The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
