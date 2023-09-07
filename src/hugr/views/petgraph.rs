@@ -63,6 +63,9 @@ macro_rules! impl_petgraph_into_noderefs {
 }
 
 macro_rules! impl_region_petgraph_traits {
+    ($hugr:ident) => {
+        impl_region_petgraph_traits!($hugr<>);
+    };
     ($hugr:ident < $($l:lifetime,)? $($v:ident $(:$b:tt $(+ $b2:tt)*)?),* > ) => {
         impl <$($l,)? $($v $(:$b $(+ $b2)*)?),*> pv::GraphBase for $hugr<$($l,)? $($v),*>
         {
@@ -185,7 +188,7 @@ macro_rules! impl_region_petgraph_traits {
 }
 
 #[rustfmt::skip]
-impl_region_petgraph_traits!(Hugr<>);
+impl_region_petgraph_traits!(Hugr);
 
 impl_petgraph_into_noderefs!(SiblingGraph);
 impl_petgraph_into_noderefs!(DescendantsGraph);
