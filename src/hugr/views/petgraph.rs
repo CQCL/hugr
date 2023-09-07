@@ -6,11 +6,8 @@ use crate::types::EdgeKind;
 use crate::{Node, Port};
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
-use delegate::delegate;
 use petgraph::visit as pv;
 use portgraph::NodeIndex;
-
-use super::sealed::HugrInternals;
 
 /// Wrapper for a HugrView that implements petgraph's traits.
 ///
@@ -50,7 +47,7 @@ where
     T: HugrView,
 {
     fn node_count(&self) -> usize {
-        HugrView::node_count(self)
+        HugrView::node_count(self.hugr)
     }
 }
 
@@ -59,7 +56,7 @@ where
     T: HugrView,
 {
     fn node_bound(&self) -> usize {
-        HugrView::node_count(self)
+        HugrView::node_count(self.hugr)
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
@@ -76,7 +73,7 @@ where
     T: HugrView,
 {
     fn edge_count(&self) -> usize {
-        HugrView::edge_count(self)
+        HugrView::edge_count(self.hugr)
     }
 }
 
@@ -96,9 +93,10 @@ where
     type NodeReferences = MapWithCtx<<T as HugrView>::Nodes<'g>, Self, HugrNodeRef<'g>>;
 
     fn node_references(self) -> Self::NodeReferences {
-        self.nodes()
+        self.hugr
+            .nodes()
             .with_context(self)
-            .map_with_context(|n, &hugr| HugrNodeRef::from_node(n, hugr))
+            .map_with_context(|n, &wrapper| HugrNodeRef::from_node(n, wrapper.hugr))
     }
 }
 
@@ -109,7 +107,7 @@ where
     type NodeIdentifiers = <T as HugrView>::Nodes<'g>;
 
     fn node_identifiers(self) -> Self::NodeIdentifiers {
-        self.nodes()
+        self.hugr.nodes()
     }
 }
 
@@ -120,7 +118,7 @@ where
     type Neighbors = <T as HugrView>::Neighbours<'g>;
 
     fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
-        self.output_neighbours(n)
+        self.hugr.output_neighbours(n)
     }
 }
 
@@ -135,7 +133,7 @@ where
         n: Self::NodeId,
         d: petgraph::Direction,
     ) -> Self::NeighborsDirected {
-        self.neighbours(n, d.into())
+        self.hugr.neighbours(n, d.into())
     }
 }
 
@@ -162,8 +160,8 @@ where
 
     fn adjacency_matrix(&self) -> Self::AdjMatrix {
         let mut matrix = std::collections::HashSet::new();
-        for node in self.nodes() {
-            for neighbour in self.output_neighbours(node) {
+        for node in self.hugr.nodes() {
+            for neighbour in self.hugr.output_neighbours(node) {
                 matrix.insert((node, neighbour));
             }
         }
@@ -172,77 +170,6 @@ where
 
     fn is_adjacent(&self, matrix: &Self::AdjMatrix, a: Self::NodeId, b: Self::NodeId) -> bool {
         matrix.contains(&(a, b))
-    }
-}
-
-impl<'a, T> HugrInternals for PetgraphWrapper<'a, T>
-where
-    T: HugrView,
-{
-    type Portgraph<'p> = <T as HugrInternals>::Portgraph<'p>
-    where
-        Self: 'p;
-
-    delegate! {
-        to self.hugr {
-            fn portgraph(&self) -> Self::Portgraph<'_>;
-            fn base_hugr(&self) -> &crate::Hugr;
-            fn root_node(&self) -> Node;
-        }
-    }
-}
-
-impl<'g, T> HugrView for PetgraphWrapper<'g, T>
-where
-    T: HugrView,
-{
-    type RootHandle = T::RootHandle;
-
-    type Nodes<'a> = T::Nodes<'a>
-    where
-        Self: 'a;
-
-    type NodePorts<'a> = T::NodePorts<'a>
-    where
-        Self: 'a;
-
-    type Children<'a> = T::Children<'a>
-    where
-        Self: 'a;
-
-    type Neighbours<'a> = T::Neighbours<'a>
-    where
-        Self: 'a;
-
-    type PortLinks<'a> = T::PortLinks<'a>
-    where
-        Self: 'a;
-
-    type NodeConnections<'a> = T::NodeConnections<'a>
-    where
-        Self: 'a;
-
-    delegate! {
-        to self.hugr {
-            fn contains_node(&self, node: Node) -> bool;
-            fn get_parent(&self, node: Node) -> Option<Node>;
-            fn get_optype(&self, node: Node) -> &OpType;
-            fn get_nodetype(&self, node: Node) -> &crate::hugr::NodeType;
-            fn get_metadata(&self, node: Node) -> &crate::hugr::NodeMetadata;
-            fn node_count(&self) -> usize;
-            fn edge_count(&self) -> usize;
-            fn nodes(&self) -> Self::Nodes<'_>;
-            fn node_ports(&self, node: Node, dir: crate::Direction) -> Self::NodePorts<'_>;
-            fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
-            fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
-            fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
-            fn num_ports(&self, node: Node, dir: crate::Direction) -> usize;
-            fn children(&self, node: Node) -> Self::Children<'_>;
-            fn neighbours(&self, node: Node, dir: crate::Direction) -> Self::Neighbours<'_>;
-            fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
-            fn get_io(&self, node: Node) -> Option<[Node; 2]>;
-            fn get_function_type(&self) -> Option<&crate::types::FunctionType>;
-        }
     }
 }
 
