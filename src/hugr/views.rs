@@ -187,7 +187,7 @@ pub trait HugrView: sealed::HugrInternals {
     where
         Self: Sized,
     {
-        PetgraphWrapper::new(self)
+        PetgraphWrapper { hugr: self }
     }
 
     /// Return dot string showing underlying graph and hierarchy side by side.

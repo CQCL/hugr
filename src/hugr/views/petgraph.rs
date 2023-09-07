@@ -14,17 +14,7 @@ use portgraph::NodeIndex;
 /// It can be used to apply petgraph's algorithms to a Hugr.
 #[derive(Debug, Clone, Copy)]
 pub struct PetgraphWrapper<'a, T> {
-    hugr: &'a T,
-}
-
-impl<'a, T> PetgraphWrapper<'a, T>
-where
-    T: HugrView,
-{
-    /// Wrap a HugrView in a PetgraphWrapper.
-    pub fn new(hugr: &'a T) -> Self {
-        Self { hugr }
-    }
+    pub(crate) hugr: &'a T,
 }
 
 impl<'a, T> pv::GraphBase for PetgraphWrapper<'a, T>
