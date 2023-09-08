@@ -336,13 +336,11 @@ impl Type {
 }
 
 fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
-    println!("ALAN subst_row {:?} with {:?}", row, args);
     let res = row
         .iter()
         .map(|t| t.substitute(exts, args))
         .collect::<Vec<_>>()
         .into();
-    println!("ALAN ==> {:?}", res);
     res
 }
 
