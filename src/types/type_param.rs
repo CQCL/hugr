@@ -112,8 +112,11 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
-    /// Type variable (used in type schemes only)
-    Variable(TypeArgVariable),
+    /// Variable (used in type schemes only)
+    Variable {
+        #[allow(missing_docs)]
+        v: TypeArgVariable,
+    },
 }
 
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
@@ -134,10 +137,12 @@ impl TypeArg {
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
             },
-            _ => TypeArg::Variable(TypeArgVariable {
-                idx,
-                cached_decl: decl,
-            }),
+            _ => TypeArg::Variable {
+                v: TypeArgVariable {
+                    idx,
+                    cached_decl: decl,
+                },
+            },
         }
     }
 
@@ -160,7 +165,9 @@ impl TypeArg {
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, type_vars)),
             TypeArg::Extensions { es: _ } => Ok(()),
-            TypeArg::Variable(TypeArgVariable { idx, cached_decl }) => {
+            TypeArg::Variable {
+                v: TypeArgVariable { idx, cached_decl },
+            } => {
                 if type_vars.get(*idx) == Some(cached_decl) {
                     Ok(())
                 } else {
@@ -193,7 +200,9 @@ impl TypeArg {
             TypeArg::Extensions { es } => TypeArg::Extensions {
                 es: es.substitute(args),
             },
-            TypeArg::Variable(TypeArgVariable { idx, .. }) => args
+            TypeArg::Variable {
+                v: TypeArgVariable { idx, .. },
+            } => args
                 .get(*idx)
                 .expect("validate + check_type_args should rule this out")
                 .clone(),
@@ -227,11 +236,12 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Variable(TypeArgVariable { cached_decl, .. }), _)
-            if param.contains(cached_decl) =>
-        {
-            Ok(())
-        }
+        (
+            TypeArg::Variable {
+                v: TypeArgVariable { cached_decl, .. },
+            },
+            _,
+        ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type(bound))
             if bound.contains(ty.least_upper_bound()) =>
         {
