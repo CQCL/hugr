@@ -11,6 +11,7 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+use crate::hugr::IdentList;
 use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_arg, TypeArgError};
@@ -30,7 +31,7 @@ pub mod validate;
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
-pub struct ExtensionRegistry(BTreeMap<SmolStr, Extension>);
+pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
 
 impl ExtensionRegistry {
     /// Makes a new (empty) registry.
@@ -79,10 +80,10 @@ pub enum SignatureError {
     InvalidTypeArgs,
     /// The Extension Registry did not contain an Extension referenced by the Signature
     #[error("Extension '{0}' not found")]
-    ExtensionNotFound(SmolStr),
+    ExtensionNotFound(ExtensionId),
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
-    ExtensionTypeNotFound { exn: SmolStr, typ: SmolStr },
+    ExtensionTypeNotFound { exn: ExtensionId, typ: SmolStr },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
     #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
@@ -204,10 +205,10 @@ impl ExtensionValue {
 /// A unique identifier for a extension.
 ///
 /// The actual [`Extension`] is stored externally.
-pub type ExtensionId = SmolStr;
+pub type ExtensionId = IdentList;
 
 /// A extension is a set of capabilities required to execute a graph.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Extension {
     /// Unique identifier for the extension.
     pub name: ExtensionId,
@@ -232,10 +233,7 @@ pub struct Extension {
 impl Extension {
     /// Creates a new extension with the given name.
     pub fn new(name: ExtensionId) -> Self {
-        Self {
-            name,
-            ..Default::default()
-        }
+        Self::new_with_reqs(name, Default::default())
     }
 
     /// Creates a new extension with the given name and requirements.
@@ -243,7 +241,9 @@ impl Extension {
         Self {
             name,
             extension_reqs,
-            ..Default::default()
+            types: Default::default(),
+            values: Default::default(),
+            operations: Default::default(),
         }
     }
 
@@ -263,7 +263,7 @@ impl Extension {
     }
 
     /// Returns the name of the extension.
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &ExtensionId {
         &self.name
     }
 
@@ -284,7 +284,7 @@ impl Extension {
         typed_value: ops::Const,
     ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
         let extension_value = ExtensionValue {
-            extension: self.name().into(),
+            extension: self.name.clone(),
             name: name.into(),
             typed_value,
         };

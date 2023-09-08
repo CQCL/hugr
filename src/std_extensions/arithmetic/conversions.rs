@@ -2,10 +2,8 @@
 
 use std::collections::HashSet;
 
-use smol_str::SmolStr;
-
 use crate::{
-    extension::{ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionSet, SignatureError},
     type_row,
     types::{type_param::TypeArg, FunctionType, Type},
     utils::collect_array,
@@ -16,7 +14,7 @@ use super::int_types::int_type;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.conversions");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
 fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
@@ -90,7 +88,7 @@ mod test {
     #[test]
     fn test_conversions_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.conversions");
+        assert_eq!(r.name() as &str, "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.starts_with("convert") || name.starts_with("trunc"));

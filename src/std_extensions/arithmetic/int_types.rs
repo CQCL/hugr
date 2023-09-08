@@ -5,6 +5,7 @@ use std::num::NonZeroU64;
 use smol_str::SmolStr;
 
 use crate::{
+    extension::ExtensionId,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
@@ -14,7 +15,7 @@ use crate::{
 };
 use lazy_static::lazy_static;
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.int.types");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 
 /// Identifier for the integer type.
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
@@ -187,7 +188,7 @@ mod test {
     #[test]
     fn test_int_types_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.int.types");
+        assert_eq!(r.name() as &str, "arithmetic.int.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
     }

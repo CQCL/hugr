@@ -80,3 +80,34 @@ macro_rules! type_row {
 
 #[allow(unused_imports)]
 pub use type_row;
+
+/// Declare 'const' variables holding new ExtensionIds, validating
+/// that they are well-formed as separate tests - hence, usable at the top level
+/// of a test module only. Example:
+/// ```rust
+/// # mod test {
+/// # use hugr::macros::const_extension_ids;
+///   const_extension_ids! {
+///     pub const EXT_A: ExtensionId = "A";
+///     /// A doc comment
+///     #[cfg(foobar)] pub (super) const EXT_A_B: ExtensionId = "A.B";
+///     const EXT_BAD: ExtensionId = "..55"; // this will generate a failing #[test] fn ....
+///   }
+/// # }
+/// ```
+#[macro_export]
+macro_rules! const_extension_ids {
+    ($($(#[$attr:meta])* $v:vis const $field_name:ident : ExtensionId = $ext_name:expr;)+) => {
+        $($(#[$attr])* $v const $field_name: $crate::extension::ExtensionId =
+            $crate::extension::ExtensionId::new_unchecked($ext_name);
+
+        paste::paste! {
+            #[test]
+            fn [<check_ $field_name:lower _wellformed>]() {
+                $crate::extension::ExtensionId::new($ext_name).unwrap();
+            }
+        })*
+    };
+}
+
+pub use const_extension_ids;

@@ -1,9 +1,7 @@
 //! Basic floating-point operations.
 
-use smol_str::SmolStr;
-
 use crate::{
-    extension::{ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionSet, SignatureError},
     type_row,
     types::{type_param::TypeArg, FunctionType},
     Extension,
@@ -12,7 +10,7 @@ use crate::{
 use super::float_types::FLOAT64_TYPE;
 
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 
 fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     Ok(FunctionType::new(
@@ -126,7 +124,7 @@ mod test {
     #[test]
     fn test_float_ops_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.float");
+        assert_eq!(r.name() as &str, "arithmetic.float");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.starts_with('f'));
