@@ -17,6 +17,7 @@ use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
+
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -158,7 +159,16 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Check operation-specific constraints
+        // Check operation-specific constraints. Firstly that type args are correct
+        // (note that if the Hugr were mutable here, this could be a good time to do
+        // resolve_extension_ops)
+        if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
+            for arg in b.args() {
+                arg.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+        }
+        // Secondly that the node has correct children
         self.validate_operation(node, node_type)?;
 
         // If this is a container with I/O nodes, check that the extension they
