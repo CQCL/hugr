@@ -397,14 +397,12 @@ impl ExtensionSet {
     }
 
     pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        for e in self.iter() {
-            if let Some(i) = as_typevar(e) {
-                if params.get(i) != Some(&TypeParam::Extensions) {
-                    return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                        used: TypeParam::Extensions,
-                        decl: params.get(i).cloned(),
-                    });
-                }
+        for var_idx in self.iter().filter_map(as_typevar) {
+            if params.get(var_idx) != Some(&TypeParam::Extensions) {
+                return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    used: TypeParam::Extensions,
+                    decl: params.get(var_idx).cloned(),
+                });
             }
         }
         Ok(())
