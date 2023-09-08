@@ -64,9 +64,10 @@ mod test {
 
     use smol_str::SmolStr;
 
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::{PRELUDE_ID, USIZE_T};
     use crate::extension::{
-        CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE,
+        CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound,
+        TypeParametrised, PRELUDE, PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -113,24 +114,7 @@ mod test {
 
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
-        const ARRAY_EXT_ID: ExtensionId = ExtensionId::new_unchecked("array_ext");
-        const ARRAY_TYPE_NAME: SmolStr = SmolStr::new_inline("Array");
-
-        let mut e = Extension::new(ARRAY_EXT_ID);
-        e.add_type(
-            ARRAY_TYPE_NAME,
-            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
-            "elemtype and size".to_string(),
-            TypeDefBound::FromParams(vec![0]),
-        )
-        .unwrap();
-
-        let reg: ExtensionRegistry = [e, PRELUDE.to_owned()].into();
-        let ar_def = reg
-            .get(&ARRAY_EXT_ID)
-            .unwrap()
-            .get_type(&ARRAY_TYPE_NAME)
-            .unwrap();
+        let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
         let tyvar = TypeArg::use_var(0, typarams[0].clone());
         let szvar = TypeArg::use_var(1, typarams[1].clone());
@@ -138,7 +122,7 @@ mod test {
         // Valid schema...
         let good_array =
             Type::new_extension(ar_def.instantiate_concrete([tyvar.clone(), szvar.clone()])?);
-        let good_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(good_array), &reg)?;
+        let good_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
         good_ts.compute_signature(
@@ -173,12 +157,12 @@ mod test {
         );
         // ok, so that doesn't work - well, it shouldn't! So let's say we just have this signature (with bad args)...
         let bad_array = Type::new_extension(CustomType::new(
-            ARRAY_TYPE_NAME,
+            ar_def.name().clone(),
             [szvar, tyvar],
-            ARRAY_EXT_ID,
+            PRELUDE_ID,
             TypeBound::Any,
         ));
-        let bad_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(bad_array), &reg);
+        let bad_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
