@@ -206,7 +206,7 @@ mod test {
         let ex_id: ExtensionId = "myrsrc".try_into().unwrap();
         let typ_int = CustomType::new(
             "mytype",
-            vec![TypeArg::BoundedNat(8)],
+            vec![TypeArg::BoundedNat { n: 8 }],
             ex_id.clone(),
             TypeBound::Eq,
         );

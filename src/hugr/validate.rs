@@ -101,7 +101,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region, entry_node)
+        dominators::simple_fast(&region.as_petgraph(), entry_node)
     }
 
     /// Check the constraints on a single node.
@@ -365,8 +365,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         };
 
         let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
-        let postorder = Topo::new(&region);
-        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let postorder = Topo::new(&region.as_petgraph());
+        let nodes_visited = postorder
+            .iter(&region.as_petgraph())
+            .filter(|n| *n != parent)
+            .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {
@@ -955,6 +958,7 @@ mod test {
             NodeType::pure(ops::CFG {
                 inputs: type_row![BOOL_T],
                 outputs: type_row![BOOL_T],
+                extension_delta: ExtensionSet::new(),
             }),
         );
         assert_matches!(
@@ -971,6 +975,7 @@ mod test {
                     inputs: type_row![BOOL_T],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![BOOL_T],
+                    extension_delta: ExtensionSet::new(),
                 },
             )
             .unwrap();
@@ -1011,6 +1016,7 @@ mod test {
                 inputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
                 other_outputs: type_row![Q],
+                extension_delta: ExtensionSet::new(),
             }),
         );
         let mut block_children = b.hierarchy.children(block.index);
@@ -1359,7 +1365,7 @@ mod test {
 
         let valid = Type::new_extension(CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             name.clone(),
             TypeBound::Any,
         ));
@@ -1371,7 +1377,7 @@ mod test {
         // valid is Any, so is not allowed as an element of an outer MyContainer.
         let element_outside_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(valid.clone())],
+            vec![TypeArg::Type { ty: valid.clone() }],
             name.clone(),
             TypeBound::Any,
         );
@@ -1379,13 +1385,13 @@ mod test {
             validate_to_sig_error(element_outside_bound),
             SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
                 param: TypeParam::Type(TypeBound::Copyable),
-                arg: TypeArg::Type(valid)
+                arg: TypeArg::Type { ty: valid }
             })
         );
 
         let bad_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             name.clone(),
             TypeBound::Copyable,
         );
@@ -1400,7 +1406,9 @@ mod test {
         // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
         let nested = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(Type::new_extension(bad_bound))],
+            vec![TypeArg::Type {
+                ty: Type::new_extension(bad_bound),
+            }],
             name.clone(),
             TypeBound::Any,
         );
@@ -1414,7 +1422,7 @@ mod test {
 
         let too_many_type_args = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T), TypeArg::BoundedNat(3)],
+            vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
             name.clone(),
             TypeBound::Any,
         );

@@ -74,7 +74,10 @@ pub const BOOL_T: Type = Type::new_simple_predicate(2);
 pub fn new_array(typ: Type, size: u64) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
-        .instantiate_concrete(vec![TypeArg::Type(typ), TypeArg::BoundedNat(size)])
+        .instantiate_concrete(vec![
+            TypeArg::Type { ty: typ },
+            TypeArg::BoundedNat { n: size },
+        ])
         .unwrap();
     Type::new_extension(custom_t)
 }

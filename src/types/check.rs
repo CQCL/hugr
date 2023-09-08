@@ -55,11 +55,11 @@ impl PrimType {
         }
 
         match (self, val) {
-            (PrimType::Extension(e), PrimValue::Extension(e_val)) => {
+            (PrimType::Extension(e), PrimValue::Extension { c: e_val }) => {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (PrimType::Function(t), PrimValue::Function(v))
+            (PrimType::Function(t), PrimValue::Function { hugr: v })
                 if Some(t.as_ref()) == v.get_function_type() =>
             {
                 // exact signature equality, in future this may need to be
@@ -68,7 +68,7 @@ impl PrimType {
             }
             _ => Err(ConstTypeError::ValueCheckFail(
                 Type::new(TypeEnum::Prim(self.clone())),
-                Value::Prim(val.clone()),
+                Value::Prim { val: val.clone() },
             )),
         }
     }
@@ -82,8 +82,8 @@ impl Type {
     /// This function will return an error if there is a type check error.
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
         match (&self.0, val) {
-            (TypeEnum::Prim(p), Value::Prim(p_v)) => p.check_type(p_v),
-            (TypeEnum::Tuple(t), Value::Tuple(t_v)) => {
+            (TypeEnum::Prim(p), Value::Prim { val: p_v }) => p.check_type(p_v),
+            (TypeEnum::Tuple(t), Value::Tuple { vs: t_v }) => {
                 if t.len() != t_v.len() {
                     return Err(ConstTypeError::TupleWrongLength);
                 }
@@ -92,7 +92,7 @@ impl Type {
                     .try_for_each(|(elem, ty)| ty.check_type(elem))
                     .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
-            (TypeEnum::Sum(sum), Value::Sum(tag, value)) => sum
+            (TypeEnum::Sum(sum), Value::Sum { tag, value }) => sum
                 .get_variant(*tag)
                 .ok_or(ConstTypeError::InvalidSumTag)?
                 .check_type(value),

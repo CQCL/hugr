@@ -19,7 +19,7 @@ that can be shared between the tools, allowing for more complex
 operations such as TKET optimizations across control-flow blocks, and
 nested quantum and classical programs in a single graph.
 The HUGR should provide a generic graph representation of a program,
-where each node contains a specific kind of operation and wires
+where each node contains a specific kind of operation and edges
 represent (typed) data or control dependencies.
 
 ### Goals
@@ -32,7 +32,7 @@ represent (typed) data or control dependencies.
     receive HUGRs via a serialized interface when sharing the in-memory
     structure is not possible.
   - Provide a common interface for rewrite operations with support for
-    opaque types.  
+    opaque types.
 
 ### Non-goals
 
@@ -77,7 +77,8 @@ represent (typed) data or control dependencies.
 A HUGR is a directed graph. There are several different types of node, and
 several different types of edge, with different semantics, described below.
 
-Nodes usually have additional data associated with them.
+A node usually has additional data associated with it, which we will
+refer to as it's node weight.
 
 The nodes represent
 processes that produce values - either statically, i.e. at compile time,
@@ -114,17 +115,19 @@ CNOT.
 ### Edges, ports and signatures
 
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
-of edge for different relationships.
+of edge for different relationships. Edges of a given kind are specified to
+carry an edge weight:
 
-- `Order` edges are plain directed edges, and express requirements on the ordering.
+- `Order` edges are plain directed edges, and express requirements on the
+  ordering. They have no edge weight.
 - `Value` edges carry typed data at runtime. They have a _port_ at each end, associated
-  with the source and target nodes.
+  with the source and target nodes. They have a `SimpleType`as an edge weight.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time).
+  compilation time). They have a `ClassicalType` as an edge weight.
 - `ControlFlow` edges represent possible flows of control from one part of the
-  program to another.
+  program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
-  children.
+  children. They have no edge weight.
 
 `Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
 A `Value` edge can carry data of any `SimpleType`: these include the `ClassicType`s
@@ -937,7 +940,8 @@ then it is assumed empty.
 ### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
-is preserved during graph modifications, and copied when rewriting.
+is preserved during graph modifications, and, [when possible](##Metadata updates on replacement), copied when
+rewriting.
 Additionally the metadata may record references to other nodes; these
 references are updated along with node indices.
 
@@ -1075,7 +1079,7 @@ equality constraint of `typeof(b) ~ Bool`.
 ### Types of built-ins
 
 We will provide some built in modules to provide basic functionality.
-I’m going to define them in terms of extensions. We have the “builtin”
+We will define them in terms of extensions. We have the “builtin”
 extension which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
@@ -1096,14 +1100,14 @@ we can perform rewrites which remove the arithmetic.
 We would expect standard circuits to look something like
 
 ```
-FunctionType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
+Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 A circuit built using our higher-order extension to manage control flow
 could then look like:
 
 ```
-FunctionType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
+Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 So we’d need to perform some graph transformation pass to turn the
@@ -1111,8 +1115,9 @@ graph-based control flow into a CFG node that a quantum computer could
 run, which removes the `HigherOrder` extension requirement:
 
 ```
-precompute :: FunctionType[](FunctionType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         FunctionType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
+                                         Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+>>>>>>> c6abd39 ([doc] Tidy hugr specification)
 ```
 
 Before we can run the circuit.
@@ -1578,7 +1583,7 @@ below).
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
 
-The possible values of `N` are 2^i for i in the range [0,7].
+The possible values of `N` are 2^i for i in the range [0,6].
 
 The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
@@ -1607,8 +1612,8 @@ Casts:
 | ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
 | `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
 | `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen a signed integer to a wider one with the same value (where M \<= N)                    |
-| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow an unsigned integer to a narrower one with the same value if possible (where M \>= N) |
-| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow a signed integer to a narrower one with the same value if possible (where M \>= N)    |
+| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
+| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
 | `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
 | `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
 
@@ -1687,8 +1692,9 @@ Conversions between integers and floats:
 
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int |
-| `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int   |
+| `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
+
+| `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
