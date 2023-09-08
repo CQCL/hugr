@@ -38,7 +38,7 @@ impl IdentList {
 
     /// Create a new [IdentList] *without* doing the well-formedness check.
     /// This is a backdoor to be used sparingly, as we rely upon callers to
-    /// validate names themselves. In tests, instead the [crate::test_const_ext_id]
+    /// validate names themselves. In tests, instead the [crate::const_extension_ids]
     /// macro is strongly encouraged as this ensures the name validity check
     /// is done properly.
     pub const fn new_unchecked(n: &str) -> Self {

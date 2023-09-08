@@ -706,7 +706,7 @@ mod test {
     };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
-    use crate::macros::test_const_ext_id;
+    use crate::macros::const_extension_ids;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
@@ -1083,7 +1083,7 @@ mod test {
         Ok(())
     }
 
-    test_const_ext_id! {
+    const_extension_ids! {
         const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";
     }

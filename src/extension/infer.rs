@@ -672,7 +672,7 @@ mod test {
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
-    use crate::macros::test_const_ext_id;
+    use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -682,7 +682,7 @@ mod test {
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
 
-    test_const_ext_id! {
+    const_extension_ids! {
         const A: ExtensionId = "A";
         const B: ExtensionId = "B";
         const C: ExtensionId = "C";
