@@ -102,10 +102,10 @@ pub enum TypeArg {
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
-    /// sequence of arguments.
+    /// sequence of elements.
     Sequence {
         #[allow(missing_docs)]
-        args: Vec<TypeArg>,
+        elems: Vec<TypeArg>,
     },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
     Extensions {
@@ -161,7 +161,7 @@ impl TypeArg {
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
                 custarg.typ.validate(extension_registry, &[])
             }
-            TypeArg::Sequence { args } => args
+            TypeArg::Sequence { elems } => elems
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, type_vars)),
             TypeArg::Extensions { es: _ } => Ok(()),
@@ -194,8 +194,8 @@ impl TypeArg {
                 debug_assert_eq!(&typ.substitute(exts, args), typ);
                 self.clone()
             }
-            TypeArg::Sequence { args: elems } => TypeArg::Sequence {
-                args: elems.iter().map(|ta| ta.substitute(exts, args)).collect(),
+            TypeArg::Sequence { elems } => TypeArg::Sequence {
+                elems: elems.iter().map(|ta| ta.substitute(exts, args)).collect(),
             },
             TypeArg::Extensions { es } => TypeArg::Extensions {
                 es: es.substitute(args),
@@ -247,10 +247,10 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-        (TypeArg::Sequence { args: items }, TypeParam::List(param)) => {
-            items.iter().try_for_each(|arg| check_type_arg(arg, param))
+        (TypeArg::Sequence { elems }, TypeParam::List(param)) => {
+            elems.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Sequence { args: items }, TypeParam::Tuple(types)) => {
+        (TypeArg::Sequence { elems: items }, TypeParam::Tuple(types)) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
