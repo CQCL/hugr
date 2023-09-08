@@ -230,7 +230,6 @@ pub fn resolve_extension_ops(
                             r.name().to_string(),
                         ));
                     };
-                    // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
                     let op = ExternalOp::Extension(
                         ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
                     );
@@ -252,7 +251,11 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        let node_type = NodeType::pure(Into::<LeafOp>::into(op));
+        let leaf: LeafOp = op.into();
+        let node_type = match h.get_nodetype(n).input_extensions() {
+            None => NodeType::open_extensions(leaf),
+            Some(exts) => NodeType::new(leaf, exts.clone()),
+        };
         h.replace_op(n, node_type);
     }
     Ok(())
