@@ -1,15 +1,21 @@
-//! Polymorphic type schemes for ops.
+//! Polymorphic type schemes for [OpDef]s.
 //! The type scheme declares a number of TypeParams; any TypeArgs fitting those,
 //! produce a FunctionType for the Op by substitution.
+//!
+//! [OpDef]: super::OpDef
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::FunctionType;
 
 use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
 
-/// A polymorphic type scheme for an op
+/// A polymorphic type scheme for an [OpDef]
+///
+/// [OpDef]: super::OpDef
 pub struct OpDefTypeScheme<'a> {
-    /// The declared type parameters, i.e., every Op must provide [TypeArg]s for these
+    /// The declared type parameters, i.e., every instantiation ([ExternalOp]) must provide [TypeArg]s for these
+    ///
+    /// [ExternalOp]: crate::ops::custom::ExternalOp
     pub params: Vec<TypeParam>,
     /// Template for the Op type. May contain variables up to length of [OpDefTypeScheme::params]
     body: FunctionType,
