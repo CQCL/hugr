@@ -112,7 +112,7 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
-    /// Variable (used in type schemes only)
+    /// Variable (used in type schemes only) - see [TypeArg::use_var]
     Variable {
         #[allow(missing_docs)]
         v: TypeArgVariable,
