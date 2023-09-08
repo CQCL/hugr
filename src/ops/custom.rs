@@ -252,10 +252,7 @@ pub fn resolve_extension_ops(
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
         let leaf: LeafOp = op.into();
-        let node_type = match h.get_nodetype(n).input_extensions() {
-            None => NodeType::open_extensions(leaf),
-            Some(exts) => NodeType::new(leaf, exts.clone()),
-        };
+        let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
         h.replace_op(n, node_type);
     }
     Ok(())

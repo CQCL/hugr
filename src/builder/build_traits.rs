@@ -292,10 +292,7 @@ pub trait Dataflow: Container {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = match &input_extensions {
-            None => NodeType::open_extensions(op),
-            Some(rs) => NodeType::new(op, rs.clone()),
-        };
+        let nodetype = NodeType::new(op, input_extensions.clone());
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
         DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
