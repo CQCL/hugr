@@ -194,10 +194,6 @@ where
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
         self.base_hugr().get_io(node)
     }
-
-    fn get_function_type(&self) -> Option<&crate::types::FunctionType> {
-        self.base_hugr().get_function_type()
-    }
 }
 
 impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
@@ -310,6 +306,16 @@ pub(super) mod test {
             || hugr.get_parent(n) == Some(def)
             || hugr.get_parent(n) == Some(inner)));
         assert_eq!(region.children(inner).count(), 2);
+
+        assert_eq!(
+            region.get_function_type(),
+            Some(&FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
+        );
+        let inner_region: DescendantsGraph = DescendantsGraph::new(&hugr, inner);
+        assert_eq!(
+            inner_region.get_function_type(),
+            Some(&FunctionType::new(type_row![NAT], type_row![NAT]))
+        );
 
         Ok(())
     }

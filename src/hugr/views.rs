@@ -179,7 +179,15 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self) -> Option<&FunctionType>;
+    fn get_function_type(&self) -> Option<&FunctionType> {
+        let op = self.get_nodetype(self.root());
+        match &op.op {
+            OpType::DFG(DFG { signature })
+            | OpType::FuncDecl(FuncDecl { signature, .. })
+            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
+            _ => None,
+        }
+    }
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.
     #[inline]
@@ -379,15 +387,6 @@ where
         }
     }
 
-    fn get_function_type(&self) -> Option<&FunctionType> {
-        let op = self.get_nodetype(self.root());
-        match &op.op {
-            OpType::DFG(DFG { signature })
-            | OpType::FuncDecl(FuncDecl { signature, .. })
-            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
-            _ => None,
-        }
-    }
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.as_ref().metadata.get(node.index)
