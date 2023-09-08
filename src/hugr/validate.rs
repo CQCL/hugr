@@ -17,7 +17,7 @@ use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
-use crate::ops::custom::ExternalOp;
+
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -165,11 +165,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
             for arg in b.args() {
                 arg.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-            }
-            if let ExternalOp::Extension(e) = &**b {
-                e.def()
-                    .check_args(e.args())
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
         }
