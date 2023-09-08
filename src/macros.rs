@@ -89,6 +89,7 @@ pub use type_row;
 /// # use hugr::macros::test_const_ext_id;
 ///   test_const_ext_id! {
 ///     pub const EXT_A: ExtensionId = "A";
+///     /// A doc comment
 ///     #[cfg(foobar)] pub (super) const EXT_A_B: ExtensionId = "A.B";
 ///     const EXT_BAD: ExtensionId = "..55"; // this will generate a failing #[test] fn ....
 ///   }
@@ -96,7 +97,7 @@ pub use type_row;
 /// ```
 #[macro_export]
 macro_rules! test_const_ext_id {
-    ($($(#[$attr:meta])* $v:vis const $field_name:ident : ExtensionId = $ext_name:literal;)+) => {
+    ($($(#[$attr:meta])* $v:vis const $field_name:ident : ExtensionId = $ext_name:expr;)+) => {
         $($(#[$attr])* $v const $field_name: $crate::extension::ExtensionId =
             $crate::extension::ExtensionId::new_unchecked($ext_name);
 
