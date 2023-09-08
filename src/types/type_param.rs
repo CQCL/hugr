@@ -84,18 +84,34 @@ impl TypeParam {
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
+#[serde(tag = "tya")]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
-    Type(Type),
+    Type {
+        #[allow(missing_docs)]
+        ty: Type,
+    },
     /// Instance of [TypeParam::BoundedNat]. 64-bit unsigned integer.
-    BoundedNat(u64),
+    BoundedNat {
+        #[allow(missing_docs)]
+        n: u64,
+    },
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
-    Opaque(CustomTypeArg),
+    Opaque {
+        #[allow(missing_docs)]
+        arg: CustomTypeArg,
+    },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of arguments.
-    Sequence(Vec<TypeArg>),
+    Sequence {
+        #[allow(missing_docs)]
+        args: Vec<TypeArg>,
+    },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
-    Extensions(ExtensionSet),
+    Extensions {
+        #[allow(missing_docs)]
+        es: ExtensionSet,
+    },
     /// Type variable (used in type schemes only)
     Variable(TypeArgVariable),
 }
@@ -112,8 +128,12 @@ impl TypeArg {
     /// and declared [TypeParam].
     pub fn use_var(idx: usize, decl: TypeParam) -> Self {
         match decl {
-            TypeParam::Type(b) => TypeArg::Type(Type::new_variable(idx, b)),
-            TypeParam::Extensions => TypeArg::Extensions(ExtensionSet::type_var(idx)),
+            TypeParam::Type(b) => TypeArg::Type {
+                ty: Type::new_variable(idx, b),
+            },
+            TypeParam::Extensions => TypeArg::Extensions {
+                es: ExtensionSet::type_var(idx),
+            },
             _ => TypeArg::Variable(TypeArgVariable {
                 idx,
                 cached_decl: decl,
@@ -127,19 +147,19 @@ impl TypeArg {
         type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type(ty) => ty.validate(extension_registry, type_vars),
-            TypeArg::BoundedNat(_) => Ok(()),
-            TypeArg::Opaque(custarg) => {
+            TypeArg::Type { ty } => ty.validate(extension_registry, type_vars),
+            TypeArg::BoundedNat { .. } => Ok(()),
+            TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
                 custarg.typ.validate(extension_registry, &[])
             }
-            TypeArg::Sequence(args) => args
+            TypeArg::Sequence { args } => args
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, type_vars)),
-            TypeArg::Extensions(_) => Ok(()),
+            TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable(TypeArgVariable { idx, cached_decl }) => {
                 if type_vars.get(*idx) == Some(cached_decl) {
                     Ok(())
@@ -155,18 +175,24 @@ impl TypeArg {
 
     pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
         match self {
-            TypeArg::Type(t) => TypeArg::Type(t.substitute(exts, args)),
-            TypeArg::BoundedNat(_) => self.clone(), // We do not allow variables as bounds on BoundedNat's
-            TypeArg::Opaque(CustomTypeArg { typ, .. }) => {
+            TypeArg::Type { ty } => TypeArg::Type {
+                ty: ty.substitute(exts, args),
+            },
+            TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
+            TypeArg::Opaque {
+                arg: CustomTypeArg { typ, .. },
+            } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
                 debug_assert_eq!(&typ.substitute(exts, args), typ);
                 self.clone()
             }
-            TypeArg::Sequence(elems) => {
-                TypeArg::Sequence(elems.iter().map(|ta| ta.substitute(exts, args)).collect())
-            }
-            TypeArg::Extensions(es) => TypeArg::Extensions(es.substitute(args)),
+            TypeArg::Sequence { args: elems } => TypeArg::Sequence {
+                args: elems.iter().map(|ta| ta.substitute(exts, args)).collect(),
+            },
+            TypeArg::Extensions { es } => TypeArg::Extensions {
+                es: es.substitute(args),
+            },
             TypeArg::Variable(TypeArgVariable { idx, .. }) => args
                 .get(*idx)
                 .expect("validate + check_type_args should rule this out")
@@ -206,13 +232,15 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-        (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
+        (TypeArg::Type { ty }, TypeParam::Type(bound))
+            if bound.contains(ty.least_upper_bound()) =>
+        {
             Ok(())
         }
-        (TypeArg::Sequence(items), TypeParam::List(param)) => {
+        (TypeArg::Sequence { args: items }, TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Sequence(items), TypeParam::Tuple(types)) => {
+        (TypeArg::Sequence { args: items }, TypeParam::Tuple(types)) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
@@ -222,16 +250,18 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::BoundedNat(val), TypeParam::BoundedNat(bound)) if bound.valid_value(*val) => {
+        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat(bound))
+            if bound.valid_value(*val) =>
+        {
             Ok(())
         }
 
-        (TypeArg::Opaque(arg), TypeParam::Opaque(param))
+        (TypeArg::Opaque { arg }, TypeParam::Opaque(param))
             if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())
         }
-        (TypeArg::Extensions(_), TypeParam::Extensions) => Ok(()),
+        (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),

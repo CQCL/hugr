@@ -88,7 +88,7 @@ mod test {
     #[test]
     fn test_conversions_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.conversions");
+        assert_eq!(r.name() as &str, "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.starts_with("convert") || name.starts_with("trunc"));

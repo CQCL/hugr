@@ -89,7 +89,7 @@ mod test {
 
         let t = list_len.compute_signature(
             &SmolStr::new_inline(""),
-            &[TypeArg::Type(USIZE_T)],
+            &[TypeArg::Type { ty: USIZE_T }],
             &HashMap::new(),
         )?;
         assert_eq!(
@@ -97,7 +97,7 @@ mod test {
             FunctionType::new(
                 vec![Type::new_extension(
                     list_def
-                        .instantiate_concrete([TypeArg::Type(USIZE_T)])
+                        .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
                         .unwrap()
                 )],
                 vec![USIZE_T]
@@ -143,13 +143,13 @@ mod test {
         // Sanity check (good args)
         good_ts.compute_signature(
             &"reverse".into(),
-            &[TypeArg::Type(USIZE_T), TypeArg::BoundedNat(5)],
+            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &HashMap::new(),
         )?;
 
         let wrong_args = good_ts.compute_signature(
             &"reverse".into(),
-            &[TypeArg::BoundedNat(5), TypeArg::Type(USIZE_T)],
+            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &HashMap::new(),
         );
         assert_eq!(
@@ -157,7 +157,7 @@ mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     param: typarams[0].clone(),
-                    arg: TypeArg::BoundedNat(5)
+                    arg: TypeArg::BoundedNat { n: 5 }
                 }
             ))
         );

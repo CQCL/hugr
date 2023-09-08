@@ -82,7 +82,7 @@ impl TailLoopBuilder<Hugr> {
             rest: inputs_outputs.into(),
         };
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(tail_loop.clone()));
+        let base = Hugr::new(NodeType::open_extensions(tail_loop.clone()));
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }

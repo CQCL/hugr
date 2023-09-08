@@ -1,13 +1,17 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
-pub mod hierarchy;
+pub mod descendants;
+pub mod petgraph;
 pub mod sibling;
+pub mod sibling_subgraph;
 
 #[cfg(test)]
 mod tests;
 
-pub use hierarchy::{DescendantsGraph, HierarchyView, SiblingGraph};
-pub use sibling::SiblingSubgraph;
+pub use self::petgraph::PetgraphWrapper;
+pub use descendants::DescendantsGraph;
+pub use sibling::SiblingGraph;
+pub use sibling_subgraph::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
@@ -18,8 +22,7 @@ use super::{Hugr, NodeMetadata, NodeType};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
-use crate::Direction;
-use crate::{Node, Port};
+use crate::{Direction, Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -176,7 +179,24 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self) -> Option<&FunctionType>;
+    fn get_function_type(&self) -> Option<&FunctionType> {
+        let op = self.get_nodetype(self.root());
+        match &op.op {
+            OpType::DFG(DFG { signature })
+            | OpType::FuncDecl(FuncDecl { signature, .. })
+            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
+            _ => None,
+        }
+    }
+
+    /// Return a wrapper over the view that can be used in petgraph algorithms.
+    #[inline]
+    fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
+    where
+        Self: Sized,
+    {
+        PetgraphWrapper { hugr: self }
+    }
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
@@ -226,6 +246,15 @@ pub trait HugrView: sealed::HugrInternals {
             })
             .finish()
     }
+}
+
+/// A common trait for views of a HUGR hierarchical subgraph.
+pub trait HierarchyView<'a>: HugrView {
+    /// The base from which the subgraph is derived.
+    type Base;
+
+    /// Create a hierarchical view of a HUGR given a root node.
+    fn new(hugr: &'a Self::Base, root: Node) -> Self;
 }
 
 impl<T> HugrView for T
@@ -358,15 +387,6 @@ where
         }
     }
 
-    fn get_function_type(&self) -> Option<&FunctionType> {
-        let op = self.get_nodetype(self.root());
-        match &op.op {
-            OpType::DFG(DFG { signature })
-            | OpType::FuncDecl(FuncDecl { signature, .. })
-            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
-            _ => None,
-        }
-    }
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         self.as_ref().metadata.get(node.index)
@@ -382,10 +402,12 @@ pub(crate) mod sealed {
     /// view.
     pub trait HugrInternals {
         /// The underlying portgraph view type.
-        type Portgraph: LinkView;
+        type Portgraph<'p>: LinkView + Clone + 'p
+        where
+            Self: 'p;
 
         /// Returns a reference to the underlying portgraph.
-        fn portgraph(&self) -> &Self::Portgraph;
+        fn portgraph(&self) -> Self::Portgraph<'_>;
 
         /// Returns the Hugr at the base of a chain of views.
         fn base_hugr(&self) -> &Hugr;
@@ -398,10 +420,10 @@ pub(crate) mod sealed {
     where
         T: AsRef<super::Hugr>,
     {
-        type Portgraph = MultiPortGraph;
+        type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
         #[inline]
-        fn portgraph(&self) -> &Self::Portgraph {
+        fn portgraph(&self) -> Self::Portgraph<'_> {
             &self.as_ref().graph
         }
 

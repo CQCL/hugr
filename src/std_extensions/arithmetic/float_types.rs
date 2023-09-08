@@ -24,20 +24,23 @@ pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.
-pub struct ConstF64(f64);
+pub struct ConstF64 {
+    /// The value.
+    value: f64,
+}
 
 impl std::ops::Deref for ConstF64 {
     type Target = f64;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.value
     }
 }
 
 impl ConstF64 {
     /// Create a new [`ConstF64`]
     pub fn new(value: f64) -> Self {
-        Self(value)
+        Self { value }
     }
 }
 
@@ -48,7 +51,7 @@ impl KnownTypeConst for ConstF64 {
 #[typetag::serde]
 impl CustomConst for ConstF64 {
     fn name(&self) -> SmolStr {
-        format!("f64({})", self.0).into()
+        format!("f64({})", self.value).into()
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
@@ -83,7 +86,7 @@ mod test {
     #[test]
     fn test_float_types_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.float.types");
+        assert_eq!(r.name() as &str, "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
     }

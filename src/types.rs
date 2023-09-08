@@ -318,7 +318,7 @@ impl Type {
                 self.clone()
             }
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(*idx) {
-                Some(TypeArg::Type(t)) => t.clone(),
+                Some(TypeArg::Type { ty }) => ty.clone(),
                 Some(v) => panic!(
                     "Value of variable {:?} did not match cached param {}",
                     v, bound

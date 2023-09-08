@@ -37,9 +37,11 @@ impl IdentList {
     }
 
     /// Create a new [IdentList] *without* doing the well-formedness check.
-    /// Useful because we want to have static 'const'ants inside the crate,
-    /// but to be used sparingly.
-    pub(crate) const fn new_unchecked(n: &str) -> Self {
+    /// This is a backdoor to be used sparingly, as we rely upon callers to
+    /// validate names themselves. In tests, instead the [crate::const_extension_ids]
+    /// macro is strongly encouraged as this ensures the name validity check
+    /// is done properly.
+    pub const fn new_unchecked(n: &str) -> Self {
         IdentList(SmolStr::new_inline(n))
     }
 }
@@ -55,12 +57,6 @@ impl std::ops::Deref for IdentList {
 
     fn deref(&self) -> &str {
         self.0.deref()
-    }
-}
-
-impl PartialEq<str> for IdentList {
-    fn eq(&self, other: &str) -> bool {
-        self.0.eq(other)
     }
 }
 

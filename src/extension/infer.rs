@@ -672,6 +672,7 @@ mod test {
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::{ExtensionSet, EMPTY_REG};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
+    use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -681,9 +682,11 @@ mod test {
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
 
-    test_const_ext_id!(A, "A");
-    test_const_ext_id!(B, "B");
-    test_const_ext_id!(C, "C");
+    const_extension_ids! {
+        const A: ExtensionId = "A";
+        const B: ExtensionId = "B";
+        const C: ExtensionId = "C";
+    }
 
     #[test]
     // Build up a graph with some holes in its extension requirements, and infer

@@ -6,7 +6,10 @@ use super::{
 };
 
 use crate::ops::{self, BasicBlock, OpType};
-use crate::{extension::ExtensionRegistry, types::FunctionType};
+use crate::{
+    extension::{ExtensionRegistry, ExtensionSet},
+    types::FunctionType,
+};
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{ops::handle::NodeHandle, types::Type};
 
@@ -60,10 +63,12 @@ impl CFGBuilder<Hugr> {
         let cfg_op = ops::CFG {
             inputs: input.clone(),
             outputs: output.clone(),
+            // TODO: Make this a parameter
+            extension_delta: ExtensionSet::new(),
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(cfg_op));
+        let base = Hugr::new(NodeType::open_extensions(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, input, output)
     }
@@ -130,6 +135,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
+            // TODO: Make this a parameter
+            extension_delta: ExtensionSet::new(),
         });
         let parent = self.container_node();
         let block_n = if entry {
@@ -277,10 +284,12 @@ impl BlockBuilder<Hugr> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
+            // TODO: make this a parameter
+            extension_delta: ExtensionSet::new(),
         };
 
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::pure(op));
+        let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }
