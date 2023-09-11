@@ -66,10 +66,10 @@ pub struct NodeType {
 
 impl NodeType {
     /// Create a new optype with some ExtensionSet
-    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
+    pub fn new(op: impl Into<OpType>, input_extensions: impl Into<Option<ExtensionSet>>) -> Self {
         NodeType {
             op: op.into(),
-            input_extensions: Some(input_extensions),
+            input_extensions: input_extensions.into(),
         }
     }
 
