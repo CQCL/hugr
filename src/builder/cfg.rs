@@ -57,20 +57,16 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Result<Self, BuildError> {
-        let input = input.into();
-        let output = output.into();
+    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
-            inputs: input.clone(),
-            outputs: output.clone(),
-            // TODO: Make this a parameter
-            extension_delta: ExtensionSet::new(),
+            inputs: signature.input.clone(),
+            outputs: signature.output.clone(),
+            extension_delta: signature.extension_reqs,
         };
 
-        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::open_extensions(cfg_op));
         let cfg_node = base.root();
-        CFGBuilder::create(base, cfg_node, input, output)
+        CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
 }
 
@@ -119,9 +115,16 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
+        extension_delta: ExtensionSet,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.any_block_builder(inputs, predicate_variants, other_outputs, false)
+        self.any_block_builder(
+            inputs,
+            predicate_variants,
+            other_outputs,
+            extension_delta,
+            false,
+        )
     }
 
     fn any_block_builder(
@@ -129,14 +132,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         inputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
+        extension_delta: ExtensionSet,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
-            // TODO: Make this a parameter
-            extension_delta: ExtensionSet::new(),
+            extension_delta,
         });
         let parent = self.container_node();
         let block_n = if entry {
@@ -165,11 +168,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        inputs: TypeRow,
-        outputs: TypeRow,
+        signature: FunctionType,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder(inputs, vec![type_row![]; n_cases], outputs)
+        self.block_builder(
+            signature.input,
+            vec![type_row![]; n_cases],
+            signature.extension_reqs,
+            signature.output,
+        )
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
@@ -183,12 +190,19 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         predicate_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.any_block_builder(inputs, predicate_variants, other_outputs, true)
+        self.any_block_builder(
+            inputs,
+            predicate_variants,
+            other_outputs,
+            extension_delta,
+            true,
+        )
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
@@ -201,8 +215,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         outputs: TypeRow,
         n_cases: usize,
+        extension_delta: ExtensionSet,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder(vec![type_row![]; n_cases], outputs)
+        self.entry_builder(vec![type_row![]; n_cases], outputs, extension_delta)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -276,6 +291,7 @@ impl BlockBuilder<Hugr> {
         inputs: impl Into<TypeRow>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
+        extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
@@ -284,11 +300,9 @@ impl BlockBuilder<Hugr> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             predicate_variants: predicate_variants.clone(),
-            // TODO: make this a parameter
-            extension_delta: ExtensionSet::new(),
+            extension_delta,
         };
 
-        // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::open_extensions(op));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
@@ -326,8 +340,11 @@ mod test {
                 let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {
-                    let mut cfg_builder =
-                        func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
+                    let mut cfg_builder = func_builder.cfg_builder(
+                        vec![(NAT, int)],
+                        type_row![NAT],
+                        ExtensionSet::new(),
+                    )?;
                     build_basic_cfg(&mut cfg_builder)?;
 
                     cfg_builder.finish_sub_container()?
@@ -344,7 +361,7 @@ mod test {
     }
     #[test]
     fn basic_cfg_hugr() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(type_row![NAT], type_row![NAT])?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         build_basic_cfg(&mut cfg_builder)?;
         assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
 
@@ -355,14 +372,16 @@ mod test {
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
-        let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
+        let mut entry_b =
+            cfg_builder.entry_builder(sum2_variants.clone(), type_row![], ExtensionSet::new())?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
             let sum = entry_b.make_predicate(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
-        let mut middle_b = cfg_builder.simple_block_builder(type_row![NAT], type_row![NAT], 1)?;
+        let mut middle_b = cfg_builder
+            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
             let c = middle_b.add_load_const(ops::Const::simple_unary_predicate())?;
             let [inw] = middle_b.input_wires_arr();
