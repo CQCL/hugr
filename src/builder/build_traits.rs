@@ -315,6 +315,7 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
 
@@ -325,8 +326,7 @@ pub trait Dataflow: Container {
             NodeType::open_extensions(ops::CFG {
                 inputs: inputs.clone(),
                 outputs: output_types.clone(),
-                // TODO: Make this a parameter
-                extension_delta: ExtensionSet::new(),
+                extension_delta,
             }),
             input_wires,
         )?;
