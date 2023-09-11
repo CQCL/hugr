@@ -51,6 +51,11 @@ impl SimpleReplacement {
     pub fn node_count_delta(&self) -> isize {
         (self.replacement.node_count() - 3) as isize - self.subgraph.nodes().len() as isize
     }
+
+    /// Subgraph to be replaced.
+    pub fn subgraph(&self) -> &SiblingSubgraph {
+        &self.subgraph
+    }
 }
 
 impl Rewrite for SimpleReplacement {
