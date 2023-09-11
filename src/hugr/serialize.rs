@@ -210,10 +210,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
-            match input_extensions {
-                None => NodeType::open_extensions(root_type),
-                Some(rs) => NodeType::new(root_type, rs),
-            },
+            NodeType::new(root_type, input_extensions),
             nodes.len(),
             edges.len() * 2,
         );
