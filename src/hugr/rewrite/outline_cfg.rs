@@ -128,7 +128,6 @@ impl Rewrite for OutlineCfg {
             let cfg = new_block_bldr
                 .cfg_builder(wires_in, outputs, extension_delta)
                 .unwrap();
-            cfg.exit_block(); // Makes inner exit block (but no entry block)
             let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
             let predicate = new_block_bldr
                 .add_constant(ops::Const::simple_unary_predicate())
