@@ -701,17 +701,19 @@ mod test {
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-    use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{
+        Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
+    };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
+    use crate::macros::const_extension_ids;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
     use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
-    use crate::Direction;
-    use crate::{type_row, Node};
+    use crate::{type_row, Direction, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;
@@ -1081,6 +1083,11 @@ mod test {
         Ok(())
     }
 
+    const_extension_ids! {
+        const XA: ExtensionId = "A";
+        const XB: ExtensionId = "BOOL_EXT";
+    }
+
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
@@ -1125,7 +1132,7 @@ mod test {
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             // Inner DFG has extension requirements that the wire wont satisfy
-            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
+            .with_input_extensions(ExtensionSet::from_iter([XA, XB]));
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
@@ -1161,7 +1168,7 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"A".into()))
+            .with_extension_delta(&ExtensionSet::singleton(&XA))
             .with_input_extensions(ExtensionSet::new());
 
         let f_builder = main.dfg_builder(
@@ -1191,7 +1198,7 @@ mod test {
     fn extensions_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let all_rs = ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]);
+        let all_rs = ExtensionSet::from_iter([XA, XB]);
 
         let main_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&all_rs)
@@ -1200,10 +1207,10 @@ mod test {
         let mut main = module_builder.define_function("main", main_sig)?;
 
         let inner_left_sig = FunctionType::new(type_row![], type_row![NAT])
-            .with_input_extensions(ExtensionSet::singleton(&"A".into()));
+            .with_input_extensions(ExtensionSet::singleton(&XA));
 
         let inner_right_sig = FunctionType::new(type_row![], type_row![NAT])
-            .with_input_extensions(ExtensionSet::singleton(&"BOOL_T".into()));
+            .with_input_extensions(ExtensionSet::singleton(&XB));
 
         let inner_mult_sig =
             FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_input_extensions(all_rs);
@@ -1247,7 +1254,7 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let rs = ExtensionSet::singleton(&"R".into());
+        let rs = ExtensionSet::singleton(&XA);
 
         let main_signature =
             FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
@@ -1337,7 +1344,8 @@ mod test {
 
     #[test]
     fn invalid_types() {
-        let mut e = Extension::new("MyExt".into());
+        let name: ExtensionId = "MyExt".try_into().unwrap();
+        let mut e = Extension::new(name.clone());
         e.add_type(
             "MyContainer".into(),
             vec![TypeParam::Type(TypeBound::Copyable)],
@@ -1358,7 +1366,7 @@ mod test {
         let valid = Type::new_extension(CustomType::new(
             "MyContainer",
             vec![TypeArg::Type { ty: USIZE_T }],
-            "MyExt",
+            name.clone(),
             TypeBound::Any,
         ));
         assert_eq!(
@@ -1370,7 +1378,7 @@ mod test {
         let element_outside_bound = CustomType::new(
             "MyContainer",
             vec![TypeArg::Type { ty: valid.clone() }],
-            "MyExt",
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(
@@ -1384,7 +1392,7 @@ mod test {
         let bad_bound = CustomType::new(
             "MyContainer",
             vec![TypeArg::Type { ty: USIZE_T }],
-            "MyExt",
+            name.clone(),
             TypeBound::Copyable,
         );
         assert_eq!(
@@ -1401,7 +1409,7 @@ mod test {
             vec![TypeArg::Type {
                 ty: Type::new_extension(bad_bound),
             }],
-            "MyExt",
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(
@@ -1415,7 +1423,7 @@ mod test {
         let too_many_type_args = CustomType::new(
             "MyContainer",
             vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
-            "MyExt",
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(

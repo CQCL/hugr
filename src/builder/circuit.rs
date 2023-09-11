@@ -177,7 +177,7 @@ mod test {
     fn with_nonlinear_and_outputs() {
         let my_custom_op = LeafOp::CustomOp(
             crate::ops::custom::ExternalOp::Opaque(OpaqueOp::new(
-                "MissingRsrc".into(),
+                "MissingRsrc".try_into().unwrap(),
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],

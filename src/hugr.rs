@@ -2,6 +2,7 @@
 
 pub mod hugrmut;
 
+mod ident;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -14,6 +15,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
+pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
@@ -510,7 +512,7 @@ mod test {
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
         const BIT: Type = crate::extension::prelude::USIZE_T;
-        let r = ExtensionSet::singleton(&"R".into());
+        let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let mut hugr = closed_dfg_root_hugr(
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
@@ -520,7 +522,7 @@ mod test {
             hugr.root(),
             NodeType::open_extensions(ops::LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_extension: "R".into(),
+                new_extension: "R".try_into().unwrap(),
             }),
         )?;
         hugr.connect(input, 0, lift, 0)?;

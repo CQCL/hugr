@@ -3,13 +3,14 @@
 use smol_str::SmolStr;
 
 use crate::{
+    extension::ExtensionId,
     types::{CustomCheckFailure, CustomType, Type, TypeBound},
     values::{CustomConst, KnownTypeConst},
     Extension,
 };
 
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("arithmetic.float.types");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
 
 /// Identfier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
@@ -85,7 +86,7 @@ mod test {
     #[test]
     fn test_float_types_extension() {
         let r = extension();
-        assert_eq!(r.name(), "arithmetic.float.types");
+        assert_eq!(r.name() as &str, "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
     }

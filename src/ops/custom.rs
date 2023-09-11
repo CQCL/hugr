@@ -222,7 +222,7 @@ pub fn resolve_extension_ops(
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&opaque.extension) {
+                if let Some(r) = extension_registry.get(&*opaque.extension) {
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                         return Err(CustomOpError::OpNotFoundInExtension(
@@ -230,7 +230,6 @@ pub fn resolve_extension_ops(
                             r.name().to_string(),
                         ));
                     };
-                    // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
                     let op = ExternalOp::Extension(
                         ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
                     );
@@ -252,7 +251,11 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        let node_type = NodeType::pure(Into::<LeafOp>::into(op));
+        let leaf: LeafOp = op.into();
+        let node_type = match h.get_nodetype(n).input_extensions() {
+            None => NodeType::open_extensions(leaf),
+            Some(exts) => NodeType::new(leaf, exts.clone()),
+        };
         h.replace_op(n, node_type);
     }
     Ok(())
@@ -283,7 +286,7 @@ mod test {
     #[test]
     fn new_opaque_op() {
         let op = OpaqueOp::new(
-            "res".into(),
+            "res".try_into().unwrap(),
             "op",
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],

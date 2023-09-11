@@ -141,7 +141,7 @@ impl Extension {
         bound: TypeDefBound,
     ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
-            extension: self.name().into(),
+            extension: self.name.clone(),
             name,
             params,
             description,
@@ -169,7 +169,7 @@ mod test {
         let def = TypeDef {
             name: "MyType".into(),
             params: vec![TypeParam::Type(TypeBound::Copyable)],
-            extension: "MyRsrc".into(),
+            extension: "MyRsrc".try_into().unwrap(),
             description: "Some parameterised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
         };
