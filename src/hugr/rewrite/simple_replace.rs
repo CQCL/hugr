@@ -1,9 +1,10 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
+use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
 use crate::{
     hugr::{Node, Rewrite},
@@ -13,13 +14,10 @@ use crate::{
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
-// TODO: use `SiblingSubgraph` to define the replacement.
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
-    /// The common DataflowParent of all nodes to be replaced.
-    pub parent: Node,
-    /// The set of nodes to remove (a convex set of leaf children of `parent`).
-    pub removal: HashSet<Node>,
+    /// The subgraph of the hugr to be replaced.
+    pub subgraph: SiblingSubgraph,
     /// A hugr with DFG root (consisting of replacement nodes).
     pub replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
@@ -33,19 +31,25 @@ pub struct SimpleReplacement {
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
     pub fn new(
-        parent: Node,
-        removal: HashSet<Node>,
+        subgraph: SiblingSubgraph,
         replacement: Hugr,
         nu_inp: HashMap<(Node, Port), (Node, Port)>,
         nu_out: HashMap<(Node, Port), Port>,
     ) -> Self {
         Self {
-            parent,
-            removal,
+            subgraph,
             replacement,
             nu_inp,
             nu_out,
         }
+    }
+
+    /// Number of nodes added to the hugr by this replacement.
+    ///
+    /// This will be negative if the replacement is a reduction in node count and
+    /// positive otherwise.
+    pub fn node_count_delta(&self) -> isize {
+        (self.replacement.node_count() - 3) as isize - self.subgraph.nodes().len() as isize
     }
 }
 
@@ -60,13 +64,14 @@ impl Rewrite for SimpleReplacement {
     }
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
+        let parent = self.subgraph.get_parent(h);
         // 1. Check the parent node exists and is a DataflowParent.
-        if !OpTag::DataflowParent.is_superset(h.get_optype(self.parent).tag()) {
+        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
             return Err(SimpleReplacementError::InvalidParentNode());
         }
         // 2. Check that all the to-be-removed nodes are children of it and are leaves.
-        for node in &self.removal {
-            if h.get_parent(*node) != Some(self.parent) || h.children(*node).next().is_some() {
+        for node in self.subgraph.nodes() {
+            if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
             }
         }
@@ -80,7 +85,7 @@ impl Rewrite for SimpleReplacement {
             .collect::<Vec<Node>>();
         // slice of nodes omitting Input and Output:
         let replacement_inner_nodes = &replacement_nodes[2..];
-        let self_output_node = h.children(self.parent).nth(1).unwrap();
+        let self_output_node = h.children(parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
@@ -170,8 +175,8 @@ impl Rewrite for SimpleReplacement {
             }
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
-        for node in &self.removal {
-            h.remove_node(*node).unwrap();
+        for &node in self.subgraph.nodes() {
+            h.remove_node(node).unwrap();
         }
         Ok(())
     }
@@ -196,7 +201,7 @@ pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
     use rstest::{fixture, rstest};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -204,7 +209,7 @@ pub(in crate::hugr::rewrite) mod test {
     };
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::hugr::views::HugrView;
+    use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, Node};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
@@ -327,28 +332,23 @@ pub(in crate::hugr::rewrite) mod test {
     /// └───┘└───┘
     fn test_simple_replacement(simple_hugr: Hugr, dfg_hugr: Hugr) {
         let mut h: Hugr = simple_hugr;
-        // 1. Find the DFG node for the inner circuit
-        let p: Node = h
-            .nodes()
-            .find(|node: &Node| h.get_optype(*node).tag() == OpTag::Dfg)
-            .unwrap();
-        // 2. Locate the CX and its successor H's in h
+        // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
             .nodes()
             .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
-        let s: HashSet<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
-        // 3. Construct a new DFG-rooted hugr for the replacement
+        let s: Vec<Node> = vec![h_node_cx, h_node_h0, h_node_h1].into_iter().collect();
+        // 2. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = dfg_hugr;
-        // 4. Construct the input and output matchings
-        // 4.1. Locate the CX and its predecessor H's in n
+        // 3. Construct the input and output matchings
+        // 3.1. Locate the CX and its predecessor H's in n
         let n_node_cx = n
             .nodes()
             .find(|node: &Node| *n.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
-        // 4.2. Locate the ports we need to specify as "glue" in n
+        // 3.2. Locate the ports we need to specify as "glue" in n
         let n_port_0 = n.node_ports(n_node_h0, Direction::Incoming).next().unwrap();
         let n_port_1 = n.node_ports(n_node_h1, Direction::Incoming).next().unwrap();
         let (n_cx_out_0, n_cx_out_1) = n
@@ -358,7 +358,7 @@ pub(in crate::hugr::rewrite) mod test {
             .unwrap();
         let n_port_2 = n.linked_ports(n_node_cx, n_cx_out_0).next().unwrap().1;
         let n_port_3 = n.linked_ports(n_node_cx, n_cx_out_1).next().unwrap().1;
-        // 4.3. Locate the ports we need to specify as "glue" in h
+        // 3.3. Locate the ports we need to specify as "glue" in h
         let (h_port_0, h_port_1) = h
             .node_ports(h_node_cx, Direction::Incoming)
             .take(2)
@@ -368,17 +368,16 @@ pub(in crate::hugr::rewrite) mod test {
         let h_h1_out = h.node_ports(h_node_h1, Direction::Outgoing).next().unwrap();
         let (h_outp_node, h_port_2) = h.linked_ports(h_node_h0, h_h0_out).next().unwrap();
         let h_port_3 = h.linked_ports(h_node_h1, h_h1_out).next().unwrap().1;
-        // 4.4. Construct the maps
+        // 3.4. Construct the maps
         let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
         let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
         nu_inp.insert((n_node_h0, n_port_0), (h_node_cx, h_port_0));
         nu_inp.insert((n_node_h1, n_port_1), (h_node_cx, h_port_1));
         nu_out.insert((h_outp_node, h_port_2), n_port_2);
         nu_out.insert((h_outp_node, h_port_3), n_port_3);
-        // 5. Define the replacement
+        // 4. Define the replacement
         let r = SimpleReplacement {
-            parent: p,
-            removal: s,
+            subgraph: SiblingSubgraph::try_from_nodes(s, &h).unwrap(),
             replacement: n,
             nu_inp,
             nu_out,
@@ -414,49 +413,43 @@ pub(in crate::hugr::rewrite) mod test {
     fn test_simple_replacement_with_empty_wires(simple_hugr: Hugr, dfg_hugr2: Hugr) {
         let mut h: Hugr = simple_hugr;
 
-        // 1. Find the DFG node for the inner circuit
-        let p: Node = h
-            .nodes()
-            .find(|node: &Node| h.get_optype(*node).tag() == OpTag::Dfg)
-            .unwrap();
-        // 2. Locate the CX in h
+        // 1. Locate the CX in h
         let h_node_cx: Node = h
             .nodes()
             .find(|node: &Node| *h.get_optype(*node) == OpType::LeafOp(cx_gate()))
             .unwrap();
-        let s: HashSet<Node> = vec![h_node_cx].into_iter().collect();
-        // 3. Construct a new DFG-rooted hugr for the replacement
+        let s: Vec<Node> = vec![h_node_cx].into_iter().collect();
+        // 2. Construct a new DFG-rooted hugr for the replacement
         let n: Hugr = dfg_hugr2;
-        // 4. Construct the input and output matchings
-        // 4.1. Locate the Output and its predecessor H in n
+        // 3. Construct the input and output matchings
+        // 3.1. Locate the Output and its predecessor H in n
         let n_node_output = n
             .nodes()
             .find(|node: &Node| n.get_optype(*node).tag() == OpTag::Output)
             .unwrap();
         let (_n_node_input, n_node_h) = n.input_neighbours(n_node_output).collect_tuple().unwrap();
-        // 4.2. Locate the ports we need to specify as "glue" in n
+        // 3.2. Locate the ports we need to specify as "glue" in n
         let (n_port_0, n_port_1) = n
             .node_inputs(n_node_output)
             .take(2)
             .collect_tuple()
             .unwrap();
         let n_port_2 = n.node_inputs(n_node_h).next().unwrap();
-        // 4.3. Locate the ports we need to specify as "glue" in h
+        // 3.3. Locate the ports we need to specify as "glue" in h
         let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
         let h_port_2 = h.node_ports(h_node_h0, Direction::Incoming).next().unwrap();
         let h_port_3 = h.node_ports(h_node_h1, Direction::Incoming).next().unwrap();
-        // 4.4. Construct the maps
+        // 3.4. Construct the maps
         let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
         let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
         nu_inp.insert((n_node_output, n_port_0), (h_node_cx, h_port_0));
         nu_inp.insert((n_node_h, n_port_2), (h_node_cx, h_port_1));
         nu_out.insert((h_node_h0, h_port_2), n_port_0);
         nu_out.insert((h_node_h1, h_port_3), n_port_1);
-        // 5. Define the replacement
+        // 4. Define the replacement
         let r = SimpleReplacement {
-            parent: p,
-            removal: s,
+            subgraph: SiblingSubgraph::try_from_nodes(s, &h).unwrap(),
             replacement: n,
             nu_inp,
             nu_out,
@@ -484,11 +477,10 @@ pub(in crate::hugr::rewrite) mod test {
         let replacement = h.clone();
         let orig = h.clone();
 
-        let parent = h.root();
         let removal = h
             .nodes()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
-            .collect();
+            .collect_vec();
         let inputs = h
             .node_outputs(input)
             .filter(|&p| h.get_optype(input).signature().get(p).is_some())
@@ -503,8 +495,7 @@ pub(in crate::hugr::rewrite) mod test {
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
-            parent,
-            removal,
+            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
             replacement,
             inputs,
             outputs,
@@ -538,11 +529,10 @@ pub(in crate::hugr::rewrite) mod test {
 
         let orig = h.clone();
 
-        let parent = h.root();
         let removal = h
             .nodes()
             .filter(|&n| h.get_optype(n).tag() == OpTag::Leaf)
-            .collect();
+            .collect_vec();
 
         let first_out_p = h.node_outputs(input).next().unwrap();
         let embedded_inputs = h.linked_ports(input, first_out_p);
@@ -558,7 +548,10 @@ pub(in crate::hugr::rewrite) mod test {
             .collect();
 
         h.apply_rewrite(SimpleReplacement::new(
-            parent, removal, repl, inputs, outputs,
+            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
+            repl,
+            inputs,
+            outputs,
         ))
         .unwrap();
 

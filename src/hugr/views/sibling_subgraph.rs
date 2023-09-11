@@ -194,6 +194,51 @@ impl SiblingSubgraph {
         })
     }
 
+    /// Create a subgraph from a set of nodes.
+    ///
+    /// The incoming boundary is given by the set of edges with a source
+    /// not in nodes and a target in nodes. Conversely, the outgoing boundary
+    /// is given by the set of edges with a source in nodes and a target not
+    /// in nodes.
+    ///
+    /// The subgraph signature will be given by the types of the incoming and
+    /// outgoing edges ordered by the node order in `nodes` and within each node
+    /// by the port order.
+    pub fn try_from_nodes(
+        nodes: impl Into<Vec<Node>>,
+        hugr: &impl HugrView,
+    ) -> Result<Self, InvalidSubgraph> {
+        let nodes = nodes.into();
+        let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
+        let incoming_edges = nodes
+            .iter()
+            .flat_map(|&n| hugr.node_inputs(n).map(move |p| (n, p)));
+        let outgoing_edges = nodes
+            .iter()
+            .flat_map(|&n| hugr.node_outputs(n).map(move |p| (n, p)));
+        let inputs = incoming_edges
+            .filter(|&(n, p)| {
+                if !hugr.is_linked(n, p) {
+                    return false;
+                }
+                let (out_n, _) = hugr.linked_ports(n, p).exactly_one().ok().unwrap();
+                !nodes_set.contains(&out_n)
+            })
+            .map(|p| vec![p])
+            .collect_vec();
+        let outputs = outgoing_edges
+            .filter(|&(n, p)| {
+                if !hugr.is_linked(n, p) {
+                    return false;
+                }
+                // TODO: what if there are multiple outgoing edges?
+                let (out_n, _) = hugr.linked_ports(n, p).next().unwrap();
+                !nodes_set.contains(&out_n)
+            })
+            .collect_vec();
+        Self::try_new(inputs, outputs, hugr)
+    }
+
     /// An iterator over the nodes in the subgraph.
     pub fn nodes(&self) -> &[Node] {
         &self.nodes
@@ -248,8 +293,6 @@ impl SiblingSubgraph {
         hugr: &impl HugrView,
         replacement: Hugr,
     ) -> Result<SimpleReplacement, InvalidReplacement> {
-        let removal = self.nodes().iter().copied().collect();
-
         let rep_root = replacement.root();
         let dfg_optype = replacement.get_optype(rep_root);
         if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
@@ -300,8 +343,7 @@ impl SiblingSubgraph {
             .collect();
 
         Ok(SimpleReplacement::new(
-            self.get_parent(hugr),
-            removal,
+            self.clone(),
             replacement,
             nu_inp,
             nu_out,
@@ -608,7 +650,7 @@ mod tests {
 
         let rep = sub.create_simple_replacement(&func, empty_dfg).unwrap();
 
-        assert_eq!(rep.removal.len(), 1);
+        assert_eq!(rep.subgraph.nodes().len(), 1);
 
         assert_eq!(hugr.node_count(), 5); // Module + Def + In + CX + Out
         hugr.apply_rewrite(rep).unwrap();
