@@ -26,6 +26,9 @@ impl OutlineCfg {
         }
     }
 
+    /// Compute the entry and exit nodes of the CFG which contains
+    /// [`self.blocks`], along with the output neighbour its parent graph and
+    /// the combined extension_deltas of all of the blocks.
     fn compute_entry_exit_outside_extensions(
         &self,
         h: &impl HugrView,
