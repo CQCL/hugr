@@ -121,19 +121,19 @@ carry an edge weight:
 - `Order` edges are plain directed edges, and express requirements on the
   ordering. They have no edge weight.
 - `Value` edges carry typed data at runtime. They have a _port_ at each end, associated
-  with the source and target nodes. They have a `SimpleType`as an edge weight.
+  with the source and target nodes. They have an `AnyType`as an edge weight.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time). They have a `ClassicalType` as an edge weight.
+  compilation time). They have a `CopyableType` as an edge weight.
 - `ControlFlow` edges represent possible flows of control from one part of the
   program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
   children. They have no edge weight.
 
 `Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
-A `Value` edge can carry data of any `SimpleType`: these include the `ClassicType`s
+A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
-A `Static` edge can only carry a `ClassicType`. For
+A `Static` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
@@ -148,9 +148,9 @@ As well as the type, dataflow edges are also parametrized by a
     [Non-local Edges](#non-local-edges)
 
 ```
-SimpleType ⊃ ClassicType -- In the absence of unicode: "SimpleType is a superset of ClassicType"
+AnyType ⊃ CopyableType
 
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
 ```
@@ -165,7 +165,7 @@ _signature_.
 
 Note that the locality is not fixed or even specified by the signature.
 
-A source port with a `ClassicType` may have any number of edges associated with
+A source port with a `CopyableType` may have any number of edges associated with
 it (including zero, which means "discard"). Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once. See [Linearity](#linearity).
@@ -283,7 +283,7 @@ the following basic dataflow operations are available (in addition to the
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
@@ -561,7 +561,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 #### **Non-local Edges**
 
-**For classical values only** we allow dataflow edges (i.e. both Value and Static)
+**For ``CopyableType`` values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
   * for Value edges, Ext or Dom;
@@ -910,7 +910,7 @@ The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
 
 Opaque ::= string<[TypeArgs]>
 
@@ -992,17 +992,18 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type: Any $\supset$ Copyable $\supset$ Equatable. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
-  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
+  - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
 
-  - The next class are "Copyable" types, aka "Classic" types, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
+  - The next class is ``CopyableType``, i.e. types holding ordinary classical data, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
 
-  - The final class are "Equatable" types: these are Copyable types where additionally there is a well-defined notion of equality between values. (While *some* notion of equality is defined on
+  - The final class is ``EqType``: these are copyable types with a well-defined
+  notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
 
-For example, a `float` type (defined in an extension) would be Copyable, but not Equatable. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
+For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
 
 **Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
@@ -1022,9 +1023,9 @@ Type ::= Tuple(#) -- fixed-arity, heterogenous components
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Functions are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
-Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
+Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
 
 ### Extension Tracking
 
