@@ -326,7 +326,6 @@ impl UnificationContext {
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_)))
                     || matches!(sig.port_kind(*src_port), Some(EdgeKind::Static(_)))
-                    || matches!(sig.port_kind(*src_port), Some(EdgeKind::ControlFlow))
             }) {
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
                     let m_src = self
