@@ -18,8 +18,12 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
+    ///
+    /// [Extension]: crate::Extension
     Extension(ExtensionOp),
     /// When we either haven't tried to identify the [Extension] or failed to find it.
+    ///
+    /// [Extension]: crate::Extension
     Opaque(OpaqueOp),
 }
 
@@ -94,7 +98,9 @@ impl OpTrait for ExternalOp {
 }
 
 /// An operation defined by an [OpDef] from a loaded [Extension].
-// Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
+/// Note *not* Serializable: container ([ExternalOp]) is serialized as an [OpaqueOp] instead.
+///
+/// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
