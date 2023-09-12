@@ -115,12 +115,16 @@ pub trait Container {
     /// Add metadata to the container node.
     fn set_metadata(&mut self, meta: NodeMetadata) {
         let parent = self.container_node();
+        // Implementor's container_node() should be a valid node
         self.hugr_mut().set_metadata(parent, meta).unwrap();
     }
 
     /// Add metadata to a child node.
+    ///
+    /// Returns an error if the specified `child` is not a child of this container
     fn set_child_metadata(&mut self, child: Node, meta: NodeMetadata) -> Result<(), BuildError> {
-        Ok(self.hugr_mut().set_metadata(child, meta)?)
+        self.hugr_mut().set_metadata(child, meta)?;
+        Ok(())
     }
 }
 
