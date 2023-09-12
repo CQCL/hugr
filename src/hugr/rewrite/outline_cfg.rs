@@ -5,7 +5,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
-use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::ExtensionSet;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
@@ -133,10 +133,9 @@ impl Rewrite for OutlineCfg {
                 .add_constant(ops::Const::simple_unary_predicate(), None)
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
-            let new_block_hugr = new_block_bldr
-                .finish_hugr_with_outputs(pred_wire, cfg_outputs, &PRELUDE_REGISTRY)
-                .unwrap();
-            h.insert_hugr(outer_cfg, new_block_hugr).unwrap()
+            new_block_bldr.set_outputs(pred_wire, cfg_outputs).unwrap();
+            h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
+                .unwrap()
         };
 
         // 3. Extract Cfg node created above (it moved when we called insert_hugr)
@@ -289,10 +288,10 @@ mod test {
         for n in [head, tail, merge] {
             assert_eq!(depth(&h, n), 1);
         }
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         for n in blocks {
             assert_eq!(depth(&h, n), 3);
         }
@@ -327,7 +326,7 @@ mod test {
         }
         h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         let new_entry = h.children(h.root()).next().unwrap();
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
