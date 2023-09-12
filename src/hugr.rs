@@ -212,14 +212,6 @@ pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<R, E>(
-        &mut self,
-        rw: impl Rewrite<ApplyResult = R, Error = E>,
-    ) -> Result<R, E> {
-        rw.apply(self)
-    }
-
     /// Run resource inference and pass the closure into validation
     pub fn infer_and_validate(
         &mut self,
