@@ -1,15 +1,14 @@
 //! Extensible operations.
 
 use smol_str::SmolStr;
-use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ExtensionId, OpDef, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
-use crate::{Extension, Hugr, Node};
+use crate::{Hugr, Node};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
@@ -216,13 +215,13 @@ impl OpaqueOp {
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
     h: &mut Hugr,
-    extension_registry: &HashMap<SmolStr, Extension>,
+    extension_registry: &ExtensionRegistry,
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&*opaque.extension) {
+                if let Some(r) = extension_registry.get(&opaque.extension) {
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                         return Err(CustomOpError::OpNotFoundInExtension(
