@@ -7,9 +7,9 @@ use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
-use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
+use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView, NodeMetadata};
+use super::{sealed::HugrInternals, HierarchyView, HugrView};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -92,29 +92,6 @@ where
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
-    }
-
-    #[inline]
-    fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hugr
-            .get_parent(node)
-            .filter(|&parent| self.graph.contains_node(parent.index))
-            .map(Into::into)
-    }
-
-    #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
-        self.hugr.get_optype(node)
-    }
-
-    #[inline]
-    fn get_nodetype(&self, node: Node) -> &NodeType {
-        self.hugr.get_nodetype(node)
-    }
-
-    #[inline]
-    fn get_metadata(&self, node: Node) -> &NodeMetadata {
-        self.hugr.get_metadata(node)
     }
 
     #[inline]
