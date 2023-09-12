@@ -165,7 +165,7 @@ where
     }
 
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
-        let node = self.add_node(node);
+        let node = self.as_mut().add_node(node);
         self.as_mut()
             .hierarchy
             .push_child(node.index, parent.index)?;
@@ -173,7 +173,7 @@ where
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op);
+        let node = self.as_mut().add_op(op);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
@@ -181,7 +181,7 @@ where
     }
 
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op);
+        let node = self.as_mut().add_op(op);
         self.as_mut()
             .hierarchy
             .insert_after(node.index, sibling.index)?;
@@ -334,16 +334,6 @@ pub(crate) mod sealed {
                 true => Err(HugrError::InvalidNode(node)),
                 false => self.valid_node(node),
             }
-        }
-
-        /// Add a node to the graph, with the default conversion from OpType to NodeType
-        fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-            self.hugr_mut().add_op(op)
-        }
-
-        /// Add a node to the graph.
-        fn add_node(&mut self, nodetype: NodeType) -> Node {
-            self.hugr_mut().add_node(nodetype)
         }
 
         /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
