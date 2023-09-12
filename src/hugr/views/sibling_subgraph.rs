@@ -256,6 +256,11 @@ impl SiblingSubgraph {
         &self.nodes
     }
 
+    /// The number of nodes in the subgraph.
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     /// The signature of the subgraph.
     pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
         let input = self
