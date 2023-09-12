@@ -25,6 +25,7 @@ type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 /// used interchangeably with [`SiblingGraph`].
 ///
 /// [`SiblingGraph`]: super::SiblingGraph
+#[derive(Clone)]
 pub struct DescendantsGraph<'g, Root = Node> {
     /// The chosen root node.
     root: Node,
@@ -37,15 +38,6 @@ pub struct DescendantsGraph<'g, Root = Node> {
 
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
-}
-
-impl<'g, Root> Clone for DescendantsGraph<'g, Root>
-where
-    Root: NodeHandle,
-{
-    fn clone(&self) -> Self {
-        DescendantsGraph::new(self.hugr, self.root)
-    }
 }
 
 impl<'g, Root> HugrView for DescendantsGraph<'g, Root>
