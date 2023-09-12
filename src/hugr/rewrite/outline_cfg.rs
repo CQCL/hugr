@@ -230,6 +230,7 @@ mod test {
         build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
     };
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::hugr::HugrMut;
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
     use cool_asserts::assert_matches;
@@ -283,7 +284,7 @@ mod test {
         //            |  \-> right -/             |
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
-        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        let merge = h.input_neighbours(tail).exactly_one().ok().unwrap();
         let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
         for n in [head, tail, merge] {
             assert_eq!(depth(&h, n), 1);
@@ -295,11 +296,14 @@ mod test {
         for n in blocks {
             assert_eq!(depth(&h, n), 3);
         }
-        let new_block = h.output_neighbours(entry).exactly_one().unwrap();
+        let new_block = h.output_neighbours(entry).exactly_one().ok().unwrap();
         for n in [entry, exit, tail, new_block] {
             assert_eq!(depth(&h, n), 1);
         }
-        assert_eq!(h.input_neighbours(tail).exactly_one().unwrap(), new_block);
+        assert_eq!(
+            h.input_neighbours(tail).exactly_one().ok().unwrap(),
+            new_block
+        );
         assert_eq!(
             h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
             HashSet::from([exit, new_block])

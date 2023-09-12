@@ -12,7 +12,7 @@ use crate::{Hugr, Port};
 
 use self::sealed::HugrMutInternals;
 
-use super::NodeMetadata;
+use super::{NodeMetadata, Rewrite};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrView + HugrMutInternals {
@@ -143,6 +143,14 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_from_view(root, other)
+    }
+
+    /// Applies a rewrite to the graph.
+    fn apply_rewrite<R, E>(&mut self, rw: impl Rewrite<ApplyResult = R, Error = E>) -> Result<R, E>
+    where
+        Self: Sized,
+    {
+        rw.apply(self)
     }
 }
 
