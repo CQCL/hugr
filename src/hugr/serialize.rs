@@ -227,7 +227,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 
         for (node, metadata) in metadata.into_iter().enumerate() {
             let node = NodeIndex::new(node).into();
-            hugr.set_metadata(node, metadata);
+            hugr.set_metadata(node, metadata)?;
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {

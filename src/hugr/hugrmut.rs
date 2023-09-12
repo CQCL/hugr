@@ -17,11 +17,15 @@ use super::NodeMetadata;
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrView + HugrMutInternals {
     /// Returns the metadata associated with a node.
-    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
+    fn get_metadata_mut(&mut self, node: Node) -> Result<&mut NodeMetadata, HugrError> {
+        self.valid_node(node)?;
+        Ok(self.hugr_mut().metadata.get_mut(node.index))
+    }
 
     /// Sets the metadata associated with a node.
-    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) {
-        *self.get_metadata_mut(node) = metadata;
+    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) -> Result<(), HugrError> {
+        *self.get_metadata_mut(node)? = metadata;
+        Ok(())
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -151,10 +155,6 @@ impl<T> HugrMut for T
 where
     T: HugrView + AsMut<Hugr>,
 {
-    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
-        self.as_mut().metadata.get_mut(node.index)
-    }
-
     fn add_op_with_parent(
         &mut self,
         parent: Node,
@@ -244,7 +244,7 @@ where
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
-            self.as_mut().set_metadata(node.into(), meta);
+            self.as_mut().set_metadata(node.into(), meta).unwrap();
         }
         Ok(other_root)
     }
@@ -256,7 +256,9 @@ where
             let nodetype = other.get_nodetype(node.into());
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.get_metadata(node.into());
-            self.as_mut().set_metadata(node.into(), meta.clone());
+            self.as_mut()
+                .set_metadata(node.into(), meta.clone())
+                .unwrap();
         }
         Ok(other_root)
     }
