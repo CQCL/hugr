@@ -17,6 +17,7 @@ use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
+
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -158,8 +159,17 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Check operation-specific constraints
-        self.validate_operation(node, node_type)?;
+        // Check operation-specific constraints. Firstly that type args are correct
+        // (Good to call `resolve_extension_ops` immediately before this
+        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
+        if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
+            for arg in b.args() {
+                arg.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+        }
+        // Secondly that the node has correct children
+        self.validate_children(node, node_type)?;
 
         // If this is a container with I/O nodes, check that the extension they
         // define match the extensions of the container.
@@ -260,7 +270,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_operation(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
+    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
         let op_type = &node_type.op;
         let flags = op_type.validity_flags();
 
@@ -301,7 +311,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
-            if let Err(source) = op_type.validate_children(children_optypes) {
+            if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
                     parent_optype: op_type.clone(),

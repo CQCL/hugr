@@ -229,7 +229,7 @@ pub trait ValidateOp {
 
     /// Validate the ordered list of children.
     #[inline]
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), validate::ChildrenValidationError> {
