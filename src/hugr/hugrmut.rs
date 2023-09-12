@@ -37,8 +37,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        self.valid_node(parent)?;
-        self.hugr_mut().add_op_with_parent(parent, op)
+        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
+        self.add_node_with_parent(parent, NodeType::pure(op))
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -163,15 +163,6 @@ impl<T> HugrMut for T
 where
     T: HugrView + AsMut<Hugr>,
 {
-    fn add_op_with_parent(
-        &mut self,
-        parent: Node,
-        op: impl Into<OpType>,
-    ) -> Result<Node, HugrError> {
-        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-        self.add_node_with_parent(parent, NodeType::pure(op))
-    }
-
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
         let node = self.as_mut().add_node(node);
         self.as_mut()
