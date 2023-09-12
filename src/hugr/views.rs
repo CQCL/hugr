@@ -300,11 +300,8 @@ pub trait HugrView: sealed::HugrInternals {
 
 /// A common trait for views of a HUGR hierarchical subgraph.
 pub trait HierarchyView<'a>: HugrView {
-    /// The base from which the subgraph is derived.
-    type Base;
-
     /// Create a hierarchical view of a HUGR given a root node.
-    fn new(hugr: &'a Self::Base, root: Node) -> Self;
+    fn new(hugr: &'a impl HugrView, root: Node) -> Self;
 }
 
 impl<T> HugrView for T

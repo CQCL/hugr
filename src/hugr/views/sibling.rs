@@ -25,37 +25,32 @@ type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 /// used interchangeably with [`DescendantsGraph`].
 ///
 /// [`DescendantsGraph`]: super::DescendantsGraph
-pub struct SiblingGraph<'g, Root = Node, Base = Hugr>
-where
-    Base: HugrInternals,
-{
+pub struct SiblingGraph<'g, Root = Node> {
     /// The chosen root node.
     root: Node,
 
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g>,
 
-    /// The rest of the HUGR.
-    hugr: &'g Base,
+    /// View onto the underlying Hugr which this graph filters
+    hugr: &'g Hugr,
 
     /// The operation type of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root, Base> Clone for SiblingGraph<'g, Root, Base>
+impl<'g, Root> Clone for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
 {
     fn clone(&self) -> Self {
         SiblingGraph::new(self.hugr, self.root)
     }
 }
 
-impl<'g, Root, Base> HugrView for SiblingGraph<'g, Root, Base>
+impl<'g, Root> HugrView for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
 {
     type RootHandle = Root;
 
@@ -186,36 +181,29 @@ where
     }
 }
 
-impl<'a, Root, Base> HierarchyView<'a> for SiblingGraph<'a, Root, Base>
+impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
     Root: NodeHandle,
-    Base: HugrView,
 {
-    type Base = Base;
-
-    fn new(hugr: &'a Base, root: Node) -> Self {
+    fn new(hugr: &'a impl HugrView, root: Node) -> Self {
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
             // TODO: Return an error
             panic!("Root node must have the correct operation type tag.")
         }
+        let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new_flat_region(
-                &hugr.base_hugr().graph,
-                &hugr.base_hugr().hierarchy,
-                root.index,
-            ),
+            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
             hugr,
             _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<'g, Root, Base> HugrInternals for SiblingGraph<'g, Root, Base>
+impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
-    Base: HugrInternals,
 {
     type Portgraph<'p> = &'p FlatRegionGraph<'g> where Self: 'p;
 
@@ -226,7 +214,7 @@ where
 
     #[inline]
     fn base_hugr(&self) -> &Hugr {
-        self.hugr.base_hugr()
+        self.hugr
     }
 
     #[inline]
