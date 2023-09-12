@@ -89,7 +89,7 @@ pub trait Container {
         let f_node = self.add_child_node(NodeType::new(
             ops::FuncDefn {
                 name: name.into(),
-                signature: signature.clone().into(),
+                signature: signature.signature.clone(),
             },
             signature.input_extensions.clone(),
         ))?;
