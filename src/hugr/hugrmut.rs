@@ -312,30 +312,6 @@ pub(crate) mod sealed {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
 
-        /// Validates that a node is valid in the graph.
-        ///
-        /// Returns a [`HugrError::InvalidNode`] otherwise.
-        #[inline]
-        fn valid_node(&self, node: Node) -> Result<(), HugrError> {
-            match self.contains_node(node) {
-                true => Ok(()),
-                false => Err(HugrError::InvalidNode(node)),
-            }
-        }
-
-        /// Validates that a node is a valid root descendant in the graph.
-        ///
-        /// To include the root node use [`HugrMutInternals::valid_node`] instead.
-        ///
-        /// Returns a [`HugrError::InvalidNode`] otherwise.
-        #[inline]
-        fn valid_non_root(&self, node: Node) -> Result<(), HugrError> {
-            match self.root() == node {
-                true => Err(HugrError::InvalidNode(node)),
-                false => self.valid_node(node),
-            }
-        }
-
         /// Add a node to the graph, with the default conversion from OpType to NodeType
         fn add_op(&mut self, op: impl Into<OpType>) -> Node {
             self.hugr_mut().add_op(op)
