@@ -160,8 +160,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Check operation-specific constraints. Firstly that type args are correct
-        // (note that if the Hugr were mutable here, this could be a good time to do
-        // resolve_extension_ops)
+        // (Good to call `resolve_extension_ops` immediately before this
+        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
         if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
             for arg in b.args() {
                 arg.validate(self.extension_registry)
