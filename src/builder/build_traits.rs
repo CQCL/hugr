@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -62,14 +62,25 @@ pub trait Container {
         Ok(Wire::new(src, src_port))
     }
 
-    /// Add a constant value to the container and return a handle to it.
+    /// Add a constant value to the container and return a handle to it. The
+    /// `provenance` argument says which extension the type and value of the
+    /// constant comes from. If it is `None`, then the constant must be a built
+    /// in type.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_op(constant)?;
+    fn add_constant(
+        &mut self,
+        constant: ops::Const,
+        provenance: Option<ExtensionId>,
+    ) -> Result<ConstID, BuildError> {
+        let mut extensions = ExtensionSet::new();
+        if let Some(ext) = provenance {
+            extensions.insert(&ext);
+        };
+        let const_n = self.add_child_node(NodeType::new(constant, extensions))?;
 
         Ok(const_n.into())
     }
@@ -190,7 +201,7 @@ pub trait Dataflow: Container {
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_node(NodeType::pure(op), input_wires)
+        self.add_dataflow_node(NodeType::open_extensions(op), input_wires)
     }
 
     /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
@@ -340,17 +351,21 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let const_node = cid.node();
-        let op: ops::Const = self
-            .hugr()
-            .get_optype(const_node)
+        let nodetype = self.hugr().get_nodetype(const_node);
+        let input_extensions = nodetype.input_extensions().cloned();
+        let op: &OpType = nodetype.into();
+        let op: ops::Const = op
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
 
-        let load_n = self.add_dataflow_op(
-            ops::LoadConstant {
-                datatype: op.const_type().clone(),
-            },
+        let load_n = self.add_dataflow_node(
+            NodeType::new(
+                ops::LoadConstant {
+                    datatype: op.const_type().clone(),
+                },
+                input_extensions,
+            ),
             // Constant wire from the constant value node
             vec![Wire::new(const_node, Port::new_outgoing(0))],
         )?;
@@ -363,8 +378,12 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant)?;
+    fn add_load_const(
+        &mut self,
+        constant: ops::Const,
+        provenance: Option<ExtensionId>,
+    ) -> Result<Wire, BuildError> {
+        let cid = self.add_constant(constant, provenance)?;
         self.load_const(&cid)
     }
 

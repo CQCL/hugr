@@ -130,7 +130,7 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
             let predicate = new_block_bldr
-                .add_constant(ops::Const::simple_unary_predicate())
+                .add_constant(ops::Const::simple_unary_predicate(), None)
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
             let new_block_hugr = new_block_bldr
