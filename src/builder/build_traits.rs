@@ -86,10 +86,13 @@ pub trait Container {
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let f_node = self.add_child_op(ops::FuncDefn {
-            name: name.into(),
-            signature: signature.clone().into(),
-        })?;
+        let f_node = self.add_child_node(NodeType::new(
+            ops::FuncDefn {
+                name: name.into(),
+                signature: signature.clone().into(),
+            },
+            signature.input_extensions.clone(),
+        ))?;
 
         let db = DFGBuilder::create_with_io(
             self.hugr_mut(),
