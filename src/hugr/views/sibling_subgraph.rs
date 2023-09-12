@@ -560,6 +560,7 @@ mod tests {
             EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
+        hugr::HugrMut,
         ops::{
             handle::{FuncID, NodeHandle},
             OpType,
