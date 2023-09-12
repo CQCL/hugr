@@ -17,7 +17,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use itertools::Itertools;
@@ -74,12 +74,8 @@ pub trait Container {
     fn add_constant(
         &mut self,
         constant: ops::Const,
-        provenance: Option<ExtensionId>,
+        extensions: ExtensionSet,
     ) -> Result<ConstID, BuildError> {
-        let mut extensions = ExtensionSet::new();
-        if let Some(ext) = provenance {
-            extensions.insert(&ext);
-        };
         let const_n = self.add_child_node(NodeType::new(constant, extensions))?;
 
         Ok(const_n.into())
@@ -381,9 +377,9 @@ pub trait Dataflow: Container {
     fn add_load_const(
         &mut self,
         constant: ops::Const,
-        provenance: Option<ExtensionId>,
+        extensions: ExtensionSet,
     ) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant, provenance)?;
+        let cid = self.add_constant(constant, extensions)?;
         self.load_const(&cid)
     }
 

@@ -243,7 +243,7 @@ mod test {
                 "main",
                 FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
             )?;
-            let tru_const = fbuild.add_constant(Const::true_val(), None)?;
+            let tru_const = fbuild.add_constant(Const::true_val(), ExtensionSet::new())?;
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
