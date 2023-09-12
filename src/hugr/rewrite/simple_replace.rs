@@ -205,7 +205,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::HugrView;
-    use crate::hugr::{Hugr, Node};
+    use crate::hugr::{Hugr, HugrMut, Node};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;

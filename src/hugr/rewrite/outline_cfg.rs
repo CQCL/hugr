@@ -230,6 +230,7 @@ mod test {
         build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
     };
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::hugr::HugrMut;
     use crate::ops::handle::NodeHandle;
     use crate::{HugrView, Node};
     use cool_asserts::assert_matches;
