@@ -4,9 +4,10 @@ use std::iter;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
+use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortIndex, PortView};
 
-use crate::hugr::HugrError;
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
@@ -214,6 +215,163 @@ where
         self.root
     }
 }
+
+/// Mutable view onto a HUGR sibling graph.
+///
+/// Includes only the root node and its direct children, but no deeper descendants.
+/// Uniquely, the root node has no parent.
+///
+/// [HugrView] methods may be slower than for an immutable [SiblingGraph] as the latter
+/// may cache information about the graph connectivity, whereas (in order
+/// to ease mutation) this does not.
+pub struct SiblingMut<'g> {
+    /// The chosen root node.
+    root: Node,
+
+    /// The rest of the HUGR.
+    hugr: &'g mut Hugr,
+}
+
+impl<'g> SiblingMut<'g> {
+    /// Create a new SiblingMut from a base.
+    /// Equivalent to [HierarchyView::new] but takes a *mutable* reference.
+    pub fn new(hugr: &'g mut impl HugrMut, root: Node) -> Self {
+        Self {
+            hugr: hugr.hugr_mut(),
+            root,
+        }
+    }
+}
+
+impl<'g> HugrInternals for SiblingMut<'g> {
+    type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p;
+
+    fn portgraph(&self) -> Self::Portgraph<'_> {
+        FlatRegionGraph::new_flat_region(
+            &self.base_hugr().graph,
+            &self.base_hugr().hierarchy,
+            self.root.index,
+        )
+    }
+
+    fn base_hugr(&self) -> &Hugr {
+        self.hugr
+    }
+
+    fn root_node(&self) -> Node {
+        self.root
+    }
+}
+
+impl<'g> HugrView for SiblingMut<'g> {
+    type RootHandle = Node; // TODO ?? Add Root parameter??
+
+    type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
+    where
+        Self: 'a;
+
+    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
+    where
+        Self: 'a;
+
+    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
+    where
+        Self: 'a;
+
+    type Neighbours<'a> = MapInto<multiportgraph::Neighbours<'a>, Node>
+    where
+        Self: 'a;
+
+    type PortLinks<'a> = MapWithCtx<multiportgraph::PortLinks<'a>, &'a Hugr, (Node, Port)>
+    where
+        Self: 'a;
+
+    type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
+
+    fn contains_node(&self, node: Node) -> bool {
+        // Don't call self.get_parent(). That requires valid_node(node)
+        // which infinitely-recurses back here.
+        node == self.root || self.base_hugr().get_parent(node) == Some(self.root)
+    }
+
+    fn node_count(&self) -> usize {
+        // Same as SiblingGraph.
+        self.base_hugr().hierarchy.child_count(self.root.index) + 1
+    }
+
+    fn edge_count(&self) -> usize {
+        // Same as SiblingGraph
+        self.nodes()
+            .map(|n| self.output_neighbours(n).count())
+            .sum()
+    }
+
+    fn nodes(&self) -> Self::Nodes<'_> {
+        // Same as SiblingGraph
+        let children = self
+            .base_hugr()
+            .hierarchy
+            .children(self.root.index)
+            .map_into();
+        iter::once(self.root).chain(children)
+    }
+
+    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.base_hugr().node_ports(node, dir)
+    }
+
+    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.base_hugr().all_node_ports(node)
+    }
+
+    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.base_hugr().linked_ports(node, port)
+    }
+
+    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.valid_node(other).unwrap(); // ?? Is this even a requirement for non-local edges?
+        self.base_hugr().node_connections(node, other)
+    }
+
+    fn num_ports(&self, node: Node, dir: Direction) -> usize {
+        self.valid_node(node).unwrap(); // ?? Or return 0?
+        self.base_hugr().num_ports(node, dir)
+    }
+
+    fn children(&self, node: Node) -> Self::Children<'_> {
+        match node == self.root {
+            true => self.base_hugr().hierarchy.children(node.index).map_into(),
+            false => portgraph::hierarchy::Children::default().map_into(),
+        }
+    }
+
+    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.base_hugr().neighbours(node, dir) // Or self.hugr ?
+    }
+
+    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
+        self.base_hugr().all_neighbours(node)
+    }
+
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        self.valid_node(node).unwrap(); // ?? Or return None?
+        self.base_hugr().get_io(node)
+    }
+}
+
+impl<'g> HugrMutInternals for SiblingMut<'g> {
+    fn hugr_mut(&mut self) -> &mut Hugr {
+        self.hugr
+    }
+}
+
+impl<'g> HugrMut for SiblingMut<'g> {}
 
 #[cfg(test)]
 mod test {
