@@ -169,7 +169,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
         // Secondly that the node has correct children
-        self.validate_operation(node, node_type)?;
+        self.validate_children(node, node_type)?;
 
         // If this is a container with I/O nodes, check that the extension they
         // define match the extensions of the container.
@@ -270,7 +270,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_operation(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
+    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
         let op_type = &node_type.op;
         let flags = op_type.validity_flags();
 
