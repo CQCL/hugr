@@ -250,14 +250,14 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::handle::{BasicBlockID, NodeHandle};
     use crate::types::FunctionType;
-    use crate::{type_row, HugrView, Node};
+    use crate::{type_row, Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
 
-    fn depth(h: &impl HugrView, n: Node) -> u32 {
-        match h.base_hugr().get_parent(n) {
+    fn depth(h: &Hugr, n: Node) -> u32 {
+        match h.get_parent(n) {
             Some(p) => 1 + depth(h, p),
             None => 0,
         }
@@ -316,16 +316,16 @@ mod test {
         let merge = h.input_neighbours(tail).exactly_one().ok().unwrap();
         let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
         for n in [head, tail, merge] {
-            assert_eq!(depth(h, n), expected_depth);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
         for n in blocks {
-            assert_eq!(depth(h, n), expected_depth + 2);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth + 2);
         }
         let new_block = h.output_neighbours(entry).exactly_one().ok().unwrap();
         for n in [entry, exit, tail, new_block] {
-            assert_eq!(depth(h, n), expected_depth);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
         assert_eq!(
             h.input_neighbours(tail).exactly_one().ok().unwrap(),
