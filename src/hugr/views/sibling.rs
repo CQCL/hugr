@@ -179,13 +179,8 @@ where
     Root: NodeHandle,
 {
     fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
-        println!("ALAN checking node {:?} against {}", root, Root::TAG);
         hugr.valid_node(root)?;
         if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
-            println!(
-                "ALAN check failed, optype was {}",
-                hugr.get_optype(root).tag()
-            );
             return Err(HugrError::InvalidNode(root));
         }
         let hugr = hugr.base_hugr();
