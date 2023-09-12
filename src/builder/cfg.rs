@@ -59,9 +59,7 @@ impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
     pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
-            inputs: signature.input.clone(),
-            outputs: signature.output.clone(),
-            extension_delta: signature.extension_reqs,
+            signature: signature.clone(),
         };
 
         let base = Hugr::new(NodeType::open_extensions(cfg_op));

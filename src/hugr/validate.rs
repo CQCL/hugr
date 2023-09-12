@@ -966,9 +966,7 @@ mod test {
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
-                inputs: type_row![BOOL_T],
-                outputs: type_row![BOOL_T],
-                extension_delta: ExtensionSet::new(),
+                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
         );
         assert_matches!(
