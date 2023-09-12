@@ -97,7 +97,7 @@ pub enum TypeArg {
 }
 
 impl TypeArg {
-    pub(super) fn validate(
+    pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError> {
