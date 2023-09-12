@@ -60,8 +60,8 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         self.hugr_mut().add_op_before(sibling, op)
     }
 
-    /// A generalisation of [`add_op_before`], needed temporarily until
-    /// [`add_op`] defaults to creating nodes with open extensions.
+    /// A generalisation of [`HugrMut::add_op_before`], needed temporarily until
+    /// add_op type methods all default to creating nodes with open extensions.
     #[inline]
     fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
         self.valid_non_root(sibling)?;
