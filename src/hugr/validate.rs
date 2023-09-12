@@ -311,7 +311,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
-            if let Err(source) = op_type.validate_children(children_optypes) {
+            if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
                     parent_optype: op_type.clone(),
