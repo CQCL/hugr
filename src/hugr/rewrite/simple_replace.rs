@@ -17,15 +17,15 @@ use thiserror::Error;
 #[derive(Debug, Clone)]
 pub struct SimpleReplacement {
     /// The subgraph of the hugr to be replaced.
-    pub subgraph: SiblingSubgraph,
+    subgraph: SiblingSubgraph,
     /// A hugr with DFG root (consisting of replacement nodes).
-    pub replacement: Hugr,
+    replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
     /// edges from nodes not in `removal` to nodes in `removal`).
-    pub nu_inp: HashMap<(Node, Port), (Node, Port)>,
+    nu_inp: HashMap<(Node, Port), (Node, Port)>,
     /// A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
     /// (input ports of the Output node of `replacement`).
-    pub nu_out: HashMap<(Node, Port), Port>,
+    nu_out: HashMap<(Node, Port), Port>,
 }
 
 impl SimpleReplacement {
@@ -44,12 +44,9 @@ impl SimpleReplacement {
         }
     }
 
-    /// Number of nodes added to the hugr by this replacement.
-    ///
-    /// This will be negative if the replacement is a reduction in node count and
-    /// positive otherwise.
-    pub fn node_count_delta(&self) -> isize {
-        (self.replacement.node_count() - 3) as isize - self.subgraph.nodes().len() as isize
+    /// The replacement hugr.
+    pub fn replacement(&self) -> &Hugr {
+        &self.replacement
     }
 
     /// Subgraph to be replaced.

@@ -69,6 +69,11 @@ pub struct SiblingSubgraph {
 }
 
 /// The type of the incoming boundary of [`SiblingSubgraph`].
+///
+/// The nested vec represents a partition of the incoming boundary ports by
+/// input parameter. A set in the partition that has more than one element
+/// corresponds to an input parameter that is copied and useful multiple times
+/// in the subgraph.
 pub type IncomingPorts = Vec<Vec<(Node, Port)>>;
 /// The type of the outgoing boundary of [`SiblingSubgraph`].
 pub type OutgoingPorts = Vec<(Node, Port)>;
@@ -204,6 +209,11 @@ impl SiblingSubgraph {
     /// The subgraph signature will be given by the types of the incoming and
     /// outgoing edges ordered by the node order in `nodes` and within each node
     /// by the port order.
+
+    /// The in- and out-arity of the signature will match the
+    /// number of incoming and outgoing edges respectively. In particular, the
+    /// assumption is made that no two incoming edges have the same source
+    /// (no copy nodes at the input bounary).
     pub fn try_from_nodes(
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
@@ -224,6 +234,7 @@ impl SiblingSubgraph {
                 let (out_n, _) = hugr.linked_ports(n, p).exactly_one().ok().unwrap();
                 !nodes_set.contains(&out_n)
             })
+            // Every incoming edge is its own input.
             .map(|p| vec![p])
             .collect_vec();
         let outputs = outgoing_edges
@@ -232,8 +243,9 @@ impl SiblingSubgraph {
                     return false;
                 }
                 // TODO: what if there are multiple outgoing edges?
-                let (out_n, _) = hugr.linked_ports(n, p).next().unwrap();
-                !nodes_set.contains(&out_n)
+                // See https://github.com/CQCL-DEV/hugr/issues/518
+                let (in_n, _) = hugr.linked_ports(n, p).next().unwrap();
+                !nodes_set.contains(&in_n)
             })
             .collect_vec();
         Self::try_new(inputs, outputs, hugr)
@@ -650,7 +662,7 @@ mod tests {
 
         let rep = sub.create_simple_replacement(&func, empty_dfg).unwrap();
 
-        assert_eq!(rep.subgraph.nodes().len(), 1);
+        assert_eq!(rep.subgraph().nodes().len(), 1);
 
         assert_eq!(hugr.node_count(), 5); // Module + Def + In + CX + Out
         hugr.apply_rewrite(rep).unwrap();
