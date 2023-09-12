@@ -449,7 +449,7 @@ pub(crate) mod test {
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's).
-        let v: SiblingGraph = SiblingGraph::new(&h, h.root());
+        let v: SiblingGraph = SiblingGraph::new(&h, h.root()).unwrap();
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
         let [&left, &right] = edge_classes
             .keys()

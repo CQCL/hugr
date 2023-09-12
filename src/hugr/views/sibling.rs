@@ -6,6 +6,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
+use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
@@ -177,19 +178,18 @@ impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
     Root: NodeHandle,
 {
-    fn new(hugr: &'a impl HugrView, root: Node) -> Self {
-        let root_tag = hugr.get_optype(root).tag();
-        if !Root::TAG.is_superset(root_tag) {
-            // TODO: Return an error
-            panic!("Root node must have the correct operation type tag.")
+    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+        hugr.valid_node(root)?;
+        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
+            return Err(HugrError::InvalidNode(root));
         }
         let hugr = hugr.base_hugr();
-        Self {
+        Ok(Self {
             root,
             graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
             hugr,
             _phantom: std::marker::PhantomData,
-        }
+        })
     }
 }
 
@@ -224,7 +224,7 @@ mod test {
     fn flat_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region: SiblingGraph = SiblingGraph::new(&hugr, def);
+        let region: SiblingGraph = SiblingGraph::new(&hugr, def)?;
 
         assert_eq!(region.node_count(), 5);
         assert!(region

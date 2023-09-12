@@ -299,9 +299,12 @@ pub trait HugrView: sealed::HugrInternals {
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView {
+pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
-    fn new(hugr: &'a impl HugrView, root: Node) -> Self;
+    ///
+    /// # Errors
+    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
 impl<T> HugrView for T

@@ -100,7 +100,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent).unwrap();
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region.as_petgraph(), entry_node)
     }
@@ -374,7 +374,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent).unwrap();
         let postorder = Topo::new(&region.as_petgraph());
         let nodes_visited = postorder
             .iter(&region.as_petgraph())

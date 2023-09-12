@@ -5,6 +5,7 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
+use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
@@ -164,19 +165,19 @@ impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
 {
-    fn new(hugr: &'a impl HugrView, root: Node) -> Self {
+    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+        hugr.valid_node(root)?;
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
-            // TODO: Return an error
-            panic!("Root node must have the correct operation type tag.")
+            return Err(HugrError::InvalidNode(root));
         }
         let hugr = hugr.base_hugr();
-        Self {
+        Ok(Self {
             root,
             graph: RegionGraph::new_region(&hugr.graph, &hugr.hierarchy, root.index),
             hugr,
             _phantom: std::marker::PhantomData,
-        }
+        })
     }
 }
 
@@ -256,7 +257,7 @@ pub(super) mod test {
     fn full_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region: DescendantsGraph = DescendantsGraph::new(&hugr, def);
+        let region: DescendantsGraph = DescendantsGraph::new(&hugr, def)?;
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
@@ -268,7 +269,7 @@ pub(super) mod test {
             region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
         );
-        let inner_region: DescendantsGraph = DescendantsGraph::new(&hugr, inner);
+        let inner_region: DescendantsGraph = DescendantsGraph::new(&hugr, inner)?;
         assert_eq!(
             inner_region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT], type_row![NAT]))
