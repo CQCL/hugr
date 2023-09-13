@@ -293,7 +293,7 @@ mod test {
         h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         for n in blocks {
             assert_eq!(depth(&h, n), 3);
         }
@@ -328,7 +328,7 @@ mod test {
         }
         h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let new_entry = h.children(h.root()).next().unwrap();
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
