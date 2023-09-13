@@ -164,15 +164,6 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
-
-    #[inline]
-    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
-        if node == self.root() {
-            self.base_hugr().get_io(node)
-        } else {
-            None
-        }
-    }
 }
 
 impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
@@ -365,11 +356,6 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.valid_node(node).unwrap(); // ?? Or return empty iterator?
         self.base_hugr().all_neighbours(node)
-    }
-
-    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
-        self.valid_node(node).unwrap(); // ?? Or return None?
-        self.base_hugr().get_io(node)
     }
 }
 

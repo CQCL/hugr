@@ -221,7 +221,16 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
-    fn get_io(&self, node: Node) -> Option<[Node; 2]>;
+    #[inline]
+    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
+        let op = self.get_nodetype(node);
+        // Nodes outside the view have no children (and a non-DataflowParent NodeType::default())
+        if OpTag::DataflowParent.is_superset(op.tag()) {
+            self.children(node).take(2).collect_vec().try_into().ok()
+        } else {
+            None
+        }
+    }
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
@@ -406,16 +415,6 @@ where
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.as_ref().graph.all_neighbours(node.index).map_into()
-    }
-
-    #[inline]
-    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
-        let op = self.get_nodetype(node);
-        if OpTag::DataflowParent.is_superset(op.tag()) {
-            self.children(node).take(2).collect_vec().try_into().ok()
-        } else {
-            None
-        }
     }
 }
 
