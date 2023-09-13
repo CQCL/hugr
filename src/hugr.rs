@@ -23,7 +23,7 @@ use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, prelude::*};
 
 pub use self::views::HugrView;
 use crate::extension::{
@@ -464,10 +464,17 @@ pub enum HugrError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyHugrError,
+    PyException,
+    "Errors that can occur while manipulating a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<HugrError> for PyErr {
     fn from(err: HugrError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyHugrError::new_err(err.to_string())
     }
 }
 

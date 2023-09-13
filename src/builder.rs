@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, prelude::*};
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
@@ -79,10 +79,17 @@ pub enum BuildError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyBuildError,
+    PyException,
+    "Errors that can occur while building a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<BuildError> for PyErr {
     fn from(err: BuildError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyBuildError::new_err(err.to_string())
     }
 }
 
