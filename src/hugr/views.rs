@@ -300,7 +300,7 @@ pub trait HierarchyView<'a>: HugrView + Sized {
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
-    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
 impl<T> HugrView for T

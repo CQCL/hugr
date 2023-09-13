@@ -165,7 +165,7 @@ impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
 {
-    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
@@ -257,7 +257,7 @@ pub(super) mod test {
     fn full_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region: DescendantsGraph = DescendantsGraph::new(&hugr, def)?;
+        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
@@ -269,7 +269,7 @@ pub(super) mod test {
             region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
         );
-        let inner_region: DescendantsGraph = DescendantsGraph::new(&hugr, inner)?;
+        let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT], type_row![NAT]))
