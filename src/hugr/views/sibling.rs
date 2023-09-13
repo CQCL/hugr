@@ -224,7 +224,7 @@ where
 /// [HugrView] methods may be slower than for an immutable [SiblingGraph] as the latter
 /// may cache information about the graph connectivity, whereas (in order
 /// to ease mutation) this does not.
-pub struct SiblingMut<'g, Root=Node> {
+pub struct SiblingMut<'g, Root = Node> {
     /// The chosen root node.
     root: Node,
 
@@ -246,7 +246,7 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
         Ok(Self {
             hugr: hugr.hugr_mut(),
             root,
-            _phantom: std::marker::PhantomData
+            _phantom: std::marker::PhantomData,
         })
     }
 }
