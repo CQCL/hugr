@@ -31,6 +31,7 @@ pub mod validate;
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
+#[derive(Clone, Debug)]
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
 
 impl ExtensionRegistry {
