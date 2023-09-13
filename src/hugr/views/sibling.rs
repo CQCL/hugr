@@ -224,27 +224,35 @@ where
 /// [HugrView] methods may be slower than for an immutable [SiblingGraph] as the latter
 /// may cache information about the graph connectivity, whereas (in order
 /// to ease mutation) this does not.
-pub struct SiblingMut<'g> {
+pub struct SiblingMut<'g, Root=Node> {
     /// The chosen root node.
     root: Node,
 
     /// The rest of the HUGR.
     hugr: &'g mut Hugr,
+
+    /// The operation type of the root node.
+    _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g> SiblingMut<'g> {
+impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     /// Create a new SiblingMut from a base.
-    /// Equivalent to [HierarchyView::new] but takes a *mutable* reference.
-    pub fn new(hugr: &'g mut impl HugrMut, root: Node) -> Self {
-        Self {
+    /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
+    pub fn try_new(hugr: &'g mut impl HugrMut, root: Node) -> Result<Self, HugrError> {
+        hugr.valid_node(root)?;
+        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
+            return Err(HugrError::InvalidNode(root));
+        }
+        Ok(Self {
             hugr: hugr.hugr_mut(),
             root,
-        }
+            _phantom: std::marker::PhantomData
+        })
     }
 }
 
-impl<'g> HugrInternals for SiblingMut<'g> {
-    type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p;
+impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
+    type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p, Root: 'p;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
         FlatRegionGraph::new_flat_region(
@@ -263,8 +271,8 @@ impl<'g> HugrInternals for SiblingMut<'g> {
     }
 }
 
-impl<'g> HugrView for SiblingMut<'g> {
-    type RootHandle = Node; // TODO ?? Add Root parameter??
+impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
+    type RootHandle = Root;
 
     type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
     where

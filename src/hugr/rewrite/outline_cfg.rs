@@ -355,7 +355,7 @@ mod test {
         let cfg = cfg_builder.finish_sub_container().unwrap();
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_prelude_hugr().unwrap();
-        do_outline_cfg_test(&mut SiblingMut::new(&mut h, cfg.node()), head, tail, 3);
+        do_outline_cfg_test(&mut SiblingMut::try_new(&mut h, cfg.node()).unwrap(), head, tail, 3);
     }
 
     #[test]
