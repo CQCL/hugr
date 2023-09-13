@@ -115,6 +115,7 @@ impl Rewrite for OutlineCfg {
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
         let new_block = {
+            let input_extensions = h.get_nodetype(entry).input_extensions().cloned();
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
                 vec![type_row![]],
@@ -126,7 +127,7 @@ impl Rewrite for OutlineCfg {
             // N.B. By invoking the cfg_builder, we're forgetting any input
             // extensions that may have existed on the original CFG.
             let cfg = new_block_bldr
-                .cfg_builder(wires_in, outputs, extension_delta)
+                .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
             let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
             let predicate = new_block_bldr

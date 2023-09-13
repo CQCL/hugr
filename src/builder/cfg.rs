@@ -340,6 +340,7 @@ mod test {
                 let cfg_id = {
                     let mut cfg_builder = func_builder.cfg_builder(
                         vec![(NAT, int)],
+                        None,
                         type_row![NAT],
                         ExtensionSet::new(),
                     )?;
