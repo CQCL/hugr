@@ -29,7 +29,7 @@ pub use self::views::HugrView;
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
-use crate::ops::{OpTag, OpTrait, OpType};
+use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
@@ -63,6 +63,12 @@ pub struct NodeType {
     /// The extensions that the signature has been specialised to
     input_extensions: Option<ExtensionSet>,
 }
+
+/// The default NodeType, with open extensions
+pub const DEFAULT_NODETYPE: NodeType = NodeType {
+    op: DEFAULT_OPTYPE,
+    input_extensions: None, // Default for any Option
+};
 
 impl NodeType {
     /// Create a new optype with some ExtensionSet

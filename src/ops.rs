@@ -52,9 +52,12 @@ pub enum OpType {
     Case,
 }
 
+/// The default OpType (as returned by [Default::default])
+pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module);
+
 impl Default for OpType {
     fn default() -> Self {
-        Module.into()
+        DEFAULT_OPTYPE
     }
 }
 

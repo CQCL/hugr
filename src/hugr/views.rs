@@ -18,7 +18,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, NodeMetadata, NodeType};
+use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -80,17 +80,63 @@ pub trait HugrView: sealed::HugrInternals {
     /// Returns whether the node exists.
     fn contains_node(&self, node: Node) -> bool;
 
+    /// Validates that a node is valid in the graph.
+    ///
+    /// Returns a [`HugrError::InvalidNode`] otherwise.
+    #[inline]
+    fn valid_node(&self, node: Node) -> Result<(), HugrError> {
+        match self.contains_node(node) {
+            true => Ok(()),
+            false => Err(HugrError::InvalidNode(node)),
+        }
+    }
+
+    /// Validates that a node is a valid root descendant in the graph.
+    ///
+    /// To include the root node use [`HugrView::valid_node`] instead.
+    ///
+    /// Returns a [`HugrError::InvalidNode`] otherwise.
+    #[inline]
+    fn valid_non_root(&self, node: Node) -> Result<(), HugrError> {
+        match self.root() == node {
+            true => Err(HugrError::InvalidNode(node)),
+            false => self.valid_node(node),
+        }
+    }
+
     /// Returns the parent of a node.
-    fn get_parent(&self, node: Node) -> Option<Node>;
+    #[inline]
+    fn get_parent(&self, node: Node) -> Option<Node> {
+        self.valid_non_root(node).ok()?;
+        self.base_hugr()
+            .hierarchy
+            .parent(node.index)
+            .map(Into::into)
+    }
 
     /// Returns the operation type of a node.
-    fn get_optype(&self, node: Node) -> &OpType;
+    #[inline]
+    fn get_optype(&self, node: Node) -> &OpType {
+        &self.get_nodetype(node).op
+    }
 
     /// Returns the type of a node.
-    fn get_nodetype(&self, node: Node) -> &NodeType;
+    #[inline]
+    fn get_nodetype(&self, node: Node) -> &NodeType {
+        match self.contains_node(node) {
+            true => self.base_hugr().op_types.get(node.index),
+            false => &DEFAULT_NODETYPE,
+        }
+    }
 
     /// Returns the metadata associated with a node.
-    fn get_metadata(&self, node: Node) -> &NodeMetadata;
+    #[inline]
+    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+        match self.contains_node(node) {
+            true => self.base_hugr().metadata.get(node.index),
+            false => &NodeMetadata::Null,
+        }
+    }
 
     /// Returns the number of nodes in the hugr.
     fn node_count(&self) -> usize;
@@ -249,12 +295,12 @@ pub trait HugrView: sealed::HugrInternals {
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView {
-    /// The base from which the subgraph is derived.
-    type Base;
-
+pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
-    fn new(hugr: &'a Self::Base, root: Node) -> Self;
+    ///
+    /// # Errors
+    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
 impl<T> HugrView for T
@@ -285,21 +331,6 @@ where
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.as_ref().graph.contains_node(node.index)
-    }
-
-    #[inline]
-    fn get_parent(&self, node: Node) -> Option<Node> {
-        self.as_ref().hierarchy.parent(node.index).map(Into::into)
-    }
-
-    #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
-        &self.as_ref().op_types.get(node.index).op
-    }
-
-    #[inline]
-    fn get_nodetype(&self, node: Node) -> &NodeType {
-        self.as_ref().op_types.get(node.index)
     }
 
     #[inline]
@@ -385,11 +416,6 @@ where
         } else {
             None
         }
-    }
-
-    #[inline]
-    fn get_metadata(&self, node: Node) -> &NodeMetadata {
-        self.as_ref().metadata.get(node.index)
     }
 }
 
