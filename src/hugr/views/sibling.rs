@@ -34,7 +34,7 @@ pub struct SiblingGraph<'g, Root = Node> {
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g>,
 
-    /// View onto the underlying Hugr which this graph filters
+    /// The underlying Hugr onto which this view is a filter
     hugr: &'g Hugr,
 
     /// The operation type of the root node.
