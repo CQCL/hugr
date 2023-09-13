@@ -62,6 +62,7 @@ pub trait HugrMut: HugrView + HugrMutInternals {
 
     /// A generalisation of [`HugrMut::add_op_before`], needed temporarily until
     /// add_op type methods all default to creating nodes with open extensions.
+    /// See issue #424
     #[inline]
     fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
         self.valid_non_root(sibling)?;

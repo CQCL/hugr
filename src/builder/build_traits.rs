@@ -62,10 +62,7 @@ pub trait Container {
         Ok(Wire::new(src, src_port))
     }
 
-    /// Add a constant value to the container and return a handle to it. The
-    /// `provenance` argument says which extension the type and value of the
-    /// constant comes from. If it is `None`, then the constant must be a built
-    /// in type.
+    /// Add a constant value to the container and return a handle to it.
     ///
     /// # Errors
     ///
