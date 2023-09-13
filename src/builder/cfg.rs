@@ -265,7 +265,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
         let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
-        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
+        let inp_ex = base.as_ref().get_nodetype(block_n).input_extensions().cloned();
+        let db = DFGBuilder::create_with_io(base, block_n, signature, inp_ex)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 
