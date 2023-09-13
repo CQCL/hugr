@@ -1159,6 +1159,22 @@ mod test {
         ops::custom::ExternalOp::from(opaque).into()
     }
 
+    fn make_block(
+        hugr: &mut Hugr,
+        bb_parent: Node,
+        dfb: impl Into<OpType>,
+        op: impl Into<OpType>,
+    ) -> Result<Node, Box<dyn Error>> {
+        let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb)?;
+
+        let dfg = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
+
+        hugr.connect(bb_in, 0, dfg, 0)?;
+        hugr.connect(dfg, 0, bb_out, 0)?;
+
+        Ok(bb)
+    }
+
     /// A CFG rooted hugr adding resources at each basic block.
     /// Looks like this:
     ///
@@ -1224,7 +1240,7 @@ mod test {
             )),
         )?;
 
-        let [bb0, bb0_in, bb0_out] = create_with_io(
+        let bb0 = make_block(
             &mut hugr,
             root,
             ops::BasicBlock::DFB {
@@ -1233,9 +1249,13 @@ mod test {
                 predicate_variants: vec![type_row![NAT]],
                 extension_delta: bc.clone(),
             },
+            make_opaque(
+                B,
+                FunctionType::new(vec![NAT], oneway.clone()).with_extension_delta(&bc),
+            ),
         )?;
 
-        let [bb1, bb1_in, bb1_out] = create_with_io(
+        let bb1 = make_block(
             &mut hugr,
             root,
             ops::BasicBlock::DFB {
@@ -1244,25 +1264,13 @@ mod test {
                 predicate_variants: vec![type_row![NAT], type_row![NAT]],
                 extension_delta: b.clone(),
             },
-        )?;
-
-        let add_bc = hugr.add_node_with_parent(
-            bb0,
-            NodeType::open_extensions(make_opaque(
-                B,
-                FunctionType::new(vec![NAT], oneway.clone()).with_extension_delta(&bc),
-            )),
-        )?;
-
-        let add_b = hugr.add_node_with_parent(
-            bb1,
-            NodeType::open_extensions(make_opaque(
+            make_opaque(
                 B,
                 FunctionType::new(vec![NAT], twoway.clone()).with_extension_delta(&b),
-            )),
+            ),
         )?;
 
-        let [bb10, bb10_in, bb10_out] = create_with_io(
+        let bb10 = make_block(
             &mut hugr,
             root,
             ops::BasicBlock::DFB {
@@ -1271,49 +1279,30 @@ mod test {
                 predicate_variants: vec![type_row![NAT]],
                 extension_delta: c.clone(),
             },
-        )?;
-
-        let [bb11, bb11_in, bb11_out] = create_with_io(
-            &mut hugr,
-            root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: c.clone(),
-            },
-        )?;
-
-        let add_c0 = hugr.add_node_with_parent(
-            bb10,
-            NodeType::open_extensions(make_opaque(
+            make_opaque(
                 C,
                 FunctionType::new(vec![NAT], oneway.clone()).with_extension_delta(&c),
-            )),
+            ),
         )?;
 
-        let add_c1 = hugr.add_node_with_parent(
-            bb11,
-            NodeType::open_extensions(make_opaque(
+        let bb11 = make_block(
+            &mut hugr,
+            root,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: c.clone(),
+            },
+            make_opaque(
                 C,
                 FunctionType::new(vec![NAT], oneway).with_extension_delta(&c),
-            )),
+            ),
         )?;
 
         // Internal wiring for DFGs
         hugr.connect(entry_in, 0, mkpred, 0)?;
         hugr.connect(mkpred, 0, entry_out, 0)?;
-
-        hugr.connect(bb0_in, 0, add_bc, 0)?;
-        hugr.connect(add_bc, 0, bb0_out, 0)?;
-
-        hugr.connect(bb1_in, 0, add_b, 0)?;
-        hugr.connect(add_b, 0, bb1_out, 0)?;
-
-        hugr.connect(bb10_in, 0, add_c0, 0)?;
-        hugr.connect(add_c0, 0, bb10_out, 0)?;
-        hugr.connect(bb11_in, 0, add_c1, 0)?;
-        hugr.connect(add_c1, 0, bb11_out, 0)?;
 
         // CFG Wiring
         hugr.connect(entry, 0, bb0, 0)?;
