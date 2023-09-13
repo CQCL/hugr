@@ -1,5 +1,6 @@
 //! SiblingGraph: view onto a sibling subgraph of the HUGR.
 
+use lazy_static::lazy_static;
 use std::iter;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
@@ -262,6 +263,10 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 }
 
+lazy_static! {
+    static ref EMPTY_GRAPH: MultiPortGraph = MultiPortGraph::default();
+}
+
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     type RootHandle = Root;
 
@@ -316,29 +321,44 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.base_hugr().node_ports(node, dir)
+        match self.contains_node(node) {
+            true => self.base_hugr().node_ports(node, dir),
+            false => <FlatRegionGraph as PortView>::NodePortOffsets::default().map_into(),
+        }
     }
 
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.base_hugr().all_node_ports(node)
+        match self.contains_node(node) {
+            true => self.base_hugr().all_node_ports(node),
+            false => <FlatRegionGraph as PortView>::NodePortOffsets::default().map_into(),
+        }
     }
 
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.base_hugr().linked_ports(node, port)
+        match self.contains_node(node) {
+            true => self.base_hugr().linked_ports(node, port),
+            false => EMPTY_GRAPH
+                .port_links(portgraph::PortIndex::new(1))
+                .with_context(self.base_hugr())
+                .map_with_context(|_port, _ctx| panic!("Never called")),
+        }
     }
 
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.valid_node(other).unwrap(); // ?? Is this even a requirement for non-local edges?
-        self.base_hugr().node_connections(node, other)
+        match self.contains_node(node) && self.contains_node(other) {
+            true => self.base_hugr().node_connections(node, other),
+            false => EMPTY_GRAPH
+                .get_connections(portgraph::NodeIndex::new(1), portgraph::NodeIndex::new(2))
+                .with_context(self.base_hugr())
+                .map_with_context(|_port, _ctx| panic!("Never called")),
+        }
     }
 
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.valid_node(node).unwrap(); // ?? Or return 0?
-        self.base_hugr().num_ports(node, dir)
+        match self.contains_node(node) {
+            true => self.base_hugr().num_ports(node, dir),
+            false => 0,
+        }
     }
 
     fn children(&self, node: Node) -> Self::Children<'_> {
