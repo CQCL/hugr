@@ -332,9 +332,8 @@ pub trait Dataflow: Container {
         let (cfg_node, _) = add_node_with_wires(
             self,
             NodeType::open_extensions(ops::CFG {
-                inputs: inputs.clone(),
-                outputs: output_types.clone(),
-                extension_delta,
+                signature: FunctionType::new(inputs.clone(), output_types.clone())
+                    .with_extension_delta(&extension_delta),
             }),
             input_wires,
         )?;
