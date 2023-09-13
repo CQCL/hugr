@@ -59,9 +59,7 @@ impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
     pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
-            inputs: signature.input.clone(),
-            outputs: signature.output.clone(),
-            extension_delta: signature.extension_reqs,
+            signature: signature.clone(),
         };
 
         let base = Hugr::new(NodeType::open_extensions(cfg_op));
@@ -383,7 +381,8 @@ mod test {
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ops::Const::simple_unary_predicate())?;
+            let c = middle_b
+                .add_load_const(ops::Const::simple_unary_predicate(), ExtensionSet::new())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

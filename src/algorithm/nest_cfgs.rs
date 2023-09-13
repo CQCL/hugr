@@ -428,8 +428,10 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
+        let pred_const =
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit =
+            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
@@ -449,7 +451,7 @@ pub(crate) mod test {
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's).
-        let v: SiblingGraph = SiblingGraph::new(&h, h.root()).unwrap();
+        let v: SiblingGraph = SiblingGraph::try_new(&h, h.root()).unwrap();
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&v));
         let [&left, &right] = edge_classes
             .keys()
@@ -675,8 +677,10 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
+        let pred_const =
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit =
+            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2, ExtensionSet::new())?,
@@ -717,8 +721,10 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const = cfg_builder.add_constant(Const::simple_predicate(0, 2))?; // Nothing here cares which
-        let const_unit = cfg_builder.add_constant(Const::simple_unary_predicate())?;
+        let pred_const =
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit =
+            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,

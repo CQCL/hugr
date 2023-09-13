@@ -64,6 +64,15 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         self.hugr_mut().add_op_before(sibling, op)
     }
 
+    /// A generalisation of [`HugrMut::add_op_before`], needed temporarily until
+    /// add_op type methods all default to creating nodes with open extensions.
+    /// See issue #424
+    #[inline]
+    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
+        self.valid_non_root(sibling)?;
+        self.hugr_mut().add_node_before(sibling, nodetype)
+    }
+
     /// Add a node to the graph as the next sibling of another node.
     ///
     /// The sibling node's parent becomes the new node's parent.
@@ -172,7 +181,11 @@ where
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_op(op);
+        self.add_node_before(sibling, NodeType::pure(op))
+    }
+
+    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
+        let node = self.as_mut().add_node(nodetype);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;

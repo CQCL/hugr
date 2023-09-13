@@ -26,6 +26,9 @@ use crate::{
 
 use super::HugrView;
 
+#[cfg(feature = "pyo3")]
+use pyo3::{create_exception, exceptions::PyException, PyErr};
+
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
 /// A HUGR region in which all nodes share the same parent. Unlike
@@ -536,6 +539,21 @@ pub enum InvalidReplacement {
     NonConvexSubgraph,
 }
 
+#[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyInvalidReplacementError,
+    PyException,
+    "Errors that can occur while constructing a SimpleReplacement"
+);
+
+#[cfg(feature = "pyo3")]
+impl From<InvalidReplacement> for PyErr {
+    fn from(err: InvalidReplacement) -> Self {
+        PyInvalidReplacementError::new_err(err.to_string())
+    }
+}
+
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum InvalidSubgraph {
@@ -639,9 +657,9 @@ mod tests {
     #[test]
     fn construct_subgraph() -> Result<(), InvalidSubgraph> {
         let (hugr, func_root) = build_hugr().unwrap();
-        let sibling_graph: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let sibling_graph: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let from_root = SiblingSubgraph::from_sibling_graph(&sibling_graph)?;
-        let region: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let region: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let from_region = SiblingSubgraph::from_sibling_graph(&region)?;
         assert_eq!(
             from_root.get_parent(&sibling_graph),
@@ -657,7 +675,7 @@ mod tests {
     #[test]
     fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
@@ -680,7 +698,7 @@ mod tests {
     #[test]
     fn test_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::new(&hugr, dfg).unwrap();
+        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
         assert_eq!(
             sub.signature(&func),
@@ -692,7 +710,7 @@ mod tests {
     #[test]
     fn construct_simple_replacement_invalid_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, dfg).unwrap();
+        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, dfg).unwrap();
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
@@ -711,7 +729,7 @@ mod tests {
     #[test]
     fn convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         assert_eq!(
             SiblingSubgraph::try_new_dataflow_subgraph(&func)
                 .unwrap()
@@ -725,7 +743,7 @@ mod tests {
     fn convex_subgraph_2() {
         let (hugr, func_root) = build_hugr().unwrap();
         let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         // All graph except input/output nodes
         SiblingSubgraph::try_new(
             hugr.node_outputs(inp)
@@ -743,7 +761,7 @@ mod tests {
     #[test]
     fn degen_boundary() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let (inp, _) = hugr.children(func_root).take(2).collect_tuple().unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         // All graph but one edge
@@ -760,7 +778,7 @@ mod tests {
     #[test]
     fn non_convex_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let func: SiblingGraph<'_> = SiblingGraph::new(&hugr, func_root).unwrap();
+        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         let snd_cx_edge = hugr.node_inputs(out).next().unwrap();
@@ -779,7 +797,7 @@ mod tests {
     fn preserve_signature() {
         let (hugr, func_root) = build_hugr_classical().unwrap();
         let func_graph: SiblingGraph<'_, FuncID<true>> =
-            SiblingGraph::new(&hugr, func_root).unwrap();
+            SiblingGraph::try_new(&hugr, func_root).unwrap();
         let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
         let OpType::FuncDefn(func_defn) = hugr.get_optype(func_root) else {
             panic!()

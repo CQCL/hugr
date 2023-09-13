@@ -133,7 +133,7 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
             let predicate = new_block_bldr
-                .add_constant(ops::Const::simple_unary_predicate())
+                .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
             new_block_bldr.set_outputs(pred_wire, cfg_outputs).unwrap();
@@ -143,7 +143,8 @@ impl Rewrite for OutlineCfg {
 
         // 3. Extract Cfg node created above (it moved when we called insert_hugr)
         // Support filtered Sibling-only views by explicitly descending into new_block
-        let in_bb_view: SiblingGraph<'_, BasicBlockID> = SiblingGraph::new(h, new_block).unwrap();
+        let in_bb_view: SiblingGraph<'_, BasicBlockID> =
+            SiblingGraph::try_new(h, new_block).unwrap();
         let cfg_node = in_bb_view
             .children(new_block)
             .filter(|n| in_bb_view.get_optype(*n).tag() == OpTag::Cfg)
@@ -151,7 +152,7 @@ impl Rewrite for OutlineCfg {
             .ok() // HugrMut::Children is not Debug
             .unwrap();
         let in_cfg_view: SiblingGraph<'_, CfgID> =
-            SiblingGraph::new(&in_bb_view, cfg_node).unwrap();
+            SiblingGraph::try_new(&in_bb_view, cfg_node).unwrap();
         let inner_exit = in_cfg_view.children(cfg_node).exactly_one().ok().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block

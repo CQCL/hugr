@@ -10,7 +10,7 @@ use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::extension::SignatureError;
 use crate::extension::{
@@ -100,7 +100,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent).unwrap();
+        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
         let entry_node = self.hugr.children(parent).next().unwrap();
         dominators::simple_fast(&region.as_petgraph(), entry_node)
     }
@@ -374,7 +374,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent).unwrap();
+        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
         let postorder = Topo::new(&region.as_petgraph());
         let nodes_visited = postorder
             .iter(&region.as_petgraph())
@@ -637,10 +637,17 @@ pub enum ValidationError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyValidationError,
+    PyException,
+    "Errors that can occur while validating a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<ValidationError> for PyErr {
     fn from(err: ValidationError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyValidationError::new_err(err.to_string())
     }
 }
 
@@ -966,9 +973,7 @@ mod test {
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
-                inputs: type_row![BOOL_T],
-                outputs: type_row![BOOL_T],
-                extension_delta: ExtensionSet::new(),
+                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
         );
         assert_matches!(

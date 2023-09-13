@@ -35,7 +35,7 @@ pub struct SiblingGraph<'g, Root = Node> {
     /// The filtered portgraph encoding the adjacency structure of the HUGR.
     graph: FlatRegionGraph<'g>,
 
-    /// View onto the underlying Hugr which this graph filters
+    /// The underlying Hugr onto which this view is a filter
     hugr: &'g Hugr,
 
     /// The operation type of the root node.
@@ -179,7 +179,7 @@ impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
     Root: NodeHandle,
 {
-    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
         if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
             return Err(HugrError::InvalidNode(root));
@@ -389,7 +389,7 @@ mod test {
     fn flat_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region: SiblingGraph = SiblingGraph::new(&hugr, def)?;
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
 
         assert_eq!(region.node_count(), 5);
         assert!(region
@@ -413,11 +413,11 @@ mod test {
         let h = module_builder.finish_hugr(&PRELUDE_REGISTRY)?;
         let sub_dfg = sub_dfg.node();
         // Can create a view from a child or grandchild of a hugr:
-        let dfg_view: SiblingGraph<'_, DfgID> = SiblingGraph::new(&h, sub_dfg)?;
-        let fun_view: SiblingGraph<'_, FuncID<true>> = SiblingGraph::new(&h, fun.node())?;
+        let dfg_view: SiblingGraph<'_, DfgID> = SiblingGraph::try_new(&h, sub_dfg)?;
+        let fun_view: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&h, fun.node())?;
         assert_eq!(fun_view.children(sub_dfg).len(), 0);
         // And can create a view from a child of another SiblingGraph
-        let nested_dfg_view: SiblingGraph<'_, DfgID> = SiblingGraph::new(&fun_view, sub_dfg)?;
+        let nested_dfg_view: SiblingGraph<'_, DfgID> = SiblingGraph::try_new(&fun_view, sub_dfg)?;
 
         // Both ways work:
         let just_io = vec![
@@ -432,9 +432,10 @@ mod test {
         }
 
         // But cannot create a view directly as a grandchild of another SiblingGraph
-        let root_view: SiblingGraph<'_, ModuleRootID> = SiblingGraph::new(&h, h.root()).unwrap();
+        let root_view: SiblingGraph<'_, ModuleRootID> =
+            SiblingGraph::try_new(&h, h.root()).unwrap();
         assert_eq!(
-            SiblingGraph::<'_, DfgID>::new(&root_view, sub_dfg.node()).err(),
+            SiblingGraph::<'_, DfgID>::try_new(&root_view, sub_dfg.node()).err(),
             Some(HugrError::InvalidNode(sub_dfg.node()))
         );
 

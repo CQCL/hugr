@@ -132,14 +132,10 @@ pub trait HugrView: sealed::HugrInternals {
     /// Returns the metadata associated with a node.
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
-        // The other way to do it - exploit the UnmanagedDenseMap's get() returning &default
-        let md = &self.base_hugr().metadata;
-
-        let idx = match self.contains_node(node) {
-            true => node.index,
-            false => portgraph::NodeIndex::new(md.capacity() + 1),
-        };
-        md.get(idx)
+        match self.contains_node(node) {
+            true => self.base_hugr().metadata.get(node.index),
+            false => &NodeMetadata::Null,
+        }
     }
 
     /// Returns the number of nodes in the hugr.
@@ -304,7 +300,7 @@ pub trait HierarchyView<'a>: HugrView + Sized {
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
-    fn new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
 impl<T> HugrView for T
