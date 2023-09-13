@@ -287,6 +287,7 @@ impl BlockBuilder<Hugr> {
     /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
+        input_extensions: impl Into<Option<ExtensionSet>>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
@@ -301,7 +302,7 @@ impl BlockBuilder<Hugr> {
             extension_delta,
         };
 
-        let base = Hugr::new(NodeType::open_extensions(op));
+        let base = Hugr::new(NodeType::new(op, input_extensions));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }

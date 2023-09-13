@@ -118,6 +118,7 @@ impl Rewrite for OutlineCfg {
             let input_extensions = h.get_nodetype(entry).input_extensions().cloned();
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
+                input_extensions.clone(),
                 vec![type_row![]],
                 outputs.clone(),
                 extension_delta.clone(),
