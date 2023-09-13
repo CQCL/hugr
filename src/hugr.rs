@@ -23,7 +23,7 @@ use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
 pub use self::views::HugrView;
 use crate::extension::{

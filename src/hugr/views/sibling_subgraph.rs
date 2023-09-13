@@ -27,7 +27,7 @@ use crate::{
 use super::HugrView;
 
 #[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///

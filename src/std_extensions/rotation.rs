@@ -8,7 +8,7 @@ use num_rational::Rational64;
 use smol_str::SmolStr;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{pyclass, FromPyObject};
 
 use crate::extension::ExtensionId;
 use crate::types::type_param::TypeArg;

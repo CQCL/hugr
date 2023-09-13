@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};

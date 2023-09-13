@@ -10,7 +10,7 @@ use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::extension::SignatureError;
 use crate::extension::{

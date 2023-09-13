@@ -26,7 +26,7 @@ use std::fmt::Debug;
 use self::primitive::PrimType;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::pyclass;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

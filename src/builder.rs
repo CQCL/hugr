@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, prelude::*};
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::hugr::{HugrError, Node, ValidationError, Wire};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};

@@ -12,7 +12,7 @@ use crate::utils::display_list;
 use delegate::delegate;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::pyclass;
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
