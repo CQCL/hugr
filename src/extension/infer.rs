@@ -323,10 +323,10 @@ impl UnificationContext {
         for tgt_node in hugr.nodes() {
             let sig: &OpType = hugr.get_nodetype(tgt_node).into();
             // Incoming ports with a dataflow edge
-            for port in hugr
-                .node_inputs(tgt_node)
-                .filter(|src_port| matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_))))
-            {
+            for port in hugr.node_inputs(tgt_node).filter(|src_port| {
+                matches!(sig.port_kind(*src_port), Some(EdgeKind::Value(_)))
+                    || matches!(sig.port_kind(*src_port), Some(EdgeKind::Static(_)))
+            }) {
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
                     let m_src = self
                         .extensions
