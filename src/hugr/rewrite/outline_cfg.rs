@@ -249,7 +249,7 @@ mod test {
     use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
-    use crate::ops::handle::{BasicBlockID, NodeHandle};
+    use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
     use crate::types::FunctionType;
     use crate::{type_row, Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
@@ -356,7 +356,7 @@ mod test {
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_prelude_hugr().unwrap();
         do_outline_cfg_test(
-            &mut SiblingMut::try_new(&mut h, cfg.node()).unwrap(),
+            &mut SiblingMut::<'_, CfgID>::try_new(&mut h, cfg.node()).unwrap(),
             head,
             tail,
             3,

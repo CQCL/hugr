@@ -379,13 +379,13 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 }
 
-impl<'g> HugrMutInternals for SiblingMut<'g> {
+impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
     }
 }
 
-impl<'g> HugrMut for SiblingMut<'g> {}
+impl<'g, Root: NodeHandle> HugrMut for SiblingMut<'g, Root> {}
 
 #[cfg(test)]
 mod test {
