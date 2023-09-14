@@ -167,18 +167,6 @@ where
     }
 }
 
-impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
-    fn new_unchecked(hugr: &'a impl HugrView, root:Node) -> Self {
-        let hugr = hugr.base_hugr();
-        Self {
-            root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
-            hugr,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
-
 impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
     Root: NodeHandle,
@@ -188,7 +176,13 @@ where
         if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
             return Err(HugrError::InvalidNode(root));
         }
-        Ok(SiblingGraph::new_unchecked(hugr, root))
+        let hugr = hugr.base_hugr();
+        Ok(Self {
+            root,
+            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
+            hugr,
+            _phantom: std::marker::PhantomData,
+        })
     }
 }
 
@@ -317,7 +311,13 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn nodes(&self) -> Self::Nodes<'_> {
-        SiblingGraph::<'g, Root>::new_unchecked(self.hugr, self.root).nodes()
+        // Same as SiblingGraph
+        let children = self
+            .base_hugr()
+            .hierarchy
+            .children(self.root.index)
+            .map_into();
+        iter::once(self.root).chain(children)
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
