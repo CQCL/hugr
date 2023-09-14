@@ -110,13 +110,13 @@ pub trait Container {
     /// Insert a HUGR as a child of the container.
     fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_hugr(parent, child)?)
+        Ok(self.hugr_mut().insert_hugr(parent, child)?.0)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
     fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_from_view(parent, child)?)
+        Ok(self.hugr_mut().insert_from_view(parent, child)?.0)
     }
 
     /// Add metadata to the container node.

@@ -142,18 +142,30 @@ pub trait HugrMut: HugrView + HugrMutInternals {
 
     /// Insert another hugr into this one, under a given root node.
     ///
-    /// Returns the root node of the inserted hugr.
+    /// Returns a tuple of
+    /// * the root node of the inserted hugr.
+    /// * a map from each Node in `other` to the equivalent new Node in `self`
     #[inline]
-    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(
+        &mut self,
+        root: Node,
+        other: Hugr,
+    ) -> Result<(Node, HashMap<Node, Node>), HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_hugr(root, other)
     }
 
     /// Copy another hugr into this one, under a given root node.
     ///
-    /// Returns the root node of the inserted hugr.
+    /// Returns a tuple of
+    /// * the root node of the inserted hugr.
+    /// * a map from each Node in `other` to the equivalent new Node in `self`
     #[inline]
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<(Node, HashMap<Node, Node>), HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_from_view(root, other)
     }
@@ -258,7 +270,11 @@ where
         Ok((src_port, dst_port))
     }
 
-    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(
+        &mut self,
+        root: Node,
+        mut other: Hugr,
+    ) -> Result<(Node, HashMap<Node, Node>), HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
         // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
@@ -267,10 +283,17 @@ where
             let meta = other.metadata.take(node);
             self.as_mut().set_metadata(node.into(), meta).unwrap();
         }
-        Ok(other_root)
+        Ok((
+            other_root,
+            HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
+        ))
     }
 
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<(Node, HashMap<Node, Node>), HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
@@ -281,7 +304,10 @@ where
                 .set_metadata(node.into(), meta.clone())
                 .unwrap();
         }
-        Ok(other_root)
+        Ok((
+            other_root,
+            HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
+        ))
     }
 }
 

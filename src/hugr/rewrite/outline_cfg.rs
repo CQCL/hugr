@@ -114,7 +114,7 @@ impl Rewrite for OutlineCfg {
         let outer_entry = h.children(outer_cfg).next().unwrap();
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
-        let new_block = {
+        let (new_block, _) = {
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
                 vec![type_row![]],
