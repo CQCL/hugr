@@ -322,6 +322,7 @@ pub trait Dataflow: Container {
     fn cfg_builder(
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
+        input_extensions: impl Into<Option<ExtensionSet>>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
@@ -331,10 +332,13 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            NodeType::open_extensions(ops::CFG {
-                signature: FunctionType::new(inputs.clone(), output_types.clone())
-                    .with_extension_delta(&extension_delta),
-            }),
+            NodeType::new(
+                ops::CFG {
+                    signature: FunctionType::new(inputs.clone(), output_types.clone())
+                        .with_extension_delta(&extension_delta),
+                },
+                input_extensions,
+            ),
             input_wires,
         )?;
         CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)
