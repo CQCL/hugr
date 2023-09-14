@@ -139,10 +139,13 @@ impl Rewrite for OutlineCfg {
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
                 .unwrap();
-            let (new_block, node_map) = h
+            let ins_res = h
                 .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
                 .unwrap();
-            (new_block, *node_map.get(&cfg.node()).unwrap())
+            (
+                ins_res.new_root,
+                *ins_res.node_map.get(&cfg.node()).unwrap(),
+            )
         };
 
         // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
