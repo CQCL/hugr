@@ -8,9 +8,11 @@ use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
+use crate::hugr::views::sibling::SiblingMut;
+use crate::hugr::views::HierarchyView;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
-use crate::ops::handle::{NodeHandle};
+use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{BasicBlock, OpTrait, OpType};
 use crate::{type_row, Node};
 
@@ -165,7 +167,22 @@ impl Rewrite for OutlineCfg {
             h.move_before_sibling(new_block, outer_entry).unwrap();
         }
 
-        {
+        // 4(a). Exit edges.
+        // Remove edge from exit_node (that used to target outside)
+        let exit_port = h
+            .node_outputs(exit)
+            .filter(|p| {
+                let (t, p2) = h.linked_ports(exit, *p).exactly_one().ok().unwrap();
+                assert!(p2.index() == 0);
+                t == outside
+            })
+            .exactly_one()
+            .ok() // NodePorts does not implement Debug
+            .unwrap();
+        h.disconnect(exit, exit_port).unwrap();
+
+        let inner_exit = {
+            // 5. Children of new CFG.
             // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
             let h = h.hugr_mut();
@@ -180,24 +197,20 @@ impl Rewrite for OutlineCfg {
                     h.set_parent(n, cfg_node).unwrap();
                 }
             }
+            inner_exit
+        };
 
-            // 5. Exit edges.
-            // Retarget edge from exit_node (that used to target outside) to inner_exit
-            let exit_port = h
-                .node_outputs(exit)
-                .filter(|p| {
-                    let (t, p2) = h.linked_ports(exit, *p).exactly_one().ok().unwrap();
-                    assert!(p2.index() == 0);
-                    t == outside
-                })
-                .exactly_one()
-                .ok() // NodePorts does not implement Debug
-                .unwrap();
-            h.disconnect(exit, exit_port).unwrap();
-            h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
-            // And connect new_block to outside instead
-            h.connect(new_block, 0, outside, 0).unwrap();
-        }
+        // 4(b). Reconnect exit edge to the empty exit node within the inner CFG
+        let mut in_bb_view: SiblingMut<'_, BasicBlockID> =
+            SiblingMut::try_new(h, new_block).unwrap();
+        let mut in_cfg_view: SiblingMut<'_, CfgID> =
+            SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
+        in_cfg_view
+            .connect(exit, exit_port.index(), inner_exit, 0)
+            .unwrap();
+        // And connect new_block to outside instead
+        h.connect(new_block, 0, outside, 0).unwrap();
+
         Ok(())
     }
 }
