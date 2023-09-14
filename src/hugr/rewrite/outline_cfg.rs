@@ -8,11 +8,10 @@ use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
-use crate::hugr::views::{HierarchyView, SiblingGraph};
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
-use crate::ops::handle::{BasicBlockID, CfgID};
-use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
+use crate::ops::handle::{NodeHandle};
+use crate::ops::{BasicBlock, OpTrait, OpType};
 use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -117,9 +116,11 @@ impl Rewrite for OutlineCfg {
         let outer_entry = h.children(outer_cfg).next().unwrap();
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
-        let new_block = {
+        let (new_block, cfg_node) = {
+            let input_extensions = h.get_nodetype(entry).input_extensions().cloned();
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
+                input_extensions.clone(),
                 vec![type_row![]],
                 outputs.clone(),
                 extension_delta.clone(),
@@ -129,33 +130,26 @@ impl Rewrite for OutlineCfg {
             // N.B. By invoking the cfg_builder, we're forgetting any input
             // extensions that may have existed on the original CFG.
             let cfg = new_block_bldr
-                .cfg_builder(wires_in, outputs, extension_delta)
+                .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
-            let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+            let cfg = cfg.finish_sub_container().unwrap();
             let predicate = new_block_bldr
                 .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
-            new_block_bldr.set_outputs(pred_wire, cfg_outputs).unwrap();
-            h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
-                .unwrap()
+            new_block_bldr
+                .set_outputs(pred_wire, cfg.outputs())
+                .unwrap();
+            let ins_res = h
+                .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
+                .unwrap();
+            (
+                ins_res.new_root,
+                *ins_res.node_map.get(&cfg.node()).unwrap(),
+            )
         };
 
-        // 3. Extract Cfg node created above (it moved when we called insert_hugr)
-        // Support filtered Sibling-only views by explicitly descending into new_block
-        let in_bb_view: SiblingGraph<'_, BasicBlockID> =
-            SiblingGraph::try_new(h, new_block).unwrap();
-        let cfg_node = in_bb_view
-            .children(new_block)
-            .filter(|n| in_bb_view.get_optype(*n).tag() == OpTag::Cfg)
-            .exactly_one()
-            .ok() // HugrView::Children is not Debug
-            .unwrap();
-        let in_cfg_view: SiblingGraph<'_, CfgID> =
-            SiblingGraph::try_new(&in_bb_view, cfg_node).unwrap();
-        let inner_exit = in_cfg_view.children(cfg_node).exactly_one().ok().unwrap();
-
-        // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
+        // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
             .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
@@ -175,8 +169,8 @@ impl Rewrite for OutlineCfg {
             // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
             let h = h.hugr_mut();
-
-            // 5. Children of new CFG.
+            // 4. Children of new CFG.
+            let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
             // Entry node must be first
             h.move_before_sibling(entry, inner_exit).unwrap();
             // And remaining nodes
@@ -187,7 +181,7 @@ impl Rewrite for OutlineCfg {
                 }
             }
 
-            // 6. Exit edges.
+            // 5. Exit edges.
             // Retarget edge from exit_node (that used to target outside) to inner_exit
             let exit_port = h
                 .node_outputs(exit)
@@ -201,10 +195,9 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             h.disconnect(exit, exit_port).unwrap();
             h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
+            // And connect new_block to outside instead
+            h.connect(new_block, 0, outside, 0).unwrap();
         }
-        // And connect new_block to outside instead
-        h.connect(new_block, 0, outside, 0).unwrap();
-
         Ok(())
     }
 }
@@ -296,7 +289,7 @@ mod test {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
         h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         do_outline_cfg_test(&mut h, head, tail, 1);
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     fn do_outline_cfg_test(
@@ -349,7 +342,12 @@ mod test {
             .unwrap();
         let [i1] = fbuild.input_wires_arr();
         let mut cfg_builder = fbuild
-            .cfg_builder([(USIZE_T, i1)], type_row![USIZE_T], Default::default())
+            .cfg_builder(
+                [(USIZE_T, i1)],
+                None,
+                type_row![USIZE_T],
+                Default::default(),
+            )
             .unwrap();
         let (head, tail) = build_conditional_in_loop(&mut cfg_builder, false).unwrap();
         let cfg = cfg_builder.finish_sub_container().unwrap();
@@ -383,7 +381,7 @@ mod test {
         }
         h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let new_entry = h.children(h.root()).next().unwrap();
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);

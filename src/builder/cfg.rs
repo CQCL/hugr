@@ -265,7 +265,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         let mut node_outputs = vec![predicate_type];
         node_outputs.extend_from_slice(&other_outputs);
         let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
-        let db = DFGBuilder::create_with_io(base, block_n, signature, None)?;
+        let inp_ex = base
+            .as_ref()
+            .get_nodetype(block_n)
+            .input_extensions()
+            .cloned();
+        let db = DFGBuilder::create_with_io(base, block_n, signature, inp_ex)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 
@@ -287,6 +292,7 @@ impl BlockBuilder<Hugr> {
     /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
+        input_extensions: impl Into<Option<ExtensionSet>>,
         predicate_variants: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
@@ -301,7 +307,7 @@ impl BlockBuilder<Hugr> {
             extension_delta,
         };
 
-        let base = Hugr::new(NodeType::open_extensions(op));
+        let base = Hugr::new(NodeType::new(op, input_extensions));
         let root = base.root();
         Self::create(base, root, predicate_variants, other_outputs, inputs)
     }
@@ -340,6 +346,7 @@ mod test {
                 let cfg_id = {
                     let mut cfg_builder = func_builder.cfg_builder(
                         vec![(NAT, int)],
+                        None,
                         type_row![NAT],
                         ExtensionSet::new(),
                     )?;

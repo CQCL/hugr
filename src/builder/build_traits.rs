@@ -1,3 +1,4 @@
+use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
@@ -108,13 +109,13 @@ pub trait Container {
     }
 
     /// Insert a HUGR as a child of the container.
-    fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
+    fn add_hugr(&mut self, child: Hugr) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
+    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_from_view(parent, child)?)
     }
@@ -230,7 +231,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr(hugr)?;
+        let node = self.add_hugr(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -251,7 +252,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr_view(hugr)?;
+        let node = self.add_hugr_view(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -322,6 +323,7 @@ pub trait Dataflow: Container {
     fn cfg_builder(
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
+        input_extensions: impl Into<Option<ExtensionSet>>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
@@ -331,10 +333,13 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            NodeType::open_extensions(ops::CFG {
-                signature: FunctionType::new(inputs.clone(), output_types.clone())
-                    .with_extension_delta(&extension_delta),
-            }),
+            NodeType::new(
+                ops::CFG {
+                    signature: FunctionType::new(inputs.clone(), output_types.clone())
+                        .with_extension_delta(&extension_delta),
+                },
+                input_extensions,
+            ),
             input_wires,
         )?;
         CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)

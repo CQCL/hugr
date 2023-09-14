@@ -141,19 +141,19 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     }
 
     /// Insert another hugr into this one, under a given root node.
-    ///
-    /// Returns the root node of the inserted hugr.
     #[inline]
-    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<InsertionResult, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_hugr(root, other)
     }
 
     /// Copy another hugr into this one, under a given root node.
-    ///
-    /// Returns the root node of the inserted hugr.
     #[inline]
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<InsertionResult, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_from_view(root, other)
     }
@@ -164,6 +164,26 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         Self: Sized,
     {
         rw.apply(self)
+    }
+}
+
+/// Records the result of inserting a Hugr or view
+/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view]
+pub struct InsertionResult {
+    /// The node, after insertion, that was the root of the inserted Hugr.
+    /// (That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]))
+    pub new_root: Node,
+    /// Map from nodes in the Hugr/view that was inserted, to their new
+    /// positions in the Hugr into which said was inserted.
+    pub node_map: HashMap<Node, Node>,
+}
+
+impl InsertionResult {
+    fn translating_indices(new_root: Node, node_map: HashMap<NodeIndex, NodeIndex>) -> Self {
+        Self {
+            new_root,
+            node_map: HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
+        }
     }
 }
 
@@ -249,7 +269,7 @@ where
         Ok((src_port, dst_port))
     }
 
-    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<InsertionResult, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
         // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
@@ -258,10 +278,15 @@ where
             let meta = other.metadata.take(node);
             self.as_mut().set_metadata(node.into(), meta).unwrap();
         }
-        Ok(other_root)
+        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult::translating_indices(other_root, node_map))
     }
 
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<InsertionResult, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
@@ -272,7 +297,8 @@ where
                 .set_metadata(node.into(), meta.clone())
                 .unwrap();
         }
-        Ok(other_root)
+        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult::translating_indices(other_root, node_map))
     }
 }
 
