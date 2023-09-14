@@ -270,15 +270,27 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
 }
 
 struct SiblingGraphHolder<'a, Root, T> {
+    // Seems like I need T to be not a type but a type parameterized by a lifetime argument...
     sg: SiblingGraph<'a, Root>,
-    val: T
+    // such that this can be Option<T<'_>> ?
+    val: Option<T>, // Only None temporarily during construction
+}
+
+impl<'a, Root: NodeHandle, T> SiblingGraphHolder<'a, Root, T> {
+    // Seems like I need T to be not a type but a type parameterized by a lifetime argument
+    // such that val_fn can be a function<'b>(&'b SiblingGraph<...>) -> T<'b>
+    fn from(sg: SiblingGraph<'a, Root>, val_fn: impl FnOnce(&SiblingGraph<'a, Root>) -> T) -> Self {
+        let mut res = Self {sg, val: None};
+        res.val = Some(val_fn(&res.sg));
+        res
+    }
 }
 
 impl<'a, Root: NodeHandle, T: Iterator> Iterator for SiblingGraphHolder<'a, Root, T> {
     type Item = T::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.val.next()
+        self.val.as_mut().unwrap().next()
     }
 
 }
@@ -331,9 +343,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn nodes(&self) -> Self::Nodes<'_> {
-        let sg = SiblingGraph::<'_, Root>::new_unchecked(self.hugr, self.root);
-        let val = sg.nodes();
-        SiblingGraphHolder { sg, val }
+        SiblingGraphHolder::from(SiblingGraph::<'_, Root>::new_unchecked(self.hugr, self.root), |sg|sg.nodes())
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
