@@ -9,7 +9,8 @@ use crate::extension::ExtensionSet;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
-use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
+use crate::ops::handle::NodeHandle;
+use crate::ops::{BasicBlock, OpTrait, OpType};
 use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -114,7 +115,7 @@ impl Rewrite for OutlineCfg {
         let outer_entry = h.children(outer_cfg).next().unwrap();
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
-        let new_block = {
+        let (new_block, cfg_node) = {
             let input_extensions = h.get_nodetype(entry).input_extensions().cloned();
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
@@ -130,26 +131,24 @@ impl Rewrite for OutlineCfg {
             let cfg = new_block_bldr
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
-            let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+            let cfg = cfg.finish_sub_container().unwrap();
             let predicate = new_block_bldr
                 .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
-            new_block_bldr.set_outputs(pred_wire, cfg_outputs).unwrap();
-            h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
-                .unwrap()
+            new_block_bldr
+                .set_outputs(pred_wire, cfg.outputs())
+                .unwrap();
+            let ins_res = h
+                .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
+                .unwrap();
+            (
+                ins_res.new_root,
+                *ins_res.node_map.get(&cfg.node()).unwrap(),
+            )
         };
 
-        // 3. Extract Cfg node created above (it moved when we called insert_hugr)
-        let cfg_node = h
-            .children(new_block)
-            .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
-            .exactly_one()
-            .ok() // HugrMut::Children is not Debug
-            .unwrap();
-        let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
-
-        // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
+        // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
             .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
@@ -165,7 +164,8 @@ impl Rewrite for OutlineCfg {
             h.move_before_sibling(new_block, outer_entry).unwrap();
         }
 
-        // 5. Children of new CFG.
+        // 4. Children of new CFG.
+        let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
         // Entry node must be first
         h.move_before_sibling(entry, inner_exit).unwrap();
         // And remaining nodes
@@ -176,7 +176,7 @@ impl Rewrite for OutlineCfg {
             }
         }
 
-        // 6. Exit edges.
+        // 5. Exit edges.
         // Retarget edge from exit_node (that used to target outside) to inner_exit
         let exit_port = h
             .node_outputs(exit)
