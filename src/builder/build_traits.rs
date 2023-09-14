@@ -3,6 +3,7 @@ use crate::hugr::views::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
 
+use std::collections::HashMap;
 use std::iter;
 
 use super::FunctionBuilder;
@@ -108,15 +109,18 @@ pub trait Container {
     }
 
     /// Insert a HUGR as a child of the container.
-    fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
+    fn add_hugr(&mut self, child: Hugr) -> Result<(Node, HashMap<Node, Node>), BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_hugr(parent, child)?.0)
+        Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
+    fn add_hugr_view(
+        &mut self,
+        child: &impl HugrView,
+    ) -> Result<(Node, HashMap<Node, Node>), BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_from_view(parent, child)?.0)
+        Ok(self.hugr_mut().insert_from_view(parent, child)?)
     }
 
     /// Add metadata to the container node.
@@ -230,7 +234,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr(hugr)?;
+        let node = self.add_hugr(hugr)?.0;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -251,7 +255,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr_view(hugr)?;
+        let node = self.add_hugr_view(hugr)?.0;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
