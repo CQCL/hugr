@@ -167,6 +167,18 @@ where
     }
 }
 
+impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
+    fn new_unchecked(hugr: &'a impl HugrView, root:Node) -> Self {
+        let hugr = hugr.base_hugr();
+        Self {
+            root,
+            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
+            hugr,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
     Root: NodeHandle,
@@ -176,13 +188,7 @@ where
         if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
             return Err(HugrError::InvalidNode(root));
         }
-        let hugr = hugr.base_hugr();
-        Ok(Self {
-            root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
-            hugr,
-            _phantom: std::marker::PhantomData,
-        })
+        Ok(SiblingGraph::new_unchecked(hugr, root))
     }
 }
 
@@ -263,6 +269,20 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 }
 
+struct SiblingGraphHolder<'a, Root, T> {
+    sg: SiblingGraph<'a, Root>,
+    val: T
+}
+
+impl<'a, Root: NodeHandle, T: Iterator> Iterator for SiblingGraphHolder<'a, Root, T> {
+    type Item = T::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.val.next()
+    }
+
+}
+
 lazy_static! {
     static ref EMPTY_GRAPH: MultiPortGraph = MultiPortGraph::default();
 }
@@ -270,7 +290,7 @@ lazy_static! {
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     type RootHandle = Root;
 
-    type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
+    type Nodes<'a> = SiblingGraphHolder<'g, Root, <SiblingGraph<'g, Root> as HugrView>::Nodes<'a>>
     where
         Self: 'a;
 
@@ -311,13 +331,9 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn nodes(&self) -> Self::Nodes<'_> {
-        // Same as SiblingGraph
-        let children = self
-            .base_hugr()
-            .hierarchy
-            .children(self.root.index)
-            .map_into();
-        iter::once(self.root).chain(children)
+        let sg = SiblingGraph::<'_, Root>::new_unchecked(self.hugr, self.root);
+        let val = sg.nodes();
+        SiblingGraphHolder { sg, val }
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
