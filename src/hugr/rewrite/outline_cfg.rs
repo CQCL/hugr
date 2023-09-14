@@ -179,13 +179,14 @@ impl Rewrite for OutlineCfg {
             .ok() // NodePorts does not implement Debug
             .unwrap();
         h.disconnect(exit, exit_port).unwrap();
+        // And connect new_block to outside instead
+        h.connect(new_block, 0, outside, 0).unwrap();
 
+        // 5. Children of new CFG.
         let inner_exit = {
-            // 5. Children of new CFG.
             // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
             let h = h.hugr_mut();
-            // 4. Children of new CFG.
             let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
             // Entry node must be first
             h.move_before_sibling(entry, inner_exit).unwrap();
@@ -199,7 +200,7 @@ impl Rewrite for OutlineCfg {
             inner_exit
         };
 
-        // 4(b). Reconnect exit edge to the empty exit node within the inner CFG
+        // 4(b). Reconnect exit edge to the new exit node within the inner CFG
         let mut in_bb_view: SiblingMut<'_, BasicBlockID> =
             SiblingMut::try_new(h, new_block).unwrap();
         let mut in_cfg_view: SiblingMut<'_, CfgID> =
@@ -207,8 +208,6 @@ impl Rewrite for OutlineCfg {
         in_cfg_view
             .connect(exit, exit_port.index(), inner_exit, 0)
             .unwrap();
-        // And connect new_block to outside instead
-        h.connect(new_block, 0, outside, 0).unwrap();
 
         Ok(())
     }
