@@ -149,7 +149,7 @@ impl Rewrite for OutlineCfg {
             .children(new_block)
             .filter(|n| in_bb_view.get_optype(*n).tag() == OpTag::Cfg)
             .exactly_one()
-            .ok() // HugrMut::Children is not Debug
+            .ok() // HugrView::Children is not Debug
             .unwrap();
         let in_cfg_view: SiblingGraph<'_, CfgID> =
             SiblingGraph::try_new(&in_bb_view, cfg_node).unwrap();
@@ -172,7 +172,7 @@ impl Rewrite for OutlineCfg {
         }
 
         {
-            // These operations do not fit into any SiblingView
+            // These operations do not fit within any CSG/SiblingMut
             // so we need to access the Hugr directly.
             let h = h.hugr_mut();
 
