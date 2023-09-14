@@ -9,6 +9,7 @@ use crate::extension::ExtensionSet;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
+use crate::ops::handle::NodeHandle;
 use crate::ops::{BasicBlock, OpTag, OpTrait, OpType};
 use crate::{type_row, Node};
 
@@ -114,7 +115,7 @@ impl Rewrite for OutlineCfg {
         let outer_entry = h.children(outer_cfg).next().unwrap();
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
-        let (new_block, _) = {
+        let ((new_block, node_map), cfg_node) = {
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
                 vec![type_row![]],
@@ -128,23 +129,24 @@ impl Rewrite for OutlineCfg {
             let cfg = new_block_bldr
                 .cfg_builder(wires_in, outputs, extension_delta)
                 .unwrap();
-            let cfg_outputs = cfg.finish_sub_container().unwrap().outputs();
+            let cfg = cfg.finish_sub_container().unwrap();
             let predicate = new_block_bldr
                 .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
-            new_block_bldr.set_outputs(pred_wire, cfg_outputs).unwrap();
-            h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
-                .unwrap()
+            new_block_bldr.set_outputs(pred_wire, cfg.outputs()).unwrap();
+            (h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
+                .unwrap(), cfg.node())
         };
 
         // 3. Extract Cfg node created above (it moved when we called insert_hugr)
-        let cfg_node = h
+        let cfg_node = *node_map.get(&cfg_node).unwrap();
+        assert_eq!(cfg_node, h
             .children(new_block)
             .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
             .exactly_one()
             .ok() // HugrMut::Children is not Debug
-            .unwrap();
+            .unwrap());
         let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
 
         // 4. Entry edges. Change any edges into entry_block from outside, to target new_block
