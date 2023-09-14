@@ -9,7 +9,6 @@ use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::views::HierarchyView;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
