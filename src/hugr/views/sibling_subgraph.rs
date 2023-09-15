@@ -362,12 +362,7 @@ impl SiblingSubgraph {
             })
             .collect();
 
-        Ok(SimpleReplacement::new(
-            self.clone(),
-            replacement,
-            nu_inp,
-            nu_out,
-        ))
+        Ok(SimpleReplacement::try_new(self.clone(), replacement, nu_inp, nu_out).unwrap())
     }
 }
 

@@ -6,6 +6,7 @@ use itertools::Itertools;
 
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadata};
+use crate::Direction;
 use crate::{
     hugr::{Node, Rewrite},
     ops::{OpTag, OpTrait, OpType},
@@ -30,18 +31,20 @@ pub struct SimpleReplacement {
 
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
-    pub fn new(
+    pub fn try_new(
         subgraph: SiblingSubgraph,
         replacement: Hugr,
         nu_inp: HashMap<(Node, Port), (Node, Port)>,
         nu_out: HashMap<(Node, Port), Port>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, SimpleReplacementError> {
+        valid_in_boundary(&nu_inp)?;
+        valid_out_boundary(&nu_out)?;
+        Ok(Self {
             subgraph,
             replacement,
             nu_inp,
             nu_out,
-        }
+        })
     }
 
     /// The replacement hugr.
@@ -121,8 +124,7 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .linked_ports(*rem_inp_node, *rem_inp_port)
                     .exactly_one()
-                    .ok() // PortLinks does not implement Debug
-                    .unwrap();
+                    .map_err(|_| SimpleReplacementError::InvalidBoundary())?;
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
@@ -196,6 +198,29 @@ pub enum SimpleReplacementError {
     /// Node in replacement graph is invalid.
     #[error("A node in the replacement graph is invalid.")]
     InvalidReplacementNode(),
+    /// Replacement boundary is invalid.
+    #[error("The replacement boundary is invalid.")]
+    InvalidBoundary(),
+}
+
+/// All ports in boundary maps must be incoming.
+fn valid_in_boundary(
+    map: &HashMap<(Node, Port), (Node, Port)>,
+) -> Result<(), SimpleReplacementError> {
+    all_target_ports(map.iter().flat_map(|(&(_, p1), &(_, p2))| [p1, p2]))
+        .then_some(())
+        .ok_or(SimpleReplacementError::InvalidBoundary())
+}
+
+/// All ports in boundary maps must be incoming.
+fn valid_out_boundary(map: &HashMap<(Node, Port), Port>) -> Result<(), SimpleReplacementError> {
+    all_target_ports(map.iter().flat_map(|(&(_, p1), &p2)| [p1, p2]))
+        .then_some(())
+        .ok_or(SimpleReplacementError::InvalidBoundary())
+}
+
+fn all_target_ports(mut ports: impl Iterator<Item = Port>) -> bool {
+    ports.all(|p| p.direction() == Direction::Incoming)
 }
 
 #[cfg(test)]
@@ -496,12 +521,15 @@ pub(in crate::hugr::rewrite) mod test {
             .filter(|&p| h.get_optype(output).signature().get(p).is_some())
             .map(|p| ((output, p), p))
             .collect();
-        h.apply_rewrite(SimpleReplacement::new(
-            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
-            replacement,
-            inputs,
-            outputs,
-        ))
+        h.apply_rewrite(
+            SimpleReplacement::try_new(
+                SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
+                replacement,
+                inputs,
+                outputs,
+            )
+            .unwrap(),
+        )
         .unwrap();
 
         // They should be the same, up to node indices
@@ -549,12 +577,15 @@ pub(in crate::hugr::rewrite) mod test {
             .map(|p| ((repl_output, p), p))
             .collect();
 
-        h.apply_rewrite(SimpleReplacement::new(
-            SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
-            repl,
-            inputs,
-            outputs,
-        ))
+        h.apply_rewrite(
+            SimpleReplacement::try_new(
+                SiblingSubgraph::try_from_nodes(removal, &h).unwrap(),
+                repl,
+                inputs,
+                outputs,
+            )
+            .unwrap(),
+        )
         .unwrap();
 
         // Nothing changed
