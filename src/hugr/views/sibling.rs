@@ -1,5 +1,6 @@
 //! SiblingGraph: view onto a sibling subgraph of the HUGR.
 
+use ouroboros::self_referencing;
 use lazy_static::lazy_static;
 use std::iter;
 
@@ -269,28 +270,18 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     }
 }
 
+#[self_referencing]
 struct SiblingGraphHolder<'a, Root, T> {
-    // Seems like I need T to be not a type but a type parameterized by a lifetime argument...
     sg: SiblingGraph<'a, Root>,
-    // such that this can be Option<T<'_>> ?
-    val: Option<T>, // Only None temporarily during construction
-}
-
-impl<'a, Root: NodeHandle, T> SiblingGraphHolder<'a, Root, T> {
-    // Seems like I need T to be not a type but a type parameterized by a lifetime argument
-    // such that val_fn can be a function<'b>(&'b SiblingGraph<...>) -> T<'b>
-    fn from(sg: SiblingGraph<'a, Root>, val_fn: impl FnOnce(&SiblingGraph<'a, Root>) -> T) -> Self {
-        let mut res = Self {sg, val: None};
-        res.val = Some(val_fn(&res.sg));
-        res
-    }
+    #[borrows(sg)]
+    val: T
 }
 
 impl<'a, Root: NodeHandle, T: Iterator> Iterator for SiblingGraphHolder<'a, Root, T> {
     type Item = T::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.val.as_mut().unwrap().next()
+        self.with_val_mut(|val|val.next())
     }
 
 }
@@ -302,7 +293,7 @@ lazy_static! {
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     type RootHandle = Root;
 
-    type Nodes<'a> = SiblingGraphHolder<'g, Root, <SiblingGraph<'g, Root> as HugrView>::Nodes<'a>>
+    type Nodes<'a> = SiblingGraphHolder<'a, Root, <SiblingGraph<'a, Root> as HugrView>::Nodes<'a>>
     where
         Self: 'a;
 
@@ -343,7 +334,13 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn nodes(&self) -> Self::Nodes<'_> {
-        SiblingGraphHolder::from(SiblingGraph::<'_, Root>::new_unchecked(self.hugr, self.root), |sg|sg.nodes())
+        Self::Nodes::<'_>::new(
+            SiblingGraph::new_unchecked(self.hugr, self.root),
+            |sg: &'_ SiblingGraph<'_, Root>| {
+                let n: <SiblingGraph<'_, Root> as HugrView>::Nodes<'_> = sg.nodes();
+                n
+            }
+        )
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
