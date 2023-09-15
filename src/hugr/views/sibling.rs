@@ -5,7 +5,7 @@ use std::iter;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortIndex, PortView};
+use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
@@ -288,15 +288,15 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     where
         Self: 'a;
 
-    type Neighbours<'a> = MapInto<multiportgraph::Neighbours<'a>, Node>
+    type Neighbours<'a> = <Vec<Node> as IntoIterator>::IntoIter
     where
         Self: 'a;
 
-    type PortLinks<'a> = MapWithCtx<multiportgraph::PortLinks<'a>, &'a Hugr, (Node, Port)>
+    type PortLinks<'a> = <Vec<(Node, Port)> as IntoIterator>::IntoIter
     where
         Self: 'a;
 
-    type NodeConnections<'a> = MapWithCtx<multiportgraph::NodeConnections<'a>,&'a Hugr, [Port; 2]> where Self: 'a;
+    type NodeConnections<'a> = <Vec<[Port; 2]> as IntoIterator>::IntoIter where Self: 'a;
 
     fn contains_node(&self, node: Node) -> bool {
         // Don't call self.get_parent(). That requires valid_node(node)
@@ -341,23 +341,19 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
-        match self.contains_node(node) {
-            true => self.base_hugr().linked_ports(node, port),
-            false => EMPTY_GRAPH
-                .port_links(portgraph::PortIndex::new(1))
-                .with_context(self.base_hugr())
-                .map_with_context(|_port, _ctx| panic!("Never called")),
-        }
+        // Need to filter only to links inside the sibling graph
+        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
+            .linked_ports(node, port)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
-        match self.contains_node(node) && self.contains_node(other) {
-            true => self.base_hugr().node_connections(node, other),
-            false => EMPTY_GRAPH
-                .get_connections(portgraph::NodeIndex::new(1), portgraph::NodeIndex::new(2))
-                .with_context(self.base_hugr())
-                .map_with_context(|_port, _ctx| panic!("Never called")),
-        }
+        // Need to filter only to connections inside the sibling graph
+        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
+            .node_connections(node, other)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
@@ -375,13 +371,18 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.base_hugr().neighbours(node, dir) // Or self.hugr ?
+        // Need to filter to neighbours in the Sibling Graph
+        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
+            .neighbours(node, dir)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.valid_node(node).unwrap(); // ?? Or return empty iterator?
-        self.base_hugr().all_neighbours(node)
+        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
+            .all_neighbours(node)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
 
