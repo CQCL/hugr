@@ -364,6 +364,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn children(&self, node: Node) -> Self::Children<'_> {
+        // Same as SiblingGraph
         match node == self.root {
             true => self.base_hugr().hierarchy.children(node.index).map_into(),
             false => portgraph::hierarchy::Children::default().map_into(),
