@@ -28,7 +28,7 @@ struct HalfNodeView<'a, H> {
     exit: Node,
 }
 
-impl<'a, H: HugrView> HalfNodeView<'a, H> {
+impl<'a, H: HugrView<'a>> HalfNodeView<'a, H> {
     #[allow(unused)]
     pub(crate) fn new(h: &'a H) -> Self {
         let mut children = h.children(h.root());
@@ -51,15 +51,15 @@ impl<'a, H: HugrView> HalfNodeView<'a, H> {
         }
     }
 
-    fn bb_succs(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+    fn bb_succs(&self, n: Node) -> impl Iterator<Item = Node> + 'a {
         self.h.neighbours(n, Direction::Outgoing)
     }
-    fn bb_preds(&self, n: Node) -> impl Iterator<Item = Node> + '_ {
+    fn bb_preds(&self, n: Node) -> impl Iterator<Item = Node> + 'a {
         self.h.neighbours(n, Direction::Incoming)
     }
 }
 
-impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
+impl<'a, H: HugrView<'a>> CfgView<HalfNode> for HalfNodeView<'_, H> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)

@@ -115,7 +115,7 @@ pub trait Container {
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<InsertionResult, BuildError> {
+    fn add_hugr_view<'a>(&mut self, child: &impl HugrView<'a>) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_from_view(parent, child)?)
     }
@@ -246,9 +246,9 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when adding the
     /// node.
-    fn add_hugr_view_with_wires(
+    fn add_hugr_view_with_wires<'a>(
         &mut self,
-        hugr: &impl HugrView,
+        hugr: &impl HugrView<'a>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();

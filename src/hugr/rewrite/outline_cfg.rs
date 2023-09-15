@@ -30,9 +30,9 @@ impl OutlineCfg {
     /// Compute the entry and exit nodes of the CFG which contains
     /// [`self.blocks`], along with the output neighbour its parent graph and
     /// the combined extension_deltas of all of the blocks.
-    fn compute_entry_exit_outside_extensions(
+    fn compute_entry_exit_outside_extensions<'a>(
         &self,
-        h: &impl HugrView,
+        h: &impl HugrView<'a>,
     ) -> Result<(Node, Node, Node, ExtensionSet), OutlineCfgError> {
         let cfg_n = match self
             .blocks
@@ -94,11 +94,11 @@ impl Rewrite for OutlineCfg {
     type ApplyResult = ();
 
     const UNCHANGED_ON_FAILURE: bool = true;
-    fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
+    fn verify<'a>(&self, h: &impl HugrView<'a>) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside_extensions(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), OutlineCfgError> {
+    fn apply<'a>(self, h: &mut impl HugrMut<'a>) -> Result<(), OutlineCfgError> {
         let (entry, exit, outside, extension_delta) =
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature
@@ -239,7 +239,7 @@ mod test {
 
     use super::{OutlineCfg, OutlineCfgError};
 
-    fn depth(h: &impl HugrView, n: Node) -> u32 {
+    fn depth<'a>(h: &impl HugrView<'a>, n: Node) -> u32 {
         match h.get_parent(n) {
             Some(p) => 1 + depth(h, p),
             None => 0,

@@ -22,7 +22,7 @@ pub trait Rewrite {
     /// Checks whether the rewrite would succeed on the specified Hugr.
     /// If this call succeeds, [self.apply] should also succeed on the same `h`
     /// If this calls fails, [self.apply] would fail with the same error.
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error>;
+    fn verify<'a>(&self, h: &impl HugrView<'a>) -> Result<(), Self::Error>;
 
     /// Mutate the specified Hugr, or fail with an error.
     /// Returns [`Self::ApplyResult`] if successful.
@@ -32,7 +32,7 @@ pub trait Rewrite {
     /// May panic if-and-only-if `h` would have failed [Hugr::validate]; that is,
     /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error>;
+    fn apply<'a>(self, h: &mut impl HugrMut<'a>) -> Result<Self::ApplyResult, Self::Error>;
 }
 
 /// Wraps any rewrite into a transaction (i.e. that has no effect upon failure)
@@ -47,11 +47,11 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
     type ApplyResult = R::ApplyResult;
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
+    fn verify<'a>(&self, h: &impl HugrView<'a>) -> Result<(), Self::Error> {
         self.underlying.verify(h)
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
+    fn apply<'a>(self, h: &mut impl HugrMut<'a>) -> Result<Self::ApplyResult, Self::Error> {
         if R::UNCHANGED_ON_FAILURE {
             return self.underlying.apply(h);
         }
@@ -59,7 +59,7 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
         let mut backup = Hugr::new(h.root_type().clone());
         backup.insert_from_view(backup.root(), h).unwrap();
         let r = self.underlying.apply(h);
-        fn first_child(h: &impl HugrView) -> Option<crate::Node> {
+        fn first_child<'a>(h: &impl HugrView<'a>) -> Option<crate::Node> {
             h.children(h.root()).next()
         }
         if r.is_err() {

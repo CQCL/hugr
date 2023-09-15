@@ -90,9 +90,9 @@ impl SiblingSubgraph {
     ///
     /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
     /// subgraph is empty.
-    pub fn try_new_dataflow_subgraph<H, Root>(dfg_graph: &H) -> Result<Self, InvalidSubgraph>
+    pub fn try_new_dataflow_subgraph<'a, H, Root>(dfg_graph: &H) -> Result<Self, InvalidSubgraph>
     where
-        H: Clone + HugrView<RootHandle = Root>,
+        H: Clone + HugrView<'a, RootHandle = Root>,
         Root: ContainerHandle<ChildrenHandle = DataflowOpID>,
     {
         let parent = dfg_graph.root();
@@ -151,10 +151,10 @@ impl SiblingSubgraph {
     ///
     /// This function fails if the subgraph is not convex, if the nodes
     /// do not share a common parent or if the subgraph is empty.
-    pub fn try_new(
+    pub fn try_new<'a>(
         incoming: IncomingPorts,
         outgoing: OutgoingPorts,
-        hugr: &impl HugrView,
+        hugr: &'a impl HugrView<'a>,
     ) -> Result<Self, InvalidSubgraph> {
         let mut checker = ConvexChecker::new(hugr);
         Self::try_new_with_checker(incoming, outgoing, hugr, &mut checker)
@@ -168,7 +168,7 @@ impl SiblingSubgraph {
     ///
     /// Refer to [`SiblingSubgraph::try_new`] for the full
     /// documentation.
-    pub fn try_new_with_checker<'c, 'h: 'c, H: HugrView>(
+    pub fn try_new_with_checker<'c, 'h: 'c, H: HugrView<'h>>( // ALAN ?
         inputs: IncomingPorts,
         outputs: OutgoingPorts,
         hugr: &'h H,
@@ -217,9 +217,9 @@ impl SiblingSubgraph {
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
     /// (no copy nodes at the input bounary).
-    pub fn try_from_nodes(
+    pub fn try_from_nodes<'a>(
         nodes: impl Into<Vec<Node>>,
-        hugr: &impl HugrView,
+        hugr: &'a impl HugrView<'a>,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
@@ -265,7 +265,7 @@ impl SiblingSubgraph {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
+    pub fn signature<'a>(&self, hugr: &impl HugrView<'a>) -> FunctionType {
         let input = self
             .inputs
             .iter()
@@ -287,7 +287,7 @@ impl SiblingSubgraph {
     }
 
     /// The parent of the sibling subgraph.
-    pub fn get_parent(&self, hugr: &impl HugrView) -> Node {
+    pub fn get_parent<'a>(&self, hugr: &impl HugrView<'a>) -> Node {
         hugr.get_parent(self.nodes[0]).expect("invalid subgraph")
     }
 
@@ -308,9 +308,9 @@ impl SiblingSubgraph {
     ///
     /// At the moment we do not support state order edges. If any are found in
     /// the replacement graph, this will panic.
-    pub fn create_simple_replacement(
+    pub fn create_simple_replacement<'a>(
         &self,
-        hugr: &impl HugrView,
+        hugr: &impl HugrView<'a>,
         replacement: Hugr,
     ) -> Result<SimpleReplacement, InvalidReplacement> {
         let rep_root = replacement.root();
@@ -375,11 +375,11 @@ impl SiblingSubgraph {
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct ConvexChecker<'g, Base: 'g + HugrView>(
+pub struct ConvexChecker<'g, Base: 'g + HugrView<'g>>( // ALAN ?
     portgraph::algorithms::ConvexChecker<Base::Portgraph<'g>>,
 );
 
-impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
+impl<'g, Base: HugrView<'g>> ConvexChecker<'g, Base> { // ALAN ?
     /// Create a new convexity checker.
     pub fn new(base: &'g Base) -> Self {
         let pg = base.portgraph();
@@ -390,7 +390,7 @@ impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
 /// The type of all ports in the iterator.
 ///
 /// If the array is empty or a port does not exist, returns `None`.
-fn get_edge_type<H: HugrView>(hugr: &H, ports: &[(Node, Port)]) -> Option<Type> {
+fn get_edge_type<'g>(hugr: &impl HugrView<'g>, ports: &[(Node, Port)]) -> Option<Type> {
     let &(n, p) = ports.first()?;
     let edge_t = hugr.get_optype(n).signature().get(p)?.clone();
     ports
@@ -402,8 +402,8 @@ fn get_edge_type<H: HugrView>(hugr: &H, ports: &[(Node, Port)]) -> Option<Type> 
 /// Whether a subgraph is valid.
 ///
 /// Does NOT check for convexity.
-fn validate_subgraph<H: HugrView>(
-    hugr: &H,
+fn validate_subgraph<'g>(
+    hugr: &impl HugrView<'g>,
     nodes: &[Node],
     inputs: &IncomingPorts,
     outputs: &OutgoingPorts,
@@ -480,7 +480,7 @@ fn validate_subgraph<H: HugrView>(
     Ok(())
 }
 
-fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPorts) {
+fn get_input_output_ports<'a>(hugr: &impl HugrView<'a>) -> (IncomingPorts, OutgoingPorts) {
     let (inp, out) = hugr
         .children(hugr.root())
         .take(2)
@@ -511,13 +511,13 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
 }
 
 /// Whether a port is linked to a state order edge.
-fn is_order_edge<H: HugrView>(hugr: &H, node: Node, port: Port) -> bool {
+fn is_order_edge<'a>(hugr: &impl HugrView<'a>, node: Node, port: Port) -> bool {
     let op = hugr.get_optype(node);
     op.other_port_index(port.direction()) == Some(port) && hugr.is_linked(node, port)
 }
 
 /// Whether node has a non-df linked port in the given direction.
-fn has_other_edge<H: HugrView>(hugr: &H, node: Node, dir: Direction) -> bool {
+fn has_other_edge<'a>(hugr: &impl HugrView<'a>, node: Node, dir: Direction) -> bool {
     let op = hugr.get_optype(node);
     op.other_port(dir).is_some() && hugr.is_linked(node, op.other_port_index(dir).unwrap())
 }
@@ -603,7 +603,7 @@ mod tests {
         ///
         /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
         /// subgraph is empty.
-        fn from_sibling_graph(sibling_graph: &impl HugrView) -> Result<Self, InvalidSubgraph> {
+        fn from_sibling_graph<'a>(sibling_graph: &impl HugrView<'a>) -> Result<Self, InvalidSubgraph> {
             let root = sibling_graph.root();
             let nodes = sibling_graph.children(root).collect_vec();
             if nodes.is_empty() {

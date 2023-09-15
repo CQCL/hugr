@@ -15,7 +15,7 @@ use self::sealed::HugrMutInternals;
 use super::{NodeMetadata, Rewrite};
 
 /// Functions for low-level building of a HUGR.
-pub trait HugrMut: HugrView + HugrMutInternals {
+pub trait HugrMut<'a>: HugrView<'a> + HugrMutInternals<'a> {
     /// Returns the metadata associated with a node.
     fn get_metadata_mut(&mut self, node: Node) -> Result<&mut NodeMetadata, HugrError> {
         self.valid_node(node)?;
@@ -149,10 +149,10 @@ pub trait HugrMut: HugrView + HugrMutInternals {
 
     /// Copy another hugr into this one, under a given root node.
     #[inline]
-    fn insert_from_view(
+    fn insert_from_view<'b>(
         &mut self,
         root: Node,
-        other: &impl HugrView,
+        other: &impl HugrView<'b>,
     ) -> Result<InsertionResult, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_from_view(root, other)
@@ -188,9 +188,9 @@ impl InsertionResult {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T> HugrMut for T
+impl<T> HugrMut<'static> for T
 where
-    T: HugrView + AsMut<Hugr>,
+    T: HugrView<'static> + AsMut<Hugr>,
 {
     fn add_op_with_parent(
         &mut self,
@@ -291,10 +291,10 @@ where
         Ok(InsertionResult::translating_indices(other_root, node_map))
     }
 
-    fn insert_from_view(
+    fn insert_from_view<'b>(
         &mut self,
         root: Node,
-        other: &impl HugrView,
+        other: &impl HugrView<'b>,
     ) -> Result<InsertionResult, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
@@ -319,10 +319,10 @@ where
 ///
 /// This function does not update the optypes of the inserted nodes, so the
 /// caller must do that.
-fn insert_hugr_internal(
+fn insert_hugr_internal<'b>(
     hugr: &mut Hugr,
     root: Node,
-    other: &impl HugrView,
+    other: &impl HugrView<'b>,
 ) -> Result<(Node, HashMap<NodeIndex, NodeIndex>), HugrError> {
     let node_map = hugr.graph.insert_graph(&other.portgraph())?;
     let other_root = node_map[&other.root().index];
@@ -357,7 +357,7 @@ pub(crate) mod sealed {
     ///
     /// Specifically, this trait lets you apply arbitrary modifications that may
     /// invalidate the HUGR.
-    pub trait HugrMutInternals: HugrView {
+    pub trait HugrMutInternals<'a>: HugrView<'a> {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -420,9 +420,9 @@ pub(crate) mod sealed {
     }
 
     /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-    impl<T> HugrMutInternals for T
+    impl<T> HugrMutInternals<'static> for T
     where
-        T: HugrView + AsMut<Hugr>,
+        T: HugrView<'static> + AsMut<Hugr>,
     {
         fn hugr_mut(&mut self) -> &mut Hugr {
             self.as_mut()

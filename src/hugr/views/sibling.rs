@@ -11,6 +11,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
+use super::Holder;
 use super::{sealed::HugrInternals, HierarchyView, HugrView};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
@@ -41,15 +42,18 @@ pub struct SiblingGraph<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root> HugrView for SiblingGraph<'g, Root>
+impl<'g, Root> HugrView<'g> for SiblingGraph<'g, Root>
 where
-    Root: NodeHandle,
+    Root: NodeHandle + 'g,
 {
     type RootHandle = Root;
 
     type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
     where
         Self: 'a;
+
+    type Nodes2<'a> = Holder<portgraph::Hierarchy,
+        iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>> where 'g: 'a,;
 
     type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
     where
@@ -104,6 +108,15 @@ where
             .children(self.root.index)
             .map_into();
         iter::once(self.root).chain(children)
+    }
+
+    fn nodes2(&self) -> Self::Nodes2<'g> {
+        let i = self.root.index;
+        let it = iter::once(self.root);
+        Holder::new(
+            self.base_hugr().hierarchy.clone(),
+            move |h| it.chain(h.children(i).map_into())
+        )
     }
 
     #[inline]
@@ -176,9 +189,9 @@ where
 
 impl<'a, Root> HierarchyView<'a> for SiblingGraph<'a, Root>
 where
-    Root: NodeHandle,
+    Root: NodeHandle + 'a,
 {
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+    fn try_new(hugr: &'a impl HugrView<'a>, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
         if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
             return Err(HugrError::InvalidNode(root));
@@ -193,7 +206,7 @@ where
     }
 }
 
-impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
+impl<'g, Root> HugrInternals<'g> for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
 {
@@ -205,7 +218,7 @@ where
     }
 
     #[inline]
-    fn base_hugr(&self) -> &Hugr {
+    fn base_hugr(&self) -> &'g Hugr {
         self.hugr
     }
 

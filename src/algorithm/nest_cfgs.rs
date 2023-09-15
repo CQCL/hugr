@@ -130,7 +130,7 @@ pub struct SimpleCfgView<'a, H> {
     entry: Node,
     exit: Node,
 }
-impl<'a, H: HugrView> SimpleCfgView<'a, H> {
+impl<'a, H: HugrView<'a>> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
     pub fn new(h: &'a H) -> Self {
         let mut children = h.children(h.root());
@@ -140,7 +140,7 @@ impl<'a, H: HugrView> SimpleCfgView<'a, H> {
         Self { h, entry, exit }
     }
 }
-impl<H: HugrView> CfgView<Node> for SimpleCfgView<'_, H> {
+impl<'a, H: HugrView<'a>> CfgView<Node> for SimpleCfgView<'a, H> {
     fn entry_node(&self) -> Node {
         self.entry
     }

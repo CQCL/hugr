@@ -10,6 +10,7 @@ mod tests;
 
 pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
+use ouroboros::self_referencing;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
@@ -26,7 +27,7 @@ use crate::{Direction, Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView: sealed::HugrInternals {
+pub trait HugrView<'m>: sealed::HugrInternals<'m> {
     /// The kind of handle that can be used to refer to the root node.
     ///
     /// The handle is guaranteed to be able to contain the operation returned by
@@ -37,6 +38,10 @@ pub trait HugrView: sealed::HugrInternals {
     type Nodes<'a>: Iterator<Item = Node>
     where
         Self: 'a;
+
+    /// An Iterator over the nodes in a Hugr(View) - used where the iterator must outlive
+    /// the HugrView, so some data will be copied into it
+    type Nodes2<'a>: Iterator<Item = Node> where 'm: 'a;
 
     /// An Iterator over (some or all) ports of a node
     type NodePorts<'a>: Iterator<Item = Port>
@@ -71,7 +76,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Return the type of the HUGR root node.
     #[inline]
-    fn root_type(&self) -> &NodeType {
+    fn root_type<'a>(&'a self) -> &NodeType where 'm: 'a {
         let node_type = self.get_nodetype(self.root());
         debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type
@@ -116,13 +121,13 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the operation type of a node.
     #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
+    fn get_optype<'a>(&'a self, node: Node) -> &OpType where 'm: 'a {
         &self.get_nodetype(node).op
     }
 
     /// Returns the type of a node.
     #[inline]
-    fn get_nodetype(&self, node: Node) -> &NodeType {
+    fn get_nodetype<'a>(&'a self, node: Node) -> &NodeType where 'm: 'a {
         match self.contains_node(node) {
             true => self.base_hugr().op_types.get(node.index),
             false => &DEFAULT_NODETYPE,
@@ -131,7 +136,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the metadata associated with a node.
     #[inline]
-    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+    fn get_metadata<'a>(&'a self, node: Node) -> &NodeMetadata where 'm: 'a {
         match self.contains_node(node) {
             true => self.base_hugr().metadata.get(node.index),
             false => &NodeMetadata::Null,
@@ -146,6 +151,8 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterates over the nodes in the port graph.
     fn nodes(&self) -> Self::Nodes<'_>;
+
+    fn nodes2(&self) -> Self::Nodes2<'m>;
 
     /// Iterator over ports of node in a given direction.
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
@@ -225,7 +232,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self) -> Option<&FunctionType> {
+    fn get_function_type<'a>(&'a self) -> Option<&FunctionType> where 'm: 'a {
         let op = self.get_nodetype(self.root());
         match &op.op {
             OpType::DFG(DFG { signature })
@@ -295,22 +302,39 @@ pub trait HugrView: sealed::HugrInternals {
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView + Sized {
+pub trait HierarchyView<'a>: HugrView<'a> + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
+    fn try_new(hugr: &'a impl HugrView<'a>, root: Node) -> Result<Self, HugrError>; // ALAN ?
 }
 
-impl<T> HugrView for T
+#[self_referencing]
+struct Holder<S, T> {
+    s: S,
+    #[borrows(s)]
+    t: T
+}
+
+impl<S, T:Iterator> Iterator for Holder<S,T> {
+    type Item = T::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.with_t_mut(|t| t.next())
+    }
+}
+
+impl<T> HugrView<'static> for T
 where
-    T: AsRef<Hugr>,
+    T: AsRef<Hugr> + 'static,
 {
     type RootHandle = Node;
 
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
+
+    type Nodes2<'a> = Holder<MultiPortGraph, MapInto<multiportgraph::Nodes<'a>, Node>>;
 
     /// An Iterator over (some or all) ports of a node
     type NodePorts<'a> = MapInto<portgraph::portgraph::NodePortOffsets, Port> where Self: 'a;
@@ -346,6 +370,11 @@ where
     #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
         self.as_ref().graph.nodes_iter().map_into()
+    }
+
+    fn nodes2(&self) -> Self::Nodes2<'static> {
+        Holder::new(self.as_ref().graph.clone(),
+       |g| g.nodes_iter().map_into())
     }
 
     #[inline]
@@ -426,7 +455,7 @@ pub(crate) mod sealed {
     ///
     /// Specifically, this trait provides access to the underlying portgraph
     /// view.
-    pub trait HugrInternals {
+    pub trait HugrInternals<'g> {
         /// The underlying portgraph view type.
         type Portgraph<'p>: LinkView + Clone + 'p
         where
@@ -436,15 +465,15 @@ pub(crate) mod sealed {
         fn portgraph(&self) -> Self::Portgraph<'_>;
 
         /// Returns the Hugr at the base of a chain of views.
-        fn base_hugr(&self) -> &Hugr;
+        fn base_hugr(&self) -> &'g Hugr;
 
         /// Return the root node of this view.
         fn root_node(&self) -> Node;
     }
 
-    impl<T> HugrInternals for T
+    impl<'g, T> HugrInternals<'g> for T
     where
-        T: AsRef<super::Hugr>,
+        T: AsRef<super::Hugr> + 'g,
     {
         type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
@@ -454,7 +483,7 @@ pub(crate) mod sealed {
         }
 
         #[inline]
-        fn base_hugr(&self) -> &Hugr {
+        fn base_hugr(&self) -> &'g Hugr {
             self.as_ref()
         }
 

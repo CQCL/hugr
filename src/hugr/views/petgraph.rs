@@ -19,7 +19,7 @@ pub struct PetgraphWrapper<'a, T> {
 
 impl<'a, T> pv::GraphBase for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     type NodeId = Node;
     type EdgeId = ((Node, Port), (Node, Port));
@@ -27,14 +27,14 @@ where
 
 impl<'a, T> pv::GraphProp for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     type EdgeType = petgraph::Directed;
 }
 
 impl<'a, T> pv::NodeCount for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     fn node_count(&self) -> usize {
         HugrView::node_count(self.hugr)
@@ -43,7 +43,7 @@ where
 
 impl<'a, T> pv::NodeIndexable for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     fn node_bound(&self) -> usize {
         HugrView::node_count(self.hugr)
@@ -60,7 +60,7 @@ where
 
 impl<'a, T> pv::EdgeCount for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     fn edge_count(&self) -> usize {
         HugrView::edge_count(self.hugr)
@@ -69,7 +69,7 @@ where
 
 impl<'a, T> pv::Data for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     type NodeWeight = OpType;
     type EdgeWeight = EdgeKind;
@@ -77,10 +77,10 @@ where
 
 impl<'g, 'a, T> pv::IntoNodeReferences for &'g PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>, // ALAN ?
 {
     type NodeRef = HugrNodeRef<'g>;
-    type NodeReferences = MapWithCtx<<T as HugrView>::Nodes<'g>, Self, HugrNodeRef<'g>>;
+    type NodeReferences = MapWithCtx<<T as HugrView<'a>>::Nodes<'g>, Self, HugrNodeRef<'g>>;
 
     fn node_references(self) -> Self::NodeReferences {
         self.hugr
@@ -92,9 +92,9 @@ where
 
 impl<'g, 'a, T> pv::IntoNodeIdentifiers for &'g PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>, // ALAN ?
 {
-    type NodeIdentifiers = <T as HugrView>::Nodes<'g>;
+    type NodeIdentifiers = <T as HugrView<'a>>::Nodes<'g>;
 
     fn node_identifiers(self) -> Self::NodeIdentifiers {
         self.hugr.nodes()
@@ -103,9 +103,9 @@ where
 
 impl<'g, 'a, T> pv::IntoNeighbors for &'g PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>, // ALAN ?
 {
-    type Neighbors = <T as HugrView>::Neighbours<'g>;
+    type Neighbors = <T as HugrView<'a>>::Neighbours<'g>;
 
     fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
         self.hugr.output_neighbours(n)
@@ -114,9 +114,9 @@ where
 
 impl<'g, 'a, T> pv::IntoNeighborsDirected for &'g PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>, // ALAN ?
 {
-    type NeighborsDirected = <T as HugrView>::Neighbours<'g>;
+    type NeighborsDirected = <T as HugrView<'a>>::Neighbours<'g>;
 
     fn neighbors_directed(
         self,
@@ -129,7 +129,7 @@ where
 
 impl<'a, T> pv::Visitable for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     type Map = std::collections::HashSet<Self::NodeId>;
 
@@ -144,7 +144,7 @@ where
 
 impl<'a, T> pv::GetAdjacencyMatrix for PetgraphWrapper<'a, T>
 where
-    T: HugrView,
+    T: HugrView<'a>,
 {
     type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
 
@@ -171,7 +171,8 @@ pub struct HugrNodeRef<'a> {
 }
 
 impl<'a> HugrNodeRef<'a> {
-    pub(self) fn from_node(node: Node, hugr: &'a impl HugrView) -> Self {
+    // ALAN just inline this used-once-only ?
+    pub(self) fn from_node(node: Node, hugr: &'a impl HugrView<'a>) -> Self {
         Self {
             node,
             op: hugr.get_optype(node),

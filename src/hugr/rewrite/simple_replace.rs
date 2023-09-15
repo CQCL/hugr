@@ -61,11 +61,11 @@ impl Rewrite for SimpleReplacement {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+    fn verify<'a>(&self, _h: &impl HugrView<'a>) -> Result<(), SimpleReplacementError> {
         unimplemented!()
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
+    fn apply<'a>(self, h: &mut impl HugrMut<'a>) -> Result<(), SimpleReplacementError> {
         let parent = self.subgraph.get_parent(h);
         // 1. Check the parent node exists and is a DataflowParent.
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {

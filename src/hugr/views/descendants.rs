@@ -10,7 +10,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView};
+use super::{sealed::HugrInternals, HierarchyView, HugrView, Holder};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -41,15 +41,17 @@ pub struct DescendantsGraph<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root> HugrView for DescendantsGraph<'g, Root>
+impl<'g, Root> HugrView<'g> for DescendantsGraph<'g, Root>
 where
-    Root: NodeHandle,
+    Root: NodeHandle + 'g,
 {
     type RootHandle = Root;
 
     type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
     where
         Self: 'a;
+    
+    type Nodes2<'a> = Holder<RegionGraph<'g>, MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>> where 'g: 'a;
 
     type NodePorts<'a> = MapInto<<RegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
     where
@@ -95,6 +97,13 @@ where
     #[inline]
     fn nodes(&self) -> Self::Nodes<'_> {
         self.graph.nodes_iter().map_into()
+    }
+
+    fn nodes2(&self) -> Self::Nodes2<'g> {
+        Holder::new(
+            self.graph.clone(),
+            |g| g.nodes_iter().map_into()
+        )
     }
 
     #[inline]
@@ -163,9 +172,9 @@ where
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
-    Root: NodeHandle,
+    Root: NodeHandle + 'a,
 {
-    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+    fn try_new(hugr: &'a impl HugrView<'a>, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
@@ -181,7 +190,7 @@ where
     }
 }
 
-impl<'g, Root> super::sealed::HugrInternals for DescendantsGraph<'g, Root>
+impl<'g, Root> super::sealed::HugrInternals<'g> for DescendantsGraph<'g, Root>
 where
     Root: NodeHandle,
 {
@@ -193,7 +202,7 @@ where
     }
 
     #[inline]
-    fn base_hugr(&self) -> &Hugr {
+    fn base_hugr(&self) -> &'g Hugr {
         self.hugr
     }
 

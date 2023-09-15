@@ -37,8 +37,8 @@ pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 /// closure: a solution which would be valid if all of the variables in the graph
 /// were instantiated to an empty extension set. This is used (by validation) to
 /// concretise the extension requirements of the whole hugr.
-pub fn infer_extensions(
-    hugr: &impl HugrView,
+pub fn infer_extensions<'a>(
+    hugr: &impl HugrView<'a>,
 ) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
     let solution = ctx.main_loop()?;
@@ -177,7 +177,7 @@ struct UnificationContext {
 impl UnificationContext {
     /// Create a new unification context, and populate it with constraints from
     /// traversing the hugr which is passed in.
-    pub fn new(hugr: &impl HugrView) -> Self {
+    pub fn new<'a>(hugr: &impl HugrView<'a>) -> Self {
         let mut ctx = Self {
             constraints: HashMap::new(),
             extensions: HashMap::new(),
@@ -267,9 +267,7 @@ impl UnificationContext {
     }
 
     /// Iterate over the nodes in a hugr and generate unification constraints
-    fn gen_constraints<T>(&mut self, hugr: &T)
-    where
-        T: HugrView,
+    fn gen_constraints<'a, T: HugrView<'a>>(&mut self, hugr: &T)
     {
         if hugr.root_type().signature().is_none() {
             let m_input = self.make_or_get_meta(hugr.root(), Direction::Incoming);
