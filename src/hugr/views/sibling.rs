@@ -43,23 +43,62 @@ pub struct SiblingGraph<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 
+/// HugrView trait members common to both [SiblingGraph] and [SiblingMut],
+/// i.e. that rely only on [HugrInternals::base_hugr]
+macro_rules! base_members {
+    () => {
+
+        type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
+        where
+            Self: 'a;
+
+        type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
+        where
+            Self: 'a;
+
+        type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
+        where
+            Self: 'a;
+
+        #[inline]
+        fn node_count(&self) -> usize {
+            self.base_hugr().hierarchy.child_count(self.root.index) + 1
+        }
+
+        #[inline]
+        fn edge_count(&self) -> usize {
+            // Faster implementation than filtering all the nodes in the internal graph.
+            self.nodes()
+                .map(|n| self.output_neighbours(n).count())
+                .sum()
+        }
+
+        #[inline]
+        fn nodes(&self) -> Self::Nodes<'_> {
+            // Faster implementation than filtering all the nodes in the internal graph.
+            let children = self
+                .base_hugr()
+                .hierarchy
+                .children(self.root.index)
+                .map_into();
+            iter::once(self.root).chain(children)
+        }
+
+        fn children(&self, node: Node) -> Self::Children<'_> {
+            // Same as SiblingGraph
+            match node == self.root {
+                true => self.base_hugr().hierarchy.children(node.index).map_into(),
+                false => portgraph::hierarchy::Children::default().map_into(),
+            }
+        }
+    };
+}
+
 impl<'g, Root> HugrView for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
 {
     type RootHandle = Root;
-
-    type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
-    where
-        Self: 'a;
-
-    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
-    where
-        Self: 'a;
-
-    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
-    where
-        Self: 'a;
 
     type Neighbours<'a> = MapInto<<FlatRegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
     where
@@ -79,33 +118,11 @@ where
     > where
         Self: 'a;
 
+    base_members! {}
+
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
-    }
-
-    #[inline]
-    fn node_count(&self) -> usize {
-        self.base_hugr().hierarchy.child_count(self.root.index) + 1
-    }
-
-    #[inline]
-    fn edge_count(&self) -> usize {
-        // Faster implementation than filtering all the nodes in the internal graph.
-        self.nodes()
-            .map(|n| self.output_neighbours(n).count())
-            .sum()
-    }
-
-    #[inline]
-    fn nodes(&self) -> Self::Nodes<'_> {
-        // Faster implementation than filtering all the nodes in the internal graph.
-        let children = self
-            .base_hugr()
-            .hierarchy
-            .children(self.root.index)
-            .map_into();
-        iter::once(self.root).chain(children)
     }
 
     #[inline]
@@ -146,14 +163,6 @@ where
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
         self.graph.num_ports(node.index, dir)
-    }
-
-    #[inline]
-    fn children(&self, node: Node) -> Self::Children<'_> {
-        match node == self.root {
-            true => self.base_hugr().hierarchy.children(node.index).map_into(),
-            false => portgraph::hierarchy::Children::default().map_into(),
-        }
     }
 
     #[inline]
@@ -276,18 +285,6 @@ lazy_static! {
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     type RootHandle = Root;
 
-    type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
-    where
-        Self: 'a;
-
-    type NodePorts<'a> = MapInto<<FlatRegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
-    where
-        Self: 'a;
-
-    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
-    where
-        Self: 'a;
-
     type Neighbours<'a> = <Vec<Node> as IntoIterator>::IntoIter
     where
         Self: 'a;
@@ -298,32 +295,12 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
 
     type NodeConnections<'a> = <Vec<[Port; 2]> as IntoIterator>::IntoIter where Self: 'a;
 
+    base_members! {}
+
     fn contains_node(&self, node: Node) -> bool {
         // Don't call self.get_parent(). That requires valid_node(node)
         // which infinitely-recurses back here.
         node == self.root || self.base_hugr().get_parent(node) == Some(self.root)
-    }
-
-    fn node_count(&self) -> usize {
-        // Same as SiblingGraph.
-        self.base_hugr().hierarchy.child_count(self.root.index) + 1
-    }
-
-    fn edge_count(&self) -> usize {
-        // Same as SiblingGraph
-        self.nodes()
-            .map(|n| self.output_neighbours(n).count())
-            .sum()
-    }
-
-    fn nodes(&self) -> Self::Nodes<'_> {
-        // Same as SiblingGraph
-        let children = self
-            .base_hugr()
-            .hierarchy
-            .children(self.root.index)
-            .map_into();
-        iter::once(self.root).chain(children)
     }
 
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
@@ -360,14 +337,6 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
         match self.contains_node(node) {
             true => self.base_hugr().num_ports(node, dir),
             false => 0,
-        }
-    }
-
-    fn children(&self, node: Node) -> Self::Children<'_> {
-        // Same as SiblingGraph
-        match node == self.root {
-            true => self.base_hugr().hierarchy.children(node.index).map_into(),
-            false => portgraph::hierarchy::Children::default().map_into(),
         }
     }
 
