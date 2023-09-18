@@ -5,6 +5,9 @@ use smol_str::SmolStr;
 use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
 
+use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::types::type_param::{check_type_args, TypeArg};
+use crate::types::PolyFuncType;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
@@ -49,6 +52,63 @@ pub enum LeafOp {
         /// The extensions which we're adding to the inputs
         new_extension: ExtensionId,
     },
+    /// Fixes some [TypeParam]s of a polymorphic type by providing [TypeArg]s
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    TypeApply {
+        /// The type and args, plus a cache of the resulting type
+        ta: TypeApplication,
+    },
+}
+
+/// Records details of an application of a [PolyFuncType] to some [TypeArg]s
+/// and the result (a less-, but still potentially-, polymorphic type).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TypeApplication {
+    input: PolyFuncType,
+    args: Vec<TypeArg>,
+    output: PolyFuncType, // cached
+}
+
+impl TypeApplication {
+    /// Checks that the specified args are correct for the [TypeParam]s of the polymorphic input.
+    /// Note the extension registry is required here to recompute [Type::least_upper_bound]s.
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    pub fn try_new(
+        input: PolyFuncType,
+        args: impl Into<Vec<TypeArg>>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let args = args.into();
+        // Should we require >=1 `arg`s here? Or that input declares >=1 params?
+        // At the moment we allow an identity TypeApply on a monomorphic function type.
+        let (fixed, remaining) = input.params.split_at(args.len());
+        check_type_args(&args, fixed)?;
+        let mut v = vec![];
+        let subst = if remaining.len() == 0 {
+            &args
+        } else {
+            v.extend(args.clone());
+            // Any remaining type params, we renumber to start at 0
+            for (idx, d) in remaining.iter().enumerate() {
+                v.push(TypeArg::use_var(idx, d.clone()));
+            }
+            &v
+        };
+        let body = input
+            .body
+            .substitute(extension_registry, subst, &input.params);
+        let params = Vec::from(remaining);
+        Ok(Self {
+            input,
+            args,
+            output: PolyFuncType {
+                params,
+                body: Box::new(body),
+            },
+        })
+    }
 }
 
 impl Default for LeafOp {
@@ -66,6 +126,7 @@ impl OpName for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::Lift { .. } => "Lift",
+            LeafOp::TypeApply { .. } => "TypeApply",
         }
         .into()
     }
@@ -85,6 +146,9 @@ impl OpTrait for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::Lift { .. } => "Add a extension requirement to an edge",
+            LeafOp::TypeApply { .. } => {
+                "Instantiate (perhaps partially) a polymorphic type with some type arguments"
+            }
         }
     }
 
@@ -115,6 +179,10 @@ impl OpTrait for LeafOp {
                 new_extension,
             } => FunctionType::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(&ExtensionSet::singleton(new_extension)),
+            LeafOp::TypeApply { ta } => FunctionType::new(
+                vec![Type::new_function(ta.input.clone())],
+                vec![Type::new_function(ta.output.clone())],
+            ),
         }
     }
 
