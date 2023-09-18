@@ -126,8 +126,6 @@ impl Rewrite for OutlineCfg {
             )
             .unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
-            // N.B. By invoking the cfg_builder, we're forgetting any input
-            // extensions that may have existed on the original CFG.
             let cfg = new_block_bldr
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
