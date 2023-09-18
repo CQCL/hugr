@@ -516,10 +516,12 @@ impl UnificationContext {
                                 solved = true;
                             }
                         };
-                    } else if let Some(superset) = self.get_solution(&meta) {
-                        let subset = ExtensionSet::singleton(r).missing_from(superset);
-                        self.add_solution(self.resolve(*other_meta), subset);
-                        solved = true;
+                    } else if let Some(_superset) = self.get_solution(&meta) {
+                        // Here, we're stuck because the Plus constraint only
+                        // signifies a preorder. I.e. if m0 = m1 + 'R', it's
+                        // still possible that the solution is m0 = m1 because
+                        // it's possible that we're adding 'R' to a set which
+                        // already contained it.
                     };
                 }
             }
@@ -936,58 +938,6 @@ mod test {
         assert_eq!(ctx.resolve(m0), ctx.resolve(m2));
         assert_eq!(ctx.resolve(m1), ctx.resolve(m2));
         assert!(ctx.resolve(m0) != mid0);
-        Ok(())
-    }
-
-    #[test]
-    fn minus_test() -> Result<(), Box<dyn Error>> {
-        let const_true = ops::Const::true_val();
-        const BOOLEAN: Type = Type::new_simple_predicate(2);
-        let just_bool = type_row![BOOLEAN];
-
-        let abc = ExtensionSet::from_iter([A, B, C]);
-
-        // Parent graph is closed
-        let mut hugr = closed_dfg_root_hugr(
-            FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
-        );
-
-        let [_, output] = hugr.get_io(hugr.root()).unwrap();
-
-        let root = hugr.root();
-        let [child, _, ochild] = create_with_io(
-            &mut hugr,
-            root,
-            ops::DFG {
-                signature: FunctionType::new(type_row![], just_bool.clone())
-                    .with_extension_delta(&abc),
-            },
-        )?;
-
-        let const_node = hugr.add_node_with_parent(child, NodeType::open_extensions(const_true))?;
-        let lift_node = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::LeafOp::Lift {
-                type_row: just_bool,
-                new_extension: C,
-            }),
-        )?;
-
-        hugr.connect(const_node, 0, lift_node, 0)?;
-        hugr.connect(lift_node, 0, ochild, 0)?;
-        hugr.connect(child, 0, output, 0)?;
-
-        hugr.infer_extensions()?;
-
-        // The solution for the const node should be {A, B}!
-        assert_eq!(
-            hugr.get_nodetype(const_node)
-                .signature()
-                .unwrap()
-                .output_extensions(),
-            ExtensionSet::from_iter([A, B])
-        );
-
         Ok(())
     }
 
