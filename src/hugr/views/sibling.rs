@@ -19,6 +19,9 @@ type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 /// View of a HUGR sibling graph.
 ///
 /// Includes only the root node and its direct children, but no deeper descendants.
+/// However, the descendants can still be accessed by creating [`SiblingGraph`]s and/or
+/// [`DescendantsGraph`]s from nodes in this view.
+///
 /// Uniquely, the root node has no parent.
 ///
 /// See [`DescendantsGraph`] for a view that includes all descendants of the root.
@@ -224,12 +227,15 @@ where
 
 /// Mutable view onto a HUGR sibling graph.
 ///
-/// Includes only the root node and its direct children, but no deeper descendants.
+/// Like [SiblingGraph], includes only the root node and its direct children, but no
+/// deeper descendants; but the descendants can still be accessed by creating nested
+/// [SiblingMut] instances from nodes in the view.
+///
 /// Uniquely, the root node has no parent.
 ///
-/// [HugrView] methods may be slower than for an immutable [SiblingGraph] as the latter
-/// may cache information about the graph connectivity, whereas (in order
-/// to ease mutation) this does not.
+/// [HugrView] methods may be slower than for an immutable [SiblingGraph]
+/// as the latter may cache information about the graph connectivity,
+/// whereas (in order to ease mutation) this does not.
 pub struct SiblingMut<'g, Root = Node> {
     /// The chosen root node.
     root: Node,

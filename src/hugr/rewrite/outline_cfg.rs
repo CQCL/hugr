@@ -201,6 +201,7 @@ impl Rewrite for OutlineCfg {
         };
 
         // 4(b). Reconnect exit edge to the new exit node within the inner CFG
+        // Use nested SiblingMut's in case the outer `h` is only a SiblingMut itself.
         let mut in_bb_view: SiblingMut<'_, BasicBlockID> =
             SiblingMut::try_new(h, new_block).unwrap();
         let mut in_cfg_view: SiblingMut<'_, CfgID> =
