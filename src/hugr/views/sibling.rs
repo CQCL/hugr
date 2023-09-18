@@ -1,6 +1,5 @@
 //! SiblingGraph: view onto a sibling subgraph of the HUGR.
 
-use lazy_static::lazy_static;
 use std::iter;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
@@ -276,10 +275,6 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     fn root_node(&self) -> Node {
         self.root
     }
-}
-
-lazy_static! {
-    static ref EMPTY_GRAPH: MultiPortGraph = MultiPortGraph::default();
 }
 
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
