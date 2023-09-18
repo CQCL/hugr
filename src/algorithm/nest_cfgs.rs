@@ -708,13 +708,19 @@ pub(crate) mod test {
     }
 
     // Build a CFG, returning the Hugr
-    pub fn build_conditional_in_loop_cfg(
+    pub(crate) fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        //let sum2_type = Type::new_predicate(2);
-
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let (head, tail) = build_conditional_in_loop(&mut cfg_builder, separate_headers)?;
+        let h = cfg_builder.finish_prelude_hugr()?;
+        Ok((h, head, tail))
+    }
 
+    pub(crate) fn build_conditional_in_loop<T: AsMut<Hugr> + AsRef<Hugr>>(
+        cfg_builder: &mut CFGBuilder<T>,
+        separate_headers: bool,
+    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
         let pred_const =
             cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
         let const_unit =
@@ -724,15 +730,15 @@ pub(crate) mod test {
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
             &const_unit,
         )?;
-        let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
+        let (split, merge) = build_if_then_else_merge(cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
-            let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
+            let (head, tail) = build_loop(cfg_builder, &pred_const, &const_unit)?;
             cfg_builder.branch(&head, 0, &split)?;
             (head, tail)
         } else {
             // Combine loop header with split.
-            let tail = build_loop_from_header(&mut cfg_builder, &pred_const, split)?;
+            let tail = build_loop_from_header(cfg_builder, &pred_const, split)?;
             (split, tail)
         };
         cfg_builder.branch(&merge, 0, &tail)?;
@@ -742,7 +748,6 @@ pub(crate) mod test {
         cfg_builder.branch(&entry, 0, &head)?;
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let h = cfg_builder.finish_prelude_hugr()?;
-        Ok((h, head, tail))
+        Ok((head, tail))
     }
 }
