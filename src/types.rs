@@ -10,6 +10,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
+pub use primitive::PolyFuncType;
 pub use signature::{FunctionType, Signature, SignatureDescription};
 pub use type_row::TypeRow;
 
@@ -209,8 +210,8 @@ impl Type {
     const UNIT_REF: &'static Self = &Self::UNIT;
 
     /// Initialize a new function type.
-    pub fn new_function(signature: FunctionType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(signature))))
+    pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Function(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -412,7 +413,8 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), Function([[]][]), my_custom([]), Alias(my_alias)])".to_string()
+            "Tuple([usize([]), Function(forall . [[]][]), my_custom([]), Alias(my_alias)])"
+                .to_string()
         );
     }
 
