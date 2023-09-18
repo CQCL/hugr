@@ -146,7 +146,7 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn validate(
+    pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
         type_vars: &[TypeParam],

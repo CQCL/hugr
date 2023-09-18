@@ -96,9 +96,7 @@ impl Conditional {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
 pub struct CFG {
-    pub inputs: TypeRow,
-    pub outputs: TypeRow,
-    pub extension_delta: ExtensionSet,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(CFG);
@@ -111,8 +109,7 @@ impl DataflowOpTrait for CFG {
     }
 
     fn signature(&self) -> FunctionType {
-        FunctionType::new(self.inputs.clone(), self.outputs.clone())
-            .with_extension_delta(&self.extension_delta)
+        self.signature.clone()
     }
 }
 

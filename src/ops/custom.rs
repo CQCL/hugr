@@ -1,15 +1,14 @@
 //! Extensible operations.
 
 use smol_str::SmolStr;
-use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ExtensionId, OpDef, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
-use crate::{Extension, Hugr, Node};
+use crate::{Hugr, Node};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
@@ -19,8 +18,12 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
+    ///
+    /// [Extension]: crate::Extension
     Extension(ExtensionOp),
     /// When we either haven't tried to identify the [Extension] or failed to find it.
+    ///
+    /// [Extension]: crate::Extension
     Opaque(OpaqueOp),
 }
 
@@ -95,7 +98,9 @@ impl OpTrait for ExternalOp {
 }
 
 /// An operation defined by an [OpDef] from a loaded [Extension].
-// Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
+/// Note *not* Serializable: container ([ExternalOp]) is serialized as an [OpaqueOp] instead.
+///
+/// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
@@ -216,13 +221,13 @@ impl OpaqueOp {
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
     h: &mut Hugr,
-    extension_registry: &HashMap<SmolStr, Extension>,
+    extension_registry: &ExtensionRegistry,
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&*opaque.extension) {
+                if let Some(r) = extension_registry.get(&opaque.extension) {
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                         return Err(CustomOpError::OpNotFoundInExtension(
@@ -252,10 +257,7 @@ pub fn resolve_extension_ops(
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
         let leaf: LeafOp = op.into();
-        let node_type = match h.get_nodetype(n).input_extensions() {
-            None => NodeType::open_extensions(leaf),
-            Some(exts) => NodeType::new(leaf, exts.clone()),
-        };
+        let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
         h.replace_op(n, node_type);
     }
     Ok(())

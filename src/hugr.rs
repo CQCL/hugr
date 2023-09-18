@@ -23,13 +23,13 @@ use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
 pub use self::views::HugrView;
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
-use crate::ops::{OpTag, OpTrait, OpType};
+use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
@@ -64,12 +64,18 @@ pub struct NodeType {
     input_extensions: Option<ExtensionSet>,
 }
 
+/// The default NodeType, with open extensions
+pub const DEFAULT_NODETYPE: NodeType = NodeType {
+    op: DEFAULT_OPTYPE,
+    input_extensions: None, // Default for any Option
+};
+
 impl NodeType {
     /// Create a new optype with some ExtensionSet
-    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
+    pub fn new(op: impl Into<OpType>, input_extensions: impl Into<Option<ExtensionSet>>) -> Self {
         NodeType {
             op: op.into(),
-            input_extensions: Some(input_extensions),
+            input_extensions: input_extensions.into(),
         }
     }
 
@@ -206,14 +212,6 @@ pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<R, E>(
-        &mut self,
-        rw: impl Rewrite<ApplyResult = R, Error = E>,
-    ) -> Result<R, E> {
-        rw.apply(self)
-    }
-
     /// Run resource inference and pass the closure into validation
     pub fn infer_and_validate(
         &mut self,
@@ -472,10 +470,17 @@ pub enum HugrError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyHugrError,
+    PyException,
+    "Errors that can occur while manipulating a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<HugrError> for PyErr {
     fn from(err: HugrError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyHugrError::new_err(err.to_string())
     }
 }
 

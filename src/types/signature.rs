@@ -1,7 +1,7 @@
 //! Abstract and concrete Signature types.
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{pyclass, pymethods};
 
 use std::ops::Index;
 

@@ -5,11 +5,12 @@ use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
+use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::ops::OpTrait;
-use crate::{hugr::NodeType, hugr::OpType, Direction, Hugr, Node, Port};
+use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView, NodeMetadata};
+use super::{sealed::HugrInternals, HierarchyView, HugrView};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -25,10 +26,8 @@ type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 /// used interchangeably with [`SiblingGraph`].
 ///
 /// [`SiblingGraph`]: super::SiblingGraph
-pub struct DescendantsGraph<'g, Root = Node, Base = Hugr>
-where
-    Base: HugrInternals,
-{
+#[derive(Clone)]
+pub struct DescendantsGraph<'g, Root = Node> {
     /// The chosen root node.
     root: Node,
 
@@ -36,26 +35,15 @@ where
     graph: RegionGraph<'g>,
 
     /// The node hierarchy.
-    hugr: &'g Base,
+    hugr: &'g Hugr,
 
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root, Base: Clone> Clone for DescendantsGraph<'g, Root, Base>
+impl<'g, Root> HugrView for DescendantsGraph<'g, Root>
 where
     Root: NodeHandle,
-    Base: HugrInternals + HugrView,
-{
-    fn clone(&self) -> Self {
-        DescendantsGraph::new(self.hugr, self.root)
-    }
-}
-
-impl<'g, Root, Base> HugrView for DescendantsGraph<'g, Root, Base>
-where
-    Root: NodeHandle,
-    Base: HugrInternals + HugrView,
 {
     type RootHandle = Root;
 
@@ -92,29 +80,6 @@ where
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.index)
-    }
-
-    #[inline]
-    fn get_parent(&self, node: Node) -> Option<Node> {
-        self.hugr
-            .get_parent(node)
-            .filter(|&parent| self.graph.contains_node(parent.index))
-            .map(Into::into)
-    }
-
-    #[inline]
-    fn get_optype(&self, node: Node) -> &OpType {
-        self.hugr.get_optype(node)
-    }
-
-    #[inline]
-    fn get_nodetype(&self, node: Node) -> &NodeType {
-        self.hugr.get_nodetype(node)
-    }
-
-    #[inline]
-    fn get_metadata(&self, node: Node) -> &NodeMetadata {
-        self.hugr.get_metadata(node)
     }
 
     #[inline]
@@ -196,36 +161,29 @@ where
     }
 }
 
-impl<'a, Root, Base> HierarchyView<'a> for DescendantsGraph<'a, Root, Base>
+impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
-    Base: HugrView,
 {
-    type Base = Base;
-
-    fn new(hugr: &'a Base, root: Node) -> Self {
+    fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+        hugr.valid_node(root)?;
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
-            // TODO: Return an error
-            panic!("Root node must have the correct operation type tag.")
+            return Err(HugrError::InvalidNode(root));
         }
-        Self {
+        let hugr = hugr.base_hugr();
+        Ok(Self {
             root,
-            graph: RegionGraph::new_region(
-                &hugr.base_hugr().graph,
-                &hugr.base_hugr().hierarchy,
-                root.index,
-            ),
+            graph: RegionGraph::new_region(&hugr.graph, &hugr.hierarchy, root.index),
             hugr,
             _phantom: std::marker::PhantomData,
-        }
+        })
     }
 }
 
-impl<'g, Root, Base> super::sealed::HugrInternals for DescendantsGraph<'g, Root, Base>
+impl<'g, Root> super::sealed::HugrInternals for DescendantsGraph<'g, Root>
 where
     Root: NodeHandle,
-    Base: HugrInternals,
 {
     type Portgraph<'p> = &'p RegionGraph<'g> where Self: 'p;
 
@@ -236,7 +194,7 @@ where
 
     #[inline]
     fn base_hugr(&self) -> &Hugr {
-        self.hugr.base_hugr()
+        self.hugr
     }
 
     #[inline]
@@ -299,7 +257,7 @@ pub(super) mod test {
     fn full_region() -> Result<(), Box<dyn std::error::Error>> {
         let (hugr, def, inner) = make_module_hgr()?;
 
-        let region: DescendantsGraph = DescendantsGraph::new(&hugr, def);
+        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
@@ -311,7 +269,7 @@ pub(super) mod test {
             region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
         );
-        let inner_region: DescendantsGraph = DescendantsGraph::new(&hugr, inner);
+        let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.get_function_type(),
             Some(&FunctionType::new(type_row![NAT], type_row![NAT]))

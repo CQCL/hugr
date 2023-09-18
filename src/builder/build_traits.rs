@@ -1,3 +1,4 @@
+use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
@@ -68,8 +69,12 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_op(constant)?;
+    fn add_constant(
+        &mut self,
+        constant: ops::Const,
+        extensions: ExtensionSet,
+    ) -> Result<ConstID, BuildError> {
+        let const_n = self.add_child_node(NodeType::new(constant, extensions))?;
 
         Ok(const_n.into())
     }
@@ -86,10 +91,13 @@ pub trait Container {
         name: impl Into<String>,
         signature: Signature,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let f_node = self.add_child_op(ops::FuncDefn {
-            name: name.into(),
-            signature: signature.clone().into(),
-        })?;
+        let f_node = self.add_child_node(NodeType::new(
+            ops::FuncDefn {
+                name: name.into(),
+                signature: signature.signature.clone(),
+            },
+            signature.input_extensions.clone(),
+        ))?;
 
         let db = DFGBuilder::create_with_io(
             self.hugr_mut(),
@@ -101,13 +109,13 @@ pub trait Container {
     }
 
     /// Insert a HUGR as a child of the container.
-    fn add_hugr(&mut self, child: Hugr) -> Result<Node, BuildError> {
+    fn add_hugr(&mut self, child: Hugr) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_hugr(parent, child)?)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<Node, BuildError> {
+    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
         Ok(self.hugr_mut().insert_from_view(parent, child)?)
     }
@@ -115,12 +123,16 @@ pub trait Container {
     /// Add metadata to the container node.
     fn set_metadata(&mut self, meta: NodeMetadata) {
         let parent = self.container_node();
-        self.hugr_mut().set_metadata(parent, meta);
+        // Implementor's container_node() should be a valid node
+        self.hugr_mut().set_metadata(parent, meta).unwrap();
     }
 
     /// Add metadata to a child node.
-    fn set_child_metadata(&mut self, child: Node, meta: NodeMetadata) {
-        self.hugr_mut().set_metadata(child, meta);
+    ///
+    /// Returns an error if the specified `child` is not a child of this container
+    fn set_child_metadata(&mut self, child: Node, meta: NodeMetadata) -> Result<(), BuildError> {
+        self.hugr_mut().set_metadata(child, meta)?;
+        Ok(())
     }
 }
 
@@ -187,7 +199,7 @@ pub trait Dataflow: Container {
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_node(NodeType::pure(op), input_wires)
+        self.add_dataflow_node(NodeType::open_extensions(op), input_wires)
     }
 
     /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
@@ -219,7 +231,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr(hugr)?;
+        let node = self.add_hugr(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -240,7 +252,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr_view(hugr)?;
+        let node = self.add_hugr_view(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -292,10 +304,7 @@ pub trait Dataflow: Container {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = match &input_extensions {
-            None => NodeType::open_extensions(op),
-            Some(rs) => NodeType::new(op, rs.clone()),
-        };
+        let nodetype = NodeType::new(op, input_extensions.clone());
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
         DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
@@ -314,7 +323,9 @@ pub trait Dataflow: Container {
     fn cfg_builder(
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
+        input_extensions: impl Into<Option<ExtensionSet>>,
         output_types: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
 
@@ -322,12 +333,13 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            NodeType::open_extensions(ops::CFG {
-                inputs: inputs.clone(),
-                outputs: output_types.clone(),
-                // TODO: Make this a parameter
-                extension_delta: ExtensionSet::new(),
-            }),
+            NodeType::new(
+                ops::CFG {
+                    signature: FunctionType::new(inputs.clone(), output_types.clone())
+                        .with_extension_delta(&extension_delta),
+                },
+                input_extensions,
+            ),
             input_wires,
         )?;
         CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)
@@ -340,17 +352,21 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error when adding the node.
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let const_node = cid.node();
-        let op: ops::Const = self
-            .hugr()
-            .get_optype(const_node)
+        let nodetype = self.hugr().get_nodetype(const_node);
+        let input_extensions = nodetype.input_extensions().cloned();
+        let op: &OpType = nodetype.into();
+        let op: ops::Const = op
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
 
-        let load_n = self.add_dataflow_op(
-            ops::LoadConstant {
-                datatype: op.const_type().clone(),
-            },
+        let load_n = self.add_dataflow_node(
+            NodeType::new(
+                ops::LoadConstant {
+                    datatype: op.const_type().clone(),
+                },
+                input_extensions,
+            ),
             // Constant wire from the constant value node
             vec![Wire::new(const_node, Port::new_outgoing(0))],
         )?;
@@ -363,8 +379,12 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant)?;
+    fn add_load_const(
+        &mut self,
+        constant: ops::Const,
+        extensions: ExtensionSet,
+    ) -> Result<Wire, BuildError> {
+        let cid = self.add_constant(constant, extensions)?;
         self.load_const(&cid)
     }
 

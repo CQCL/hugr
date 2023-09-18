@@ -12,16 +12,20 @@ use crate::{Hugr, Port};
 
 use self::sealed::HugrMutInternals;
 
-use super::NodeMetadata;
+use super::{NodeMetadata, Rewrite};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrView + HugrMutInternals {
     /// Returns the metadata associated with a node.
-    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata;
+    fn get_metadata_mut(&mut self, node: Node) -> Result<&mut NodeMetadata, HugrError> {
+        self.valid_node(node)?;
+        Ok(self.hugr_mut().metadata.get_mut(node.index))
+    }
 
     /// Sets the metadata associated with a node.
-    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) {
-        *self.get_metadata_mut(node) = metadata;
+    fn set_metadata(&mut self, node: Node, metadata: NodeMetadata) -> Result<(), HugrError> {
+        *self.get_metadata_mut(node)? = metadata;
+        Ok(())
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -58,6 +62,15 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
         self.valid_non_root(sibling)?;
         self.hugr_mut().add_op_before(sibling, op)
+    }
+
+    /// A generalisation of [`HugrMut::add_op_before`], needed temporarily until
+    /// add_op type methods all default to creating nodes with open extensions.
+    /// See issue #424
+    #[inline]
+    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
+        self.valid_non_root(sibling)?;
+        self.hugr_mut().add_node_before(sibling, nodetype)
     }
 
     /// Add a node to the graph as the next sibling of another node.
@@ -128,21 +141,49 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     }
 
     /// Insert another hugr into this one, under a given root node.
-    ///
-    /// Returns the root node of the inserted hugr.
     #[inline]
-    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(&mut self, root: Node, other: Hugr) -> Result<InsertionResult, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_hugr(root, other)
     }
 
     /// Copy another hugr into this one, under a given root node.
-    ///
-    /// Returns the root node of the inserted hugr.
     #[inline]
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<InsertionResult, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_from_view(root, other)
+    }
+
+    /// Applies a rewrite to the graph.
+    fn apply_rewrite<R, E>(&mut self, rw: impl Rewrite<ApplyResult = R, Error = E>) -> Result<R, E>
+    where
+        Self: Sized,
+    {
+        rw.apply(self)
+    }
+}
+
+/// Records the result of inserting a Hugr or view
+/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view]
+pub struct InsertionResult {
+    /// The node, after insertion, that was the root of the inserted Hugr.
+    /// (That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]))
+    pub new_root: Node,
+    /// Map from nodes in the Hugr/view that was inserted, to their new
+    /// positions in the Hugr into which said was inserted.
+    pub node_map: HashMap<Node, Node>,
+}
+
+impl InsertionResult {
+    fn translating_indices(new_root: Node, node_map: HashMap<NodeIndex, NodeIndex>) -> Self {
+        Self {
+            new_root,
+            node_map: HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
+        }
     }
 }
 
@@ -151,10 +192,6 @@ impl<T> HugrMut for T
 where
     T: HugrView + AsMut<Hugr>,
 {
-    fn get_metadata_mut(&mut self, node: Node) -> &mut NodeMetadata {
-        self.as_mut().metadata.get_mut(node.index)
-    }
-
     fn add_op_with_parent(
         &mut self,
         parent: Node,
@@ -165,7 +202,7 @@ where
     }
 
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
-        let node = self.add_node(node);
+        let node = self.as_mut().add_node(node);
         self.as_mut()
             .hierarchy
             .push_child(node.index, parent.index)?;
@@ -173,7 +210,11 @@ where
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op);
+        self.add_node_before(sibling, NodeType::pure(op))
+    }
+
+    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
+        let node = self.as_mut().add_node(nodetype);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
@@ -181,7 +222,7 @@ where
     }
 
     fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.add_op(op);
+        let node = self.as_mut().add_op(op);
         self.as_mut()
             .hierarchy
             .insert_after(node.index, sibling.index)?;
@@ -237,28 +278,36 @@ where
         Ok((src_port, dst_port))
     }
 
-    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<Node, HugrError> {
+    fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<InsertionResult, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
         // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
-            self.as_mut().set_metadata(node.into(), meta);
+            self.as_mut().set_metadata(node.into(), meta).unwrap();
         }
-        Ok(other_root)
+        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult::translating_indices(other_root, node_map))
     }
 
-    fn insert_from_view(&mut self, root: Node, other: &impl HugrView) -> Result<Node, HugrError> {
+    fn insert_from_view(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+    ) -> Result<InsertionResult, HugrError> {
         let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_nodetype(node.into());
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.get_metadata(node.into());
-            self.as_mut().set_metadata(node.into(), meta.clone());
+            self.as_mut()
+                .set_metadata(node.into(), meta.clone())
+                .unwrap();
         }
-        Ok(other_root)
+        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult::translating_indices(other_root, node_map))
     }
 }
 
@@ -311,40 +360,6 @@ pub(crate) mod sealed {
     pub trait HugrMutInternals: HugrView {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
-
-        /// Validates that a node is valid in the graph.
-        ///
-        /// Returns a [`HugrError::InvalidNode`] otherwise.
-        #[inline]
-        fn valid_node(&self, node: Node) -> Result<(), HugrError> {
-            match self.contains_node(node) {
-                true => Ok(()),
-                false => Err(HugrError::InvalidNode(node)),
-            }
-        }
-
-        /// Validates that a node is a valid root descendant in the graph.
-        ///
-        /// To include the root node use [`HugrMutInternals::valid_node`] instead.
-        ///
-        /// Returns a [`HugrError::InvalidNode`] otherwise.
-        #[inline]
-        fn valid_non_root(&self, node: Node) -> Result<(), HugrError> {
-            match self.root() == node {
-                true => Err(HugrError::InvalidNode(node)),
-                false => self.valid_node(node),
-            }
-        }
-
-        /// Add a node to the graph, with the default conversion from OpType to NodeType
-        fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-            self.hugr_mut().add_op(op)
-        }
-
-        /// Add a node to the graph.
-        fn add_node(&mut self, nodetype: NodeType) -> Node {
-            self.hugr_mut().add_node(nodetype)
-        }
 
         /// Set the number of ports on a node. This may invalidate the node's `PortIndex`.
         fn set_num_ports(&mut self, node: Node, incoming: usize, outgoing: usize) {
