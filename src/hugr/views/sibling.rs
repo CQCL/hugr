@@ -47,7 +47,7 @@ pub struct SiblingGraph<'g, Root = Node> {
 
 /// HugrView trait members common to both [SiblingGraph] and [SiblingMut],
 /// i.e. that rely only on [HugrInternals::base_hugr]
-macro_rules! base_members {
+macro_rules! impl_base_members {
     () => {
 
         type Nodes<'a> = iter::Chain<iter::Once<Node>, MapInto<portgraph::hierarchy::Children<'a>, Node>>
@@ -120,7 +120,7 @@ where
     > where
         Self: 'a;
 
-    base_members! {}
+    impl_base_members! {}
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
@@ -296,7 +296,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
 
     type NodeConnections<'a> = <Vec<[Port; 2]> as IntoIterator>::IntoIter where Self: 'a;
 
-    base_members! {}
+    impl_base_members! {}
 
     fn contains_node(&self, node: Node) -> bool {
         // Don't call self.get_parent(). That requires valid_node(node)
