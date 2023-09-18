@@ -7,11 +7,12 @@
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::FunctionType;
 
-use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
+use super::{ExtensionRegistry, SignatureError};
 
 /// A polymorphic type scheme for an [OpDef]
 ///
 /// [OpDef]: super::OpDef
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDefTypeScheme {
     /// The declared type parameters, i.e., every instantiation ([ExternalOp]) must provide [TypeArg]s for these
     ///
@@ -38,31 +39,26 @@ impl OpDefTypeScheme {
         body.validate(extension_registry, &params)?;
         Ok(Self { params, body })
     }
-}
 
-impl CustomSignatureFunc for OpDefTypeScheme {
-    fn compute_signature(
+    pub(super) fn compute_signature(
         &self,
-        _name: &smol_str::SmolStr,
         args: &[TypeArg],
-        _misc: &std::collections::HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        check_type_args(args, &self.params).map_err(SignatureError::TypeArgMismatch)?;
+        check_type_args(args, &self.params)?;
         Ok(self.body.substitute(extension_registry, args))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use std::num::NonZeroU64;
 
     use smol_str::SmolStr;
 
     use crate::extension::prelude::{PRELUDE_ID, USIZE_T};
     use crate::extension::{
-        CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound,
+        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound,
         TypeParametrised, PRELUDE, PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
@@ -84,12 +80,7 @@ mod test {
             &reg,
         )?;
 
-        let t = list_len.compute_signature(
-            &SmolStr::new_inline(""),
-            &[TypeArg::Type { ty: USIZE_T }],
-            &HashMap::new(),
-            &reg,
-        )?;
+        let t = list_len.compute_signature(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
         assert_eq!(
             t,
             FunctionType::new(
@@ -123,16 +114,12 @@ mod test {
 
         // Sanity check (good args)
         good_ts.compute_signature(
-            &"reverse".into(),
             &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
-            &HashMap::new(),
             &PRELUDE_REGISTRY,
         )?;
 
         let wrong_args = good_ts.compute_signature(
-            &"reverse".into(),
             &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
-            &HashMap::new(),
             &PRELUDE_REGISTRY,
         );
         assert_eq!(

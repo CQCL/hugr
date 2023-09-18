@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
+use super::type_scheme::OpDefTypeScheme;
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
     TypeParametrised,
@@ -96,20 +97,19 @@ pub(super) enum SignatureFunc {
     // to serialize well.
     /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
     #[serde(rename = "signature")]
-    FromDecl { inputs: String, outputs: String },
+    TypeScheme(OpDefTypeScheme),
     #[serde(skip)]
-    CustomFunc(Box<dyn CustomSignatureFunc>),
+    CustomFunc {
+        params: Vec<TypeParam>,
+        func: Box<dyn CustomSignatureFunc>,
+    },
 }
 
 impl Debug for SignatureFunc {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FromDecl { inputs, outputs } => f
-                .debug_struct("signature")
-                .field("inputs", inputs)
-                .field("outputs", outputs)
-                .finish(),
-            Self::CustomFunc(_) => f.write_str("<custom sig>"),
+            Self::TypeScheme(scheme) => scheme.fmt(f),
+            Self::CustomFunc { .. } => f.write_str("<custom sig>"),
         }
     }
 }
@@ -149,8 +149,6 @@ pub struct OpDef {
     name: SmolStr,
     /// Human readable description of the operation.
     description: String,
-    /// Declared type parameters, values must be provided for each operation node
-    params: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     misc: HashMap<String, serde_yaml::Value>,
@@ -225,16 +223,13 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        self.check_args(args)?;
         let res = match &self.signature_func {
-            SignatureFunc::FromDecl { .. } => {
-                // Sig should be computed solely from inputs + outputs + args.
-                todo!()
+            SignatureFunc::TypeScheme(ts) => ts.compute_signature(args, exts),
+            SignatureFunc::CustomFunc { func, .. } => {
+                self.check_args(args)?;
+                func.compute_signature(&self.name, args, &self.misc, exts)
             }
-            SignatureFunc::CustomFunc(bf) => {
-                bf.compute_signature(&self.name, args, &self.misc, exts)?
-            }
-        };
+        }?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
@@ -244,17 +239,17 @@ impl OpDef {
     /// Optional description of the ports in the signature.
     pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
         match &self.signature_func {
-            SignatureFunc::FromDecl { .. } => {
-                todo!()
+            SignatureFunc::TypeScheme { .. } => todo!(),
+            SignatureFunc::CustomFunc { func, .. } => {
+                func.describe_signature(&self.name, args, &self.misc)
             }
-            SignatureFunc::CustomFunc(bf) => bf.describe_signature(&self.name, args, &self.misc),
         }
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {
         match self.signature_func {
-            SignatureFunc::CustomFunc(_) => true,
-            SignatureFunc::FromDecl { .. } => false,
+            SignatureFunc::TypeScheme { .. } => true,
+            SignatureFunc::CustomFunc { .. } => false,
         }
     }
 
@@ -295,7 +290,10 @@ impl OpDef {
 
     /// Returns a reference to the params of this [`OpDef`].
     pub fn params(&self) -> &[TypeParam] {
-        self.params.as_ref()
+        match &self.signature_func {
+            SignatureFunc::TypeScheme(ts) => &ts.params,
+            SignatureFunc::CustomFunc { params, .. } => params,
+        }
     }
 }
 
@@ -305,7 +303,6 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: SignatureFunc,
@@ -314,7 +311,6 @@ impl Extension {
             extension: self.name.clone(),
             name,
             description,
-            params,
             misc,
             signature_func,
             lower_funcs,
@@ -339,10 +335,12 @@ impl Extension {
         self.add_op(
             name,
             description,
-            params,
             misc,
             lower_funcs,
-            SignatureFunc::CustomFunc(Box::new(signature_func)),
+            SignatureFunc::CustomFunc {
+                params,
+                func: Box::new(signature_func),
+            },
         )
     }
 
@@ -365,24 +363,22 @@ impl Extension {
         )
     }
 
-    /// Create an OpDef with a signature (inputs+outputs) read from the
+    /// Create an OpDef with a signature (inputs+outputs) read from e.g.
     /// declarative YAML
-    pub fn add_op_decl_sig(
+    pub fn add_op_type_scheme(
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
-        (inputs, outputs): (String, String), // separating these makes clippy complain about too many args
+        type_scheme: OpDefTypeScheme,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op(
             name,
             description,
-            params,
             misc,
             lower_funcs,
-            SignatureFunc::FromDecl { inputs, outputs },
+            SignatureFunc::TypeScheme(type_scheme),
         )
     }
 }
