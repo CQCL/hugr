@@ -162,13 +162,19 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // Check operation-specific constraints. Firstly that type args are correct
         // (Good to call `resolve_extension_ops` immediately before this
         //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
-        if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
-            for arg in b.args() {
+        match op_type {
+            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
                 // Hugrs are monomorphic, so no type variables in scope
-                arg.validate(self.extension_registry, &[])
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                b.args()
+                    .iter()
+                    .try_for_each(|arg| arg.validate(self.extension_registry, &[]))
             }
+            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
+                ta.validate(self.extension_registry)
+            }
+            _ => Ok(()),
         }
+        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
         // Secondly that the node has correct children
         self.validate_children(node, node_type)?;
 

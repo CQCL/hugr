@@ -16,7 +16,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomType, TypeBound};
+use crate::types::{CustomType, PolyFuncType, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -97,6 +97,18 @@ pub enum SignatureError {
     TypeVarDoesNotMatchDeclaration {
         used: TypeParam,
         decl: Option<TypeParam>,
+    },
+    /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
+    /// [ExtensionRegistry]. (Note: might be commoned up with
+    /// [CustomOpError::SignatureMismatch] if we implement
+    /// <https://github.com/CQCL-DEV/hugr/issues/508>).
+    ///
+    /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
+    /// [CustomOpError::SignatureMismatch]: crate::ops::custom::CustomOpError::SignatureMismatch
+    #[error("Incorrect cache of signature - found {stored} but expected {expected}")]
+    CachedTypeIncorrect {
+        stored: PolyFuncType,
+        expected: PolyFuncType,
     },
 }
 

@@ -109,6 +109,21 @@ impl TypeApplication {
             },
         })
     }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.input.clone(), self.args.clone(), extension_registry)?;
+        if other.output == self.output {
+            Ok(())
+        } else {
+            Err(SignatureError::CachedTypeIncorrect {
+                stored: self.output.clone(),
+                expected: other.output.clone(),
+            })
+        }
+    }
 }
 
 impl Default for LeafOp {
