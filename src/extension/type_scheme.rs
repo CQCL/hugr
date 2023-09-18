@@ -12,26 +12,19 @@ use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
 /// A polymorphic type scheme for an [OpDef]
 ///
 /// [OpDef]: super::OpDef
-pub struct OpDefTypeScheme<'a> {
+pub struct OpDefTypeScheme {
     /// The declared type parameters, i.e., every instantiation ([ExternalOp]) must provide [TypeArg]s for these
     ///
     /// [ExternalOp]: crate::ops::custom::ExternalOp
     pub params: Vec<TypeParam>,
     /// Template for the Op type. May contain variables up to length of [OpDefTypeScheme::params]
     body: FunctionType,
-    /// Extensions - the [TypeDefBound]s in here will be needed when we instantiate the [OpDefTypeScheme]
-    /// into a [FunctionType].
-    ///
-    /// [TypeDefBound]: super::type_def::TypeDefBound
-    // Note that if the lifetimes, etc., become too painful to store this reference in here,
-    // and we'd rather own the necessary data, we really only need the TypeDefBounds not the other parts,
-    // and the validation traversal in new() discovers the small subset of TypeDefBounds that
-    // each OpDefTypeScheme actually needs.
-    exts: &'a ExtensionRegistry,
 }
 
-impl<'a> OpDefTypeScheme<'a> {
+impl OpDefTypeScheme {
     /// Create a new OpDefTypeScheme.
+    /// The [ExtensionRegistry] should be the same (or a subset) of that which will later
+    /// be used to create operations; at this point we only need the types.
     ///
     /// #Errors
     /// Validates that all types in the schema are well-formed and all variables in the body
@@ -39,27 +32,24 @@ impl<'a> OpDefTypeScheme<'a> {
     pub fn new(
         params: impl Into<Vec<TypeParam>>,
         body: FunctionType,
-        extension_registry: &'a ExtensionRegistry,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let params = params.into();
         body.validate(extension_registry, &params)?;
-        Ok(Self {
-            params,
-            body,
-            exts: extension_registry,
-        })
+        Ok(Self { params, body })
     }
 }
 
-impl<'a> CustomSignatureFunc for OpDefTypeScheme<'a> {
+impl CustomSignatureFunc for OpDefTypeScheme {
     fn compute_signature(
         &self,
         _name: &smol_str::SmolStr,
         args: &[TypeArg],
         _misc: &std::collections::HashMap<String, serde_yaml::Value>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params).map_err(SignatureError::TypeArgMismatch)?;
-        Ok(self.body.substitute(self.exts, args))
+        Ok(self.body.substitute(extension_registry, args))
     }
 }
 
@@ -98,6 +88,7 @@ mod test {
             &SmolStr::new_inline(""),
             &[TypeArg::Type { ty: USIZE_T }],
             &HashMap::new(),
+            &reg,
         )?;
         assert_eq!(
             t,
@@ -135,12 +126,14 @@ mod test {
             &"reverse".into(),
             &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &HashMap::new(),
+            &PRELUDE_REGISTRY,
         )?;
 
         let wrong_args = good_ts.compute_signature(
             &"reverse".into(),
             &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &HashMap::new(),
+            &PRELUDE_REGISTRY,
         );
         assert_eq!(
             wrong_args,
