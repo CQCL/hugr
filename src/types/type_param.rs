@@ -4,8 +4,8 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
+use itertools::Itertools;
 use std::num::NonZeroU64;
-
 use thiserror::Error;
 
 use crate::extension::ExtensionRegistry;
@@ -16,9 +16,12 @@ use super::CustomType;
 use super::Type;
 use super::TypeBound;
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
+#[derive(
+    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
+#[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
     fn valid_value(&self, val: u64) -> bool {
@@ -32,7 +35,9 @@ impl UpperBound {
 
 /// A parameter declared by an OpDef. Specifies a value
 /// that must be provided by each operation node.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
@@ -44,6 +49,7 @@ pub enum TypeParam {
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
     List(Box<TypeParam>),
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
+    #[display(fmt = "Tuple({})", "_0.iter().map(|t|t.to_string()).join(\", \")")]
     Tuple(Vec<TypeParam>),
     /// Argument is a [TypeArg::Extensions]. A set of [ExtensionId]s.
     ///
