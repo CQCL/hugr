@@ -6,10 +6,12 @@ use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
+use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
-use crate::ops::handle::NodeHandle;
+use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{BasicBlock, OpTrait, OpType};
 use crate::{type_row, Node};
 
@@ -126,8 +128,6 @@ impl Rewrite for OutlineCfg {
             )
             .unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
-            // N.B. By invoking the cfg_builder, we're forgetting any input
-            // extensions that may have existed on the original CFG.
             let cfg = new_block_bldr
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
@@ -164,20 +164,8 @@ impl Rewrite for OutlineCfg {
             h.move_before_sibling(new_block, outer_entry).unwrap();
         }
 
-        // 4. Children of new CFG.
-        let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
-        // Entry node must be first
-        h.move_before_sibling(entry, inner_exit).unwrap();
-        // And remaining nodes
-        for n in self.blocks {
-            // Do not move the entry node, as we have already
-            if n != entry {
-                h.set_parent(n, cfg_node).unwrap();
-            }
-        }
-
-        // 5. Exit edges.
-        // Retarget edge from exit_node (that used to target outside) to inner_exit
+        // 4(a). Exit edges.
+        // Remove edge from exit_node (that used to target outside)
         let exit_port = h
             .node_outputs(exit)
             .filter(|p| {
@@ -189,9 +177,36 @@ impl Rewrite for OutlineCfg {
             .ok() // NodePorts does not implement Debug
             .unwrap();
         h.disconnect(exit, exit_port).unwrap();
-        h.connect(exit, exit_port.index(), inner_exit, 0).unwrap();
         // And connect new_block to outside instead
         h.connect(new_block, 0, outside, 0).unwrap();
+
+        // 5. Children of new CFG.
+        let inner_exit = {
+            // These operations do not fit within any CSG/SiblingMut
+            // so we need to access the Hugr directly.
+            let h = h.hugr_mut();
+            let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
+            // Entry node must be first
+            h.move_before_sibling(entry, inner_exit).unwrap();
+            // And remaining nodes
+            for n in self.blocks {
+                // Do not move the entry node, as we have already
+                if n != entry {
+                    h.set_parent(n, cfg_node).unwrap();
+                }
+            }
+            inner_exit
+        };
+
+        // 4(b). Reconnect exit edge to the new exit node within the inner CFG
+        // Use nested SiblingMut's in case the outer `h` is only a SiblingMut itself.
+        let mut in_bb_view: SiblingMut<'_, BasicBlockID> =
+            SiblingMut::try_new(h, new_block).unwrap();
+        let mut in_cfg_view: SiblingMut<'_, CfgID> =
+            SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
+        in_cfg_view
+            .connect(exit, exit_port.index(), inner_exit, 0)
+            .unwrap();
 
         Ok(())
     }
@@ -228,18 +243,24 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop_cfg,
+        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg,
     };
+    use crate::builder::{
+        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
+    };
+    use crate::extension::prelude::USIZE_T;
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
-    use crate::ops::handle::NodeHandle;
-    use crate::{HugrView, Node};
+    use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
+    use crate::types::FunctionType;
+    use crate::{type_row, Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
 
-    fn depth(h: &impl HugrView, n: Node) -> u32 {
+    fn depth(h: &Hugr, n: Node) -> u32 {
         match h.get_parent(n) {
             Some(p) => 1 + depth(h, p),
             None => 0,
@@ -276,6 +297,17 @@ mod test {
     #[test]
     fn test_outline_cfg() {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
+        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        do_outline_cfg_test(&mut h, head, tail, 1);
+        h.validate(&PRELUDE_REGISTRY).unwrap();
+    }
+
+    fn do_outline_cfg_test(
+        h: &mut impl HugrMut,
+        head: BasicBlockID,
+        tail: BasicBlockID,
+        expected_depth: u32,
+    ) {
         let head = head.node();
         let tail = tail.node();
         let parent = h.get_parent(head).unwrap();
@@ -285,26 +317,57 @@ mod test {
         //            |  \-> right -/             |
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
-        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        let merge = h.input_neighbours(tail).exactly_one().ok().unwrap();
         let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
         for n in [head, tail, merge] {
-            assert_eq!(depth(&h, n), 1);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
         let blocks = [head, left, right, merge];
         h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
         for n in blocks {
-            assert_eq!(depth(&h, n), 3);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth + 2);
         }
-        let new_block = h.output_neighbours(entry).exactly_one().unwrap();
+        let new_block = h.output_neighbours(entry).exactly_one().ok().unwrap();
         for n in [entry, exit, tail, new_block] {
-            assert_eq!(depth(&h, n), 1);
+            assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
-        assert_eq!(h.input_neighbours(tail).exactly_one().unwrap(), new_block);
+        assert_eq!(
+            h.input_neighbours(tail).exactly_one().ok().unwrap(),
+            new_block
+        );
         assert_eq!(
             h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
             HashSet::from([exit, new_block])
+        );
+    }
+
+    #[test]
+    fn test_outline_cfg_subregion() {
+        let mut module_builder = ModuleBuilder::new();
+        let mut fbuild = module_builder
+            .define_function(
+                "main",
+                FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]).pure(),
+            )
+            .unwrap();
+        let [i1] = fbuild.input_wires_arr();
+        let mut cfg_builder = fbuild
+            .cfg_builder(
+                [(USIZE_T, i1)],
+                None,
+                type_row![USIZE_T],
+                Default::default(),
+            )
+            .unwrap();
+        let (head, tail) = build_conditional_in_loop(&mut cfg_builder, false).unwrap();
+        let cfg = cfg_builder.finish_sub_container().unwrap();
+        fbuild.finish_with_outputs(cfg.outputs()).unwrap();
+        let mut h = module_builder.finish_prelude_hugr().unwrap();
+        do_outline_cfg_test(
+            &mut SiblingMut::<'_, CfgID>::try_new(&mut h, cfg.node()).unwrap(),
+            head,
+            tail,
+            3,
         );
     }
 
