@@ -670,7 +670,7 @@ mod test {
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::{ExtensionSet, EMPTY_REG};
+    use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
@@ -678,6 +678,7 @@ mod test {
     use crate::types::{FunctionType, Type};
 
     use cool_asserts::assert_matches;
+    use itertools::Itertools;
     use portgraph::NodeIndex;
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -1089,6 +1090,78 @@ mod test {
                 ExtensionSet::new()
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
+        fn mknode(
+            hugr: &mut Hugr,
+            root: Node,
+            sig: FunctionType,
+            ext: ExtensionId,
+        ) -> Result<Node, Box<dyn Error>> {
+            let [node, input, output] = create_with_io(
+                hugr,
+                root,
+                ops::DFG {
+                    signature: sig
+                        .clone()
+                        .with_extension_delta(&ExtensionSet::singleton(&ext)),
+                },
+            )?;
+
+            let lift = hugr.add_node_with_parent(
+                node,
+                NodeType::open_extensions(ops::LeafOp::Lift {
+                    type_row: type_row![NAT],
+                    new_extension: ext,
+                }),
+            )?;
+
+            hugr.connect(input, 0, lift, 0)?;
+            hugr.connect(lift, 0, output, 0)?;
+
+            Ok(node)
+        }
+
+        let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
+
+        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+            signature: df_sig
+                .clone()
+                .with_extension_delta(&ExtensionSet::from_iter([A, B])),
+        }));
+
+        let root = hugr.root();
+        let input = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::Input {
+                types: type_row![NAT],
+            }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::Output {
+                types: type_row![NAT],
+            }),
+        )?;
+
+        let node0 = mknode(&mut hugr, root, df_sig.clone(), A)?;
+        let node1 = mknode(&mut hugr, root, df_sig.clone(), A)?;
+        let node2 = mknode(&mut hugr, root, df_sig.clone(), B)?;
+        let node3 = mknode(&mut hugr, root, df_sig.clone(), B)?;
+        let node4 = mknode(&mut hugr, root, df_sig.clone(), A)?;
+        let node5 = mknode(&mut hugr, root, df_sig.clone(), B)?;
+
+        // Connect nodes in order (0 -> 1 -> 2 ...)
+        let nodes = [input, node0, node1, node2, node3, node4, node5, output];
+        for (src, tgt) in nodes.into_iter().tuple_windows() {
+            hugr.connect(src, 0, tgt, 0)?;
+        }
+
+        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+
         Ok(())
     }
 }
