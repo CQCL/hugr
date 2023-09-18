@@ -307,11 +307,9 @@ impl UnificationContext {
                 let entry = children.next().unwrap();
                 let exit = children.next().unwrap();
                 let m_entry = self.make_or_get_meta(entry, Direction::Incoming);
-                let m_exit_in = self.make_or_get_meta(exit, Direction::Incoming);
-                let m_exit_out = self.make_or_get_meta(exit, Direction::Outgoing);
+                let m_exit = self.make_or_get_meta(exit, Direction::Outgoing);
                 self.add_constraint(m_input, Constraint::Equal(m_entry));
-                self.add_constraint(m_output, Constraint::Equal(m_exit_in));
-                self.add_constraint(m_output, Constraint::Equal(m_exit_out));
+                self.add_constraint(m_output, Constraint::Equal(m_exit));
             }
 
             match node_type.signature() {
@@ -705,7 +703,10 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
-    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+    use crate::extension::{
+        prelude::{PRELUDE_ID, PRELUDE_REGISTRY},
+        ExtensionSet,
+    };
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
@@ -993,20 +994,21 @@ mod test {
         hugr: &mut Hugr,
         parent: Node,
         op: impl Into<OpType>,
+        op_sig: FunctionType,
     ) -> Result<[Node; 3], Box<dyn Error>> {
         let op: OpType = op.into();
-        let input_types = op.signature().input;
-        let output_types = op.signature().output;
 
         let node = hugr.add_node_with_parent(parent, NodeType::open_extensions(op))?;
         let input = hugr.add_node_with_parent(
             node,
-            NodeType::open_extensions(ops::Input { types: input_types }),
+            NodeType::open_extensions(ops::Input {
+                types: op_sig.input,
+            }),
         )?;
         let output = hugr.add_node_with_parent(
             node,
             NodeType::open_extensions(ops::Output {
-                types: output_types,
+                types: op_sig.output,
             }),
         )?;
         Ok([node, input, output])
@@ -1021,7 +1023,12 @@ mod test {
             first_ext: ExtensionId,
             second_ext: ExtensionId,
         ) -> Result<Node, Box<dyn Error>> {
-            let [case, case_in, case_out] = create_with_io(hugr, conditional_node, op)?;
+            let [case, case_in, case_out] = create_with_io(
+                hugr,
+                conditional_node,
+                op.clone(),
+                Into::<OpType>::into(op).signature(),
+            )?;
 
             let lift1 = hugr.add_node_with_parent(
                 case,
@@ -1118,14 +1125,16 @@ mod test {
         let df_nodes: Vec<Node> = vec![A, A, B, B, A, B]
             .into_iter()
             .map(|ext| {
+                let dfg_sig = df_sig
+                    .clone()
+                    .with_extension_delta(&ExtensionSet::singleton(&ext));
                 let [node, input, output] = create_with_io(
                     &mut hugr,
                     root,
                     ops::DFG {
-                        signature: df_sig
-                            .clone()
-                            .with_extension_delta(&ExtensionSet::singleton(&ext)),
+                        signature: dfg_sig.clone(),
                     },
+                    dfg_sig,
                 )
                 .unwrap();
 
@@ -1165,9 +1174,10 @@ mod test {
         hugr: &mut Hugr,
         bb_parent: Node,
         dfb: impl Into<OpType>,
-        op: impl Into<OpType>,
+        dfb_sig: FunctionType,
+        op: impl Into<OpType>, // A single op contained in the DFB, with inputs and outputs wired to it
     ) -> Result<Node, Box<dyn Error>> {
-        let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb)?;
+        let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
         let dfg = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
 
@@ -1175,6 +1185,14 @@ mod test {
         hugr.connect(dfg, 0, bb_out, 0)?;
 
         Ok(bb)
+    }
+
+    fn oneway(ty: Type) -> Vec<Type> {
+        vec![Type::new_predicate([vec![ty]])]
+    }
+
+    fn twoway(ty: Type) -> Vec<Type> {
+        vec![Type::new_predicate([vec![ty.clone()], vec![ty]])]
     }
 
     /// A CFG rooted hugr adding resources at each basic block.
@@ -1207,9 +1225,6 @@ mod test {
         let b = ExtensionSet::singleton(&B);
         let c = ExtensionSet::singleton(&C);
 
-        let oneway = vec![Type::new_predicate([type_row![NAT]])];
-        let twoway = vec![Type::new_predicate([type_row![NAT], type_row![NAT]])];
-
         let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&abc),
         }));
@@ -1225,6 +1240,7 @@ mod test {
                 predicate_variants: vec![type_row![NAT], type_row![NAT]],
                 extension_delta: a.clone(),
             },
+            FunctionType::new(vec![NAT], twoway(NAT)),
         )?;
 
         let exit = hugr.add_node_with_parent(
@@ -1238,7 +1254,7 @@ mod test {
             entry,
             NodeType::open_extensions(make_opaque(
                 A,
-                FunctionType::new(vec![NAT], twoway.clone()).with_extension_delta(&a),
+                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&a),
             )),
         )?;
 
@@ -1251,9 +1267,10 @@ mod test {
                 predicate_variants: vec![type_row![NAT]],
                 extension_delta: bc.clone(),
             },
+            FunctionType::new(vec![NAT], oneway(NAT)),
             make_opaque(
                 B,
-                FunctionType::new(vec![NAT], oneway.clone()).with_extension_delta(&bc),
+                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bc),
             ),
         )?;
 
@@ -1266,9 +1283,10 @@ mod test {
                 predicate_variants: vec![type_row![NAT], type_row![NAT]],
                 extension_delta: b.clone(),
             },
+            FunctionType::new(vec![NAT], twoway(NAT)),
             make_opaque(
                 B,
-                FunctionType::new(vec![NAT], twoway.clone()).with_extension_delta(&b),
+                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&b),
             ),
         )?;
 
@@ -1281,9 +1299,10 @@ mod test {
                 predicate_variants: vec![type_row![NAT]],
                 extension_delta: c.clone(),
             },
+            FunctionType::new(vec![NAT], oneway(NAT)),
             make_opaque(
                 C,
-                FunctionType::new(vec![NAT], oneway.clone()).with_extension_delta(&c),
+                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&c),
             ),
         )?;
 
@@ -1296,9 +1315,10 @@ mod test {
                 predicate_variants: vec![type_row![NAT]],
                 extension_delta: c.clone(),
             },
+            FunctionType::new(vec![NAT], oneway(NAT)),
             make_opaque(
                 C,
-                FunctionType::new(vec![NAT], oneway).with_extension_delta(&c),
+                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&c),
             ),
         )?;
 
@@ -1317,6 +1337,335 @@ mod test {
         hugr.connect(bb11, 0, exit, 0)?;
 
         hugr.infer_extensions()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn multi_entry() -> Result<(), Box<dyn Error>> {
+        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+            signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
+        }));
+        let cfg = hugr.root();
+        let exit = hugr.add_node_with_parent(
+            cfg,
+            NodeType::open_extensions(ops::BasicBlock::Exit {
+                cfg_outputs: type_row![NAT],
+            }),
+        )?;
+        let entry = {
+            let dfb = ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT], type_row![NAT]],
+                extension_delta: ExtensionSet::new(),
+            };
+
+            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+
+            let entry_in = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Input {
+                    types: type_row![NAT],
+                }),
+            )?;
+
+            let entry_out = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Output {
+                    types: twoway(NAT).into(),
+                }),
+            )?;
+
+            let mid = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(make_opaque(
+                    PRELUDE_ID,
+                    FunctionType::new(vec![NAT], twoway(NAT)),
+                )),
+            )?;
+
+            hugr.connect(entry_in, 0, mid, 0)?;
+            hugr.connect(mid, 0, entry_out, 0)?;
+
+            entry
+        };
+
+        let bb0 = make_block(
+            &mut hugr,
+            cfg,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: ExtensionSet::new(),
+            },
+            FunctionType::new(vec![NAT], oneway(NAT)),
+            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+        )?;
+
+        let bb1 = make_block(
+            &mut hugr,
+            cfg,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: ExtensionSet::new(),
+            },
+            FunctionType::new(vec![NAT], oneway(NAT)),
+            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+        )?;
+
+        // Mult
+        let bb2 = make_block(
+            &mut hugr,
+            cfg,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: ExtensionSet::new(),
+            },
+            FunctionType::new(vec![NAT], oneway(NAT)),
+            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+        )?;
+
+        hugr.connect(entry, 0, bb0, 0)?;
+        hugr.connect(entry, 0, bb1, 0)?;
+        hugr.connect(bb0, 0, bb2, 0)?;
+        hugr.connect(bb1, 0, bb2, 0)?;
+        hugr.connect(bb2, 0, exit, 0)?;
+
+        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+
+        Ok(())
+    }
+
+    ///       +-----------+
+    ///  +--->|   Entry   |
+    ///  |    |   (BB0)   |
+    ///  |    |           |
+    ///  |    +-----+-----+
+    ///  |          |
+    ///  |          V
+    ///  |    +------------+
+    ///  |    |    BB1     |
+    ///  |    |            +---+
+    ///  |    +-----+------+   |
+    ///  |          |          |
+    ///  |          V          |
+    ///  |    +------------+   |
+    ///  +----+    BB2     |   |
+    ///       |            |   |
+    ///       +------------+   |
+    ///                        |
+    ///       +------------+   |
+    ///       |    Exit    |   |
+    ///       |            |<--+
+    ///       +------------+
+    ///
+    ///
+    ///
+    fn make_cfg_loop_test(
+        entry_ext: ExtensionSet,
+        bb1_ext: ExtensionSet,
+        bb2_ext: ExtensionSet,
+    ) -> Result<Hugr, Box<dyn Error>> {
+        let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
+
+        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+            signature: FunctionType::new(type_row![NAT], type_row![NAT])
+                .with_extension_delta(&hugr_delta),
+        }));
+
+        let root = hugr.root();
+
+        let exit = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::BasicBlock::Exit {
+                cfg_outputs: type_row![NAT],
+            }),
+        )?;
+
+        let entry = {
+            let dfb: OpType = ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: entry_ext.clone(),
+            }
+            .into();
+
+            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+            let entry_in = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Input {
+                    types: type_row![NAT],
+                }),
+            )?;
+            let entry_out = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Output {
+                    types: oneway(NAT).into(),
+                }),
+            )?;
+
+            let dfg = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(make_opaque(
+                    PRELUDE_ID,
+                    FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&entry_ext),
+                )),
+            )?;
+
+            hugr.connect(entry_in, 0, dfg, 0)?;
+            hugr.connect(dfg, 0, entry_out, 0)?;
+            entry
+        };
+
+        let bb1 = make_block(
+            &mut hugr,
+            root,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT], type_row![NAT]],
+                extension_delta: bb1_ext.clone(),
+            },
+            FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&bb1_ext),
+            make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&bb1_ext),
+            ),
+        )?;
+
+        let bb2 = make_block(
+            &mut hugr,
+            root,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: bb2_ext.clone(),
+            },
+            FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bb2_ext),
+            make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bb2_ext),
+            ),
+        )?;
+
+        hugr.connect(entry, 0, bb1, 0)?;
+        hugr.connect(bb1, 0, bb2, 0)?;
+        hugr.connect(bb1, 0, exit, 0)?;
+        hugr.connect(bb2, 0, entry, 0)?;
+
+        Ok(hugr)
+    }
+
+    #[test]
+    fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
+        let just_a = ExtensionSet::singleton(&A);
+        let variants = vec![
+            (
+                ExtensionSet::new(),
+                ExtensionSet::new(),
+                ExtensionSet::new(),
+            ),
+            (just_a.clone(), ExtensionSet::new(), ExtensionSet::new()),
+            (ExtensionSet::new(), just_a.clone(), ExtensionSet::new()),
+            (ExtensionSet::new(), ExtensionSet::new(), just_a.clone()),
+        ];
+
+        for (bb0, bb1, bb2) in variants.into_iter() {
+            println!("{}, {}, {}", bb0, bb1, bb2);
+            let mut hugr = make_cfg_loop_test(bb0, bb1, bb2)?;
+            hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    /// A control flow graph consisting of an entry node and a single block
+    /// which adds a resource and links to both itself and the exit node.
+    fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
+        let just_a = ExtensionSet::singleton(&A);
+
+        let mut hugr = Hugr::new(NodeType::new(
+            ops::CFG {
+                signature: FunctionType::new(type_row![NAT], type_row![NAT])
+                    .with_extension_delta(&just_a),
+            },
+            just_a.clone(),
+        ));
+
+        let root = hugr.root();
+
+        let exit = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::BasicBlock::Exit {
+                cfg_outputs: type_row![NAT],
+            }),
+        )?;
+
+        let entry = {
+            let dfb: OpType = ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT]],
+                extension_delta: ExtensionSet::new(),
+            }
+            .into();
+
+            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+            let entry_in = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Input {
+                    types: type_row![NAT],
+                }),
+            )?;
+            let entry_out = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(ops::Output {
+                    types: oneway(NAT).into(),
+                }),
+            )?;
+
+            let mid = hugr.add_node_with_parent(
+                entry,
+                NodeType::open_extensions(make_opaque(
+                    PRELUDE_ID,
+                    FunctionType::new(vec![NAT], oneway(NAT)),
+                )),
+            )?;
+
+            hugr.connect(entry_in, 0, mid, 0)?;
+            hugr.connect(mid, 0, entry_out, 0)?;
+            entry
+        };
+
+        let bb = make_block(
+            &mut hugr,
+            root,
+            ops::BasicBlock::DFB {
+                inputs: type_row![NAT],
+                other_outputs: type_row![],
+                predicate_variants: vec![type_row![NAT], type_row![NAT]],
+                extension_delta: just_a.clone(),
+            },
+            FunctionType::new(vec![NAT], twoway(NAT)),
+            make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&just_a),
+            ),
+        )?;
+
+        hugr.connect(entry, 0, bb, 0)?;
+        hugr.connect(bb, 0, bb, 0)?;
+        hugr.connect(bb, 0, exit, 0)?;
+
+        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }
