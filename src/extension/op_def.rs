@@ -3,13 +3,12 @@ use std::collections::hash_map::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use super::type_scheme::OpDefTypeScheme;
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
     TypeParametrised,
 };
 
-use crate::types::SignatureDescription;
+use crate::types::{PolyFuncType, SignatureDescription};
 
 use crate::types::FunctionType;
 
@@ -97,7 +96,7 @@ pub(super) enum SignatureFunc {
     // to serialize well.
     /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
     #[serde(rename = "signature")]
-    TypeScheme(OpDefTypeScheme),
+    TypeScheme(PolyFuncType),
     #[serde(skip)]
     CustomFunc {
         params: Vec<TypeParam>,
@@ -371,7 +370,7 @@ impl Extension {
         description: String,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
-        type_scheme: OpDefTypeScheme,
+        type_scheme: PolyFuncType,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op(
             name,
