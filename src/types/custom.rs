@@ -91,13 +91,12 @@ impl CustomType {
     pub(super) fn substitute(
         &self,
         exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
+        args: &[(TypeArg, TypeParam)],
     ) -> Self {
         let args = self
             .args
             .iter()
-            .map(|arg| arg.substitute(exts, args, decls))
+            .map(|arg| arg.substitute(exts, args))
             .collect::<Vec<_>>();
         let bound = self
             .get_type_def(exts)

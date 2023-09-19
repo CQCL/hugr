@@ -4,6 +4,8 @@
 //!
 //! [OpDef]: super::OpDef
 
+use itertools::Itertools;
+
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::FunctionType;
 
@@ -46,7 +48,14 @@ impl OpDefTypeScheme {
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(extension_registry, args, &self.params))
+        Ok(self.body.substitute(
+            extension_registry,
+            &args
+                .iter()
+                .cloned()
+                .zip_eq(self.params.clone())
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 

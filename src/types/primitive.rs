@@ -58,7 +58,7 @@ impl PolyFuncType {
             // Type vars declared here go at lowest indices (as per DeBruijn)
             v.extend(type_vars.iter().cloned());
             v.extend_from_slice(type_vars);
-            v.as_slice()
+            &v
         };
         self.body.validate(reg, all_type_vars)
     }
@@ -66,41 +66,38 @@ impl PolyFuncType {
     pub(super) fn substitute(
         &self,
         exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
+        args: &[(TypeArg, TypeParam)],
     ) -> Self {
         // For type vars declared here, we'll insert extra TypeArgs (before `args`, as per DeBruijn)
         // being the identity substitution.
-        let mut n_args = vec![];
-        let mut n_decls = vec![];
-        let (all_args, all_decls) = if self.params.is_empty() {
-            (args, decls)
+        let mut v = vec![];
+        let all_args = if self.params.is_empty() {
+            args
         } else {
             // First, our own params
-            n_decls.extend(self.params.iter().cloned());
-            n_args.extend(
+            v.extend(
                 self.params
                     .iter()
                     .cloned()
                     .enumerate()
-                    .map(|(idx, decl)| TypeArg::use_var(idx, decl)),
+                    .map(|(idx, decl)| (TypeArg::use_var(idx, decl.clone()), decl)),
             );
-            // Now copy across outer params
-            n_decls.extend_from_slice(decls);
             // Any variables on the RHS of the substitution must be shifted along too
             // (e.g. if there were "identity substitutions" there before, they are now at different indices)
-            assert_eq!(args.len(), decls.len());
-            let shift = decls
+            let shift = args
                 .iter()
                 .cloned()
                 .enumerate()
-                .map(|(idx, d)| TypeArg::use_var(idx + self.params.len(), d))
+                .map(|(idx, (_, d))| (TypeArg::use_var(idx + self.params.len(), d.clone()), d))
                 .collect::<Vec<_>>();
-            n_args.extend(args.iter().map(|a| a.substitute(exts, &shift, decls)));
-            (n_args.as_slice(), n_decls.as_slice())
+            v.extend(
+                args.iter()
+                    .map(|(a, d)| (a.substitute(exts, &shift), d.clone())),
+            );
+            &v
         };
         Self {
-            body: Box::new(self.body.substitute(exts, all_args, all_decls)),
+            body: Box::new(self.body.substitute(exts, all_args)),
             params: self.params.clone(),
         }
     }

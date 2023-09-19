@@ -76,12 +76,11 @@ impl FunctionType {
     pub(crate) fn substitute(
         &self,
         exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
+        args: &[(TypeArg, TypeParam)],
     ) -> Self {
         FunctionType {
-            input: subst_row(&self.input, exts, args, decls),
-            output: subst_row(&self.output, exts, args, decls),
+            input: subst_row(&self.input, exts, args),
+            output: subst_row(&self.output, exts, args),
             extension_reqs: self.extension_reqs.substitute(args),
         }
     }
