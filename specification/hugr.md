@@ -1733,13 +1733,14 @@ compatibility:
 1. The `main` function takes one `Array<N, Qubit>`
 input and has one output of the same type (the same statically known
 size).
-2. All Operations that have a `FunctionType` involving `Qubit`:
-    1. Have as many `Qubit` input wires as output.
-    2. Guarantee semantics that when filtered to `Qubit` only, there is a
-       bijection such that the _nth_ input maps to the _nth_ output.
+2. All Operations that have a `FunctionType` involving `Qubit` have as
+ many `Qubit` input wires as output.
 
-This means we can treat all `Qubit` operations as returning all qubits they take
-in. If further the program does not contain any `qalloc` or `qfree`
+
+With these constraints, we can treat all `Qubit` operations as returning all qubits they take
+in. The implicit bijection from input `Qubit` to output allows register
+allocation for all `Qubit` wires. 
+If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
 
 ### Higher-order (Tierkreis) Extension
