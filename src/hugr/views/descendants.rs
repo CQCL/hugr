@@ -154,11 +154,6 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
-
-    #[inline]
-    fn get_io(&self, node: Node) -> Option<[Node; 2]> {
-        self.base_hugr().get_io(node)
-    }
 }
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>

@@ -110,9 +110,13 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
-    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
+    pub fn new(
+        def: Arc<OpDef>,
+        args: impl Into<Vec<TypeArg>>,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
         let args = args.into();
-        let signature = def.compute_signature(&args)?;
+        let signature = def.compute_signature(&args, exts)?;
         Ok(Self {
             def,
             args,
@@ -236,7 +240,8 @@ pub fn resolve_extension_ops(
                         ));
                     };
                     let op = ExternalOp::Extension(
-                        ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
+                        ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
+                            .unwrap(),
                     );
                     if let Some(sig) = &opaque.signature {
                         if sig != &op.signature() {
