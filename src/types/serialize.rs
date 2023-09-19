@@ -1,5 +1,4 @@
-use super::primitive::PolyFuncType;
-use super::{SumType, Type, TypeBound, TypeEnum, TypeRow};
+use super::{PolyFuncType, SumType, Type, TypeBound, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 

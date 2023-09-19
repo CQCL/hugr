@@ -2,6 +2,7 @@
 
 mod check;
 pub mod custom;
+mod poly_func;
 mod primitive;
 mod serialize;
 mod signature;
@@ -10,7 +11,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
-pub use primitive::PolyFuncType;
+pub use poly_func::PolyFuncType;
 pub use signature::{FunctionType, Signature, SignatureDescription};
 pub use type_row::TypeRow;
 
