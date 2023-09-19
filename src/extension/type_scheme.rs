@@ -46,7 +46,7 @@ impl OpDefTypeScheme {
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(extension_registry, args))
+        Ok(self.body.substitute(extension_registry, args, &self.params))
     }
 }
 

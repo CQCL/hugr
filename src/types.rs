@@ -322,7 +322,12 @@ impl Type {
     /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
     /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
     /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(crate) fn substitute(
+        &self,
+        exts: &ExtensionRegistry,
+        args: &[TypeArg],
+        decls: &[TypeParam],
+    ) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
@@ -336,19 +341,28 @@ impl Type {
                 None => panic!("No value found for variable"), // No need to support partial substitution for just type schemes
             },
             TypeEnum::Prim(PrimType::Extension(cty)) => {
-                Type::new_extension(cty.substitute(exts, args))
+                Type::new_extension(cty.substitute(exts, args, decls))
             }
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, args)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, args)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, exts, args)),
+            TypeEnum::Prim(PrimType::Function(bf)) => {
+                Type::new_function(bf.substitute(exts, args, decls))
+            }
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, args, decls)),
+            TypeEnum::Sum(SumType::General { row }) => {
+                Type::new_sum(subst_row(row, exts, args, decls))
+            }
         }
     }
 }
 
-fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
+fn subst_row(
+    row: &TypeRow,
+    exts: &ExtensionRegistry,
+    args: &[TypeArg],
+    decls: &[TypeParam],
+) -> TypeRow {
     let res = row
         .iter()
-        .map(|t| t.substitute(exts, args))
+        .map(|t| t.substitute(exts, args, decls))
         .collect::<Vec<_>>()
         .into();
     res

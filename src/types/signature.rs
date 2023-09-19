@@ -73,10 +73,15 @@ impl FunctionType {
         self.extension_reqs.validate(type_vars)
     }
 
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(crate) fn substitute(
+        &self,
+        exts: &ExtensionRegistry,
+        args: &[TypeArg],
+        decls: &[TypeParam],
+    ) -> Self {
         FunctionType {
-            input: subst_row(&self.input, exts, args),
-            output: subst_row(&self.output, exts, args),
+            input: subst_row(&self.input, exts, args, decls),
+            output: subst_row(&self.output, exts, args, decls),
             extension_reqs: self.extension_reqs.substitute(args),
         }
     }
