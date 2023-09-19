@@ -189,11 +189,12 @@ impl TypeArg {
     pub(super) fn substitute(
         &self,
         exts: &ExtensionRegistry,
-        args: &[(TypeArg, TypeParam)],
+        args: &[TypeArg],
+        decls: &[TypeParam],
     ) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
-                ty: ty.substitute(exts, args),
+                ty: ty.substitute(exts, args, decls),
             },
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
@@ -201,11 +202,14 @@ impl TypeArg {
             } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(exts, args), typ);
+                debug_assert_eq!(&typ.substitute(exts, args, decls), typ);
                 self.clone()
             }
             TypeArg::Sequence { elems } => TypeArg::Sequence {
-                elems: elems.iter().map(|ta| ta.substitute(exts, args)).collect(),
+                elems: elems
+                    .iter()
+                    .map(|ta| ta.substitute(exts, args, decls))
+                    .collect(),
             },
             TypeArg::Extensions { es } => TypeArg::Extensions {
                 es: es.substitute(args),
@@ -215,7 +219,6 @@ impl TypeArg {
             } => args
                 .get(*idx)
                 .expect("validate + check_type_args should rule this out")
-                .0
                 .clone(),
         }
     }
