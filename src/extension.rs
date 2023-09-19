@@ -299,9 +299,10 @@ impl Extension {
         &self,
         op_name: &str,
         args: impl Into<Vec<TypeArg>>,
+        ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.get_op(op_name).expect("Op not found.");
-        ExtensionOp::new(op_def.clone(), args)
+        ExtensionOp::new(op_def.clone(), args, ext_reg)
     }
 }
 

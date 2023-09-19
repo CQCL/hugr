@@ -4,7 +4,8 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use super::{
-    Extension, ExtensionBuildError, ExtensionId, ExtensionSet, SignatureError, TypeParametrised,
+    Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
+    TypeParametrised,
 };
 
 use crate::types::SignatureDescription;
@@ -31,6 +32,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         name: &SmolStr,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
+        extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError>;
 
     /// Describe the signature of a node, given the operation name,
@@ -46,6 +48,8 @@ pub trait CustomSignatureFunc: Send + Sync {
     }
 }
 
+// Note this is very much a utility, rather than definitive;
+// one can only do so much without the ExtensionRegistry!
 impl<F> CustomSignatureFunc for F
 where
     F: Fn(&[TypeArg]) -> Result<FunctionType, SignatureError> + Send + Sync,
@@ -55,6 +59,7 @@ where
         _name: &SmolStr,
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
+        _extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         self(arg_values)
     }
@@ -215,14 +220,20 @@ impl OpDef {
 
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
-    pub fn compute_signature(&self, args: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    pub fn compute_signature(
+        &self,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+    ) -> Result<FunctionType, SignatureError> {
         self.check_args(args)?;
         let res = match &self.signature_func {
             SignatureFunc::FromDecl { .. } => {
                 // Sig should be computed solely from inputs + outputs + args.
                 todo!()
             }
-            SignatureFunc::CustomFunc(bf) => bf.compute_signature(&self.name, args, &self.misc)?,
+            SignatureFunc::CustomFunc(bf) => {
+                bf.compute_signature(&self.name, args, &self.misc, exts)?
+            }
         };
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
