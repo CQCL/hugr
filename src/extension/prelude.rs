@@ -7,7 +7,7 @@ use crate::{
     extension::{ExtensionId, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, Type, TypeBound,
+        CustomCheckFailure, CustomType, FunctionType, Type, TypeBound,
     },
     values::{CustomConst, KnownTypeConst},
     Extension,
@@ -36,6 +36,23 @@ lazy_static! {
                 vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 "array".into(),
                 TypeDefBound::FromParams(vec![0]),
+            )
+            .unwrap();
+
+        prelude
+            .add_op_custom_sig_simple(
+                SmolStr::new_inline("new_array"),
+                "Create a new array from elements".to_string(),
+                vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+                |args: &[TypeArg]| {
+                    let [TypeArg::Type { ty }, TypeArg::BoundedNat { n }] = args else {
+                        panic!("should have been checked already.")
+                    };
+                    Ok(FunctionType::new(
+                        vec![ty.clone(); *n as usize],
+                        vec![new_array(ty.clone(), *n)],
+                    ))
+                },
             )
             .unwrap();
 
@@ -116,4 +133,40 @@ impl CustomConst for ConstUsize {
 
 impl KnownTypeConst for ConstUsize {
     const TYPE: CustomType = USIZE_CUSTOM_T;
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        builder::{DFGBuilder, Dataflow, DataflowHugr},
+        extension::EMPTY_REG,
+        ops::LeafOp,
+    };
+
+    use super::*;
+
+    #[test]
+    /// Test building a HUGR involving a new_array operation.
+    fn test_new_array() {
+        let mut b = DFGBuilder::new(FunctionType::new(
+            vec![QB_T, QB_T],
+            vec![new_array(QB_T, 2)],
+        ))
+        .unwrap();
+
+        let [q1, q2] = b.input_wires_arr();
+
+        let op: LeafOp = PRELUDE
+            .instantiate_extension_op(
+                "new_array",
+                vec![TypeArg::Type { ty: QB_T }, TypeArg::BoundedNat { n: 2 }],
+                &EMPTY_REG,
+            )
+            .unwrap()
+            .into();
+
+        let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
+
+        b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+    }
 }
