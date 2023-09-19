@@ -495,6 +495,12 @@ impl UnificationContext {
                 Constraint::Equal(other_meta) => {
                     self.eq_graph.register_eq(meta, *other_meta);
                 }
+                // N.B. If `meta` is already solved, we can't use that
+                // information to solve `other_meta`. This is because the Plus
+                // constraint only signifies a preorder.
+                // I.e. if meta = other_meta + 'R', it's still possible that the
+                // solution is meta = other_meta because we could be adding 'R'
+                // to a set which already contained it.
                 Constraint::Plus(r, other_meta) => {
                     if let Some(rs) = self.get_solution(other_meta) {
                         let mut rrs = rs.clone();
@@ -516,12 +522,6 @@ impl UnificationContext {
                                 solved = true;
                             }
                         };
-                    } else if let Some(_superset) = self.get_solution(&meta) {
-                        // Here, we're stuck because the Plus constraint only
-                        // signifies a preorder. I.e. if m0 = m1 + 'R', it's
-                        // still possible that the solution is m0 = m1 because
-                        // it's possible that we're adding 'R' to a set which
-                        // already contained it.
                     };
                 }
             }
