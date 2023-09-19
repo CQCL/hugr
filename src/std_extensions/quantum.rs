@@ -78,13 +78,13 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::ops::LeafOp;
+    use crate::{extension::EMPTY_REG, ops::LeafOp};
 
     use super::EXTENSION;
 
     fn get_gate(gate_name: &str) -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(gate_name, [])
+            .instantiate_extension_op(gate_name, [], &EMPTY_REG)
             .unwrap()
             .into()
     }

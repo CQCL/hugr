@@ -174,8 +174,9 @@ mod test {
 
     #[test]
     fn test_list_ops() {
+        let reg = &[EXTENSION.to_owned()].into();
         let pop_sig = get_op(&POP_NAME)
-            .compute_signature(&[TypeArg::Type { ty: QB_T }])
+            .compute_signature(&[TypeArg::Type { ty: QB_T }], reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
@@ -191,7 +192,7 @@ mod test {
         assert_eq!(pop_sig.output(), &both_row);
 
         let push_sig = get_op(&PUSH_NAME)
-            .compute_signature(&[TypeArg::Type { ty: FLOAT64_TYPE }])
+            .compute_signature(&[TypeArg::Type { ty: FLOAT64_TYPE }], reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
