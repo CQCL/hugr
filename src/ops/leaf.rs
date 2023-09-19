@@ -242,16 +242,17 @@ mod test {
         let sig_fn =
             |i, o| FunctionType::new(vec![Type::new_function(i)], vec![Type::new_function(o)]);
 
-        let array_max = PolyFuncType {
-            params: vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
-            body: Box::new(FunctionType::new(
+        let array_max = PolyFuncType::new_validated(
+            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+            FunctionType::new(
                 vec![new_array(
                     Type::new_variable(0, TypeBound::Any),
                     TypeArg::use_var(1, TypeParam::max_nat()),
                 )],
                 vec![Type::new_variable(0, TypeBound::Any)],
-            )),
-        };
+            ),
+            &PRELUDE_REGISTRY,
+        )?;
 
         let concrete = FunctionType::new(
             vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
@@ -267,16 +268,17 @@ mod test {
             sig_fn(array_max.clone(), concrete.into())
         );
 
-        let partial = PolyFuncType {
-            params: vec![TypeParam::max_nat()],
-            body: Box::new(FunctionType::new(
+        let partial = PolyFuncType::new_validated(
+            vec![TypeParam::max_nat()],
+            FunctionType::new(
                 vec![new_array(
                     USIZE_T,
                     TypeArg::use_var(0, TypeParam::max_nat()),
                 )],
                 vec![USIZE_T],
-            )),
-        };
+            ),
+            &PRELUDE_REGISTRY,
+        )?;
         let ta = TypeApplication::try_new(array_max.clone(), [USIZE_TA], &PRELUDE_REGISTRY)?;
         assert_eq!(ta.to_leaf().signature(), sig_fn(array_max, partial));
 
@@ -296,22 +298,24 @@ mod test {
                 vec![inner_var.clone()],
             )),
         };
-        let outer = PolyFuncType {
-            params: vec![TypeParam::max_nat()],
-            body: Box::new(FunctionType::new(vec![], vec![Type::new_function(inner)])),
-        };
+        let outer = PolyFuncType::new_validated(
+            vec![TypeParam::max_nat()],
+            FunctionType::new(vec![], vec![Type::new_function(inner)]),
+            &PRELUDE_REGISTRY,
+        )?;
 
         let outer_applied = FunctionType::new(
             vec![],
-            vec![Type::new_function(PolyFuncType {
-                params: vec![TypeParam::Type(TypeBound::Any)],
-                body: Box::new(FunctionType::new(
+            vec![Type::new_function(PolyFuncType::new_validated(
+                vec![TypeParam::Type(TypeBound::Any)],
+                FunctionType::new(
                     // We are checking that the substitution has been applied to the right var
                     // - NOT to the inner_var which has index 0 here
                     vec![new_array(inner_var.clone(), TypeArg::BoundedNat { n: 5 })],
                     vec![inner_var.clone()],
-                )),
-            })],
+                ),
+                &PRELUDE_REGISTRY,
+            )?)],
         );
 
         let do_apply = TypeApplication::try_new(

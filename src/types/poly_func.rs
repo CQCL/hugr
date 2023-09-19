@@ -65,16 +65,16 @@ impl PolyFuncType {
     pub(super) fn validate(
         &self,
         reg: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        external_type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // TODO should we add a mechanism to validate a TypeParam?
         let mut v = vec![];
         let all_type_vars = if self.params.is_empty() {
-            type_vars
+            external_type_vars
         } else {
             // Type vars declared here go at lowest indices (as per DeBruijn)
-            v.extend(type_vars.iter().cloned());
-            v.extend_from_slice(type_vars);
+            v.extend(self.params.iter().cloned());
+            v.extend_from_slice(external_type_vars);
             v.as_slice()
         };
         self.body.validate(reg, all_type_vars)
@@ -164,7 +164,8 @@ mod test {
         // Valid schema...
         let good_array =
             Type::new_extension(ar_def.instantiate_concrete([tyvar.clone(), szvar.clone()])?);
-        let good_ts = PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
+        let good_ts =
+            PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
         good_ts.compute_signature(
@@ -202,7 +203,8 @@ mod test {
             PRELUDE_ID,
             TypeBound::Any,
         ));
-        let bad_ts = PolyFuncType::new_validated(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
+        let bad_ts =
+            PolyFuncType::new_validated(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
