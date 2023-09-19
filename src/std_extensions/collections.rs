@@ -131,9 +131,9 @@ mod test {
     use crate::{
         extension::{
             prelude::{ConstUsize, QB_T, USIZE_T},
-            OpDef,
+            OpDef, PRELUDE,
         },
-        std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         types::{type_param::TypeArg, Type},
         Extension,
     };
@@ -174,7 +174,12 @@ mod test {
 
     #[test]
     fn test_list_ops() {
-        let reg = &[EXTENSION.to_owned()].into();
+        let reg = &[
+            EXTENSION.to_owned(),
+            PRELUDE.to_owned(),
+            float_types::extension(),
+        ]
+        .into();
         let pop_sig = get_op(&POP_NAME)
             .compute_signature(&[TypeArg::Type { ty: QB_T }], reg)
             .unwrap();
