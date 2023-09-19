@@ -8,7 +8,7 @@ use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
 use super::{
     type_param::{TypeArg, TypeParam},
-    TypeBound,
+    Substitution, TypeBound,
 };
 
 /// An opaque type element. Contains the unique identifier of its definition.
@@ -88,16 +88,11 @@ impl CustomType {
             })
     }
 
-    pub(super) fn substitute(
-        &self,
-        exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
-    ) -> Self {
+    pub(super) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         let args = self
             .args
             .iter()
-            .map(|arg| arg.substitute(exts, args, decls))
+            .map(|arg| arg.substitute(exts, sub))
             .collect::<Vec<_>>();
         let bound = self
             .get_type_def(exts)

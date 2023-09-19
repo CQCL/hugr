@@ -13,6 +13,7 @@ use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
 use super::CustomType;
+use super::Substitution;
 use super::Type;
 use super::TypeBound;
 
@@ -186,15 +187,10 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn substitute(
-        &self,
-        exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
-    ) -> Self {
+    pub(super) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
-                ty: ty.substitute(exts, args, decls),
+                ty: ty.substitute(exts, sub),
             },
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
@@ -202,24 +198,18 @@ impl TypeArg {
             } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(exts, args, decls), typ);
+                debug_assert_eq!(&typ.substitute(exts, sub), typ);
                 self.clone()
             }
             TypeArg::Sequence { elems } => TypeArg::Sequence {
-                elems: elems
-                    .iter()
-                    .map(|ta| ta.substitute(exts, args, decls))
-                    .collect(),
+                elems: elems.iter().map(|ta| ta.substitute(exts, sub)).collect(),
             },
             TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(args),
+                es: es.substitute(sub),
             },
             TypeArg::Variable {
-                v: TypeArgVariable { idx, .. },
-            } => args
-                .get(*idx)
-                .expect("validate + check_type_args should rule this out")
-                .clone(),
+                v: TypeArgVariable { idx, cached_decl },
+            } => sub.get(*idx, cached_decl),
         }
     }
 }

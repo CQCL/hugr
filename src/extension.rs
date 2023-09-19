@@ -16,7 +16,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomType, PolyFuncType, TypeBound};
+use crate::types::{CustomType, PolyFuncType, Substitution, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -422,11 +422,11 @@ impl ExtensionSet {
         Ok(())
     }
 
-    pub(crate) fn substitute(&self, args: &[TypeArg]) -> Self {
+    pub(crate) fn substitute(&self, sub: &Substitution) -> Self {
         Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
             None => vec![e.clone()],
-            Some(i) => match args.get(i) {
-                Some(TypeArg::Extensions{es}) => es.iter().cloned().collect::<Vec<_>>(),
+            Some(i) => match sub.get(i, &TypeParam::Extensions) {
+                TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
                 _ => panic!("value for type var was not extension set - type scheme should be validate()d first"),
             },
         }))

@@ -11,8 +11,8 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::Direction;
 
-use super::type_param::{TypeArg, TypeParam};
-use super::{subst_row, Type, TypeRow};
+use super::type_param::TypeParam;
+use super::{subst_row, Substitution, Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -73,16 +73,11 @@ impl FunctionType {
         self.extension_reqs.validate(type_vars)
     }
 
-    pub(crate) fn substitute(
-        &self,
-        exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
-    ) -> Self {
+    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         FunctionType {
-            input: subst_row(&self.input, exts, args, decls),
-            output: subst_row(&self.output, exts, args, decls),
-            extension_reqs: self.extension_reqs.substitute(args),
+            input: subst_row(&self.input, exts, sub),
+            output: subst_row(&self.output, exts, sub),
+            extension_reqs: self.extension_reqs.substitute(sub),
         }
     }
 }

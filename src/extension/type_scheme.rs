@@ -5,7 +5,7 @@
 //! [OpDef]: super::OpDef
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::FunctionType;
+use crate::types::{FunctionType, Substitution};
 
 use super::{ExtensionRegistry, SignatureError};
 
@@ -46,7 +46,9 @@ impl OpDefTypeScheme {
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(extension_registry, args, &self.params))
+        Ok(self
+            .body
+            .substitute(extension_registry, &Substitution::new(args, 0)))
     }
 }
 

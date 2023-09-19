@@ -323,47 +323,80 @@ impl Type {
     /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
     /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
     /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
-    pub(crate) fn substitute(
-        &self,
-        exts: &ExtensionRegistry,
-        args: &[TypeArg],
-        decls: &[TypeParam],
-    ) -> Self {
+    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(*idx) {
-                Some(TypeArg::Type { ty }) => ty.clone(),
-                Some(v) => panic!(
-                    "Value of variable {:?} did not match cached param {}",
-                    v, bound
-                ),
-                None => panic!("No value found for variable"), // No need to support partial substitution for just type schemes
-            },
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => sub.get_type(*idx, *bound),
             TypeEnum::Prim(PrimType::Extension(cty)) => {
-                Type::new_extension(cty.substitute(exts, args, decls))
+                Type::new_extension(cty.substitute(exts, sub))
             }
-            TypeEnum::Prim(PrimType::Function(bf)) => {
-                Type::new_function(bf.substitute(exts, args, decls))
-            }
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, args, decls)),
-            TypeEnum::Sum(SumType::General { row }) => {
-                Type::new_sum(subst_row(row, exts, args, decls))
-            }
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, sub)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, sub)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, exts, sub)),
         }
     }
 }
 
-fn subst_row(
-    row: &TypeRow,
-    exts: &ExtensionRegistry,
-    args: &[TypeArg],
-    decls: &[TypeParam],
-) -> TypeRow {
+#[derive(Clone, Debug)]
+pub(crate) struct Substitution<'a> {
+    /// The number of variables bound more closely than those being substituted,
+    /// so these should be untouched by the substitution
+    leave_lowest: usize,
+    /// The values for the variables being substituted
+    args: &'a [TypeArg],
+    /// The number of greater-indexed variables which should be renumbered downwards
+    /// (by `args.len()` - the variables being substituted are removed from numbering)
+    renumber_down: usize,
+}
+
+impl<'a> Substitution<'a> {
+    pub(crate) fn new(args: &'a [TypeArg], renumber_down: usize) -> Self {
+        Self {
+            leave_lowest: 0,
+            args,
+            renumber_down,
+        }
+    }
+
+    pub(crate) fn get(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        if idx < self.leave_lowest {
+            return TypeArg::use_var(idx - self.renumber_down, decl.clone());
+        }
+        let idx_in_orig_scope = idx - self.leave_lowest;
+        match self.args.get(idx_in_orig_scope) {
+            Some(r) => r.clone(),
+            None => {
+                assert!(
+                    idx_in_orig_scope - self.args.len() < self.renumber_down,
+                    "Unknown var {} in {:?}",
+                    idx,
+                    self
+                );
+                // Use idx (not _in_orig_scope) to avoid leave_lowest indices
+                TypeArg::use_var(idx - self.args.len(), decl.clone())
+            }
+        }
+    }
+
+    fn get_type(&self, idx: usize, bound: TypeBound) -> Type {
+        let TypeArg::Type {ty} = self.get(idx, &TypeParam::Type(bound))
+           else {panic!("Var of kind 'type' did not produce a Type")};
+        ty
+    }
+
+    fn enter_scope(&self, new_vars: usize) -> Self {
+        let mut res = self.clone();
+        res.leave_lowest += new_vars;
+        res
+    }
+}
+
+fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, sub: &Substitution) -> TypeRow {
     let res = row
         .iter()
-        .map(|t| t.substitute(exts, args, decls))
+        .map(|t| t.substitute(exts, sub))
         .collect::<Vec<_>>()
         .into();
     res

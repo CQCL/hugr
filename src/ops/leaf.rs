@@ -7,7 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::types::type_param::{check_type_args, TypeArg};
-use crate::types::PolyFuncType;
+use crate::types::{PolyFuncType, Substitution};
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
@@ -85,20 +85,10 @@ impl TypeApplication {
         // At the moment we allow an identity TypeApply on a monomorphic function type.
         let (fixed, remaining) = input.params.split_at(args.len());
         check_type_args(&args, fixed)?;
-        let mut v = vec![];
-        let subst = if remaining.len() == 0 {
-            &args
-        } else {
-            v.extend(args.clone());
-            // Any remaining type params, we renumber to start at 0
-            for (idx, d) in remaining.iter().enumerate() {
-                v.push(TypeArg::use_var(idx, d.clone()));
-            }
-            &v
-        };
-        let body = input
-            .body
-            .substitute(extension_registry, subst, &input.params);
+        let body = input.body.substitute(
+            extension_registry,
+            &Substitution::new(&args, remaining.len()),
+        );
         let params = Vec::from(remaining);
         Ok(Self {
             input,
