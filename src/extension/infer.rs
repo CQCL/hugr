@@ -1045,36 +1045,6 @@ mod test {
 
     #[test]
     fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
-        fn mknode(
-            hugr: &mut Hugr,
-            root: Node,
-            sig: FunctionType,
-            ext: ExtensionId,
-        ) -> Result<Node, Box<dyn Error>> {
-            let [node, input, output] = create_with_io(
-                hugr,
-                root,
-                ops::DFG {
-                    signature: sig
-                        .clone()
-                        .with_extension_delta(&ExtensionSet::singleton(&ext)),
-                },
-            )?;
-
-            let lift = hugr.add_node_with_parent(
-                node,
-                NodeType::open_extensions(ops::LeafOp::Lift {
-                    type_row: type_row![NAT],
-                    new_extension: ext,
-                }),
-            )?;
-
-            hugr.connect(input, 0, lift, 0)?;
-            hugr.connect(lift, 0, output, 0)?;
-
-            Ok(node)
-        }
-
         let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
 
         let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
@@ -1097,15 +1067,40 @@ mod test {
             }),
         )?;
 
-        let node0 = mknode(&mut hugr, root, df_sig.clone(), A)?;
-        let node1 = mknode(&mut hugr, root, df_sig.clone(), A)?;
-        let node2 = mknode(&mut hugr, root, df_sig.clone(), B)?;
-        let node3 = mknode(&mut hugr, root, df_sig.clone(), B)?;
-        let node4 = mknode(&mut hugr, root, df_sig.clone(), A)?;
-        let node5 = mknode(&mut hugr, root, df_sig.clone(), B)?;
+        // Make identical dataflow nodes which add extension requirement "A" or "B"
+        let df_nodes: Vec<Node> = vec![A, A, B, B, A, B]
+            .into_iter()
+            .map(|ext| {
+                let [node, input, output] = create_with_io(
+                    &mut hugr,
+                    root,
+                    ops::DFG {
+                        signature: df_sig
+                            .clone()
+                            .with_extension_delta(&ExtensionSet::singleton(&ext)),
+                    },
+                )
+                .unwrap();
+
+                let lift = hugr
+                    .add_node_with_parent(
+                        node,
+                        NodeType::open_extensions(ops::LeafOp::Lift {
+                            type_row: type_row![NAT],
+                            new_extension: ext,
+                        }),
+                    )
+                    .unwrap();
+
+                hugr.connect(input, 0, lift, 0).unwrap();
+                hugr.connect(lift, 0, output, 0).unwrap();
+
+                node
+            })
+            .collect();
 
         // Connect nodes in order (0 -> 1 -> 2 ...)
-        let nodes = [input, node0, node1, node2, node3, node4, node5, output];
+        let nodes = [vec![input], df_nodes, vec![output]].concat();
         for (src, tgt) in nodes.into_iter().tuple_windows() {
             hugr.connect(src, 0, tgt, 0)?;
         }
