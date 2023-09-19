@@ -89,17 +89,18 @@ impl CustomType {
     }
 
     pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+        let args = self
+            .args
+            .iter()
+            .map(|arg| arg.substitute(exts, args))
+            .collect::<Vec<_>>();
         let bound = self
             .get_type_def(exts)
             .expect("validate should rule this out")
-            .bound(args);
+            .bound(&args);
         assert!(self.bound.contains(bound));
         Self {
-            args: self
-                .args
-                .iter()
-                .map(|arg| arg.substitute(exts, args))
-                .collect(),
+            args,
             bound,
             ..self.clone()
         }

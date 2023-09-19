@@ -58,8 +58,8 @@ mod test {
 
     use crate::extension::prelude::{PRELUDE_ID, USIZE_T};
     use crate::extension::{
-        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound,
-        TypeParametrised, PRELUDE, PRELUDE_REGISTRY,
+        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, TypeParametrised, PRELUDE,
+        PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
