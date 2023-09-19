@@ -12,7 +12,7 @@ use crate::types::{PolyFuncType, SignatureDescription};
 
 use crate::types::FunctionType;
 
-use crate::types::type_param::TypeArg;
+use crate::types::type_param::{check_type_args, TypeArg};
 
 use crate::ops::custom::OpaqueOp;
 
@@ -33,7 +33,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError>;
+    ) -> Result<PolyFuncType, SignatureError>;
 
     /// Describe the signature of a node, given the operation name,
     /// values for the type parameters,
@@ -50,9 +50,9 @@ pub trait CustomSignatureFunc: Send + Sync {
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F> CustomSignatureFunc for F
+impl<F, R: Into<PolyFuncType>> CustomSignatureFunc for F
 where
-    F: Fn(&[TypeArg]) -> Result<FunctionType, SignatureError> + Send + Sync,
+    F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync,
 {
     fn compute_signature(
         &self,
@@ -60,8 +60,8 @@ where
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
         _extension_registry: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
-        self(arg_values)
+    ) -> Result<PolyFuncType, SignatureError> {
+        Ok(self(arg_values)?.into())
     }
 }
 
@@ -99,7 +99,11 @@ pub(super) enum SignatureFunc {
     TypeScheme(PolyFuncType),
     #[serde(skip)]
     CustomFunc {
-        params: Vec<TypeParam>,
+        /// All type parameters (both those passed to [func] and any passed
+        /// to the PolyFuncType returned by that)
+        all_params: Vec<TypeParam>,
+        /// The number (of `all_params`) that are passed to [self::func]
+        num_static_params: usize,
         func: Box<dyn CustomSignatureFunc>,
     },
 }
@@ -222,13 +226,24 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let res = match &self.signature_func {
-            SignatureFunc::TypeScheme(ts) => ts.compute_signature(args, exts),
-            SignatureFunc::CustomFunc { func, .. } => {
-                self.check_args(args)?;
-                func.compute_signature(&self.name, args, &self.misc, exts)
+        let temp: Option<PolyFuncType>; // to keep alive
+        let (pf, args) = match &self.signature_func {
+            SignatureFunc::TypeScheme(ts) => (ts, args),
+            SignatureFunc::CustomFunc {
+                all_params,
+                num_static_params,
+                func,
+            } => {
+                check_type_args(args, all_params)?;
+                let (binary_args, ts_args) = args.split_at(*num_static_params);
+                let ts = func.compute_signature(&self.name, binary_args, &self.misc, exts)?;
+                assert_eq!(ts.params, all_params.iter().skip(*num_static_params).cloned().collect::<Vec<_>>(),
+                    "Custom binary function returned polymorphic type scheme whose parameters did not match");
+                temp = Some(ts);
+                (temp.as_ref().unwrap(), ts_args)
             }
-        }?;
+        };
+        let res = pf.compute_signature(args, exts)?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
@@ -291,7 +306,7 @@ impl OpDef {
     pub fn params(&self) -> &[TypeParam] {
         match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => &ts.params,
-            SignatureFunc::CustomFunc { params, .. } => params,
+            SignatureFunc::CustomFunc { all_params, .. } => all_params,
         }
     }
 }
@@ -326,36 +341,40 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
+        params: (Vec<TypeParam>, Vec<TypeParam>),
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
+        let mut all_params = params.0;
+        let num_static_params = all_params.len();
+        all_params.extend(params.1);
         self.add_op(
             name,
             description,
             misc,
             lower_funcs,
             SignatureFunc::CustomFunc {
-                params,
+                all_params,
+                num_static_params,
                 func: Box::new(signature_func),
             },
         )
     }
 
-    /// Create an OpDef with custom binary code to compute the signature, and no "misc" or "lowering
-    /// functions" defined.
+    /// Create an OpDef with custom binary code to compute the signature,
+    /// which is not polymorphic; and no "misc" or "lowering functions" defined.
     pub fn add_op_custom_sig_simple(
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
+        static_params: Vec<TypeParam>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op_custom_sig(
             name,
             description,
-            params,
+            (static_params, vec![]),
             HashMap::default(),
             Vec::new(),
             signature_func,
