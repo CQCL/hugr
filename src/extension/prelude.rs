@@ -5,6 +5,7 @@ use smol_str::SmolStr;
 
 use crate::{
     extension::{ExtensionId, TypeDefBound},
+    ops::LeafOp,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, Type, TypeBound,
@@ -13,7 +14,7 @@ use crate::{
     Extension,
 };
 
-use super::ExtensionRegistry;
+use super::{ExtensionRegistry, EMPTY_REG};
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
@@ -41,7 +42,7 @@ lazy_static! {
 
         prelude
             .add_op_custom_sig_simple(
-                SmolStr::new_inline("new_array"),
+                SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
                 vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 |args: &[TypeArg]| {
@@ -50,7 +51,7 @@ lazy_static! {
                     };
                     Ok(FunctionType::new(
                         vec![ty.clone(); *n as usize],
-                        vec![new_array(ty.clone(), *n)],
+                        vec![array_type(ty.clone(), *n)],
                     ))
                 },
             )
@@ -88,7 +89,7 @@ pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 pub const BOOL_T: Type = Type::new_simple_predicate(2);
 
 /// Initialize a new array of type `typ` of length `size`
-pub fn new_array(typ: Type, size: u64) -> Type {
+pub fn array_type(typ: Type, size: u64) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
         .instantiate_concrete(vec![
@@ -97,6 +98,21 @@ pub fn new_array(typ: Type, size: u64) -> Type {
         ])
         .unwrap();
     Type::new_extension(custom_t)
+}
+
+/// Name of the operation in the prelude for creating new arrays.
+pub const NEW_ARRAY_OP_ID: &str = "new_array";
+
+/// Initialize a new array op of type `typ` of length `size`
+pub fn new_array_op(typ: Type, size: u64) -> LeafOp {
+    PRELUDE
+        .instantiate_extension_op(
+            NEW_ARRAY_OP_ID,
+            vec![TypeArg::Type { ty: typ }, TypeArg::BoundedNat { n: size }],
+            &EMPTY_REG,
+        )
+        .unwrap()
+        .into()
 }
 
 pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
@@ -137,11 +153,7 @@ impl KnownTypeConst for ConstUsize {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::EMPTY_REG,
-        ops::LeafOp,
-    };
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
 
     use super::*;
 
@@ -150,20 +162,13 @@ mod test {
     fn test_new_array() {
         let mut b = DFGBuilder::new(FunctionType::new(
             vec![QB_T, QB_T],
-            vec![new_array(QB_T, 2)],
+            vec![array_type(QB_T, 2)],
         ))
         .unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 
-        let op: LeafOp = PRELUDE
-            .instantiate_extension_op(
-                "new_array",
-                vec![TypeArg::Type { ty: QB_T }, TypeArg::BoundedNat { n: 2 }],
-                &EMPTY_REG,
-            )
-            .unwrap()
-            .into();
+        let op = new_array_op(QB_T, 2);
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
