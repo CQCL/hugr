@@ -97,7 +97,7 @@ impl Rewrite for SimpleReplacement {
 
             // Move the metadata
             let meta: &NodeMetadata = self.replacement.get_metadata(node);
-            h.set_metadata(node, meta.clone()).unwrap();
+            h.set_metadata(new_node, meta.clone()).unwrap();
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
