@@ -8,6 +8,8 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use std::marker::PhantomData;
+
 pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
 pub use sibling::SiblingGraph;
@@ -303,6 +305,29 @@ pub trait HugrView: sealed::HugrInternals {
     }
 }
 
+/// A view of the whole Hugr.
+/// (Just provides static checking of the type of the root node)
+pub struct WholeHugrView<'a, Root = Node>(&'a Hugr, PhantomData<Root>);
+
+impl<'a, Root: NodeHandle> WholeHugrView<'a, Root> {
+    /// Create a hierarchical view of a whole HUGR
+    ///
+    /// # Errors
+    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    pub fn try_new(hugr: &'a Hugr) -> Result<Self, HugrError> {
+        if !Root::TAG.is_superset(hugr.root_type().tag()) {
+            return Err(HugrError::InvalidNode(hugr.root()));
+        }
+        Ok(Self(hugr, PhantomData))
+    }
+}
+
+impl<'a, Root> AsRef<Hugr> for WholeHugrView<'a, Root> {
+    fn as_ref(&self) -> &Hugr {
+        self.0
+    }
+}
+
 /// A common trait for views of a HUGR hierarchical subgraph.
 pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
@@ -461,5 +486,24 @@ pub(crate) mod sealed {
         fn root_node(&self) -> Node {
             self.as_ref().root.into()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{NodeType, WholeHugrView};
+    use crate::ops::handle::{CfgID, DfgID};
+    use crate::{hugr::HugrError, ops, types::FunctionType, Hugr, HugrView};
+
+    #[test]
+    fn whole_hugr_view() {
+        let h = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(vec![], vec![]),
+        }));
+        let cfg_v = WholeHugrView::<CfgID>::try_new(&h);
+        assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
+        let dfg_v = WholeHugrView::<DfgID>::try_new(h).unwrap();
+        // Just to check that WholeHugrView is a HugrView:
+        assert_eq!(dfg_v.all_neighbours(dfg_v.root()).collect(), vec![]);
     }
 }
