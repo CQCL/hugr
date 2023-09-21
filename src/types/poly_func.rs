@@ -106,7 +106,7 @@ impl PolyFuncType {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::num::NonZeroU64;
 
     use smol_str::SmolStr;
@@ -321,5 +321,106 @@ mod test {
             &[TypeParam::max_nat()],
         )?;
         Ok(())
+    }
+
+    fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncType {
+        PolyFuncType {
+            params: vec![param],
+            body: Box::new(FunctionType::new(vec![input], vec![output])),
+        }
+    }
+
+    // The standard library new_array does not allow passing in a variable for size.
+    pub(crate) fn new_array(ty: Type, s: TypeArg) -> Type {
+        let array_def = PRELUDE.get_type("array").unwrap();
+        Type::new_extension(
+            array_def
+                .instantiate_concrete(vec![TypeArg::Type { ty }, s])
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn substitute_under_binder() {
+        let list_def = EXTENSION.get_type(LIST_TYPENAME.as_str()).unwrap();
+        let list_of_tup = |t1, t2| {
+            Type::new_extension(
+                list_def
+                    .instantiate_concrete([TypeArg::Type {
+                        ty: Type::new_tuple(vec![t1, t2]),
+                    }])
+                    .unwrap(),
+            )
+        };
+        let reg = [EXTENSION.to_owned()].into();
+        let pf = PolyFuncType::new_validated(
+            vec![TypeParam::Type(TypeBound::Any)],
+            FunctionType::new(
+                vec![Type::new_variable(0, TypeBound::Any)],
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_variable(0, TypeBound::Copyable),
+                    list_of_tup(
+                        Type::new_variable(0, TypeBound::Copyable),
+                        Type::new_variable(1, TypeBound::Any), // The outer variable (renumbered)
+                    ),
+                ))],
+            ),
+            &reg,
+        )
+        .unwrap();
+
+        // Now substitute in a free var from further outside
+        const FREE: usize = 3;
+        const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
+        let res = pf
+            .compute_signature(&[TypeArg::use_var(FREE, TP_EQ)], &reg)
+            .unwrap();
+        assert_eq!(
+            res,
+            FunctionType::new(
+                vec![Type::new_variable(FREE, TypeBound::Eq)],
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_variable(0, TypeBound::Copyable), // unchanged
+                    list_of_tup(
+                        Type::new_variable(0, TypeBound::Copyable),
+                        // Next is the free variable that we substituted in (hence Eq)
+                        // - renumbered because of the intervening forall (Copyable)
+                        Type::new_variable(FREE, TypeBound::Eq) // ALAN XXX this should be 4
+                    )
+                ))]
+            )
+        );
+
+        // Also try substituting in a type containing both free and bound vars
+        let rhs = |i| {
+            Type::new_function(new_pf1(
+                TP_EQ,
+                Type::new_variable(0, TypeBound::Eq),
+                new_array(
+                    Type::new_variable(0, TypeBound::Eq),
+                    TypeArg::use_var(i, TypeParam::max_nat()),
+                ),
+            ))
+        };
+
+        let res = pf
+            .compute_signature(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .unwrap();
+        assert_eq!(
+            res,
+            FunctionType::new(
+                vec![rhs(FREE)],
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_variable(0, TypeBound::Copyable),
+                    list_of_tup(
+                        Type::new_variable(0, TypeBound::Copyable), // not renumbered...
+                        rhs(FREE)                                   // ALAN XXX should be using 4
+                    )
+                ))]
+            )
+        )
     }
 }
