@@ -174,7 +174,7 @@ mod test {
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
                     used: TypeParam::Type(TypeBound::Copyable),
-                    decl: Some(decl)
+                    decl
                 })
             );
         }
@@ -182,9 +182,9 @@ mod test {
         let invalid_ts = OpDefTypeScheme::new([], body_type, &reg);
         assert_eq!(
             invalid_ts.err(),
-            Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                used: TypeParam::Type(TypeBound::Copyable),
-                decl: None
+            Some(SignatureError::FreeTypeVar {
+                idx: 0,
+                num_decls: 0
             })
         );
 

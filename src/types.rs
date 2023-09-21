@@ -294,14 +294,7 @@ impl Type {
             }
             TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, type_vars),
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
-                if type_vars.get(*idx) == Some(&TypeParam::Type(*bound)) {
-                    Ok(())
-                } else {
-                    Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                        decl: type_vars.get(*idx).cloned(),
-                        used: TypeParam::Type(*bound),
-                    })
-                }
+                check_typevar_decl(type_vars, *idx, &TypeParam::Type(*bound))
             }
         }
     }
@@ -352,6 +345,29 @@ fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeR
         .collect::<Vec<_>>()
         .into();
     res
+}
+
+pub(crate) fn check_typevar_decl(
+    decls: &[TypeParam],
+    idx: usize,
+    used_as: &TypeParam,
+) -> Result<(), SignatureError> {
+    match decls.get(idx) {
+        None => Err(SignatureError::FreeTypeVar {
+            idx,
+            num_decls: decls.len(),
+        }),
+        Some(decl) => {
+            if decl == used_as {
+                Ok(())
+            } else {
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    used: used_as.clone(),
+                    decl: decl.clone(),
+                })
+            }
+        }
+    }
 }
 
 /// Return the type row of variants required to define a Sum of Tuples type
