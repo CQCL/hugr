@@ -15,6 +15,10 @@ use itertools::Itertools;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
+use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder};
+use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+use crate::hugr::{HugrError, HugrMut};
+use crate::types::Signature;
 use crate::{
     ops::{
         handle::{ContainerHandle, DataflowOpID},
@@ -122,7 +126,7 @@ impl SiblingSubgraph {
     /// ## Definition
     ///
     /// More formally, the sibling subgraph of a graph $G = (V, E)$ given
-    /// by sets of incoming and outoing boundary edges $B_I, B_O \subseteq E$
+    /// by sets of incoming and outgoing boundary edges $B_I, B_O \subseteq E$
     /// is the graph given by the connected components of the graph
     /// $G' = (V, E \ B_I \ B_O)$ that contain at least one node that is either
     ///  - the target of an incoming boundary edge, or
@@ -386,6 +390,61 @@ impl SiblingSubgraph {
             nu_out,
         ))
     }
+
+    /// Create a new Hugr containing only the subgraph.
+    ///
+    /// The new Hugr will contain a function root wth the same signature as the
+    /// subgraph and the specified `input_extensions`.
+    pub fn extract_subgraph(
+        &self,
+        hugr: &impl HugrView,
+        name: impl Into<String>,
+        input_extensions: ExtensionSet,
+    ) -> Result<Hugr, HugrError> {
+        let signature = Signature {
+            signature: self.signature(hugr),
+            input_extensions,
+        };
+        let builder = FunctionBuilder::new(name, signature).unwrap();
+        let inputs = builder.input_wires();
+        let mut extracted = builder
+            .finish_hugr_with_outputs(inputs, &PRELUDE_REGISTRY)
+            .unwrap();
+        let node_map = extracted
+            .insert_subgraph(extracted.root(), hugr, self)?
+            .node_map;
+
+        // Disconnect the input and output nodes, and connect the inserted nodes
+        // in-between.
+        let [inp, out] = extracted.get_io(extracted.root()).unwrap();
+        for (inp_port, repl_ports) in extracted
+            .node_ports(inp, Direction::Outgoing)
+            .zip(self.inputs.iter())
+        {
+            extracted.disconnect(inp, inp_port)?;
+            for (repl_node, repl_port) in repl_ports {
+                extracted.connect(
+                    inp,
+                    inp_port.index(),
+                    node_map[repl_node],
+                    repl_port.index(),
+                )?;
+            }
+        }
+        for (out_port, (repl_node, repl_port)) in extracted
+            .node_ports(out, Direction::Incoming)
+            .zip(self.outputs.iter())
+        {
+            extracted.connect(
+                node_map[repl_node],
+                repl_port.index(),
+                out,
+                out_port.index(),
+            )?;
+        }
+
+        Ok(extracted)
+    }
 }
 
 /// Precompute convexity information for a HUGR.
@@ -590,6 +649,8 @@ pub enum InvalidSubgraph {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -820,5 +881,18 @@ mod tests {
             panic!()
         };
         assert_eq!(func_defn.signature, func.signature(&func_graph))
+    }
+
+    #[test]
+    fn extract_subgraph() -> Result<(), Box<dyn Error>> {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let func_graph: SiblingGraph<'_, FuncID<true>> =
+            SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
+        let extracted = subgraph.extract_subgraph(&hugr, "region", ExtensionSet::new())?;
+
+        extracted.validate(&PRELUDE_REGISTRY).unwrap();
+
+        Ok(())
     }
 }

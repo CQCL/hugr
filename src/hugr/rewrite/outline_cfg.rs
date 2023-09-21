@@ -143,7 +143,7 @@ impl Rewrite for OutlineCfg {
                 .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
                 .unwrap();
             (
-                ins_res.new_root,
+                ins_res.new_root.unwrap(),
                 *ins_res.node_map.get(&cfg.node()).unwrap(),
             )
         };
