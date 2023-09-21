@@ -416,6 +416,9 @@ impl ExtensionSet {
 }
 
 fn as_typevar(e: &ExtensionId) -> Option<usize> {
+    // Type variables are represented as radix-10 numbers, which are illegal
+    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
+    // we assume it must be a type variable, and fail fast if it isn't.
     match e.chars().next() {
         Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
         _ => None,
