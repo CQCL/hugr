@@ -59,7 +59,7 @@ mod test {
 
     use smol_str::SmolStr;
 
-    use crate::extension::prelude::{PRELUDE_ID, USIZE_T};
+    use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, TypeParametrised, PRELUDE,
         PRELUDE_REGISTRY,
@@ -167,7 +167,8 @@ mod test {
         for decl in [
             TypeParam::Extensions,
             TypeParam::List(Box::new(TypeParam::max_nat())),
-            TypeParam::Type(TypeBound::Any),
+            TypeParam::Opaque(USIZE_CUSTOM_T),
+            TypeParam::Tuple(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()]),
         ] {
             let invalid_ts = OpDefTypeScheme::new([decl.clone()], body_type.clone(), &reg);
             assert_eq!(
