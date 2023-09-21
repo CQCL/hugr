@@ -101,7 +101,7 @@ impl PolyFuncType {
         check_type_args(args, &self.params)?;
         Ok(self
             .body
-            .substitute(extension_registry, &Substitution::new(args, 0)))
+            .substitute(extension_registry, &Substitution::new(args)))
     }
 }
 

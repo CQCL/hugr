@@ -347,38 +347,25 @@ pub(crate) struct Substitution<'a> {
     leave_lowest: usize,
     /// The values for the variables being substituted
     args: &'a [TypeArg],
-    /// The number of greater-indexed variables which should be renumbered downwards
-    /// (by `args.len()` - the variables being substituted are removed from numbering)
-    renumber_down: usize,
 }
 
 impl<'a> Substitution<'a> {
-    pub(crate) fn new(args: &'a [TypeArg], renumber_down: usize) -> Self {
+    pub(crate) fn new(args: &'a [TypeArg]) -> Self {
         Self {
             leave_lowest: 0,
             args,
-            renumber_down,
         }
     }
 
     pub(crate) fn get(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         if idx < self.leave_lowest {
-            return TypeArg::use_var(idx - self.renumber_down, decl.clone());
+            return TypeArg::use_var(idx, decl.clone());
         }
         let idx_in_orig_scope = idx - self.leave_lowest;
-        match self.args.get(idx_in_orig_scope) {
-            Some(r) => r.clone(),
-            None => {
-                assert!(
-                    idx_in_orig_scope - self.args.len() < self.renumber_down,
-                    "Unknown var {} in {:?}",
-                    idx,
-                    self
-                );
-                // Use idx (not _in_orig_scope) to avoid leave_lowest indices
-                TypeArg::use_var(idx - self.args.len(), decl.clone())
-            }
-        }
+        self.args
+            .get(idx_in_orig_scope)
+            .expect("Unexpected free type var")
+            .clone()
     }
 
     fn get_type(&self, idx: usize, bound: TypeBound) -> Type {
