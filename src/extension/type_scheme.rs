@@ -107,8 +107,7 @@ mod test {
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
-        let tyvar = TypeArg::use_var(0, typarams[0].clone());
-        let szvar = TypeArg::use_var(1, typarams[1].clone());
+        let [tyvar, szvar] = [0, 1].map(|i| TypeArg::use_var(i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
         let good_array =
