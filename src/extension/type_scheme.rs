@@ -46,6 +46,9 @@ impl OpDefTypeScheme {
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?;
+        // Hugr's are monomorphic, so check the args have no free variables
+        args.iter()
+            .try_for_each(|ta| ta.validate(extension_registry, &[]))?;
         Ok(self.body.substitute(extension_registry, args))
     }
 }
