@@ -221,6 +221,23 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
+        let mut checker = ConvexChecker::new(hugr);
+        Self::try_from_nodes_with_checker(nodes, hugr, &mut checker)
+    }
+
+    /// Create a subgraph from a set of nodes.
+    ///
+    /// Provide a [`ConvexChecker`] instance to avoid constructing one for
+    /// faster convexity check. If you do not have one, use
+    /// [`SiblingSubgraph::try_from_nodes`].
+    ///
+    /// Refer to [`SiblingSubgraph::try_from_nodes`] for the full
+    /// documentation.
+    pub fn try_from_nodes_with_checker<'c, 'h: 'c, H: HugrView>(
+        nodes: impl Into<Vec<Node>>,
+        hugr: &'h H,
+        checker: &'c mut ConvexChecker<'h, H>,
+    ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
@@ -251,7 +268,7 @@ impl SiblingSubgraph {
                 !nodes_set.contains(&in_n)
             })
             .collect_vec();
-        Self::try_new(inputs, outputs, hugr)
+        Self::try_new_with_checker(inputs, outputs, hugr, checker)
     }
 
     /// An iterator over the nodes in the subgraph.
