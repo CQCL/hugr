@@ -17,7 +17,7 @@ pub struct OpDefTypeScheme {
     /// The declared type parameters, i.e., every instantiation ([ExternalOp]) must provide [TypeArg]s for these
     ///
     /// [ExternalOp]: crate::ops::custom::ExternalOp
-    pub params: Vec<TypeParam>,
+    pub(super) params: Vec<TypeParam>,
     /// Template for the Op type. May contain variables up to length of [OpDefTypeScheme::params]
     body: FunctionType,
 }
