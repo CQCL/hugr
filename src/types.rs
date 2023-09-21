@@ -276,6 +276,13 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, and that for each [CustomType] the corresponding
+    /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
+    /// [validate] and fit into the def's declared parameters.
+    ///
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,

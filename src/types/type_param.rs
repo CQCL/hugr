@@ -147,6 +147,8 @@ impl TypeArg {
         }
     }
 
+    /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
+    /// is valid and closed.
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
