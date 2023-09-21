@@ -84,7 +84,7 @@ impl PolyFuncType {
         Self {
             body: Box::new(
                 self.body
-                    .substitute(exts, &sub.enter_scope(self.params.len())),
+                    .substitute(exts, &sub.enter_scope(self.params.len(), exts)),
             ),
             params: self.params.clone(),
         }
@@ -101,7 +101,7 @@ impl PolyFuncType {
         check_type_args(args, &self.params)?;
         Ok(self
             .body
-            .substitute(extension_registry, &Substitution::new(args)))
+            .substitute(extension_registry, &Substitution::new(args.to_vec())))
     }
 }
 
@@ -371,6 +371,7 @@ pub(crate) mod test {
         .unwrap();
 
         // Now substitute in a free var from further outside
+        let reg = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
         const FREE: usize = 3;
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = pf
@@ -387,7 +388,7 @@ pub(crate) mod test {
                         Type::new_variable(0, TypeBound::Copyable),
                         // Next is the free variable that we substituted in (hence Eq)
                         // - renumbered because of the intervening forall (Copyable)
-                        Type::new_variable(FREE, TypeBound::Eq) // ALAN XXX this should be 4
+                        Type::new_variable(FREE + 1, TypeBound::Eq)
                     )
                 ))]
             )
@@ -417,7 +418,7 @@ pub(crate) mod test {
                     Type::new_variable(0, TypeBound::Copyable),
                     list_of_tup(
                         Type::new_variable(0, TypeBound::Copyable), // not renumbered...
-                        rhs(FREE)                                   // ALAN XXX should be using 4
+                        rhs(FREE + 1)                               // renumbered
                     )
                 ))]
             )

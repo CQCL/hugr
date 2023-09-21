@@ -85,21 +85,14 @@ impl TypeApplication {
         // At the moment we allow an identity TypeApply on a monomorphic function type.
         let (fixed, remaining) = input.params.split_at(args.len());
         check_type_args(&args, fixed)?;
-        let mut temp; // to keep alive
-        let sub = if remaining.len() == 0 {
-            &args
-        } else {
-            // Partial application. Renumber remaining params downward
-            let mut v = args.clone();
-            v.extend(
-                remaining
-                    .iter()
-                    .enumerate()
-                    .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
-            );
-            temp = Some(v);
-            temp.as_mut().unwrap()
-        };
+        let mut sub = args.clone();
+        // If partial application, renumber remaining params downward
+        sub.extend(
+            remaining
+                .iter()
+                .enumerate()
+                .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
+        );
         let body = input
             .body
             .substitute(extension_registry, &Substitution::new(sub));

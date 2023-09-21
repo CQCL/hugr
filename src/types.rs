@@ -17,7 +17,7 @@ pub use type_row::TypeRow;
 
 use derive_more::{From, Into};
 use itertools::FoldWhile::{Continue, Done};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
@@ -341,19 +341,22 @@ impl Type {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Substitution<'a> {
+pub(crate) struct Substitution {
     /// The number of variables bound more closely than those being substituted,
     /// so these should be untouched by the substitution
     leave_lowest: usize,
-    /// The values for the variables being substituted
-    args: &'a [TypeArg],
+    /// Either
+    /// * the values for the variables being substituted, or
+    /// * a `usize` to indicate ALL free vars are mapped to vars
+    ///   whose index incremented by that amount
+    args: Either<Vec<TypeArg>, usize>,
 }
 
-impl<'a> Substitution<'a> {
-    pub(crate) fn new(args: &'a [TypeArg]) -> Self {
+impl Substitution {
+    pub(crate) fn new(args: impl Into<Vec<TypeArg>>) -> Self {
         Self {
             leave_lowest: 0,
-            args,
+            args: Either::Left(args.into()),
         }
     }
 
@@ -361,11 +364,13 @@ impl<'a> Substitution<'a> {
         if idx < self.leave_lowest {
             return TypeArg::use_var(idx, decl.clone());
         }
-        let idx_in_orig_scope = idx - self.leave_lowest;
-        self.args
-            .get(idx_in_orig_scope)
-            .expect("Unexpected free type var")
-            .clone()
+        match &self.args {
+            Either::Left(args) => args
+                .get(idx - self.leave_lowest)
+                .expect("Unexpected free type var")
+                .clone(),
+            Either::Right(diff) => TypeArg::use_var(idx + diff, decl.clone()),
+        }
     }
 
     fn get_type(&self, idx: usize, bound: TypeBound) -> Type {
@@ -374,10 +379,22 @@ impl<'a> Substitution<'a> {
         ty
     }
 
-    fn enter_scope(&self, new_vars: usize) -> Self {
-        let mut res = self.clone();
-        res.leave_lowest += new_vars;
-        res
+    // A bit unfortunate to need a new extension registry here...move into Substitution?
+    fn enter_scope(&self, new_vars: usize, exts: &ExtensionRegistry) -> Self {
+        Self {
+            leave_lowest: self.leave_lowest + new_vars,
+            args: match &self.args {
+                Either::Left(vals) => Either::Left({
+                    // We need to renumber the RHS `vals` to avoid the newly-bound variables
+                    let renum = Substitution {
+                        leave_lowest: 0,
+                        args: Either::Right(new_vars),
+                    };
+                    vals.iter().map(|v| v.substitute(exts, &renum)).collect()
+                }),
+                Either::Right(i) => Either::Right(*i),
+            },
+        }
     }
 }
 
