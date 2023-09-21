@@ -75,7 +75,7 @@ mod test {
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::use_var(0, TypeParam::Type(TypeBound::Any));
-        let list_of_var = Type::new_extension(list_def.instantiate_concrete([tyvar.clone()])?);
+        let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
         let list_len = OpDefTypeScheme::new(
             [TypeParam::Type(TypeBound::Any)],
@@ -89,7 +89,7 @@ mod test {
             FunctionType::new(
                 vec![Type::new_extension(
                     list_def
-                        .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                        .instantiate([TypeArg::Type { ty: USIZE_T }])
                         .unwrap()
                 )],
                 vec![USIZE_T]
@@ -110,8 +110,7 @@ mod test {
         let [tyvar, szvar] = [0, 1].map(|i| TypeArg::use_var(i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
-        let good_array =
-            Type::new_extension(ar_def.instantiate_concrete([tyvar.clone(), szvar.clone()])?);
+        let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
         let good_ts = OpDefTypeScheme::new(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
@@ -140,7 +139,7 @@ mod test {
             arg: szvar.clone(),
         });
         assert_eq!(
-            ar_def.instantiate_concrete([szvar.clone(), tyvar.clone()]),
+            ar_def.instantiate([szvar.clone(), tyvar.clone()]),
             Err(arg_err.clone())
         );
         // ok, so that doesn't work - well, it shouldn't! So let's say we just have this signature (with bad args)...
@@ -161,7 +160,7 @@ mod test {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::use_var(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let body_type = id_fn(Type::new_extension(list_def.instantiate_concrete([tv])?));
+        let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
         let reg = [EXTENSION.to_owned()].into();
         for decl in [
             TypeParam::Extensions,

@@ -349,7 +349,7 @@ mod test {
     fn test_types(extension: Extension) {
         let angle = extension.get_type(ANGLE_T_NAME).unwrap();
 
-        let custom = angle.instantiate_concrete([]).unwrap();
+        let custom = angle.instantiate([]).unwrap();
 
         angle.check_custom(&custom).unwrap();
 
@@ -374,7 +374,7 @@ mod test {
         let custom_type = extension
             .get_type(ANGLE_T_NAME)
             .unwrap()
-            .instantiate_concrete([])
+            .instantiate([])
             .unwrap();
 
         let custom_value = RotationValue::Angle(AngleValue::F64(0.0));
@@ -382,11 +382,7 @@ mod test {
         // correct type
         custom_value.check_custom_type(&custom_type).unwrap();
 
-        let wrong_custom_type = extension
-            .get_type("quat")
-            .unwrap()
-            .instantiate_concrete([])
-            .unwrap();
+        let wrong_custom_type = extension.get_type("quat").unwrap().instantiate([]).unwrap();
         let res = custom_value.check_custom_type(&wrong_custom_type);
         assert!(res.is_err());
     }
