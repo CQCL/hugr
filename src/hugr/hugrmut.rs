@@ -163,6 +163,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     /// Copy a subgraph from another hugr into this one, under a given root node.
     ///
     /// Sibling order is not preserved.
+    ///
+    /// The returned `InsertionResult` does not contain a `new_root` value, since
+    /// a subgraph may not have a defined root.
     //
     // TODO: Try to preserve the order when possible? We cannot always ensure
     // it, since the subgraph may have arbitrary nodes without including their
@@ -345,7 +348,7 @@ where
                 |node, ctx| ctx.contains(&node.into()),
                 subgraph.nodes(),
             );
-        let node_map = insert_hugr_internal_with_portgraph(self.as_mut(), root, other, &portgraph)?;
+        let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_nodetype(node.into());
@@ -407,8 +410,10 @@ fn insert_hugr_internal(
 /// caller must do that.
 ///
 /// In contrast to `insert_hugr_internal`, this function does not preserve
-/// sibling order in the hierarchy.
-fn insert_hugr_internal_with_portgraph(
+/// sibling order in the hierarchy. This is due to the subgraph not necessarily
+/// having a single root, so the logic for reconstructing the hierarchy is not
+/// able to just do a BFS.
+fn insert_subgraph_internal(
     hugr: &mut Hugr,
     root: Node,
     other: &impl HugrView,
