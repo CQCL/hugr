@@ -209,7 +209,8 @@ pub struct Port {
 
 /// A trait for getting the undirected index of a port.
 ///
-/// Implemented for both [`Port`] and `usize`.
+/// This allows functions to admit both [`Port`]s and explicit `usize`s for
+/// identifying port offsets.
 pub trait PortIndex {
     /// Returns the offset of the port.
     fn index(self) -> usize;
