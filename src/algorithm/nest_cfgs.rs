@@ -43,11 +43,13 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
+use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, Rewrite};
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::views::HugrView;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
+use crate::ops::handle::CfgID;
 use crate::{Direction, Hugr, Node};
 
 // TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
@@ -128,7 +130,9 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
 pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
     fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
         if h.get_optype(n).tag() == OpTag::Cfg {
-            transform_cfg_to_nested(&mut SimpleCfgView::new_subtree(h, n))?;
+            // We've checked the optype so this should be fine
+            let s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
+            transform_cfg_to_nested(&mut SimpleCfgView::new(&mut s))?;
         }
         let children = h.children(n).collect::<Vec<_>>();
         for node in children {
@@ -196,22 +200,17 @@ pub struct SimpleCfgView<'a, T: HugrMut> {
     entry: Node,
     exit: Node,
 }
-impl<'a, T: HugrMut> SimpleCfgView<'a, T> {
-    /// Creates a SimpleCfgView for a CFG-rooted Hugr
-    pub fn new(h: &'a mut T) -> Self {
-        Self::new_subtree(h, h.root())
-    }
-
+impl<'a, H: HugrMut<RootHandle=CfgID>> SimpleCfgView<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
-    pub fn new_subtree(h: &'a mut T, n: Node) -> Self {
-        let mut children = h.children(n);
+    pub fn new(h: &'a mut H) -> Self {
+        let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
 }
-impl<T: HugrMut> CfgView<Node> for SimpleCfgView<'_, T> {
+impl<H: HugrMut> CfgView<Node> for SimpleCfgView<'_, H> {
     fn entry_node(&self) -> Node {
         self.entry
     }
@@ -220,7 +219,7 @@ impl<T: HugrMut> CfgView<Node> for SimpleCfgView<'_, T> {
         self.exit
     }
 
-    type Iterator<'c> = <T as HugrView>::Neighbours<'c>
+    type Iterator<'c> = <H as HugrView>::Neighbours<'c>
     where
         Self: 'c;
 
@@ -539,7 +538,6 @@ pub(crate) mod test {
     use crate::extension::PRELUDE_REGISTRY;
     use crate::extension::{prelude::USIZE_T, ExtensionSet};
 
-    use crate::hugr::views::{HierarchyView, SiblingGraph};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
     use crate::types::{FunctionType, Type};
@@ -590,7 +588,7 @@ pub(crate) mod test {
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a FlatRegionView here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's).
-        let mut v: SiblingGraph = SiblingGraph::try_new(&h, h.root()).unwrap();
+        let mut v = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
         let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut v));
         let [&left, &right] = edge_classes
             .keys()
@@ -612,7 +610,9 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
+        // ALAN here's where we need a WholeHugrView...
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
+        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut m)).unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -651,7 +651,9 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&h));
+        // ALAN and another case for WholeHugrView
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
+        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut m));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == entry)
@@ -689,7 +691,9 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
-        let v = SimpleCfgView::new(&mut h);
+        // ALAN and another case for WholeHugrView
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
+        let v = SimpleCfgView::new(&mut m);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -711,7 +715,10 @@ pub(crate) mod test {
                 Vec::from([(tail, head)])              // The loop back-edge
             ])
         );
-        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut h)).unwrap();
+
+        // ALAN and another case for WholeHugrView
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
+        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut m)).unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
@@ -734,7 +741,10 @@ pub(crate) mod test {
         //             \---<---<---<---<---<--<---/
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
-        let v = SimpleCfgView::new(&mut h);
+
+        // ALAN and another case for WholeHugrView
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
+        let v = SimpleCfgView::new(&mut m);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let SimpleCfgView { h: _, entry, exit } = v;
         // merge is unique predecessor of tail

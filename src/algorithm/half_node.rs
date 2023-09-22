@@ -6,7 +6,7 @@ use super::nest_cfgs::{CfgView, SimpleCfgView};
 use crate::builder::{BuildError, CFGBuilder, Dataflow, SubContainer};
 use crate::hugr::views::HugrView;
 use crate::hugr::HugrMut;
-use crate::ops::handle::NodeHandle;
+use crate::ops::handle::{NodeHandle, CfgID};
 use crate::ops::OpTag;
 use crate::ops::{BasicBlock, Const, ConstValue, LoadConstant, OpTrait, OpType, Output};
 use crate::types::{ClassicType, SimpleType, TypeRow};
@@ -28,15 +28,15 @@ enum HalfNode {
     X(Node),
 }
 
-struct HalfNodeView<'a> {
-    h: &'a mut Hugr,
+struct HalfNodeView<'a, H> {
+    h: &'a mut H,
     entry: Node,
     exit: Node,
 }
 
-impl<'a> HalfNodeView<'a> {
+impl<'a, H: HugrMut> HalfNodeView<'a, H> {
     #[allow(unused)]
-    pub(crate) fn new(h: &'a mut Hugr) -> Self {
+    pub(crate) fn new(h: &'a H) -> Self {
         let mut children = h.children(h.root());
         let entry = children.next().unwrap(); // Panic if malformed
         let exit = children.next().unwrap();
@@ -65,7 +65,7 @@ impl<'a> HalfNodeView<'a> {
     }
 }
 
-impl CfgView<HalfNode> for HalfNodeView<'_> {
+impl<H: HugrMut<RootHandle=CfgID>> CfgView<HalfNode> for HalfNodeView<'_, H> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)
@@ -108,7 +108,7 @@ impl CfgView<HalfNode> for HalfNodeView<'_> {
 }
 
 fn maybe_split(
-    h: &mut crate::Hugr,
+    h: &mut impl HugrView,
     edge: (HalfNode, HalfNode),
 ) -> Result<(Node, Node), BuildError> {
     match edge.1 {
