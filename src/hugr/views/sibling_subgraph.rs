@@ -285,6 +285,16 @@ impl SiblingSubgraph {
         self.nodes.len()
     }
 
+    /// Returns the computed [`IncomingPorts`] of the subgraph.
+    pub fn incoming_ports(&self) -> &IncomingPorts {
+        &self.inputs
+    }
+
+    /// Returns the computed [`OutgoingPorts`] of the subgraph.
+    pub fn outgoing_ports(&self) -> &OutgoingPorts {
+        &self.outputs
+    }
+
     /// The signature of the subgraph.
     pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
         let input = self
