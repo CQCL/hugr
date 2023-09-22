@@ -45,9 +45,9 @@ use itertools::Itertools;
 
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::views::HugrView;
+use crate::hugr::views::{HierarchyView, HugrView, SiblingGraph};
 use crate::hugr::{HugrMut, Rewrite};
-use crate::ops::handle::CfgID;
+use crate::ops::handle::{BasicBlockID, CfgID};
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node};
@@ -241,22 +241,21 @@ impl<H: HugrMut> CfgNodeMapMut<Node> for IdentityCfgMap<'_, H> {
         exit_edge: (Node, Node),
     ) -> Result<Node, String> {
         let blocks = get_blocks(self, entry_edge, exit_edge)?;
-        let cfg = self.h.get_parent(entry_edge.0).unwrap();
-        assert!([entry_edge.1, exit_edge.0, exit_edge.1].iter().all(|n| self
-            .h
-            .get_parent(*n)
-            .unwrap()
-            == cfg));
-        // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
-        OutlineCfg::new(blocks).apply(self.h).unwrap();
-        // Hmmm, no way to get the node created out from the rewrite...
-        assert!([entry_edge.0, exit_edge.1]
+        assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
-            .all(|n| self.h.get_parent(*n).unwrap() == cfg));
-        let new_cfg = self.h.get_parent(exit_edge.0).unwrap();
-        assert_eq!(new_cfg, self.h.get_parent(entry_edge.1).unwrap());
-        let new_block = self.h.get_parent(new_cfg).unwrap();
-        assert_eq!(cfg, self.h.get_parent(new_block).unwrap());
+            .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
+        // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
+        let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(self.h).unwrap();
+        debug_assert!([entry_edge.0, exit_edge.1]
+            .iter()
+            .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
+
+        let new_block_view = SiblingGraph::<BasicBlockID>::try_new(self.h, new_block).unwrap();
+        let new_cfg_view = SiblingGraph::<CfgID>::try_new(&new_block_view, new_cfg).unwrap();
+
+        debug_assert!([entry_edge.1, exit_edge.0]
+            .iter()
+            .all(|n| new_cfg_view.get_parent(*n) == Some(new_cfg)));
         Ok(new_block)
     }
 }
