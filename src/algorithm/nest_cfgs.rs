@@ -43,25 +43,23 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::{HugrMut, Rewrite};
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
+use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::views::HugrView;
+use crate::hugr::{HugrMut, Rewrite};
+use crate::ops::handle::CfgID;
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
-use crate::ops::handle::CfgID;
 use crate::{Direction, Hugr, Node};
 
-// TODO: transform the CFG: each SESE region can be turned into its own Kappa-node
-// (in a BB with one predecessor and one successor, which may then be merged
-//     and contents parallelized with predecessor or successor).
-
-/// A view of a CFG. `T` is the type of basic block; one interpretation of `T` would be a BasicBlock
-/// (e.g. `Node`) in the Hugr, but this extra level of indirection allows "splitting" one HUGR BB
-/// into many (or vice versa). Since SESE regions are bounded by edges between pairs of such `T`, such
-/// splitting may allow the algorithm to identify more regions than existed in the underlying CFG
+/// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
+/// multiple blocks in the view (or merged together).
+/// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`Node`]) in the Hugr,
+/// for an [IdentityCfgMap] if the extra level of indirection is not required. However, since
+/// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
+/// algorithm to identify more regions than existed in the underlying CFG
 /// (without mutating the underlying CFG perhaps in vain).
-pub trait CfgView<T> {
+pub trait CfgNodeMap<T> {
     /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
     fn entry_node(&self) -> T;
     /// The unique exit node of the CFG. The only node to have no successors.
@@ -75,7 +73,12 @@ pub trait CfgView<T> {
     fn successors(&self, node: T) -> Self::Iterator<'_>;
     /// Returns an iterator over the predecessors of the specified basic block.
     fn predecessors(&self, node: T) -> Self::Iterator<'_>;
+}
 
+/// An extension of CfgNodeMapping that additionally allows to perform the nesting transformation
+/// - this requires any node splitting/merging provided by the view to be enacted on the underlying
+/// CFG before that can be transformed.
+pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
     /// Given an entry edge and exit edge defining a SESE region, mutates the
     /// Hugr such that all nodes between these edges are placed in a nested CFG.
     /// Hugr is temporarily passed in until we have a View-like trait that allows applying a rewrite.
@@ -86,7 +89,7 @@ pub trait CfgView<T> {
 
 /// Transforms a CFG to nested form.
 pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
-    view: &mut impl CfgView<T>,
+    view: &mut impl CfgNodeMapMut<T>,
 ) -> Result<(), String> {
     let edges = EdgeClassifier::get_edge_classes(view);
     // Traverse. Any traversal will encounter edges in SESE-respecting order,
@@ -131,8 +134,8 @@ pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
     fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
         if h.get_optype(n).tag() == OpTag::Cfg {
             // We've checked the optype so this should be fine
-            let s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
-            transform_cfg_to_nested(&mut SimpleCfgView::new(&mut s))?;
+            let mut s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
+            transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut s))?;
         }
         let children = h.children(n).collect::<Vec<_>>();
         for node in children {
@@ -165,7 +168,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeDest<T> {
 }
 
 fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
-    cfg: &'a impl CfgView<T>,
+    cfg: &'a impl CfgNodeMap<T>,
     n: T,
 ) -> impl Iterator<Item = EdgeDest<T>> + '_ {
     let extra = if n == cfg.exit_node() {
@@ -195,22 +198,21 @@ fn cfg_edge<T: Copy + Clone + PartialEq + Eq + Hash>(s: T, d: EdgeDest<T>) -> Cf
 }
 
 /// A straightforward view of a Cfg as it appears in a Hugr
-pub struct SimpleCfgView<'a, T: HugrMut> {
-    h: &'a mut T,
+pub struct IdentityCfgMap<'a, H: HugrView> {
+    h: &'a mut H,
     entry: Node,
     exit: Node,
 }
-impl<'a, H: HugrMut<RootHandle=CfgID>> SimpleCfgView<'a, H> {
+impl<'a, H: HugrView<RootHandle = CfgID>> IdentityCfgMap<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
     pub fn new(h: &'a mut H) -> Self {
-        let mut children = h.children(h.root());
-        let entry = children.next().unwrap(); // Panic if malformed
-        let exit = children.next().unwrap();
+        // Panic if malformed enough not to have two children
+        let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
 }
-impl<H: HugrMut> CfgView<Node> for SimpleCfgView<'_, H> {
+impl<H: HugrView> CfgNodeMap<Node> for IdentityCfgMap<'_, H> {
     fn entry_node(&self) -> Node {
         self.entry
     }
@@ -230,7 +232,9 @@ impl<H: HugrMut> CfgView<Node> for SimpleCfgView<'_, H> {
     fn predecessors(&self, node: Node) -> Self::Iterator<'_> {
         self.h.neighbours(node, Direction::Incoming)
     }
+}
 
+impl<H: HugrMut> CfgNodeMapMut<Node> for IdentityCfgMap<'_, H> {
     fn nest_sese_region(
         &mut self,
         entry_edge: (Node, Node),
@@ -259,7 +263,7 @@ impl<H: HugrMut> CfgView<Node> for SimpleCfgView<'_, H> {
 
 /// Given entry and exit edges for a SESE region, get a list of all the blocks in it.
 pub fn get_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
-    v: &impl CfgView<T>,
+    v: &impl CfgNodeMap<T>,
     entry_edge: (T, T),
     exit_edge: (T, T),
 ) -> Result<HashSet<T>, String> {
@@ -314,7 +318,7 @@ struct UndirectedDFSTree<T> {
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
-    pub fn new(cfg: &impl CfgView<T>) -> Self {
+    pub fn new(cfg: &impl CfgNodeMap<T>) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
@@ -427,7 +431,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
     /// are cycle-equivalent. Any two consecutive edges in the same class define a SESE region
     /// (where "consecutive" means on any path in the original directed CFG, as the edges
     /// in a class all dominate + postdominate each other as part of defn of cycle equivalence).
-    pub fn get_edge_classes(cfg: &impl CfgView<T>) -> HashMap<CfgEdge<T>, usize> {
+    pub fn get_edge_classes(cfg: &impl CfgNodeMap<T>) -> HashMap<CfgEdge<T>, usize> {
         let tree = UndirectedDFSTree::new(cfg);
         let mut s = Self {
             deleted_backedges: HashSet::new(),
@@ -451,7 +455,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
     /// the subtree, and the list of said brackets.
     fn traverse(
         &mut self,
-        cfg: &impl CfgView<T>,
+        cfg: &impl CfgNodeMap<T>,
         tree: &UndirectedDFSTree<T>,
         n: T,
     ) -> (usize, BracketList<T>) {
@@ -586,10 +590,10 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        // There's no need to use a FlatRegionView here but we do so just to check
-        // that we *can* (as we'll need to for "real" module Hugr's).
-        let mut v = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut v));
+        // ALAN here's where we need a WholeHugrView...tho it's good to try SiblingMut at least somewhere
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&mut m));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -610,9 +614,10 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        // ALAN here's where we need a WholeHugrView...
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut m)).unwrap();
+        // ALAN and another case for WholeHugrView
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h,root).unwrap();
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m)).unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -652,8 +657,9 @@ pub(crate) mod test {
             .unwrap();
 
         // ALAN and another case for WholeHugrView
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&SimpleCfgView::new(&mut m));
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&mut m));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == entry)
@@ -692,10 +698,11 @@ pub(crate) mod test {
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
         // ALAN and another case for WholeHugrView
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        let v = SimpleCfgView::new(&mut m);
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let v = IdentityCfgMap::new(&mut m);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
-        let SimpleCfgView { h: _, entry, exit } = v;
+        let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -717,8 +724,9 @@ pub(crate) mod test {
         );
 
         // ALAN and another case for WholeHugrView
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        transform_cfg_to_nested(&mut SimpleCfgView::new(&mut m)).unwrap();
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m)).unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
@@ -743,10 +751,11 @@ pub(crate) mod test {
         // but there is no edge to act as entry to a region containing just the conditional :-(.
 
         // ALAN and another case for WholeHugrView
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h, h.root()).unwrap();
-        let v = SimpleCfgView::new(&mut m);
+        let root = h.root();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
+        let v = IdentityCfgMap::new(&mut m);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
-        let SimpleCfgView { h: _, entry, exit } = v;
+        let IdentityCfgMap { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
         let merge = *edge_classes
             .keys()

@@ -243,7 +243,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth
+        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
     };
     use crate::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
