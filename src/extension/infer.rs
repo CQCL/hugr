@@ -1308,9 +1308,9 @@ mod test {
 
         // CFG Wiring
         hugr.connect(entry, 0, bb0, 0)?;
-        hugr.connect(entry, 1, bb1, 0)?;
+        hugr.connect(entry, 0, bb1, 0)?;
         hugr.connect(bb1, 0, bb10, 0)?;
-        hugr.connect(bb1, 1, bb11, 0)?;
+        hugr.connect(bb1, 0, bb11, 0)?;
 
         hugr.connect(bb0, 0, exit, 0)?;
         hugr.connect(bb10, 0, exit, 0)?;
