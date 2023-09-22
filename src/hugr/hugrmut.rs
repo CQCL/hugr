@@ -161,6 +161,12 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     }
 
     /// Copy a subgraph from another hugr into this one, under a given root node.
+    ///
+    /// Sibling order is not preserved.
+    //
+    // TODO: Try to preserve the order when possible? We cannot always ensure
+    // it, since the subgraph may have arbitrary nodes without including their
+    // parent.
     fn insert_subgraph(
         &mut self,
         root: Node,
