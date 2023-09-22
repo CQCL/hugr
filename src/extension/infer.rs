@@ -658,7 +658,17 @@ impl UnificationContext {
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
             if !self.solved.contains_key(&m) {
-                self.add_solution(m, ExtensionSet::new());
+                // Handle the case where the constraints for `m` contain a self
+                // reference, i.e. "m = Plus(E, m)", in which case the variable
+                // should be instantiated to E rather than the empty set.
+                let solution =
+                    ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
+                        |c| match c {
+                            Constraint::Plus(x, other_m) if &m == other_m => Some(x.clone()),
+                            _ => None,
+                        },
+                    ));
+                self.add_solution(m, solution);
             }
         }
         self.variables = HashSet::new();
