@@ -93,8 +93,11 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
 ) -> Result<(), String> {
     let edges = EdgeClassifier::get_edge_classes(view);
     // Traverse. Any traversal will encounter edges in SESE-respecting order,
-    // but TODO does this stack work for branching/merging?
-    // Might need to traverse dominator tree considering edges from each node, or similar.
+    // but in the presence of branching and merging we cannot guarantee we won't nest a region
+    // *after* nesting a region containing it; which will not work if the view we have
+    // onto the region is a `SiblingMut`... so TODO we must either
+    // * use the base_hugr()
+    // * traverse in some way using dominators, so that subregions are nested before their ancestors
     let mut last_edge_in_class: HashMap<usize, (T, T)> = HashMap::new();
     let mut seen_nodes = HashSet::new();
     let mut node_stack = Vec::new();
@@ -108,10 +111,8 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
             let edge = (n, s);
             if let Some(class) = edges.get(&edge) {
                 if let Some(&prev_edge) = last_edge_in_class.get(class) {
-                    // n will be moved into new block.
-                    // TODO OutlineCfg will only work if all other edges from n are *inside* the block...
-                    // so how does this work? Don't we need to traverse successors of n in a particular order,
-                    // i.e. most-nested-blocks first?
+                    // n will be moved into new block. (Cycle equivalence means there cannot be
+                    // any other edges from n that exit that block, so we're ok.)
                     if n != prev_edge.1 || succs.len() > 1 {
                         n = view.nest_sese_region(prev_edge, edge).unwrap();
                     }
@@ -128,8 +129,9 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
 }
 
 /// Attempt to transform all CFGs in the given Hugr into nested form.
-/// This traverses every node in the entire Hugr, so is quite an expensive way,
-/// but it'll do for the time being while we experiment.
+/// This searches every node in the entire Hugr looking for CFGs,
+/// so may be expensive, although costs of the analysis/transformation
+/// are likely to be higher if much of the Hugr is CFG(s)!
 pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
     fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
         if h.get_optype(n).tag() == OpTag::Cfg {
