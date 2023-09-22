@@ -231,7 +231,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr(hugr)?.new_root;
+        let node = self.add_hugr(hugr)?.new_root.unwrap();
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -252,7 +252,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr_view(hugr)?.new_root;
+        let node = self.add_hugr_view(hugr)?.new_root.unwrap();
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;

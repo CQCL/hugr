@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType};
@@ -12,6 +13,7 @@ use crate::{Hugr, Port};
 
 use self::sealed::HugrMutInternals;
 
+use super::views::SiblingSubgraph;
 use super::{NodeMetadata, PortIndex, Rewrite};
 
 /// Functions for low-level building of a HUGR.
@@ -158,6 +160,26 @@ pub trait HugrMut: HugrView + HugrMutInternals {
         self.hugr_mut().insert_from_view(root, other)
     }
 
+    /// Copy a subgraph from another hugr into this one, under a given root node.
+    ///
+    /// Sibling order is not preserved.
+    ///
+    /// The returned `InsertionResult` does not contain a `new_root` value, since
+    /// a subgraph may not have a defined root.
+    //
+    // TODO: Try to preserve the order when possible? We cannot always ensure
+    // it, since the subgraph may have arbitrary nodes without including their
+    // parent.
+    fn insert_subgraph(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+        subgraph: &SiblingSubgraph,
+    ) -> Result<InsertionResult, HugrError> {
+        self.valid_node(root)?;
+        self.hugr_mut().insert_subgraph(root, other, subgraph)
+    }
+
     /// Applies a rewrite to the graph.
     fn apply_rewrite<R, E>(&mut self, rw: impl Rewrite<ApplyResult = R, Error = E>) -> Result<R, E>
     where
@@ -171,15 +193,21 @@ pub trait HugrMut: HugrView + HugrMutInternals {
 /// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view]
 pub struct InsertionResult {
     /// The node, after insertion, that was the root of the inserted Hugr.
-    /// (That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]))
-    pub new_root: Node,
+    ///
+    /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
+    ///
+    /// When inserting a subgraph, this value is `None`.
+    pub new_root: Option<Node>,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
     pub node_map: HashMap<Node, Node>,
 }
 
 impl InsertionResult {
-    fn translating_indices(new_root: Node, node_map: HashMap<NodeIndex, NodeIndex>) -> Self {
+    fn translating_indices(
+        new_root: Option<Node>,
+        node_map: HashMap<NodeIndex, NodeIndex>,
+    ) -> Self {
         Self {
             new_root,
             node_map: HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
@@ -276,10 +304,13 @@ where
             let optype = other.op_types.take(node);
             self.as_mut().op_types.set(new_node, optype);
             let meta = other.metadata.take(node);
-            self.as_mut().set_metadata(node.into(), meta).unwrap();
+            self.as_mut().set_metadata(new_node.into(), meta).unwrap();
         }
         debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
-        Ok(InsertionResult::translating_indices(other_root, node_map))
+        Ok(InsertionResult::translating_indices(
+            Some(other_root),
+            node_map,
+        ))
     }
 
     fn insert_from_view(
@@ -294,11 +325,40 @@ where
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.get_metadata(node.into());
             self.as_mut()
-                .set_metadata(node.into(), meta.clone())
+                .set_metadata(new_node.into(), meta.clone())
                 .unwrap();
         }
         debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
-        Ok(InsertionResult::translating_indices(other_root, node_map))
+        Ok(InsertionResult::translating_indices(
+            Some(other_root),
+            node_map,
+        ))
+    }
+
+    fn insert_subgraph(
+        &mut self,
+        root: Node,
+        other: &impl HugrView,
+        subgraph: &SiblingSubgraph,
+    ) -> Result<InsertionResult, HugrError> {
+        // Create a portgraph view with the explicit list of nodes defined by the subgraph.
+        let portgraph: NodeFiltered<_, NodeFilter<&[Node]>, &[Node]> =
+            NodeFiltered::new_node_filtered(
+                other.portgraph(),
+                |node, ctx| ctx.contains(&node.into()),
+                subgraph.nodes(),
+            );
+        let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph)?;
+        // Update the optypes and metadata, copying them from the other graph.
+        for (&node, &new_node) in node_map.iter() {
+            let nodetype = other.get_nodetype(node.into());
+            self.as_mut().op_types.set(new_node, nodetype.clone());
+            let meta = other.get_metadata(node.into());
+            self.as_mut()
+                .set_metadata(new_node.into(), meta.clone())
+                .unwrap();
+        }
+        Ok(InsertionResult::translating_indices(None, node_map))
     }
 }
 
@@ -339,6 +399,39 @@ fn insert_hugr_internal(
     );
 
     Ok((other_root.into(), node_map))
+}
+
+/// Internal implementation of the `insert_subgraph` method for AsMut<Hugr>.
+///
+/// Returns a mapping from the nodes in the inserted graph to their new indices
+/// in `hugr`.
+///
+/// This function does not update the optypes of the inserted nodes, so the
+/// caller must do that.
+///
+/// In contrast to `insert_hugr_internal`, this function does not preserve
+/// sibling order in the hierarchy. This is due to the subgraph not necessarily
+/// having a single root, so the logic for reconstructing the hierarchy is not
+/// able to just do a BFS.
+fn insert_subgraph_internal(
+    hugr: &mut Hugr,
+    root: Node,
+    other: &impl HugrView,
+    portgraph: &impl portgraph::LinkView,
+) -> Result<HashMap<NodeIndex, NodeIndex>, HugrError> {
+    let node_map = hugr.graph.insert_graph(&portgraph)?;
+
+    // A map for nodes that we inserted before their parent, so we couldn't
+    // update the hierarchy with their new id.
+    for (&node, &new_node) in node_map.iter() {
+        let new_parent = other
+            .get_parent(node.into())
+            .and_then(|parent| node_map.get(&parent.index).copied())
+            .unwrap_or(root.index);
+        hugr.hierarchy.push_child(new_node, new_parent)?;
+    }
+
+    Ok(node_map)
 }
 
 pub(crate) mod sealed {
