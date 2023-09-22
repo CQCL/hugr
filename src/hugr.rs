@@ -207,6 +207,14 @@ pub struct Port {
     offset: portgraph::PortOffset,
 }
 
+/// A trait for getting the undirected index of a port.
+///
+/// Implemented for both [`Port`] and `usize`.
+pub trait PortIndex {
+    /// Returns the offset of the port.
+    fn index(self) -> usize;
+}
+
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
 
@@ -382,11 +390,19 @@ impl Port {
     pub fn direction(self) -> Direction {
         self.offset.direction()
     }
+}
 
-    /// Returns the offset of the port.
+impl PortIndex for Port {
     #[inline(always)]
-    pub fn index(self) -> usize {
+    fn index(self) -> usize {
         self.offset.index()
+    }
+}
+
+impl PortIndex for usize {
+    #[inline(always)]
+    fn index(self) -> usize {
+        self
     }
 }
 

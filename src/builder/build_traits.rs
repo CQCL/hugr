@@ -1,7 +1,7 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
-use crate::hugr::{Node, NodeMetadata, Port, ValidationError};
+use crate::hugr::{Node, NodeMetadata, Port, PortIndex, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -649,13 +649,7 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
     data_builder: &mut T,
 ) -> Result<(), BuildError> {
     for (dst_port, wire) in inputs.into_iter().enumerate() {
-        wire_up(
-            data_builder,
-            wire.node(),
-            wire.source().index(),
-            op_node,
-            dst_port,
-        )?;
+        wire_up(data_builder, wire.node(), wire.source(), op_node, dst_port)?;
     }
     Ok(())
 }
@@ -664,10 +658,12 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
-    src_port: usize,
+    src_port: impl PortIndex,
     dst: Node,
-    dst_port: usize,
+    dst_port: impl PortIndex,
 ) -> Result<bool, BuildError> {
+    let src_port = src_port.index();
+    let dst_port = dst_port.index();
     let base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 

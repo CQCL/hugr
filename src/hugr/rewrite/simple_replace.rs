@@ -107,7 +107,7 @@ impl Rewrite for SimpleReplacement {
                 for target in self.replacement.linked_ports(node, outport) {
                     if self.replacement.get_optype(target.0).tag() != OpTag::Output {
                         let new_target = index_map.get(&target.0).unwrap();
-                        h.connect(*new_node, outport.index(), *new_target, target.1.index())
+                        h.connect(*new_node, outport, *new_target, target.1)
                             .unwrap();
                     }
                 }
@@ -127,9 +127,9 @@ impl Rewrite for SimpleReplacement {
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
                     rem_inp_pred_node,
-                    rem_inp_pred_port.index(),
+                    rem_inp_pred_port,
                     *new_inp_node,
-                    rep_inp_port.offset.index(),
+                    *rep_inp_port,
                 )
                 .unwrap();
             }
@@ -147,9 +147,9 @@ impl Rewrite for SimpleReplacement {
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
                 h.connect(
                     *new_out_node,
-                    rep_out_pred_port.index(),
+                    rep_out_pred_port,
                     *rem_out_node,
-                    rem_out_port.index(),
+                    *rem_out_port,
                 )
                 .unwrap();
             }
@@ -169,9 +169,9 @@ impl Rewrite for SimpleReplacement {
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
                 h.connect(
                     rem_inp_pred_node,
-                    rem_inp_pred_port.index(),
+                    rem_inp_pred_port,
                     *rem_out_node,
-                    rem_out_port.index(),
+                    *rem_out_port,
                 )
                 .unwrap();
             }
