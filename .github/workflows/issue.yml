@@ -43,6 +43,7 @@ jobs:
         echo $MY_RESULT >> $GITHUB_OUTPUT
 
     - name: Create Task
+      uses: atlassian/gajira-create@v3.0.1
       env:
         JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
       if: "! contains(github.event.issue.labels.*.name, 'bug')"
