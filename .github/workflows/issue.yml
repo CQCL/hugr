@@ -31,7 +31,7 @@ jobs:
         MY_RESULT=""
         case ${GH_PRIORITY} in
           P-low)
-            MY_RESULT=echo Low;;
+            MY_RESULT=Low;;
           P-medium)
             MY_RESULT=Medium;;
           P-high)
