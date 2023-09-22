@@ -11,9 +11,12 @@ use super::Type;
 use crate::utils::display_list;
 use delegate::delegate;
 
+#[cfg(feature = "pyo3")]
+use pyo3::pyclass;
+
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-//#[cfg_attr(feature = "pyo3", pyclass)]
+#[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow {

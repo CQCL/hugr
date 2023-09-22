@@ -19,7 +19,7 @@ that can be shared between the tools, allowing for more complex
 operations such as TKET optimizations across control-flow blocks, and
 nested quantum and classical programs in a single graph.
 The HUGR should provide a generic graph representation of a program,
-where each node contains a specific kind of operation and wires
+where each node contains a specific kind of operation and edges
 represent (typed) data or control dependencies.
 
 ### Goals
@@ -32,7 +32,7 @@ represent (typed) data or control dependencies.
     receive HUGRs via a serialized interface when sharing the in-memory
     structure is not possible.
   - Provide a common interface for rewrite operations with support for
-    opaque types.  
+    opaque types.
 
 ### Non-goals
 
@@ -77,7 +77,8 @@ represent (typed) data or control dependencies.
 A HUGR is a directed graph. There are several different types of node, and
 several different types of edge, with different semantics, described below.
 
-Nodes usually have additional data associated with them.
+A node usually has additional data associated with it, which we will
+refer to as it's node weight.
 
 The nodes represent
 processes that produce values - either statically, i.e. at compile time,
@@ -114,23 +115,25 @@ CNOT.
 ### Edges, ports and signatures
 
 The edges of a HUGR encode relationships between nodes; there are several *kinds*
-of edge for different relationships.
+of edge for different relationships. Edges of a given kind are specified to
+carry an edge weight:
 
-- `Order` edges are plain directed edges, and express requirements on the ordering.
+- `Order` edges are plain directed edges, and express requirements on the
+  ordering. They have no edge weight.
 - `Value` edges carry typed data at runtime. They have a _port_ at each end, associated
-  with the source and target nodes.
+  with the source and target nodes. They have an `AnyType`as an edge weight.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time).
+  compilation time). They have a `CopyableType` as an edge weight.
 - `ControlFlow` edges represent possible flows of control from one part of the
-  program to another.
+  program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
-  children.
+  children. They have no edge weight.
 
 `Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
-A `Value` edge can carry data of any `SimpleType`: these include the `ClassicType`s
+A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
-A `Static` edge can only carry a `ClassicType`. For
+A `Static` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
@@ -145,9 +148,9 @@ As well as the type, dataflow edges are also parametrized by a
     [Non-local Edges](#non-local-edges)
 
 ```
-SimpleType ⊃ ClassicType -- In the absence of unicode: "SimpleType is a superset of ClassicType"
+AnyType ⊃ CopyableType
 
-EdgeKind ::= Hierarchy | Value(Locality, SimpleType) | Static(Local | Ext, ClassicType) | Order | ControlFlow
+EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
 
 Locality ::= Local | Ext | Dom
 ```
@@ -162,7 +165,7 @@ _signature_.
 
 Note that the locality is not fixed or even specified by the signature.
 
-A source port with a `ClassicType` may have any number of edges associated with
+A source port with a `CopyableType` may have any number of edges associated with
 it (including zero, which means "discard"). Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once. See [Linearity](#linearity).
@@ -280,7 +283,7 @@ the following basic dataflow operations are available (in addition to the
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `ClassicType`, and a
+  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
     dataflow graph. They also have an incoming `Order` edge connecting
     them to the `Input` node, as should all operations that
@@ -558,7 +561,7 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 #### **Non-local Edges**
 
-**For classical values only** we allow dataflow edges (i.e. both Value and Static)
+**For ``CopyableType`` values only** we allow dataflow edges (i.e. both Value and Static)
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
   * for Value edges, Ext or Dom;
@@ -907,7 +910,7 @@ The declaration of the `params` uses a language that is a distinct, simplified
 form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
 the value of each member of `params` is given by the following production:
 ```
-TypeParam ::= "Type"("Any"|"Copy"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
 
 Opaque ::= string<[TypeArgs]>
 
@@ -937,7 +940,8 @@ then it is assumed empty.
 ### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
-is preserved during graph modifications, and copied when rewriting.
+is preserved during graph modifications, and, [when possible](##Metadata updates on replacement), copied when
+rewriting.
 Additionally the metadata may record references to other nodes; these
 references are updated along with node indices.
 
@@ -988,17 +992,18 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type: Any $\supset$ Copyable $\supset$ Equatable. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
-  - For the broadest class ("Any" type), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
+  - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
 
-  - The next class are "Copyable" types, aka "Classic" types, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
+  - The next class is ``CopyableType``, i.e. types holding ordinary classical data, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
 
-  - The final class are "Equatable" types: these are Copyable types where additionally there is a well-defined notion of equality between values. (While *some* notion of equality is defined on
+  - The final class is ``EqType``: these are copyable types with a well-defined
+  notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
 
-For example, a `float` type (defined in an extension) would be Copyable, but not Equatable. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
+For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
 
 **Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
@@ -1018,9 +1023,9 @@ Type ::= Tuple(#) -- fixed-arity, heterogenous components
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Functions are Copyable, but not Equatable (as they represent functions: it is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
-Tuples and Sums are Copyable (or Equatable) if all their components are, also are fixed-size if their components are.
+Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
 
 ### Extension Tracking
 
@@ -1075,7 +1080,7 @@ equality constraint of `typeof(b) ~ Bool`.
 ### Types of built-ins
 
 We will provide some built in modules to provide basic functionality.
-I’m going to define them in terms of extensions. We have the “builtin”
+We will define them in terms of extensions. We have the “builtin”
 extension which should always be available when writing hugr plugins.
 This includes Conditional and TailLoop nodes, and nodes like `Call`:
 
@@ -1096,14 +1101,14 @@ we can perform rewrites which remove the arithmetic.
 We would expect standard circuits to look something like
 
 ```
-FunctionType[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
+Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 A circuit built using our higher-order extension to manage control flow
 could then look like:
 
 ```
-FunctionType[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
+Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 So we’d need to perform some graph transformation pass to turn the
@@ -1111,8 +1116,9 @@ graph-based control flow into a CFG node that a quantum computer could
 run, which removes the `HigherOrder` extension requirement:
 
 ```
-precompute :: FunctionType[](FunctionType[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         FunctionType[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
+                                         Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+>>>>>>> c6abd39 ([doc] Tidy hugr specification)
 ```
 
 Before we can run the circuit.
@@ -1578,7 +1584,7 @@ below).
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
 
-The possible values of `N` are 2^i for i in the range [0,7].
+The possible values of `N` are 2^i for i in the range [0,6].
 
 The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
@@ -1607,8 +1613,8 @@ Casts:
 | ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
 | `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
 | `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen a signed integer to a wider one with the same value (where M \<= N)                    |
-| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow an unsigned integer to a narrower one with the same value if possible (where M \>= N) |
-| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow a signed integer to a narrower one with the same value if possible (where M \>= N)    |
+| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
+| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
 | `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
 | `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
 
@@ -1687,8 +1693,9 @@ Conversions between integers and floats:
 
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int |
-| `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int   |
+| `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
+
+| `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
@@ -1720,10 +1727,20 @@ allocation, and the compiler can add/remove/move these operations to use
 more or fewer qubits. In some use cases, that may not be desirable, and
 we may instead want to guarantee only a certain number of qubits are
 used by the program. For this purpose TKET2 places additional
-constraints on the `main` function that are in line with TKET1 backwards
-compatibility. Namely the main function takes one `Array<N, Qubit>`
+constraints on the HUGR that are in line with TKET1 backwards
+compatibility:
+
+1. The `main` function takes one `Array<N, Qubit>`
 input and has one output of the same type (the same statically known
-size). If further the program does not contain any `qalloc` or `qfree`
+size).
+2. All Operations that have a `FunctionType` involving `Qubit` have as
+ many `Qubit` input wires as output.
+
+
+With these constraints, we can treat all `Qubit` operations as returning all qubits they take
+in. The implicit bijection from input `Qubit` to output allows register
+allocation for all `Qubit` wires. 
+If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
 
 ### Higher-order (Tierkreis) Extension

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::prelude::BOOL_T,
+    extension::{prelude::BOOL_T, ExtensionId},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
@@ -26,7 +26,7 @@ pub const AND_NAME: &str = "And";
 /// Name of the "or" operation.
 pub const OR_NAME: &str = "Or";
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("logic");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 
 /// Extension for basic logical operations.
 fn extension() -> Extension {
@@ -50,7 +50,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::BoundedNat(n) => *n,
+                    TypeArg::BoundedNat { n } => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -75,7 +75,7 @@ fn extension() -> Extension {
             |arg_values: &[TypeArg]| {
                 let a = arg_values.iter().exactly_one().unwrap();
                 let n: u64 = match a {
-                    TypeArg::BoundedNat(n) => *n,
+                    TypeArg::BoundedNat { n } => *n,
                     _ => {
                         return Err(TypeArgError::TypeMismatch {
                             arg: a.clone(),
@@ -108,14 +108,19 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::{extension::prelude::BOOL_T, ops::LeafOp, types::type_param::TypeArg, Extension};
+    use crate::{
+        extension::{prelude::BOOL_T, EMPTY_REG},
+        ops::LeafOp,
+        types::type_param::TypeArg,
+        Extension,
+    };
 
     use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, NOT_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
         let r: Extension = extension();
-        assert_eq!(r.name(), "logic");
+        assert_eq!(r.name() as &str, "logic");
         assert_eq!(r.operations().count(), 3);
     }
 
@@ -134,7 +139,7 @@ pub(crate) mod test {
     /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat(2)])
+            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
             .unwrap()
             .into()
     }
@@ -142,7 +147,7 @@ pub(crate) mod test {
     /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn not_op() -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(NOT_NAME, [])
+            .instantiate_extension_op(NOT_NAME, [], &EMPTY_REG)
             .unwrap()
             .into()
     }

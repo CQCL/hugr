@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionSet, SignatureError, TypeDef, TypeDefBound},
+    extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow,
@@ -21,7 +21,7 @@ pub const POP_NAME: SmolStr = SmolStr::new_inline("pop");
 /// Push operation name.
 pub const PUSH_NAME: SmolStr = SmolStr::new_inline("push");
 /// Reported unique name of the extension
-pub const EXTENSION_NAME: SmolStr = SmolStr::new_inline("Collections");
+pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections");
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
@@ -44,7 +44,7 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type(t)] = typ.args() else {
+        let [TypeArg::Type { ty: t }] = typ.args() else {
             return Err(error());
         };
 
@@ -118,7 +118,7 @@ fn get_type(name: &str) -> &TypeDef {
 
 fn list_types(args: &[TypeArg]) -> Result<(Type, Type), SignatureError> {
     let list_custom_type = get_type(&LIST_TYPENAME).instantiate_concrete(args)?;
-    let [TypeArg::Type(element_type)] = args else {
+    let [TypeArg::Type { ty: element_type }] = args else {
         panic!("should be checked by def.")
     };
 
@@ -156,11 +156,11 @@ mod test {
         let list_def = r.get_type(&LIST_TYPENAME).unwrap();
 
         let list_type = list_def
-            .instantiate_concrete([TypeArg::Type(USIZE_T)])
+            .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
             .unwrap();
 
         assert!(list_def
-            .instantiate_concrete([TypeArg::BoundedNat(3)])
+            .instantiate_concrete([TypeArg::BoundedNat { n: 3 }])
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();
@@ -174,13 +174,14 @@ mod test {
 
     #[test]
     fn test_list_ops() {
+        let reg = &[EXTENSION.to_owned()].into();
         let pop_sig = get_op(&POP_NAME)
-            .compute_signature(&[TypeArg::Type(QB_T)])
+            .compute_signature(&[TypeArg::Type { ty: QB_T }], reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
             LIST_TYPENAME,
-            vec![TypeArg::Type(QB_T)],
+            vec![TypeArg::Type { ty: QB_T }],
             EXTENSION_NAME,
             TypeBound::Any,
         ));
@@ -191,12 +192,12 @@ mod test {
         assert_eq!(pop_sig.output(), &both_row);
 
         let push_sig = get_op(&PUSH_NAME)
-            .compute_signature(&[TypeArg::Type(FLOAT64_TYPE)])
+            .compute_signature(&[TypeArg::Type { ty: FLOAT64_TYPE }], reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
             LIST_TYPENAME,
-            vec![TypeArg::Type(FLOAT64_TYPE)],
+            vec![TypeArg::Type { ty: FLOAT64_TYPE }],
             EXTENSION_NAME,
             TypeBound::Copyable,
         ));

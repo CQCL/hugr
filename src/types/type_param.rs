@@ -66,35 +66,53 @@ impl TypeParam {
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
+#[serde(tag = "tya")]
 pub enum TypeArg {
     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
-    Type(Type),
+    Type {
+        #[allow(missing_docs)]
+        ty: Type,
+    },
     /// Instance of [TypeParam::BoundedNat]. 64-bit unsigned integer.
-    BoundedNat(u64),
+    BoundedNat {
+        #[allow(missing_docs)]
+        n: u64,
+    },
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
-    Opaque(CustomTypeArg),
+    Opaque {
+        #[allow(missing_docs)]
+        arg: CustomTypeArg,
+    },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of arguments.
-    Sequence(Vec<TypeArg>),
+    Sequence {
+        #[allow(missing_docs)]
+        args: Vec<TypeArg>,
+    },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
-    Extensions(ExtensionSet),
+    Extensions {
+        #[allow(missing_docs)]
+        es: ExtensionSet,
+    },
 }
 
 impl TypeArg {
-    pub(super) fn validate(
+    pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type(ty) => ty.validate(extension_registry),
-            TypeArg::BoundedNat(_) => Ok(()),
-            TypeArg::Opaque(custarg) => {
+            TypeArg::Type { ty } => ty.validate(extension_registry),
+            TypeArg::BoundedNat { .. } => Ok(()),
+            TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
                 custarg.typ.validate(extension_registry)
             }
-            TypeArg::Sequence(args) => args.iter().try_for_each(|a| a.validate(extension_registry)),
-            TypeArg::Extensions(_) => Ok(()),
+            TypeArg::Sequence { args } => {
+                args.iter().try_for_each(|a| a.validate(extension_registry))
+            }
+            TypeArg::Extensions { es: _ } => Ok(()),
         }
     }
 }
@@ -125,13 +143,15 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type(t), TypeParam::Type(bound)) if bound.contains(t.least_upper_bound()) => {
+        (TypeArg::Type { ty: t }, TypeParam::Type(bound))
+            if bound.contains(t.least_upper_bound()) =>
+        {
             Ok(())
         }
-        (TypeArg::Sequence(items), TypeParam::List(param)) => {
+        (TypeArg::Sequence { args: items }, TypeParam::List(param)) => {
             items.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Sequence(items), TypeParam::Tuple(types)) => {
+        (TypeArg::Sequence { args: items }, TypeParam::Tuple(types)) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
@@ -141,16 +161,18 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::BoundedNat(val), TypeParam::BoundedNat(bound)) if bound.valid_value(*val) => {
+        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat(bound))
+            if bound.valid_value(*val) =>
+        {
             Ok(())
         }
 
-        (TypeArg::Opaque(arg), TypeParam::Opaque(param))
+        (TypeArg::Opaque { arg }, TypeParam::Opaque(param))
             if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())
         }
-        (TypeArg::Extensions(_), TypeParam::Extensions) => Ok(()),
+        (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),

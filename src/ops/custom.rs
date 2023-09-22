@@ -1,15 +1,14 @@
 //! Extensible operations.
 
 use smol_str::SmolStr;
-use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ExtensionId, OpDef, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
-use crate::{Extension, Hugr, Node};
+use crate::{Hugr, Node};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpName, OpTrait, OpType};
@@ -19,8 +18,12 @@ use super::{LeafOp, OpName, OpTrait, OpType};
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
+    ///
+    /// [Extension]: crate::Extension
     Extension(ExtensionOp),
     /// When we either haven't tried to identify the [Extension] or failed to find it.
+    ///
+    /// [Extension]: crate::Extension
     Opaque(OpaqueOp),
 }
 
@@ -95,7 +98,9 @@ impl OpTrait for ExternalOp {
 }
 
 /// An operation defined by an [OpDef] from a loaded [Extension].
-// Note *not* Serializable: container (ExternalOp) is serialized as an OpaqueOp instead.
+/// Note *not* Serializable: container ([ExternalOp]) is serialized as an [OpaqueOp] instead.
+///
+/// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
@@ -105,9 +110,13 @@ pub struct ExtensionOp {
 
 impl ExtensionOp {
     /// Create a new ExtensionOp given the type arguments and specified input extensions
-    pub fn new(def: Arc<OpDef>, args: impl Into<Vec<TypeArg>>) -> Result<Self, SignatureError> {
+    pub fn new(
+        def: Arc<OpDef>,
+        args: impl Into<Vec<TypeArg>>,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
         let args = args.into();
-        let signature = def.compute_signature(&args)?;
+        let signature = def.compute_signature(&args, exts)?;
         Ok(Self {
             def,
             args,
@@ -216,7 +225,7 @@ impl OpaqueOp {
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
     h: &mut Hugr,
-    extension_registry: &HashMap<SmolStr, Extension>,
+    extension_registry: &ExtensionRegistry,
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
@@ -230,9 +239,9 @@ pub fn resolve_extension_ops(
                             r.name().to_string(),
                         ));
                     };
-                    // TODO input extensions. From type checker, or just drop by storing only delta in Signature.
                     let op = ExternalOp::Extension(
-                        ExtensionOp::new(def.clone(), opaque.args.clone()).unwrap(),
+                        ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
+                            .unwrap(),
                     );
                     if let Some(sig) = &opaque.signature {
                         if sig != &op.signature() {
@@ -252,7 +261,8 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        let node_type = NodeType::pure(Into::<LeafOp>::into(op));
+        let leaf: LeafOp = op.into();
+        let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
         h.replace_op(n, node_type);
     }
     Ok(())
@@ -283,15 +293,15 @@ mod test {
     #[test]
     fn new_opaque_op() {
         let op = OpaqueOp::new(
-            "res".into(),
+            "res".try_into().unwrap(),
             "op",
             "desc".into(),
-            vec![TypeArg::Type(USIZE_T)],
+            vec![TypeArg::Type { ty: USIZE_T }],
             None,
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(op.description(), "desc");
-        assert_eq!(op.args(), &[TypeArg::Type(USIZE_T)]);
+        assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
     }
 }

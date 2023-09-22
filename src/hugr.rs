@@ -2,6 +2,7 @@
 
 pub mod hugrmut;
 
+mod ident;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
@@ -14,6 +15,7 @@ pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
 use derive_more::From;
+pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
@@ -21,13 +23,13 @@ use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
 pub use self::views::HugrView;
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
-use crate::ops::{OpTag, OpTrait, OpType};
+use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
 
 use delegate::delegate;
@@ -62,12 +64,18 @@ pub struct NodeType {
     input_extensions: Option<ExtensionSet>,
 }
 
+/// The default NodeType, with open extensions
+pub const DEFAULT_NODETYPE: NodeType = NodeType {
+    op: DEFAULT_OPTYPE,
+    input_extensions: None, // Default for any Option
+};
+
 impl NodeType {
     /// Create a new optype with some ExtensionSet
-    pub fn new(op: impl Into<OpType>, input_extensions: ExtensionSet) -> Self {
+    pub fn new(op: impl Into<OpType>, input_extensions: impl Into<Option<ExtensionSet>>) -> Self {
         NodeType {
             op: op.into(),
-            input_extensions: Some(input_extensions),
+            input_extensions: input_extensions.into(),
         }
     }
 
@@ -179,7 +187,21 @@ pub struct Node {
 }
 
 /// A handle to a port for a node in the HUGR.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug, From)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Ord,
+    Hash,
+    Default,
+    Debug,
+    From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(transparent)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Port {
     offset: portgraph::PortOffset,
@@ -190,14 +212,6 @@ pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Applies a rewrite to the graph.
-    pub fn apply_rewrite<R, E>(
-        &mut self,
-        rw: impl Rewrite<ApplyResult = R, Error = E>,
-    ) -> Result<R, E> {
-        rw.apply(self)
-    }
-
     /// Run resource inference and pass the closure into validation
     pub fn infer_and_validate(
         &mut self,
@@ -456,10 +470,17 @@ pub enum HugrError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyHugrError,
+    PyException,
+    "Errors that can occur while manipulating a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<HugrError> for PyErr {
     fn from(err: HugrError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyHugrError::new_err(err.to_string())
     }
 }
 
@@ -496,7 +517,7 @@ mod test {
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
         const BIT: Type = crate::extension::prelude::USIZE_T;
-        let r = ExtensionSet::singleton(&"R".into());
+        let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let mut hugr = closed_dfg_root_hugr(
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
@@ -506,7 +527,7 @@ mod test {
             hugr.root(),
             NodeType::open_extensions(ops::LeafOp::Lift {
                 type_row: type_row![BIT],
-                new_extension: "R".into(),
+                new_extension: "R".try_into().unwrap(),
             }),
         )?;
         hugr.connect(input, 0, lift, 0)?;

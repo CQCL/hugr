@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
@@ -90,9 +90,17 @@ pub enum HUGRSerializationError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyHUGRSerializationError,
+    PyException,
+    "Errors that can occur while serializing a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<HUGRSerializationError> for PyErr {
     fn from(err: HUGRSerializationError) -> Self {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyHUGRSerializationError::new_err(err.to_string())
     }
 }
 
@@ -210,10 +218,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
-            match input_extensions {
-                None => NodeType::open_extensions(root_type),
-                Some(rs) => NodeType::new(root_type, rs),
-            },
+            NodeType::new(root_type, input_extensions),
             nodes.len(),
             edges.len() * 2,
         );
@@ -230,7 +235,7 @@ impl TryFrom<SerHugrV0> for Hugr {
 
         for (node, metadata) in metadata.into_iter().enumerate() {
             let node = NodeIndex::new(node).into();
-            hugr.set_metadata(node, metadata);
+            hugr.set_metadata(node, metadata)?;
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {

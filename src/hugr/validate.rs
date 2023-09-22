@@ -10,13 +10,14 @@ use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
-use pyo3::prelude::*;
+use pyo3::{create_exception, exceptions::PyException, PyErr};
 
 use crate::extension::SignatureError;
 use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
+
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -99,9 +100,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// The results of this computation should be cached in `self.dominators`.
     /// We don't do it here to avoid mutable borrows.
     fn compute_dominator(&self, parent: Node) -> Dominators<Node> {
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
+        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
         let entry_node = self.hugr.children(parent).next().unwrap();
-        dominators::simple_fast(&region, entry_node)
+        dominators::simple_fast(&region.as_petgraph(), entry_node)
     }
 
     /// Check the constraints on a single node.
@@ -158,8 +159,17 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Check operation-specific constraints
-        self.validate_operation(node, node_type)?;
+        // Check operation-specific constraints. Firstly that type args are correct
+        // (Good to call `resolve_extension_ops` immediately before this
+        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
+        if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
+            for arg in b.args() {
+                arg.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+        }
+        // Secondly that the node has correct children
+        self.validate_children(node, node_type)?;
 
         // If this is a container with I/O nodes, check that the extension they
         // define match the extensions of the container.
@@ -260,7 +270,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_operation(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
+    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
         let op_type = &node_type.op;
         let flags = op_type.validity_flags();
 
@@ -301,7 +311,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
-            if let Err(source) = op_type.validate_children(children_optypes) {
+            if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
                     parent_optype: op_type.clone(),
@@ -364,9 +374,12 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         };
 
-        let region: SiblingGraph = SiblingGraph::new(self.hugr, parent);
-        let postorder = Topo::new(&region);
-        let nodes_visited = postorder.iter(&region).filter(|n| *n != parent).count();
+        let region: SiblingGraph = SiblingGraph::try_new(self.hugr, parent).unwrap();
+        let postorder = Topo::new(&region.as_petgraph());
+        let nodes_visited = postorder
+            .iter(&region.as_petgraph())
+            .filter(|n| *n != parent)
+            .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {
@@ -624,10 +637,17 @@ pub enum ValidationError {
 }
 
 #[cfg(feature = "pyo3")]
+create_exception!(
+    pyrs,
+    PyValidationError,
+    PyException,
+    "Errors that can occur while validating a Hugr"
+);
+
+#[cfg(feature = "pyo3")]
 impl From<ValidationError> for PyErr {
     fn from(err: ValidationError) -> Self {
-        // We may want to define more specific python-level errors at some point.
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
+        PyValidationError::new_err(err.to_string())
     }
 }
 
@@ -698,17 +718,19 @@ mod test {
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-    use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{
+        Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
+    };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
+    use crate::macros::const_extension_ids;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
     use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
-    use crate::Direction;
-    use crate::{type_row, Node};
+    use crate::{type_row, Direction, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;
@@ -951,8 +973,7 @@ mod test {
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
-                inputs: type_row![BOOL_T],
-                outputs: type_row![BOOL_T],
+                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
         );
         assert_matches!(
@@ -969,6 +990,7 @@ mod test {
                     inputs: type_row![BOOL_T],
                     predicate_variants: vec![type_row![]],
                     other_outputs: type_row![BOOL_T],
+                    extension_delta: ExtensionSet::new(),
                 },
             )
             .unwrap();
@@ -1009,6 +1031,7 @@ mod test {
                 inputs: type_row![Q],
                 predicate_variants: vec![type_row![]],
                 other_outputs: type_row![Q],
+                extension_delta: ExtensionSet::new(),
             }),
         );
         let mut block_children = b.hierarchy.children(block.index);
@@ -1075,6 +1098,11 @@ mod test {
         Ok(())
     }
 
+    const_extension_ids! {
+        const XA: ExtensionId = "A";
+        const XB: ExtensionId = "BOOL_EXT";
+    }
+
     #[test]
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
@@ -1119,7 +1147,7 @@ mod test {
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             // Inner DFG has extension requirements that the wire wont satisfy
-            .with_input_extensions(ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]));
+            .with_input_extensions(ExtensionSet::from_iter([XA, XB]));
 
         let f_builder = main.dfg_builder(
             inner_sig.signature,
@@ -1155,7 +1183,7 @@ mod test {
         let [main_input] = main.input_wires_arr();
 
         let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&"A".into()))
+            .with_extension_delta(&ExtensionSet::singleton(&XA))
             .with_input_extensions(ExtensionSet::new());
 
         let f_builder = main.dfg_builder(
@@ -1185,7 +1213,7 @@ mod test {
     fn extensions_mismatch() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let all_rs = ExtensionSet::from_iter(["A".into(), "BOOL_T".into()]);
+        let all_rs = ExtensionSet::from_iter([XA, XB]);
 
         let main_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&all_rs)
@@ -1194,10 +1222,10 @@ mod test {
         let mut main = module_builder.define_function("main", main_sig)?;
 
         let inner_left_sig = FunctionType::new(type_row![], type_row![NAT])
-            .with_input_extensions(ExtensionSet::singleton(&"A".into()));
+            .with_input_extensions(ExtensionSet::singleton(&XA));
 
         let inner_right_sig = FunctionType::new(type_row![], type_row![NAT])
-            .with_input_extensions(ExtensionSet::singleton(&"BOOL_T".into()));
+            .with_input_extensions(ExtensionSet::singleton(&XB));
 
         let inner_mult_sig =
             FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_input_extensions(all_rs);
@@ -1241,7 +1269,7 @@ mod test {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let rs = ExtensionSet::singleton(&"R".into());
+        let rs = ExtensionSet::singleton(&XA);
 
         let main_signature =
             FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
@@ -1331,7 +1359,8 @@ mod test {
 
     #[test]
     fn invalid_types() {
-        let mut e = Extension::new("MyExt".into());
+        let name: ExtensionId = "MyExt".try_into().unwrap();
+        let mut e = Extension::new(name.clone());
         e.add_type(
             "MyContainer".into(),
             vec![TypeParam::Type(TypeBound::Copyable)],
@@ -1351,8 +1380,8 @@ mod test {
 
         let valid = Type::new_extension(CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
-            "MyExt",
+            vec![TypeArg::Type { ty: USIZE_T }],
+            name.clone(),
             TypeBound::Any,
         ));
         assert_eq!(
@@ -1363,22 +1392,22 @@ mod test {
         // valid is Any, so is not allowed as an element of an outer MyContainer.
         let element_outside_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(valid.clone())],
-            "MyExt",
+            vec![TypeArg::Type { ty: valid.clone() }],
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(
             validate_to_sig_error(element_outside_bound),
             SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
                 param: TypeParam::Type(TypeBound::Copyable),
-                arg: TypeArg::Type(valid)
+                arg: TypeArg::Type { ty: valid }
             })
         );
 
         let bad_bound = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T)],
-            "MyExt",
+            vec![TypeArg::Type { ty: USIZE_T }],
+            name.clone(),
             TypeBound::Copyable,
         );
         assert_eq!(
@@ -1392,8 +1421,10 @@ mod test {
         // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
         let nested = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(Type::new_extension(bad_bound))],
-            "MyExt",
+            vec![TypeArg::Type {
+                ty: Type::new_extension(bad_bound),
+            }],
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(
@@ -1406,8 +1437,8 @@ mod test {
 
         let too_many_type_args = CustomType::new(
             "MyContainer",
-            vec![TypeArg::Type(USIZE_T), TypeArg::BoundedNat(3)],
-            "MyExt",
+            vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
+            name.clone(),
             TypeBound::Any,
         );
         assert_eq!(

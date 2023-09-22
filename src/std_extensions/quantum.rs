@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::extension::prelude::{BOOL_T, QB_T};
-use crate::extension::SignatureError;
+use crate::extension::{ExtensionId, SignatureError};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::type_row;
 use crate::types::type_param::TypeArg;
@@ -13,7 +13,7 @@ use crate::Extension;
 use lazy_static::lazy_static;
 
 /// The extension identifier.
-pub const EXTENSION_ID: SmolStr = SmolStr::new_inline("quantum");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("quantum");
 fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     Ok(FunctionType::new(type_row![QB_T], type_row![QB_T]))
 }
@@ -78,13 +78,13 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::ops::LeafOp;
+    use crate::{extension::EMPTY_REG, ops::LeafOp};
 
     use super::EXTENSION;
 
     fn get_gate(gate_name: &str) -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(gate_name, [])
+            .instantiate_extension_op(gate_name, [], &EMPTY_REG)
             .unwrap()
             .into()
     }

@@ -106,7 +106,7 @@ impl TypeDef {
                 least_upper_bound(indices.iter().map(|i| {
                     let ta = args.get(*i);
                     match ta {
-                        Some(TypeArg::Type(s)) => s.least_upper_bound(),
+                        Some(TypeArg::Type { ty: s }) => s.least_upper_bound(),
                         _ => panic!("TypeArg index does not refer to a type."),
                     }
                 }))
@@ -141,7 +141,7 @@ impl Extension {
         bound: TypeDefBound,
     ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
-            extension: self.name().into(),
+            extension: self.name.clone(),
             name,
             params,
             description,
@@ -169,27 +169,29 @@ mod test {
         let def = TypeDef {
             name: "MyType".into(),
             params: vec![TypeParam::Type(TypeBound::Copyable)],
-            extension: "MyRsrc".into(),
+            extension: "MyRsrc".try_into().unwrap(),
             description: "Some parameterised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type(Type::new_function(FunctionType::new(
-                vec![],
-                vec![],
-            )))])
+            def.instantiate_concrete(vec![TypeArg::Type {
+                ty: Type::new_function(FunctionType::new(vec![], vec![])),
+            }])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate_concrete([TypeArg::Type(USIZE_T)]).unwrap());
+        let typ2 = Type::new_extension(
+            def.instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                .unwrap(),
+        );
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(QB_T)]),
+            def.instantiate_concrete([TypeArg::Type { ty: QB_T }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type(QB_T),
+                    arg: TypeArg::Type { ty: QB_T },
                     param: TypeParam::Type(TypeBound::Copyable)
                 }
             ))
@@ -201,8 +203,11 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type(FLOAT64_TYPE), TypeArg::Type(FLOAT64_TYPE),])
-                .unwrap_err(),
+            def.instantiate_concrete([
+                TypeArg::Type { ty: FLOAT64_TYPE },
+                TypeArg::Type { ty: FLOAT64_TYPE },
+            ])
+            .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );
     }

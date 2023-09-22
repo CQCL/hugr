@@ -3,6 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
+use crate::type_row;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 
 use super::dataflow::DataflowOpTrait;
@@ -95,8 +96,7 @@ impl Conditional {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
 pub struct CFG {
-    pub inputs: TypeRow,
-    pub outputs: TypeRow,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(CFG);
@@ -109,7 +109,7 @@ impl DataflowOpTrait for CFG {
     }
 
     fn signature(&self) -> FunctionType {
-        FunctionType::new(self.inputs.clone(), self.outputs.clone())
+        self.signature.clone()
     }
 }
 
@@ -123,6 +123,7 @@ pub enum BasicBlock {
         inputs: TypeRow,
         other_outputs: TypeRow,
         predicate_variants: Vec<TypeRow>,
+        extension_delta: ExtensionSet,
     },
     /// The single exit node of the CFG, has no children,
     /// stores the types of the CFG node output.
@@ -165,6 +166,15 @@ impl OpTrait for BasicBlock {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
+    }
+
+    fn signature(&self) -> FunctionType {
+        match self {
+            BasicBlock::DFB {
+                extension_delta, ..
+            } => FunctionType::new(type_row![], type_row![]).with_extension_delta(extension_delta),
+            BasicBlock::Exit { .. } => FunctionType::new(type_row![], type_row![]),
+        }
     }
 }
 

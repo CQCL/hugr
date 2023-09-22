@@ -3,7 +3,7 @@
 //! Adds a `validity_flags` method to [`OpType`] that returns a series of flags
 //! used by the [`crate::hugr::validate`] module.
 //!
-//! It also defines a `validate_children` method for more complex tests that
+//! It also defines a `validate_op_children` method for more complex tests that
 //! require traversing the children.
 
 use itertools::Itertools;
@@ -93,7 +93,7 @@ impl ValidateOp for super::FuncDefn {
         }
     }
 
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -118,7 +118,7 @@ impl ValidateOp for super::DFG {
         }
     }
 
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -141,7 +141,7 @@ impl ValidateOp for super::Conditional {
         }
     }
 
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -188,7 +188,7 @@ impl ValidateOp for super::TailLoop {
         }
     }
 
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -214,7 +214,7 @@ impl ValidateOp for super::CFG {
         }
     }
 
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -334,7 +334,7 @@ impl ValidateOp for BasicBlock {
     }
 
     /// Validate the ordered list of children.
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
@@ -343,6 +343,7 @@ impl ValidateOp for BasicBlock {
                 inputs,
                 predicate_variants,
                 other_outputs: outputs,
+                extension_delta: _,
             } => {
                 let predicate_type = Type::new_predicate(predicate_variants.clone());
                 let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
@@ -368,7 +369,7 @@ impl ValidateOp for super::Case {
     }
 
     /// Validate the ordered list of children.
-    fn validate_children<'a>(
+    fn validate_op_children<'a>(
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
