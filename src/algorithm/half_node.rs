@@ -1,16 +1,13 @@
 use std::hash::Hash;
 
-use itertools::Itertools;
-
 use super::nest_cfgs::CfgNodeMap;
-use crate::builder::{BuildError, CFGBuilder, Dataflow, SubContainer};
+
 use crate::hugr::views::HugrView;
-use crate::hugr::HugrMut;
-use crate::ops::handle::{CfgID, NodeHandle};
-use crate::ops::OpTag;
-use crate::ops::{BasicBlock, Const, LoadConstant, OpTrait, OpType, Output};
-use crate::types::TypeRow;
-use crate::{type_row, Direction, Hugr, Node, Port};
+
+use crate::ops::handle::CfgID;
+use crate::ops::{OpTag, OpTrait};
+
+use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -107,7 +104,7 @@ mod test {
     use std::collections::HashSet;
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (mut h, main, tail) = build_conditional_in_loop_cfg(false)?;
+        let (h, main, tail) = build_conditional_in_loop_cfg(false)?;
         //               /-> left --\
         //  entry -> main            > merge -> tail -> exit
         //            |  \-> right -/             |
@@ -121,7 +118,7 @@ mod test {
         // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
 
         // ALAN and another case for WholeHugrView
-        let mut m = SiblingGraph::<CfgID>::try_new(&h, h.root()).unwrap();
+        let m = SiblingGraph::<CfgID>::try_new(&h, h.root()).unwrap();
 
         let v = HalfNodeView::new(&m);
 

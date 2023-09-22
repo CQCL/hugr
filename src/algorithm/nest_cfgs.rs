@@ -616,7 +616,7 @@ pub(crate) mod test {
         );
         // ALAN and another case for WholeHugrView
         let root = h.root();
-        let mut m = SiblingMut::<CfgID>::try_new(&mut h,root).unwrap();
+        let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m)).unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
