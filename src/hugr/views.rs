@@ -502,8 +502,11 @@ mod test {
         }));
         let cfg_v = WholeHugrView::<CfgID>::try_new(&h);
         assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
-        let dfg_v = WholeHugrView::<DfgID>::try_new(h).unwrap();
+        let dfg_v = WholeHugrView::<DfgID>::try_new(&h).unwrap();
         // Just to check that WholeHugrView is a HugrView:
-        assert_eq!(dfg_v.all_neighbours(dfg_v.root()).collect(), vec![]);
+        assert_eq!(
+            dfg_v.all_neighbours(dfg_v.root()).collect::<Vec<_>>(),
+            vec![]
+        );
     }
 }
