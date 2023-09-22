@@ -24,7 +24,8 @@ jobs:
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
         fields: '{"labels": ["hugr"]}'
-    - name: set_priority_var
+    - name: Parse the priority label into a Jira priority
+      id: set_priority_var
       env:
         GH_PRIORITY: ${{ github.event.issue.label }}
       run: |
