@@ -8,6 +8,7 @@ use std::{
 };
 
 use super::Type;
+use crate::hugr::PortIndex;
 use crate::utils::display_list;
 use delegate::delegate;
 
@@ -42,6 +43,18 @@ impl TypeRow {
         }
     }
 
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
+        self.types.get(offset.index())
+    }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
+        self.types.to_mut().get_mut(offset.index())
+    }
+
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
@@ -56,18 +69,9 @@ impl TypeRow {
             /// Allow access (consumption) of the contained elements
             pub fn into_owned(self) -> Vec<Type>;
 
-            /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-            pub fn get(&self, offset: usize) -> Option<&Type>;
-
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
         }
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type> {
-        self.types.to_mut().get_mut(offset)
     }
 }
 

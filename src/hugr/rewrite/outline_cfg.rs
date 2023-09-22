@@ -9,7 +9,7 @@ use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::{HugrMut, HugrView};
+use crate::hugr::{HugrMut, HugrView, PortIndex};
 use crate::ops;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{BasicBlock, OpTrait, OpType};
@@ -155,7 +155,7 @@ impl Rewrite for OutlineCfg {
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
                 h.disconnect(pred, br).unwrap();
-                h.connect(pred, br.index(), new_block, 0).unwrap();
+                h.connect(pred, br, new_block, 0).unwrap();
             }
         }
         if entry == outer_entry {
@@ -204,9 +204,7 @@ impl Rewrite for OutlineCfg {
             SiblingMut::try_new(h, new_block).unwrap();
         let mut in_cfg_view: SiblingMut<'_, CfgID> =
             SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
-        in_cfg_view
-            .connect(exit, exit_port.index(), inner_exit, 0)
-            .unwrap();
+        in_cfg_view.connect(exit, exit_port, inner_exit, 0).unwrap();
 
         Ok(())
     }

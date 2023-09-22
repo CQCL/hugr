@@ -658,7 +658,17 @@ impl UnificationContext {
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
             if !self.solved.contains_key(&m) {
-                self.add_solution(m, ExtensionSet::new());
+                // Handle the case where the constraints for `m` contain a self
+                // reference, i.e. "m = Plus(E, m)", in which case the variable
+                // should be instantiated to E rather than the empty set.
+                let solution =
+                    ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
+                        |c| match c {
+                            Constraint::Plus(x, other_m) if &m == other_m => Some(x.clone()),
+                            _ => None,
+                        },
+                    ));
+                self.add_solution(m, solution);
             }
         }
         self.variables = HashSet::new();
@@ -671,8 +681,7 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
-    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
@@ -813,19 +822,33 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let builder = DFGBuilder::new(
-            FunctionType::new(type_row![NAT], type_row![NAT])
-                .with_extension_delta(&ExtensionSet::singleton(&"R".try_into().unwrap())),
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(type_row![NAT], type_row![NAT])
+                .with_extension_delta(&ExtensionSet::singleton(&A)),
+        }));
+
+        let input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Input {
+                types: type_row![NAT],
+            }),
         )?;
-        let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w], &EMPTY_REG);
+
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Output {
+                types: type_row![NAT],
+            }),
+        )?;
+
+        hugr.connect(input, 0, output, 0)?;
 
         // Fail to catch the actual error because it's a difference between I/O
         // nodes and their parents and `report_mismatch` isn't yet smart enough
         // to handle that.
         assert_matches!(
-            hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
+            hugr.infer_and_validate(&PRELUDE_REGISTRY),
+            Err(ValidationError::CantInfer(_))
         );
         Ok(())
     }

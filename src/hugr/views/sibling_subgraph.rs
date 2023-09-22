@@ -423,24 +423,14 @@ impl SiblingSubgraph {
         {
             extracted.disconnect(inp, inp_port)?;
             for (repl_node, repl_port) in repl_ports {
-                extracted.connect(
-                    inp,
-                    inp_port.index(),
-                    node_map[repl_node],
-                    repl_port.index(),
-                )?;
+                extracted.connect(inp, inp_port, node_map[repl_node], *repl_port)?;
             }
         }
         for (out_port, (repl_node, repl_port)) in extracted
             .node_ports(out, Direction::Incoming)
             .zip(self.outputs.iter())
         {
-            extracted.connect(
-                node_map[repl_node],
-                repl_port.index(),
-                out,
-                out_port.index(),
-            )?;
+            extracted.connect(node_map[repl_node], *repl_port, out, out_port)?;
         }
 
         Ok(extracted)

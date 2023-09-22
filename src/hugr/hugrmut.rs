@@ -14,7 +14,7 @@ use crate::{Hugr, Port};
 use self::sealed::HugrMutInternals;
 
 use super::views::SiblingSubgraph;
-use super::{NodeMetadata, Rewrite};
+use super::{NodeMetadata, PortIndex, Rewrite};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrView + HugrMutInternals {
@@ -110,9 +110,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     fn connect(
         &mut self,
         src: Node,
-        src_port: usize,
+        src_port: impl PortIndex,
         dst: Node,
-        dst_port: usize,
+        dst_port: impl PortIndex,
     ) -> Result<(), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
@@ -259,13 +259,13 @@ where
     fn connect(
         &mut self,
         src: Node,
-        src_port: usize,
+        src_port: impl PortIndex,
         dst: Node,
-        dst_port: usize,
+        dst_port: impl PortIndex,
     ) -> Result<(), HugrError> {
         self.as_mut()
             .graph
-            .link_nodes(src.index, src_port, dst.index, dst_port)?;
+            .link_nodes(src.index, src_port.index(), dst.index, dst_port.index())?;
         Ok(())
     }
 
@@ -290,7 +290,7 @@ where
             .get_optype(dst)
             .other_port_index(Direction::Incoming)
             .expect("Destination operation has no non-dataflow incoming edges");
-        self.connect(src, src_port.index(), dst, dst_port.index())?;
+        self.connect(src, src_port, dst, dst_port)?;
         Ok((src_port, dst_port))
     }
 
