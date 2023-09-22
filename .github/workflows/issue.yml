@@ -26,13 +26,24 @@ jobs:
         fields: '{"labels": ["hugr"]}'
     - name: set_priority_var
       env:
-        GH_PRIORITY: {{ github.event.issue.label }}
+        GH_PRIORITY: ${{ github.event.issue.label }}
       run: |
-        echo JIRA_PRIORITY=$(../goodies/priority-to-jira.sh $GH_PRIORITY) >> $GITHUB_OUTPUT
+        MY_RESULT=""
+        case ${GH_PRIORITY} in
+          P-low)
+            MY_RESULT=echo Low;;
+          P-medium)
+            MY_RESULT=Medium;;
+          P-high)
+            MY_RESULT=High;;
+          P-critical)
+            MY_RESULT=Highest;;
+        esac
+        echo $MY_RESULT >> $GITHUB_OUTPUT
+
     - name: Create Task
       env:
-        JIRA_PRIORITY: {{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
-      uses: atlassian/gajira-create@v3.0.1
+        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
       if: "! contains(github.event.issue.labels.*.name, 'bug')"
       with:
         project: TKET
