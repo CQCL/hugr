@@ -40,7 +40,7 @@ jobs:
           P-critical)
             MY_RESULT=Highest;;
         esac
-        echo $MY_RESULT >> $GITHUB_OUTPUT
+        echo "JIRA_PRIORITY=$MY_RESULT" >> $GITHUB_OUTPUT
 
     - name: Create Task
       uses: atlassian/gajira-create@v3.0.1
