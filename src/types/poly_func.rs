@@ -97,19 +97,22 @@ impl PolyFuncType {
     ) -> Result<Self, SignatureError> {
         let (fixed, remaining) = self.params.split_at(args.len());
         check_type_args(args, fixed)?;
-        let mut sub = args.to_vec();
-        // If partial application, renumber remaining params downward
-        sub.extend(
-            remaining
-                .iter()
-                .enumerate()
-                .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
-        );
-        let body = self.body.substitute(exts, &Substitution::new(sub));
-        let params = Vec::from(remaining);
+        let sub: Substitution = if remaining.is_empty() {
+            args.into()
+        } else {
+            // Partial application - renumber remaining params (still bound) downward
+            let mut rhs = args.to_vec();
+            rhs.extend(
+                remaining
+                    .iter()
+                    .enumerate()
+                    .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
+            );
+            rhs.into()
+        };
         Ok(Self {
-            params,
-            body: Box::new(body),
+            params: remaining.to_vec(),
+            body: Box::new(self.body.substitute(exts, &sub)),
         })
     }
 

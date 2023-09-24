@@ -23,14 +23,16 @@ enum Mapping<'a> {
     AddToIndex(usize),
 }
 
-impl<'a> Substitution<'a> {
-    pub(crate) fn new(args: impl Into<Cow<'a, [TypeArg]>>) -> Self {
+impl<'a, T: Into<Cow<'a, [TypeArg]>>> From<T> for Substitution<'a> {
+    fn from(value: T) -> Self {
         Self {
             leave_lowest: 0,
-            mapping: Mapping::Values(args.into()),
+            mapping: Mapping::Values(value.into()),
         }
     }
+}
 
+impl<'a> Substitution<'a> {
     pub(crate) fn get(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         if idx < self.leave_lowest {
             return TypeArg::use_var(idx, decl.clone());
