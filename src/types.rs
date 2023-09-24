@@ -334,8 +334,8 @@ impl Type {
                 Type::new_extension(cty.substitute(exts, sub))
             }
             TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, sub)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, sub)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, exts, sub)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(sub.apply_row(elems, exts)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(sub.apply_row(row, exts)),
         }
     }
 }
@@ -396,15 +396,15 @@ impl Substitution {
             },
         }
     }
-}
 
-fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, sub: &Substitution) -> TypeRow {
-    let res = row
-        .iter()
-        .map(|t| t.substitute(exts, sub))
-        .collect::<Vec<_>>()
-        .into();
-    res
+    fn apply_row(&self, row: &TypeRow, exts: &ExtensionRegistry) -> TypeRow {
+        let res = row
+            .iter()
+            .map(|t| t.substitute(exts, self))
+            .collect::<Vec<_>>()
+            .into();
+        res
+    }
 }
 
 pub(crate) fn check_typevar_decl(

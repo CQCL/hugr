@@ -12,7 +12,7 @@ use std::fmt::{self, Display, Write};
 use crate::hugr::{Direction, PortIndex};
 
 use super::type_param::TypeParam;
-use super::{subst_row, Substitution, Type, TypeRow};
+use super::{Substitution, Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -75,8 +75,8 @@ impl FunctionType {
 
     pub(crate) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         FunctionType {
-            input: subst_row(&self.input, exts, sub),
-            output: subst_row(&self.output, exts, sub),
+            input: sub.apply_row(&self.input, exts),
+            output: sub.apply_row(&self.output, exts),
             extension_reqs: self.extension_reqs.substitute(sub),
         }
     }
