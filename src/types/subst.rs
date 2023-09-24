@@ -1,28 +1,30 @@
+use std::borrow::Cow;
+
 use crate::extension::ExtensionRegistry;
 
 use super::type_param::{TypeArg, TypeParam};
 use super::{Type, TypeBound, TypeRow};
 
 #[derive(Clone, Debug)]
-pub(crate) struct Substitution {
+pub(crate) struct Substitution<'a> {
     /// The number of variables bound more closely than those being substituted,
     /// so these should be untouched by the substitution
     leave_lowest: usize,
     /// What to do to variables that are affected
-    mapping: Mapping,
+    mapping: Mapping<'a>,
 }
 
 #[derive(Clone, Debug)]
-enum Mapping {
+enum Mapping<'a> {
     /// An explicit value to substitute for each bound variable
-    Values(Vec<TypeArg>),
+    Values(Cow<'a, [TypeArg]>),
     /// An amount to add to the index of any free variable
     /// (That is: any free var, of index `i`, becomes the variable `i +` this amount)
     AddToIndex(usize),
 }
 
-impl Substitution {
-    pub(crate) fn new(args: impl Into<Vec<TypeArg>>) -> Self {
+impl<'a> Substitution<'a> {
+    pub(crate) fn new(args: impl Into<Cow<'a, [TypeArg]>>) -> Self {
         Self {
             leave_lowest: 0,
             mapping: Mapping::Values(args.into()),
