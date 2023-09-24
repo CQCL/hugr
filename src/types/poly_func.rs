@@ -121,9 +121,8 @@ impl PolyFuncType {
         args: &[TypeArg],
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        check_type_args(args, &self.params)?;
-        let pf = self.instantiate(args, extension_registry)?;
-        // Since we checked args vs params, we know there are the right number
+        check_type_args(args, &self.params)?; // Ensures applicability AND totality
+        let pf = self.instantiate(args, extension_registry).unwrap();
         assert!(pf.params.is_empty());
         Ok(*pf.body)
     }
