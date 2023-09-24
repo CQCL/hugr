@@ -18,7 +18,7 @@ use portgraph::{Direction, LinkError, NodeIndex, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrError, HugrMut, HugrView};
+use super::{HugrError, HugrMut, HugrView, PortIndex};
 
 /// A wrapper over the available HUGR serialization formats.
 ///

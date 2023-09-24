@@ -495,6 +495,12 @@ impl UnificationContext {
                 Constraint::Equal(other_meta) => {
                     self.eq_graph.register_eq(meta, *other_meta);
                 }
+                // N.B. If `meta` is already solved, we can't use that
+                // information to solve `other_meta`. This is because the Plus
+                // constraint only signifies a preorder.
+                // I.e. if meta = other_meta + 'R', it's still possible that the
+                // solution is meta = other_meta because we could be adding 'R'
+                // to a set which already contained it.
                 Constraint::Plus(r, other_meta) => {
                     if let Some(rs) = self.get_solution(other_meta) {
                         let mut rrs = rs.clone();
@@ -516,10 +522,6 @@ impl UnificationContext {
                                 solved = true;
                             }
                         };
-                    } else if let Some(superset) = self.get_solution(&meta) {
-                        let subset = ExtensionSet::singleton(r).missing_from(superset);
-                        self.add_solution(self.resolve(*other_meta), subset);
-                        solved = true;
                     };
                 }
             }
@@ -656,7 +658,17 @@ impl UnificationContext {
     pub fn instantiate_variables(&mut self) {
         for m in self.variables.clone().into_iter() {
             if !self.solved.contains_key(&m) {
-                self.add_solution(m, ExtensionSet::new());
+                // Handle the case where the constraints for `m` contain a self
+                // reference, i.e. "m = Plus(E, m)", in which case the variable
+                // should be instantiated to E rather than the empty set.
+                let solution =
+                    ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
+                        |c| match c {
+                            Constraint::Plus(x, other_m) if &m == other_m => Some(x.clone()),
+                            _ => None,
+                        },
+                    ));
+                self.add_solution(m, solution);
             }
         }
         self.variables = HashSet::new();
@@ -669,8 +681,7 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
-    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::{ExtensionSet, EMPTY_REG};
+    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
@@ -678,6 +689,7 @@ mod test {
     use crate::types::{FunctionType, Type};
 
     use cool_asserts::assert_matches;
+    use itertools::Itertools;
     use portgraph::NodeIndex;
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -810,19 +822,33 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let builder = DFGBuilder::new(
-            FunctionType::new(type_row![NAT], type_row![NAT])
-                .with_extension_delta(&ExtensionSet::singleton(&"R".try_into().unwrap())),
+        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+            signature: FunctionType::new(type_row![NAT], type_row![NAT])
+                .with_extension_delta(&ExtensionSet::singleton(&A)),
+        }));
+
+        let input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Input {
+                types: type_row![NAT],
+            }),
         )?;
-        let [w] = builder.input_wires_arr();
-        let hugr = builder.finish_hugr_with_outputs([w], &EMPTY_REG);
+
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::pure(ops::Output {
+                types: type_row![NAT],
+            }),
+        )?;
+
+        hugr.connect(input, 0, output, 0)?;
 
         // Fail to catch the actual error because it's a difference between I/O
         // nodes and their parents and `report_mismatch` isn't yet smart enough
         // to handle that.
         assert_matches!(
-            hugr,
-            Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
+            hugr.infer_and_validate(&PRELUDE_REGISTRY),
+            Err(ValidationError::CantInfer(_))
         );
         Ok(())
     }
@@ -939,58 +965,6 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn minus_test() -> Result<(), Box<dyn Error>> {
-        let const_true = ops::Const::true_val();
-        const BOOLEAN: Type = Type::new_simple_predicate(2);
-        let just_bool = type_row![BOOLEAN];
-
-        let abc = ExtensionSet::from_iter([A, B, C]);
-
-        // Parent graph is closed
-        let mut hugr = closed_dfg_root_hugr(
-            FunctionType::new(type_row![], just_bool.clone()).with_extension_delta(&abc),
-        );
-
-        let [_, output] = hugr.get_io(hugr.root()).unwrap();
-
-        let root = hugr.root();
-        let [child, _, ochild] = create_with_io(
-            &mut hugr,
-            root,
-            ops::DFG {
-                signature: FunctionType::new(type_row![], just_bool.clone())
-                    .with_extension_delta(&abc),
-            },
-        )?;
-
-        let const_node = hugr.add_node_with_parent(child, NodeType::open_extensions(const_true))?;
-        let lift_node = hugr.add_node_with_parent(
-            child,
-            NodeType::open_extensions(ops::LeafOp::Lift {
-                type_row: just_bool,
-                new_extension: C,
-            }),
-        )?;
-
-        hugr.connect(const_node, 0, lift_node, 0)?;
-        hugr.connect(lift_node, 0, ochild, 0)?;
-        hugr.connect(child, 0, output, 0)?;
-
-        hugr.infer_extensions()?;
-
-        // The solution for the const node should be {A, B}!
-        assert_eq!(
-            hugr.get_nodetype(const_node)
-                .signature()
-                .unwrap()
-                .output_extensions(),
-            ExtensionSet::from_iter([A, B])
-        );
-
-        Ok(())
-    }
-
     fn create_with_io(
         hugr: &mut Hugr,
         parent: Node,
@@ -1089,6 +1063,73 @@ mod test {
                 ExtensionSet::new()
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
+        let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
+
+        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+            signature: df_sig
+                .clone()
+                .with_extension_delta(&ExtensionSet::from_iter([A, B])),
+        }));
+
+        let root = hugr.root();
+        let input = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::Input {
+                types: type_row![NAT],
+            }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::Output {
+                types: type_row![NAT],
+            }),
+        )?;
+
+        // Make identical dataflow nodes which add extension requirement "A" or "B"
+        let df_nodes: Vec<Node> = vec![A, A, B, B, A, B]
+            .into_iter()
+            .map(|ext| {
+                let [node, input, output] = create_with_io(
+                    &mut hugr,
+                    root,
+                    ops::DFG {
+                        signature: df_sig
+                            .clone()
+                            .with_extension_delta(&ExtensionSet::singleton(&ext)),
+                    },
+                )
+                .unwrap();
+
+                let lift = hugr
+                    .add_node_with_parent(
+                        node,
+                        NodeType::open_extensions(ops::LeafOp::Lift {
+                            type_row: type_row![NAT],
+                            new_extension: ext,
+                        }),
+                    )
+                    .unwrap();
+
+                hugr.connect(input, 0, lift, 0).unwrap();
+                hugr.connect(lift, 0, output, 0).unwrap();
+
+                node
+            })
+            .collect();
+
+        // Connect nodes in order (0 -> 1 -> 2 ...)
+        let nodes = [vec![input], df_nodes, vec![output]].concat();
+        for (src, tgt) in nodes.into_iter().tuple_windows() {
+            hugr.connect(src, 0, tgt, 0)?;
+        }
+
+        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+
         Ok(())
     }
 }

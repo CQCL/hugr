@@ -6,8 +6,8 @@ use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
-use crate::types::type_param::{check_type_args, TypeArg};
-use crate::types::{PolyFuncType, Substitution};
+use crate::types::type_param::TypeArg;
+use crate::types::PolyFuncType;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
@@ -83,27 +83,11 @@ impl TypeApplication {
         let args = args.into();
         // Should we require >=1 `arg`s here? Or that input declares >=1 params?
         // At the moment we allow an identity TypeApply on a monomorphic function type.
-        let (fixed, remaining) = input.params.split_at(args.len());
-        check_type_args(&args, fixed)?;
-        let mut sub = args.clone();
-        // If partial application, renumber remaining params downward
-        sub.extend(
-            remaining
-                .iter()
-                .enumerate()
-                .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
-        );
-        let body = input
-            .body
-            .substitute(extension_registry, &Substitution::new(sub));
-        let params = Vec::from(remaining);
+        let output = input.instantiate(&args, extension_registry)?;
         Ok(Self {
             input,
             args,
-            output: PolyFuncType {
-                params,
-                body: Box::new(body),
-            },
+            output,
         })
     }
 
@@ -219,124 +203,5 @@ impl OpTrait for LeafOp {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::extension::prelude::USIZE_T;
-    use crate::extension::{SignatureError, PRELUDE, PRELUDE_REGISTRY};
-    use crate::ops::OpTrait;
-    use crate::types::type_param::{TypeArg, TypeParam};
-    use crate::types::{FunctionType, PolyFuncType, Type, TypeBound};
-
-    use super::TypeApplication;
-
-    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
-
-    // The standard library new_array does not allow passing in a variable for size.
-    fn new_array(ty: Type, s: TypeArg) -> Type {
-        let array_def = PRELUDE.get_type("array").unwrap();
-        Type::new_extension(
-            array_def
-                .instantiate_concrete(vec![TypeArg::Type { ty }, s])
-                .unwrap(),
-        )
-    }
-
-    #[test]
-    fn test_type_apply() -> Result<(), SignatureError> {
-        let sig_fn =
-            |i, o| FunctionType::new(vec![Type::new_function(i)], vec![Type::new_function(o)]);
-
-        let array_max = PolyFuncType::new_validated(
-            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
-            FunctionType::new(
-                vec![new_array(
-                    Type::new_variable(0, TypeBound::Any),
-                    TypeArg::use_var(1, TypeParam::max_nat()),
-                )],
-                vec![Type::new_variable(0, TypeBound::Any)],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-
-        let concrete = FunctionType::new(
-            vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
-            vec![USIZE_T],
-        );
-        let ta = TypeApplication::try_new(
-            array_max.clone(),
-            [USIZE_TA, TypeArg::BoundedNat { n: 3 }],
-            &PRELUDE_REGISTRY,
-        )?;
-        assert_eq!(
-            ta.to_leaf().signature(),
-            sig_fn(array_max.clone(), concrete.into())
-        );
-
-        let partial = PolyFuncType::new_validated(
-            vec![TypeParam::max_nat()],
-            FunctionType::new(
-                vec![new_array(
-                    USIZE_T,
-                    TypeArg::use_var(0, TypeParam::max_nat()),
-                )],
-                vec![USIZE_T],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-        let ta = TypeApplication::try_new(array_max.clone(), [USIZE_TA], &PRELUDE_REGISTRY)?;
-        assert_eq!(ta.to_leaf().signature(), sig_fn(array_max, partial));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_type_apply_nested() -> Result<(), SignatureError> {
-        let inner_var = Type::new_variable(0, TypeBound::Any);
-        let inner = PolyFuncType {
-            params: vec![TypeParam::Type(TypeBound::Any)],
-            body: Box::new(FunctionType::new(
-                vec![new_array(
-                    inner_var.clone(),
-                    TypeArg::use_var(1, TypeParam::max_nat()),
-                )],
-                vec![inner_var.clone()],
-            )),
-        };
-        let outer = PolyFuncType::new_validated(
-            vec![TypeParam::max_nat()],
-            FunctionType::new(vec![], vec![Type::new_function(inner)]),
-            &PRELUDE_REGISTRY,
-        )?;
-
-        let outer_applied = FunctionType::new(
-            vec![],
-            vec![Type::new_function(PolyFuncType::new_validated(
-                vec![TypeParam::Type(TypeBound::Any)],
-                FunctionType::new(
-                    // We are checking that the substitution has been applied to the right var
-                    // - NOT to the inner_var which has index 0 here
-                    vec![new_array(inner_var.clone(), TypeArg::BoundedNat { n: 5 })],
-                    vec![inner_var.clone()],
-                ),
-                &PRELUDE_REGISTRY,
-            )?)],
-        );
-
-        let do_apply = TypeApplication::try_new(
-            outer.clone(),
-            [TypeArg::BoundedNat { n: 5 }],
-            &PRELUDE_REGISTRY,
-        )?;
-        assert_eq!(
-            do_apply.to_leaf().signature(),
-            FunctionType::new(
-                vec![Type::new_function(outer)],
-                vec![Type::new_function(outer_applied)]
-            )
-        );
-        Ok(())
     }
 }

@@ -12,6 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
+use super::check_typevar_decl;
 use super::CustomType;
 use super::Substitution;
 use super::Type;
@@ -153,6 +154,8 @@ impl TypeArg {
         }
     }
 
+    /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
+    /// is valid and closed.
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -174,16 +177,7 @@ impl TypeArg {
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => {
-                if type_vars.get(*idx) == Some(cached_decl) {
-                    Ok(())
-                } else {
-                    Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                        used: cached_decl.clone(),
-                        decl: type_vars.get(*idx).cloned(),
-                    })
-                }
-            }
+            } => check_typevar_decl(type_vars, *idx, cached_decl),
         }
     }
 

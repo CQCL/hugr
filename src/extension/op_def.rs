@@ -91,10 +91,9 @@ pub trait CustomLowerFunc: Send + Sync {
 /// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(super) enum SignatureFunc {
-    // Note: I'd prefer to make the YAML version just implement the same CustomSignatureFunc trait,
-    // and then just have a Box<dyn CustomSignatureFunc> instead of this enum, but that seems less likely
-    // to serialize well.
-    /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
+    // Note: except for serialization, we could have type schemes just implement the same
+    // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
+    // However instead we treat all CustomFunc's as non-serializable.
     #[serde(rename = "signature")]
     TypeScheme(PolyFuncType),
     #[serde(skip)]
@@ -243,7 +242,10 @@ impl OpDef {
                 (temp.as_ref().unwrap(), ts_args)
             }
         };
-        let res = pf.compute_signature(args, exts)?;
+        // Hugr's are monomorphic, so check the args have no free variables
+        args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
+
+        let res = pf.instantiate_all(args, exts)?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));

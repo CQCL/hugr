@@ -16,7 +16,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomType, PolyFuncType, Substitution, TypeBound};
+use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -91,12 +91,12 @@ pub enum SignatureError {
         actual: TypeBound,
         expected: TypeBound,
     },
-    /// A Type Variable is either not declared, or the usage does not match the declaration
+    /// A Type Variable is used as a kind that does not match the declaration
     #[error("Type Variable used as {used:?} but declared as {decl:?}")]
-    TypeVarDoesNotMatchDeclaration {
-        used: TypeParam,
-        decl: Option<TypeParam>,
-    },
+    TypeVarDoesNotMatchDeclaration { used: TypeParam, decl: TypeParam },
+    /// A type variable that was used has not been declared
+    #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
+    FreeTypeVar { idx: usize, num_decls: usize },
     /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
     /// [ExtensionRegistry]. (Note: might be commoned up with
     /// [CustomOpError::SignatureMismatch] if we implement
@@ -410,15 +410,9 @@ impl ExtensionSet {
     }
 
     pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
-        for var_idx in self.iter().filter_map(as_typevar) {
-            if params.get(var_idx) != Some(&TypeParam::Extensions) {
-                return Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: TypeParam::Extensions,
-                    decl: params.get(var_idx).cloned(),
-                });
-            }
-        }
-        Ok(())
+        self.iter()
+            .filter_map(as_typevar)
+            .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
     }
 
     pub(crate) fn substitute(&self, sub: &Substitution) -> Self {
@@ -433,6 +427,9 @@ impl ExtensionSet {
 }
 
 fn as_typevar(e: &ExtensionId) -> Option<usize> {
+    // Type variables are represented as radix-10 numbers, which are illegal
+    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
+    // we assume it must be a type variable, and fail fast if it isn't.
     match e.chars().next() {
         Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
         _ => None,

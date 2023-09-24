@@ -26,9 +26,9 @@ pub struct PolyFuncType {
     /// the same number of [TypeArg]s before the function can be called.
     ///
     /// [TypeArg]: super::type_param::TypeArg
-    pub params: Vec<TypeParam>,
+    pub(crate) params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    pub body: Box<FunctionType>,
+    body: Box<FunctionType>,
 }
 
 impl From<FunctionType> for PolyFuncType {
@@ -90,18 +90,39 @@ impl PolyFuncType {
         }
     }
 
-    /// A useful wrapper for when a PolyFuncType is used as a [SignatureFunc]
-    ///
-    /// [SignatureFunc]: crate::extension::SignatureFunc
-    pub(crate) fn compute_signature(
+    pub(crate) fn instantiate(
+        &self,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let (fixed, remaining) = self.params.split_at(args.len());
+        check_type_args(args, fixed)?;
+        let mut sub = args.to_vec();
+        // If partial application, renumber remaining params downward
+        sub.extend(
+            remaining
+                .iter()
+                .enumerate()
+                .map(|(i, decl)| TypeArg::use_var(i, decl.clone())),
+        );
+        let body = self.body.substitute(exts, &Substitution::new(sub));
+        let params = Vec::from(remaining);
+        Ok(Self {
+            params,
+            body: Box::new(body),
+        })
+    }
+
+    pub(crate) fn instantiate_all(
         &self,
         args: &[TypeArg],
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?;
-        Ok(self
-            .body
-            .substitute(extension_registry, &Substitution::new(args.to_vec())))
+        let pf = self.instantiate(args, extension_registry)?;
+        // Since we checked args vs params, we know there are the right number
+        assert!(pf.params.is_empty());
+        Ok(*pf.body)
     }
 }
 
@@ -111,7 +132,7 @@ pub(crate) mod test {
 
     use smol_str::SmolStr;
 
-    use crate::extension::prelude::{PRELUDE_ID, USIZE_T};
+    use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
     };
@@ -126,7 +147,7 @@ pub(crate) mod test {
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::use_var(0, TypeParam::Type(TypeBound::Any));
-        let list_of_var = Type::new_extension(list_def.instantiate_concrete([tyvar.clone()])?);
+        let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
         let list_len = PolyFuncType::new_validated(
             [TypeParam::Type(TypeBound::Any)],
@@ -134,13 +155,13 @@ pub(crate) mod test {
             &reg,
         )?;
 
-        let t = list_len.compute_signature(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
+        let t = list_len.instantiate_all(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
         assert_eq!(
             t,
             FunctionType::new(
                 vec![Type::new_extension(
                     list_def
-                        .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                        .instantiate([TypeArg::Type { ty: USIZE_T }])
                         .unwrap()
                 )],
                 vec![USIZE_T]
@@ -158,22 +179,20 @@ pub(crate) mod test {
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
-        let tyvar = TypeArg::use_var(0, typarams[0].clone());
-        let szvar = TypeArg::use_var(1, typarams[1].clone());
+        let [tyvar, szvar] = [0, 1].map(|i| TypeArg::use_var(i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
-        let good_array =
-            Type::new_extension(ar_def.instantiate_concrete([tyvar.clone(), szvar.clone()])?);
+        let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
         let good_ts =
             PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
-        good_ts.compute_signature(
+        good_ts.instantiate_all(
             &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &PRELUDE_REGISTRY,
         )?;
 
-        let wrong_args = good_ts.compute_signature(
+        let wrong_args = good_ts.instantiate_all(
             &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &PRELUDE_REGISTRY,
         );
@@ -193,7 +212,7 @@ pub(crate) mod test {
             arg: szvar.clone(),
         });
         assert_eq!(
-            ar_def.instantiate_concrete([szvar.clone(), tyvar.clone()]),
+            ar_def.instantiate([szvar.clone(), tyvar.clone()]),
             Err(arg_err.clone())
         );
         // ok, so that doesn't work - well, it shouldn't! So let's say we just have this signature (with bad args)...
@@ -215,19 +234,20 @@ pub(crate) mod test {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::use_var(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let body_type = id_fn(Type::new_extension(list_def.instantiate_concrete([tv])?));
+        let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
         let reg = [EXTENSION.to_owned()].into();
         for decl in [
             TypeParam::Extensions,
             TypeParam::List(Box::new(TypeParam::max_nat())),
-            TypeParam::Type(TypeBound::Any),
+            TypeParam::Opaque(USIZE_CUSTOM_T),
+            TypeParam::Tuple(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()]),
         ] {
             let invalid_ts = PolyFuncType::new_validated([decl.clone()], body_type.clone(), &reg);
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
                     used: TypeParam::Type(TypeBound::Copyable),
-                    decl: Some(decl)
+                    decl
                 })
             );
         }
@@ -235,9 +255,9 @@ pub(crate) mod test {
         let invalid_ts = PolyFuncType::new_validated([], body_type, &reg);
         assert_eq!(
             invalid_ts.err(),
-            Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                used: TypeParam::Type(TypeBound::Copyable),
-                decl: None
+            Some(SignatureError::FreeTypeVar {
+                idx: 0,
+                num_decls: 0
             })
         );
 
@@ -335,7 +355,7 @@ pub(crate) mod test {
         let array_def = PRELUDE.get_type("array").unwrap();
         Type::new_extension(
             array_def
-                .instantiate_concrete(vec![TypeArg::Type { ty }, s])
+                .instantiate(vec![TypeArg::Type { ty }, s])
                 .unwrap(),
         )
     }
@@ -346,7 +366,7 @@ pub(crate) mod test {
         let list_of_tup = |t1, t2| {
             Type::new_extension(
                 list_def
-                    .instantiate_concrete([TypeArg::Type {
+                    .instantiate([TypeArg::Type {
                         ty: Type::new_tuple(vec![t1, t2]),
                     }])
                     .unwrap(),
@@ -375,7 +395,7 @@ pub(crate) mod test {
         const FREE: usize = 3;
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = pf
-            .compute_signature(&[TypeArg::use_var(FREE, TP_EQ)], &reg)
+            .instantiate_all(&[TypeArg::use_var(FREE, TP_EQ)], &reg)
             .unwrap();
         assert_eq!(
             res,
@@ -407,7 +427,7 @@ pub(crate) mod test {
         };
 
         let res = pf
-            .compute_signature(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .instantiate_all(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
             .unwrap();
         assert_eq!(
             res,
@@ -423,5 +443,85 @@ pub(crate) mod test {
                 ))]
             )
         )
+    }
+
+    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
+
+    #[test]
+    fn test_instantiate() -> Result<(), SignatureError> {
+        let array_max = PolyFuncType::new_validated(
+            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+            FunctionType::new(
+                vec![new_array(
+                    Type::new_variable(0, TypeBound::Any),
+                    TypeArg::use_var(1, TypeParam::max_nat()),
+                )],
+                vec![Type::new_variable(0, TypeBound::Any)],
+            ),
+            &PRELUDE_REGISTRY,
+        )?;
+
+        let concrete = FunctionType::new(
+            vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
+            vec![USIZE_T],
+        );
+        let actual =
+            array_max.instantiate(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
+
+        assert_eq!(actual, concrete.into());
+
+        let partial = PolyFuncType::new_validated(
+            vec![TypeParam::max_nat()],
+            FunctionType::new(
+                vec![new_array(
+                    USIZE_T,
+                    TypeArg::use_var(0, TypeParam::max_nat()),
+                )],
+                vec![USIZE_T],
+            ),
+            &PRELUDE_REGISTRY,
+        )?;
+        let res = array_max.instantiate(&[USIZE_TA], &PRELUDE_REGISTRY)?;
+        assert_eq!(res, partial);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_type_apply_nested() -> Result<(), SignatureError> {
+        let inner_var = Type::new_variable(0, TypeBound::Any);
+        let inner = PolyFuncType {
+            params: vec![TypeParam::Type(TypeBound::Any)],
+            body: Box::new(FunctionType::new(
+                vec![new_array(
+                    inner_var.clone(),
+                    TypeArg::use_var(1, TypeParam::max_nat()),
+                )],
+                vec![inner_var.clone()],
+            )),
+        };
+        let outer = PolyFuncType::new_validated(
+            vec![TypeParam::max_nat()],
+            FunctionType::new(vec![], vec![Type::new_function(inner)]),
+            &PRELUDE_REGISTRY,
+        )?;
+
+        let outer_applied = FunctionType::new(
+            vec![],
+            vec![Type::new_function(PolyFuncType::new_validated(
+                vec![TypeParam::Type(TypeBound::Any)],
+                FunctionType::new(
+                    // We are checking that the substitution has been applied to the right var
+                    // - NOT to the inner_var which has index 0 here
+                    vec![new_array(inner_var.clone(), TypeArg::BoundedNat { n: 5 })],
+                    vec![inner_var.clone()],
+                ),
+                &PRELUDE_REGISTRY,
+            )?)],
+        );
+
+        let res = outer.instantiate(&[TypeArg::BoundedNat { n: 5 }], &PRELUDE_REGISTRY)?;
+        assert_eq!(res, outer_applied.into());
+        Ok(())
     }
 }

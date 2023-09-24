@@ -117,7 +117,7 @@ fn get_type(name: &str) -> &TypeDef {
 }
 
 fn list_types(args: &[TypeArg]) -> Result<(Type, Type), SignatureError> {
-    let list_custom_type = get_type(&LIST_TYPENAME).instantiate_concrete(args)?;
+    let list_custom_type = get_type(&LIST_TYPENAME).instantiate(args)?;
     let [TypeArg::Type { ty: element_type }] = args else {
         panic!("should be checked by def.")
     };
@@ -156,11 +156,11 @@ mod test {
         let list_def = r.get_type(&LIST_TYPENAME).unwrap();
 
         let list_type = list_def
-            .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+            .instantiate([TypeArg::Type { ty: USIZE_T }])
             .unwrap();
 
         assert!(list_def
-            .instantiate_concrete([TypeArg::BoundedNat { n: 3 }])
+            .instantiate([TypeArg::BoundedNat { n: 3 }])
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();

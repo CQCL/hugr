@@ -1727,10 +1727,20 @@ allocation, and the compiler can add/remove/move these operations to use
 more or fewer qubits. In some use cases, that may not be desirable, and
 we may instead want to guarantee only a certain number of qubits are
 used by the program. For this purpose TKET2 places additional
-constraints on the `main` function that are in line with TKET1 backwards
-compatibility. Namely the main function takes one `Array<N, Qubit>`
+constraints on the HUGR that are in line with TKET1 backwards
+compatibility:
+
+1. The `main` function takes one `Array<N, Qubit>`
 input and has one output of the same type (the same statically known
-size). If further the program does not contain any `qalloc` or `qfree`
+size).
+2. All Operations that have a `FunctionType` involving `Qubit` have as
+ many `Qubit` input wires as output.
+
+
+With these constraints, we can treat all `Qubit` operations as returning all qubits they take
+in. The implicit bijection from input `Qubit` to output allows register
+allocation for all `Qubit` wires. 
+If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
 
 ### Higher-order (Tierkreis) Extension
