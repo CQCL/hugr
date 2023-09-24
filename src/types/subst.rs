@@ -1,5 +1,3 @@
-use itertools::Either;
-
 use crate::extension::ExtensionRegistry;
 
 use super::type_param::{TypeArg, TypeParam};
@@ -10,18 +8,24 @@ pub(crate) struct Substitution {
     /// The number of variables bound more closely than those being substituted,
     /// so these should be untouched by the substitution
     leave_lowest: usize,
-    /// Either
-    /// * the values for the variables being substituted, or
-    /// * a `usize` to indicate ALL free vars are mapped to vars
-    ///   whose index incremented by that amount
-    args: Either<Vec<TypeArg>, usize>,
+    /// What to do to variables that are affected
+    mapping: Mapping,
+}
+
+#[derive(Clone, Debug)]
+enum Mapping {
+    /// An explicit value to substitute for each bound variable
+    Values(Vec<TypeArg>),
+    /// An amount to add to the index of any free variable
+    /// (That is: any free var, of index `i`, becomes the variable `i +` this amount)
+    AddToIndex(usize),
 }
 
 impl Substitution {
     pub(crate) fn new(args: impl Into<Vec<TypeArg>>) -> Self {
         Self {
             leave_lowest: 0,
-            args: Either::Left(args.into()),
+            mapping: Mapping::Values(args.into()),
         }
     }
 
@@ -29,12 +33,12 @@ impl Substitution {
         if idx < self.leave_lowest {
             return TypeArg::use_var(idx, decl.clone());
         }
-        match &self.args {
-            Either::Left(args) => args
+        match &self.mapping {
+            Mapping::Values(args) => args
                 .get(idx - self.leave_lowest)
                 .expect("Unexpected free type var")
                 .clone(),
-            Either::Right(diff) => TypeArg::use_var(idx + diff, decl.clone()),
+            Mapping::AddToIndex(diff) => TypeArg::use_var(idx + diff, decl.clone()),
         }
     }
 
@@ -48,16 +52,16 @@ impl Substitution {
     pub(super) fn enter_scope(&self, new_vars: usize, exts: &ExtensionRegistry) -> Self {
         Self {
             leave_lowest: self.leave_lowest + new_vars,
-            args: match &self.args {
-                Either::Left(vals) => Either::Left({
+            mapping: match &self.mapping {
+                Mapping::Values(vals) => Mapping::Values({
                     // We need to renumber the RHS `vals` to avoid the newly-bound variables
                     let renum = Substitution {
                         leave_lowest: 0,
-                        args: Either::Right(new_vars),
+                        mapping: Mapping::AddToIndex(new_vars),
                     };
                     vals.iter().map(|v| v.substitute(exts, &renum)).collect()
                 }),
-                Either::Right(i) => Either::Right(*i),
+                Mapping::AddToIndex(i) => Mapping::AddToIndex(*i),
             },
         }
     }
