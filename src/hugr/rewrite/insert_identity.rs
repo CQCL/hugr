@@ -91,10 +91,10 @@ impl Rewrite for IdentityInsertion {
         let new_node = h
             .add_op_with_parent(parent, LeafOp::Noop { ty })
             .expect("Parent validity already checked.");
-        h.connect(pre_node, pre_port.index(), new_node, 0)
+        h.connect(pre_node, pre_port, new_node, 0)
             .expect("Should only fail if ports don't exist.");
 
-        h.connect(new_node, 0, self.post_node, self.post_port.index())
+        h.connect(new_node, 0, self.post_node, self.post_port)
             .expect("Should only fail if ports don't exist.");
         Ok(new_node)
     }

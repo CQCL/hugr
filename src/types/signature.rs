@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 
 use std::fmt::{self, Display, Write};
 
-use crate::hugr::Direction;
+use crate::hugr::{Direction, PortIndex};
 
 use super::type_param::{TypeArg, TypeParam};
 use super::{subst_row, Type, TypeRow};
@@ -126,8 +126,8 @@ impl FunctionType {
     #[inline]
     pub fn get(&self, port: Port) -> Option<&Type> {
         match port.direction() {
-            Direction::Incoming => self.input.get(port.index()),
-            Direction::Outgoing => self.output.get(port.index()),
+            Direction::Incoming => self.input.get(port),
+            Direction::Outgoing => self.output.get(port),
         }
     }
 
@@ -136,8 +136,8 @@ impl FunctionType {
     #[inline]
     pub fn get_mut(&mut self, port: Port) -> Option<&mut Type> {
         match port.direction() {
-            Direction::Incoming => self.input.get_mut(port.index()),
-            Direction::Outgoing => self.output.get_mut(port.index()),
+            Direction::Incoming => self.input.get_mut(port),
+            Direction::Outgoing => self.output.get_mut(port),
         }
     }
 
