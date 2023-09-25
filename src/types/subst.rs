@@ -7,7 +7,8 @@ use super::{Type, TypeBound, TypeRow};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Substitution<'a> {
-    /// The number of variables bound more closely than those being substituted,
+    /// The number of variables bound locally-to the tree within which we are substituting
+    /// (i.e. beneath the point where we started applying the substitution),
     /// so these should be untouched by the substitution
     leave_lowest: usize,
     /// What to do to variables that are affected
@@ -18,8 +19,8 @@ pub(crate) struct Substitution<'a> {
 enum Mapping<'a> {
     /// An explicit value to substitute for each bound variable
     Values(Cow<'a, [TypeArg]>),
-    /// An amount to add to the index of any free variable
-    /// (That is: any free var, of index `i`, becomes the variable `i +` this amount)
+    /// An amount to add to the index of any free variable - that is,
+    /// any free var, of index `i`, becomes the variable `(i +` this amount`)`
     AddToIndex(usize),
 }
 
@@ -52,7 +53,7 @@ impl<'a> Substitution<'a> {
         ty
     }
 
-    // A bit unfortunate to need a new extension registry here...move into Substitution?
+    // A bit unfortunate to need the Extension registry here. We could move `exts` into Substitution?
     pub(super) fn enter_scope(&self, new_vars: usize, exts: &ExtensionRegistry) -> Self {
         Self {
             leave_lowest: self.leave_lowest + new_vars,
