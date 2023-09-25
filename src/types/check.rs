@@ -60,11 +60,11 @@ impl PrimType {
                 Ok(())
             }
             (PrimType::Function(t), PrimValue::Function { hugr: v })
-                if Some(t.as_ref()) == v.get_function_type().cloned().map(Into::into).as_ref() =>
+                if t.params.is_empty() // Hugr's still monomorphic
+                && Some(&t.body) == v.get_function_type() =>
             {
-                // exact signature equality, with Hugr's still monomorphic.
-                // In future this may need to be relaxed
-                // to be compatibility checks between the signatures.
+                // exact signature equality, in future this may need to be
+                // relaxed to be compatibility checks between the signatures.
                 Ok(())
             }
             _ => Err(ConstTypeError::ValueCheckFail(

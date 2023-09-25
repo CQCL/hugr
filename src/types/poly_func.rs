@@ -28,7 +28,7 @@ pub struct PolyFuncType {
     /// [TypeArg]: super::type_param::TypeArg
     pub(crate) params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    body: FunctionType,
+    pub(super) body: FunctionType,
 }
 
 impl From<FunctionType> for PolyFuncType {
