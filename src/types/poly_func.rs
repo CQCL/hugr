@@ -68,12 +68,12 @@ impl PolyFuncType {
         external_type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // TODO should we add a mechanism to validate a TypeParam?
-        let mut v = vec![];
+        let mut v;
         let all_type_vars = if self.params.is_empty() {
             external_type_vars
         } else {
             // Type vars declared here go at lowest indices (as per DeBruijn)
-            v.extend(self.params.iter().cloned());
+            v = self.params.clone();
             v.extend_from_slice(external_type_vars);
             v.as_slice()
         };
