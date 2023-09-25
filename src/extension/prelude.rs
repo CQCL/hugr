@@ -88,12 +88,12 @@ pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 /// Boolean type - Sum of two units.
 pub const BOOL_T: Type = Type::new_simple_predicate(2);
 
-/// Initialize a new array of type `typ` of length `size`
-pub fn array_type(typ: Type, size: u64) -> Type {
+/// Initialize a new array of element type `element_ty` of length `size`
+pub fn array_type(element_ty: Type, size: u64) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
         .instantiate_concrete(vec![
-            TypeArg::Type { ty: typ },
+            TypeArg::Type { ty: element_ty },
             TypeArg::BoundedNat { n: size },
         ])
         .unwrap();
@@ -103,12 +103,15 @@ pub fn array_type(typ: Type, size: u64) -> Type {
 /// Name of the operation in the prelude for creating new arrays.
 pub const NEW_ARRAY_OP_ID: &str = "new_array";
 
-/// Initialize a new array op of type `typ` of length `size`
-pub fn new_array_op(typ: Type, size: u64) -> LeafOp {
+/// Initialize a new array op of element type `element_ty` of length `size`
+pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
     PRELUDE
         .instantiate_extension_op(
             NEW_ARRAY_OP_ID,
-            vec![TypeArg::Type { ty: typ }, TypeArg::BoundedNat { n: size }],
+            vec![
+                TypeArg::Type { ty: element_ty },
+                TypeArg::BoundedNat { n: size },
+            ],
             &EMPTY_REG,
         )
         .unwrap()
