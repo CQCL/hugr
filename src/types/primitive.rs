@@ -14,7 +14,7 @@ pub(super) enum PrimType {
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[display(fmt = "Function({})", "_0")]
-    Function(PolyFuncType),
+    Function(Box<PolyFuncType>),
     // DeBruijn index, and cache of TypeBound (checked in validation)
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),

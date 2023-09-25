@@ -11,7 +11,7 @@ use crate::types::primitive::PrimType;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(PolyFuncType),
+    G(Box<PolyFuncType>),
     Tuple { inner: TypeRow },
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
@@ -48,7 +48,7 @@ impl From<SerSimpleType> for Type {
         match value {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
-            SerSimpleType::G(sig) => Type::new_function(sig),
+            SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
             SerSimpleType::Sum(sum) => sum.into(),
             SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),

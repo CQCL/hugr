@@ -214,7 +214,7 @@ impl Type {
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Function(fun_ty.into())))
+        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(fun_ty.into()))))
     }
 
     /// Initialize a new tuple type by providing the elements.

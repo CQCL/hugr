@@ -60,7 +60,7 @@ impl PrimType {
                 Ok(())
             }
             (PrimType::Function(t), PrimValue::Function { hugr: v })
-                if Some(t) == v.get_function_type().cloned().map(Into::into).as_ref() =>
+                if Some(t.as_ref()) == v.get_function_type().cloned().map(Into::into).as_ref() =>
             {
                 // exact signature equality, with Hugr's still monomorphic.
                 // In future this may need to be relaxed
