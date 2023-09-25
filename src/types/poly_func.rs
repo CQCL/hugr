@@ -28,14 +28,14 @@ pub struct PolyFuncType {
     /// [TypeArg]: super::type_param::TypeArg
     pub(crate) params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    body: Box<FunctionType>,
+    body: FunctionType,
 }
 
 impl From<FunctionType> for PolyFuncType {
     fn from(body: FunctionType) -> Self {
         Self {
             params: vec![],
-            body: Box::new(body),
+            body,
         }
     }
 }
@@ -56,10 +56,7 @@ impl PolyFuncType {
     ) -> Result<Self, SignatureError> {
         let params = params.into();
         body.validate(extension_registry, &params)?;
-        Ok(Self {
-            params,
-            body: Box::new(body),
-        })
+        Ok(Self { params, body })
     }
 
     pub(super) fn validate(
@@ -82,10 +79,9 @@ impl PolyFuncType {
 
     pub(super) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
         Self {
-            body: Box::new(
-                self.body
-                    .substitute(exts, &sub.enter_scope(self.params.len(), exts)),
-            ),
+            body: self
+                .body
+                .substitute(exts, &sub.enter_scope(self.params.len(), exts)),
             params: self.params.clone(),
         }
     }
@@ -112,7 +108,7 @@ impl PolyFuncType {
         };
         Ok(Self {
             params: remaining.to_vec(),
-            body: Box::new(self.body.substitute(exts, &sub)),
+            body: self.body.substitute(exts, &sub),
         })
     }
 
@@ -124,7 +120,7 @@ impl PolyFuncType {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
         let pf = self.instantiate(args, extension_registry).unwrap();
         assert!(pf.params.is_empty());
-        Ok(*pf.body)
+        Ok(pf.body)
     }
 }
 
@@ -348,7 +344,7 @@ pub(crate) mod test {
     fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncType {
         PolyFuncType {
             params: vec![param],
-            body: Box::new(FunctionType::new(vec![input], vec![output])),
+            body: FunctionType::new(vec![input], vec![output]),
         }
     }
 
@@ -494,13 +490,13 @@ pub(crate) mod test {
         let inner_var = Type::new_variable(0, TypeBound::Any);
         let inner = PolyFuncType {
             params: vec![TypeParam::Type(TypeBound::Any)],
-            body: Box::new(FunctionType::new(
+            body: FunctionType::new(
                 vec![new_array(
                     inner_var.clone(),
                     TypeArg::use_var(1, TypeParam::max_nat()),
                 )],
                 vec![inner_var.clone()],
-            )),
+            ),
         };
         let outer = PolyFuncType::new_validated(
             vec![TypeParam::max_nat()],
