@@ -4,7 +4,7 @@ use super::custom::CustomType;
 
 use super::FunctionType;
 
-use crate::extension::prelude::{new_array, QB_T, USIZE_T};
+use crate::extension::prelude::{array_type, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
 use crate::types::primitive::PrimType;
 
@@ -51,7 +51,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
             SerSimpleType::Sum(sum) => sum.into(),
-            SerSimpleType::Array { inner, len } => new_array((*inner).into(), len),
+            SerSimpleType::Array { inner, len } => array_type((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
         }
