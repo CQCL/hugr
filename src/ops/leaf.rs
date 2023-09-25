@@ -91,12 +91,6 @@ impl TypeApplication {
         })
     }
 
-    /// Turns this into a [LeafOp].
-    /// (Would impl [Into] but that ends up with the client needing annotations.)
-    pub fn to_leaf(self) -> LeafOp {
-        LeafOp::TypeApply { ta: self }
-    }
-
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
