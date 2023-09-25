@@ -36,14 +36,14 @@ impl<'a, T: Into<Cow<'a, [TypeArg]>>> From<T> for Substitution<'a> {
 impl<'a> Substitution<'a> {
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         if idx < self.leave_lowest {
-            return TypeArg::use_var(idx, decl.clone());
+            return TypeArg::new_var_use(idx, decl.clone());
         }
         match &self.mapping {
             Mapping::Values(args) => args
                 .get(idx - self.leave_lowest)
                 .expect("Unexpected free type var")
                 .clone(),
-            Mapping::AddToIndex(diff) => TypeArg::use_var(idx + diff, decl.clone()),
+            Mapping::AddToIndex(diff) => TypeArg::new_var_use(idx + diff, decl.clone()),
         }
     }
 

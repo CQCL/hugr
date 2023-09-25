@@ -264,7 +264,7 @@ impl Type {
     /// New type variable (for use in type schemes only),
     /// with bound matching that in the type scheme
     /// (i.e. the variable must be declared as a [TypeParam::Type])
-    pub fn new_variable(idx: usize, bound: TypeBound) -> Self {
+    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
     }
 
