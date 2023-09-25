@@ -74,7 +74,7 @@ mod test {
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let tyvar = TypeArg::use_var(0, TypeParam::Type(TypeBound::Any));
+        let tyvar = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Any));
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
         let list_len = OpDefTypeScheme::new(
@@ -107,7 +107,8 @@ mod test {
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
-        let [tyvar, szvar] = [0, 1].map(|i| TypeArg::use_var(i, typarams.get(i).unwrap().clone()));
+        let [tyvar, szvar] =
+            [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
@@ -158,7 +159,7 @@ mod test {
     #[test]
     fn test_misused_variables() -> Result<(), SignatureError> {
         // Variables in args have different bounds from variable declaration
-        let tv = TypeArg::use_var(0, TypeParam::Type(TypeBound::Copyable));
+        let tv = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
         let reg = [EXTENSION.to_owned()].into();
@@ -214,7 +215,7 @@ mod test {
                 [tp.clone()],
                 id_fn(Type::new_extension(CustomType::new(
                     TYPE_NAME,
-                    [TypeArg::use_var(0, tp)],
+                    [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
                     TypeBound::Any,
                 ))),
@@ -230,7 +231,7 @@ mod test {
                 Some(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
                         param: bound.clone(),
-                        arg: TypeArg::use_var(0, decl.clone())
+                        arg: TypeArg::new_var_use(0, decl.clone())
                     }
                 ))
             );

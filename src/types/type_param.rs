@@ -113,7 +113,7 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
-    /// Variable (used in type schemes only) - see [TypeArg::use_var]
+    /// Variable (used in type schemes only) - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
         v: TypeArgVariable,
@@ -130,10 +130,10 @@ pub struct TypeArgVariable {
 impl TypeArg {
     /// Makes a TypeArg representing the type variable with the specified (DeBruijn) index
     /// and declared [TypeParam].
-    pub fn use_var(idx: usize, decl: TypeParam) -> Self {
+    pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
             TypeParam::Type(b) => TypeArg::Type {
-                ty: Type::new_variable(idx, b),
+                ty: Type::new_var_use(idx, b),
             },
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
