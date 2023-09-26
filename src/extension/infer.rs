@@ -664,7 +664,9 @@ impl UnificationContext {
                 let solution =
                     ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
                         |c| match c {
-                            Constraint::Plus(x, other_m) if &m == other_m => Some(x.clone()),
+                            Constraint::Plus(x, other_m) if m == self.resolve(*other_m) => {
+                                Some(x.clone())
+                            }
                             _ => None,
                         },
                     ));
