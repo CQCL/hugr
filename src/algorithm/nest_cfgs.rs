@@ -91,9 +91,9 @@ pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
 pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     view: &mut impl CfgNodeMapMut<T>,
 ) -> Result<(), String> {
-    let edges = EdgeClassifier::get_edge_classes(view);
+    let classes = EdgeClassifier::get_edge_classes(view);
     // Traverse. Any traversal will encounter edges in SESE-respecting order.
-    let mut classes = edges
+    let mut rem_edges = classes
         .iter()
         .map(|(k, v)| (*v, *k))
         .into_group_map()
@@ -104,8 +104,8 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
         view: &mut impl CfgNodeMapMut<T>,
         n: T,
         seen: &mut HashSet<T>,
-        edges: &HashMap<(T, T), usize>,
-        classes: &mut HashMap<usize, HashSet<(T, T)>>,
+        e_cls: &HashMap<(T, T), usize>,
+        rem_edges: &mut HashMap<usize, HashSet<(T, T)>>,
         stop_at: Option<usize>,
     ) -> Option<(T, T)> {
         if !seen.insert(n) {
@@ -114,19 +114,19 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
         let (exit, rest): (Vec<_>, Vec<_>) = view
             .successors(n)
             .map(|s| (n, s))
-            .partition(|e| stop_at.is_some() && edges.get(e).copied() == stop_at);
+            .partition(|e| stop_at.is_some() && e_cls.get(e).copied() == stop_at);
         let edge_from_here = exit.into_iter().at_most_one().unwrap();
         let descendant_edges = rest.into_iter().flat_map(|mut e| {
-            if let Some(cls) = edges.get(&e) {
-                assert!(classes.get_mut(cls).unwrap().remove(&e));
+            if let Some(cls) = e_cls.get(&e) {
+                assert!(rem_edges.get_mut(cls).unwrap().remove(&e));
                 // While there are more edges in that same class, we can traverse the entire
                 // subregion between pairs of edges in that class in a single step
                 // (as these are strictly nested in any outer region)
-                while !classes.get_mut(cls).unwrap().is_empty() {
+                while !rem_edges.get_mut(cls).unwrap().is_empty() {
                     let prev_e = e;
-                    e = traverse(view, e.1, &mut HashSet::new(), edges, classes, Some(*cls))
+                    e = traverse(view, e.1, &mut HashSet::new(), e_cls, rem_edges, Some(*cls))
                         .unwrap(); // The next edge in the same class - we know it's one of those in the set
-                    assert!(classes.get_mut(&cls).unwrap().remove(&e));
+                    assert!(rem_edges.get_mut(&cls).unwrap().remove(&e));
                     // Skip trivial regions of a single node, unless the node has other edges
                     // (non-exiting, but e.g. a backedge to a loop header, ending that loop)
                     if prev_e.1 != e.0 || view.successors(e.0).count() > 1 {
@@ -136,17 +136,16 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
                     };
                 }
             }
-            traverse(view, e.1, seen, edges, classes, stop_at)
+            traverse(view, e.1, seen, e_cls, rem_edges, stop_at)
         });
-        edge_from_here
-            .into_iter()
-            .chain(descendant_edges)
+        descendant_edges
+            .chain(edge_from_here)
             .unique()
             .at_most_one()
             .unwrap()
     }
-    let e = view.entry_node();
-    traverse(view, e, &mut HashSet::new(), &edges, &mut classes, None);
+    let n = view.entry_node();
+    traverse(view, n, &mut HashSet::new(), &classes, &mut rem_edges, None);
     // TODO we should probably now try to merge consecutive basic blocks
     // (i.e. where a BB has a single successor, that has a single predecessor)
     // and thus convert CF dependencies into (parallelizable) dataflow.
