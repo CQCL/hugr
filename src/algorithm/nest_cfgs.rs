@@ -98,20 +98,22 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     // onto the region is a `SiblingMut`... so TODO we must either
     // * use the base_hugr()
     // * traverse in some way using dominators, so that subregions are nested before their ancestors
-    let mut last_edge_in_class: HashMap<usize, (T, T)> = HashMap::new();
-    let mut seen_nodes = HashSet::new();
-    let mut node_stack = Vec::new();
-    node_stack.push(view.entry_node());
-    while let Some(n) = node_stack.pop() {
-        if !seen_nodes.insert(n) {
-            continue;
+    fn traverse<T: Copy + Eq + Hash + std::fmt::Debug>(
+        view: &mut impl CfgNodeMapMut<T>,
+        n: T,
+        seen: &mut HashSet<T>,
+        edge_classes: &HashMap<(T, T), usize>,
+        prev_in_class: &mut HashMap<usize, (T, T)>,
+    ) {
+        if !seen.insert(n) {
+            return;
         }
         let succs = view.successors(n).collect::<Vec<_>>();
 
         let exitting_edges = succs
             .iter()
-            .filter_map(|s| edges.get(&(n, *s)).map(|class| (*class, (n, *s))))
-            .filter_map(|(cls, e)| last_edge_in_class.insert(cls, e).map(|p| (cls, p, e)));
+            .filter_map(|s| edge_classes.get(&(n, *s)).map(|class| (*class, (n, *s))))
+            .filter_map(|(cls, e)| prev_in_class.insert(cls, e).map(|p| (cls, p, e)));
         if let Some((cls, prev_edge, edge)) = exitting_edges
             .at_most_one()
             .expect("Only one out-edge of a basic block can exit a SESE region")
@@ -120,15 +122,19 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
             // (non-exiting, but e.g. a backedge to a loop header, ending that loop)
             if prev_edge.1 != edge.0 || view.successors(n).count() > 1 {
                 let new_block = view.nest_sese_region(prev_edge, edge).unwrap();
-                last_edge_in_class.insert(cls, (new_block, edge.1));
+                prev_in_class.insert(cls, (new_block, edge.1));
                 // Similarly, at most one edge into a block can enter a SESE region.
                 // Since the edge into prev_edge.1 entered the SESE region we've just dealt with,
                 // we do not need to update last_edge_in_class for any other edges/classes.
                 // (We can leave non-edges from ex-siblings, they would fail if we tried to use them.)
             }
         };
-        node_stack.extend(succs);
+        succs
+            .into_iter()
+            .for_each(|s| traverse(view, s, seen, edge_classes, prev_in_class));
     }
+    let e = view.entry_node();
+    traverse(view, e, &mut HashSet::new(), &edges, &mut HashMap::new());
     // TODO we should probably now try to merge consecutive basic blocks
     // (i.e. where a BB has a single successor, that has a single predecessor)
     // and thus convert CF dependencies into (parallelizable) dataflow.
