@@ -88,7 +88,7 @@ pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
 }
 
 /// Transforms a CFG to nested form.
-pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
+pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     view: &mut impl CfgNodeMapMut<T>,
 ) -> Result<(), String> {
     let edges = EdgeClassifier::get_edge_classes(view);
@@ -102,25 +102,28 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash>(
     let mut seen_nodes = HashSet::new();
     let mut node_stack = Vec::new();
     node_stack.push(view.entry_node());
-    while let Some(mut n) = node_stack.pop() {
+    while let Some(n) = node_stack.pop() {
         if !seen_nodes.insert(n) {
             continue;
         }
-        let succs = view.successors(n).collect_vec();
-        for &s in succs.iter() {
-            let edge = (n, s);
-            if let Some(class) = edges.get(&edge) {
-                if let Some(&prev_edge) = last_edge_in_class.get(class) {
-                    // n will be moved into new block. (Cycle equivalence means there cannot be
-                    // any other edges from n that exit that block, so we're ok.)
-                    if n != prev_edge.1 || succs.len() > 1 {
-                        n = view.nest_sese_region(prev_edge, edge).unwrap();
-                    }
-                }
-                last_edge_in_class.insert(*class, (n, s));
+        let succs = view.successors(n).collect::<Vec<_>>();
+
+        let exitting_edges = succs
+            .iter()
+            .filter_map(|s| edges.get(&(n, *s)).map(|class| (*class, (n, *s))))
+            .filter_map(|(cls, e)| last_edge_in_class.insert(cls, e).map(|p| (cls, p, e)));
+        if let Some((cls, prev_edge, edge)) = exitting_edges
+            .at_most_one()
+            .expect("Only one out-edge of a basic block can exit a SESE region")
+        {
+            // Skip trivial regions of a single node, unless the node has other edges
+            // (non-exiting, but e.g. a backedge to a loop header, ending that loop)
+            if prev_edge.1 != edge.0 || view.successors(n).count() > 1 {
+                let new_block = view.nest_sese_region(prev_edge, edge).unwrap();
+                last_edge_in_class.insert(cls, (new_block, edge.1));
             }
-            node_stack.push(s);
-        }
+        };
+        node_stack.extend(succs);
     }
     // TODO we should probably now try to merge consecutive basic blocks
     // (i.e. where a BB has a single successor, that has a single predecessor)
