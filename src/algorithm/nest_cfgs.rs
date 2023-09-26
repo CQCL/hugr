@@ -119,14 +119,19 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
         let descendant_edges = rest.into_iter().flat_map(|mut e| {
             if let Some(cls) = edges.get(&e) {
                 assert!(classes.get_mut(cls).unwrap().remove(&e));
+                // While there are more edges in that same class, we can traverse the entire
+                // subregion between pairs of edges in that class in a single step
+                // (as these are strictly nested in any outer region)
                 while !classes.get_mut(cls).unwrap().is_empty() {
                     let prev_e = e;
                     e = traverse(view, e.1, &mut HashSet::new(), edges, classes, Some(*cls))
-                        .unwrap();
+                        .unwrap(); // The next edge in the same class - we know it's one of those in the set
                     assert!(classes.get_mut(&cls).unwrap().remove(&e));
                     // Skip trivial regions of a single node, unless the node has other edges
                     // (non-exiting, but e.g. a backedge to a loop header, ending that loop)
                     if prev_e.1 != e.0 || view.successors(e.0).count() > 1 {
+                        // This moves into descendant CFG only nodes which we finished processing
+                        // above, so there is no problem doing the traversal on a SiblingMut.
                         e = (view.nest_sese_region(prev_e, e).unwrap(), e.1)
                     };
                 }
