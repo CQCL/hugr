@@ -92,14 +92,12 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     view: &mut impl CfgNodeMapMut<T>,
 ) -> Result<(), String> {
     let classes = EdgeClassifier::get_edge_classes(view);
+    let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
+    for (e, cls) in classes.iter() {
+        rem_edges.entry(*cls).or_default().insert(*e);
+    }
+
     // Traverse. Any traversal will encounter edges in SESE-respecting order.
-    let mut rem_edges = classes
-        .iter()
-        .map(|(k, v)| (*v, *k))
-        .into_group_map()
-        .into_iter()
-        .map(|(k, v)| (k, HashSet::from_iter(v.into_iter())))
-        .collect();
     fn traverse<T: Copy + Eq + Hash + std::fmt::Debug>(
         view: &mut impl CfgNodeMapMut<T>,
         n: T,
