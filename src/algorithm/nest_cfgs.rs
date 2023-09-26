@@ -121,6 +121,10 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
             if prev_edge.1 != edge.0 || view.successors(n).count() > 1 {
                 let new_block = view.nest_sese_region(prev_edge, edge).unwrap();
                 last_edge_in_class.insert(cls, (new_block, edge.1));
+                // Similarly, at most one edge into a block can enter a SESE region.
+                // Since the edge into prev_edge.1 entered the SESE region we've just dealt with,
+                // we do not need to update last_edge_in_class for any other edges/classes.
+                // (We can leave non-edges from ex-siblings, they would fail if we tried to use them.)
             }
         };
         node_stack.extend(succs);
