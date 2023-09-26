@@ -784,10 +784,10 @@ mod test {
     fn add_block_children(
         b: &mut Hugr,
         parent: Node,
-        predicate_size: usize,
+        choice_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::simple_predicate(0, predicate_size as u8);
-        let tag_type = Type::new_simple_predicate(predicate_size as u8);
+        let const_op = ops::Const::unit_choice(0, choice_size as u8);
+        let tag_type = Type::new_unit_choice(choice_size as u8);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
@@ -988,7 +988,7 @@ mod test {
                 cfg,
                 ops::BasicBlock::DFB {
                     inputs: type_row![BOOL_T],
-                    predicate_variants: vec![type_row![]],
+                    choice_variants: vec![type_row![]],
                     other_outputs: type_row![BOOL_T],
                     extension_delta: ExtensionSet::new(),
                 },
@@ -1029,7 +1029,7 @@ mod test {
             block,
             NodeType::pure(ops::BasicBlock::DFB {
                 inputs: type_row![Q],
-                predicate_variants: vec![type_row![]],
+                choice_variants: vec![type_row![]],
                 other_outputs: type_row![Q],
                 extension_delta: ExtensionSet::new(),
             }),
@@ -1040,10 +1040,7 @@ mod test {
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(type_row![
-                Type::new_simple_predicate(1),
-                Q
-            ])),
+            NodeType::pure(ops::Output::new(type_row![Type::new_unit_choice(1), Q])),
         );
         assert_matches!(
             b.validate(&EMPTY_REG),

@@ -158,20 +158,20 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = TypeRow>,
+        choice_inputs: impl IntoIterator<Item = TypeRow>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
-        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
+        let choice_inputs: Vec<_> = choice_inputs.into_iter().collect();
         let other_inputs = other_inputs.into();
         let outputs = outputs.into();
 
         let n_out_wires = outputs.len();
-        let n_cases = predicate_inputs.len();
+        let n_cases = choice_inputs.len();
 
         let op = ops::Conditional {
-            predicate_inputs,
+            choice_inputs,
             other_inputs,
             outputs,
             extension_delta,
@@ -222,9 +222,9 @@ mod test {
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
+        let choice_inputs = vec![type_row![]; 2];
         let mut conditional_b = ConditionalBuilder::new(
-            predicate_inputs,
+            choice_inputs,
             type_row![NAT],
             type_row![NAT],
             ExtensionSet::new(),
@@ -248,11 +248,11 @@ mod test {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
-                    let predicate_inputs = vec![type_row![]; 2];
+                    let choice_inputs = vec![type_row![]; 2];
                     let other_inputs = vec![(NAT, int)];
                     let outputs = vec![NAT].into();
                     let mut conditional_b = fbuild.conditional_builder(
-                        (predicate_inputs, const_wire),
+                        (choice_inputs, const_wire),
                         other_inputs,
                         outputs,
                         ExtensionSet::new(),
@@ -276,13 +276,9 @@ mod test {
 
     #[test]
     fn test_not_all_cases() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
-        let mut builder = ConditionalBuilder::new(
-            predicate_inputs,
-            type_row![],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let choice_inputs = vec![type_row![]; 2];
+        let mut builder =
+            ConditionalBuilder::new(choice_inputs, type_row![], type_row![], ExtensionSet::new())?;
         n_identity(builder.case_builder(0)?)?;
         assert_matches!(
             builder.finish_sub_container().map(|_| ()),
@@ -295,13 +291,9 @@ mod test {
 
     #[test]
     fn test_case_already_built() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
-        let mut builder = ConditionalBuilder::new(
-            predicate_inputs,
-            type_row![],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let choice_inputs = vec![type_row![]; 2];
+        let mut builder =
+            ConditionalBuilder::new(choice_inputs, type_row![], type_row![], ExtensionSet::new())?;
         n_identity(builder.case_builder(0)?)?;
         assert_matches!(
             builder.case_builder(0).map(|_| ()),

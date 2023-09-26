@@ -146,18 +146,18 @@ impl ValidateOp for super::Conditional {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         let children = children.collect_vec();
-        // The first input to the ɣ-node is a predicate of Sum type,
+        // The first input to the ɣ-node is a value of Sum type,
         // whose arity matches the number of children of the ɣ-node.
-        if self.predicate_inputs.len() != children.len() {
-            return Err(ChildrenValidationError::InvalidConditionalPredicate {
+        if self.choice_inputs.len() != children.len() {
+            return Err(ChildrenValidationError::InvalidConditionalChoice {
                 child: children[0].0, // Pass an arbitrary child
                 expected_count: children.len(),
-                actual_count: self.predicate_inputs.len(),
-                actual_predicate_rows: self.predicate_inputs.clone(),
+                actual_count: self.choice_inputs.len(),
+                actual_choice_rows: self.choice_inputs.clone(),
             });
         }
 
-        // Each child must have its predicate variant's row and the rest of `inputs` as input,
+        // Each child must have its Choice variant's row and the rest of `inputs` as input,
         // and matching output
         for (i, (child, optype)) in children.into_iter().enumerate() {
             let OpType::Case(case_op) = optype else {
@@ -252,13 +252,13 @@ pub enum ChildrenValidationError {
     /// The signature of a child case in a conditional operation does not match the container's signature.
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
-    /// The conditional container's branch predicate does not match the number of children.
-    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {actual_count} elements. Predicate rows: {actual_predicate_rows:?} ")]
-    InvalidConditionalPredicate {
+    /// The conditional container's branch Choice does not match the number of children.
+    #[error("The conditional container's branch Choice input should be a sum with {expected_count} elements, but it had {actual_count} elements. Choice rows: {actual_choice_rows:?} ")]
+    InvalidConditionalChoice {
         child: NodeIndex,
         expected_count: usize,
         actual_count: usize,
-        actual_predicate_rows: Vec<TypeRow>,
+        actual_choice_rows: Vec<TypeRow>,
     },
 }
 
@@ -270,7 +270,7 @@ impl ChildrenValidationError {
             ChildrenValidationError::InternalExitChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalCaseSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
-            ChildrenValidationError::InvalidConditionalPredicate { child, .. } => *child,
+            ChildrenValidationError::InvalidConditionalChoice { child, .. } => *child,
         }
     }
 }
@@ -318,14 +318,14 @@ impl ValidateOp for BasicBlock {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             BasicBlock::DFB {
-                predicate_variants, ..
+                choice_variants, ..
             } => OpValidityFlags {
                 allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(predicate_variants.len())),
+                non_df_ports: (None, Some(choice_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -341,12 +341,12 @@ impl ValidateOp for BasicBlock {
         match self {
             BasicBlock::DFB {
                 inputs,
-                predicate_variants,
+                choice_variants,
                 other_outputs: outputs,
                 extension_delta: _,
             } => {
-                let predicate_type = Type::new_predicate(predicate_variants.clone());
-                let node_outputs: TypeRow = [&[predicate_type], outputs.as_ref()].concat().into();
+                let choice_type = Type::new_choice(choice_variants.clone());
+                let node_outputs: TypeRow = [&[choice_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children

@@ -107,9 +107,9 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 #[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
-/// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
+/// of a "unit choice" (sum over empty tuples), store only the size of the Choice.
 enum SumType {
-    #[display(fmt = "SimplePredicate({})", "size")]
+    #[display(fmt = "UnitChoice({})", "size")]
     Simple {
         size: u8,
     },
@@ -142,7 +142,7 @@ impl SumType {
 impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
-            SumType::Simple { size } => Type::new_simple_predicate(size),
+            SumType::Simple { size } => Type::new_unit_choice(size),
             SumType::General { row } => Type::new_sum(row),
         }
     }
@@ -241,17 +241,17 @@ impl Type {
         Self(type_e, bound)
     }
 
-    /// New Sum of Tuple types, used as predicates in branching.
+    /// New Sum of Tuple types, used as choices in branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_predicate<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
+    pub fn new_choice<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
     where
         V: Into<TypeRow>,
     {
-        Self::new_sum(predicate_variants_row(variant_rows))
+        Self::new_sum(choice_variant_row(variant_rows))
     }
 
-    /// New simple predicate with empty Tuple variants
-    pub const fn new_simple_predicate(size: u8) -> Self {
+    /// New unit choice with empty Tuple variants
+    pub const fn new_unit_choice(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
@@ -292,7 +292,7 @@ impl Type {
 
 /// Return the type row of variants required to define a Sum of Tuples type
 /// given the rows of each tuple
-pub(crate) fn predicate_variants_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
+pub(crate) fn choice_variant_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
 where
     V: Into<TypeRow>,
 {
@@ -341,7 +341,7 @@ pub(crate) mod test {
     #[test]
     fn sum_construct() {
         let pred1 = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
-        let pred2 = Type::new_simple_predicate(2);
+        let pred2 = Type::new_unit_choice(2);
 
         assert_eq!(pred1, pred2);
 

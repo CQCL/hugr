@@ -80,8 +80,8 @@ mod test {
         let t = Type::new_sum(vec![USIZE_T, FLOAT64_TYPE]);
         assert_eq!(ser_roundtrip(&t), t);
 
-        // A simple predicate
-        let t = Type::new_simple_predicate(4);
+        // A unit choice
+        let t = Type::new_unit_choice(4);
         assert_eq!(ser_roundtrip(&t), t);
     }
 }

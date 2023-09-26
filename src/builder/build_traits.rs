@@ -421,8 +421,8 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
-    /// `predicate_inputs` and `predicate_wire` define the type of the predicate
-    /// variants and the wire carrying the predicate respectively.
+    /// `choice_inputs` and `choice_wire` define the type of the Choice
+    /// variants and the wire carrying the Choice respectively.
     ///
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -434,24 +434,24 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
+        (choice_inputs, choice_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
-        let mut input_wires = vec![predicate_wire];
+        let mut input_wires = vec![choice_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
         input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
-        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
-        let n_cases = predicate_inputs.len();
+        let choice_inputs: Vec<_> = choice_inputs.into_iter().collect();
+        let n_cases = choice_inputs.len();
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
             ops::Conditional {
-                predicate_inputs,
+                choice_inputs,
                 other_inputs: inputs,
                 outputs: output_types,
                 extension_delta,
@@ -534,15 +534,15 @@ pub trait Dataflow: Container {
     }
 
     /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
-    /// `tag` variant of a predicate (sum-of-tuples) type.
-    fn make_predicate(
+    /// `tag` variant of a Choice (sum-of-tuples) type.
+    fn make_choice(
         &mut self,
         tag: usize,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        choice_variants: impl IntoIterator<Item = TypeRow>,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
-        let variants = crate::types::predicate_variants_row(predicate_variants);
+        let variants = crate::types::choice_variant_row(choice_variants);
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
@@ -561,7 +561,7 @@ pub trait Dataflow: Container {
         tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
+        self.make_choice(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -578,7 +578,7 @@ pub trait Dataflow: Container {
         loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(1, [loop_op.just_inputs, loop_op.just_outputs], values)
+        self.make_choice(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
     /// Add a [`ops::Call`] node, calling `function`, with inputs

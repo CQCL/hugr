@@ -335,16 +335,16 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type (see below), whose
+The first input to the Conditional-node is of Choice type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
-contents of the Predicate with all remaining inputs to Conditional
+contents of the Choice with all remaining inputs to Conditional
 appended are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
+A **Choice(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
 system](#type-system)), where `#ti` is the *i*th Row defining it.
 
@@ -362,7 +362,7 @@ flowchart
         end
         Case0 ~~~ Case1
     end
-    Pred["case 0 inputs | case 1 inputs"] --> Conditional
+    Choice["case 0 inputs | case 1 inputs"] --> Conditional
     OI["other inputs"] --> Conditional
     Conditional --> outputs
 ```
@@ -370,7 +370,7 @@ flowchart
 ##### `TailLoop` nodes
 
 These provide tail-controlled loops: the data sibling graph within the
-TailLoop-node computes a value of 2-ary `Predicate(#i, #o)`; the first
+TailLoop-node computes a value of 2-ary `Choice(#i, #o)`; the first
 variant means to repeat the loop with the values of the tuple unpacked
 and “fed” in at at the top; the second variant means to exit the loop
 with those values unpacked. The graph may additionally take in a row
@@ -398,7 +398,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
+`Choice(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -424,7 +424,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Const" are simply generating a predicate with one empty
+The three nodes labelled "Const" are simply generating a choice with one empty
 value to pass to the Output node.
 
 ```mermaid
@@ -1376,8 +1376,8 @@ use an empty node in the replacement and have B map this node to the old
 one.
 
 We can, for example, implement “turning a Conditional-node with known
-predicate into a DFG-node” by a `Replace` where the Conditional (and its
-preceding predicate) is replaced by an empty DFG and the map B specifies
+Choice into a DFG-node” by a `Replace` where the Conditional (and its
+preceding Choice) is replaced by an empty DFG and the map B specifies
 the “good” child of the Conditional as the surrogate parent of the new
 DFG’s children. (If the good child was just an Op, we could either
 remove it and include it in the replacement, or – to avoid this overhead

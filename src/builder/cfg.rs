@@ -103,8 +103,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching predicate Sum value
-    /// specified by `predicate_variants`.
+    /// and `outputs` and the variants of the branching Choice Sum value
+    /// specified by `choice_variants`.
     ///
     /// # Errors
     ///
@@ -112,13 +112,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     pub fn block_builder(
         &mut self,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        choice_variants: Vec<TypeRow>,
         extension_delta: ExtensionSet,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.any_block_builder(
             inputs,
-            predicate_variants,
+            choice_variants,
             other_outputs,
             extension_delta,
             false,
@@ -128,7 +128,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     fn any_block_builder(
         &mut self,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        choice_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
         extension_delta: ExtensionSet,
         entry: bool,
@@ -136,7 +136,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
-            predicate_variants: predicate_variants.clone(),
+            choice_variants: choice_variants.clone(),
             extension_delta,
         });
         let parent = self.container_node();
@@ -152,14 +152,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         BlockBuilder::create(
             self.hugr_mut(),
             block_n,
-            predicate_variants,
+            choice_variants,
             other_outputs,
             inputs,
         )
     }
 
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a unit choice type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -178,15 +178,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching predicate Sum value
-    /// specified by `predicate_variants`.
+    /// and `outputs` and the variants of the branching Choice Sum value
+    /// specified by `choice_variants`.
     ///
     /// # Errors
     ///
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder(
         &mut self,
-        predicate_variants: Vec<TypeRow>,
+        choice_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
@@ -196,7 +196,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
         self.any_block_builder(
             inputs,
-            predicate_variants,
+            choice_variants,
             other_outputs,
             extension_delta,
             true,
@@ -204,7 +204,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a unit choice type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -245,7 +245,7 @@ pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` being the value of the
-    /// predicate.  `outputs` are the remaining outputs.
+    /// Choice.  `outputs` are the remaining outputs.
     pub fn set_outputs(
         &mut self,
         branch_wire: Wire,
@@ -256,13 +256,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     fn create(
         base: B,
         block_n: Node,
-        predicate_variants: Vec<TypeRow>,
+        choice_variants: Vec<TypeRow>,
         other_outputs: TypeRow,
         inputs: TypeRow,
     ) -> Result<Self, BuildError> {
-        // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = Type::new_predicate(predicate_variants);
-        let mut node_outputs = vec![predicate_type];
+        // The node outputs a Choice before the data outputs of the block node
+        let choice_type = Type::new_choice(choice_variants);
+        let mut node_outputs = vec![choice_type];
         node_outputs.extend_from_slice(&other_outputs);
         let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
         let inp_ex = base
@@ -293,23 +293,23 @@ impl BlockBuilder<Hugr> {
     pub fn new(
         inputs: impl Into<TypeRow>,
         input_extensions: impl Into<Option<ExtensionSet>>,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        choice_variants: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
-        let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
+        let choice_variants: Vec<_> = choice_variants.into_iter().collect();
         let other_outputs = other_outputs.into();
         let op = BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
-            predicate_variants: predicate_variants.clone(),
+            choice_variants: choice_variants.clone(),
             extension_delta,
         };
 
         let base = Hugr::new(NodeType::new(op, input_extensions));
         let root = base.root();
-        Self::create(base, root, predicate_variants, other_outputs, inputs)
+        Self::create(base, root, choice_variants, other_outputs, inputs)
     }
 
     /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
@@ -382,14 +382,14 @@ mod test {
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
-            let sum = entry_b.make_predicate(1, sum2_variants, [inw])?;
+            let sum = entry_b.make_choice(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
-            let c = middle_b
-                .add_load_const(ops::Const::simple_unary_predicate(), ExtensionSet::new())?;
+            let c =
+                middle_b.add_load_const(ops::Const::unary_unit_choice(), ExtensionSet::new())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

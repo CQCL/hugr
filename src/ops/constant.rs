@@ -34,41 +34,41 @@ impl Const {
         &self.typ
     }
 
-    /// Sum of Tuples, used as predicates in branching.
+    /// Sum of Tuples, used  for branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn predicate(
+    pub fn choice(
         tag: usize,
         value: Value,
         variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Result<Self, ConstTypeError> {
-        let typ = Type::new_predicate(variant_rows);
+        let typ = Type::new_choice(variant_rows);
         Self::new(Value::sum(tag, value), typ)
     }
 
-    /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize, size: u8) -> Self {
+    /// Constant Sum over units, used as branching values.
+    pub fn unit_choice(tag: usize, size: u8) -> Self {
         Self {
-            value: Value::simple_predicate(tag),
-            typ: Type::new_simple_predicate(size),
+            value: Value::unit_choice(tag),
+            typ: Type::new_unit_choice(size),
         }
     }
 
     /// Constant Sum over units, with only one variant.
-    pub fn simple_unary_predicate() -> Self {
+    pub fn unary_unit_choice() -> Self {
         Self {
-            value: Value::simple_unary_predicate(),
-            typ: Type::new_simple_predicate(1),
+            value: Value::unary_unit_choice(),
+            typ: Type::new_unit_choice(1),
         }
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).
     pub fn true_val() -> Self {
-        Self::simple_predicate(1, 2)
+        Self::unit_choice(1, 2)
     }
 
     /// Constant "false" value, i.e. the first variant of Sum((), ()).
     pub fn false_val() -> Self {
-        Self::simple_predicate(0, 2)
+        Self::unit_choice(0, 2)
     }
 
     /// Tuple of values
@@ -142,17 +142,17 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_predicate() -> Result<(), BuildError> {
+    fn test_choice() -> Result<(), BuildError> {
         use crate::builder::Container;
         let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
-        let pred_ty = Type::new_predicate(pred_rows.clone());
+        let pred_ty = Type::new_choice(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
         let c = b.add_constant(
-            Const::predicate(
+            Const::choice(
                 0,
                 Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
                 pred_rows.clone(),
@@ -164,7 +164,7 @@ mod test {
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
         let c = b.add_constant(
-            Const::predicate(1, Value::unit(), pred_rows)?,
+            Const::choice(1, Value::unit(), pred_rows)?,
             ExtensionSet::new(),
         )?;
         let w = b.load_const(&c)?;
@@ -174,10 +174,10 @@ mod test {
     }
 
     #[test]
-    fn test_bad_predicate() {
+    fn test_bad_choice() {
         let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
-        let res = Const::predicate(0, Value::tuple([]), pred_rows);
+        let res = Const::choice(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
     }
 

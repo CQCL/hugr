@@ -1028,14 +1028,14 @@ mod test {
             Ok(case)
         }
 
-        let predicate_inputs = vec![type_row![]; 2];
+        let choice_inputs = vec![type_row![]; 2];
         let rs = ExtensionSet::from_iter([A, B]);
 
         let inputs = type_row![NAT];
         let outputs = type_row![NAT];
 
         let op = ops::Conditional {
-            predicate_inputs,
+            choice_inputs,
             other_inputs: inputs.clone(),
             outputs: outputs.clone(),
             extension_delta: rs.clone(),

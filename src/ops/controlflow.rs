@@ -32,7 +32,7 @@ impl DataflowOpTrait for TailLoop {
 
     fn signature(&self) -> FunctionType {
         let [inputs, outputs] =
-            [&self.just_inputs, &self.just_outputs].map(|row| predicate_first(row, &self.rest));
+            [&self.just_inputs, &self.just_outputs].map(|row| choice_first(row, &self.rest));
         FunctionType::new(inputs, outputs)
     }
 }
@@ -40,23 +40,23 @@ impl DataflowOpTrait for TailLoop {
 impl TailLoop {
     /// Build the output TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let predicate = Type::new_predicate([self.just_inputs.clone(), self.just_outputs.clone()]);
-        let mut outputs = vec![predicate];
+        let choice = Type::new_choice([self.just_inputs.clone(), self.just_outputs.clone()]);
+        let mut outputs = vec![choice];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
     }
 
     /// Build the input TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
-        predicate_first(&self.just_inputs, &self.rest)
+        choice_first(&self.just_inputs, &self.rest)
     }
 }
 
 /// Conditional operation, defined by child `Case` nodes for each branch.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conditional {
-    /// The possible rows of the predicate input
-    pub predicate_inputs: Vec<TypeRow>,
+    /// The possible rows of the Choice input
+    pub choice_inputs: Vec<TypeRow>,
     /// Remaining input types
     pub other_inputs: TypeRow,
     /// Output types
@@ -77,7 +77,7 @@ impl DataflowOpTrait for Conditional {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
-            .insert(0, Type::new_predicate(self.predicate_inputs.clone()));
+            .insert(0, Type::new_choice(self.choice_inputs.clone()));
         FunctionType::new(inputs, self.outputs.clone()).with_extension_delta(&self.extension_delta)
     }
 }
@@ -85,8 +85,8 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
-        Some(predicate_first(
-            self.predicate_inputs.get(case)?,
+        Some(choice_first(
+            self.choice_inputs.get(case)?,
             &self.other_inputs,
         ))
     }
@@ -122,7 +122,7 @@ pub enum BasicBlock {
     DFB {
         inputs: TypeRow,
         other_outputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        choice_variants: Vec<TypeRow>,
         extension_delta: ExtensionSet,
     },
     /// The single exit node of the CFG, has no children,
@@ -192,10 +192,10 @@ impl BasicBlock {
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
         match self {
             BasicBlock::DFB {
-                predicate_variants,
+                choice_variants,
                 other_outputs: outputs,
                 ..
-            } => Some(predicate_first(predicate_variants.get(successor)?, outputs)),
+            } => Some(choice_first(choice_variants.get(successor)?, outputs)),
             BasicBlock::Exit { .. } => panic!("Exit should have no successors"),
         }
     }
@@ -240,9 +240,10 @@ impl Case {
     }
 }
 
-fn predicate_first(pred: &TypeRow, rest: &TypeRow) -> TypeRow {
+fn choice_first(choice: &TypeRow, rest: &TypeRow) -> TypeRow {
     TypeRow::from(
-        pred.iter()
+        choice
+            .iter()
             .cloned()
             .chain(rest.iter().cloned())
             .collect::<Vec<_>>(),
