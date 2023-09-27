@@ -88,7 +88,7 @@ pub trait CfgNodeMap<T> {
 /// Transforms a CFG to nested form.
 pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     view: &mut impl CfgNodeMap<T>,
-) -> Result<(), String> {
+) {
     let edge_classes = EdgeClassifier::get_edge_classes(view);
     let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
     for (e, cls) in edge_classes.iter() {
@@ -145,24 +145,22 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     // TODO we should probably now try to merge consecutive basic blocks
     // (i.e. where a BB has a single successor, that has a single predecessor)
     // and thus convert CF dependencies into (parallelizable) dataflow.
-    Ok(())
 }
 
 /// Attempt to transform all CFGs in the given Hugr into nested form.
 /// This searches every node in the entire Hugr looking for CFGs,
 /// so may be expensive, although costs of the analysis/transformation
 /// are likely to be higher if much of the Hugr is CFG(s)!
-pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
+pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
         if h.get_optype(n).tag() == OpTag::Cfg {
             // We've checked the optype so this should be fine
             let mut s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
-            transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut s))?;
+            transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut s));
         }
         node_stack.extend(h.children(n))
     }
-    Ok(())
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
@@ -653,7 +651,7 @@ pub(crate) mod test {
         // ALAN and another case for WholeHugrView
         let root = h.root();
         let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m)).unwrap();
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m));
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -762,7 +760,7 @@ pub(crate) mod test {
         // ALAN and another case for WholeHugrView
         let root = h.root();
         let mut m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m)).unwrap();
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut m));
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
