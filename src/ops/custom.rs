@@ -235,8 +235,8 @@ pub fn resolve_extension_ops(
                     // Fail if the Extension was found but did not have the expected operation
                     let Some(def) = r.get_op(&opaque.op_name) else {
                         return Err(CustomOpError::OpNotFoundInExtension(
-                            opaque.op_name.to_string(),
-                            r.name().to_string(),
+                            opaque.op_name.clone(),
+                            r.name().clone(),
                         ));
                     };
                     let op = ExternalOp::Extension(
@@ -246,7 +246,8 @@ pub fn resolve_extension_ops(
                     if let Some(sig) = &opaque.signature {
                         if sig != &op.signature() {
                             return Err(CustomOpError::SignatureMismatch(
-                                def.name().to_string(),
+                                r.name().clone(),
+                                def.name().clone(),
                                 op.signature(),
                                 sig.clone(),
                             ));
@@ -277,10 +278,10 @@ pub enum CustomOpError {
     NoStoredSignature(SmolStr, Node),
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(String, String),
+    OpNotFoundInExtension(SmolStr, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
-    #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, FunctionType, FunctionType),
+    #[error("Conflicting signature: resolved {1} in extension {0} to a concrete implementation which computed {2:?} but stored signature was {3:?}")]
+    SignatureMismatch(ExtensionId, SmolStr, FunctionType, FunctionType),
 }
 
 #[cfg(test)]
