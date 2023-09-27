@@ -50,7 +50,9 @@ jobs:
         issuetype: Bug
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
+        fields: '{"labels": ["hugr"]}'
+        # TODO: Add priority field
+        # fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
 
     - name: Create Task
       uses: atlassian/gajira-create@v3.0.1
@@ -62,4 +64,6 @@ jobs:
         issuetype: Task
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
+        fields: '{"labels": ["hugr"]}'
+        # TODO: Add priority field
+        # fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
