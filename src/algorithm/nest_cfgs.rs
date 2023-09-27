@@ -57,8 +57,9 @@ use crate::{Direction, Hugr, Node};
 /// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`Node`]) in the Hugr,
 /// for an [IdentityCfgMap] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
-/// algorithm to identify more regions than existed in the underlying CFG
-/// (without mutating the underlying CFG perhaps in vain).
+/// algorithm to identify more regions than existed in the underlying CFG, without mutating the
+/// underlying CFG just for the analysis - the mutation can then be performed by [CfgNodeMapMut]
+/// only as necessary for nesting transformations actually applied.
 pub trait CfgNodeMap<T> {
     /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
     fn entry_node(&self) -> T;
@@ -81,7 +82,6 @@ pub trait CfgNodeMap<T> {
 pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
     /// Given an entry edge and exit edge defining a SESE region, mutates the
     /// Hugr such that all nodes between these edges are placed in a nested CFG.
-    /// Hugr is temporarily passed in until we have a View-like trait that allows applying a rewrite.
     /// Returns the newly-constructed block (containing a nested CFG), or an error
     /// if the two edges do not constitute a SESE region.
     fn nest_sese_region(&mut self, entry_edge: (T, T), exit_edge: (T, T)) -> Result<T, String>;
