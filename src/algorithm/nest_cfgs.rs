@@ -221,7 +221,7 @@ pub struct IdentityCfgMap<'a, H: HugrView> {
     exit: Node,
 }
 impl<'a, H: HugrMut<RootHandle = CfgID>> IdentityCfgMap<'a, H> {
-    /// Creates a SimpleCfgView for the specified CSG of a Hugr
+    /// Creates an [IdentityCfgMap] for the specified CFG
     pub fn new(h: &'a mut H) -> Self {
         // Panic if malformed enough not to have two children
         let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();

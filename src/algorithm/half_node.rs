@@ -119,7 +119,7 @@ mod test {
         // N(entry) -> head -> split            > N(merge) -> N(tail) -> N(exit)
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
-        // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
+        // Allowing to identity two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
         // ALAN and another case for WholeHugrView
         let m = SiblingGraph::<CfgID>::try_new(&h, h.root()).unwrap();
