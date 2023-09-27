@@ -251,11 +251,11 @@ impl<H: HugrMut<RootHandle = CfgID>> CfgNodeMap<Node> for IdentityCfgMap<'_, H> 
     }
 
     fn nest_sese_region(&mut self, entry_edge: (Node, Node), exit_edge: (Node, Node)) -> Node {
+        // The algorithm only calls with entry/exit edges for a SESE region; panic if they don't
         let blocks = region_blocks(self, entry_edge, exit_edge).unwrap();
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
-        // If the above succeeds, we should have a valid set of blocks ensuring the below also succeeds
         let (new_block, new_cfg) = OutlineCfg::new(blocks).apply(self.h).unwrap();
         debug_assert!([entry_edge.0, exit_edge.1]
             .iter()
@@ -286,13 +286,12 @@ pub enum RegionBlocksError<T> {
     UnexpectedEntryEdges(Vec<T>),
 }
 
-/// Given entry and exit edges for a SESE region, get a list of all the blocks in it.
+/// Given entry and exit edges for a SESE region, identify all the blocks in it.
 pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
     v: &impl CfgNodeMap<T>,
     entry_edge: (T, T),
     exit_edge: (T, T),
 ) -> Result<HashSet<T>, RegionBlocksError<T>> {
-    // Identify the nodes in the region
     let mut blocks = HashSet::new();
     let mut queue = VecDeque::new();
     queue.push_back(entry_edge.1);
