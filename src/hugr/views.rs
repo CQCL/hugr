@@ -309,12 +309,13 @@ pub trait HugrView: sealed::HugrInternals {
 /// (Just provides static checking of the type of the root node)
 pub struct WholeHugrView<'a, Root = Node>(&'a Hugr, PhantomData<Root>);
 
-impl<'a, Root: NodeHandle> WholeHugrView<'a, Root> {
+impl<'a, Root: NodeHandle> TryFrom<&'a Hugr> for WholeHugrView<'a, Root> {
+    type Error = HugrError;
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
-    pub fn try_new(hugr: &'a Hugr) -> Result<Self, HugrError> {
+    fn try_from(hugr: &'a Hugr) -> Result<Self, HugrError> {
         if !Root::TAG.is_superset(hugr.root_type().tag()) {
             return Err(HugrError::InvalidNode(hugr.root()));
         }
@@ -500,9 +501,9 @@ mod test {
         let h = Hugr::new(NodeType::pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
         }));
-        let cfg_v = WholeHugrView::<CfgID>::try_new(&h);
+        let cfg_v = WholeHugrView::<CfgID>::try_from(&h);
         assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
-        let dfg_v = WholeHugrView::<DfgID>::try_new(&h).unwrap();
+        let dfg_v: WholeHugrView<DfgID> = (&h).try_into().unwrap();
         // Just to check that WholeHugrView is a HugrView:
         assert_eq!(
             dfg_v.all_neighbours(dfg_v.root()).collect::<Vec<_>>(),
