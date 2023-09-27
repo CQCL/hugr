@@ -291,7 +291,7 @@ pub fn resolve_opaque_op(
 
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
 /// when trying to resolve the serialized names against a registry of known Extensions.
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum CustomOpError {
     /// Extension not found, and no signature
     #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
