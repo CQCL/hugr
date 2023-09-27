@@ -42,6 +42,7 @@ use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use std::hash::Hash;
 
 use itertools::Itertools;
+use thiserror::Error;
 
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::views::sibling::SiblingMut;
@@ -77,9 +78,11 @@ pub trait CfgNodeMap<T> {
 
     /// Given an entry edge and exit edge defining a SESE region, mutates the
     /// Hugr such that all nodes between these edges are placed in a nested CFG.
-    /// Returns the newly-constructed block (containing a nested CFG), or an error
-    /// if the two edges do not constitute a SESE region.
-    fn nest_sese_region(&mut self, entry_edge: (T, T), exit_edge: (T, T)) -> Result<T, String>;
+    /// Returns the newly-constructed block (containing a nested CFG).
+    ///
+    /// # Panics
+    /// May panic if the two edges do not constitute a SESE region.
+    fn nest_sese_region(&mut self, entry_edge: (T, T), exit_edge: (T, T)) -> T;
 }
 
 /// Transforms a CFG to nested form.
@@ -129,7 +132,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
                         if prev_e.1 != e.0 || view.successors(e.0).count() > 1 {
                             // Traversal and nesting of the subregion's *contents* were completed in the
                             // recursive call above, so only processed nodes are moved into descendant CFGs
-                            e = (view.nest_sese_region(prev_e, e).unwrap(), e.1)
+                            e = (view.nest_sese_region(prev_e, e), e.1)
                         };
                     }
                 }
@@ -249,12 +252,8 @@ impl<H: HugrMut<RootHandle = CfgID>> CfgNodeMap<Node> for IdentityCfgMap<'_, H> 
         self.h.neighbours(node, Direction::Incoming)
     }
 
-    fn nest_sese_region(
-        &mut self,
-        entry_edge: (Node, Node),
-        exit_edge: (Node, Node),
-    ) -> Result<Node, String> {
-        let blocks = get_blocks(self, entry_edge, exit_edge)?;
+    fn nest_sese_region(&mut self, entry_edge: (Node, Node), exit_edge: (Node, Node)) -> Node {
+        let blocks = region_blocks(self, entry_edge, exit_edge).unwrap();
         assert!([entry_edge.0, entry_edge.1, exit_edge.0, exit_edge.1]
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
@@ -270,16 +269,31 @@ impl<H: HugrMut<RootHandle = CfgID>> CfgNodeMap<Node> for IdentityCfgMap<'_, H> 
         debug_assert!([entry_edge.1, exit_edge.0]
             .iter()
             .all(|n| new_cfg_view.get_parent(*n) == Some(new_cfg)));
-        Ok(new_block)
+        new_block
     }
 }
 
+/// An error trying to get the blocks of a SESE (single-entry-single-exit) region
+#[derive(Clone, Debug, Error)]
+pub enum RegionBlocksError<T> {
+    /// The specified exit edge did not exist in the CFG
+    ExitEdgeNotPresent(T, T),
+    /// The specified entry edge did not exist in the CFG
+    EntryEdgeNotPresent(T, T),
+    /// The source of the entry edge was in the region
+    /// (reachable from the target of the entry edge without using the exit edge)
+    EntryEdgeSourceInRegion(T),
+    /// The target of the entry edge had other predecessors (given)
+    /// that were outside the region (i.e. not reachable from the target)
+    UnexpectedEntryEdges(Vec<T>),
+}
+
 /// Given entry and exit edges for a SESE region, get a list of all the blocks in it.
-pub fn get_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
+pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
     v: &impl CfgNodeMap<T>,
     entry_edge: (T, T),
     exit_edge: (T, T),
-) -> Result<HashSet<T>, String> {
+) -> Result<HashSet<T>, RegionBlocksError<T>> {
     // Identify the nodes in the region
     let mut blocks = HashSet::new();
     let mut queue = VecDeque::new();
@@ -288,31 +302,40 @@ pub fn get_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
         if blocks.insert(n) {
             if n == exit_edge.0 {
                 let succs: Vec<T> = v.successors(n).collect();
-                let in_succs: Vec<T> = succs
-                    .iter()
-                    .copied()
-                    .filter(|s| *s != exit_edge.1)
-                    .collect();
-                if succs.len() == in_succs.len() {
-                    return Err("Exit node missing exit edge".to_string());
+                let n_succs = succs.len();
+                let internal_succs: Vec<T> =
+                    succs.into_iter().filter(|s| *s != exit_edge.1).collect();
+                if internal_succs.len() == n_succs {
+                    return Err(RegionBlocksError::ExitEdgeNotPresent(
+                        exit_edge.0,
+                        exit_edge.1,
+                    ));
                 }
-                queue.extend(in_succs.into_iter())
+                queue.extend(internal_succs)
             } else {
                 queue.extend(v.successors(n));
             }
         }
     }
     if blocks.contains(&entry_edge.0) {
-        return Err("Entry edge was from a node in the block".to_string());
+        return Err(RegionBlocksError::EntryEdgeSourceInRegion(entry_edge.0));
     }
-    for p in v.predecessors(entry_edge.1) {
-        if p != entry_edge.0 && !blocks.contains(&p) {
-            return Err(format!(
-                "Entry node had additional external predecessor {:?}",
-                p
-            ));
-        }
+
+    let ext_preds = v
+        .predecessors(entry_edge.1)
+        .unique()
+        .filter(|p| !blocks.contains(p));
+    let (expected, extra): (Vec<T>, Vec<T>) = ext_preds.partition(|i| *i == entry_edge.0);
+    if expected != vec![entry_edge.0] {
+        return Err(RegionBlocksError::EntryEdgeNotPresent(
+            entry_edge.0,
+            entry_edge.1,
+        ));
+    };
+    if extra != vec![] {
+        return Err(RegionBlocksError::UnexpectedEntryEdges(extra));
     }
+    // We could check for other nodes in the region having predecessors outside it, but that would be more expensive
     Ok(blocks)
 }
 
