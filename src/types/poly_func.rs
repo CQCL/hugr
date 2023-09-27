@@ -91,24 +91,24 @@ impl PolyFuncType {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let (fixed, remaining) = self.params.split_at(args.len());
-        check_type_args(args, fixed)?;
-        let sub: Substitution = if remaining.is_empty() {
-            args.into()
+        let remaining = self.params.get(args.len()..).unwrap_or_default();
+        let mut v;
+        let args = if remaining.is_empty() {
+            args
         } else {
             // Partial application - renumber remaining params (still bound) downward
-            let mut rhs = args.to_vec();
-            rhs.extend(
+            v = args.to_vec();
+            v.extend(
                 remaining
                     .iter()
                     .enumerate()
                     .map(|(i, decl)| TypeArg::new_var_use(i, decl.clone())),
             );
-            rhs.into()
+            v.as_slice()
         };
         Ok(Self {
             params: remaining.to_vec(),
-            body: self.body.substitute(exts, &sub),
+            body: self.instantiate_all(args, exts)?,
         })
     }
 
@@ -118,9 +118,7 @@ impl PolyFuncType {
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
-        let pf = self.instantiate(args, extension_registry).unwrap();
-        assert!(pf.params.is_empty());
-        Ok(pf.body)
+        Ok(self.body.substitute(extension_registry, &args.into()))
     }
 }
 
