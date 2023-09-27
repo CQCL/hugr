@@ -266,9 +266,12 @@ where
         dst: Node,
         dst_port: impl PortIndex,
     ) -> Result<(), HugrError> {
-        self.as_mut()
-            .graph
-            .link_nodes(src.index, src_port.index(), dst.index, dst_port.index())?;
+        self.as_mut().graph.link_nodes(
+            src.index,
+            src_port.try_index(Direction::Outgoing)?,
+            dst.index,
+            dst_port.try_index(Direction::Incoming)?,
+        )?;
         Ok(())
     }
 

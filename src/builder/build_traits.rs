@@ -28,7 +28,7 @@ use super::{
     tail_loop::TailLoopBuilder, BuildError, Wire,
 };
 
-use crate::Hugr;
+use crate::{Direction, Hugr};
 
 use crate::hugr::HugrMut;
 
@@ -662,8 +662,8 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: impl PortIndex,
 ) -> Result<bool, BuildError> {
-    let src_port = src_port.index();
-    let dst_port = dst_port.index();
+    let src_port = src_port.try_index(Direction::Outgoing)?;
+    let dst_port = dst_port.try_index(Direction::Incoming)?;
     let base = data_builder.hugr_mut();
     let src_offset = Port::new_outgoing(src_port);
 

@@ -214,6 +214,14 @@ pub struct Port {
 pub trait PortIndex {
     /// Returns the offset of the port.
     fn index(self) -> usize;
+    /// Returns the offset of the port, doing a sanity check on the expected direction.
+    #[inline(always)]
+    fn try_index(self, _dir: Direction) -> Result<usize, HugrError>
+    where
+        Self: Sized,
+    {
+        Ok(self.index())
+    }
 }
 
 /// The direction of a port.
@@ -398,6 +406,16 @@ impl PortIndex for Port {
     fn index(self) -> usize {
         self.offset.index()
     }
+    #[inline(always)]
+    fn try_index(self, dir: Direction) -> Result<usize, HugrError>
+    where
+        Self: Sized,
+    {
+        match dir == self.direction() {
+            true => Ok(self.index()),
+            false => Err(HugrError::InvalidPortDirection(dir)),
+        }
+    }
 }
 
 impl PortIndex for usize {
@@ -416,7 +434,7 @@ impl Wire {
     /// Create a new wire from a node and a port.
     #[inline]
     pub fn new(node: Node, port: Port) -> Self {
-        Self(node, port.index())
+        Self(node, port.try_index(Direction::Outgoing).unwrap())
     }
 
     /// The node that this wire is connected to.
@@ -484,6 +502,9 @@ pub enum HugrError {
     /// The node doesn't exist.
     #[error("Invalid node {0:?}.")]
     InvalidNode(Node),
+    /// An invalid port was specified.
+    #[error("Invalid port direction {0:?}.")]
+    InvalidPortDirection(Direction),
 }
 
 #[cfg(feature = "pyo3")]
