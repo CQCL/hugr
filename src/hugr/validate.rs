@@ -18,6 +18,7 @@ use crate::extension::{
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
 
+use crate::ops::custom::CustomOpError;
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -160,8 +161,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Check operation-specific constraints. Firstly that type args are correct
-        // (Good to call `resolve_extension_ops` immediately before this
-        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
+        // (Best if we've called `resolve_extension_ops` first, as per infer_and_validate)
         if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
             for arg in b.args() {
                 arg.validate(self.extension_registry)
@@ -634,6 +634,12 @@ pub enum ValidationError {
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
+    /// Error in a [CustomOp] serialized as an [Opaque]
+    ///
+    /// [CustomOp]: crate::ops::LeafOp::CustomOp
+    /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
+    #[error(transparent)]
+    CustomOpError(#[from] CustomOpError),
 }
 
 #[cfg(feature = "pyo3")]
