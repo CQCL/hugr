@@ -474,8 +474,6 @@ fn get_edge_type<H: HugrView>(hugr: &H, ports: &[(Node, Port)]) -> Option<Type> 
 }
 
 /// Whether a subgraph is valid.
-///
-/// Does NOT check for convexity.
 fn validate_subgraph<H: HugrView>(
     hugr: &H,
     nodes: &[Node],
