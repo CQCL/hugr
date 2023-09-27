@@ -517,16 +517,13 @@ fn validate_subgraph<H: HugrView>(
     }
 
     let mut ports_inside = inputs.iter().flatten().chain(outputs).copied();
-    let mut ports_outside = ports_inside
-        .clone()
-        .flat_map(|(n, p)| hugr.linked_ports(n, p));
     // Check incoming & outgoing ports have target resp. source inside
     let nodes = nodes.iter().copied().collect::<HashSet<_>>();
     if ports_inside.any(|(n, _)| !nodes.contains(&n)) {
         return Err(InvalidSubgraph::InvalidBoundary);
     }
-    // Check incoming & outgoing ports have source resp. target outside
-    if ports_outside.any(|(n, _)| nodes.contains(&n)) {
+    // Check that every inside port has at least one linked port outside.
+    if ports_inside.any(|(n, p)| hugr.linked_ports(n, p).all(|(n1, _)| nodes.contains(&n1))) {
         return Err(InvalidSubgraph::NotConvex);
     }
 
