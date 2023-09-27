@@ -662,10 +662,13 @@ mod tests {
         hugr::views::{HierarchyView, SiblingGraph},
         hugr::HugrMut,
         ops::{
-            handle::{FuncID, NodeHandle},
+            handle::{DfgID, FuncID, NodeHandle},
             OpType,
         },
-        std_extensions::{logic::test::and_op, quantum::test::cx_gate},
+        std_extensions::{
+            logic::test::{and_op, not_op},
+            quantum::test::cx_gate,
+        },
         type_row,
     };
 
@@ -893,5 +896,29 @@ mod tests {
         extracted.validate(&PRELUDE_REGISTRY).unwrap();
 
         Ok(())
+    }
+
+    #[test]
+    fn edge_both_output_and_copy() {
+        // https://github.com/CQCL-DEV/hugr/issues/518
+        let one_bit = type_row![BOOL_T];
+        let two_bit = type_row![BOOL_T, BOOL_T];
+
+        let mut builder =
+            DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
+        let inw = builder.input_wires().exactly_one().unwrap();
+        let outw1 = builder
+            .add_dataflow_op(not_op(), [inw])
+            .unwrap()
+            .out_wire(0);
+        let outw2 = builder
+            .add_dataflow_op(and_op(), [inw, outw1])
+            .unwrap()
+            .outputs();
+        let outw = [outw1].into_iter().chain(outw2);
+        let h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
+        let view = SiblingGraph::<DfgID>::try_new(&h, h.root()).unwrap();
+        let subg = SiblingSubgraph::try_new_dataflow_subgraph(&view).unwrap();
+        assert_eq!(subg.nodes().len(), 2);
     }
 }
