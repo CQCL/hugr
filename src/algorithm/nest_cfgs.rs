@@ -99,7 +99,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
         edge_classes: &HashMap<(T, T), usize>,
         rem_edges: &mut HashMap<usize, HashSet<(T, T)>>,
         stop_at: Option<usize>,
-    ) -> Result<Option<(T, T)>, String> {
+    ) -> Option<(T, T)> {
         let mut seen = HashSet::new();
         let mut stack = Vec::new();
         let mut exit_edges = Vec::new();
@@ -122,23 +122,23 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
                     while !rem_edges.get_mut(cls).unwrap().is_empty() {
                         let prev_e = e;
                         // Traverse to the next edge in the same class - we know it exists in the set
-                        e = traverse(view, e.1, edge_classes, rem_edges, Some(*cls))?.unwrap();
+                        e = traverse(view, e.1, edge_classes, rem_edges, Some(*cls)).unwrap();
                         assert!(rem_edges.get_mut(cls).unwrap().remove(&e));
                         // Skip trivial regions of a single node, unless the node has other edges
                         // (non-exiting, but e.g. a backedge to a loop header, ending that loop)
                         if prev_e.1 != e.0 || view.successors(e.0).count() > 1 {
                             // Traversal and nesting of the subregion's *contents* were completed in the
                             // recursive call above, so only processed nodes are moved into descendant CFGs
-                            e = (view.nest_sese_region(prev_e, e)?, e.1)
+                            e = (view.nest_sese_region(prev_e, e).unwrap(), e.1)
                         };
                     }
                 }
                 stack.push(e.1);
             }
         }
-        Ok(exit_edges.into_iter().unique().at_most_one().unwrap())
+        exit_edges.into_iter().unique().at_most_one().unwrap()
     }
-    traverse(view, view.entry_node(), &edge_classes, &mut rem_edges, None)?;
+    traverse(view, view.entry_node(), &edge_classes, &mut rem_edges, None);
     // TODO we should probably now try to merge consecutive basic blocks
     // (i.e. where a BB has a single successor, that has a single predecessor)
     // and thus convert CF dependencies into (parallelizable) dataflow.
