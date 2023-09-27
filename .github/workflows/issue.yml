@@ -15,15 +15,6 @@ jobs:
         JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
         JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-    - name: Create Bug
-      uses: atlassian/gajira-create@v3.0.1
-      if: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
-      with:
-        project: TKET
-        issuetype: Bug
-        summary: « [hugr] ${{ github.event.issue.title }}»
-        description: ${{ github.event.issue.html_url }}
-        fields: '{"labels": ["hugr"]}'
     - name: Parse the priority label into a Jira priority
       id: set_priority_var
       env:
@@ -49,11 +40,23 @@ jobs:
         done
         echo "JIRA_PRIORITY=$MY_RESULT" >> $GITHUB_OUTPUT
 
-    - name: Create Task
+    - name: Create Bug
       uses: atlassian/gajira-create@v3.0.1
+      if: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
       env:
         JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
+      with:
+        project: TKET
+        issuetype: Bug
+        summary: « [hugr] ${{ github.event.issue.title }}»
+        description: ${{ github.event.issue.html_url }}
+        fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
+
+    - name: Create Task
+      uses: atlassian/gajira-create@v3.0.1
       if: ${{ ! contains(github.event.issue.labels.*.name, 'bug') }}
+      env:
+        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
       with:
         project: TKET
         issuetype: Task
