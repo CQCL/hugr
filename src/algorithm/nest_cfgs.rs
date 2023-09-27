@@ -85,7 +85,7 @@ pub trait CfgNodeMap<T> {
     fn nest_sese_region(&mut self, entry_edge: (T, T), exit_edge: (T, T)) -> T;
 }
 
-/// Transforms a CFG to nested form.
+/// Transforms a CFG into as much-nested a form as possible.
 pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     view: &mut impl CfgNodeMap<T>,
 ) {
@@ -147,10 +147,10 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
     // and thus convert CF dependencies into (parallelizable) dataflow.
 }
 
-/// Attempt to transform all CFGs in the given Hugr into nested form.
-/// This searches every node in the entire Hugr looking for CFGs,
-/// so may be expensive, although costs of the analysis/transformation
-/// are likely to be higher if much of the Hugr is CFG(s)!
+/// Search the entire Hugr looking for CFGs, and transform each
+/// into as deeply-nested form as possible (as per [transform_cfg_to_nested]).
+/// This search may be expensive, although if it finds much/many CFGs,
+/// the analysis/transformation on them is likely to be more expensive still!
 pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
