@@ -972,7 +972,7 @@ pub(crate) mod test {
         Ok((head, tail))
     }
 
-    pub fn depth(h: &impl HugrView, n: Node) -> u32 {
+    pub fn depth(h: &Hugr, n: Node) -> u32 {
         match h.get_parent(n) {
             Some(p) => 1 + depth(h, p),
             None => 0,
