@@ -314,7 +314,7 @@ impl<'a, Root: NodeHandle> TryFrom<&'a Hugr> for WholeHugrView<'a, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [`OpTag`]
     fn try_from(hugr: &'a Hugr) -> Result<Self, HugrError> {
         if !Root::TAG.is_superset(hugr.root_type().tag()) {
             return Err(HugrError::InvalidNode(hugr.root()));
