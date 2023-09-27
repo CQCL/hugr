@@ -27,19 +27,26 @@ jobs:
     - name: Parse the priority label into a Jira priority
       id: set_priority_var
       env:
-        GH_PRIORITY: ${{ github.event.issue.label }}
+        LABELS: ${{ github.event.issue.labels.*.name }}
       run: |
         MY_RESULT=""
-        case ${GH_PRIORITY} in
-          P-low)
-            MY_RESULT=Low;;
-          P-medium)
-            MY_RESULT=Medium;;
-          P-high)
-            MY_RESULT=High;;
-          P-critical)
-            MY_RESULT=Highest;;
-        esac
+        for label in $LABELS
+        do
+          case $label in
+            P-low)
+              MY_RESULT=Low
+              break;;
+            P-medium)
+              MY_RESULT=Medium
+              break;;
+            P-high)
+              MY_RESULT=High
+              break;;
+            P-critical)
+              MY_RESULT=Highest
+              break;;
+          esac
+        done
         echo "JIRA_PRIORITY=$MY_RESULT" >> $GITHUB_OUTPUT
 
     - name: Create Task
