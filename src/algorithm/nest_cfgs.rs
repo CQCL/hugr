@@ -155,19 +155,16 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 /// so may be expensive, although costs of the analysis/transformation
 /// are likely to be higher if much of the Hugr is CFG(s)!
 pub fn transform_all_cfgs(h: &mut Hugr) -> Result<(), String> {
-    fn traverse(h: &mut Hugr, n: Node) -> Result<(), String> {
+    let mut node_stack = Vec::from([h.root()]);
+    while let Some(n) = node_stack.pop() {
         if h.get_optype(n).tag() == OpTag::Cfg {
             // We've checked the optype so this should be fine
             let mut s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
             transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut s))?;
         }
-        let children = h.children(n).collect::<Vec<_>>();
-        for node in children {
-            traverse(h, node)?;
-        }
-        Ok(())
+        node_stack.extend(h.children(n))
     }
-    traverse(h, h.root())
+    Ok(())
 }
 
 /// Directed edges in a Cfg - i.e. along which control flows from first to second only.
