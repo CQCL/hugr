@@ -261,12 +261,13 @@ impl<H: HugrMut<RootHandle = CfgID>> CfgNodeMap<Node> for IdentityCfgMap<'_, H> 
             .iter()
             .all(|n| self.h.get_parent(*n) == Some(self.h.root())));
 
-        let new_block_view = SiblingGraph::<BasicBlockID>::try_new(self.h, new_block).unwrap();
-        let new_cfg_view = SiblingGraph::<CfgID>::try_new(&new_block_view, new_cfg).unwrap();
-
-        debug_assert!([entry_edge.1, exit_edge.0]
-            .iter()
-            .all(|n| new_cfg_view.get_parent(*n) == Some(new_cfg)));
+        debug_assert!({
+            let new_block_view = SiblingGraph::<BasicBlockID>::try_new(self.h, new_block).unwrap();
+            let new_cfg_view = SiblingGraph::<CfgID>::try_new(&new_block_view, new_cfg).unwrap();
+            [entry_edge.1, exit_edge.0]
+                .iter()
+                .all(|n| new_cfg_view.get_parent(*n) == Some(new_cfg))
+        });
         new_block
     }
 }
@@ -329,7 +330,7 @@ pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
             entry_edge.1,
         ));
     };
-    if extra != vec![] {
+    if !extra.is_empty() {
         return Err(RegionBlocksError::UnexpectedEntryEdges(extra));
     }
     // We could check for other nodes in the region having predecessors outside it, but that would be more expensive
