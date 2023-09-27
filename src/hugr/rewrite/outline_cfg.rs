@@ -299,7 +299,7 @@ mod test {
     #[test]
     fn test_outline_cfg() {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.intern_and_validate(&PRELUDE_REGISTRY).unwrap();
         do_outline_cfg_test(&mut h, head, tail, 1);
         h.validate(&PRELUDE_REGISTRY).unwrap();
     }

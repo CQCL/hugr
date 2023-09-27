@@ -60,7 +60,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, ValidationError> {
-        self.0.infer_and_validate(extension_registry)?;
+        self.0.intern_and_validate(extension_registry)?;
         Ok(self.0)
     }
 }

@@ -161,7 +161,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Check operation-specific constraints. Firstly that type args are correct
-        // (Best if we've called `resolve_extension_ops` first, as per infer_and_validate)
+        // (Best if we've called `resolve_extension_ops` first, as per intern_and_validate)
         if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
             for arg in b.args() {
                 arg.validate(self.extension_registry)
@@ -1087,20 +1087,20 @@ mod test {
         h.connect(sub_dfg, 0, output, 0)?;
 
         assert_matches!(
-            h.infer_and_validate(&EMPTY_REG),
+            h.intern_and_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort { .. })
         );
 
         h.connect(input, 1, sub_op, 1)?;
         assert_matches!(
-            h.infer_and_validate(&EMPTY_REG),
+            h.intern_and_validate(&EMPTY_REG),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::MissingOrderEdge { .. }
             ))
         );
         //Order edge. This will need metadata indicating its purpose.
         h.add_other_edge(input, sub_dfg)?;
-        h.infer_and_validate(&EMPTY_REG).unwrap();
+        h.intern_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 
@@ -1117,7 +1117,7 @@ mod test {
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, output, 0)?;
         assert_eq!(
-            h.infer_and_validate(&EMPTY_REG),
+            h.intern_and_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
                 port: Port::new_incoming(1),
@@ -1135,7 +1135,7 @@ mod test {
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, and, 1)?;
         // There is no edge from Input to LoadConstant, but that's OK:
-        h.infer_and_validate(&EMPTY_REG).unwrap();
+        h.intern_and_validate(&EMPTY_REG).unwrap();
         Ok(())
     }
 

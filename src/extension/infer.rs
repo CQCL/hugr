@@ -853,7 +853,7 @@ mod test {
         // nodes and their parents and `report_mismatch` isn't yet smart enough
         // to handle that.
         assert_matches!(
-            hugr.infer_and_validate(&PRELUDE_REGISTRY),
+            hugr.intern_and_validate(&PRELUDE_REGISTRY),
             Err(ValidationError::CantInfer(_))
         );
         Ok(())
@@ -1134,7 +1134,7 @@ mod test {
             hugr.connect(src, 0, tgt, 0)?;
         }
 
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.intern_and_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }
