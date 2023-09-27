@@ -669,6 +669,8 @@ impl UnificationContext {
     }
 
     /// Instantiate all variables in the graph with the empty extension set.
+    /// Instantiate all variables in the graph with the empty extension set, or
+    /// the smallest solution possible given their constraints.
     /// This is done to solve metas which depend on variables, which allows
     /// us to come up with a fully concrete solution to pass into validation.
     pub fn instantiate_variables(&mut self) {
