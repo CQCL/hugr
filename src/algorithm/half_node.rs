@@ -90,6 +90,14 @@ impl<H: HugrView<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<'_, 
         };
         succs.into_iter()
     }
+
+    fn nest_sese_region(
+        &mut self,
+        _entry_edge: (HalfNode, HalfNode),
+        _exit_edge: (HalfNode, HalfNode),
+    ) -> Result<HalfNode, String> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

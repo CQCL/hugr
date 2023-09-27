@@ -58,8 +58,8 @@ use crate::{Direction, Hugr, Node};
 /// for an [IdentityCfgMap] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
 /// algorithm to identify more regions than existed in the underlying CFG, without mutating the
-/// underlying CFG just for the analysis - the mutation can then be performed by [CfgNodeMapMut]
-/// only as necessary for nesting transformations actually applied.
+/// underlying CFG just for the analysis - the splitting /merging) can then be performed by
+/// [nest_sese_region][CfgNodeMap::nest_sese_region] only as necessary for regions actually nested.
 pub trait CfgNodeMap<T> {
     /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
     fn entry_node(&self) -> T;
@@ -74,12 +74,7 @@ pub trait CfgNodeMap<T> {
     fn successors(&self, node: T) -> Self::Iterator<'_>;
     /// Returns an iterator over the predecessors of the specified basic block.
     fn predecessors(&self, node: T) -> Self::Iterator<'_>;
-}
 
-/// An extension of CfgNodeMapping that additionally allows to perform the nesting transformation
-/// - this requires any node splitting/merging provided by the view to be enacted on the underlying
-/// CFG before that can be transformed.
-pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
     /// Given an entry edge and exit edge defining a SESE region, mutates the
     /// Hugr such that all nodes between these edges are placed in a nested CFG.
     /// Returns the newly-constructed block (containing a nested CFG), or an error
@@ -89,7 +84,7 @@ pub trait CfgNodeMapMut<T>: CfgNodeMap<T> {
 
 /// Transforms a CFG to nested form.
 pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
-    view: &mut impl CfgNodeMapMut<T>,
+    view: &mut impl CfgNodeMap<T>,
 ) -> Result<(), String> {
     let edge_classes = EdgeClassifier::get_edge_classes(view);
     let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
@@ -99,7 +94,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 
     // Traverse. Any traversal will encounter edges in SESE-respecting order.
     fn traverse<T: Copy + Eq + Hash + std::fmt::Debug>(
-        view: &mut impl CfgNodeMapMut<T>,
+        view: &mut impl CfgNodeMap<T>,
         n: T,
         edge_classes: &HashMap<(T, T), usize>,
         rem_edges: &mut HashMap<usize, HashSet<(T, T)>>,
@@ -224,7 +219,7 @@ pub struct IdentityCfgMap<'a, H: HugrView> {
     entry: Node,
     exit: Node,
 }
-impl<'a, H: HugrView<RootHandle = CfgID>> IdentityCfgMap<'a, H> {
+impl<'a, H: HugrMut<RootHandle = CfgID>> IdentityCfgMap<'a, H> {
     /// Creates a SimpleCfgView for the specified CSG of a Hugr
     pub fn new(h: &'a mut H) -> Self {
         // Panic if malformed enough not to have two children
@@ -233,7 +228,7 @@ impl<'a, H: HugrView<RootHandle = CfgID>> IdentityCfgMap<'a, H> {
         Self { h, entry, exit }
     }
 }
-impl<H: HugrView> CfgNodeMap<Node> for IdentityCfgMap<'_, H> {
+impl<H: HugrMut<RootHandle = CfgID>> CfgNodeMap<Node> for IdentityCfgMap<'_, H> {
     fn entry_node(&self) -> Node {
         self.entry
     }
@@ -253,9 +248,7 @@ impl<H: HugrView> CfgNodeMap<Node> for IdentityCfgMap<'_, H> {
     fn predecessors(&self, node: Node) -> Self::Iterator<'_> {
         self.h.neighbours(node, Direction::Incoming)
     }
-}
 
-impl<H: HugrMut> CfgNodeMapMut<Node> for IdentityCfgMap<'_, H> {
     fn nest_sese_region(
         &mut self,
         entry_edge: (Node, Node),
