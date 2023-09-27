@@ -17,7 +17,7 @@ jobs:
         JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
     - name: Create Bug
       uses: atlassian/gajira-create@v3.0.1
-      if: "contains(github.event.issue.labels.*.name, 'bug')"
+      if: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
       with:
         project: TKET
         issuetype: Bug
@@ -53,7 +53,7 @@ jobs:
       uses: atlassian/gajira-create@v3.0.1
       env:
         JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
-      if: "! contains(github.event.issue.labels.*.name, 'bug')"
+      if: ${{ ! contains(github.event.issue.labels.*.name, 'bug') }}
       with:
         project: TKET
         issuetype: Task
