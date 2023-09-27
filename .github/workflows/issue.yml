@@ -18,7 +18,7 @@ jobs:
     - name: Parse the priority label into a Jira priority
       id: set_priority_var
       env:
-        LABELS: ${{ github.event.issue.labels.*.name }}
+        LABELS: ${{ join(github.event.issue.labels.*.name, ' ') }}
       run: |
         MY_RESULT=""
         for label in $LABELS
