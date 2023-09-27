@@ -9,6 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
+use crate::hugr::PortIndex;
 use crate::types::{EdgeKind, FunctionType, SignatureDescription, Type};
 use crate::{Direction, Port};
 
@@ -77,7 +78,7 @@ impl OpType {
     /// Returns the edge kind for the given port.
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.signature();
-        let port = port.into();
+        let port: Port = port.into();
         let dir = port.direction();
 
         let port_count = signature.port_count(dir);

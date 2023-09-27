@@ -9,6 +9,7 @@
   packages = lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk; [
     frameworks.CoreServices
     frameworks.CoreFoundation
+    pkgs.just
   ]);
 
   # https://devenv.sh/scripts/
