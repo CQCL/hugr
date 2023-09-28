@@ -208,20 +208,21 @@ pub struct Port {
 }
 
 /// A trait for getting the undirected index of a port.
-///
-/// This allows functions to admit both [`Port`]s and explicit `usize`s for
-/// identifying port offsets.
 pub trait PortIndex {
     /// Returns the offset of the port.
     fn index(self) -> usize;
-    /// Returns the offset of the port, doing a sanity check on the expected direction.
-    #[inline(always)]
-    fn try_index(self, _dir: Direction) -> Result<usize, HugrError>
-    where
-        Self: Sized,
-    {
-        Ok(self.index())
-    }
+}
+
+/// A port in the incoming direction.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
+pub struct IncomingPort {
+    index: u16,
+}
+
+/// A port in the outgoing direction.
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
+pub struct OutgoingPort {
+    index: u16,
 }
 
 /// The direction of a port.
@@ -380,18 +381,36 @@ impl Port {
 
     /// Creates a new incoming port.
     #[inline]
-    pub fn new_incoming(port: usize) -> Self {
-        Self {
-            offset: portgraph::PortOffset::new_incoming(port),
-        }
+    pub fn new_incoming(port: impl Into<IncomingPort>) -> Self {
+        Self::try_new_incoming(port).unwrap()
     }
 
     /// Creates a new outgoing port.
     #[inline]
-    pub fn new_outgoing(port: usize) -> Self {
-        Self {
-            offset: portgraph::PortOffset::new_outgoing(port),
-        }
+    pub fn new_outgoing(port: impl Into<OutgoingPort>) -> Self {
+        Self::try_new_outgoing(port).unwrap()
+    }
+
+    /// Creates a new incoming port.
+    #[inline]
+    pub fn try_new_incoming(port: impl TryInto<IncomingPort>) -> Result<Self, HugrError> {
+        let Ok(port) = port.try_into() else {
+            return Err(HugrError::InvalidPortDirection(Direction::Outgoing));
+        };
+        Ok(Self {
+            offset: portgraph::PortOffset::new_incoming(port.index()),
+        })
+    }
+
+    /// Creates a new outgoing port.
+    #[inline]
+    pub fn try_new_outgoing(port: impl TryInto<OutgoingPort>) -> Result<Self, HugrError> {
+        let Ok(port) = port.try_into() else {
+            return Err(HugrError::InvalidPortDirection(Direction::Incoming));
+        };
+        Ok(Self {
+            offset: portgraph::PortOffset::new_outgoing(port.index()),
+        })
     }
 
     /// Returns the direction of the port.
@@ -406,22 +425,70 @@ impl PortIndex for Port {
     fn index(self) -> usize {
         self.offset.index()
     }
-    #[inline(always)]
-    fn try_index(self, dir: Direction) -> Result<usize, HugrError>
-    where
-        Self: Sized,
-    {
-        match dir == self.direction() {
-            true => Ok(self.index()),
-            false => Err(HugrError::InvalidPortDirection(dir)),
-        }
-    }
 }
 
 impl PortIndex for usize {
     #[inline(always)]
     fn index(self) -> usize {
         self
+    }
+}
+
+impl PortIndex for IncomingPort {
+    #[inline(always)]
+    fn index(self) -> usize {
+        self.index as usize
+    }
+}
+
+impl PortIndex for OutgoingPort {
+    #[inline(always)]
+    fn index(self) -> usize {
+        self.index as usize
+    }
+}
+
+impl From<usize> for IncomingPort {
+    #[inline(always)]
+    fn from(index: usize) -> Self {
+        Self {
+            index: index as u16,
+        }
+    }
+}
+
+impl From<usize> for OutgoingPort {
+    #[inline(always)]
+    fn from(index: usize) -> Self {
+        Self {
+            index: index as u16,
+        }
+    }
+}
+
+impl TryFrom<Port> for IncomingPort {
+    type Error = HugrError;
+    #[inline(always)]
+    fn try_from(port: Port) -> Result<Self, Self::Error> {
+        match port.direction() {
+            Direction::Incoming => Ok(Self {
+                index: port.index() as u16,
+            }),
+            dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
+        }
+    }
+}
+
+impl TryFrom<Port> for OutgoingPort {
+    type Error = HugrError;
+    #[inline(always)]
+    fn try_from(port: Port) -> Result<Self, Self::Error> {
+        match port.direction() {
+            Direction::Outgoing => Ok(Self {
+                index: port.index() as u16,
+            }),
+            dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
+        }
     }
 }
 
@@ -433,8 +500,8 @@ pub struct Wire(Node, usize);
 impl Wire {
     /// Create a new wire from a node and a port.
     #[inline]
-    pub fn new(node: Node, port: Port) -> Self {
-        Self(node, port.try_index(Direction::Outgoing).unwrap())
+    pub fn new(node: Node, port: impl TryInto<OutgoingPort>) -> Self {
+        Self(node, Port::try_new_outgoing(port).unwrap().index())
     }
 
     /// The node that this wire is connected to.
