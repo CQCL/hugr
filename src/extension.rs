@@ -98,15 +98,12 @@ pub enum SignatureError {
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
     /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
-    /// [ExtensionRegistry]. (Note: might be commoned up with
-    /// [CustomOpError::SignatureMismatch] if we implement
-    /// <https://github.com/CQCL-DEV/hugr/issues/508>).
+    /// [ExtensionRegistry].
     ///
     /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
-    /// [CustomOpError::SignatureMismatch]: crate::ops::custom::CustomOpError::SignatureMismatch
-    #[error("Incorrect cache of signature - found {stored} but expected {expected}")]
-    CachedTypeIncorrect {
-        stored: PolyFuncType,
+    #[error("Incorrect result of type application - cached {cached} but expected {expected}")]
+    TypeApplyIncorrectCache {
+        cached: PolyFuncType,
         expected: PolyFuncType,
     },
 }

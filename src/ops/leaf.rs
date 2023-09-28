@@ -99,8 +99,8 @@ impl TypeApplication {
         if other.output == self.output {
             Ok(())
         } else {
-            Err(SignatureError::CachedTypeIncorrect {
-                stored: self.output.clone(),
+            Err(SignatureError::TypeApplyIncorrectCache {
+                cached: self.output.clone(),
                 expected: other.output.clone(),
             })
         }
