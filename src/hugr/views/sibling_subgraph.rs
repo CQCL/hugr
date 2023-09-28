@@ -524,6 +524,27 @@ fn validate_subgraph<H: HugrView>(
     if ports_inside.any(|(n, p)| hugr.linked_ports(n, p).all(|(n1, _)| nodes.contains(&n1))) {
         return Err(InvalidSubgraph::NotConvex);
     }
+    // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
+    // belongs to inputs.
+    if nodes.clone().into_iter().any(|n| {
+        hugr.node_inputs(n).any(|p| {
+            hugr.linked_ports(n, p).any(|(n1, _)| {
+                !nodes.contains(&n1) && !inputs.iter().any(|nps| nps.contains(&(n, p)))
+            })
+        })
+    }) {
+        return Err(InvalidSubgraph::NotConvex);
+    }
+    // Check that every outgoing port of a node in the subgraph whose target is not in the subgraph
+    // belongs to outputs.
+    if nodes.clone().into_iter().any(|n| {
+        hugr.node_outputs(n).any(|p| {
+            hugr.linked_ports(n, p)
+                .any(|(n1, _)| !nodes.contains(&n1) && !outputs.contains(&(n, p)))
+        })
+    }) {
+        return Err(InvalidSubgraph::NotConvex);
+    }
 
     // Check inputs are unique
     if !inputs.iter().flatten().all_unique() {
