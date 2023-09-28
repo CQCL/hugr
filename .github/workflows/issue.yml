@@ -38,14 +38,17 @@ jobs:
               break;;
           esac
         done
-        echo "JIRA_PRIORITY=$MY_RESULT" >> $GITHUB_OUTPUT
+        if [ ! -z $MY_RESULT ]
+        then
+            MY_RESULT=", \"priority\": { \"name\": \"$MY_RESULT\" }"
+        fi
+        echo "JIRA_PRIORITY_FIELD=$MY_RESULT" >> $GITHUB_OUTPUT
 
     - name: Create Bug
       uses: atlassian/gajira-create@v3.0.1
       if: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
       env:
-        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
-        JIRA_PRIORITY_FIELD: ', "priority": { "name": "${{ env.JIRA_PRIORITY }}" }'
+        JIRA_PRIORITY_FIELD: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY_FIELD }}
       with:
         project: TKET
         issuetype: Bug
@@ -57,8 +60,7 @@ jobs:
       uses: atlassian/gajira-create@v3.0.1
       if: ${{ ! contains(github.event.issue.labels.*.name, 'bug') }}
       env:
-        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
-        JIRA_PRIORITY_FIELD: ', "priority": { "name": "${{ env.JIRA_PRIORITY }}" }'
+        JIRA_PRIORITY_FIELD: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY_FIELD }}
       with:
         project: TKET
         issuetype: Task
