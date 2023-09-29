@@ -307,9 +307,9 @@ pub trait HugrView: sealed::HugrInternals {
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
-pub struct WholeHugrView<H, Root = Node>(H, PhantomData<Root>);
+pub struct RootTagged<H, Root = Node>(H, PhantomData<Root>);
 
-impl<H: HugrView, Root: NodeHandle> WholeHugrView<H, Root> {
+impl<H: HugrView, Root: NodeHandle> RootTagged<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -322,20 +322,20 @@ impl<H: HugrView, Root: NodeHandle> WholeHugrView<H, Root> {
     }
 }
 
-impl<Root> WholeHugrView<Hugr, Root> {
+impl<Root> RootTagged<Hugr, Root> {
     /// Extracts the underlying (owned) Hugr
     pub fn into_hugr(self) -> Hugr {
         self.0
     }
 }
 
-impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for WholeHugrView<H, Root> {
+impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootTagged<H, Root> {
     fn as_ref(&self) -> &Hugr {
         self.0.as_ref()
     }
 }
 
-impl<H: AsMut<Hugr>, Root> AsMut<Hugr> for WholeHugrView<H, Root> {
+impl<H: AsMut<Hugr>, Root> AsMut<Hugr> for RootTagged<H, Root> {
     fn as_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
@@ -504,21 +504,21 @@ pub(crate) mod sealed {
 
 #[cfg(test)]
 mod test {
-    use super::{NodeType, WholeHugrView};
+    use super::{NodeType, RootTagged};
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{CfgID, DfgID};
     use crate::ops::LeafOp;
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
-    fn whole_hugr_view() {
+    fn root_tagged() {
         let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
         }));
-        let cfg_v = WholeHugrView::<&Hugr, CfgID>::try_new(&h);
+        let cfg_v = RootTagged::<&Hugr, CfgID>::try_new(&h);
         assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
-        let mut dfg_v = WholeHugrView::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
-        // Just to check that WholeHugrView is a HugrMut:
+        let mut dfg_v = RootTagged::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
+        // Just to check that RootTagged is a HugrMut:
         dfg_v
             .add_node_with_parent(
                 dfg_v.root(),
