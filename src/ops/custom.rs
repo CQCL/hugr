@@ -263,19 +263,20 @@ pub fn resolve_opaque_op(
         // Fail if the Extension was found but did not have the expected operation
         let Some(def) = r.get_op(&opaque.op_name) else {
             return Err(CustomOpError::OpNotFoundInExtension(
-                opaque.op_name.to_string(),
-                r.name().to_string(),
+                opaque.op_name.clone(),
+                r.name().clone(),
             ));
         };
         let ext_op =
             ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry).unwrap();
         if let Some(stored_sig) = &opaque.signature {
             if stored_sig != &ext_op.signature {
-                return Err(CustomOpError::SignatureMismatch(
-                    def.name().to_string(),
-                    ext_op.signature.clone(),
-                    stored_sig.clone(),
-                ));
+                return Err(CustomOpError::SignatureMismatch {
+                    extension: opaque.extension.clone(),
+                    op: def.name().clone(),
+                    computed: ext_op.signature.clone(),
+                    stored: stored_sig.clone(),
+                });
             };
         }
         Ok(Some(ext_op))
@@ -298,10 +299,16 @@ pub enum CustomOpError {
     NoStoredSignature(SmolStr, Node),
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(String, String),
+    OpNotFoundInExtension(SmolStr, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
-    #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, FunctionType, FunctionType),
+    #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
+    #[allow(missing_docs)]
+    SignatureMismatch {
+        extension: ExtensionId,
+        op: SmolStr,
+        stored: FunctionType,
+        computed: FunctionType,
+    },
 }
 
 #[cfg(test)]
