@@ -180,7 +180,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             };
             // If successful, check TypeArgs are valid for the declared TypeParams
             if let Some(ext_op) = ext_op {
-                // WTF looks like check_opaque might be duplicating some of this?!
                 ext_op
                     .def()
                     .check_args(ext_op.args())

@@ -185,16 +185,6 @@ impl OpDef {
         self.check_args_impl(args)
     }
 
-    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
-        self.check_concrete_impl(opaque)
-    }
-
     /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
     ///
     /// # Errors
