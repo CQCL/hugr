@@ -164,7 +164,10 @@ where
         hugr.valid_node(root)?;
         let root_tag = hugr.get_optype(root).tag();
         if !Root::TAG.is_superset(root_tag) {
-            return Err(HugrError::InvalidNode(root));
+            return Err(HugrError::InvalidTag {
+                required: Root::TAG,
+                actual: root_tag,
+            });
         }
         let hugr = hugr.base_hugr();
         Ok(Self {

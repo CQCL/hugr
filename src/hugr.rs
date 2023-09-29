@@ -484,6 +484,11 @@ pub enum HugrError {
     /// The node doesn't exist.
     #[error("Invalid node {0:?}.")]
     InvalidNode(Node),
+    /// The node was not of the required [OpTag]
+    /// (e.g. to conform to a [HugrView::RootHandle])
+    #[error("Invalid tag: required a tag in {required} but found {actual}")]
+    #[allow(missing_docs)]
+    InvalidTag { required: OpTag, actual: OpTag },
 }
 
 #[cfg(feature = "pyo3")]

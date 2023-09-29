@@ -196,8 +196,12 @@ where
 {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
-        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
-            return Err(HugrError::InvalidNode(root));
+        let actual = hugr.get_optype(root).tag();
+        if !Root::TAG.is_superset(actual) {
+            return Err(HugrError::InvalidTag {
+                required: Root::TAG,
+                actual,
+            });
         }
         Ok(Self::new_unchecked(hugr, root))
     }
@@ -252,8 +256,12 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
     pub fn try_new(hugr: &'g mut impl HugrMut, root: Node) -> Result<Self, HugrError> {
         hugr.valid_node(root)?;
-        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
-            return Err(HugrError::InvalidNode(root));
+        let actual = hugr.get_optype(root).tag();
+        if !Root::TAG.is_superset(actual) {
+            return Err(HugrError::InvalidTag {
+                required: Root::TAG,
+                actual,
+            });
         }
         Ok(Self {
             hugr: hugr.hugr_mut(),
