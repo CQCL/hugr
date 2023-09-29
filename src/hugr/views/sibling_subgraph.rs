@@ -10,13 +10,14 @@
 //! hierarchy.
 
 use std::collections::HashSet;
+use std::mem;
 
 use itertools::Itertools;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
-use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder};
-use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+use crate::builder::{Container, FunctionBuilder};
+use crate::extension::ExtensionSet;
 use crate::hugr::{HugrError, HugrMut};
 use crate::types::Signature;
 use crate::{
@@ -415,23 +416,20 @@ impl SiblingSubgraph {
             signature: self.signature(hugr),
             input_extensions,
         };
-        let builder = FunctionBuilder::new(name, signature).unwrap();
-        let inputs = builder.input_wires();
-        let mut extracted = builder
-            .finish_hugr_with_outputs(inputs, &PRELUDE_REGISTRY)
-            .unwrap();
+        let mut builder = FunctionBuilder::new(name, signature).unwrap();
+        // Take the unfinished Hugr from the builder, to avoid unnecessary
+        // validation checks that require connecting the inputs an outputs.
+        let mut extracted = mem::take(builder.hugr_mut());
         let node_map = extracted
             .insert_subgraph(extracted.root(), hugr, self)?
             .node_map;
 
-        // Disconnect the input and output nodes, and connect the inserted nodes
-        // in-between.
+        // Connect the inserted nodes in-between the input and output nodes.
         let [inp, out] = extracted.get_io(extracted.root()).unwrap();
         for (inp_port, repl_ports) in extracted
             .node_ports(inp, Direction::Outgoing)
             .zip(self.inputs.iter())
         {
-            extracted.disconnect(inp, inp_port)?;
             for (repl_node, repl_port) in repl_ports {
                 extracted.connect(inp, inp_port, node_map[repl_node], *repl_port)?;
             }
@@ -651,6 +649,7 @@ pub enum InvalidSubgraph {
 mod tests {
     use std::error::Error;
 
+    use crate::extension::PRELUDE_REGISTRY;
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
