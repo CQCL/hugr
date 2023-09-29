@@ -231,30 +231,8 @@ pub fn resolve_extension_ops(
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&opaque.extension) {
-                    // Fail if the Extension was found but did not have the expected operation
-                    let Some(def) = r.get_op(&opaque.op_name) else {
-                        return Err(CustomOpError::OpNotFoundInExtension(
-                            opaque.op_name.to_string(),
-                            r.name().to_string(),
-                        ));
-                    };
-                    let op = ExternalOp::Extension(
-                        ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
-                            .unwrap(),
-                    );
-                    if let Some(sig) = &opaque.signature {
-                        if sig != &op.signature() {
-                            return Err(CustomOpError::SignatureMismatch(
-                                def.name().to_string(),
-                                op.signature(),
-                                sig.clone(),
-                            ));
-                        };
-                    };
-                    replacements.push((n, op));
-                } else if opaque.signature.is_none() {
-                    return Err(CustomOpError::NoStoredSignature(op.name(), n));
+                if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
+                    replacements.push((n, resolved))
                 }
             }
         }
@@ -266,6 +244,49 @@ pub fn resolve_extension_ops(
         h.replace_op(n, node_type);
     }
     Ok(())
+}
+
+/// Try to resolve an [`ExternalOp::Opaque`] to a [`ExternalOp::Extension`]
+///
+/// # Return
+/// Some if the serialized opaque resolves to an extension-defined op and all is ok;
+/// None if the serialized opaque doesn't identify an extension
+///
+/// # Errors
+/// If the serialized opaque resolves to a definition that conflicts with what was serialized
+pub fn resolve_opaque_op(
+    n: Node,
+    opaque: &OpaqueOp,
+    extension_registry: &ExtensionRegistry,
+) -> Result<Option<ExtensionOp>, CustomOpError> {
+    if let Some(r) = extension_registry.get(&opaque.extension) {
+        // Fail if the Extension was found but did not have the expected operation
+        let Some(def) = r.get_op(&opaque.op_name) else {
+            return Err(CustomOpError::OpNotFoundInExtension(
+                opaque.op_name.to_string(),
+                r.name().to_string(),
+            ));
+        };
+        let ext_op =
+            ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry).unwrap();
+        if let Some(stored_sig) = &opaque.signature {
+            if stored_sig != &ext_op.signature {
+                return Err(CustomOpError::SignatureMismatch(
+                    def.name().to_string(),
+                    ext_op.signature.clone(),
+                    stored_sig.clone(),
+                ));
+            };
+        }
+        Ok(Some(ext_op))
+    } else if opaque.signature.is_none() {
+        Err(CustomOpError::NoStoredSignature(
+            ExternalOp::Opaque(opaque.clone()).name(),
+            n,
+        ))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
