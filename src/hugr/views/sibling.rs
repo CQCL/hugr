@@ -360,10 +360,14 @@ impl<'g, Root: NodeHandle> HugrMut for SiblingMut<'g, Root> {}
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
+    use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
-    use crate::ops::handle::{DfgID, FuncID, ModuleRootID};
-    use crate::ops::{dataflow::IOTrait, Input, Output};
+    use crate::hugr::NodeType;
+    use crate::ops::handle::{CfgID, DfgID, FuncID, ModuleRootID};
+    use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -425,5 +429,37 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[rstest]
+    fn flat_mut(mut simple_dfg_hugr: Hugr) {
+        simple_dfg_hugr
+            .infer_and_validate(&PRELUDE_REGISTRY)
+            .unwrap();
+        let root = simple_dfg_hugr.root();
+        let signature = simple_dfg_hugr.get_function_type().unwrap().clone();
+
+        let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
+        assert_eq!(
+            sib_mut.err(),
+            Some(HugrError::InvalidTag {
+                required: OpTag::Cfg,
+                actual: OpTag::Dfg
+            })
+        );
+
+        let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
+        let bad_nodetype = NodeType::open_extensions(crate::ops::CFG { signature });
+        assert_eq!(
+            sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
+            Err(HugrError::InvalidTag {
+                required: OpTag::Dfg,
+                actual: OpTag::Cfg
+            })
+        );
+
+        // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
+        simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
+        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
     }
 }
