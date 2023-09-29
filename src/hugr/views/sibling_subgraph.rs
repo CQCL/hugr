@@ -418,7 +418,7 @@ impl SiblingSubgraph {
         };
         let mut builder = FunctionBuilder::new(name, signature).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
-        // validation checks that require connecting the inputs an outputs.
+        // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
         let node_map = extracted
             .insert_subgraph(extracted.root(), hugr, self)?
