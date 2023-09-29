@@ -307,15 +307,14 @@ pub trait HugrView: sealed::HugrInternals {
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
-pub struct WholeHugrView<'a, Root = Node>(&'a Hugr, PhantomData<Root>);
+pub struct WholeHugrView<H, Root = Node>(H, PhantomData<Root>);
 
-impl<'a, Root: NodeHandle> TryFrom<&'a Hugr> for WholeHugrView<'a, Root> {
-    type Error = HugrError;
+impl<H: HugrView, Root: NodeHandle> WholeHugrView<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
     /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [`OpTag`]
-    fn try_from(hugr: &'a Hugr) -> Result<Self, HugrError> {
+    pub fn try_new(hugr: H) -> Result<Self, HugrError> {
         if !Root::TAG.is_superset(hugr.root_type().tag()) {
             return Err(HugrError::InvalidNode(hugr.root()));
         }
@@ -323,9 +322,22 @@ impl<'a, Root: NodeHandle> TryFrom<&'a Hugr> for WholeHugrView<'a, Root> {
     }
 }
 
-impl<'a, Root> AsRef<Hugr> for WholeHugrView<'a, Root> {
-    fn as_ref(&self) -> &Hugr {
+impl<Root> WholeHugrView<Hugr, Root> {
+    /// Extracts the underlying (owned) Hugr
+    pub fn into_hugr(self) -> Hugr {
         self.0
+    }
+}
+
+impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for WholeHugrView<H, Root> {
+    fn as_ref(&self) -> &Hugr {
+        self.0.as_ref()
+    }
+}
+
+impl<H: AsMut<Hugr>, Root> AsMut<Hugr> for WholeHugrView<H, Root> {
+    fn as_mut(&mut self) -> &mut Hugr {
+        self.0.as_mut()
     }
 }
 
@@ -493,21 +505,25 @@ pub(crate) mod sealed {
 #[cfg(test)]
 mod test {
     use super::{NodeType, WholeHugrView};
+    use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{CfgID, DfgID};
-    use crate::{hugr::HugrError, ops, types::FunctionType, Hugr, HugrView};
+    use crate::ops::LeafOp;
+    use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
     fn whole_hugr_view() {
-        let h = Hugr::new(NodeType::pure(ops::DFG {
+        let mut h = Hugr::new(NodeType::pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
         }));
-        let cfg_v = WholeHugrView::<CfgID>::try_from(&h);
+        let cfg_v = WholeHugrView::<&Hugr, CfgID>::try_new(&h);
         assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
-        let dfg_v: WholeHugrView<DfgID> = (&h).try_into().unwrap();
-        // Just to check that WholeHugrView is a HugrView:
-        assert_eq!(
-            dfg_v.all_neighbours(dfg_v.root()).collect::<Vec<_>>(),
-            vec![]
-        );
+        let mut dfg_v = WholeHugrView::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
+        // Just to check that WholeHugrView is a HugrMut:
+        dfg_v
+            .add_node_with_parent(
+                dfg_v.root(),
+                NodeType::pure(LeafOp::MakeTuple { tys: type_row![] }),
+            )
+            .unwrap();
     }
 }
