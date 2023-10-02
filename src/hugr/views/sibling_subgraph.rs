@@ -911,6 +911,24 @@ mod tests {
     }
 
     #[test]
+    fn invalid_boundary() {
+        let (hugr, func_root) = build_hugr().unwrap();
+        let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
+        let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let cx_edges_in = hugr.node_outputs(inp);
+        let cx_edges_out = hugr.node_inputs(out);
+        // All graph but the CX
+        assert!(matches!(
+            SiblingSubgraph::try_new(
+                cx_edges_out.map(|p| vec![(out, p)]).collect(),
+                cx_edges_in.map(|p| (inp, p)).collect(),
+                &func,
+            ),
+            Err(InvalidSubgraph::InvalidBoundary)
+        ));
+    }
+
+    #[test]
     fn preserve_signature() {
         let (hugr, func_root) = build_hugr_classical().unwrap();
         let func_graph: SiblingGraph<'_, FuncID<true>> =
