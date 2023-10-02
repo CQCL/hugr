@@ -14,7 +14,7 @@ use crate::{Hugr, Port};
 use self::sealed::HugrMutInternals;
 
 use super::views::SiblingSubgraph;
-use super::{NodeMetadata, PortIndex, Rewrite};
+use super::{IncomingPort, NodeMetadata, OutgoingPort, PortIndex, Rewrite};
 
 /// Functions for low-level building of a HUGR.
 pub trait HugrMut: HugrView + HugrMutInternals {
@@ -110,9 +110,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl PortIndex,
+        src_port: impl TryInto<OutgoingPort>,
         dst: Node,
-        dst_port: impl PortIndex,
+        dst_port: impl TryInto<IncomingPort>,
     ) -> Result<(), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
@@ -262,13 +262,16 @@ where
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl PortIndex,
+        src_port: impl TryInto<OutgoingPort>,
         dst: Node,
-        dst_port: impl PortIndex,
+        dst_port: impl TryInto<IncomingPort>,
     ) -> Result<(), HugrError> {
-        self.as_mut()
-            .graph
-            .link_nodes(src.index, src_port.index(), dst.index, dst_port.index())?;
+        self.as_mut().graph.link_nodes(
+            src.index,
+            Port::try_new_outgoing(src_port)?.index(),
+            dst.index,
+            Port::try_new_incoming(dst_port)?.index(),
+        )?;
         Ok(())
     }
 
