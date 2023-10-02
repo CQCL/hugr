@@ -474,6 +474,11 @@ fn get_edge_type<H: HugrView>(hugr: &H, ports: &[(Node, Port)]) -> Option<Type> 
 }
 
 /// Whether a subgraph is valid.
+///
+/// Verifies that input and output ports are valid subgraph boundaries, i.e. they belong
+/// to nodes within the subgraph and are linked to at least one node outside of the subgraph.
+/// This does NOT check convexity proper, i.e. whether the set of nodes form a convex
+/// induced graph.
 fn validate_subgraph<H: HugrView>(
     hugr: &H,
     nodes: &[Node],
