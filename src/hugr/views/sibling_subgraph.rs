@@ -527,7 +527,7 @@ fn validate_subgraph<H: HugrView>(
     }
     // Check that every inside port has at least one linked port outside.
     if ports_inside.any(|(n, p)| hugr.linked_ports(n, p).all(|(n1, _)| nodes.contains(&n1))) {
-        return Err(InvalidSubgraph::NotConvex);
+        return Err(InvalidSubgraph::InvalidBoundary);
     }
     // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
     // belongs to inputs.
