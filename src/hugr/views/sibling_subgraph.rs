@@ -731,6 +731,23 @@ mod tests {
         Ok((hugr, func_id.node()))
     }
 
+    fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
+        let mut mod_builder = ModuleBuilder::new();
+        let func =
+            mod_builder.declare("test", FunctionType::new_linear(type_row![BOOL_T]).pure())?;
+        let func_id = {
+            let mut dfg = mod_builder.define_declaration(&func)?;
+            let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
+            let outs2 = dfg.add_dataflow_op(not_op(), outs1.outputs())?;
+            let outs3 = dfg.add_dataflow_op(not_op(), outs2.outputs())?;
+            dfg.finish_with_outputs(outs3.outputs())?
+        };
+        let hugr = mod_builder
+            .finish_prelude_hugr()
+            .map_err(|e| -> BuildError { e.into() })?;
+        Ok((hugr, func_id.node()))
+    }
+
     /// A HUGR with a copy
     fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
@@ -873,17 +890,21 @@ mod tests {
 
     #[test]
     fn non_convex_subgraph() {
-        let (hugr, func_root) = build_hugr().unwrap();
+        let (hugr, func_root) = build_3not_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
-        let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
-        let snd_cx_edge = hugr.node_inputs(out).next().unwrap();
-        // All graph but one edge
+        let (inp, _out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
+        let not2 = hugr.output_neighbours(not1).exactly_one().unwrap();
+        let not3 = hugr.output_neighbours(not2).exactly_one().unwrap();
+        let not1_inp = hugr.node_inputs(not1).next().unwrap();
+        let not1_out = hugr.node_outputs(not1).next().unwrap();
+        let not3_inp = hugr.node_inputs(not3).next().unwrap();
+        let not3_out = hugr.node_outputs(not3).next().unwrap();
         assert!(matches!(
             SiblingSubgraph::try_new(
-                vec![vec![(out, snd_cx_edge)]],
-                vec![(inp, first_cx_edge)],
-                &func,
+                vec![vec![(not1, not1_inp)], vec![(not3, not3_inp)]],
+                vec![(not1, not1_out), (not3, not3_out)],
+                &func
             ),
             Err(InvalidSubgraph::NotConvex)
         ));
