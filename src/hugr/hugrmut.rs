@@ -439,6 +439,7 @@ fn insert_subgraph_internal(
 
 pub(crate) mod sealed {
     use super::*;
+    use crate::ops::handle::NodeHandle;
 
     /// Trait for accessing the mutable internals of a Hugr(Mut).
     ///
@@ -500,8 +501,18 @@ pub(crate) mod sealed {
         /// In general this invalidates the ports, which may need to be resized to
         /// match the OpType signature.
         /// TODO: Add a version which ignores input extensions
-        fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
-            self.valid_node(node).unwrap_or_else(|e| panic!("{}", e));
+        ///
+        /// # Errors
+        /// Returns a [`HugrError::InvalidTag`] if this would break the bound
+        /// ([`Self::RootHandle`]) on the root node's [OpTag]
+        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+            self.valid_node(node)?;
+            if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
+                return Err(HugrError::InvalidTag {
+                    required: Self::RootHandle::TAG,
+                    actual: op.tag(),
+                });
+            }
             self.hugr_mut().replace_op(node, op)
         }
     }
@@ -565,9 +576,10 @@ pub(crate) mod sealed {
             Ok(())
         }
 
-        fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
+        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+            // No possibility of failure here since Self::RootHandle == Any
             let cur = self.hugr_mut().op_types.get_mut(node.index);
-            std::mem::replace(cur, op)
+            Ok(std::mem::replace(cur, op))
         }
     }
 }

@@ -64,7 +64,7 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
         }
         if r.is_err() {
             // Try to restore backup.
-            h.replace_op(h.root(), backup.root_type().clone());
+            h.replace_op(h.root(), backup.root_type().clone()).unwrap();
             while let Some(child) = first_child(h) {
                 h.remove_node(child).unwrap();
             }
