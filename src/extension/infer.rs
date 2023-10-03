@@ -1341,6 +1341,28 @@ mod test {
         Ok(())
     }
 
+    /// A test case for a CFG with a node (BB2) which has multiple predecessors,
+    /// Like so:
+    ///
+    ///              +-----------------+
+    ///              |      Entry      |
+    ///              +------/--\-------+
+    ///                    /    \
+    ///                   /      \
+    ///                  /        \
+    ///       +---------/--+  +----\-------+
+    ///       |     BB0    |  |    BB1     |
+    ///       +--------\---+  +----/-------+
+    ///                 \         /
+    ///                  \       /
+    ///                   \     /
+    ///             +------\---/--------+
+    ///             |        BB2        |
+    ///             +---------+---------+
+    ///                       |
+    ///             +---------+----------+
+    ///             |        Exit        |
+    ///             +--------------------+
     #[test]
     fn multi_entry() -> Result<(), Box<dyn Error>> {
         let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
