@@ -26,15 +26,19 @@ use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Node, Port};
 
-/// A trait for inspecting HUGRs.
-/// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView: sealed::HugrInternals {
+/// Trait for separate provision of the type of the root node.
+/// We expect all instances of [RootTagged] to also implement [HugrView].
+pub trait RootTagged {
     /// The kind of handle that can be used to refer to the root node.
     ///
     /// The handle is guaranteed to be able to contain the operation returned by
     /// [`HugrView::root_type`].
     type RootHandle: NodeHandle;
+}
 
+/// A trait for inspecting HUGRs.
+/// For end users we intend this to be superseded by region-specific APIs.
+pub trait HugrView: sealed::HugrInternals + RootTagged {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -364,16 +368,6 @@ fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(
     Ok(())
 }
 
-/// Trait for separate provision of the type of the root node.
-/// We expect all instances of [RootTagged] to also implement [HugrView].
-pub trait RootTagged {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle;
-}
-
 impl RootTagged for Hugr {
     type RootHandle = Node;
 }
@@ -387,8 +381,6 @@ impl RootTagged for &mut Hugr {
 }
 
 impl<T: AsRef<Hugr> + RootTagged> HugrView for T {
-    type RootHandle = <T as RootTagged>::RootHandle;
-
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
