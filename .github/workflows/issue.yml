@@ -38,32 +38,32 @@ jobs:
               break;;
           esac
         done
-        echo "JIRA_PRIORITY=$MY_RESULT" >> $GITHUB_OUTPUT
+        if [ ! -z $MY_RESULT ]
+        then
+            MY_RESULT=", \"priority\": { \"name\": \"$MY_RESULT\" }"
+        fi
+        echo "JIRA_PRIORITY_FIELD=$MY_RESULT" >> $GITHUB_OUTPUT
 
     - name: Create Bug
       uses: atlassian/gajira-create@v3.0.1
       if: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
       env:
-        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
+        JIRA_PRIORITY_FIELD: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY_FIELD }}
       with:
         project: TKET
         issuetype: Bug
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"labels": ["hugr"]}'
-        # TODO: Add priority field
-        # fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
+        fields: '{ "labels": ["hugr"] ${{ env.JIRA_PRIORITY_FIELD }} }'
 
     - name: Create Task
       uses: atlassian/gajira-create@v3.0.1
       if: ${{ ! contains(github.event.issue.labels.*.name, 'bug') }}
       env:
-        JIRA_PRIORITY: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY }}
+        JIRA_PRIORITY_FIELD: ${{ steps.set_priority_var.outputs.JIRA_PRIORITY_FIELD }}
       with:
         project: TKET
         issuetype: Task
         summary: « [hugr] ${{ github.event.issue.title }}»
         description: ${{ github.event.issue.html_url }}
-        fields: '{"labels": ["hugr"]}'
-        # TODO: Add priority field
-        # fields: '{"labels": ["hugr"], "priority": "${{ env.JIRA_PRIORITY }}"}'
+        fields: '{ "labels": ["hugr"] ${{ env.JIRA_PRIORITY_FIELD }} }'

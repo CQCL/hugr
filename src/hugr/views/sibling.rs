@@ -9,10 +9,9 @@ use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView};
+use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -195,10 +194,7 @@ where
     Root: NodeHandle,
 {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
-        hugr.valid_node(root)?;
-        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
-            return Err(HugrError::InvalidNode(root));
-        }
+        check_tag::<Root>(hugr, root)?;
         Ok(Self::new_unchecked(hugr, root))
     }
 }
@@ -251,10 +247,7 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     /// Create a new SiblingMut from a base.
     /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
     pub fn try_new(hugr: &'g mut impl HugrMut, root: Node) -> Result<Self, HugrError> {
-        hugr.valid_node(root)?;
-        if !Root::TAG.is_superset(hugr.get_optype(root).tag()) {
-            return Err(HugrError::InvalidNode(root));
-        }
+        check_tag::<Root>(hugr, root)?;
         Ok(Self {
             hugr: hugr.hugr_mut(),
             root,
@@ -367,10 +360,14 @@ impl<'g, Root: NodeHandle> HugrMut for SiblingMut<'g, Root> {}
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
+    use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
-    use crate::ops::handle::{DfgID, FuncID, ModuleRootID};
-    use crate::ops::{dataflow::IOTrait, Input, Output};
+    use crate::hugr::NodeType;
+    use crate::ops::handle::{CfgID, DfgID, FuncID, ModuleRootID};
+    use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -432,5 +429,37 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[rstest]
+    fn flat_mut(mut simple_dfg_hugr: Hugr) {
+        simple_dfg_hugr
+            .infer_and_validate(&PRELUDE_REGISTRY)
+            .unwrap();
+        let root = simple_dfg_hugr.root();
+        let signature = simple_dfg_hugr.get_function_type().unwrap().clone();
+
+        let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
+        assert_eq!(
+            sib_mut.err(),
+            Some(HugrError::InvalidTag {
+                required: OpTag::Cfg,
+                actual: OpTag::Dfg
+            })
+        );
+
+        let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
+        let bad_nodetype = NodeType::open_extensions(crate::ops::CFG { signature });
+        assert_eq!(
+            sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
+            Err(HugrError::InvalidTag {
+                required: OpTag::Dfg,
+                actual: OpTag::Cfg
+            })
+        );
+
+        // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
+        simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
+        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
     }
 }

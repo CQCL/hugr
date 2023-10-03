@@ -22,7 +22,7 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
+use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Node, Port};
 
@@ -346,8 +346,18 @@ pub trait HierarchyView<'a>: HugrView + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
+}
+
+fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(), HugrError> {
+    hugr.valid_node(node)?;
+    let actual = hugr.get_optype(node).tag();
+    let required = Required::TAG;
+    if !required.is_superset(actual) {
+        return Err(HugrError::InvalidTag { required, actual });
+    }
+    Ok(())
 }
 
 impl<T> HugrView for T

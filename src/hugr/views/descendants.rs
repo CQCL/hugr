@@ -7,10 +7,9 @@ use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView};
+use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -161,11 +160,7 @@ where
     Root: NodeHandle,
 {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
-        hugr.valid_node(root)?;
-        let root_tag = hugr.get_optype(root).tag();
-        if !Root::TAG.is_superset(root_tag) {
-            return Err(HugrError::InvalidNode(root));
-        }
+        check_tag::<Root>(hugr, root)?;
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,
