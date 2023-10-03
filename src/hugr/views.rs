@@ -11,6 +11,7 @@ mod tests;
 use std::marker::PhantomData;
 
 pub use self::petgraph::PetgraphWrapper;
+use delegate::delegate;
 pub use descendants::DescendantsGraph;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
@@ -20,7 +21,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
+use super::{hugrmut, Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -327,14 +328,54 @@ impl<Root> RootTagged<Hugr, Root> {
     }
 }
 
-impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootTagged<H, Root> {
-    fn as_ref(&self) -> &Hugr {
+impl<H: AsRef<Hugr>, Root> sealed::HugrInternals for RootTagged<H, Root> {
+    type Portgraph<'p> = <H as sealed::HugrInternals>::Portgraph<'p>
+    where
+        Self: 'p;
+
+    fn portgraph(&self) -> Self::Portgraph<'_> {
+        self.0.portgraph()
+    }
+
+    fn base_hugr(&self) -> &Hugr {
         self.0.as_ref()
+    }
+
+    fn root_node(&self) -> Node {
+        self.0.root_node()
     }
 }
 
-impl<H: AsMut<Hugr>, Root> AsMut<Hugr> for RootTagged<H, Root> {
-    fn as_mut(&mut self) -> &mut Hugr {
+impl<H: AsRef<Hugr>, Root: NodeHandle> HugrView for RootTagged<H, Root> {
+    type RootHandle = Root;
+    type Children<'a> = <H as HugrView>::Children<'a> where Self: 'a;
+    type Neighbours<'a> = <H as HugrView>::Neighbours<'a> where Self: 'a;
+    type PortLinks<'a> = <H as HugrView>::PortLinks<'a> where Self: 'a;
+    type Nodes<'a> = <H as HugrView>::Nodes<'a> where Self: 'a;
+    type NodePorts<'a> = <H as HugrView>::NodePorts<'a> where Self: 'a;
+    type NodeConnections<'a> = <H as HugrView>::NodeConnections<'a> where Self: 'a;
+    delegate! {
+        to self.0 {
+            fn contains_node(&self, node: Node) -> bool;
+            fn node_count(&self) -> usize;
+            fn edge_count(&self) -> usize;
+            fn nodes(&self) -> Self::Nodes<'_>;
+            fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
+            fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
+            fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
+            fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
+            fn num_ports(&self, node: Node, dir: Direction) -> usize;
+            fn children(&self, node: Node) -> Self::Children<'_>;
+            fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_>;
+            fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
+        }
+    }
+}
+
+impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInternals
+    for RootTagged<H, Root>
+{
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 }
