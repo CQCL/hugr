@@ -328,7 +328,7 @@ impl UnificationContext {
                 }
             }
         }
-        // Seperate loop so that we can assume that a metavariable has been
+        // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
             let sig: &OpType = hugr.get_nodetype(tgt_node).into();
