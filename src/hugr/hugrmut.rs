@@ -216,8 +216,7 @@ impl InsertionResult {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: HugrView + AsMut<Hugr>> HugrMut for T
-{
+impl<T: HugrView + AsMut<Hugr>> HugrMut for T {
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
         let node = self.as_mut().add_node(node);
         self.as_mut()
@@ -516,8 +515,7 @@ pub(crate) mod sealed {
     }
 
     /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-    impl<T: HugrView + AsMut<Hugr>> HugrMutInternals for T
-    {
+    impl<T: HugrView + AsMut<Hugr>> HugrMutInternals for T {
         fn hugr_mut(&mut self) -> &mut Hugr {
             self.as_mut()
         }

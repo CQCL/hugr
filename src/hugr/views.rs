@@ -11,7 +11,6 @@ mod tests;
 use std::marker::PhantomData;
 
 pub use self::petgraph::PetgraphWrapper;
-use delegate::delegate;
 pub use descendants::DescendantsGraph;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
@@ -328,47 +327,13 @@ impl<Root> RootChecked<Hugr, Root> {
     }
 }
 
-impl<H: AsRef<Hugr>, Root> sealed::HugrInternals for RootChecked<H, Root> {
-    type Portgraph<'p> = <H as sealed::HugrInternals>::Portgraph<'p>
-    where
-        Self: 'p;
-
-    fn portgraph(&self) -> Self::Portgraph<'_> {
-        self.0.portgraph()
-    }
-
-    fn base_hugr(&self) -> &Hugr {
-        self.0.as_ref()
-    }
-
-    fn root_node(&self) -> Node {
-        self.0.root_node()
-    }
+impl<H, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
+    type RootHandle = Root;
 }
 
-impl<H: AsRef<Hugr>, Root: NodeHandle> HugrView for RootChecked<H, Root> {
-    type RootHandle = Root;
-    type Children<'a> = <H as HugrView>::Children<'a> where Self: 'a;
-    type Neighbours<'a> = <H as HugrView>::Neighbours<'a> where Self: 'a;
-    type PortLinks<'a> = <H as HugrView>::PortLinks<'a> where Self: 'a;
-    type Nodes<'a> = <H as HugrView>::Nodes<'a> where Self: 'a;
-    type NodePorts<'a> = <H as HugrView>::NodePorts<'a> where Self: 'a;
-    type NodeConnections<'a> = <H as HugrView>::NodeConnections<'a> where Self: 'a;
-    delegate! {
-        to self.0 {
-            fn contains_node(&self, node: Node) -> bool;
-            fn node_count(&self) -> usize;
-            fn edge_count(&self) -> usize;
-            fn nodes(&self) -> Self::Nodes<'_>;
-            fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
-            fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
-            fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
-            fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
-            fn num_ports(&self, node: Node, dir: Direction) -> usize;
-            fn children(&self, node: Node) -> Self::Children<'_>;
-            fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_>;
-            fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_>;
-        }
+impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
+    fn as_ref(&self) -> &Hugr {
+        self.0.as_ref()
     }
 }
 
@@ -399,9 +364,30 @@ fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(
     Ok(())
 }
 
-impl<T: AsRef<Hugr>> HugrView for T
-{
+/// Trait for separate provision of the type of the root node.
+/// We expect all instances of [RootTagged] to also implement [HugrView].
+pub trait RootTagged {
+    /// The kind of handle that can be used to refer to the root node.
+    ///
+    /// The handle is guaranteed to be able to contain the operation returned by
+    /// [`HugrView::root_type`].
+    type RootHandle: NodeHandle;
+}
+
+impl RootTagged for Hugr {
     type RootHandle = Node;
+}
+
+impl RootTagged for &Hugr {
+    type RootHandle = Node;
+}
+
+impl RootTagged for &mut Hugr {
+    type RootHandle = Node;
+}
+
+impl<T: AsRef<Hugr> + RootTagged> HugrView for T {
+    type RootHandle = <T as RootTagged>::RootHandle;
 
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
@@ -526,8 +512,7 @@ pub(crate) mod sealed {
         fn root_node(&self) -> Node;
     }
 
-    impl<T: AsRef<super::Hugr>> HugrInternals for T
-    {
+    impl<T: AsRef<super::Hugr>> HugrInternals for T {
         type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
         #[inline]
