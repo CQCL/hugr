@@ -332,7 +332,7 @@ impl UnificationContext {
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
             let sig: &OpType = hugr.get_nodetype(tgt_node).into();
-            // Incoming ports with a dataflow edge
+            // Incoming ports with an edge that should mean equal extension reqs
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(
                     sig.port_kind(*src_port),
