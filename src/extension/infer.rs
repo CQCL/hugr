@@ -1206,6 +1206,44 @@ mod test {
         vec![Type::new_predicate([vec![ty.clone()], vec![ty]])]
     }
 
+    fn create_entry_exit(
+        hugr: &mut Hugr,
+        root: Node,
+        inputs: TypeRow,
+        entry_predicates: Vec<TypeRow>,
+        entry_extensions: ExtensionSet,
+        exit_types: impl Into<TypeRow>,
+    ) -> Result<([Node; 3], Node), Box<dyn Error>> {
+        let entry_predicate_type = Type::new_predicate(entry_predicates.clone());
+        let dfb = ops::BasicBlock::DFB {
+            inputs: inputs.clone(),
+            other_outputs: type_row![],
+            predicate_variants: entry_predicates,
+            extension_delta: entry_extensions,
+        };
+
+        let exit = hugr.add_node_with_parent(
+            root,
+            NodeType::open_extensions(ops::BasicBlock::Exit {
+                cfg_outputs: exit_types.into(),
+            }),
+        )?;
+
+        let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+        let entry_in = hugr.add_node_with_parent(
+            entry,
+            NodeType::open_extensions(ops::Input { types: inputs }),
+        )?;
+        let entry_out = hugr.add_node_with_parent(
+            entry,
+            NodeType::open_extensions(ops::Output {
+                types: vec![entry_predicate_type].into(),
+            }),
+        )?;
+
+        Ok(([entry, entry_in, entry_out], exit))
+    }
+
     /// A CFG rooted hugr adding resources at each basic block.
     /// Looks like this:
     ///
@@ -1242,23 +1280,13 @@ mod test {
 
         let root = hugr.root();
 
-        let [entry, entry_in, entry_out] = create_with_io(
+        let ([entry, entry_in, entry_out], exit) = create_entry_exit(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT], type_row![NAT]],
-                extension_delta: a.clone(),
-            },
-            FunctionType::new(vec![NAT], twoway(NAT)),
-        )?;
-
-        let exit = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::BasicBlock::Exit {
-                cfg_outputs: type_row![NAT],
-            }),
+            type_row![NAT],
+            vec![type_row![NAT], type_row![NAT]],
+            a.clone(),
+            type_row![NAT],
         )?;
 
         let mkpred = hugr.add_node_with_parent(
@@ -1348,49 +1376,25 @@ mod test {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
         }));
         let cfg = hugr.root();
-        let exit = hugr.add_node_with_parent(
+        let ([entry, entry_in, entry_out], exit) = create_entry_exit(
+            &mut hugr,
             cfg,
-            NodeType::open_extensions(ops::BasicBlock::Exit {
-                cfg_outputs: type_row![NAT],
-            }),
+            type_row![NAT],
+            vec![type_row![NAT], type_row![NAT]],
+            ExtensionSet::new(),
+            type_row![NAT],
         )?;
-        let entry = {
-            let dfb = ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT], type_row![NAT]],
-                extension_delta: ExtensionSet::new(),
-            };
 
-            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+        let entry_mid = hugr.add_node_with_parent(
+            entry,
+            NodeType::open_extensions(make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], twoway(NAT)),
+            )),
+        )?;
 
-            let entry_in = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Input {
-                    types: type_row![NAT],
-                }),
-            )?;
-
-            let entry_out = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Output {
-                    types: twoway(NAT).into(),
-                }),
-            )?;
-
-            let mid = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(make_opaque(
-                    PRELUDE_ID,
-                    FunctionType::new(vec![NAT], twoway(NAT)),
-                )),
-            )?;
-
-            hugr.connect(entry_in, 0, mid, 0)?;
-            hugr.connect(mid, 0, entry_out, 0)?;
-
-            entry
-        };
+        hugr.connect(entry_in, 0, entry_mid, 0)?;
+        hugr.connect(entry_mid, 0, entry_out, 0)?;
 
         let bb0 = make_block(
             &mut hugr,
@@ -1461,48 +1465,25 @@ mod test {
 
         let root = hugr.root();
 
-        let exit = hugr.add_node_with_parent(
+        let ([entry, entry_in, entry_out], exit) = create_entry_exit(
+            &mut hugr,
             root,
-            NodeType::open_extensions(ops::BasicBlock::Exit {
-                cfg_outputs: type_row![NAT],
-            }),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            entry_ext.clone(),
+            type_row![NAT],
         )?;
 
-        let entry = {
-            let dfb: OpType = ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: entry_ext.clone(),
-            }
-            .into();
+        let entry_dfg = hugr.add_node_with_parent(
+            entry,
+            NodeType::open_extensions(make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&entry_ext),
+            )),
+        )?;
 
-            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
-            let entry_in = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Input {
-                    types: type_row![NAT],
-                }),
-            )?;
-            let entry_out = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Output {
-                    types: oneway(NAT).into(),
-                }),
-            )?;
-
-            let dfg = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(make_opaque(
-                    PRELUDE_ID,
-                    FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&entry_ext),
-                )),
-            )?;
-
-            hugr.connect(entry_in, 0, dfg, 0)?;
-            hugr.connect(dfg, 0, entry_out, 0)?;
-            entry
-        };
+        hugr.connect(entry_in, 0, entry_dfg, 0)?;
+        hugr.connect(entry_dfg, 0, entry_out, 0)?;
 
         let bb1 = make_block(
             &mut hugr,
@@ -1565,48 +1546,25 @@ mod test {
 
         let root = hugr.root();
 
-        let exit = hugr.add_node_with_parent(
+        let ([entry, entry_in, entry_out], exit) = create_entry_exit(
+            &mut hugr,
             root,
-            NodeType::open_extensions(ops::BasicBlock::Exit {
-                cfg_outputs: type_row![NAT],
-            }),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            ExtensionSet::new(),
+            type_row![NAT],
         )?;
 
-        let entry = {
-            let dfb: OpType = ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: ExtensionSet::new(),
-            }
-            .into();
+        let entry_mid = hugr.add_node_with_parent(
+            entry,
+            NodeType::open_extensions(make_opaque(
+                PRELUDE_ID,
+                FunctionType::new(vec![NAT], oneway(NAT)),
+            )),
+        )?;
 
-            let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
-            let entry_in = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Input {
-                    types: type_row![NAT],
-                }),
-            )?;
-            let entry_out = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(ops::Output {
-                    types: oneway(NAT).into(),
-                }),
-            )?;
-
-            let mid = hugr.add_node_with_parent(
-                entry,
-                NodeType::open_extensions(make_opaque(
-                    PRELUDE_ID,
-                    FunctionType::new(vec![NAT], oneway(NAT)),
-                )),
-            )?;
-
-            hugr.connect(entry_in, 0, mid, 0)?;
-            hugr.connect(mid, 0, entry_out, 0)?;
-            entry
-        };
+        hugr.connect(entry_in, 0, entry_mid, 0)?;
+        hugr.connect(entry_mid, 0, entry_out, 0)?;
 
         let bb = make_block(
             &mut hugr,
