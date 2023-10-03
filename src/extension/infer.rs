@@ -1570,7 +1570,6 @@ mod test {
         ];
 
         for (bb0, bb1, bb2) in variants.into_iter() {
-            println!("{}, {}, {}", bb0, bb1, bb2);
             let mut hugr = make_cfg_loop_test(bb0, bb1, bb2)?;
             hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
         }
