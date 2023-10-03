@@ -711,7 +711,7 @@ mod test {
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use crate::types::{FunctionType, Type, TypeRow};
 
     use cool_asserts::assert_matches;
     use itertools::Itertools;
@@ -1173,10 +1173,21 @@ mod test {
     fn make_block(
         hugr: &mut Hugr,
         bb_parent: Node,
-        dfb: impl Into<OpType>,
-        dfb_sig: FunctionType,
-        op: impl Into<OpType>, // A single op contained in the DFB, with inputs and outputs wired to it
+        inputs: TypeRow,
+        predicate_variants: Vec<TypeRow>,
+        extension_delta: ExtensionSet,
     ) -> Result<Node, Box<dyn Error>> {
+        let predicate_type = Type::new_predicate(predicate_variants.clone());
+        let dfb_sig = FunctionType::new(inputs.clone(), vec![predicate_type])
+            .with_extension_delta(&extension_delta.clone());
+        let dfb = ops::BasicBlock::DFB {
+            inputs,
+            other_outputs: type_row![],
+            predicate_variants,
+            extension_delta,
+        };
+        let op = make_opaque(PRELUDE_ID, dfb_sig.clone());
+
         let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
         let dfg = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
@@ -1265,65 +1276,33 @@ mod test {
         let bb0 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: bc.clone(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(
-                B,
-                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bc),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            bc.clone(),
         )?;
 
         let bb1 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT], type_row![NAT]],
-                extension_delta: b.clone(),
-            },
-            FunctionType::new(vec![NAT], twoway(NAT)),
-            make_opaque(
-                B,
-                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&b),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT], type_row![NAT]],
+            b.clone(),
         )?;
 
         let bb10 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: c.clone(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(
-                C,
-                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&c),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            c.clone(),
         )?;
 
         let bb11 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: c.clone(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(
-                C,
-                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&c),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            c.clone(),
         )?;
 
         // CFG Wiring
@@ -1416,40 +1395,25 @@ mod test {
         let bb0 = make_block(
             &mut hugr,
             cfg,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: ExtensionSet::new(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            ExtensionSet::new(),
         )?;
 
         let bb1 = make_block(
             &mut hugr,
             cfg,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: ExtensionSet::new(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            ExtensionSet::new(),
         )?;
 
         let bb2 = make_block(
             &mut hugr,
             cfg,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: ExtensionSet::new(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)),
-            make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            ExtensionSet::new(),
         )?;
 
         hugr.connect(entry, 0, bb0, 0)?;
@@ -1543,33 +1507,17 @@ mod test {
         let bb1 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT], type_row![NAT]],
-                extension_delta: bb1_ext.clone(),
-            },
-            FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&bb1_ext),
-            make_opaque(
-                PRELUDE_ID,
-                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&bb1_ext),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT], type_row![NAT]],
+            bb1_ext.clone(),
         )?;
 
         let bb2 = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT]],
-                extension_delta: bb2_ext.clone(),
-            },
-            FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bb2_ext),
-            make_opaque(
-                PRELUDE_ID,
-                FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&bb2_ext),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT]],
+            bb2_ext.clone(),
         )?;
 
         hugr.connect(entry, 0, bb1, 0)?;
@@ -1663,17 +1611,9 @@ mod test {
         let bb = make_block(
             &mut hugr,
             root,
-            ops::BasicBlock::DFB {
-                inputs: type_row![NAT],
-                other_outputs: type_row![],
-                predicate_variants: vec![type_row![NAT], type_row![NAT]],
-                extension_delta: just_a.clone(),
-            },
-            FunctionType::new(vec![NAT], twoway(NAT)),
-            make_opaque(
-                PRELUDE_ID,
-                FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&just_a),
-            ),
+            type_row![NAT],
+            vec![type_row![NAT], type_row![NAT]],
+            just_a.clone(),
         )?;
 
         hugr.connect(entry, 0, bb, 0)?;
