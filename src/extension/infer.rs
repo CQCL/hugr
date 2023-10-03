@@ -1417,7 +1417,6 @@ mod test {
             make_opaque(PRELUDE_ID, FunctionType::new(vec![NAT], oneway(NAT))),
         )?;
 
-        // Mult
         let bb2 = make_block(
             &mut hugr,
             cfg,
