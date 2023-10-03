@@ -313,11 +313,9 @@ impl<H: HugrView, Root: NodeHandle> RootTagged<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [`OpTag`]
+    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [`OpTag`]
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
-        if !Root::TAG.is_superset(hugr.root_type().tag()) {
-            return Err(HugrError::InvalidNode(hugr.root()));
-        }
+        check_tag::<Root>(&hugr, hugr.root())?;
         Ok(Self(hugr, PhantomData))
     }
 }
@@ -517,7 +515,7 @@ mod test {
     use super::{NodeType, RootTagged};
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{CfgID, DfgID};
-    use crate::ops::LeafOp;
+    use crate::ops::{LeafOp, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
@@ -526,7 +524,13 @@ mod test {
             signature: FunctionType::new(vec![], vec![]),
         }));
         let cfg_v = RootTagged::<&Hugr, CfgID>::try_new(&h);
-        assert_eq!(cfg_v.err(), Some(HugrError::InvalidNode(h.root())));
+        assert_eq!(
+            cfg_v.err(),
+            Some(HugrError::InvalidTag {
+                required: OpTag::Cfg,
+                actual: OpTag::Dfg
+            })
+        );
         let mut dfg_v = RootTagged::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
         // Just to check that RootTagged is a HugrMut:
         dfg_v
