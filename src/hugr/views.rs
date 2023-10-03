@@ -308,9 +308,9 @@ pub trait HugrView: sealed::HugrInternals {
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
-pub struct RootTagged<H, Root = Node>(H, PhantomData<Root>);
+pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
-impl<H: HugrView, Root: NodeHandle> RootTagged<H, Root> {
+impl<H: HugrView, Root: NodeHandle> RootChecked<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -321,14 +321,14 @@ impl<H: HugrView, Root: NodeHandle> RootTagged<H, Root> {
     }
 }
 
-impl<Root> RootTagged<Hugr, Root> {
+impl<Root> RootChecked<Hugr, Root> {
     /// Extracts the underlying (owned) Hugr
     pub fn into_hugr(self) -> Hugr {
         self.0
     }
 }
 
-impl<H: AsRef<Hugr>, Root> sealed::HugrInternals for RootTagged<H, Root> {
+impl<H: AsRef<Hugr>, Root> sealed::HugrInternals for RootChecked<H, Root> {
     type Portgraph<'p> = <H as sealed::HugrInternals>::Portgraph<'p>
     where
         Self: 'p;
@@ -346,7 +346,7 @@ impl<H: AsRef<Hugr>, Root> sealed::HugrInternals for RootTagged<H, Root> {
     }
 }
 
-impl<H: AsRef<Hugr>, Root: NodeHandle> HugrView for RootTagged<H, Root> {
+impl<H: AsRef<Hugr>, Root: NodeHandle> HugrView for RootChecked<H, Root> {
     type RootHandle = Root;
     type Children<'a> = <H as HugrView>::Children<'a> where Self: 'a;
     type Neighbours<'a> = <H as HugrView>::Neighbours<'a> where Self: 'a;
@@ -373,7 +373,7 @@ impl<H: AsRef<Hugr>, Root: NodeHandle> HugrView for RootTagged<H, Root> {
 }
 
 impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInternals
-    for RootTagged<H, Root>
+    for RootChecked<H, Root>
 {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
@@ -553,7 +553,7 @@ pub(crate) mod sealed {
 
 #[cfg(test)]
 mod test {
-    use super::{NodeType, RootTagged};
+    use super::{NodeType, RootChecked};
     use crate::extension::ExtensionSet;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::HugrError;
@@ -562,12 +562,12 @@ mod test {
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
-    fn root_tagged() {
+    fn root_checked() {
         let root_type = NodeType::pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
         });
         let mut h = Hugr::new(root_type.clone());
-        let cfg_v = RootTagged::<&Hugr, CfgID>::try_new(&h);
+        let cfg_v = RootChecked::<&Hugr, CfgID>::try_new(&h);
         assert_eq!(
             cfg_v.err(),
             Some(HugrError::InvalidTag {
@@ -575,7 +575,7 @@ mod test {
                 actual: OpTag::Dfg
             })
         );
-        let mut dfg_v = RootTagged::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
+        let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
         // That is a HugrMut, so we can try:
         let root = dfg_v.root();
         let bb = NodeType::pure(BasicBlock::DFB {
@@ -595,7 +595,7 @@ mod test {
         // That didn't do anything:
         assert_eq!(dfg_v.get_nodetype(root), &root_type);
 
-        let mut dfp_v = RootTagged::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
+        let mut dfp_v = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
         let r = dfp_v.replace_op(root, bb.clone());
         assert_eq!(r, Ok(root_type));
         assert_eq!(dfp_v.get_nodetype(root), &bb);
