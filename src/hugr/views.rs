@@ -513,16 +513,19 @@ pub(crate) mod sealed {
 #[cfg(test)]
 mod test {
     use super::{NodeType, RootTagged};
-    use crate::hugr::{HugrError, HugrMut};
-    use crate::ops::handle::{CfgID, DfgID};
-    use crate::ops::{LeafOp, OpTag};
+    use crate::extension::ExtensionSet;
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::HugrError;
+    use crate::ops::handle::{CfgID, DataflowParentID, DfgID};
+    use crate::ops::{BasicBlock, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
     fn root_tagged() {
-        let mut h = Hugr::new(NodeType::pure(ops::DFG {
+        let root_type = NodeType::pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
-        }));
+        });
+        let mut h = Hugr::new(root_type.clone());
         let cfg_v = RootTagged::<&Hugr, CfgID>::try_new(&h);
         assert_eq!(
             cfg_v.err(),
@@ -532,12 +535,28 @@ mod test {
             })
         );
         let mut dfg_v = RootTagged::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
-        // Just to check that RootTagged is a HugrMut:
-        dfg_v
-            .add_node_with_parent(
-                dfg_v.root(),
-                NodeType::pure(LeafOp::MakeTuple { tys: type_row![] }),
-            )
-            .unwrap();
+        // That is a HugrMut, so we can try:
+        let root = dfg_v.root();
+        let bb = NodeType::pure(BasicBlock::DFB {
+            inputs: type_row![],
+            other_outputs: type_row![],
+            predicate_variants: vec![type_row![]],
+            extension_delta: ExtensionSet::new(),
+        });
+        let r = dfg_v.replace_op(root, bb.clone());
+        assert_eq!(
+            r,
+            Err(HugrError::InvalidTag {
+                required: OpTag::Dfg,
+                actual: ops::OpTag::BasicBlock
+            })
+        );
+        // That didn't do anything:
+        assert_eq!(dfg_v.get_nodetype(root), &root_type);
+
+        let mut dfp_v = RootTagged::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
+        let r = dfp_v.replace_op(root, bb.clone());
+        assert_eq!(r, Ok(root_type));
+        assert_eq!(dfp_v.get_nodetype(root), &bb);
     }
 }
