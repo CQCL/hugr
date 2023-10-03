@@ -1441,6 +1441,9 @@ mod test {
         Ok(())
     }
 
+    /// Create a CFG of the form below, with the extension deltas for `Entry`,
+    /// `BB1`, and `BB2` specified by arguments to the function.
+    ///
     ///       +-----------+
     ///  +--->|   Entry   |
     ///  |    +-----+-----+
@@ -1458,7 +1461,7 @@ mod test {
     ///       +------------+   |
     ///       |    Exit    |<--+
     ///       +------------+
-    fn make_cfg_loop_test(
+    fn make_looping_cfg(
         entry_ext: ExtensionSet,
         bb1_ext: ExtensionSet,
         bb2_ext: ExtensionSet,
@@ -1570,7 +1573,7 @@ mod test {
         ];
 
         for (bb0, bb1, bb2) in variants.into_iter() {
-            let mut hugr = make_cfg_loop_test(bb0, bb1, bb2)?;
+            let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
             hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
         }
         Ok(())
