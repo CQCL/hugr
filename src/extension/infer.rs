@@ -1258,6 +1258,10 @@ mod test {
             )),
         )?;
 
+        // Internal wiring for DFGs
+        hugr.connect(entry_in, 0, mkpred, 0)?;
+        hugr.connect(mkpred, 0, entry_out, 0)?;
+
         let bb0 = make_block(
             &mut hugr,
             root,
@@ -1321,10 +1325,6 @@ mod test {
                 FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&c),
             ),
         )?;
-
-        // Internal wiring for DFGs
-        hugr.connect(entry_in, 0, mkpred, 0)?;
-        hugr.connect(mkpred, 0, entry_out, 0)?;
 
         // CFG Wiring
         hugr.connect(entry, 0, bb0, 0)?;
