@@ -399,9 +399,7 @@ fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(
     Ok(())
 }
 
-impl<T> HugrView for T
-where
-    T: AsRef<Hugr>,
+impl<T: AsRef<Hugr>> HugrView for T
 {
     type RootHandle = Node;
 
@@ -528,9 +526,7 @@ pub(crate) mod sealed {
         fn root_node(&self) -> Node;
     }
 
-    impl<T> HugrInternals for T
-    where
-        T: AsRef<super::Hugr>,
+    impl<T: AsRef<super::Hugr>> HugrInternals for T
     {
         type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
