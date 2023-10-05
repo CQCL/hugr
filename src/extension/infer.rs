@@ -1587,18 +1587,14 @@ mod test {
     #[test]
     fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
         let just_a = ExtensionSet::singleton(&A);
-        let variants = vec![
-            (
-                ExtensionSet::new(),
-                ExtensionSet::new(),
-                ExtensionSet::new(),
-            ),
-            (just_a.clone(), ExtensionSet::new(), ExtensionSet::new()),
-            (ExtensionSet::new(), just_a.clone(), ExtensionSet::new()),
-            (ExtensionSet::new(), ExtensionSet::new(), just_a.clone()),
-            (ExtensionSet::new(), just_a.clone(), just_a.clone()),
-        ];
-
+        let mut variants = Vec::new();
+        for entry in [ExtensionSet::new(), just_a.clone()] {
+            for bb1 in [ExtensionSet::new(), just_a.clone()] {
+                for bb2 in [ExtensionSet::new(), just_a.clone()] {
+                    variants.push((entry.clone(), bb1.clone(), bb2.clone()));
+                }
+            }
+        }
         for (bb0, bb1, bb2) in variants.into_iter() {
             let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
             hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
