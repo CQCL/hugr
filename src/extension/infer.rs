@@ -22,6 +22,7 @@ use crate::{
 use super::validate::ExtensionError;
 
 use petgraph::graph as pg;
+use petgraph::{Directed, EdgeType, Undirected};
 
 use std::collections::{HashMap, HashSet};
 
@@ -109,48 +110,71 @@ pub enum InferExtensionError {
 
 /// A graph of metavariables which we've found equality constraints for. Edges
 /// between nodes represent equality constraints.
-struct EqGraph {
-    equalities: pg::Graph<Meta, (), petgraph::Undirected>,
+struct GraphContainer<Dir: EdgeType> {
+    graph: pg::Graph<Meta, (), Dir>,
     node_map: HashMap<Meta, pg::NodeIndex>,
 }
 
-impl EqGraph {
-    /// Create a new `EqGraph`
-    fn new() -> Self {
-        EqGraph {
-            equalities: pg::Graph::new_undirected(),
+macro_rules! impl_graph_container {
+    ($dir:ty) => {
+        impl GraphContainer<$dir> {
+            /// Add a metavariable to the graph as a node and return the `NodeIndex`.
+            /// If it's already there, just return the existing `NodeIndex`
+            fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
+                self.node_map.get(&m).cloned().unwrap_or_else(|| {
+                    let ix = self.graph.add_node(m);
+                    self.node_map.insert(m, ix);
+                    ix
+                })
+            }
+
+            /// Create an edge between two nodes on the graph
+            fn add_edge(&mut self, src: Meta, tgt: Meta) {
+                let src_ix = self.add_or_retrieve(src);
+                let tgt_ix = self.add_or_retrieve(tgt);
+                self.graph.add_edge(src_ix, tgt_ix, ());
+            }
+
+            /// Return the connected components of the graph in terms of metavariables
+            fn ccs(&self) -> Vec<Vec<Meta>> {
+                petgraph::algo::tarjan_scc(&self.graph)
+                    .into_iter()
+                    .map(|cc| {
+                        cc.into_iter()
+                            .map(|n| *self.graph.node_weight(n).unwrap())
+                            .collect()
+                    })
+                    .collect()
+            }
+        }
+    }
+}
+
+impl_graph_container!(Directed);
+impl_graph_container!(Undirected);
+
+impl GraphContainer<Undirected> {
+    fn new_undirected() -> Self {
+        GraphContainer {
+            graph: pg::Graph::new_undirected(),
             node_map: HashMap::new(),
         }
     }
+}
 
-    /// Add a metavariable to the graph as a node and return the `NodeIndex`.
-    /// If it's already there, just return the existing `NodeIndex`
-    fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
-        self.node_map.get(&m).cloned().unwrap_or_else(|| {
-            let ix = self.equalities.add_node(m);
-            self.node_map.insert(m, ix);
-            ix
-        })
+impl GraphContainer<Directed> {
+    fn new_directed() -> Self {
+        GraphContainer {
+            graph: pg::Graph::new(),
+            node_map: HashMap::new(),
+        }
     }
+}
 
-    /// Create an edge between two nodes on the graph, declaring that they stand
-    /// for metavariables which should be equal.
-    fn register_eq(&mut self, src: Meta, tgt: Meta) {
-        let src_ix = self.add_or_retrieve(src);
-        let tgt_ix = self.add_or_retrieve(tgt);
-        self.equalities.add_edge(src_ix, tgt_ix, ());
-    }
-
-    /// Return the connected components of the graph in terms of metavariables
-    fn ccs(&self) -> Vec<Vec<Meta>> {
-        petgraph::algo::tarjan_scc(&self.equalities)
-            .into_iter()
-            .map(|cc| {
-                cc.into_iter()
-                    .map(|n| *self.equalities.node_weight(n).unwrap())
-                    .collect()
-            })
-            .collect()
+type EqGraph = GraphContainer<Undirected>;
+impl EqGraph {
+    fn new() -> Self {
+        EqGraph::new_undirected()
     }
 }
 
@@ -504,7 +528,7 @@ impl UnificationContext {
             match c {
                 // Just register the equality in the EqGraph, we'll process it later
                 Constraint::Equal(other_meta) => {
-                    self.eq_graph.register_eq(meta, *other_meta);
+                    self.eq_graph.add_edge(meta, *other_meta);
                 }
                 // N.B. If `meta` is already solved, we can't use that
                 // information to solve `other_meta`. This is because the Plus
@@ -669,6 +693,8 @@ impl UnificationContext {
     /// This is done to solve metas which depend on variables, which allows
     /// us to come up with a fully concrete solution to pass into validation.
     pub fn instantiate_variables(&mut self) {
+        let minimum_sets: HashMap<Meta, ExtensionSet> = HashMap::new();
+
         for m in self.variables.clone().into_iter() {
             if !self.solved.contains_key(&m) {
                 // Handle the case where the constraints for `m` contain a self
@@ -688,6 +714,7 @@ impl UnificationContext {
                         },
                     ));
                 self.add_solution(m, solution);
+                //minimum_sets.insert(m, solution);
             }
         }
         self.variables = HashSet::new();
@@ -1518,6 +1545,7 @@ mod test {
             (just_a.clone(), ExtensionSet::new(), ExtensionSet::new()),
             (ExtensionSet::new(), just_a.clone(), ExtensionSet::new()),
             (ExtensionSet::new(), ExtensionSet::new(), just_a.clone()),
+            (ExtensionSet::new(), just_a.clone(), just_a.clone()),
         ];
 
         for (bb0, bb1, bb2) in variants.into_iter() {
