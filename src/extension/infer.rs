@@ -147,7 +147,7 @@ macro_rules! impl_graph_container {
                     .collect()
             }
         }
-    }
+    };
 }
 
 impl_graph_container!(Directed);
@@ -687,34 +687,85 @@ impl UnificationContext {
         self.results()
     }
 
-    /// Instantiate all variables in the graph with the empty extension set.
+    /// Gather all the transitive dependencies (induced by constraints) of the
+    /// variables in the context.
+    fn search_variable_deps(&self) -> HashSet<Meta> {
+        let mut variable_scope: HashSet<Meta> = self.variables.clone();
+        let mut scope_size = 0;
+        let mut new_scope_size = variable_scope.len();
+        while new_scope_size > scope_size {
+            scope_size = new_scope_size;
+            for m in variable_scope.clone().iter() {
+                for c in self.get_constraints(m).unwrap().iter() {
+                    match c {
+                        Constraint::Plus(_, other) => variable_scope.insert(self.resolve(*other)),
+                        Constraint::Equal(other) => variable_scope.insert(self.resolve(*other)),
+                    };
+                }
+            }
+            new_scope_size = variable_scope.len();
+        }
+        variable_scope
+    }
+
     /// Instantiate all variables in the graph with the empty extension set, or
     /// the smallest solution possible given their constraints.
     /// This is done to solve metas which depend on variables, which allows
     /// us to come up with a fully concrete solution to pass into validation.
+    ///
+    /// Nodes which loop into themselves must be considered as a "minimum" set
+    /// of requirements. If we have
+    ///   1 = 2 + X, ...
+    ///   2 = 1 + x, ...
+    /// then 1 and 2 both definitely contain X, even if we don't know what else.
+    /// So instead of instantiating to the empty set, we'll instantiate to `{X}`
     pub fn instantiate_variables(&mut self) {
-        let minimum_sets: HashMap<Meta, ExtensionSet> = HashMap::new();
+        // A directed graph to keep track of `Plus` constraint relationships
+        let mut relations = GraphContainer::new_directed();
+        let mut solutions: HashMap<Meta, ExtensionSet> = HashMap::new();
 
-        for m in self.variables.clone().into_iter() {
+        let variable_scope = self.search_variable_deps();
+        for m in variable_scope.into_iter() {
             if !self.solved.contains_key(&m) {
                 // Handle the case where the constraints for `m` contain a self
                 // reference, i.e. "m = Plus(E, m)", in which case the variable
                 // should be instantiated to E rather than the empty set.
-                let solution =
-                    ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
-                        |c| match c {
-                            // If `m` has been merged, [`self.variables`] entry
-                            // will have already been updated to the merged
-                            // value by [`self.merge_equal_metas`] so we don't
-                            // need to worry about resolving it.
-                            Constraint::Plus(x, other_m) if m == self.resolve(*other_m) => {
-                                Some(x.clone())
-                            }
-                            _ => None,
-                        },
-                    ));
-                self.add_solution(m, solution);
-                //minimum_sets.insert(m, solution);
+                let mut solution = ExtensionSet::new();
+                // Is the solution complete - does this variable *only* refer to itself?
+                let mut solution_complete = true;
+
+                for c in self.get_constraints(&m).unwrap().iter() {
+                    if let Constraint::Plus(r, other_m) = c {
+                        // If `m` has been merged, [`self.variables`] entry
+                        // will have already been updated to the merged
+                        // value by [`self.merge_equal_metas`] so we don't
+                        // need to worry about resolving it.
+                        let other_m = self.resolve(*other_m);
+                        solution.insert(r);
+                        if m != other_m {
+                            // This `m` depends on the solution of `other_m` so
+                            // `solution` is not enough info on its own.
+                            solution_complete = false;
+                            relations.add_edge(m, self.resolve(other_m));
+                        }
+                    }
+                }
+                solutions.insert(m, solution.clone());
+                if solution_complete {
+                    self.add_solution(m, solution);
+                }
+            }
+        }
+
+        // Strongly connected components are looping constraint dependencies.
+        // This means that each metavariable in the CC has the same solution.
+        for cc in relations.ccs() {
+            let mut combined_solution = ExtensionSet::new();
+            for sol in cc.iter().filter_map(|m| solutions.get(m)) {
+                combined_solution = combined_solution.union(sol);
+            }
+            for m in cc.iter() {
+                self.add_solution(*m, combined_solution.clone());
             }
         }
         self.variables = HashSet::new();
