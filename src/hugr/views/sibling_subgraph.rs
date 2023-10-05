@@ -508,19 +508,19 @@ fn validate_subgraph<H: HugrView>(
     }
 
     // Check inputs are incoming ports and outputs are outgoing ports
-    inputs
+    if let Some(&(n, p)) = inputs
         .iter()
         .flatten()
         .find(|(_, p)| p.direction() == Direction::Outgoing)
-        .map_or(Ok(()), |&(n, p)| {
-            Err(InvalidSubgraphBoundary::InputPortDirection(n, p))
-        })?;
-    outputs
+    {
+        Err(InvalidSubgraphBoundary::InputPortDirection(n, p))?;
+    };
+    if let Some(&(n, p)) = outputs
         .iter()
         .find(|(_, p)| p.direction() == Direction::Incoming)
-        .map_or(Ok(()), |&(n, p)| {
-            Err(InvalidSubgraphBoundary::OutputPortDirection(n, p))
-        })?;
+    {
+        Err(InvalidSubgraphBoundary::OutputPortDirection(n, p))?;
+    };
 
     let boundary_ports = inputs
         .iter()
@@ -529,22 +529,16 @@ fn validate_subgraph<H: HugrView>(
         .copied()
         .collect_vec();
     // Check that the boundary ports are all in the subgraph.
-    boundary_ports
-        .iter()
-        .find(|(n, _)| !node_set.contains(n))
-        .map_or(Ok(()), |&(n, p)| {
-            Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))
-        })?;
+    if let Some(&(n, p)) = boundary_ports.iter().find(|(n, _)| !node_set.contains(n)) {
+        Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))?;
+    };
     // Check that every inside port has at least one linked port outside.
-    boundary_ports
-        .iter()
-        .find(|&&(n, p)| {
-            hugr.linked_ports(n, p)
-                .all(|(n1, _)| node_set.contains(&n1))
-        })
-        .map_or(Ok(()), |&(n, p)| {
-            Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))
-        })?;
+    if let Some(&(n, p)) = boundary_ports.iter().find(|&&(n, p)| {
+        hugr.linked_ports(n, p)
+            .all(|(n1, _)| node_set.contains(&n1))
+    }) {
+        Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))?;
+    };
 
     // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
     // belongs to inputs.
@@ -579,19 +573,15 @@ fn validate_subgraph<H: HugrView>(
     }
 
     // Check edge types are equal within partition and copyable if partition size > 1
-    inputs
-        .iter()
-        .enumerate()
-        .find(|(_, ports)| {
-            let Some(edge_t) = get_edge_type(hugr, ports) else {
-                return true;
-            };
-            let require_copy = ports.len() > 1;
-            require_copy && !edge_t.copyable()
-        })
-        .map_or(Ok(()), |(i, _)| {
-            Err(InvalidSubgraphBoundary::MismatchedTypes(i))
-        })?;
+    if let Some((i, _)) = inputs.iter().enumerate().find(|(_, ports)| {
+        let Some(edge_t) = get_edge_type(hugr, ports) else {
+            return true;
+        };
+        let require_copy = ports.len() > 1;
+        require_copy && !edge_t.copyable()
+    }) {
+        Err(InvalidSubgraphBoundary::MismatchedTypes(i))?;
+    };
 
     Ok(())
 }
