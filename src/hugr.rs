@@ -25,7 +25,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
-pub use self::views::HugrView;
+pub use self::views::{HugrView, RootTagged};
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
@@ -619,7 +619,6 @@ mod test {
     #[test]
     fn io_node() {
         use crate::builder::test::simple_dfg_hugr;
-        use crate::hugr::views::HugrView;
         use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();

@@ -26,19 +26,9 @@ use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Node, Port};
 
-/// Trait for separate provision of the type of the root node.
-/// We expect all instances of [RootTagged] to also implement [HugrView].
-pub trait RootTagged {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle;
-}
-
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView: sealed::HugrInternals + RootTagged {
+pub trait HugrView: sealed::HugrInternals {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -79,7 +69,8 @@ pub trait HugrView: sealed::HugrInternals + RootTagged {
     #[inline]
     fn root_type(&self) -> &NodeType {
         let node_type = self.get_nodetype(self.root());
-        debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
+        // Sadly no way to do this at present
+        // debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type
     }
 
@@ -309,6 +300,15 @@ pub trait HugrView: sealed::HugrInternals + RootTagged {
     }
 }
 
+/// Trait for views that provides a guaranteed bound on the type of the root node.
+pub trait RootTagged: HugrView {
+    /// The kind of handle that can be used to refer to the root node.
+    ///
+    /// The handle is guaranteed to be able to contain the operation returned by
+    /// [`HugrView::root_type`].
+    type RootHandle: NodeHandle;
+}
+
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
@@ -331,7 +331,7 @@ impl<Root> RootChecked<Hugr, Root> {
     }
 }
 
-impl<H, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
+impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
     type RootHandle = Root;
 }
 
@@ -350,7 +350,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInt
 }
 
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView + Sized {
+pub trait HierarchyView<'a>: RootTagged + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
@@ -380,7 +380,7 @@ impl RootTagged for &mut Hugr {
     type RootHandle = Node;
 }
 
-impl<T: AsRef<Hugr> + RootTagged> HugrView for T {
+impl<T: AsRef<Hugr>> HugrView for T {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 

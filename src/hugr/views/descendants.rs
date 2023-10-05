@@ -39,9 +39,6 @@ pub struct DescendantsGraph<'g, Root = Node> {
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
-impl<'g, Root: NodeHandle> RootTagged for DescendantsGraph<'g, Root> {
-    type RootHandle = Root;
-}
 impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
     where
@@ -150,6 +147,9 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
+}
+impl<'g, Root: NodeHandle> RootTagged for DescendantsGraph<'g, Root> {
+    type RootHandle = Root;
 }
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
