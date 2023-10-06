@@ -201,10 +201,7 @@ impl UnificationContext {
 
     /// Declare a constraint on the metavariable
     fn add_constraint(&mut self, m: Meta, c: Constraint) {
-        self.constraints
-            .entry(m)
-            .or_insert(HashSet::new())
-            .insert(c);
+        self.constraints.entry(m).or_default().insert(c);
     }
 
     /// Declare that a meta has been solved
