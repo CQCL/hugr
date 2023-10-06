@@ -571,8 +571,6 @@ pub enum HugrError {
     InvalidNode(Node),
     /// The node was not of the required [OpTag]
     /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
-    ///
-    /// [RootTagged::RootHandle]: crate::hugr::views::RootTagged::RootHandle
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
