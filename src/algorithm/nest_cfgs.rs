@@ -429,7 +429,7 @@ pub(crate) mod test {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
@@ -678,7 +678,7 @@ pub(crate) mod test {
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
@@ -722,7 +722,7 @@ pub(crate) mod test {
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 

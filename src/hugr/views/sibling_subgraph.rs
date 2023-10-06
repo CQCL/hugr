@@ -40,7 +40,7 @@ use pyo3::{create_exception, exceptions::PyException, PyErr};
 /// [`super::SiblingGraph`],  not all nodes of the sibling graph must be
 /// included. A convex subgraph is always an induced subgraph, i.e. it is defined
 /// by a set of nodes and all edges between them.
-
+///
 /// The incoming boundary (resp. outgoing boundary) is given by the input (resp.
 /// output) ports of the subgraph that are linked to nodes outside of the subgraph.
 /// The signature of the subgraph is then given by the types of the incoming
@@ -87,11 +87,16 @@ pub type IncomingPorts = Vec<Vec<(Node, Port)>>;
 pub type OutgoingPorts = Vec<(Node, Port)>;
 
 impl SiblingSubgraph {
-    /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted HUGR.
+    /// A sibling subgraph from a [`crate::ops::OpTag::DataflowParent`]-rooted
+    /// HUGR.
     ///
-    /// The subgraph is given by the nodes between the input and output
-    /// children nodes of the root node. If you wish to create a subgraph
-    /// from another root, wrap the `region` argument in a [`super::SiblingGraph`].
+    /// The subgraph is given by the nodes between the input and output children
+    /// nodes of the root node. If you wish to create a subgraph from another
+    /// root, wrap the `region` argument in a [`super::SiblingGraph`].
+    ///
+    /// Wires connecting the input and output nodes are ignored. Note that due
+    /// to this the resulting subgraph's signature may not match the signature
+    /// of the dataflow parent.
     ///
     /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
     /// subgraph is empty.
@@ -350,8 +355,7 @@ impl SiblingSubgraph {
         if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph);
         }
-        let Some((rep_input, rep_output)) = replacement.children(rep_root).take(2).collect_tuple()
-        else {
+        let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
             return Err(InvalidReplacement::InvalidDataflowParent);
         };
         if dfg_optype.signature() != self.signature(hugr) {
@@ -485,6 +489,9 @@ fn validate_subgraph<H: HugrView>(
     inputs: &IncomingPorts,
     outputs: &OutgoingPorts,
 ) -> Result<(), InvalidSubgraph> {
+    // Copy of the nodes for fast lookup.
+    let node_set = nodes.iter().copied().collect::<HashSet<_>>();
+
     // Check nodes is not empty
     if nodes.is_empty() {
         return Err(InvalidSubgraph::EmptySubgraph);
@@ -501,40 +508,48 @@ fn validate_subgraph<H: HugrView>(
         .chain(outputs)
         .any(|&(n, p)| is_order_edge(hugr, n, p))
     {
-        unimplemented!("Linked other ports not supported at boundary")
+        unimplemented!("Connected order edges not supported at the boundary")
     }
 
     // Check inputs are incoming ports and outputs are outgoing ports
-    if inputs
+    if let Some(&(n, p)) = inputs
         .iter()
         .flatten()
-        .any(|(_, p)| p.direction() == Direction::Outgoing)
+        .find(|(_, p)| p.direction() == Direction::Outgoing)
     {
-        return Err(InvalidSubgraph::InvalidBoundary);
-    }
-    if outputs
+        Err(InvalidSubgraphBoundary::InputPortDirection(n, p))?;
+    };
+    if let Some(&(n, p)) = outputs
         .iter()
-        .any(|(_, p)| p.direction() == Direction::Incoming)
+        .find(|(_, p)| p.direction() == Direction::Incoming)
     {
-        return Err(InvalidSubgraph::InvalidBoundary);
-    }
+        Err(InvalidSubgraphBoundary::OutputPortDirection(n, p))?;
+    };
 
-    let mut ports_inside = inputs.iter().flatten().chain(outputs).copied();
-    // Check incoming & outgoing ports have target resp. source inside
-    let nodes = nodes.iter().copied().collect::<HashSet<_>>();
-    if ports_inside.any(|(n, _)| !nodes.contains(&n)) {
-        return Err(InvalidSubgraph::InvalidBoundary);
-    }
+    let boundary_ports = inputs
+        .iter()
+        .flatten()
+        .chain(outputs)
+        .copied()
+        .collect_vec();
+    // Check that the boundary ports are all in the subgraph.
+    if let Some(&(n, p)) = boundary_ports.iter().find(|(n, _)| !node_set.contains(n)) {
+        Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))?;
+    };
     // Check that every inside port has at least one linked port outside.
-    if ports_inside.any(|(n, p)| hugr.linked_ports(n, p).all(|(n1, _)| nodes.contains(&n1))) {
-        return Err(InvalidSubgraph::InvalidBoundary);
-    }
+    if let Some(&(n, p)) = boundary_ports.iter().find(|&&(n, p)| {
+        hugr.linked_ports(n, p)
+            .all(|(n1, _)| node_set.contains(&n1))
+    }) {
+        Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))?;
+    };
+
     // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
     // belongs to inputs.
-    if nodes.clone().into_iter().any(|n| {
+    if nodes.iter().any(|&n| {
         hugr.node_inputs(n).any(|p| {
             hugr.linked_ports(n, p).any(|(n1, _)| {
-                !nodes.contains(&n1) && !inputs.iter().any(|nps| nps.contains(&(n, p)))
+                !node_set.contains(&n1) && !inputs.iter().any(|nps| nps.contains(&(n, p)))
             })
         })
     }) {
@@ -542,10 +557,10 @@ fn validate_subgraph<H: HugrView>(
     }
     // Check that every outgoing port of a node in the subgraph whose target is not in the subgraph
     // belongs to outputs.
-    if nodes.clone().into_iter().any(|n| {
+    if nodes.iter().any(|&n| {
         hugr.node_outputs(n).any(|p| {
             hugr.linked_ports(n, p)
-                .any(|(n1, _)| !nodes.contains(&n1) && !outputs.contains(&(n, p)))
+                .any(|(n1, _)| !node_set.contains(&n1) && !outputs.contains(&(n, p)))
         })
     }) {
         return Err(InvalidSubgraph::NotConvex);
@@ -553,34 +568,30 @@ fn validate_subgraph<H: HugrView>(
 
     // Check inputs are unique
     if !inputs.iter().flatten().all_unique() {
-        return Err(InvalidSubgraph::InvalidBoundary);
+        return Err(InvalidSubgraphBoundary::NonUniqueInput.into());
     }
 
     // Check no incoming partition is empty
     if inputs.iter().any(|p| p.is_empty()) {
-        return Err(InvalidSubgraph::InvalidBoundary);
+        return Err(InvalidSubgraphBoundary::EmptyPartition.into());
     }
 
     // Check edge types are equal within partition and copyable if partition size > 1
-    if !inputs.iter().all(|ports| {
+    if let Some((i, _)) = inputs.iter().enumerate().find(|(_, ports)| {
         let Some(edge_t) = get_edge_type(hugr, ports) else {
-            return false;
+            return true;
         };
         let require_copy = ports.len() > 1;
-        !require_copy || edge_t.copyable()
+        require_copy && !edge_t.copyable()
     }) {
-        return Err(InvalidSubgraph::InvalidBoundary);
-    }
+        Err(InvalidSubgraphBoundary::MismatchedTypes(i))?;
+    };
 
     Ok(())
 }
 
 fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPorts) {
-    let (inp, out) = hugr
-        .children(hugr.root())
-        .take(2)
-        .collect_tuple()
-        .expect("invalid DFG");
+    let [inp, out] = hugr.get_io(hugr.root()).expect("invalid DFG");
     if has_other_edge(hugr, inp, Direction::Outgoing) {
         unimplemented!("Non-dataflow output not supported at input node")
     }
@@ -589,18 +600,23 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
         unimplemented!("Non-dataflow input not supported at output node")
     }
     let dfg_outputs = hugr.get_optype(out).signature().input_ports();
+
+    // Collect for each port in the input the set of target ports, filtering
+    // direct wires to the output.
     let inputs = dfg_inputs
         .into_iter()
-        .map(|p| hugr.linked_ports(inp, p).collect())
+        .map(|p| {
+            hugr.linked_ports(inp, p)
+                .filter(|&(n, _)| n != out)
+                .collect_vec()
+        })
+        .filter(|v| !v.is_empty())
         .collect();
+    // Collect for each port in the output the set of source ports, filtering
+    // direct wires to the input.
     let outputs = dfg_outputs
         .into_iter()
-        .map(|p| {
-            hugr.linked_ports(out, p)
-                .exactly_one()
-                .ok()
-                .expect("invalid DFG")
-        })
+        .filter_map(|p| hugr.linked_ports(out, p).find(|&(n, _)| n != inp))
         .collect();
     (inputs, outputs)
 }
@@ -663,12 +679,40 @@ pub enum InvalidSubgraph {
     EmptySubgraph,
     /// An invalid boundary port was found.
     #[error("Invalid boundary port.")]
-    InvalidBoundary,
+    InvalidBoundary(#[from] InvalidSubgraphBoundary),
+}
+
+/// Errors that can occur while constructing a [`SiblingSubgraph`].
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum InvalidSubgraphBoundary {
+    /// A node in the input boundary is not Incoming.
+    #[error("Expected (node {0:?}, port {1:?}) in the input boundary to be an incoming port.")]
+    InputPortDirection(Node, Port),
+    /// A node in the output boundary is not Outgoing.
+    #[error("Expected (node {0:?}, port {1:?}) in the input boundary to be an outgoing port.")]
+    OutputPortDirection(Node, Port),
+    /// A boundary port's node is not in the set of nodes.
+    #[error("(node {0:?}, port {1:?}) is in the boundary, but node {0:?} is not in the set.")]
+    PortNodeNotInSet(Node, Port),
+    /// A boundary port has no connections outside the subgraph.
+    #[error("(node {0:?}, port {1:?}) is in the boundary, but the port is not connected to a node outside the subgraph.")]
+    DisconnectedBoundaryPort(Node, Port),
+    /// There's a non-unique input-boundary port.
+    #[error("A port in the input boundary is used multiple times.")]
+    NonUniqueInput,
+    /// There's an empty partition in the input boundary.
+    #[error("A partition in the input boundary is empty.")]
+    EmptyPartition,
+    /// Different types in a partition of the input boundary.
+    #[error("The partition {0} in the input boundary has ports with different types.")]
+    MismatchedTypes(usize),
 }
 
 #[cfg(test)]
 mod tests {
     use std::error::Error;
+
+    use cool_asserts::assert_matches;
 
     use crate::extension::PRELUDE_REGISTRY;
     use crate::{
@@ -723,12 +767,13 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_linear(type_row![QB_T, QB_T]).pure(),
+            FunctionType::new_linear(type_row![QB_T, QB_T, QB_T]).pure(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs = dfg.add_dataflow_op(cx_gate(), dfg.input_wires())?;
-            dfg.finish_with_outputs(outs.outputs())?
+            let [w0, w1, w2] = dfg.input_wires_arr();
+            let [w0, w1] = dfg.add_dataflow_op(cx_gate(), [w0, w1])?.outputs_arr();
+            dfg.finish_with_outputs([w0, w1, w2])?
         };
         let hugr = mod_builder
             .finish_prelude_hugr()
@@ -818,6 +863,8 @@ mod tests {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
+        // The identity wire on the third qubit is ignored, so the subgraph's signature only contains
+        // the first two qubits.
         assert_eq!(
             sub.signature(&func),
             FunctionType::new_linear(type_row![QB_T, QB_T])
@@ -860,15 +907,17 @@ mod tests {
     #[test]
     fn convex_subgraph_2() {
         let (hugr, func_root) = build_hugr().unwrap();
-        let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let [inp, out] = hugr.get_io(func_root).unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         // All graph except input/output nodes
         SiblingSubgraph::try_new(
             hugr.node_outputs(inp)
+                .take(2)
                 .map(|p| hugr.linked_ports(inp, p).collect_vec())
                 .filter(|ps| !ps.is_empty())
                 .collect(),
             hugr.node_inputs(out)
+                .take(2)
                 .filter_map(|p| hugr.linked_ports(out, p).exactly_one().ok())
                 .collect(),
             &func,
@@ -880,24 +929,26 @@ mod tests {
     fn degen_boundary() {
         let (hugr, func_root) = build_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let (inp, _) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let [inp, _] = hugr.get_io(func_root).unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         // All graph but one edge
-        assert!(matches!(
+        assert_matches!(
             SiblingSubgraph::try_new(
                 vec![hugr.linked_ports(inp, first_cx_edge).collect()],
                 vec![(inp, first_cx_edge)],
                 &func,
             ),
-            Err(InvalidSubgraph::NotConvex)
-        ));
+            Err(InvalidSubgraph::InvalidBoundary(
+                InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
+            ))
+        );
     }
 
     #[test]
     fn non_convex_subgraph() {
         let (hugr, func_root) = build_3not_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let (inp, _out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let [inp, _out] = hugr.get_io(func_root).unwrap();
         let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
         let not2 = hugr.output_neighbours(not1).exactly_one().unwrap();
         let not3 = hugr.output_neighbours(not2).exactly_one().unwrap();
@@ -905,32 +956,34 @@ mod tests {
         let not1_out = hugr.node_outputs(not1).next().unwrap();
         let not3_inp = hugr.node_inputs(not3).next().unwrap();
         let not3_out = hugr.node_outputs(not3).next().unwrap();
-        assert!(matches!(
+        assert_matches!(
             SiblingSubgraph::try_new(
                 vec![vec![(not1, not1_inp)], vec![(not3, not3_inp)]],
                 vec![(not1, not1_out), (not3, not3_out)],
                 &func
             ),
             Err(InvalidSubgraph::NotConvex)
-        ));
+        );
     }
 
     #[test]
     fn invalid_boundary() {
         let (hugr, func_root) = build_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let (inp, out) = hugr.children(func_root).take(2).collect_tuple().unwrap();
+        let [inp, out] = hugr.get_io(func_root).unwrap();
         let cx_edges_in = hugr.node_outputs(inp);
         let cx_edges_out = hugr.node_inputs(out);
         // All graph but the CX
-        assert!(matches!(
+        assert_matches!(
             SiblingSubgraph::try_new(
                 cx_edges_out.map(|p| vec![(out, p)]).collect(),
                 cx_edges_in.map(|p| (inp, p)).collect(),
                 &func,
             ),
-            Err(InvalidSubgraph::InvalidBoundary)
-        ));
+            Err(InvalidSubgraph::InvalidBoundary(
+                InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
+            ))
+        );
     }
 
     #[test]
