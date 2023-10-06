@@ -216,7 +216,7 @@ impl InsertionResult {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
+impl<T: RootTagged + AsMut<Hugr>> HugrMut for T {
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
         let node = self.as_mut().add_node(node);
         self.as_mut()
@@ -515,7 +515,7 @@ pub(crate) mod sealed {
     }
 
     /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-    impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
+    impl<T: RootTagged + AsMut<Hugr>> HugrMutInternals for T {
         fn hugr_mut(&mut self) -> &mut Hugr {
             self.as_mut()
         }
@@ -571,7 +571,12 @@ pub(crate) mod sealed {
         }
 
         fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
-            // We know RootHandle=Node here so no need to check
+            if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
+                return Err(HugrError::InvalidTag {
+                    required: Self::RootHandle::TAG,
+                    actual: op.tag(),
+                });
+            }
             let cur = self.hugr_mut().op_types.get_mut(node.index);
             Ok(std::mem::replace(cur, op))
         }
