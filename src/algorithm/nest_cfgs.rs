@@ -627,10 +627,7 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        // ALAN here's where we need a WholeHugrView...tho it's good to try SiblingMut at least somewhere
-        let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(m));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&h));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -651,10 +648,7 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        // ALAN and another case for WholeHugrView
-        let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut h));
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -684,7 +678,7 @@ pub(crate) mod test {
         //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let (mut h, merge, tail) = build_cond_then_loop_cfg(false)?;
+        let (h, merge, tail) = build_cond_then_loop_cfg(false)?;
         let (merge, tail) = (merge.node(), tail.node());
         let [entry, exit]: [Node; 2] = h
             .children(h.root())
@@ -693,10 +687,7 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        // ALAN and another case for WholeHugrView
-        let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(m));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&h));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == entry)
@@ -734,10 +725,7 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
-        // ALAN and another case for WholeHugrView
-        let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        let v = IdentityCfgMap::new(m);
+        let v = IdentityCfgMap::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -760,7 +748,8 @@ pub(crate) mod test {
             ])
         );
 
-        // ALAN and another case for WholeHugrView
+        // We could operate on the (&mut) Hugr directly here, but check that the transformation
+        // works on a SiblingMut (i.e. which only allows direct mutation at the top level)
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
@@ -777,7 +766,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
-        let (mut h, head, tail) = build_conditional_in_loop_cfg(false)?;
+        let (h, head, tail) = build_conditional_in_loop_cfg(false)?;
         let head = head.node();
         let tail = tail.node();
         //               /-> left --\
@@ -787,10 +776,7 @@ pub(crate) mod test {
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
 
-        // ALAN and another case for WholeHugrView
-        let root = h.root();
-        let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
-        let v = IdentityCfgMap::new(m);
+        let v = IdentityCfgMap::new(&h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         // merge is unique predecessor of tail

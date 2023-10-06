@@ -97,9 +97,8 @@ mod test {
     use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
-    use crate::hugr::views::{HierarchyView, SiblingGraph};
-    use crate::ops::handle::{CfgID, NodeHandle};
-    use crate::HugrView;
+    use crate::ops::handle::NodeHandle;
+
     use itertools::Itertools;
     use std::collections::HashSet;
     #[test]
@@ -117,10 +116,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identity two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
-        // ALAN and another case for WholeHugrView
-        let m = SiblingGraph::<CfgID>::try_new(&h, h.root()).unwrap();
-
-        let v = HalfNodeView::new(m);
+        let v = HalfNodeView::new(&h);
 
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
