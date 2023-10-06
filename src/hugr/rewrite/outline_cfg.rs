@@ -244,7 +244,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg,
+        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
     };
     use crate::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
@@ -256,18 +256,11 @@ mod test {
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
     use crate::ops::{BasicBlock, OpType};
     use crate::types::FunctionType;
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
-
-    fn depth(h: &Hugr, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
-    }
 
     #[test]
     fn test_outline_cfg_errors() {
