@@ -56,10 +56,10 @@ use crate::{Direction, Hugr, Node};
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
 /// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`Node`]) in the Hugr,
-/// for an [IdentityCfgMap] if the extra level of indirection is not required. However, since
+/// or an [IdentityCfgMap] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
 /// algorithm to identify more regions than existed in the underlying CFG, without mutating the
-/// underlying CFG just for the analysis - the splitting /merging) can then be performed by
+/// underlying CFG just for the analysis - the splitting (and/or merging) can then be performed by
 /// [nest_sese_region][CfgNodeMap::nest_sese_region] only as necessary for regions actually nested.
 pub trait CfgNodeMap<T> {
     /// The unique entry node of the CFG. It may any n>=0 of incoming edges; we assume control arrives here from "outside".
