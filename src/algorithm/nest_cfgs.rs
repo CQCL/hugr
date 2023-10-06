@@ -345,10 +345,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
             if min1dfs < n_dfs {
                 bs.push(Bracket::Capping(min1dfs, n));
                 // mark capping edge to be removed when we return out to the other end
-                self.capping_edges
-                    .entry(min1dfs)
-                    .or_insert(Vec::new())
-                    .push(n);
+                self.capping_edges.entry(min1dfs).or_default().push(n);
             }
         }
 
@@ -368,7 +365,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
             self.edge_classes.entry(e).or_insert_with(|| Some((b, 0)));
         }
         // And capping backedges
-        for src in self.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+        for src in self.capping_edges.remove(&n_dfs).unwrap_or_default() {
             bs.delete(&Bracket::Capping(n_dfs, src), &mut self.deleted_backedges)
         }
 
