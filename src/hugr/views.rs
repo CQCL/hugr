@@ -20,7 +20,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{hugrmut, Hugr, HugrError, HugrMut, NodeMetadata, NodeType, DEFAULT_NODETYPE};
+use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -335,23 +335,18 @@ impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
     type RootHandle = Root;
 }
 
-// Note do not implement AsMut<Hugr> - that would get us the `impl HugrMutInternals`
-// for unwrapped Hugrs, which would not check the root node OpTag.
 impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     fn as_ref(&self) -> &Hugr {
         self.0.as_ref()
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInternals
-    for RootChecked<H, Root>
-{
-    fn hugr_mut(&mut self) -> &mut Hugr {
+impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> AsMut<Hugr> for RootChecked<H, Root> {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 }
-
-impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
 
 /// A common trait for views of a HUGR hierarchical subgraph.
 pub trait HierarchyView<'a>: RootTagged + Sized {

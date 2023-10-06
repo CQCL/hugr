@@ -571,7 +571,12 @@ pub(crate) mod sealed {
         }
 
         fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
-            // No possibility of failure here since Self::RootHandle == Any
+            if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
+                return Err(HugrError::InvalidTag {
+                    required: Self::RootHandle::TAG,
+                    actual: op.tag(),
+                });
+            }
             let cur = self.hugr_mut().op_types.get_mut(node.index);
             Ok(std::mem::replace(cur, op))
         }
