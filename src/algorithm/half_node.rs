@@ -114,7 +114,7 @@ mod test {
         // N(entry) -> head -> split            > N(merge) -> N(tail) -> N(exit)
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
-        // Allowing to identity two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
+        // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
         let v = HalfNodeView::new(&h);
 
