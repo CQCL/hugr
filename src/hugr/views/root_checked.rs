@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
-use crate::hugr::HugrError;
+use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Hugr, Node};
 
@@ -46,12 +47,14 @@ impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> AsMut<Hugr> for RootChecked<H, Root> {
+impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMutInternals for RootChecked<H, Root> {
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Hugr {
+    fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }
 }
+
+impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
 
 #[cfg(test)]
 mod test {
