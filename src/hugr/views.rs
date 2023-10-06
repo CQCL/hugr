@@ -344,17 +344,6 @@ impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
 impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInternals
     for RootChecked<H, Root>
 {
-    fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
-        self.valid_node(node)?;
-        if node == self.root() && !<Self as RootTagged>::RootHandle::TAG.is_superset(op.tag()) {
-            return Err(HugrError::InvalidTag {
-                required: <Self as RootTagged>::RootHandle::TAG,
-                actual: op.tag(),
-            });
-        }
-        self.hugr_mut().replace_op(node, op)
-    }
-
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.as_mut()
     }

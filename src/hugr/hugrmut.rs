@@ -436,12 +436,13 @@ fn insert_subgraph_internal(
 
 pub(crate) mod sealed {
     use super::*;
+    use crate::ops::handle::NodeHandle;
 
     /// Trait for accessing the mutable internals of a Hugr(Mut).
     ///
     /// Specifically, this trait lets you apply arbitrary modifications that may
     /// invalidate the HUGR.
-    pub trait HugrMutInternals: HugrView {
+    pub trait HugrMutInternals: RootTagged {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -501,11 +502,20 @@ pub(crate) mod sealed {
         /// # Errors
         /// Returns a [`HugrError::InvalidTag`] if this would break the bound
         /// ([`Self::RootHandle`]) on the root node's [OpTag]
-        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError>;
+        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+            self.valid_node(node)?;
+            if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
+                return Err(HugrError::InvalidTag {
+                    required: Self::RootHandle::TAG,
+                    actual: op.tag(),
+                });
+            }
+            self.hugr_mut().replace_op(node, op)
+        }
     }
 
     /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-    impl<T: HugrView + AsMut<Hugr>> HugrMutInternals for T {
+    impl<T: RootTagged + AsMut<Hugr>> HugrMutInternals for T {
         fn hugr_mut(&mut self) -> &mut Hugr {
             self.as_mut()
         }
@@ -561,7 +571,7 @@ pub(crate) mod sealed {
         }
 
         fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
-            // No possibility of failure here since there is no Self::RootHandle
+            // No possibility of failure here since Self::RootHandle == Any
             let cur = self.hugr_mut().op_types.get_mut(node.index);
             Ok(std::mem::replace(cur, op))
         }
