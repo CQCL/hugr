@@ -7,7 +7,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::{HugrError, HugrMut};
+use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
@@ -349,6 +349,17 @@ impl<'g, Root: NodeHandle> RootTagged for SiblingMut<'g, Root> {
     type RootHandle = Root;
 }
 impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
+    fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+        self.valid_node(node)?;
+        if node == self.root() && !<Self as RootTagged>::RootHandle::TAG.is_superset(op.tag()) {
+            return Err(HugrError::InvalidTag {
+                required: <Self as RootTagged>::RootHandle::TAG,
+                actual: op.tag(),
+            });
+        }
+        self.hugr_mut().replace_op(node, op)
+    }
+
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
     }
