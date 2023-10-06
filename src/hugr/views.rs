@@ -335,6 +335,8 @@ impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
     type RootHandle = Root;
 }
 
+// Note do not implement AsMut<Hugr> - that would get us the impl HugrMut
+// for unwrapped Hugrs, which would not check the root node OpTag.
 impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     fn as_ref(&self) -> &Hugr {
         self.0.as_ref()
