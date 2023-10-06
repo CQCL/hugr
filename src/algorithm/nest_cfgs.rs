@@ -520,10 +520,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
             if min1dfs < n_dfs {
                 bs.push(Bracket::Capping(min1dfs, n));
                 // mark capping edge to be removed when we return out to the other end
-                self.capping_edges
-                    .entry(min1dfs)
-                    .or_insert(Vec::new())
-                    .push(n);
+                self.capping_edges.entry(min1dfs).or_default().push(n);
             }
         }
 
@@ -543,7 +540,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
             self.edge_classes.entry(e).or_insert_with(|| Some((b, 0)));
         }
         // And capping backedges
-        for src in self.capping_edges.remove(&n_dfs).unwrap_or(Vec::new()) {
+        for src in self.capping_edges.remove(&n_dfs).unwrap_or_default() {
             bs.delete(&Bracket::Capping(n_dfs, src), &mut self.deleted_backedges)
         }
 
@@ -604,7 +601,7 @@ pub(crate) mod test {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
@@ -899,7 +896,7 @@ pub(crate) mod test {
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 
@@ -943,7 +940,7 @@ pub(crate) mod test {
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
         let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which
+            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
         let const_unit =
             cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
 

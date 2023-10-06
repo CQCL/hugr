@@ -7,18 +7,23 @@ use super::{CustomType, FunctionType, TypeBound};
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-pub(super) enum PrimType {
+/// Representation of a Primitive type, i.e. neither a Sum nor a Tuple.
+pub enum PrimType {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
+    #[allow(missing_docs)]
     Extension(CustomType),
+    #[allow(missing_docs)]
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
+    #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
     Function(Box<FunctionType>),
 }
 
 impl PrimType {
-    pub(super) fn bound(&self) -> TypeBound {
+    /// Returns the bound of this [`PrimType`].
+    pub fn bound(&self) -> TypeBound {
         match self {
             PrimType::Extension(c) => c.bound(),
             PrimType::Alias(a) => a.bound,

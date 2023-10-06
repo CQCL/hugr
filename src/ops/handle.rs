@@ -118,6 +118,10 @@ pub struct TailLoopID(Node);
 /// Handle to a [Conditional](crate::ops::Conditional) node.
 pub struct ConditionalID(Node);
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
+/// Handle to a dataflow container node.
+pub struct DataflowParentID(Node);
+
 /// Implements the `NodeHandle` trait for a tuple struct that contains just a
 /// NodeIndex. Takes the name of the struct, and the corresponding OpTag.
 ///
@@ -139,6 +143,7 @@ macro_rules! impl_nodehandle {
     };
 }
 
+impl_nodehandle!(DataflowParentID, OpTag::DataflowParent);
 impl_nodehandle!(DataflowOpID, OpTag::DataflowChild);
 impl_nodehandle!(ConditionalID, OpTag::Conditional);
 impl_nodehandle!(CaseID, OpTag::Case);
@@ -185,6 +190,7 @@ macro_rules! impl_containerHandle {
     };
 }
 
+impl_containerHandle!(DataflowParentID, DataflowOpID);
 impl_containerHandle!(DfgID, DataflowOpID);
 impl_containerHandle!(TailLoopID, DataflowOpID);
 impl_containerHandle!(ConditionalID, CaseID);
