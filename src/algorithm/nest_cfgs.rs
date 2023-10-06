@@ -627,7 +627,10 @@ pub(crate) mod test {
 
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&h));
+        // There's no need to use a view of a region here but we do so just to check
+        // that we *can* (as we'll need to for "real" module Hugr's)
+        let v: SiblingGraph = SiblingGraph::try_new(&h, h.root()).unwrap();
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(v));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
