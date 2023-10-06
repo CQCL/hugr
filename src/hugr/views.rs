@@ -508,7 +508,7 @@ pub(crate) mod sealed {
         fn root_node(&self) -> Node;
     }
 
-    impl<T: AsRef<super::Hugr>> HugrInternals for T {
+    impl<T: AsRef<Hugr>> HugrInternals for T {
         type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
         #[inline]
