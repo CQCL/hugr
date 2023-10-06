@@ -20,7 +20,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{hugrmut, Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
+use super::{hugrmut, Hugr, HugrError, HugrMut, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -351,6 +351,8 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> hugrmut::sealed::HugrMutInt
     }
 }
 
+impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
+
 /// A common trait for views of a HUGR hierarchical subgraph.
 pub trait HierarchyView<'a>: RootTagged + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
@@ -531,9 +533,9 @@ mod test {
     use super::{NodeType, RootChecked};
     use crate::extension::ExtensionSet;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::hugr::HugrError;
+    use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID};
-    use crate::ops::{BasicBlock, OpTag};
+    use crate::ops::{BasicBlock, LeafOp, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
@@ -551,7 +553,7 @@ mod test {
             })
         );
         let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
-        // That is a HugrMut, so we can try:
+        // That is a HugrMutInternal, so we can try:
         let root = dfg_v.root();
         let bb = NodeType::pure(BasicBlock::DFB {
             inputs: type_row![],
@@ -574,5 +576,9 @@ mod test {
         let r = dfp_v.replace_op(root, bb.clone());
         assert_eq!(r, Ok(root_type));
         assert_eq!(dfp_v.get_nodetype(root), &bb);
+
+        // And it's a HugrMut:
+        let nodetype = NodeType::pure(LeafOp::MakeTuple { tys: type_row![] });
+        dfp_v.add_node_with_parent(dfp_v.root(), nodetype).unwrap();
     }
 }
