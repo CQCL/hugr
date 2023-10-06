@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
-use crate::{Hugr, HugrView, Node};
+use crate::{Hugr, Node};
 
 use super::{check_tag, RootTagged};
 
@@ -10,7 +10,10 @@ use super::{check_tag, RootTagged};
 /// (Just provides static checking of the type of the root node)
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
-impl<H: HugrView, Root: NodeHandle> RootChecked<H, Root> {
+// The restriction on RootHandle here is because RootChecked would bypass
+// any root-tag-checking done by the inner struct and go straight to the
+// &mut Hugr (which has RootHandle=Node). So ensure no checking gets bypassed.
+impl<H: RootTagged<RootHandle = Node>, Root: NodeHandle> RootChecked<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
