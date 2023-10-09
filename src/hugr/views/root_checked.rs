@@ -47,14 +47,14 @@ impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMutInternals for RootChecked<H, Root> {
+impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMutInternals for RootChecked<H, Root> {
     #[inline(always)]
     fn hugr_mut(&mut self) -> &mut Hugr {
-        self.0.as_mut()
+        self.0.hugr_mut()
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
+impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecked<H, Root> {}
 
 #[cfg(test)]
 mod test {
@@ -62,7 +62,7 @@ mod test {
     use crate::extension::ExtensionSet;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
-    use crate::ops::handle::{CfgID, DataflowParentID, DfgID};
+    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, BasicBlockID};
     use crate::ops::{BasicBlock, LeafOp, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
@@ -114,9 +114,11 @@ mod test {
         let r = dfp_v.replace_op(root, bb.clone());
         assert_eq!(r, Ok(root_type));
         assert_eq!(dfp_v.get_nodetype(root), &bb);
+        // Just check we can create a nested instance (narrowing the bound)
+        let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
 
         // And it's a HugrMut:
         let nodetype = NodeType::pure(LeafOp::MakeTuple { tys: type_row![] });
-        dfp_v.add_node_with_parent(dfp_v.root(), nodetype).unwrap();
+        bb_v.add_node_with_parent(bb_v.root(), nodetype).unwrap();
     }
 }
