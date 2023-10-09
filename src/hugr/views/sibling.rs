@@ -366,7 +366,7 @@ mod test {
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::NodeType;
-    use crate::ops::handle::{CfgID, DfgID, FuncID, ModuleRootID};
+    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID, ModuleRootID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -461,5 +461,34 @@ mod test {
         // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
         simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
         assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
+    }
+
+    #[rstest]
+    //#[should_panic] // See commented out line in test
+    fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
+        let root = simple_dfg_hugr.root();
+        let case_nodetype = NodeType::open_extensions(crate::ops::Case {
+            signature: simple_dfg_hugr.root_type().op_signature(),
+        });
+        let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
+        // As expected, we cannot replace the root with a Case
+        assert_eq!(
+            sib_mut.replace_op(root, case_nodetype.clone()),
+            Err(HugrError::InvalidTag {
+                required: OpTag::Dfg,
+                actual: OpTag::Case
+            })
+        );
+
+        let mut nested_sib_mut =
+            SiblingMut::<DataflowParentID>::try_new(&mut sib_mut, root).unwrap();
+        nested_sib_mut
+            .replace_op(root, case_nodetype.clone())
+            .unwrap();
+        // The following line panics:
+        // assert_eq!(sib_mut.root_type(), &case_nodetype);
+        // But it'd have been much better to have stopped things getting to this point,
+        // is if we don't call root_type we can just carry on:
+        assert!(!DfgID::TAG.is_superset(case_nodetype.tag()));
     }
 }
