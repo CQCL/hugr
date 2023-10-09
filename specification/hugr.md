@@ -1143,12 +1143,6 @@ is itself in S.
 The meaning of “convex” is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
 
-Given a set S of nodes in a hugr, let S\* be the set of all nodes
-descended from nodes in S, including S itself.
-
-Call two nodes a, b in Γ *separated* if a is not in {b}\* and b is not
-in {a}\* (i.e. there is no hierarchy relation between them).
-
 #### API methods
 
 There are the following primitive operations.
