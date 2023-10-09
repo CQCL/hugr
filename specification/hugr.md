@@ -1229,9 +1229,8 @@ The `Replace` method takes as input:
   - a set $S$ of mutually-separated nodes in $\Gamma$;
   - a partial hugr $G$;
   - a map $T : \top(G) \to \Gamma \setminus S^*$ whose image consists of container nodes;
-  - a map $B : \bot(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
-    is separated from $B(y)$ unless $x = y$. Let $X$ be the set of children
-    of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
+  - a map $B : \bot(G) \to S^\*$ whose image consists of mutually-separated container nodes.
+    Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus S^*$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
