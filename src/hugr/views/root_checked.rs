@@ -47,7 +47,10 @@ impl<H: AsRef<Hugr>, Root> AsRef<Hugr> for RootChecked<H, Root> {
     }
 }
 
-impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMutInternals for RootChecked<H, Root> {
+impl<H: HugrMutInternals + AsRef<Hugr>, Root> HugrMutInternals for RootChecked<H, Root>
+where
+    Root: NodeHandle,
+{
     #[inline(always)]
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.0.hugr_mut()
@@ -62,7 +65,7 @@ mod test {
     use crate::extension::ExtensionSet;
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
-    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, BasicBlockID};
+    use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
     use crate::ops::{BasicBlock, LeafOp, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
