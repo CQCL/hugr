@@ -1178,8 +1178,8 @@ The new hugr is then derived as follows:
   
   1. Make a copy in $\Gamma$ of all children of $R$, excluding Input and Output,
      and all edges between them. Make all the newly added nodes children of $P$.
-     Notation: if $p$ is a port of a node in $R$, write $p^*$ for the copy of
-     the port in $\Gamma$.
+     Notation: for each port $p$ of a node in $R$ of which a copy is made, write
+     $p^*$ for the copy of the port in $\Gamma$.
   2. For each $(q, p = \nu_\textrm{inp}(q))$ such that $q \notin \texttt{Output}$,
      add an edge from $p^-$ to $q^*$.
   3. For each $(p, q = \nu_\textrm{out}(p))$ such that $q^- \notin \texttt{Input}$,
