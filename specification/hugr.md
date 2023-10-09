@@ -1171,8 +1171,8 @@ The method takes as input:
     Ext edges;
   - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
     let $T$ be the set of children of $R$;
-  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$ (*note* in order to produce a valid Hugr, all keys must be present; and all possible values must be present exactly once unless Copyable);
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ (*note* (similarly) in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present; and each possible value must be either Copyable and/or present exactly once. Any possible value not present could just be omitted from $H$...).
   
 The new hugr is then derived as follows:
   
