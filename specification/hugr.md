@@ -1206,7 +1206,9 @@ descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edge
 including $S$ itself.
 
 Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
-$b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them).
+$b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them). Note
+that this is much the same requirement as convexity, but following the hierarchy
+edges rather than dataflow edges.
 
 A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
