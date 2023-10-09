@@ -1,9 +1,11 @@
 use std::hash::Hash;
 
-use super::nest_cfgs::CfgView;
+use super::nest_cfgs::CfgNodeMap;
+
 use crate::hugr::views::HugrView;
-use crate::ops::OpTag;
-use crate::ops::OpTrait;
+
+use crate::ops::{OpTag, OpTrait};
+
 use crate::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
@@ -22,18 +24,19 @@ enum HalfNode {
     X(Node),
 }
 
-struct HalfNodeView<'a, H> {
-    h: &'a H,
+struct HalfNodeView<H> {
+    h: H,
     entry: Node,
     exit: Node,
 }
 
-impl<'a, H: HugrView> HalfNodeView<'a, H> {
+impl<H: HugrView> HalfNodeView<H> {
     #[allow(unused)]
-    pub(crate) fn new(h: &'a H) -> Self {
-        let mut children = h.children(h.root());
-        let entry = children.next().unwrap(); // Panic if malformed
-        let exit = children.next().unwrap();
+    pub(crate) fn new(h: H) -> Self {
+        let (entry, exit) = {
+            let mut children = h.children(h.root());
+            (children.next().unwrap(), children.next().unwrap())
+        };
         assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
         Self { h, entry, exit }
     }
@@ -59,7 +62,7 @@ impl<'a, H: HugrView> HalfNodeView<'a, H> {
     }
 }
 
-impl<H: HugrView> CfgView<HalfNode> for HalfNodeView<'_, H> {
+impl<H: HugrView> CfgNodeMap<HalfNode> for HalfNodeView<H> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)
@@ -95,6 +98,7 @@ mod test {
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
     use crate::ops::handle::NodeHandle;
+
     use itertools::Itertools;
     use std::collections::HashSet;
     #[test]
@@ -110,8 +114,10 @@ mod test {
         // N(entry) -> head -> split            > N(merge) -> N(tail) -> N(exit)
         //               |          \-> right -/                 |
         //               \---<---<---<---<---<---<---<---<---<---/
-        // Allowing to identity two nested regions (and fixing the problem with a SimpleCfgView on the same example)
+        // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
+
         let v = HalfNodeView::new(&h);
+
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;
 
