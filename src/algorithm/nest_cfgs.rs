@@ -47,7 +47,7 @@ use thiserror::Error;
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use crate::hugr::{HugrMut, Rewrite};
+use crate::hugr::{HugrMut, Rewrite, RootTagged};
 use crate::ops::handle::{BasicBlockID, CfgID};
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
@@ -224,7 +224,7 @@ pub struct IdentityCfgMap<H> {
     entry: Node,
     exit: Node,
 }
-impl<H: HugrView> IdentityCfgMap<H> {
+impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
     pub fn new(h: H) -> Self {
         // Panic if malformed enough not to have two children
@@ -579,6 +579,7 @@ pub(crate) mod test {
     use crate::extension::PRELUDE_REGISTRY;
     use crate::extension::{prelude::USIZE_T, ExtensionSet};
 
+    use crate::hugr::views::RootChecked;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
     use crate::types::{FunctionType, Type};
@@ -629,7 +630,7 @@ pub(crate) mod test {
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
         // There's no need to use a view of a region here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's)
-        let v: SiblingGraph = SiblingGraph::try_new(&h, h.root()).unwrap();
+        let v = SiblingGraph::try_new(&h, h.root()).unwrap();
         let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(v));
         let [&left, &right] = edge_classes
             .keys()
@@ -651,7 +652,7 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut h));
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(RootChecked::try_new(&mut h).unwrap()));
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -690,7 +691,8 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&h));
+        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == entry)
@@ -728,7 +730,7 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
-        let v = IdentityCfgMap::new(&h);
+        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -779,7 +781,7 @@ pub(crate) mod test {
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
 
-        let v = IdentityCfgMap::new(&h);
+        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
