@@ -1143,10 +1143,6 @@ is itself in S.
 The meaning of “convex” is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
 
-Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
-descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
-including $S$ itself.
-
 #### API methods
 
 There are the following primitive operations.
@@ -1173,9 +1169,10 @@ The method takes as input:
   - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
     including the Input and Output nodes), and that have no incoming or outgoing
     Ext edges;
-  - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children
-  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(R^\* \setminus \\{\texttt{R, Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(R^\* \setminus \\{\texttt{R, Output}\\})$.
+  - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
+    let $T$ be the set of children of $R$;
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
   
 The new hugr is then derived as follows:
   
@@ -1203,6 +1200,10 @@ Given a partial hugr $G$, let
 
   - $\top(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
   - $\bot(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
+
+Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
+descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
+including $S$ itself.
 
 Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
 $b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them). Note
