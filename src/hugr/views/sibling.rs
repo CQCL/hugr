@@ -246,7 +246,13 @@ pub struct SiblingMut<'g, Root = Node> {
 impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     /// Create a new SiblingMut from a base.
     /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
-    pub fn try_new(hugr: &'g mut impl HugrMut, root: Node) -> Result<Self, HugrError> {
+    pub fn try_new<Base: HugrMut>(hugr: &'g mut Base, root: Node) -> Result<Self, HugrError> {
+        if root == hugr.root() && !Base::RootHandle::TAG.is_superset(Root::TAG) {
+            return Err(HugrError::InvalidTag {
+                required: Base::RootHandle::TAG,
+                actual: Root::TAG,
+            });
+        }
         check_tag::<Root>(hugr, root)?;
         Ok(Self {
             hugr: hugr.hugr_mut(),
@@ -480,15 +486,7 @@ mod test {
             })
         );
 
-        let mut nested_sib_mut =
-            SiblingMut::<DataflowParentID>::try_new(&mut sib_mut, root).unwrap();
-        nested_sib_mut
-            .replace_op(root, case_nodetype.clone())
-            .unwrap();
-        // The following line panics:
-        // assert_eq!(sib_mut.root_type(), &case_nodetype);
-        // But it'd have been much better to have stopped things getting to this point,
-        // is if we don't call root_type we can just carry on:
-        assert!(!DfgID::TAG.is_superset(case_nodetype.tag()));
+        let nested_sib_mut = SiblingMut::<DataflowParentID>::try_new(&mut sib_mut, root);
+        assert!(nested_sib_mut.is_err());
     }
 }
