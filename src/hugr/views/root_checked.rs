@@ -10,10 +10,7 @@ use super::{check_tag, RootTagged};
 /// (Just provides static checking of the type of the root node)
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
-// The restriction on RootHandle here is because RootChecked would bypass
-// any root-tag-checking done by the inner struct and go straight to the
-// &mut Hugr (which has RootHandle=Node). So ensure no checking gets bypassed.
-impl<H: RootTagged<RootHandle = Node>, Root: NodeHandle> RootChecked<H, Root> {
+impl<H: RootTagged, Root: NodeHandle> RootChecked<H, Root> {
     /// Create a hierarchical view of a whole HUGR
     ///
     /// # Errors
@@ -21,6 +18,12 @@ impl<H: RootTagged<RootHandle = Node>, Root: NodeHandle> RootChecked<H, Root> {
     ///
     /// [`OpTag`]: crate::ops::OpTag
     pub fn try_new(hugr: H) -> Result<Self, HugrError> {
+        if !H::RootHandle::TAG.is_superset(Root::TAG) {
+            return Err(HugrError::InvalidTag {
+                required: H::RootHandle::TAG,
+                actual: Root::TAG,
+            });
+        }
         check_tag::<Root>(&hugr, hugr.root())?;
         Ok(Self(hugr, PhantomData))
     }
@@ -93,6 +96,16 @@ mod test {
         );
         // That didn't do anything:
         assert_eq!(dfg_v.get_nodetype(root), &root_type);
+
+        // Make a RootChecked that allows any DataflowParent
+        // We won't be able to do this by widening the bound:
+        assert_eq!(
+            RootChecked::<_, DataflowParentID>::try_new(dfg_v).err(),
+            Some(HugrError::InvalidTag {
+                required: OpTag::Dfg,
+                actual: OpTag::DataflowParent
+            })
+        );
 
         let mut dfp_v = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
         let r = dfp_v.replace_op(root, bb.clone());
