@@ -1,11 +1,11 @@
 #![allow(clippy::unit_arg)] // Required for black_box uses
 
-use criterion::{black_box, criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
+use criterion::{criterion_group, AxisScale, BenchmarkId, Criterion, PlotConfiguration};
 use hugr::ops::OpTag;
 
 /// Run `OpTag::is_superset`.
 fn bench_superset(c: &mut Criterion) {
-    let mut group = c.benchmark_group("it_works");
+    let mut group = c.benchmark_group("optag");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     let tag = OpTag::Const;

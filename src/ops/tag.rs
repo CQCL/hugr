@@ -2,75 +2,101 @@
 
 use std::{cmp, fmt::Display};
 
-/// Tags for sets of operation kinds.
-///
-/// This can mark either specific operations, or sets of operations allowed in
-/// regions.
-///
-/// Uses a flat representation for all the variants, in contrast to the complex
-/// `OpType` structures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[non_exhaustive]
-pub enum OpTag {
-    /// All operations allowed.
-    #[default]
-    Any,
-    /// No valid operation types.
-    None,
+with_variant_slice! {
+    /// Tags for sets of operation kinds.
+    ///
+    /// This can mark either specific operations, or sets of operations allowed in
+    /// regions.
+    ///
+    /// Uses a flat representation for all the variants, in contrast to the complex
+    /// `OpType` structures.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    #[non_exhaustive]
+    pub enum OpTag {
+        /// All operations allowed.
+        #[default]
+        Any,
+        /// No valid operation types.
+        None,
 
-    /// Non-root module operations.
-    ModuleOp,
-    /// Root module operation.
-    ModuleRoot,
-    /// A function definition or declaration.
-    Function,
-    /// A type alias.
-    Alias,
-    /// A constant declaration.
-    Const,
-    /// A function definition.
-    FuncDefn,
+        /// Non-root module operations.
+        ModuleOp,
+        /// Root module operation.
+        ModuleRoot,
+        /// A function definition or declaration.
+        Function,
+        /// A type alias.
+        Alias,
+        /// A constant declaration.
+        Const,
+        /// A function definition.
+        FuncDefn,
 
-    /// Node in a Control-flow Sibling Graph.
-    ControlFlowChild,
-    /// Node in a Dataflow Sibling Graph.
-    DataflowChild,
-    /// Parent node of a Dataflow Sibling Graph.
-    DataflowParent,
+        /// Node in a Control-flow Sibling Graph.
+        ControlFlowChild,
+        /// Node in a Dataflow Sibling Graph.
+        DataflowChild,
+        /// Parent node of a Dataflow Sibling Graph.
+        DataflowParent,
 
-    /// A nested data-flow operation.
-    Dfg,
-    /// A nested control-flow operation.
-    Cfg,
-    /// A dataflow input.
-    Input,
-    /// A dataflow output.
-    Output,
-    /// A function call.
-    FnCall,
-    /// A constant load operation.
-    LoadConst,
-    /// A definition that could be at module level or inside a DSG.
-    ScopedDefn,
-    /// A tail-recursive loop.
-    TailLoop,
-    /// A conditional operation.
-    Conditional,
-    /// A case op inside a conditional.
-    Case,
-    /// A leaf operation.
-    Leaf,
+        /// A nested data-flow operation.
+        Dfg,
+        /// A nested control-flow operation.
+        Cfg,
+        /// A dataflow input.
+        Input,
+        /// A dataflow output.
+        Output,
+        /// A function call.
+        FnCall,
+        /// A constant load operation.
+        LoadConst,
+        /// A definition that could be at module level or inside a DSG.
+        ScopedDefn,
+        /// A tail-recursive loop.
+        TailLoop,
+        /// A conditional operation.
+        Conditional,
+        /// A case op inside a conditional.
+        Case,
+        /// A leaf operation.
+        Leaf,
 
-    /// A control flow basic block.
-    BasicBlock,
-    /// A control flow exit node.
-    BasicBlockExit,
+        /// A control flow basic block.
+        BasicBlock,
+        /// A control flow exit node.
+        BasicBlockExit,
+    }
 }
 
 impl OpTag {
+    /// A compile-time matrix of which tags are supersets of which other tags.
+    ///
+    /// This is used to implement `is_superset` in O(1) time.
+    const TAG_SUPERSET_MATRIX: [[bool; OpTag::VARIANTS.len()]; OpTag::VARIANTS.len()] = {
+        let mut matrix = [[false; OpTag::VARIANTS.len()]; OpTag::VARIANTS.len()];
+        let mut child = 0;
+        while child < OpTag::VARIANTS.len() {
+            let mut parent = 0;
+            while parent < OpTag::VARIANTS.len() {
+                matrix[child][parent] =
+                    OpTag::VARIANTS[child]._is_superset(OpTag::VARIANTS[parent]);
+                parent += 1;
+            }
+            child += 1;
+        }
+        matrix
+    };
+
     /// Returns true if this tag is more general than `other`.
-    #[inline]
+    #[inline(always)]
     pub const fn is_superset(self, other: OpTag) -> bool {
+        Self::TAG_SUPERSET_MATRIX[self as usize][other as usize]
+    }
+
+    /// Internal computation of `is_superset`, used to build the matrix.
+    #[inline]
+    const fn _is_superset(self, other: OpTag) -> bool {
         // We cannot call iter().any() or even do for loops in const fn yet.
         // So we have to write this ugly code.
         if self.eq(other) {
@@ -79,7 +105,7 @@ impl OpTag {
         let parents = other.immediate_supersets();
         let mut i = 0;
         while i < parents.len() {
-            if self.is_superset(parents[i]) {
+            if self._is_superset(parents[i]) {
                 return true;
             }
             i += 1;
@@ -191,6 +217,37 @@ impl PartialOrd for OpTag {
     }
 }
 
+/// Declare a static slice containing all the variants of an enum.
+///
+/// Adds a `VARIANTS` constant to the enum.
+macro_rules! with_variant_slice {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $(
+                $(#[$variant_meta:meta])*
+                $variant:ident,
+            )*
+        }
+    ) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $(
+                $(#[$variant_meta])*
+                $variant,
+            )*
+        }
+
+        impl $name {
+            /// A slice containing all the variants of this enum.
+            pub const VARIANTS: &'static [$name] = &[
+                $($name::$variant,)*
+            ];
+        }
+    };
+}
+use with_variant_slice;
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -212,5 +269,13 @@ mod test {
         assert!(!OpTag::None.is_superset(OpTag::ModuleOp));
         assert!(!OpTag::None.is_superset(OpTag::DataflowChild));
         assert!(!OpTag::None.is_superset(OpTag::BasicBlock));
+    }
+
+    #[test]
+    fn tag_variants() {
+        // Check that the variants are numbered in the order they are declared.
+        for (i, &tag) in OpTag::VARIANTS.iter().enumerate() {
+            assert_eq!(i, tag as usize);
+        }
     }
 }
