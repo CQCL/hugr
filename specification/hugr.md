@@ -1346,13 +1346,12 @@ it (and its incoming value and Order edges) from the hugr.
 
 ###### `InsertConst`
 
-Given a `Const<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
-inserting an Order edge from the Input under `P` to `c`.
+Given a `Const<T>` node `c` and a container node `P` (either a `Module`,
+ a `CFG` node or a dataflow container), add `c` as a child of `P`.
 
 ###### `RemoveConst`
 
-Given a `Const<T>` node `c` having no outgoing edges, remove `c`
-together with its incoming `Order` edge.
+Given a `Const<T>` node `c` having no outgoing edges, remove `c`.
 
 #### Usage
 
