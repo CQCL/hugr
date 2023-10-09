@@ -470,7 +470,6 @@ mod test {
     }
 
     #[rstest]
-    //#[should_panic] // See commented out line in test
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
         let case_nodetype = NodeType::open_extensions(crate::ops::Case {
