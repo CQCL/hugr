@@ -369,15 +369,20 @@ flowchart
 
 ##### `TailLoop` nodes
 
-These provide tail-controlled loops: the dataflow sibling graph within the
-TailLoop-node computes a value of 2-ary `Predicate(#i, #o)`, as well as
-a row `#x` of other values (perhaps empty). The first variant means to
-repeat the loop with the computed values fed in at the top of the DSG,
-which has inputs `#i,#x`; the second variant means to exit the loop
-and output `#o,#x` from the TailLoop node. (In both cases the tuple
-within the Predicate is unpacked.) Thus, the contained graph may be
-evaluated more than once, with the first iteration using the inputs
-to the TailLoop node: `#i,#x`.
+These provide tail-controlled loops. The dataflow sibling graph within the
+TailLoop-node defines the loop body: this computes a row of outputs, whose
+first element has type `Predicate(#I, #O)` and the remainder is a row `#X`
+(perhaps empty). Inputs to the contained graph and to the TailLoop node itself
+are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
+inside the `Predicate` unpacked).
+
+Evaluation of the node begins by feeding the node inputs into the child graph
+and evaluating it.  The `Predicate` produced controls iteration of the loop:
+   * The first variant (`#I`) means that these values, along with the other
+     sibling-graph outputs `#X`, are fed back into the top of the loop,
+     and the body is evaluated again (thus perhaps many times)
+   * The second variant (`#O`) means that evaluation of the `TailLoop` node
+     terminates, returning all the values produced as a row of outputs `#O:#X`.
 
 ##### Control Flow Graphs
 
