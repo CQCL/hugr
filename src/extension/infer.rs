@@ -148,7 +148,7 @@ impl<T: EdgeType> GraphContainer<T> {
 }
 
 impl GraphContainer<Undirected> {
-    fn new_undirected() -> Self {
+    fn new() -> Self {
         GraphContainer {
             graph: pg::Graph::new_undirected(),
             node_map: HashMap::new(),
@@ -157,7 +157,7 @@ impl GraphContainer<Undirected> {
 }
 
 impl GraphContainer<Directed> {
-    fn new_directed() -> Self {
+    fn new() -> Self {
         GraphContainer {
             graph: pg::Graph::new(),
             node_map: HashMap::new(),
@@ -166,11 +166,6 @@ impl GraphContainer<Directed> {
 }
 
 type EqGraph = GraphContainer<Undirected>;
-impl EqGraph {
-    fn new() -> Self {
-        EqGraph::new_undirected()
-    }
-}
 
 /// Our current knowledge about the extensions of the graph
 struct UnificationContext {
@@ -715,7 +710,7 @@ impl UnificationContext {
     /// So instead of instantiating to the empty set, we'll instantiate to `{X}`
     pub fn instantiate_variables(&mut self) {
         // A directed graph to keep track of `Plus` constraint relationships
-        let mut relations = GraphContainer::new_directed();
+        let mut relations = GraphContainer::<Directed>::new();
         let mut solutions: HashMap<Meta, ExtensionSet> = HashMap::new();
 
         let variable_scope = self.search_variable_deps();
