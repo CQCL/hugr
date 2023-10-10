@@ -158,9 +158,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
-        if h.get_optype(n).tag() == OpTag::Cfg {
-            // We've checked the optype so this should be fine
-            let s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
+        if let Ok(s) = SiblingMut::<CfgID>::try_new(h, n) {
             transform_cfg_to_nested(&mut IdentityCfgMap::new(s));
         }
         node_stack.extend(h.children(n))
