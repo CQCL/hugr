@@ -25,7 +25,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
-pub use self::views::HugrView;
+pub use self::views::{HugrView, RootTagged};
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
@@ -570,7 +570,7 @@ pub enum HugrError {
     #[error("Invalid node {0:?}.")]
     InvalidNode(Node),
     /// The node was not of the required [OpTag]
-    /// (e.g. to conform to a [HugrView::RootHandle])
+    /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
@@ -617,7 +617,6 @@ mod test {
     #[test]
     fn io_node() {
         use crate::builder::test::simple_dfg_hugr;
-        use crate::hugr::views::HugrView;
         use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();

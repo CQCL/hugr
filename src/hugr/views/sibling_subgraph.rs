@@ -29,7 +29,7 @@ use crate::{
     Hugr, Node, Port, SimpleReplacement,
 };
 
-use super::HugrView;
+use super::{HugrView, RootTagged};
 
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
@@ -102,7 +102,7 @@ impl SiblingSubgraph {
     /// subgraph is empty.
     pub fn try_new_dataflow_subgraph<H, Root>(dfg_graph: &H) -> Result<Self, InvalidSubgraph>
     where
-        H: Clone + HugrView<RootHandle = Root>,
+        H: Clone + RootTagged<RootHandle = Root>,
         Root: ContainerHandle<ChildrenHandle = DataflowOpID>,
     {
         let parent = dfg_graph.root();

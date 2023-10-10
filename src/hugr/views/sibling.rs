@@ -11,7 +11,7 @@ use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView};
+use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView, RootTagged};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -95,12 +95,7 @@ macro_rules! impl_base_members {
     };
 }
 
-impl<'g, Root> HugrView for SiblingGraph<'g, Root>
-where
-    Root: NodeHandle,
-{
-    type RootHandle = Root;
-
+impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
     type Neighbours<'a> = MapInto<<FlatRegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
@@ -175,6 +170,9 @@ where
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
         self.graph.all_neighbours(node.index).map_into()
     }
+}
+impl<'g, Root: NodeHandle> RootTagged for SiblingGraph<'g, Root> {
+    type RootHandle = Root;
 }
 
 impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
@@ -283,8 +281,6 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
 }
 
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
-    type RootHandle = Root;
-
     type Neighbours<'a> = <Vec<Node> as IntoIterator>::IntoIter
     where
         Self: 'a;
@@ -355,7 +351,9 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
             .into_iter()
     }
 }
-
+impl<'g, Root: NodeHandle> RootTagged for SiblingMut<'g, Root> {
+    type RootHandle = Root;
+}
 impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
