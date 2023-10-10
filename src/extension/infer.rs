@@ -681,9 +681,8 @@ impl UnificationContext {
     fn search_variable_deps(&self) -> HashSet<Meta> {
         let mut variable_scope: HashSet<Meta> = self.variables.clone();
         let mut scope_size = 0;
-        let mut new_scope_size = variable_scope.len();
-        while new_scope_size > scope_size {
-            scope_size = new_scope_size;
+        while scope_size < variable_scope.len() {
+            scope_size = variable_scope.len();
             for m in variable_scope.clone().iter() {
                 for c in self.get_constraints(m).unwrap().iter() {
                     match c {
@@ -692,7 +691,6 @@ impl UnificationContext {
                     };
                 }
             }
-            new_scope_size = variable_scope.len();
         }
         variable_scope
     }
