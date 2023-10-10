@@ -1233,20 +1233,21 @@ The `Replace` method takes as input:
   - a set $S$ of IDs of nodes that are children of $P$
   - a Hugr $H$ whose root is a node of the same type as $P$. Note this Hugr need not be valid, in that it may be missing:
       * edges to/from some ports (i.e. it may have unconnected ports)---not just Copyable dataflow outputs, which may occur even in valid Hugrs, but also incoming and/or non-Copyable dataflow ports, and ControlFlow ports,
-      * children for some container nodes (i.e. it may have container nodes with no outgoing hierarchy edges)
+      * all children for some container nodes strictly beneath the root (i.e. it may have container nodes with no outgoing hierarchy edges)
       * $\mathtt{Input}$ and/or $\mathtt{Output}$ children of $P$ (if $P$ is a dataflow container node)
       * A basic block exit node as a child of $P$ (if $P$ is a CFG node)
   - a map $B$ *from* container nodes in $H$ that have no children *to* container nodes in $S^\*$ none of which is an ancestor of another.
     Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
-    $G$ and `SrcNode` in $\Gamma \setminus S^*$;
+    $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus S^*$ (and `TgtNode` has an existing
+    $G$ and `TgtNode` in $\Gamma \setminus R$ (and `TgtNode` has an existing
     incoming edge from a node in $R$).
 
 The new hugr is then derived as follows:
 
-1.  Make a copy in $\Gamma$ of all the nodes in $H$ *except the root*, and all edges where both source and target are copied.
+1.  Make a copy in $\Gamma$ of all the nodes in $H$ *except the root*, and all edges except
+    hierarchy edges from the root.
 2.  For each child of the root of $H$, make the corresponding copy in $\Gamma$ be a child of $P$.
 3.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
     copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
