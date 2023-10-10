@@ -356,7 +356,7 @@ struct UndirectedDFSTree<T> {
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
-    pub fn new(cfg: &impl CfgNodeMap<T>) -> Self {
+    fn new(cfg: &impl CfgNodeMap<T>) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
