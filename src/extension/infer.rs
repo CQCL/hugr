@@ -679,20 +679,28 @@ impl UnificationContext {
     /// Gather all the transitive dependencies (induced by constraints) of the
     /// variables in the context.
     fn search_variable_deps(&self) -> HashSet<Meta> {
-        let mut variable_scope: HashSet<Meta> = self.variables.clone();
-        let mut scope_size = 0;
-        while scope_size < variable_scope.len() {
-            scope_size = variable_scope.len();
-            for m in variable_scope.clone().iter() {
-                for c in self.get_constraints(m).unwrap().iter() {
-                    match c {
-                        Constraint::Plus(_, other) => variable_scope.insert(self.resolve(*other)),
-                        Constraint::Equal(other) => variable_scope.insert(self.resolve(*other)),
-                    };
+        let mut seen = HashSet::new();
+        let mut new_variables: HashSet<Meta> = self.variables.clone();
+        while !new_variables.is_empty() {
+            let mut newer_variables = HashSet::new();
+            for m in new_variables.into_iter() {
+                if !seen.contains(&m) {
+                    for c in self.get_constraints(&m).unwrap().iter() {
+                        match c {
+                            Constraint::Plus(_, other) => {
+                                newer_variables.insert(self.resolve(*other))
+                            }
+                            Constraint::Equal(other) => {
+                                newer_variables.insert(self.resolve(*other))
+                            }
+                        };
+                    }
+                    seen.insert(m);
                 }
             }
+            new_variables = newer_variables;
         }
-        variable_scope
+        seen
     }
 
     /// Instantiate all variables in the graph with the empty extension set, or
