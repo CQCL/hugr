@@ -115,43 +115,36 @@ struct GraphContainer<Dir: EdgeType> {
     node_map: HashMap<Meta, pg::NodeIndex>,
 }
 
-macro_rules! impl_graph_container {
-    ($dir:ty) => {
-        impl GraphContainer<$dir> {
-            /// Add a metavariable to the graph as a node and return the `NodeIndex`.
-            /// If it's already there, just return the existing `NodeIndex`
-            fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
-                self.node_map.get(&m).cloned().unwrap_or_else(|| {
-                    let ix = self.graph.add_node(m);
-                    self.node_map.insert(m, ix);
-                    ix
-                })
-            }
+impl<T: EdgeType> GraphContainer<T> {
+    /// Add a metavariable to the graph as a node and return the `NodeIndex`.
+    /// If it's already there, just return the existing `NodeIndex`
+    fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
+        self.node_map.get(&m).cloned().unwrap_or_else(|| {
+            let ix = self.graph.add_node(m);
+            self.node_map.insert(m, ix);
+            ix
+        })
+    }
 
-            /// Create an edge between two nodes on the graph
-            fn add_edge(&mut self, src: Meta, tgt: Meta) {
-                let src_ix = self.add_or_retrieve(src);
-                let tgt_ix = self.add_or_retrieve(tgt);
-                self.graph.add_edge(src_ix, tgt_ix, ());
-            }
+    /// Create an edge between two nodes on the graph
+    fn add_edge(&mut self, src: Meta, tgt: Meta) {
+        let src_ix = self.add_or_retrieve(src);
+        let tgt_ix = self.add_or_retrieve(tgt);
+        self.graph.add_edge(src_ix, tgt_ix, ());
+    }
 
-            /// Return the connected components of the graph in terms of metavariables
-            fn ccs(&self) -> Vec<Vec<Meta>> {
-                petgraph::algo::tarjan_scc(&self.graph)
-                    .into_iter()
-                    .map(|cc| {
-                        cc.into_iter()
-                            .map(|n| *self.graph.node_weight(n).unwrap())
-                            .collect()
-                    })
+    /// Return the connected components of the graph in terms of metavariables
+    fn ccs(&self) -> Vec<Vec<Meta>> {
+        petgraph::algo::tarjan_scc(&self.graph)
+            .into_iter()
+            .map(|cc| {
+                cc.into_iter()
+                    .map(|n| *self.graph.node_weight(n).unwrap())
                     .collect()
-            }
-        }
-    };
+            })
+            .collect()
+    }
 }
-
-impl_graph_container!(Directed);
-impl_graph_container!(Undirected);
 
 impl GraphContainer<Undirected> {
     fn new_undirected() -> Self {
