@@ -9,6 +9,7 @@ use super::{check_tag, RootTagged};
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
+#[derive(Clone)]
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
 impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
