@@ -1248,15 +1248,18 @@ The new hugr is then derived as follows:
 
 1.  Make a copy in $\Gamma$ of all the nodes in $H$ *except the root*, and all edges except
     hierarchy edges from the root.
-2.  For each child of the root of $H$, make the corresponding copy in $\Gamma$ be a child of $P$.
-3.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
+2.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
     copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
     Where these edges are from ports that currently have edges to nodes in $R$,
     the existing edges are replaced.
-4.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
+3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
     The target port must have an existing edge whose source is in $R$; this edge
     is removed.
+4.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $H$.
+    For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
+    target the next node in $N$. Stop if there are no more nodes in $N$.
+    Add any remaining nodes in $N$ to the end of $P$'s list of children.
 5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
