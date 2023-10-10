@@ -108,8 +108,9 @@ pub enum InferExtensionError {
     EdgeMismatch(#[from] ExtensionError),
 }
 
-/// A graph of metavariables which we've found equality constraints for. Edges
-/// between nodes represent equality constraints.
+/// A graph of metavariables connected by constraints.
+/// The edges represent `Equal` constraints in the undirected graph and `Plus`
+/// constraints in the directed case.
 struct GraphContainer<Dir: EdgeType> {
     graph: pg::Graph<Meta, (), Dir>,
     node_map: HashMap<Meta, pg::NodeIndex>,
