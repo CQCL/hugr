@@ -625,10 +625,10 @@ pub(crate) mod test {
         cfg_builder.branch(&tail, 0, &exit)?;
 
         let mut h = cfg_builder.finish_prelude_hugr()?;
-        let mut m = IdentityCfgMap::new(RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
+        let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&m);
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.borrow()));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -649,7 +649,7 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut m);
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));

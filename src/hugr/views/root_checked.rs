@@ -38,6 +38,13 @@ impl<Root> RootChecked<Hugr, Root> {
     }
 }
 
+impl<Root> RootChecked<&mut Hugr, Root> {
+    /// Allows immutably borrowing the underlying mutable reference
+    pub fn borrow(&self) -> RootChecked<&Hugr, Root> {
+        RootChecked(&*self.0, PhantomData)
+    }
+}
+
 impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
     type RootHandle = Root;
 }
