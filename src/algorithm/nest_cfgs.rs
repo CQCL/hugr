@@ -625,13 +625,10 @@ pub(crate) mod test {
         cfg_builder.branch(&tail, 0, &exit)?;
 
         let mut h = cfg_builder.finish_prelude_hugr()?;
-
+        let mut m = IdentityCfgMap::new(RootChecked::<_, CfgID>::try_new(&mut h).unwrap());
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        // There's no need to use a view of a region here but we do so just to check
-        // that we *can* (as we'll need to for "real" module Hugr's)
-        let v = SiblingGraph::try_new(&h, h.root()).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(v));
+        let edge_classes = EdgeClassifier::get_edge_classes(&m);
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -652,7 +649,7 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(RootChecked::try_new(&mut h).unwrap()));
+        transform_cfg_to_nested(&mut m);
         h.validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
@@ -730,7 +727,9 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
-        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
+        // There's no need to use a view of a region here but we do so just to check
+        // that we *can* (as we'll need to for "real" module Hugr's)
+        let v = IdentityCfgMap::new(SiblingGraph::try_new(&h, h.root()).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -753,8 +752,8 @@ pub(crate) mod test {
             ])
         );
 
-        // We could operate on the (&mut) Hugr directly here, but check that the transformation
-        // works on a SiblingMut (i.e. which only allows direct mutation at the top level)
+        // Again, there's no need for a view of a region here, but check that the
+        // transformation still works when we can only directly mutate the top level
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
