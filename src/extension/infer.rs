@@ -723,26 +723,33 @@ impl UnificationContext {
                 // Handle the case where the constraints for `m` contain a self
                 // reference, i.e. "m = Plus(E, m)", in which case the variable
                 // should be instantiated to E rather than the empty set.
-                let mut solution = ExtensionSet::new();
-                // Is the solution complete - does this variable *only* refer to itself?
-                let mut solution_complete = true;
+                let plus_constraints =
+                    self.get_constraints(&m)
+                        .unwrap()
+                        .iter()
+                        .cloned()
+                        .flat_map(|c| match c {
+                            Constraint::Plus(r, other_m) => Some((r, self.resolve(other_m))),
+                            _ => None,
+                        });
 
-                for c in self.get_constraints(&m).unwrap().iter() {
-                    if let Constraint::Plus(r, other_m) = c {
-                        let other_m = self.resolve(*other_m);
-                        solution.insert(r);
-                        if m != other_m {
-                            // This `m` depends on the solution of `other_m` so
-                            // `solution` is not enough info on its own.
-                            solution_complete = false;
-                            relations.add_edge(m, self.resolve(other_m));
-                        }
-                    }
+                let (rs, other_ms): (Vec<_>, Vec<_>) = plus_constraints.unzip();
+                let solution = ExtensionSet::from_iter(rs.into_iter());
+                let unresolved_metas = other_ms
+                    .into_iter()
+                    .filter(|other_m| m != *other_m)
+                    .collect::<Vec<_>>();
+
+                // If `m` doesn't depend on any other metas then we have all the
+                // information we need to come up with a solution for it.
+                if unresolved_metas.is_empty() {
+                    self.add_solution(m, solution.clone());
+                } else {
+                    unresolved_metas
+                        .iter()
+                        .for_each(|other_m| relations.add_edge(m, *other_m));
                 }
-                solutions.insert(m, solution.clone());
-                if solution_complete {
-                    self.add_solution(m, solution);
-                }
+                solutions.insert(m, solution);
             }
         }
 
