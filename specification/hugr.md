@@ -1198,22 +1198,10 @@ The new hugr is then derived as follows:
 
 This is the general subgraph-replacement method.
 
-<!-- A _partial hugr_ is a graph formed by a subset of nodes of a valid hugr together
-# with a subset of their adjoining edges.
-
-# Given a partial hugr $G$, let
-
-#  - $\bot(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
--->
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
 including $S$ itself.
 
-<!-- Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
-$b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them). Note
-that this is much the same requirement as convexity, but following the hierarchy
-edges rather than dataflow edges.
--->
 A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
 
