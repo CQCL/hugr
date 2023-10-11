@@ -1231,13 +1231,15 @@ in the hugr and the other is a new node.
 The `Replace` method takes as input:
   - the ID of a container node $P$ in $\Gamma$;
   - a set $S$ of IDs of nodes that are children of $P$
-  - a Hugr $G$ whose root is a node of the same type as $P$. Note this Hugr need not be valid, in that it may be missing:
+  - a Hugr $G$ whose root is a node of the same type as $P$.
+    Note this Hugr need not be valid, in that it may be missing:
       * edges to/from some ports (i.e. it may have unconnected ports)---not just Copyable dataflow outputs, which may occur even in valid Hugrs, but also incoming and/or non-Copyable dataflow ports, and ControlFlow ports,
       * all children for some container nodes strictly beneath the root (i.e. it may have container nodes with no outgoing hierarchy edges)
       * some children of the root, for container nodes that require particular children (e.g.
         $\mathtt{Input}$ and/or $\mathtt{Output}$ if $P$ is a dataflow container, the exit node
         of a CFG, the required number of children of a conditional)
-  - a map $B$ *from* container nodes in $G$ that have no children *to* container nodes in $S^\*$ none of which is an ancestor of another.
+  - a map $B$ *from* container nodes in $G$ that have no children *to* container nodes in $S^\*$
+    none of which is an ancestor of another.
     Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus R$;
