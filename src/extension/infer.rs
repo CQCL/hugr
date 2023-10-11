@@ -712,11 +712,11 @@ impl UnificationContext {
         let mut solutions: HashMap<Meta, ExtensionSet> = HashMap::new();
 
         let variable_scope = self.search_variable_deps();
-        // If `m` has been merged, [`self.variables`] entry
-        // will have already been updated to the merged
-        // value by [`self.merge_equal_metas`] so we don't
-        // need to worry about resolving it.
         for m in variable_scope.into_iter() {
+            // If `m` has been merged, [`self.variables`] entry
+            // will have already been updated to the merged
+            // value by [`self.merge_equal_metas`] so we don't
+            // need to worry about resolving it.
             if !self.solved.contains_key(&m) {
                 // Handle the case where the constraints for `m` contain a self
                 // reference, i.e. "m = Plus(E, m)", in which case the variable
