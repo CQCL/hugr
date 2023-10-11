@@ -1244,8 +1244,10 @@ The `Replace` method takes as input:
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus R$ (and `TgtNode` has an existing
-    incoming edge from a node in $R$).
+    $G$ and `TgtNode` in $\Gamma \setminus R$ (where `TgtNode` and `TgtPos` describe
+    an existing incoming edge of that kind from a node in $R$).
+
+Note that the well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ only contain Order edges if $P$ is a dataflow container, and only contain ControlFlow edges if $P$ is a CFG-node; and that any such Order or ControlFlow edges will (more precisely) be between nodes $S$ and children of the root of $G$.
 
 The new hugr is then derived as follows:
 
