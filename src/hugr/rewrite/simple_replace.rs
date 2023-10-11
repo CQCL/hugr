@@ -53,6 +53,19 @@ impl SimpleReplacement {
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
+
+    /// Returns the nodes affected by the replacement.
+    ///
+    /// This includes the nodes in the subgraph and the boundary neighbours that
+    /// are referenced by the replacement.
+    ///
+    /// Two `SimpleReplacement`s can be composed if their affected nodes are
+    /// disjoint.
+    pub fn affected_nodes(&self) -> impl Iterator<Item = Node> + '_ {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let out_neighs = self.nu_out.keys().map(|&(n, _)| n);
+        subcirc.chain(out_neighs)
+    }
 }
 
 impl Rewrite for SimpleReplacement {
@@ -203,7 +216,7 @@ pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
     use rstest::{fixture, rstest};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -384,6 +397,11 @@ pub(in crate::hugr::rewrite) mod test {
             nu_inp,
             nu_out,
         };
+        assert_eq!(
+            HashSet::<_>::from_iter(r.affected_nodes()),
+            HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
+        );
+
         h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
