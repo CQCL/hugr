@@ -1143,12 +1143,6 @@ is itself in S.
 The meaning of “convex” is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
 
-Given a set S of nodes in a hugr, let S\* be the set of all nodes
-descended from nodes in S, including S itself.
-
-Call two nodes a, b in Γ *separated* if a is not in {b}\* and b is not
-in {a}\* (i.e. there is no hierarchy relation between them).
-
 #### API methods
 
 There are the following primitive operations.
@@ -1177,15 +1171,20 @@ The method takes as input:
     Ext edges;
   - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
     let $T$ be the set of children of $R$;
-  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$;
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$.
+  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$; note that
+      * $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\})$ is just "the successors of $\texttt{Input}$", so could be expressed as outputs of the $\texttt{Input}$ node
+      * in order to produce a valid Hugr, all possible keys must be present; and all possible values must be present exactly once unless Copyable);
+  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$; again note that
+      * $\textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ is just the input ports to the $\texttt{Output}$ node (their source must all be in $H$)
+      * in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present
+      * ...and each possible value must be either Copyable and/or present exactly once. Any that is absent could just be omitted from $H$....
   
 The new hugr is then derived as follows:
   
   1. Make a copy in $\Gamma$ of all children of $R$, excluding Input and Output,
      and all edges between them. Make all the newly added nodes children of $P$.
-     Notation: if $p$ is a port of a node in $R$, write $p^*$ for the copy of
-     the port in $\Gamma$.
+     Notation: for each port $p$ of a node in $R$ of which a copy is made, write
+     $p^*$ for the copy of the port in $\Gamma$.
   2. For each $(q, p = \nu_\textrm{inp}(q))$ such that $q \notin \texttt{Output}$,
      add an edge from $p^-$ to $q^*$.
   3. For each $(p, q = \nu_\textrm{out}(p))$ such that $q^- \notin \texttt{Input}$,
@@ -1199,20 +1198,9 @@ The new hugr is then derived as follows:
 
 This is the general subgraph-replacement method.
 
-A _partial hugr_ is a graph formed by a subset of nodes of a valid hugr together
-with a subset of their adjoining edges. It must not include a `Module` node.
-
-Given a partial hugr $G$, let
-
-  - $\top(G)$ be the set of nodes in $G$ without an incoming hierarchy edge;
-  - $\bot(G)$ be the set of container nodes in $G$ without an outgoing hierarchy edge.
-
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
 including $S$ itself.
-
-Call two nodes $a, b \in \Gamma$ _separated_ if $a \notin \\{b\\}^\*$ and
-$b \notin \\{a\\}^\*$ (i.e. there is no hierarchy relation between them).
 
 A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
@@ -1229,22 +1217,34 @@ Note that in a `NewEdgeSpec` one of `SrcNode` and `TgtNode` is an existing node
 in the hugr and the other is a new node.
 
 The `Replace` method takes as input:
-
-  - a set $S$ of mutually-separated nodes in $\Gamma$;
-  - a partial hugr $G$;
-  - a map $T : \top(G) \to \Gamma \setminus S^*$ whose image consists of container nodes;
-  - a map $B : \bot(G) \to S^\*$ whose image consists of container nodes, such that $B(x)$
-    is separated from $B(y)$ unless $x = y$. Let $X$ be the set of children
-    of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
+  - the ID of a container node $P$ in $\Gamma$;
+  - a set $S$ of IDs of nodes that are children of $P$
+  - a Hugr $G$ whose root is a node of the same type as $P$.
+    Note this Hugr need not be valid, in that it may be missing:
+      * edges to/from some ports (i.e. it may have unconnected ports)---not just Copyable dataflow outputs, which may occur even in valid Hugrs, but also incoming and/or non-Copyable dataflow ports, and ControlFlow ports,
+      * all children for some container nodes strictly beneath the root (i.e. it may have container nodes with no outgoing hierarchy edges)
+      * some children of the root, for container nodes that require particular children (e.g.
+        $\mathtt{Input}$ and/or $\mathtt{Output}$ if $P$ is a dataflow container, the exit node
+        of a CFG, the required number of children of a conditional)
+  - a map $B$ *from* container nodes in $G$ that have no children *to* container nodes in $S^\*$
+    none of which is an ancestor of another.
+    Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
-    $G$ and `SrcNode` in $\Gamma \setminus S^*$;
+    $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus S^*$ (and `TgtNode` has an existing
-    incoming edge from a node in $R$).
+    $G$ and `TgtNode` in $\Gamma \setminus R$ (where `TgtNode` and `TgtPos` describe
+    an existing incoming edge of that kind from a node in $R$).
+
+The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
+   - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
+   - if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
+   - if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
+(in the case of $P$ being a CFG or Module node, any `Value` edges will be nonlocal, like Static edges.)
 
 The new hugr is then derived as follows:
 
-1.  Make a copy in $\Gamma$ of all the nodes in $G$, and all edges between them.
+1.  Make a copy in $\Gamma$ of all the nodes in $G$ *except the root*, and all edges except
+    hierarchy edges from the root.
 2.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
     copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
     Where these edges are from ports that currently have edges to nodes in $R$,
@@ -1253,8 +1253,10 @@ The new hugr is then derived as follows:
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
     The target port must have an existing edge whose source is in $R$; this edge
     is removed.
-4.  For each $(n, t = T(n))$, append the copy of $n$ to the list
-    of children of $t$ (adding a hierachy edge from $t$ to $n$).
+4.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
+    For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
+    target the next node in $N$. Stop if there are no more nodes in $N$.
+    Add any remaining nodes in $N$ to the end of $P$'s list of children.
 5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
@@ -1351,13 +1353,12 @@ it (and its incoming value and Order edges) from the hugr.
 
 ###### `InsertConst`
 
-Given a `Const<T>` node `c` and a DSG `P`, add `c` as a child of `P`,
-inserting an Order edge from the Input under `P` to `c`.
+Given a `Const<T>` node `c` and a container node `P` (either a `Module`,
+ a `CFG` node or a dataflow container), add `c` as a child of `P`.
 
 ###### `RemoveConst`
 
-Given a `Const<T>` node `c` having no outgoing edges, remove `c`
-together with its incoming `Order` edge.
+Given a `Const<T>` node `c` having no outgoing edges, remove `c`.
 
 #### Usage
 
