@@ -30,6 +30,7 @@ pub struct SimpleReplacement {
 
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
+    #[inline]
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: Hugr,
@@ -45,11 +46,13 @@ impl SimpleReplacement {
     }
 
     /// The replacement hugr.
+    #[inline]
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
 
     /// Subgraph to be replaced.
+    #[inline]
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
@@ -61,6 +64,7 @@ impl SimpleReplacement {
     ///
     /// Two `SimpleReplacement`s can be composed if their affected nodes are
     /// disjoint.
+    #[inline]
     pub fn affected_nodes(&self) -> impl Iterator<Item = Node> + '_ {
         let subcirc = self.subgraph.nodes().iter().copied();
         let out_neighs = self.nu_out.keys().map(|&(n, _)| n);
