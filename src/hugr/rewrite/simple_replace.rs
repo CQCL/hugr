@@ -57,15 +57,13 @@ impl SimpleReplacement {
         &self.subgraph
     }
 
-    /// Returns the nodes affected by the replacement.
-    ///
-    /// This includes the nodes in the subgraph and the boundary neighbours that
-    /// are referenced by the replacement.
+    /// Returns a set of nodes referenced by the replacement. Modifying any
+    /// these nodes will invalidate the replacement.
     ///
     /// Two `SimpleReplacement`s can be composed if their affected nodes are
     /// disjoint.
     #[inline]
-    pub fn affected_nodes(&self) -> impl Iterator<Item = Node> + '_ {
+    pub fn invalidation_set(&self) -> impl Iterator<Item = Node> + '_ {
         let subcirc = self.subgraph.nodes().iter().copied();
         let out_neighs = self.nu_out.keys().map(|&(n, _)| n);
         subcirc.chain(out_neighs)
@@ -402,7 +400,7 @@ pub(in crate::hugr::rewrite) mod test {
             nu_out,
         };
         assert_eq!(
-            HashSet::<_>::from_iter(r.affected_nodes()),
+            HashSet::<_>::from_iter(r.invalidation_set()),
             HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
         );
 
