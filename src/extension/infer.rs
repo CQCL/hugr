@@ -682,23 +682,15 @@ impl UnificationContext {
         let mut seen = HashSet::new();
         let mut new_variables: HashSet<Meta> = self.variables.clone();
         while !new_variables.is_empty() {
-            let mut newer_variables = HashSet::new();
-            for m in new_variables.into_iter() {
-                if !seen.contains(&m) {
-                    for c in self.get_constraints(&m).unwrap().iter() {
-                        match c {
-                            Constraint::Plus(_, other) => {
-                                newer_variables.insert(self.resolve(*other))
-                            }
-                            Constraint::Equal(other) => {
-                                newer_variables.insert(self.resolve(*other))
-                            }
-                        };
-                    }
-                    seen.insert(m);
-                }
-            }
-            new_variables = newer_variables;
+            new_variables = new_variables
+                .into_iter()
+                .filter(|m| seen.insert(*m))
+                .flat_map(|m| self.get_constraints(&m).unwrap())
+                .map(|c| match c {
+                    Constraint::Plus(_, other) => self.resolve(*other),
+                    Constraint::Equal(other) => self.resolve(*other),
+                })
+                .collect();
         }
         seen
     }
