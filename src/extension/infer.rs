@@ -740,26 +740,32 @@ impl UnificationContext {
 
                 // If `m` doesn't depend on any other metas then we have all the
                 // information we need to come up with a solution for it.
-                if unresolved_metas.is_empty() {
-                    self.add_solution(m, solution.clone());
-                } else {
-                    unresolved_metas
-                        .iter()
-                        .for_each(|other_m| relations.add_edge(m, *other_m));
-                }
+                relations.add_or_retrieve(m);
+                unresolved_metas
+                    .iter()
+                    .for_each(|other_m| relations.add_edge(m, *other_m));
                 solutions.insert(m, solution);
             }
         }
 
-        // Strongly connected components are looping constraint dependencies.
-        // This means that each metavariable in the CC has the same solution.
+        // Process the strongly-connected components. We need to deal with these
+        // depended-upon before depender. ccs() gives them back in some order
+        // - this might need to be reversed????
         for cc in relations.ccs() {
-            let mut combined_solution = ExtensionSet::new();
-            for sol in cc.iter().filter_map(|m| solutions.get(m)) {
-                combined_solution = combined_solution.union(sol);
-            }
+            // Strongly connected components are looping constraint dependencies.
+            // This means that each metavariable in the CC has the same solution.
+            let combined_solution = cc
+                .iter()
+                .flat_map(|m| self.get_constraints(m).unwrap())
+                .filter_map(|c| match c {
+                    Constraint::Plus(_, other_m) => solutions.get(other_m),
+                    Constraint::Equal(_) => None, // Or should we include this??
+                })
+                .fold(ExtensionSet::new(), |a, b| a.union(b));
+
             for m in cc.iter() {
                 self.add_solution(*m, combined_solution.clone());
+                solutions.insert(*m, combined_solution.clone());
             }
         }
         self.variables = HashSet::new();
