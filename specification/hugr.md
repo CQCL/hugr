@@ -1247,7 +1247,11 @@ The `Replace` method takes as input:
     $G$ and `TgtNode` in $\Gamma \setminus R$ (where `TgtNode` and `TgtPos` describe
     an existing incoming edge of that kind from a node in $R$).
 
-Note that the well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ only contain Order edges if $P$ is a dataflow container, and only contain ControlFlow edges if $P$ is a CFG-node; and that any such Order or ControlFlow edges will (more precisely) be between nodes $S$ and children of the root of $G$.
+The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
+   - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
+   - if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
+   - if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
+(in the case of $P$ being a CFG or Module node, any `Value` edges will be nonlocal, like Static edges.)
 
 The new hugr is then derived as follows:
 
