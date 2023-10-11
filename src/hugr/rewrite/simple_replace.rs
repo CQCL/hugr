@@ -30,6 +30,7 @@ pub struct SimpleReplacement {
 
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
+    #[inline]
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: Hugr,
@@ -45,13 +46,27 @@ impl SimpleReplacement {
     }
 
     /// The replacement hugr.
+    #[inline]
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
 
     /// Subgraph to be replaced.
+    #[inline]
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
+    }
+
+    /// Returns a set of nodes referenced by the replacement. Modifying any
+    /// these nodes will invalidate the replacement.
+    ///
+    /// Two `SimpleReplacement`s can be composed if their affected nodes are
+    /// disjoint.
+    #[inline]
+    pub fn invalidation_set(&self) -> impl Iterator<Item = Node> + '_ {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let out_neighs = self.nu_out.keys().map(|&(n, _)| n);
+        subcirc.chain(out_neighs)
     }
 }
 
@@ -203,7 +218,7 @@ pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
     use rstest::{fixture, rstest};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -384,6 +399,11 @@ pub(in crate::hugr::rewrite) mod test {
             nu_inp,
             nu_out,
         };
+        assert_eq!(
+            HashSet::<_>::from_iter(r.invalidation_set()),
+            HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
+        );
+
         h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
