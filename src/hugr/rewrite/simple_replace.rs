@@ -1,6 +1,8 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
+use std::iter::{self, Copied};
+use std::slice;
 
 use itertools::Itertools;
 
@@ -56,23 +58,18 @@ impl SimpleReplacement {
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
-
-    /// Returns a set of nodes referenced by the replacement. Modifying any
-    /// these nodes will invalidate the replacement.
-    ///
-    /// Two `SimpleReplacement`s can be composed if their affected nodes are
-    /// disjoint.
-    #[inline]
-    pub fn invalidation_set(&self) -> impl Iterator<Item = Node> + '_ {
-        let subcirc = self.subgraph.nodes().iter().copied();
-        let out_neighs = self.nu_out.keys().map(|&(n, _)| n);
-        subcirc.chain(out_neighs)
-    }
 }
+
+type SubgraphNodesIter<'a> = Copied<slice::Iter<'a, Node>>;
+type NuOutNodesIter<'a> =
+    iter::Map<hash_map::Keys<'a, (Node, Port), Port>, fn(&'a (Node, Port)) -> Node>;
 
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
     type ApplyResult = ();
+    type InvalidationSet<'a> = iter::Chain<SubgraphNodesIter<'a>, NuOutNodesIter<'a>>
+    where
+        Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -197,6 +194,14 @@ impl Rewrite for SimpleReplacement {
         }
         Ok(())
     }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let get_node: fn(&(Node, Port)) -> Node = |key: &(Node, Port)| key.0;
+        let out_neighs = self.nu_out.keys().map(get_node);
+        subcirc.chain(out_neighs)
+    }
 }
 
 /// Error from a [`SimpleReplacement`] operation.
@@ -227,7 +232,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{Hugr, HugrMut, Node};
+    use crate::hugr::{Hugr, HugrMut, Node, Rewrite};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;

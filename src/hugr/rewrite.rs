@@ -4,7 +4,7 @@ pub mod insert_identity;
 pub mod outline_cfg;
 pub mod simple_replace;
 
-use crate::{Hugr, HugrView};
+use crate::{Hugr, HugrView, Node};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
 
 use super::HugrMut;
@@ -15,6 +15,11 @@ pub trait Rewrite {
     type Error: std::error::Error;
     /// The type returned on successful application of the rewrite.
     type ApplyResult;
+    /// The node iterator returned by [`Rewrite::invalidation_set`]
+    type InvalidationSet<'a>: Iterator<Item = Node> + 'a
+    where
+        Self: 'a;
+
     /// If `true`, [self.apply]'s of this rewrite guarantee that they do not mutate the Hugr when they return an Err.
     /// If `false`, there is no guarantee; the Hugr should be assumed invalid when Err is returned.
     const UNCHANGED_ON_FAILURE: bool;
@@ -33,6 +38,13 @@ pub trait Rewrite {
     /// implementations may begin with `assert!(h.validate())`, with `debug_assert!(h.validate())`
     /// being preferred.
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error>;
+
+    /// Returns a set of nodes referenced by the rewrite. Modifying any of these
+    /// nodes will invalidate it.
+    ///
+    /// Two `impl Rewrite`s can be composed if their invalidation sets are
+    /// disjoint.
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_>;
 }
 
 /// Wraps any rewrite into a transaction (i.e. that has no effect upon failure)
@@ -45,6 +57,9 @@ pub struct Transactional<R> {
 impl<R: Rewrite> Rewrite for Transactional<R> {
     type Error = R::Error;
     type ApplyResult = R::ApplyResult;
+    type InvalidationSet<'a> = R::InvalidationSet<'a>
+        where
+            Self: 'a;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
@@ -71,5 +86,10 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
             h.insert_from_view(h.root(), &backup).unwrap();
         }
         r
+    }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        self.underlying.invalidation_set()
     }
 }
