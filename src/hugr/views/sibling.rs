@@ -437,9 +437,7 @@ mod test {
 
     #[rstest]
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
-        simple_dfg_hugr
-            .update_validate(&PRELUDE_REGISTRY)
-            .unwrap();
+        simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
         let signature = simple_dfg_hugr.get_function_type().unwrap().clone();
 
