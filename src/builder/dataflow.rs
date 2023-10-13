@@ -90,7 +90,7 @@ impl HugrBuilder for DFGBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, ValidationError> {
-        self.base.infer_and_validate(extension_registry)?;
+        self.base.update_validate(extension_registry)?;
         Ok(self.base)
     }
 }

@@ -73,7 +73,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.infer_and_validate(extension_registry)?;
+        self.base.update_validate(extension_registry)?;
         Ok(self.base)
     }
 }

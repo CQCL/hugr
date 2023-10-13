@@ -232,7 +232,7 @@ pub type Direction = portgraph::Direction;
 /// Public API for HUGRs.
 impl Hugr {
     /// Resolve extension ops, infer extensions used, and pass the closure into validation
-    pub fn infer_and_validate(
+    pub fn update_validate(
         &mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
