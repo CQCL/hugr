@@ -29,6 +29,13 @@ impl UpperBound {
             _ => false,
         }
     }
+    fn contains(&self, other: &UpperBound) -> bool {
+        match (self.0, other.0) {
+            (None, _) => true,
+            (Some(b1), Some(b2)) if b1 >= b2 => true,
+            _ => false,
+        }
+    }
 }
 
 /// A parameter declared by an OpDef. Specifies a value
@@ -66,11 +73,7 @@ impl TypeParam {
     fn contains(&self, other: &TypeParam) -> bool {
         match (self, other) {
             (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
-            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => match (b1.0, b2.0) {
-                (None, _) => true,
-                (Some(b1), Some(b2)) if b1 >= b2 => true,
-                _ => false,
-            },
+            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => b1.contains(b2),
             (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
             (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
             (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
