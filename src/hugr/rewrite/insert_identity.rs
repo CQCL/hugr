@@ -1,5 +1,7 @@
 //! Implementation of the `InsertIdentity` operation.
 
+use std::iter;
+
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
@@ -51,6 +53,9 @@ impl Rewrite for IdentityInsertion {
     type Error = IdentityInsertionError;
     /// The inserted node.
     type ApplyResult = Node;
+    type InvalidationSet<'a> = iter::Once<Node>
+    where
+        Self: 'a;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, _h: &impl HugrView) -> Result<(), IdentityInsertionError> {
         /*
@@ -97,6 +102,11 @@ impl Rewrite for IdentityInsertion {
         h.connect(new_node, 0, self.post_node, self.post_port)
             .expect("Should only fail if ports don't exist.");
         Ok(new_node)
+    }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        iter::once(self.post_node)
     }
 }
 
