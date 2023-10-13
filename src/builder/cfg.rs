@@ -159,7 +159,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a unit choice type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a unit Choice type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -204,7 +204,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a unit choice type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a unit Choice type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///

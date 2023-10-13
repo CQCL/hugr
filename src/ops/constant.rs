@@ -55,10 +55,7 @@ impl Const {
 
     /// Constant Sum over units, with only one variant.
     pub fn unary_unit_choice() -> Self {
-        Self {
-            value: Value::unary_unit_choice(),
-            typ: Type::new_unit_choice(1),
-        }
+        Self::unit_choice(0, 1)
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).

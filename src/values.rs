@@ -96,12 +96,12 @@ impl Value {
         Self::Tuple { vs: vec![] }
     }
 
-    /// Constant Sum over units, used as branching values.
+    /// Constant Sum of a unit value, used to control branches.
     pub fn unit_choice(tag: usize) -> Self {
         Self::sum(tag, Self::unit())
     }
 
-    /// Constant Sum over Tuples with just one variant of unit type
+    /// Constant Sum with just one variant of unit type
     pub fn unary_unit_choice() -> Self {
         Self::unit_choice(0)
     }
@@ -113,7 +113,7 @@ impl Value {
         }
     }
 
-    /// Sum value (could be of any compatible type, e.g. a Choice)
+    /// Sum value (could be of any compatible type - e.g., if `value` was a Tuple, a Choice type)
     pub fn sum(tag: usize, value: Value) -> Self {
         Self::Sum {
             tag,

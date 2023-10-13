@@ -345,8 +345,8 @@ not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
 A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
-defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
-system](#type-system)), where `#ti` is the *i*th Row defining it.
+defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
+system](#type-system)), where `#Ti` is the *i*th Row defining it.
 
 ```mermaid
 flowchart
@@ -424,7 +424,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Const" are simply generating a choice with one empty
+The three nodes labelled "Const" are simply generating a TupleSum with one empty
 value to pass to the Output node.
 
 ```mermaid

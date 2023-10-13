@@ -254,7 +254,7 @@ impl Type {
         Self::new_sum(choice_variant_row(variant_rows))
     }
 
-    /// New unit choice with empty Tuple variants
+    /// New unit Choice with empty Tuple variants
     pub const fn new_unit_choice(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
