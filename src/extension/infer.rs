@@ -700,10 +700,7 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
-    use crate::extension::{
-        prelude::{PRELUDE_ID, PRELUDE_REGISTRY},
-        ExtensionSet,
-    };
+    use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
@@ -720,6 +717,7 @@ mod test {
         const A: ExtensionId = "A";
         const B: ExtensionId = "B";
         const C: ExtensionId = "C";
+        const UNKNOWN_EXTENSION: ExtensionId = "Unknown";
     }
 
     #[test]
@@ -1184,7 +1182,7 @@ mod test {
             tuple_sum_rows,
             extension_delta,
         };
-        let op = make_opaque(PRELUDE_ID, dfb_sig.clone());
+        let op = make_opaque(UNKNOWN_EXTENSION, dfb_sig.clone());
 
         let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
@@ -1386,7 +1384,7 @@ mod test {
         let entry_mid = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
+                UNKNOWN_EXTENSION,
                 FunctionType::new(vec![NAT], twoway(NAT)),
             )),
         )?;
@@ -1475,7 +1473,7 @@ mod test {
         let entry_dfg = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
+                UNKNOWN_EXTENSION,
                 FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&entry_ext),
             )),
         )?;
@@ -1556,7 +1554,7 @@ mod test {
         let entry_mid = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
+                UNKNOWN_EXTENSION,
                 FunctionType::new(vec![NAT], oneway(NAT)),
             )),
         )?;
