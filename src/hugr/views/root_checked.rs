@@ -9,6 +9,7 @@ use super::{check_tag, RootTagged};
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
+#[derive(Clone)]
 pub struct RootChecked<H, Root = Node>(H, PhantomData<Root>);
 
 impl<H: RootTagged + AsRef<Hugr>, Root: NodeHandle> RootChecked<H, Root> {
@@ -34,6 +35,13 @@ impl<Root> RootChecked<Hugr, Root> {
     /// Extracts the underlying (owned) Hugr
     pub fn into_hugr(self) -> Hugr {
         self.0
+    }
+}
+
+impl<Root> RootChecked<&mut Hugr, Root> {
+    /// Allows immutably borrowing the underlying mutable reference
+    pub fn borrow(&self) -> RootChecked<&Hugr, Root> {
+        RootChecked(&*self.0, PhantomData)
     }
 }
 
