@@ -94,7 +94,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                 name,
                 signature: signature.clone(),
             }),
-        );
+        )?;
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))

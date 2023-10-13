@@ -241,7 +241,9 @@ pub fn resolve_extension_ops(
     for (n, op) in replacements {
         let leaf: LeafOp = op.into();
         let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
-        h.replace_op(n, node_type);
+        debug_assert_eq!(h.get_optype(n).tag(), OpTag::Leaf);
+        debug_assert_eq!(node_type.tag(), OpTag::Leaf);
+        h.replace_op(n, node_type).unwrap();
     }
     Ok(())
 }
