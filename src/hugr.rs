@@ -29,6 +29,7 @@ pub use self::views::{HugrView, RootTagged};
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
+use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
 
@@ -230,11 +231,12 @@ pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Run resource inference and pass the closure into validation
+    /// Resolve extension ops, infer extensions used, and pass the closure into validation
     pub fn infer_and_validate(
         &mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
+        resolve_extension_ops(self, extension_registry)?;
         let closure = self.infer_extensions()?;
         self.validate_with_extension_closure(closure, extension_registry)?;
         Ok(())
