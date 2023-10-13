@@ -14,6 +14,7 @@ pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::{FunctionType, Signature, SignatureDescription};
+pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
 use derive_more::{From, Into};
@@ -26,7 +27,7 @@ use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
-use self::primitive::PrimType;
+pub use self::primitive::PrimType;
 pub(crate) use self::subst::Substitution;
 use self::type_param::TypeParam;
 
@@ -113,18 +114,17 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a "simple predicate" (sum over empty tuples), store only the size of the predicate.
-enum SumType {
+pub enum SumType {
+    #[allow(missing_docs)]
     #[display(fmt = "SimplePredicate({})", "size")]
-    Simple {
-        size: u8,
-    },
-    General {
-        row: TypeRow,
-    },
+    Simple { size: u8 },
+    #[allow(missing_docs)]
+    General { row: TypeRow },
 }
 
 impl SumType {
-    fn new(types: impl Into<TypeRow>) -> Self {
+    /// Initialize a new sum type.
+    pub fn new(types: impl Into<TypeRow>) -> Self {
         let row: TypeRow = types.into();
 
         let len: usize = row.len();
@@ -135,7 +135,8 @@ impl SumType {
         }
     }
 
-    fn get_variant(&self, tag: usize) -> Option<&Type> {
+    /// Report the tag'th variant, if it exists.
+    pub fn get_variant(&self, tag: usize) -> Option<&Type> {
         match self {
             SumType::Simple { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
             SumType::General { row } => row.get(tag),
@@ -155,10 +156,13 @@ impl From<SumType> for Type {
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 /// Core types: primitive (leaf), tuple (product) or sum (co-product).
-enum TypeEnum {
+pub enum TypeEnum {
+    #[allow(missing_docs)]
     Prim(PrimType),
+    #[allow(missing_docs)]
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
+    #[allow(missing_docs)]
     #[display(fmt = "Sum({})", "_0")]
     Sum(SumType),
 }
@@ -274,6 +278,12 @@ impl Type {
         self.1
     }
 
+    /// Report the component TypeEnum.
+    #[inline(always)]
+    pub const fn as_type_enum(&self) -> &TypeEnum {
+        &self.0
+    }
+
     /// Report if the type is copyable - i.e.the least upper bound of the type
     /// is contained by the copyable bound.
     pub const fn copyable(&self) -> bool {
@@ -290,22 +300,22 @@ impl Type {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
             TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
                 .iter()
-                .try_for_each(|t| t.validate(extension_registry, type_vars)),
+                .try_for_each(|t| t.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
             TypeEnum::Prim(PrimType::Extension(custy)) => {
-                custy.validate(extension_registry, type_vars)
+                custy.validate(extension_registry, var_decls)
             }
-            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, type_vars),
+            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, var_decls),
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
-                check_typevar_decl(type_vars, *idx, &TypeParam::Type(*bound))
+                check_typevar_decl(var_decls, *idx, &TypeParam::Type(*bound))
             }
         }
     }
@@ -345,20 +355,20 @@ impl Type {
 pub(crate) fn check_typevar_decl(
     decls: &[TypeParam],
     idx: usize,
-    used_as: &TypeParam,
+    cached_decl: &TypeParam,
 ) -> Result<(), SignatureError> {
     match decls.get(idx) {
         None => Err(SignatureError::FreeTypeVar {
             idx,
             num_decls: decls.len(),
         }),
-        Some(decl) => {
-            if decl == used_as {
+        Some(actual) => {
+            if actual == cached_decl {
                 Ok(())
             } else {
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: used_as.clone(),
-                    decl: decl.clone(),
+                    cached: cached_decl.clone(),
+                    actual: actual.clone(),
                 })
             }
         }

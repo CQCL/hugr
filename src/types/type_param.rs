@@ -33,6 +33,13 @@ impl UpperBound {
             _ => false,
         }
     }
+    fn contains(&self, other: &UpperBound) -> bool {
+        match (self.0, other.0) {
+            (None, _) => true,
+            (Some(b1), Some(b2)) if b1 >= b2 => true,
+            _ => false,
+        }
+    }
 }
 
 /// A parameter declared by an OpDef. Specifies a value
@@ -73,11 +80,7 @@ impl TypeParam {
     fn contains(&self, other: &TypeParam) -> bool {
         match (self, other) {
             (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
-            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => match (b1.0, b2.0) {
-                (None, _) => true,
-                (Some(b1), Some(b2)) if b1 >= b2 => true,
-                _ => false,
-            },
+            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => b1.contains(b2),
             (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
             (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
             (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
@@ -120,7 +123,8 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
-    /// Variable (used in type schemes only) - see [TypeArg::new_var_use]
+    /// Variable (used in type schemes only), that is not a [TypeArg::Type]
+    /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
         v: TypeArgVariable,
@@ -159,10 +163,10 @@ impl TypeArg {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry, type_vars),
+            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
@@ -173,11 +177,11 @@ impl TypeArg {
             }
             TypeArg::Sequence { elems } => elems
                 .iter()
-                .try_for_each(|a| a.validate(extension_registry, type_vars)),
+                .try_for_each(|a| a.validate(extension_registry, var_decls)),
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => check_typevar_decl(type_vars, *idx, cached_decl),
+            } => check_typevar_decl(var_decls, *idx, cached_decl),
         }
     }
 

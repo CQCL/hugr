@@ -243,8 +243,8 @@ pub(crate) mod test {
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: TypeParam::Type(TypeBound::Copyable),
-                    decl
+                    cached: TypeParam::Type(TypeBound::Copyable),
+                    actual: decl
                 })
             );
         }

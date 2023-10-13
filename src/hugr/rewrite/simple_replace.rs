@@ -1,6 +1,8 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
+use std::iter::{self, Copied};
+use std::slice;
 
 use itertools::Itertools;
 
@@ -30,6 +32,7 @@ pub struct SimpleReplacement {
 
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
+    #[inline]
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: Hugr,
@@ -45,19 +48,28 @@ impl SimpleReplacement {
     }
 
     /// The replacement hugr.
+    #[inline]
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
 
     /// Subgraph to be replaced.
+    #[inline]
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
 }
 
+type SubgraphNodesIter<'a> = Copied<slice::Iter<'a, Node>>;
+type NuOutNodesIter<'a> =
+    iter::Map<hash_map::Keys<'a, (Node, Port), Port>, fn(&'a (Node, Port)) -> Node>;
+
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
     type ApplyResult = ();
+    type InvalidationSet<'a> = iter::Chain<SubgraphNodesIter<'a>, NuOutNodesIter<'a>>
+    where
+        Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -182,6 +194,14 @@ impl Rewrite for SimpleReplacement {
         }
         Ok(())
     }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let get_node: fn(&(Node, Port)) -> Node = |key: &(Node, Port)| key.0;
+        let out_neighs = self.nu_out.keys().map(get_node);
+        subcirc.chain(out_neighs)
+    }
 }
 
 /// Error from a [`SimpleReplacement`] operation.
@@ -203,7 +223,7 @@ pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
     use portgraph::Direction;
     use rstest::{fixture, rstest};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -212,7 +232,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{Hugr, HugrMut, Node};
+    use crate::hugr::{Hugr, HugrMut, Node, Rewrite};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
@@ -384,6 +404,11 @@ pub(in crate::hugr::rewrite) mod test {
             nu_inp,
             nu_out,
         };
+        assert_eq!(
+            HashSet::<_>::from_iter(r.invalidation_set()),
+            HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
+        );
+
         h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐

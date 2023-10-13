@@ -18,6 +18,8 @@ use crate::extension::{
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
 
+use crate::ops::custom::CustomOpError;
+use crate::ops::custom::{resolve_opaque_op, ExtensionOp, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -159,22 +161,40 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Check operation-specific constraints. Firstly that type args are correct
-        // (Good to call `resolve_extension_ops` immediately before this
-        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
+        // Check operation-specific constraints.
+        // TODO make a separate method for this (perhaps producing Result<(), SignatureError>)
         match op_type {
             OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
-                // Hugrs are monomorphic, so no type variables in scope
-                b.args()
-                    .iter()
-                    .try_for_each(|arg| arg.validate(self.extension_registry, &[]))
+                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
+                for arg in b.args() {
+                    // Hugrs are monomorphic, so no type variables in scope
+                    arg.validate(self.extension_registry, &[])
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                }
+                // Try to resolve serialized names to actual OpDefs in Extensions.
+                let e: Option<ExtensionOp>;
+                let ext_op = match &**b {
+                    ExternalOp::Opaque(op) => {
+                        // If resolve_extension_ops has been called first, this would always return Ok(None)
+                        e = resolve_opaque_op(node, op, self.extension_registry)?;
+                        e.as_ref()
+                    }
+                    ExternalOp::Extension(ext) => Some(ext),
+                };
+                // If successful, check TypeArgs are valid for the declared TypeParams
+                if let Some(ext_op) = ext_op {
+                    ext_op
+                        .def()
+                        .check_args(ext_op.args())
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                }
             }
             OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
                 ta.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
-            _ => Ok(()),
+            _ => (),
         }
-        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
         // Secondly that the node has correct children
         self.validate_children(node, node_type)?;
 
@@ -641,6 +661,12 @@ pub enum ValidationError {
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
+    /// Error in a [CustomOp] serialized as an [Opaque]
+    ///
+    /// [CustomOp]: crate::ops::LeafOp::CustomOp
+    /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
+    #[error(transparent)]
+    CustomOpError(#[from] CustomOpError),
 }
 
 #[cfg(feature = "pyo3")]
@@ -834,7 +860,7 @@ mod test {
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
-        b.replace_op(other, NodeType::pure(declare_op));
+        b.replace_op(other, NodeType::pure(declare_op)).unwrap();
         b.add_ports(other, Direction::Outgoing, 1);
         assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
@@ -936,14 +962,16 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }));
+        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }))
+            .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])));
+        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])))
+            .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
@@ -952,13 +980,15 @@ mod test {
         b.replace_op(
             output,
             NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
-        );
+        )
+        .unwrap();
 
         // After fixing the output back, replace the copy with an output op
         b.replace_op(
             copy,
             NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
-        );
+        )
+        .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -982,7 +1012,8 @@ mod test {
             NodeType::pure(ops::CFG {
                 signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
-        );
+        )
+        .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
@@ -1040,18 +1071,21 @@ mod test {
                 other_outputs: type_row![Q],
                 extension_delta: ExtensionSet::new(),
             }),
-        );
+        )
+        .unwrap();
         let mut block_children = b.hierarchy.children(block.index);
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
-        b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])));
+        b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])))
+            .unwrap();
         b.replace_op(
             block_output,
             NodeType::pure(ops::Output::new(type_row![
                 Type::new_simple_predicate(1),
                 Q
             ])),
-        );
+        )
+        .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })

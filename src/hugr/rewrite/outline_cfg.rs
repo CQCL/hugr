@@ -1,5 +1,6 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
-use std::collections::HashSet;
+use std::collections::{hash_set, HashSet};
+use std::iter;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -93,14 +94,20 @@ impl OutlineCfg {
 
 impl Rewrite for OutlineCfg {
     type Error = OutlineCfgError;
-    type ApplyResult = ();
+    /// The newly-created basic block, and the [CFG] node inside it
+    ///
+    /// [CFG]: OpType::CFG
+    type ApplyResult = (Node, Node);
+    type InvalidationSet<'a> = iter::Copied<hash_set::Iter<'a, Node>>
+        where
+            Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
         self.compute_entry_exit_outside_extensions(h)?;
         Ok(())
     }
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), OutlineCfgError> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<(Node, Node), OutlineCfgError> {
         let (entry, exit, outside, extension_delta) =
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature
@@ -206,7 +213,12 @@ impl Rewrite for OutlineCfg {
             SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
         in_cfg_view.connect(exit, exit_port, inner_exit, 0).unwrap();
 
-        Ok(())
+        Ok((new_block, cfg_node))
+    }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        self.blocks.iter().copied()
     }
 }
 
@@ -241,7 +253,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg,
+        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
     };
     use crate::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
@@ -251,19 +263,13 @@ mod test {
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
+    use crate::ops::{BasicBlock, OpType};
     use crate::types::FunctionType;
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
-
-    fn depth(h: &Hugr, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
-    }
 
     #[test]
     fn test_outline_cfg_errors() {
@@ -321,11 +327,14 @@ mod test {
             assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
         let blocks = [head, left, right, merge];
-        h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
+        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
         for n in blocks {
             assert_eq!(depth(h.base_hugr(), n), expected_depth + 2);
         }
-        let new_block = h.output_neighbours(entry).exactly_one().ok().unwrap();
+        assert_eq!(
+            new_block,
+            h.output_neighbours(entry).exactly_one().ok().unwrap()
+        );
         for n in [entry, exit, tail, new_block] {
             assert_eq!(depth(h.base_hugr(), n), expected_depth);
         }
@@ -337,6 +346,12 @@ mod test {
             h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
             HashSet::from([exit, new_block])
         );
+        assert_matches!(
+            h.get_optype(new_block),
+            OpType::BasicBlock(BasicBlock::DFB { .. })
+        );
+        assert_eq!(h.base_hugr().get_parent(new_cfg), Some(new_block));
+        assert_matches!(h.base_hugr().get_optype(new_cfg), OpType::CFG(_));
     }
 
     #[test]
@@ -387,15 +402,22 @@ mod test {
         for &n in blocks_to_move.iter().chain(other_blocks.iter()) {
             assert_eq!(depth(&h, n), 1);
         }
-        h.apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
+        let (new_block, new_cfg) = h
+            .apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
         h.validate(&PRELUDE_REGISTRY).unwrap();
-        let new_entry = h.children(h.root()).next().unwrap();
+        assert_eq!(new_block, h.children(h.root()).next().unwrap());
+        assert_matches!(
+            h.get_optype(new_block),
+            OpType::BasicBlock(BasicBlock::DFB { .. })
+        );
+        assert_eq!(h.get_parent(new_cfg), Some(new_block));
+        assert_matches!(h.get_optype(new_cfg), OpType::CFG(_));
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
         }
         for n in blocks_to_move {
-            assert_eq!(h.get_parent(h.get_parent(n).unwrap()).unwrap(), new_entry);
+            assert_eq!(h.get_parent(n).unwrap(), new_cfg);
         }
     }
 }
