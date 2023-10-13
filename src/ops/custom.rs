@@ -231,30 +231,8 @@ pub fn resolve_extension_ops(
     for n in h.nodes() {
         if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(r) = extension_registry.get(&opaque.extension) {
-                    // Fail if the Extension was found but did not have the expected operation
-                    let Some(def) = r.get_op(&opaque.op_name) else {
-                        return Err(CustomOpError::OpNotFoundInExtension(
-                            opaque.op_name.to_string(),
-                            r.name().to_string(),
-                        ));
-                    };
-                    let op = ExternalOp::Extension(
-                        ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
-                            .unwrap(),
-                    );
-                    if let Some(sig) = &opaque.signature {
-                        if sig != &op.signature() {
-                            return Err(CustomOpError::SignatureMismatch(
-                                def.name().to_string(),
-                                op.signature(),
-                                sig.clone(),
-                            ));
-                        };
-                    };
-                    replacements.push((n, op));
-                } else if opaque.signature.is_none() {
-                    return Err(CustomOpError::NoStoredSignature(op.name(), n));
+                if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
+                    replacements.push((n, resolved))
                 }
             }
         }
@@ -263,24 +241,76 @@ pub fn resolve_extension_ops(
     for (n, op) in replacements {
         let leaf: LeafOp = op.into();
         let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
-        h.replace_op(n, node_type);
+        debug_assert_eq!(h.get_optype(n).tag(), OpTag::Leaf);
+        debug_assert_eq!(node_type.tag(), OpTag::Leaf);
+        h.replace_op(n, node_type).unwrap();
     }
     Ok(())
 }
 
+/// Try to resolve an [`ExternalOp::Opaque`] to a [`ExternalOp::Extension`]
+///
+/// # Return
+/// Some if the serialized opaque resolves to an extension-defined op and all is ok;
+/// None if the serialized opaque doesn't identify an extension
+///
+/// # Errors
+/// If the serialized opaque resolves to a definition that conflicts with what was serialized
+pub fn resolve_opaque_op(
+    n: Node,
+    opaque: &OpaqueOp,
+    extension_registry: &ExtensionRegistry,
+) -> Result<Option<ExtensionOp>, CustomOpError> {
+    if let Some(r) = extension_registry.get(&opaque.extension) {
+        // Fail if the Extension was found but did not have the expected operation
+        let Some(def) = r.get_op(&opaque.op_name) else {
+            return Err(CustomOpError::OpNotFoundInExtension(
+                opaque.op_name.clone(),
+                r.name().clone(),
+            ));
+        };
+        let ext_op =
+            ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry).unwrap();
+        if let Some(stored_sig) = &opaque.signature {
+            if stored_sig != &ext_op.signature {
+                return Err(CustomOpError::SignatureMismatch {
+                    extension: opaque.extension.clone(),
+                    op: def.name().clone(),
+                    computed: ext_op.signature.clone(),
+                    stored: stored_sig.clone(),
+                });
+            };
+        }
+        Ok(Some(ext_op))
+    } else if opaque.signature.is_none() {
+        Err(CustomOpError::NoStoredSignature(
+            ExternalOp::Opaque(opaque.clone()).name(),
+            n,
+        ))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
 /// when trying to resolve the serialized names against a registry of known Extensions.
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum CustomOpError {
     /// Extension not found, and no signature
     #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
     NoStoredSignature(SmolStr, Node),
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(String, String),
+    OpNotFoundInExtension(SmolStr, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
-    #[error("Resolved {0} to a concrete implementation which computed a conflicting signature: {1:?} vs stored {2:?}")]
-    SignatureMismatch(String, FunctionType, FunctionType),
+    #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
+    #[allow(missing_docs)]
+    SignatureMismatch {
+        extension: ExtensionId,
+        op: SmolStr,
+        stored: FunctionType,
+        computed: FunctionType,
+    },
 }
 
 #[cfg(test)]

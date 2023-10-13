@@ -182,39 +182,6 @@ impl OpDef {
         self.check_args_impl(args)
     }
 
-    /// Check [`OpaqueOp`] is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    pub fn check_opaque(&self, opaque: &OpaqueOp) -> Result<(), SignatureError> {
-        self.check_concrete_impl(opaque)
-    }
-
-    /// Instantiate a concrete [`OpaqueOp`] by providing type arguments.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the provided arguments are not
-    /// valid instances of the type parameters.
-    pub fn instantiate_opaque(
-        &self,
-        args: impl Into<Vec<TypeArg>>,
-    ) -> Result<OpaqueOp, SignatureError> {
-        let args = args.into();
-        self.check_args(&args)?;
-
-        Ok(OpaqueOp::new(
-            self.extension().clone(),
-            self.name().clone(),
-            // TODO add description
-            "".to_string(),
-            args,
-            None,
-        ))
-    }
-
     /// Computes the signature of a node, i.e. an instantiation of this
     /// OpDef with statically-provided [TypeArg]s.
     pub fn compute_signature(

@@ -49,6 +49,11 @@ pub enum ConstTypeError {
 }
 
 impl PrimType {
+    /// Check that a [`PrimValue`] is a valid instance of this [`PrimType`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is a type check error.
     pub fn check_type(&self, val: &PrimValue) -> Result<(), ConstTypeError> {
         if let PrimType::Alias(alias) = self {
             return Err(ConstTypeError::NoAliases(alias.name().to_string()));

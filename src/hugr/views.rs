@@ -2,6 +2,7 @@
 
 pub mod descendants;
 pub mod petgraph;
+mod root_checked;
 pub mod sibling;
 pub mod sibling_subgraph;
 
@@ -10,6 +11,7 @@ mod tests;
 
 pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
+pub use root_checked::RootChecked;
 pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
@@ -20,19 +22,13 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpType, DFG};
+use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Node, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
 pub trait HugrView: sealed::HugrInternals {
-    /// The kind of handle that can be used to refer to the root node.
-    ///
-    /// The handle is guaranteed to be able to contain the operation returned by
-    /// [`HugrView::root_type`].
-    type RootHandle: NodeHandle;
-
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -73,7 +69,8 @@ pub trait HugrView: sealed::HugrInternals {
     #[inline]
     fn root_type(&self) -> &NodeType {
         let node_type = self.get_nodetype(self.root());
-        debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
+        // Sadly no way to do this at present
+        // debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type
     }
 
@@ -303,21 +300,47 @@ pub trait HugrView: sealed::HugrInternals {
     }
 }
 
+/// Trait for views that provides a guaranteed bound on the type of the root node.
+pub trait RootTagged: HugrView {
+    /// The kind of handle that can be used to refer to the root node.
+    ///
+    /// The handle is guaranteed to be able to contain the operation returned by
+    /// [`HugrView::root_type`].
+    type RootHandle: NodeHandle;
+}
+
 /// A common trait for views of a HUGR hierarchical subgraph.
-pub trait HierarchyView<'a>: HugrView + Sized {
+pub trait HierarchyView<'a>: RootTagged + Sized {
     /// Create a hierarchical view of a HUGR given a root node.
     ///
     /// # Errors
-    /// Returns [`HugrError::InvalidNode`] if the root isn't a node of the required [OpTag]
+    /// Returns [`HugrError::InvalidTag`] if the root isn't a node of the required [OpTag]
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
-impl<T> HugrView for T
-where
-    T: AsRef<Hugr>,
-{
-    type RootHandle = Node;
+fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(), HugrError> {
+    hugr.valid_node(node)?;
+    let actual = hugr.get_optype(node).tag();
+    let required = Required::TAG;
+    if !required.is_superset(actual) {
+        return Err(HugrError::InvalidTag { required, actual });
+    }
+    Ok(())
+}
 
+impl RootTagged for Hugr {
+    type RootHandle = Node;
+}
+
+impl RootTagged for &Hugr {
+    type RootHandle = Node;
+}
+
+impl RootTagged for &mut Hugr {
+    type RootHandle = Node;
+}
+
+impl<T: AsRef<Hugr>> HugrView for T {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a> = MapInto<multiportgraph::Nodes<'a>, Node> where Self: 'a;
 
@@ -441,10 +464,7 @@ pub(crate) mod sealed {
         fn root_node(&self) -> Node;
     }
 
-    impl<T> HugrInternals for T
-    where
-        T: AsRef<super::Hugr>,
-    {
+    impl<T: AsRef<Hugr>> HugrInternals for T {
         type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
         #[inline]

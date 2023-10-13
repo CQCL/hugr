@@ -6,7 +6,7 @@ use std::ops::Range;
 use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
-use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType};
+use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType, RootTagged};
 use crate::ops::OpType;
 
 use crate::{Hugr, Port};
@@ -14,10 +14,10 @@ use crate::{Hugr, Port};
 use self::sealed::HugrMutInternals;
 
 use super::views::SiblingSubgraph;
-use super::{NodeMetadata, PortIndex, Rewrite};
+use super::{IncomingPort, NodeMetadata, OutgoingPort, PortIndex, Rewrite};
 
 /// Functions for low-level building of a HUGR.
-pub trait HugrMut: HugrView + HugrMutInternals {
+pub trait HugrMut: HugrMutInternals {
     /// Returns the metadata associated with a node.
     fn get_metadata_mut(&mut self, node: Node) -> Result<&mut NodeMetadata, HugrError> {
         self.valid_node(node)?;
@@ -110,9 +110,9 @@ pub trait HugrMut: HugrView + HugrMutInternals {
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl PortIndex,
+        src_port: impl TryInto<OutgoingPort>,
         dst: Node,
-        dst_port: impl PortIndex,
+        dst_port: impl TryInto<IncomingPort>,
     ) -> Result<(), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
@@ -216,10 +216,7 @@ impl InsertionResult {
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-impl<T> HugrMut for T
-where
-    T: HugrView + AsMut<Hugr>,
-{
+impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
         let node = self.as_mut().add_node(node);
         self.as_mut()
@@ -262,13 +259,16 @@ where
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl PortIndex,
+        src_port: impl TryInto<OutgoingPort>,
         dst: Node,
-        dst_port: impl PortIndex,
+        dst_port: impl TryInto<IncomingPort>,
     ) -> Result<(), HugrError> {
-        self.as_mut()
-            .graph
-            .link_nodes(src.index, src_port.index(), dst.index, dst_port.index())?;
+        self.as_mut().graph.link_nodes(
+            src.index,
+            Port::try_new_outgoing(src_port)?.index(),
+            dst.index,
+            Port::try_new_incoming(dst_port)?.index(),
+        )?;
         Ok(())
     }
 
@@ -436,12 +436,13 @@ fn insert_subgraph_internal(
 
 pub(crate) mod sealed {
     use super::*;
+    use crate::ops::handle::NodeHandle;
 
     /// Trait for accessing the mutable internals of a Hugr(Mut).
     ///
     /// Specifically, this trait lets you apply arbitrary modifications that may
     /// invalidate the HUGR.
-    pub trait HugrMutInternals: HugrView {
+    pub trait HugrMutInternals: RootTagged {
         /// Returns the Hugr at the base of a chain of views.
         fn hugr_mut(&mut self) -> &mut Hugr;
 
@@ -497,17 +498,24 @@ pub(crate) mod sealed {
         /// In general this invalidates the ports, which may need to be resized to
         /// match the OpType signature.
         /// TODO: Add a version which ignores input extensions
-        fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
-            self.valid_node(node).unwrap_or_else(|e| panic!("{}", e));
+        ///
+        /// # Errors
+        /// Returns a [`HugrError::InvalidTag`] if this would break the bound
+        /// ([`Self::RootHandle`]) on the root node's [OpTag]
+        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+            self.valid_node(node)?;
+            if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
+                return Err(HugrError::InvalidTag {
+                    required: Self::RootHandle::TAG,
+                    actual: op.tag(),
+                });
+            }
             self.hugr_mut().replace_op(node, op)
         }
     }
 
     /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
-    impl<T> HugrMutInternals for T
-    where
-        T: HugrView + AsMut<Hugr>,
-    {
+    impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
         fn hugr_mut(&mut self) -> &mut Hugr {
             self.as_mut()
         }
@@ -562,9 +570,10 @@ pub(crate) mod sealed {
             Ok(())
         }
 
-        fn replace_op(&mut self, node: Node, op: NodeType) -> NodeType {
+        fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+            // We know RootHandle=Node here so no need to check
             let cur = self.hugr_mut().op_types.get_mut(node.index);
-            std::mem::replace(cur, op)
+            Ok(std::mem::replace(cur, op))
         }
     }
 }
@@ -574,7 +583,6 @@ mod test {
     use crate::{
         extension::prelude::USIZE_T,
         extension::PRELUDE_REGISTRY,
-        hugr::HugrView,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
         types::{FunctionType, Type},
