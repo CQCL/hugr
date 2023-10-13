@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
 
-use super::ExtensionBuildError;
+use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
 
 use crate::types::{least_upper_bound, CustomType};
@@ -61,7 +61,21 @@ impl TypeDef {
     /// This function will return an error if the type of the instance does not
     /// match the definition.
     pub fn check_custom(&self, custom: &CustomType) -> Result<(), SignatureError> {
-        self.check_concrete_impl(custom)?;
+        if self.extension() != custom.parent_extension() {
+            return Err(SignatureError::ExtensionMismatch(
+                self.extension().clone(),
+                custom.parent_extension().clone(),
+            ));
+        }
+        if self.name() != custom.def_name() {
+            return Err(SignatureError::NameMismatch(
+                self.name().clone(),
+                custom.def_name().clone(),
+            ));
+        }
+
+        self.check_args_impl(custom.type_args())?;
+
         let calc_bound = self.bound(custom.args());
         if calc_bound == custom.bound() {
             Ok(())
