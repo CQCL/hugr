@@ -296,22 +296,22 @@ impl Type {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
             TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
                 .iter()
-                .try_for_each(|t| t.validate(extension_registry, type_vars)),
+                .try_for_each(|t| t.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
             TypeEnum::Prim(PrimType::Extension(custy)) => {
-                custy.validate(extension_registry, type_vars)
+                custy.validate(extension_registry, var_decls)
             }
-            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, type_vars),
+            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, var_decls),
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
-                check_typevar_decl(type_vars, *idx, &TypeParam::Type(*bound))
+                check_typevar_decl(var_decls, *idx, &TypeParam::Type(*bound))
             }
         }
     }

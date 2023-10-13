@@ -152,10 +152,10 @@ impl TypeArg {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry, type_vars),
+            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
@@ -166,11 +166,11 @@ impl TypeArg {
             }
             TypeArg::Sequence { elems } => elems
                 .iter()
-                .try_for_each(|a| a.validate(extension_registry, type_vars)),
+                .try_for_each(|a| a.validate(extension_registry, var_decls)),
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => check_typevar_decl(type_vars, *idx, cached_decl),
+            } => check_typevar_decl(var_decls, *idx, cached_decl),
         }
     }
 

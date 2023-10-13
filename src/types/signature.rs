@@ -64,13 +64,13 @@ impl FunctionType {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         self.input
             .iter()
             .chain(self.output.iter())
-            .try_for_each(|t| t.validate(extension_registry, type_vars))?;
-        self.extension_reqs.validate(type_vars)
+            .try_for_each(|t| t.validate(extension_registry, var_decls))?;
+        self.extension_reqs.validate(var_decls)
     }
 
     pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {

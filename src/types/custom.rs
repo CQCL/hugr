@@ -62,12 +62,12 @@ impl CustomType {
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
-        type_vars: &[TypeParam],
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // Check the args are individually ok
         self.args
             .iter()
-            .try_for_each(|a| a.validate(extension_registry, type_vars))?;
+            .try_for_each(|a| a.validate(extension_registry, var_decls))?;
         // And check they fit into the TypeParams declared by the TypeDef
         let def = self.get_type_def(extension_registry)?;
         def.check_custom(self)
