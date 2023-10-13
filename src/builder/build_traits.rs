@@ -1,7 +1,7 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
-use crate::hugr::{Node, NodeMetadata, Port, PortIndex, ValidationError};
+use crate::hugr::{IncomingPort, Node, NodeMetadata, OutgoingPort, Port, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -658,27 +658,26 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
-    src_port: impl PortIndex,
+    src_port: impl TryInto<OutgoingPort>,
     dst: Node,
-    dst_port: impl PortIndex,
+    dst_port: impl TryInto<IncomingPort>,
 ) -> Result<bool, BuildError> {
-    let src_port = src_port.index();
-    let dst_port = dst_port.index();
+    let src_port = Port::try_new_outgoing(src_port)?;
+    let dst_port = Port::try_new_incoming(dst_port)?;
     let base = data_builder.hugr_mut();
-    let src_offset = Port::new_outgoing(src_port);
 
     let src_parent = base.get_parent(src);
     let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
-    if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_offset).unwrap() {
+    if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_port).unwrap() {
         if !local_source {
             // Non-local value sources require a state edge to an ancestor of dst
             if !typ.copyable() {
                 let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
                     from: src,
-                    from_offset: Port::new_outgoing(src_port),
+                    from_offset: src_port,
                     to: dst,
-                    to_offset: Port::new_incoming(dst_port),
+                    to_offset: dst_port,
                     ty: EdgeKind::Value(typ),
                 }
                 .into();
@@ -694,9 +693,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
                     from: src,
-                    from_offset: Port::new_outgoing(src_port),
+                    from_offset: src_port,
                     to: dst,
-                    to_offset: Port::new_incoming(dst_port),
+                    to_offset: dst_port,
                 }
                 .into();
                 return Err(val_err.into());
@@ -705,7 +704,7 @@ fn wire_up<T: Dataflow + ?Sized>(
             // TODO: Avoid adding duplicate edges
             // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
             base.add_other_edge(src, src_sibling)?;
-        } else if !typ.copyable() & base.linked_ports(src, src_offset).next().is_some() {
+        } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuildError::NoCopyLinear(typ));
         }
@@ -719,7 +718,7 @@ fn wire_up<T: Dataflow + ?Sized>(
             data_builder
                 .hugr_mut()
                 .get_optype(dst)
-                .port_kind(Port::new_incoming(dst_port))
+                .port_kind(dst_port)
                 .unwrap(),
             EdgeKind::Value(_)
         ))

@@ -7,10 +7,9 @@ use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
-use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{sealed::HugrInternals, HierarchyView, HugrView};
+use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView, RootTagged};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -40,13 +39,7 @@ pub struct DescendantsGraph<'g, Root = Node> {
     /// The operation handle of the root node.
     _phantom: std::marker::PhantomData<Root>,
 }
-
-impl<'g, Root> HugrView for DescendantsGraph<'g, Root>
-where
-    Root: NodeHandle,
-{
-    type RootHandle = Root;
-
+impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
     where
         Self: 'a;
@@ -155,17 +148,16 @@ where
         self.graph.all_neighbours(node.index).map_into()
     }
 }
+impl<'g, Root: NodeHandle> RootTagged for DescendantsGraph<'g, Root> {
+    type RootHandle = Root;
+}
 
 impl<'a, Root> HierarchyView<'a> for DescendantsGraph<'a, Root>
 where
     Root: NodeHandle,
 {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
-        hugr.valid_node(root)?;
-        let root_tag = hugr.get_optype(root).tag();
-        if !Root::TAG.is_superset(root_tag) {
-            return Err(HugrError::InvalidNode(root));
-        }
+        check_tag::<Root>(hugr, root)?;
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,

@@ -152,7 +152,6 @@ impl ValidateOp for super::Conditional {
             return Err(ChildrenValidationError::InvalidConditionalChoice {
                 child: children[0].0, // Pass an arbitrary child
                 expected_count: children.len(),
-                actual_count: self.choice_inputs.len(),
                 actual_choice_rows: self.choice_inputs.clone(),
             });
         }
@@ -253,11 +252,11 @@ pub enum ChildrenValidationError {
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
     /// The conditional container's branch Choice does not match the number of children.
-    #[error("The conditional container's branch Choice input should be a sum with {expected_count} elements, but it had {actual_count} elements. Choice rows: {actual_choice_rows:?} ")]
+    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {} elements. Predicate rows: {actual_choice_rows:?}",
+        actual_choice_rows.len())]
     InvalidConditionalChoice {
         child: NodeIndex,
         expected_count: usize,
-        actual_count: usize,
         actual_choice_rows: Vec<TypeRow>,
     },
 }

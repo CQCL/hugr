@@ -1,5 +1,6 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
-use std::collections::HashSet;
+use std::collections::{hash_set, HashSet};
+use std::iter;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -97,6 +98,9 @@ impl Rewrite for OutlineCfg {
     ///
     /// [CFG]: OpType::CFG
     type ApplyResult = (Node, Node);
+    type InvalidationSet<'a> = iter::Copied<hash_set::Iter<'a, Node>>
+        where
+            Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
@@ -211,6 +215,11 @@ impl Rewrite for OutlineCfg {
 
         Ok((new_block, cfg_node))
     }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        self.blocks.iter().copied()
+    }
 }
 
 /// Errors that can occur in expressing an OutlineCfg rewrite.
@@ -244,7 +253,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg,
+        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
     };
     use crate::builder::{
         Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
@@ -256,18 +265,11 @@ mod test {
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
     use crate::ops::{BasicBlock, OpType};
     use crate::types::FunctionType;
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
-
-    fn depth(h: &Hugr, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
-    }
 
     #[test]
     fn test_outline_cfg_errors() {
