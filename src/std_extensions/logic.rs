@@ -93,10 +93,10 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_value(FALSE_NAME, ops::Const::unit_choice(0, 2))
+        .add_value(FALSE_NAME, ops::Const::unit_sum(0, 2))
         .unwrap();
     extension
-        .add_value(TRUE_NAME, ops::Const::unit_choice(1, 2))
+        .add_value(TRUE_NAME, ops::Const::unit_sum(1, 2))
         .unwrap();
     extension
 }

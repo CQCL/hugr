@@ -26,7 +26,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
     /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
-    /// termination Choice, and `rest` being the remaining outputs
+    /// termination TupleSum, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
         out_variant: Wire,
@@ -48,7 +48,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         }
     }
 
-    /// The output types of the child graph, including the Choice as the first.
+    /// The output types of the child graph, including the TupleSum as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }
@@ -152,10 +152,9 @@ mod test {
                     let [const_wire] = lift_node.outputs_arr();
                     let [b1] = loop_b.input_wires_arr();
                     let conditional_id = {
-                        let choice_inputs = vec![type_row![]; 2];
                         let output_row = loop_b.internal_output_row()?;
                         let mut conditional_b = loop_b.conditional_builder(
-                            (choice_inputs, const_wire),
+                            ([type_row![], type_row![]], const_wire),
                             vec![(BIT, b1)],
                             output_row,
                             ExtensionSet::new(),

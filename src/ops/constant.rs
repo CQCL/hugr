@@ -36,36 +36,36 @@ impl Const {
 
     /// Sum of Tuples, used  for branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn choice(
+    pub fn tuple_sum(
         tag: usize,
         value: Value,
         variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Result<Self, ConstTypeError> {
-        let typ = Type::new_choice(variant_rows);
+        let typ = Type::new_tuple_sum(variant_rows);
         Self::new(Value::sum(tag, value), typ)
     }
 
     /// Constant Sum over units, used as branching values.
-    pub fn unit_choice(tag: usize, size: u8) -> Self {
+    pub fn unit_sum(tag: usize, size: u8) -> Self {
         Self {
-            value: Value::unit_choice(tag),
-            typ: Type::new_unit_choice(size),
+            value: Value::unit_sum(tag),
+            typ: Type::new_unit_sum(size),
         }
     }
 
     /// Constant Sum over units, with only one variant.
-    pub fn unary_unit_choice() -> Self {
-        Self::unit_choice(0, 1)
+    pub fn unary_unit_sum() -> Self {
+        Self::unit_sum(0, 1)
     }
 
     /// Constant "true" value, i.e. the second variant of Sum((), ()).
     pub fn true_val() -> Self {
-        Self::unit_choice(1, 2)
+        Self::unit_sum(1, 2)
     }
 
     /// Constant "false" value, i.e. the first variant of Sum((), ()).
     pub fn false_val() -> Self {
-        Self::unit_choice(0, 2)
+        Self::unit_sum(0, 2)
     }
 
     /// Tuple of values
@@ -139,17 +139,17 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_choice() -> Result<(), BuildError> {
+    fn test_tuple_sum() -> Result<(), BuildError> {
         use crate::builder::Container;
         let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
-        let pred_ty = Type::new_choice(pred_rows.clone());
+        let pred_ty = Type::new_tuple_sum(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
         let c = b.add_constant(
-            Const::choice(
+            Const::tuple_sum(
                 0,
                 Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
                 pred_rows.clone(),
@@ -161,7 +161,7 @@ mod test {
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
         let c = b.add_constant(
-            Const::choice(1, Value::unit(), pred_rows)?,
+            Const::tuple_sum(1, Value::unit(), pred_rows)?,
             ExtensionSet::new(),
         )?;
         let w = b.load_const(&c)?;
@@ -171,10 +171,10 @@ mod test {
     }
 
     #[test]
-    fn test_bad_choice() {
+    fn test_bad_tuple_sum() {
         let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
-        let res = Const::choice(0, Value::tuple([]), pred_rows);
+        let res = Const::tuple_sum(0, Value::tuple([]), pred_rows);
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
     }
 

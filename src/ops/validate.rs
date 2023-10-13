@@ -148,15 +148,15 @@ impl ValidateOp for super::Conditional {
         let children = children.collect_vec();
         // The first input to the ɣ-node is a value of Sum type,
         // whose arity matches the number of children of the ɣ-node.
-        if self.choice_inputs.len() != children.len() {
-            return Err(ChildrenValidationError::InvalidConditionalChoice {
+        if self.tuple_sum_rows.len() != children.len() {
+            return Err(ChildrenValidationError::InvalidConditionalTupleSum {
                 child: children[0].0, // Pass an arbitrary child
                 expected_count: children.len(),
-                actual_choice_rows: self.choice_inputs.clone(),
+                actual_sum_rows: self.tuple_sum_rows.clone(),
             });
         }
 
-        // Each child must have its Choice variant's row and the rest of `inputs` as input,
+        // Each child must have its variant's row and the rest of `inputs` as input,
         // and matching output
         for (i, (child, optype)) in children.into_iter().enumerate() {
             let OpType::Case(case_op) = optype else {
@@ -251,13 +251,13 @@ pub enum ChildrenValidationError {
     /// The signature of a child case in a conditional operation does not match the container's signature.
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
-    /// The conditional container's branch Choice does not match the number of children.
-    #[error("The conditional container's branch predicate input should be a sum with {expected_count} elements, but it had {} elements. Predicate rows: {actual_choice_rows:?}",
-        actual_choice_rows.len())]
-    InvalidConditionalChoice {
+    /// The conditional container's branching value does not match the number of children.
+    #[error("The conditional container's branch TupleSum input should be a sum with {expected_count} elements, but it had {} elements. TupleSum rows: {actual_sum_rows:?}",
+        actual_sum_rows.len())]
+    InvalidConditionalTupleSum {
         child: NodeIndex,
         expected_count: usize,
-        actual_choice_rows: Vec<TypeRow>,
+        actual_sum_rows: Vec<TypeRow>,
     },
 }
 
@@ -269,7 +269,7 @@ impl ChildrenValidationError {
             ChildrenValidationError::InternalExitChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalCaseSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
-            ChildrenValidationError::InvalidConditionalChoice { child, .. } => *child,
+            ChildrenValidationError::InvalidConditionalTupleSum { child, .. } => *child,
         }
     }
 }
@@ -317,14 +317,15 @@ impl ValidateOp for BasicBlock {
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
             BasicBlock::DFB {
-                choice_variants, ..
+                tuple_sum_rows: tuple_sum_variants,
+                ..
             } => OpValidityFlags {
                 allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(choice_variants.len())),
+                non_df_ports: (None, Some(tuple_sum_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -340,12 +341,12 @@ impl ValidateOp for BasicBlock {
         match self {
             BasicBlock::DFB {
                 inputs,
-                choice_variants,
+                tuple_sum_rows: tuple_sum_variants,
                 other_outputs: outputs,
                 extension_delta: _,
             } => {
-                let choice_type = Type::new_choice(choice_variants.clone());
-                let node_outputs: TypeRow = [&[choice_type], outputs.as_ref()].concat().into();
+                let tuple_sum_type = Type::new_tuple_sum(tuple_sum_variants.clone());
+                let node_outputs: TypeRow = [&[tuple_sum_type], outputs.as_ref()].concat().into();
                 validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
             }
             // Exit nodes do not have children

@@ -108,11 +108,11 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 #[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
-/// of a "unit choice" (sum over empty tuples), store only the size of the Choice.
+/// of a UnitSum (sum over empty tuples), store only the size of the Sum.
 pub enum SumType {
     #[allow(missing_docs)]
-    #[display(fmt = "UnitChoice({})", "size")]
-    Simple { size: u8 },
+    #[display(fmt = "UnitSum({})", "size")]
+    Unit { size: u8 },
     #[allow(missing_docs)]
     General { row: TypeRow },
 }
@@ -124,7 +124,7 @@ impl SumType {
 
         let len: usize = row.len();
         if len <= (u8::MAX as usize) && row.iter().all(|t| *t == Type::UNIT) {
-            Self::Simple { size: len as u8 }
+            Self::Unit { size: len as u8 }
         } else {
             Self::General { row }
         }
@@ -133,7 +133,7 @@ impl SumType {
     /// Report the tag'th variant, if it exists.
     pub fn get_variant(&self, tag: usize) -> Option<&Type> {
         match self {
-            SumType::Simple { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Type::UNIT_REF),
             SumType::General { row } => row.get(tag),
             _ => None,
         }
@@ -143,7 +143,7 @@ impl SumType {
 impl From<SumType> for Type {
     fn from(sum: SumType) -> Type {
         match sum {
-            SumType::Simple { size } => Type::new_unit_choice(size),
+            SumType::Unit { size } => Type::new_unit_sum(size),
             SumType::General { row } => Type::new_sum(row),
         }
     }
@@ -166,7 +166,7 @@ impl TypeEnum {
     fn least_upper_bound(&self) -> TypeBound {
         match self {
             TypeEnum::Prim(p) => p.bound(),
-            TypeEnum::Sum(SumType::Simple { size: _ }) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { row }) => {
                 least_upper_bound(row.iter().map(Type::least_upper_bound))
             }
@@ -245,19 +245,19 @@ impl Type {
         Self(type_e, bound)
     }
 
-    /// New Sum of Tuple types, used as choices in branching.
+    /// New Sum of Tuple types, used in branching control.
     /// Tuple rows are defined in order by input rows.
-    pub fn new_choice<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
+    pub fn new_tuple_sum<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
     where
         V: Into<TypeRow>,
     {
-        Self::new_sum(choice_variant_row(variant_rows))
+        Self::new_sum(tuple_sum_row(variant_rows))
     }
 
-    /// New unit Choice with empty Tuple variants
-    pub const fn new_unit_choice(size: u8) -> Self {
+    /// New UnitSum with empty Tuple variants
+    pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -288,7 +288,7 @@ impl Type {
             TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
                 row.iter().try_for_each(|t| t.validate(extension_registry))
             }
-            TypeEnum::Sum(SumType::Simple { .. }) => Ok(()), // No leaves there
+            TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
             TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
             TypeEnum::Prim(PrimType::Function(ft)) => ft
@@ -302,7 +302,7 @@ impl Type {
 
 /// Return the type row of variants required to define a Sum of Tuples type
 /// given the rows of each tuple
-pub(crate) fn choice_variant_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
+pub(crate) fn tuple_sum_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
 where
     V: Into<TypeRow>,
 {
@@ -351,11 +351,11 @@ pub(crate) mod test {
     #[test]
     fn sum_construct() {
         let pred1 = Type::new_sum(type_row![Type::UNIT, Type::UNIT]);
-        let pred2 = Type::new_unit_choice(2);
+        let pred2 = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
 
-        let pred_direct = SumType::Simple { size: 2 };
+        let pred_direct = SumType::Unit { size: 2 };
         assert_eq!(pred1, pred_direct.into())
     }
 }

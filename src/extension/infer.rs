@@ -1050,14 +1050,14 @@ mod test {
             Ok(case)
         }
 
-        let choice_inputs = vec![type_row![]; 2];
+        let tuple_sum_rows = vec![type_row![]; 2];
         let rs = ExtensionSet::from_iter([A, B]);
 
         let inputs = type_row![NAT];
         let outputs = type_row![NAT];
 
         let op = ops::Conditional {
-            choice_inputs,
+            tuple_sum_rows,
             other_inputs: inputs.clone(),
             outputs: outputs.clone(),
             extension_delta: rs.clone(),
@@ -1171,16 +1171,17 @@ mod test {
         hugr: &mut Hugr,
         bb_parent: Node,
         inputs: TypeRow,
-        choice_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Node, Box<dyn Error>> {
-        let choice_type = Type::new_choice(choice_variants.clone());
-        let dfb_sig = FunctionType::new(inputs.clone(), vec![choice_type])
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
+        let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
+        let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
             .with_extension_delta(&extension_delta.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs,
             other_outputs: type_row![],
-            choice_variants,
+            tuple_sum_rows,
             extension_delta,
         };
         let op = make_opaque(PRELUDE_ID, dfb_sig.clone());
@@ -1196,11 +1197,11 @@ mod test {
     }
 
     fn oneway(ty: Type) -> Vec<Type> {
-        vec![Type::new_choice([vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty]])]
     }
 
     fn twoway(ty: Type) -> Vec<Type> {
-        vec![Type::new_choice([vec![ty.clone()], vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty.clone()], vec![ty]])]
     }
 
     fn create_entry_exit(
@@ -1211,11 +1212,11 @@ mod test {
         entry_extensions: ExtensionSet,
         exit_types: impl Into<TypeRow>,
     ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-        let entry_predicate_type = Type::new_choice(entry_predicates.clone());
+        let entry_predicate_type = Type::new_tuple_sum(entry_predicates.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: type_row![],
-            choice_variants: entry_predicates,
+            tuple_sum_rows: entry_predicates,
             extension_delta: entry_extensions,
         };
 

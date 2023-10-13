@@ -605,9 +605,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const = cfg_builder.add_constant(Const::unit_choice(0, 2), ExtensionSet::new())?; // Nothing here cares which
-        let const_unit =
-            cfg_builder.add_constant(Const::unary_unit_choice(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
@@ -888,9 +887,8 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const = cfg_builder.add_constant(Const::unit_choice(0, 2), ExtensionSet::new())?; // Nothing here cares which
-        let const_unit =
-            cfg_builder.add_constant(Const::unary_unit_choice(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2, ExtensionSet::new())?,
@@ -931,9 +929,8 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const = cfg_builder.add_constant(Const::unit_choice(0, 2), ExtensionSet::new())?; // Nothing here cares which
-        let const_unit =
-            cfg_builder.add_constant(Const::unary_unit_choice(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
