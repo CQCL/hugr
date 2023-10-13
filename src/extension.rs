@@ -150,31 +150,6 @@ trait TypeParametrised {
         }
         Ok(())
     }
-
-    /// Check custom instance is a valid instantiation of this definition.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the type of the instance does not
-    /// match the definition.
-    fn check_concrete_impl(&self, custom: &Self::Concrete) -> Result<(), SignatureError> {
-        if self.extension() != custom.parent_extension() {
-            return Err(SignatureError::ExtensionMismatch(
-                self.extension().clone(),
-                custom.parent_extension().clone(),
-            ));
-        }
-        if self.name() != custom.def_name() {
-            return Err(SignatureError::NameMismatch(
-                self.name().clone(),
-                custom.def_name().clone(),
-            ));
-        }
-
-        self.check_args_impl(custom.type_args())?;
-
-        Ok(())
-    }
 }
 
 /// A constant value provided by a extension.
