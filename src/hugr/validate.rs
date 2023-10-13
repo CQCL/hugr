@@ -18,6 +18,8 @@ use crate::extension::{
     ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
 
+use crate::ops::custom::CustomOpError;
+use crate::ops::custom::{resolve_opaque_op, ExtensionOp, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::{EdgeKind, Type};
@@ -159,12 +161,28 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Check operation-specific constraints. Firstly that type args are correct
-        // (Good to call `resolve_extension_ops` immediately before this
-        //   - see https://github.com/CQCL-DEV/hugr/issues/508 )
+        // Check operation-specific constraints.
         if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
+            // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
             for arg in b.args() {
                 arg.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+            // Try to resolve serialized names to actual OpDefs in Extensions.
+            let e: Option<ExtensionOp>;
+            let ext_op = match &**b {
+                ExternalOp::Opaque(op) => {
+                    // If resolve_extension_ops has been called first, this would always return Ok(None)
+                    e = resolve_opaque_op(node, op, self.extension_registry)?;
+                    e.as_ref()
+                }
+                ExternalOp::Extension(ext) => Some(ext),
+            };
+            // If successful, check TypeArgs are valid for the declared TypeParams
+            if let Some(ext_op) = ext_op {
+                ext_op
+                    .def()
+                    .check_args(ext_op.args())
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
         }
@@ -634,6 +652,12 @@ pub enum ValidationError {
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
+    /// Error in a [CustomOp] serialized as an [Opaque]
+    ///
+    /// [CustomOp]: crate::ops::LeafOp::CustomOp
+    /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
+    #[error(transparent)]
+    CustomOpError(#[from] CustomOpError),
 }
 
 #[cfg(feature = "pyo3")]
