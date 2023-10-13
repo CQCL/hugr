@@ -157,8 +157,8 @@ mod test {
     }
 
     #[test]
-    fn test_misused_variables() -> Result<(), SignatureError> {
-        // Variables in args have different bounds from variable declaration
+    fn typevar_cached_decls() -> Result<(), SignatureError> {
+        // Variables in args cache different bounds from the actual declaration
         let tv = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
@@ -173,8 +173,8 @@ mod test {
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: TypeParam::Type(TypeBound::Copyable),
-                    decl
+                    cached: TypeParam::Type(TypeBound::Copyable),
+                    actual: decl
                 })
             );
         }

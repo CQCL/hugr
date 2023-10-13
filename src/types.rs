@@ -367,20 +367,20 @@ fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeR
 pub(crate) fn check_typevar_decl(
     decls: &[TypeParam],
     idx: usize,
-    used_as: &TypeParam,
+    cached_decl: &TypeParam,
 ) -> Result<(), SignatureError> {
     match decls.get(idx) {
         None => Err(SignatureError::FreeTypeVar {
             idx,
             num_decls: decls.len(),
         }),
-        Some(decl) => {
-            if decl == used_as {
+        Some(actual) => {
+            if actual == cached_decl {
                 Ok(())
             } else {
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    used: used_as.clone(),
-                    decl: decl.clone(),
+                    cached: cached_decl.clone(),
+                    actual: actual.clone(),
                 })
             }
         }

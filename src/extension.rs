@@ -92,9 +92,12 @@ pub enum SignatureError {
         actual: TypeBound,
         expected: TypeBound,
     },
-    /// A Type Variable is used as a kind that does not match the declaration
-    #[error("Type Variable used as {used:?} but declared as {decl:?}")]
-    TypeVarDoesNotMatchDeclaration { used: TypeParam, decl: TypeParam },
+    /// A Type Variable's cache of its declared kind is incorrect
+    #[error("Type Variable claims to be {cached:?} but actual declaration {actual:?}")]
+    TypeVarDoesNotMatchDeclaration {
+        actual: TypeParam,
+        cached: TypeParam,
+    },
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
