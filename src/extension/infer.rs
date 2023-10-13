@@ -134,8 +134,9 @@ impl<T: EdgeType> GraphContainer<T> {
         self.graph.add_edge(src_ix, tgt_ix, ());
     }
 
-    /// Return the connected components of the graph in terms of metavariables
-    fn ccs(&self) -> Vec<Vec<Meta>> {
+    /// Return the strongly connected components of the graph in terms of
+    /// metavariables. In the undirected case, return the connected components
+    fn sccs(&self) -> Vec<Vec<Meta>> {
         petgraph::algo::tarjan_scc(&self.graph)
             .into_iter()
             .map(|cc| {
@@ -452,7 +453,7 @@ impl UnificationContext {
     fn merge_equal_metas(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
         let mut merged: HashSet<Meta> = HashSet::new();
         let mut new_metas: HashSet<Meta> = HashSet::new();
-        for cc in self.eq_graph.ccs().into_iter() {
+        for cc in self.eq_graph.sccs().into_iter() {
             // Within a connected component everything is equal
             let combined_meta = self.fresh_meta();
             for m in cc.iter() {
@@ -753,7 +754,7 @@ impl UnificationContext {
 
         // Strongly connected components are looping constraint dependencies.
         // This means that each metavariable in the CC has the same solution.
-        for cc in relations.ccs() {
+        for cc in relations.sccs() {
             let mut combined_solution = ExtensionSet::new();
             for sol in cc.iter().filter_map(|m| solutions.get(m)) {
                 combined_solution = combined_solution.union(sol);
