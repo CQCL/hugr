@@ -8,9 +8,11 @@ use std::iter::{Chain, Copied, Take};
 use itertools::Itertools;
 use thiserror::Error;
 
+use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::HugrMut;
 use crate::ops::OpTrait;
-use crate::types::Type;
-use crate::{Hugr, HugrView, Node};
+use crate::types::EdgeKind;
+use crate::{Hugr, HugrView, Node, Port};
 
 use super::Rewrite;
 
@@ -24,19 +26,9 @@ pub struct NewEdgeSpec {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NewEdgeKind {
     Order,
-    Value {
-        ty: Type,
-        src_pos: usize,
-        tgt_pos: usize,
-    },
-    Static {
-        ty: Type,
-        src_pos: usize,
-        tgt_pos: usize,
-    },
-    ControlFlow {
-        src_pos: usize,
-    },
+    Value { src_pos: usize, tgt_pos: usize },
+    Static { src_pos: usize, tgt_pos: usize },
+    ControlFlow { src_pos: usize },
 }
 
 /// Specification of a `Replace` operation
@@ -44,6 +36,8 @@ pub enum NewEdgeKind {
 pub struct Replacement {
     /// The nodes to remove from the existing Hugr (known as Gamma).
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
+    /// Must be non-empty - otherwise there is no parent under which to place [replacement],
+    /// and no possible [in_edges], [out_edges] or [transfers].
     removal: HashSet<Node>,
     /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
     replacement: Hugr,
@@ -127,11 +121,61 @@ impl Rewrite for Replacement {
                 "Some transferred nodes were not to be removed".to_string(),
             ));
         }
+        // TODO check edges??
         Ok(())
     }
 
-    fn apply(self, _h: &mut impl crate::hugr::HugrMut) -> Result<Self::ApplyResult, Self::Error> {
-        todo!()
+    fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+        let parent = h.get_parent(*self.removal.iter().next().unwrap()).unwrap();
+        // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want
+        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement)?;
+
+        // 2. Add new edges from existing to copied nodes according to mu_in
+        let translate_idx = |n| *node_map.get(&n).unwrap();
+        let id = |n| n;
+        transfer_edges(h, self.in_edges.iter(), id, translate_idx, false)?;
+
+        // 3. Add new edges from copied to existing nodes according to mu_out,
+        // replacing existing value/static edges incoming to targets
+        transfer_edges(h, self.out_edges.iter(), translate_idx, id, true)?;
+
+        //4. Add new edges between existing nodes according to mu_new,
+        // replacing existing value/static edges incoming to targets
+        transfer_edges(h, self.new_edges.iter(), id, id, true)?;
+
+        // 5. Put newly-added copies into correct places in hierarchy
+        // (these will be correct places after removing nodes)
+        let mut remove = self.removal.iter();
+        for new_node in h.children(new_root).collect::<Vec<Node>>().into_iter() {
+            let new_node = *node_map.get(&new_node).unwrap();
+            if let Some(to_remove) = remove.next() {
+                h.move_before_sibling(new_node, *to_remove).unwrap();
+            } else {
+                h.set_parent(new_node, parent).unwrap();
+            }
+        }
+        debug_assert!(h.children(new_root).next().is_none());
+        h.remove_node(new_root).unwrap();
+
+        // 6. Transfer to keys of `transfers` children of the corresponding values.
+        fn first_child(h: &impl HugrView, parent: Node) -> Option<crate::Node> {
+            h.children(parent).next()
+        }
+        for (new_parent, old_parent) in self.transfers.iter() {
+            debug_assert!(h.children(*old_parent).next().is_some());
+            while let Some(ch) = first_child(h, *old_parent) {
+                h.set_parent(ch, *new_parent).unwrap();
+            }
+        }
+
+        // 7. Remove remaining nodes
+        let mut to_remove = VecDeque::from_iter(self.removal);
+        while let Some(n) = to_remove.pop_front() {
+            // Nodes may have no children if they were moved in step 6
+            to_remove.extend(h.children(n));
+            h.remove_node(n).unwrap();
+        }
+        Ok(())
     }
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
@@ -141,6 +185,43 @@ impl Rewrite for Replacement {
             .chain(self.transfers.values().copied())
             .chain(self.removal.iter().take(1).copied())
     }
+}
+
+fn transfer_edges<'a>(
+    h: &mut impl HugrMut,
+    edges: impl Iterator<Item = &'a NewEdgeSpec>,
+    trans_src: impl Fn(Node) -> Node,
+    trans_tgt: impl Fn(Node) -> Node,
+    remove_existing: bool,
+) -> Result<(), ReplaceError> {
+    for e in edges {
+        let src = trans_src(e.src);
+        let tgt = trans_tgt(e.tgt);
+        match e.kind {
+            NewEdgeKind::Order => {
+                if h.get_optype(src).other_output() != Some(EdgeKind::StateOrder) {
+                    return Err(ReplaceError(
+                        "Can't insert Order edge except from DFG node".to_string(),
+                    ));
+                }
+                if h.get_parent(tgt) != h.get_parent(src) {
+                    return Err(ReplaceError(
+                        "Order edge target not at top level".to_string(),
+                    ));
+                }
+                h.add_other_edge(src, tgt).unwrap();
+            }
+            NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
+                if remove_existing {
+                    h.disconnect(tgt, Port::new(portgraph::Direction::Incoming, tgt_pos))
+                        .unwrap();
+                }
+                h.connect(src, src_pos, tgt, tgt_pos).unwrap();
+            }
+            NewEdgeKind::ControlFlow { src_pos } => h.connect(src, src_pos, tgt, 0).unwrap(),
+        }
+    }
+    Ok(())
 }
 
 /// Error in a [`Replacement`]
