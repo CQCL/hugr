@@ -1220,9 +1220,6 @@ It contains the following fields:
   - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
     the incoming ports to the new node.
 
-Note that in a `NewEdgeSpec` one of `SrcNode` and `TgtNode` is an existing node
-in the hugr and the other is a new node.
-
 The `Replace` method takes as input:
   - the ID of a container node $P$ in $\Gamma$;
   - a set $S$ of IDs of nodes that are children of $P$
@@ -1239,8 +1236,15 @@ The `Replace` method takes as input:
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus R$ (where `TgtNode` and `TgtPos` describe
-    an existing incoming edge of that kind from a node in $R$).
+    $G$ and `TgtNode` in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe
+    an existing incoming edge of that kind from a node in $R$.
+  - a list $\mu\_\textrm{new}$ of `NewEdgeSpec` which all have both `SrcNode` and `TgtNode`
+    in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
+    edge of that kind from a node in $R$.
+
+Note that considering all three $\mu$ lists together,
+   - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
+   - and similarly for `EdgeKind` == `Static`
 
 The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
    - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
@@ -1258,16 +1262,19 @@ The new hugr is then derived as follows:
     the existing edges are replaced.
 3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-    The target port must have an existing edge whose source is in $R$; this edge
-    is removed.
-4.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
+    For Value or Static edges, the target port must have an existing edge whose source is in $R$;
+    this edge is removed.
+4.  For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
+    between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
+    the target port must have an existing edge whose source is in $R$; this edge is removed.
+5.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
     For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
     target the next node in $N$. Stop if there are no more nodes in $N$.
     Add any remaining nodes in $N$ to the end of $P$'s list of children.
-5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
+6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
-6.  Remove all nodes in $R$ and edges adjoining them.
+7.  Remove all nodes in $R$ and edges adjoining them.
 
 ##### Outlining methods
 
