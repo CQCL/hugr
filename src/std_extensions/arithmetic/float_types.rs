@@ -42,6 +42,11 @@ impl ConstF64 {
     pub fn new(value: f64) -> Self {
         Self { value }
     }
+
+    /// Returns the value of the constant
+    pub fn value(&self) -> f64 {
+        self.value
+    }
 }
 
 impl KnownTypeConst for ConstF64 {
