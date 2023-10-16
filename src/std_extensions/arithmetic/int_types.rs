@@ -21,7 +21,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
 fn int_custom_type(width_arg: TypeArg) -> CustomType {
-    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Copyable)
+    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
@@ -192,7 +192,7 @@ pub fn extension() -> Extension {
             INT_TYPE_ID,
             vec![LOG_WIDTH_TYPE_PARAM],
             "integral value of a given bit width".to_owned(),
-            TypeBound::Copyable.into(),
+            TypeBound::Eq.into(),
         )
         .unwrap();
 
