@@ -9,7 +9,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::HugrMut;
+use crate::hugr::{HugrError, HugrMut};
 use crate::ops::OpTrait;
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node, Port};
@@ -84,10 +84,10 @@ impl Rewrite for Replacement {
             .exactly_one()
         {
             Ok(Some(p)) => Ok(p),
-            Ok(None) => Err(ReplaceError(
+            Ok(None) => Err(ReplaceError::Msg(
                 "Cannot replace the top node of the Hugr".to_string(),
             )), // maybe we SHOULD be able to??
-            Err(e) => Err(ReplaceError(format!(
+            Err(e) => Err(ReplaceError::Msg(format!(
                 "Nodes to remove do not share a parent: {}",
                 e
             ))),
@@ -96,14 +96,14 @@ impl Rewrite for Replacement {
         let expected_tag = h.get_optype(parent).tag();
         let found_tag = self.replacement.root_type().tag();
         if expected_tag != found_tag {
-            return Err(ReplaceError(format!(
+            return Err(ReplaceError::Msg(format!(
                 "Expected replacement to have root node w/tag {} but found {}",
                 expected_tag, found_tag
             )));
         };
         let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
         if transferred.len() != self.transfers.values().len() {
-            return Err(ReplaceError(
+            return Err(ReplaceError::Msg(
                 "Repeated nodes in RHS of transfer map".to_string(),
             ));
         }
@@ -117,7 +117,7 @@ impl Rewrite for Replacement {
             }
         }
         if !transferred.is_empty() {
-            return Err(ReplaceError(
+            return Err(ReplaceError::Msg(
                 "Some transferred nodes were not to be removed".to_string(),
             ));
         }
@@ -200,12 +200,12 @@ fn transfer_edges<'a>(
         match e.kind {
             NewEdgeKind::Order => {
                 if h.get_optype(src).other_output() != Some(EdgeKind::StateOrder) {
-                    return Err(ReplaceError(
+                    return Err(ReplaceError::Msg(
                         "Can't insert Order edge except from DFG node".to_string(),
                     ));
                 }
                 if h.get_parent(tgt) != h.get_parent(src) {
-                    return Err(ReplaceError(
+                    return Err(ReplaceError::Msg(
                         "Order edge target not at top level".to_string(),
                     ));
                 }
@@ -226,5 +226,9 @@ fn transfer_edges<'a>(
 
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
-#[error("{0}")]
-pub struct ReplaceError(String);
+pub enum ReplaceError {
+    #[error("{0}")]
+    Msg(String),
+    #[error(transparent)]
+    Hugr(#[from] HugrError),
+}
