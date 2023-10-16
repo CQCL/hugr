@@ -1262,14 +1262,17 @@ The new hugr is then derived as follows:
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
     The target port must have an existing edge whose source is in $R$; this edge
     is removed.
-4.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
+4.  For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
+    between the existing `SrcNode` and `TgtNode` in $\Gamma$. The target port
+    must have an existing edge whose source is in $R$; this edge is removed.
+5.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
     For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
     target the next node in $N$. Stop if there are no more nodes in $N$.
     Add any remaining nodes in $N$ to the end of $P$'s list of children.
-5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
+6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
-6.  Remove all nodes in $R$ and edges adjoining them.
+7.  Remove all nodes in $R$ and edges adjoining them.
 
 ##### Outlining methods
 
