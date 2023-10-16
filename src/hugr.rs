@@ -19,7 +19,7 @@ pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
@@ -29,6 +29,7 @@ pub use self::views::{HugrView, RootTagged};
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
+use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
 
@@ -213,6 +214,12 @@ pub trait PortIndex {
     fn index(self) -> usize;
 }
 
+/// A trait for getting the index of a node.
+pub trait NodeIndex {
+    /// Returns the index of the node.
+    fn index(self) -> usize;
+}
+
 /// A port in the incoming direction.
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
 pub struct IncomingPort {
@@ -230,11 +237,12 @@ pub type Direction = portgraph::Direction;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Run resource inference and pass the closure into validation
-    pub fn infer_and_validate(
+    /// Resolve extension ops, infer extensions used, and pass the closure into validation
+    pub fn update_validate(
         &mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
+        resolve_extension_ops(self, extension_registry)?;
         let closure = self.infer_extensions()?;
         self.validate_with_extension_closure(closure, extension_registry)?;
         Ok(())
@@ -353,7 +361,7 @@ impl Hugr {
                 source = ordered[source.index.index()];
             }
 
-            let target: Node = NodeIndex::new(position).into();
+            let target: Node = portgraph::NodeIndex::new(position).into();
             if target != source {
                 self.graph.swap_nodes(target.index, source.index);
                 self.op_types.swap(target.index, source.index);
@@ -361,7 +369,7 @@ impl Hugr {
                 rekey(source, target);
             }
         }
-        self.root = NodeIndex::new(0);
+        self.root = portgraph::NodeIndex::new(0);
 
         // Finish by compacting the copy nodes.
         // The operation nodes will be left in place.
@@ -489,6 +497,12 @@ impl TryFrom<Port> for OutgoingPort {
             }),
             dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
         }
+    }
+}
+
+impl NodeIndex for Node {
+    fn index(self) -> usize {
+        self.index.into()
     }
 }
 

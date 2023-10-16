@@ -867,7 +867,7 @@ mod test {
         // nodes and their parents and `report_mismatch` isn't yet smart enough
         // to handle that.
         assert_matches!(
-            hugr.infer_and_validate(&PRELUDE_REGISTRY),
+            hugr.update_validate(&PRELUDE_REGISTRY),
             Err(ValidationError::CantInfer(_))
         );
         Ok(())
@@ -1155,7 +1155,7 @@ mod test {
         for (src, tgt) in nodes.into_iter().tuple_windows() {
             hugr.connect(src, 0, tgt, 0)?;
         }
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
         Ok(())
     }
 
@@ -1422,7 +1422,7 @@ mod test {
         hugr.connect(bb1, 0, bb2, 0)?;
         hugr.connect(bb2, 0, exit, 0)?;
 
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }
@@ -1521,7 +1521,7 @@ mod test {
 
         for (bb0, bb1, bb2) in variants.into_iter() {
             let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
-            hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+            hugr.update_validate(&PRELUDE_REGISTRY)?;
         }
         Ok(())
     }
@@ -1574,7 +1574,7 @@ mod test {
         hugr.connect(bb, 0, bb, 0)?;
         hugr.connect(bb, 0, exit, 0)?;
 
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }

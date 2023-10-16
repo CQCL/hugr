@@ -369,13 +369,20 @@ flowchart
 
 ##### `TailLoop` nodes
 
-These provide tail-controlled loops: the data sibling graph within the
-TailLoop-node computes a value of 2-ary `TupleSum(#i, #o)`; the first
-variant means to repeat the loop with the values of the tuple unpacked
-and “fed” in at at the top; the second variant means to exit the loop
-with those values unpacked. The graph may additionally take in a row
-`#x` (appended to `#i`) and return the same row (appended to `#o`). The
-contained graph may thus be evaluated more than once.
+These provide tail-controlled loops. The dataflow sibling graph within the
+TailLoop-node defines the loop body: this computes a row of outputs, whose
+first element has type `TupleSum(#I, #O)` and the remainder is a row `#X`
+(perhaps empty). Inputs to the contained graph and to the TailLoop node itself
+are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
+inside the `TupleSum` unpacked).
+
+Evaluation of the node begins by feeding the node inputs into the child graph
+and evaluating it.  The `TupleSum` produced controls iteration of the loop:
+   * The first variant (`#I`) means that these values, along with the other
+     sibling-graph outputs `#X`, are fed back into the top of the loop,
+     and the body is evaluated again (thus perhaps many times)
+   * The second variant (`#O`) means that evaluation of the `TailLoop` node
+     terminates, returning all the values produced as a row of outputs `#O:#X`.
 
 ##### Control Flow Graphs
 
@@ -1118,7 +1125,6 @@ run, which removes the `HigherOrder` extension requirement:
 ```
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
->>>>>>> c6abd39 ([doc] Tidy hugr specification)
 ```
 
 Before we can run the circuit.

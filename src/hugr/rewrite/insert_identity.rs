@@ -146,7 +146,7 @@ mod tests {
 
         assert_eq!(noop, LeafOp::Noop { ty: QB_T });
 
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]

@@ -103,6 +103,16 @@ impl ConstIntU {
         }
         Ok(Self { log_width, value })
     }
+
+    /// Returns the value of the constant
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+
+    /// Returns the number of bits of the constant
+    pub fn log_width(&self) -> u8 {
+        self.log_width
+    }
 }
 
 impl ConstIntS {
@@ -122,6 +132,16 @@ impl ConstIntS {
             ));
         }
         Ok(Self { log_width, value })
+    }
+
+    /// Returns the value of the constant
+    pub fn value(&self) -> i64 {
+        self.value
+    }
+
+    /// Returns the number of bits of the constant
+    pub fn log_width(&self) -> u8 {
+        self.log_width
     }
 }
 
