@@ -416,7 +416,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.infer_and_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[rstest]
@@ -488,7 +488,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.infer_and_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[test]
