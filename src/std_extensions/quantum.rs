@@ -283,7 +283,14 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::{extension::EMPTY_REG, ops::LeafOp};
+    use cool_asserts::assert_matches;
+
+    use crate::{
+        extension::EMPTY_REG,
+        ops::LeafOp,
+        std_extensions::quantum::{get_precision, ConstAngle},
+        types::{type_param::TypeArgError, ConstTypeError, TypeArg},
+    };
 
     use super::EXTENSION;
 
@@ -304,5 +311,35 @@ pub(crate) mod test {
 
     pub(crate) fn measure() -> LeafOp {
         get_gate("Measure")
+    }
+
+    #[test]
+    fn test_angle_precisions() {
+        let type_arg_53 = TypeArg::BoundedNat { n: 53 };
+        assert_matches!(get_precision(&type_arg_53), Ok(53));
+
+        let type_arg_54 = TypeArg::BoundedNat { n: 54 };
+        assert_matches!(
+            get_precision(&type_arg_54),
+            Err(TypeArgError::TypeMismatch { .. })
+        );
+    }
+
+    #[test]
+    fn test_angle_consts() {
+        let const_a32_7 = ConstAngle::new(5, 7);
+        let const_a33_7 = ConstAngle::new(6, 7);
+        let const_a32_8 = ConstAngle::new(6, 8);
+        assert_ne!(const_a32_7, const_a33_7);
+        assert_ne!(const_a32_7, const_a32_8);
+        assert_eq!(const_a32_7, ConstAngle::new(5, 7));
+        assert_matches!(
+            ConstAngle::new(3, 256),
+            Err(ConstTypeError::CustomCheckFail(_))
+        );
+        assert_matches!(
+            ConstAngle::new(54, 256),
+            Err(ConstTypeError::CustomCheckFail(_))
+        );
     }
 }
