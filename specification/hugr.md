@@ -1242,7 +1242,9 @@ The `Replace` method takes as input:
     in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
     edge of that kind from a node in $R$.
 
-Note that for `NewEdgeSpec`s with `EdgeKind` == `Value`, the `TgtNode` + `TgtPos`s will all be unique when considering all three lists together, and similarly for `EdgeKind` == `Static`.
+Note that considering all three $\mu$ lists together,
+   - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
+   - and similarly for `EdgeKind` == `Static`
 
 The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
    - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
