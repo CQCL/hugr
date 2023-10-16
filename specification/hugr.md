@@ -1728,7 +1728,7 @@ Note there are also `measurez: Qubit -> (i1, Qubit)` and on supported
 targets `reset: Qubit -> Qubit` operations to measure or reset a qubit
 without losing a handle to it.
 
-**Dynamic vs static allocation**
+#### Dynamic vs static allocation
 
 With these operations the programmer/front-end can request dynamic qubit
 allocation, and the compiler can add/remove/move these operations to use
@@ -1750,6 +1750,26 @@ in. The implicit bijection from input `Qubit` to output allows register
 allocation for all `Qubit` wires. 
 If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
+
+#### Angles
+
+The Quantum extension also defines a specialized `angle<N>` type which is used
+to express parameters of rotation gates. The type is parametrized by the
+_precision_, which is an integer $N \in [0, 53]$; angles with precision $N$ are
+multiples of $2 \pi / 2^N$, where the multiplier is an unsigned `int<N>`. The maximum precision $53$ is effectively
+ that of a `float64` value; but note that unlike `float64` all angle values are equatable and
+ hashable.
+
+The following operations are defined:
+
+| Name           | Inputs     | Outputs    | Meaning |
+| -------------- | ---------- | ---------- | ------- |
+| `aconst<N, x>` | none       | `angle<N>` | const node producing angle $2 \pi x / 2^N$ (where $0 \leq x \lt 2^N$) |
+| `atrunc<M,N>`  | `angle<M>` | `angle<N>` | round `angle<M>` to `angle<N>`, where $M \geq N$, rounding down in $[0, 2\pi)$ if necessary |
+| `awiden<M,N>`  | `angle<M>` | `angle<N>` | widen `angle<M>` to `angle<N>`, where $M \leq N$ |
+| `aadd<N>`      | `angle<N>`, `angle<N>` | `angle<N>` | add two angles |
+| `asub<N>`      | `angle<N>`, `angle<N>` | `angle<N>` | subtract the second angle from the first |
+| `aneg<N>`      | `angle<N>` | `angle<N>` | negate an angle |
 
 ### Higher-order (Tierkreis) Extension
 
