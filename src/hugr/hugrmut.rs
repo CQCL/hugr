@@ -164,8 +164,8 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// Sibling order is not preserved.
     ///
-    /// The returned `InsertionResult` does not contain a `new_root` value, since
-    /// a subgraph may not have a defined root.
+    /// The return value is a map from indices in `other` to the indices of the
+    /// corresponding new nodes in `self`.
     //
     // TODO: Try to preserve the order when possible? We cannot always ensure
     // it, since the subgraph may have arbitrary nodes without including their
@@ -175,7 +175,7 @@ pub trait HugrMut: HugrMutInternals {
         root: Node,
         other: &impl HugrView,
         subgraph: &SiblingSubgraph,
-    ) -> Result<InsertionResult, HugrError> {
+    ) -> Result<HashMap<Node, Node>, HugrError> {
         self.valid_node(root)?;
         self.hugr_mut().insert_subgraph(root, other, subgraph)
     }
@@ -195,24 +195,14 @@ pub struct InsertionResult {
     /// The node, after insertion, that was the root of the inserted Hugr.
     ///
     /// That is, the value in [InsertionResult::node_map] under the key that was the [HugrView::root]
-    ///
-    /// When inserting a subgraph, this value is `None`.
-    pub new_root: Option<Node>,
+    pub new_root: Node,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
     pub node_map: HashMap<Node, Node>,
 }
 
-impl InsertionResult {
-    fn translating_indices(
-        new_root: Option<Node>,
-        node_map: HashMap<NodeIndex, NodeIndex>,
-    ) -> Self {
-        Self {
-            new_root,
-            node_map: HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into()))),
-        }
-    }
+fn translate_indices(node_map: HashMap<NodeIndex, NodeIndex>) -> HashMap<Node, Node> {
+    HashMap::from_iter(node_map.into_iter().map(|(k, v)| (k.into(), v.into())))
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
@@ -298,7 +288,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<InsertionResult, HugrError> {
-        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
+        let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, &other)?;
         // Update the optypes and metadata, taking them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let optype = other.op_types.take(node);
@@ -306,11 +296,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             let meta = other.metadata.take(node);
             self.as_mut().set_metadata(new_node.into(), meta).unwrap();
         }
-        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
-        Ok(InsertionResult::translating_indices(
-            Some(other_root),
-            node_map,
-        ))
+        debug_assert_eq!(Some(&new_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult {
+            new_root,
+            node_map: translate_indices(node_map),
+        })
     }
 
     fn insert_from_view(
@@ -318,7 +308,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         root: Node,
         other: &impl HugrView,
     ) -> Result<InsertionResult, HugrError> {
-        let (other_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
+        let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other)?;
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
             let nodetype = other.get_nodetype(node.into());
@@ -328,11 +318,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
                 .set_metadata(new_node.into(), meta.clone())
                 .unwrap();
         }
-        debug_assert_eq!(Some(&other_root.index), node_map.get(&other.root().index));
-        Ok(InsertionResult::translating_indices(
-            Some(other_root),
-            node_map,
-        ))
+        debug_assert_eq!(Some(&new_root.index), node_map.get(&other.root().index));
+        Ok(InsertionResult {
+            new_root,
+            node_map: translate_indices(node_map),
+        })
     }
 
     fn insert_subgraph(
@@ -340,7 +330,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         root: Node,
         other: &impl HugrView,
         subgraph: &SiblingSubgraph,
-    ) -> Result<InsertionResult, HugrError> {
+    ) -> Result<HashMap<Node, Node>, HugrError> {
         // Create a portgraph view with the explicit list of nodes defined by the subgraph.
         let portgraph: NodeFiltered<_, NodeFilter<&[Node]>, &[Node]> =
             NodeFiltered::new_node_filtered(
@@ -358,7 +348,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
                 .set_metadata(new_node.into(), meta.clone())
                 .unwrap();
         }
-        Ok(InsertionResult::translating_indices(None, node_map))
+        Ok(translate_indices(node_map))
     }
 }
 
