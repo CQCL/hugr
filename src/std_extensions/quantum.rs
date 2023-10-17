@@ -1,5 +1,6 @@
 //! Basic HUGR quantum operations
 
+use std::cmp::max;
 use std::num::NonZeroU64;
 
 use smol_str::SmolStr;
@@ -150,10 +151,16 @@ fn awiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
 }
 
 fn abinop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    let [arg] = collect_array(arg_values);
+    let [arg0, arg1] = collect_array(arg_values);
+    let m: u8 = get_log_denom(arg0)?;
+    let n: u8 = get_log_denom(arg1)?;
+    let l: u8 = max(m, n);
     Ok(FunctionType::new(
-        vec![angle_type(arg.clone()); 2],
-        vec![angle_type(arg.clone())],
+        vec![
+            angle_type(TypeArg::BoundedNat { n: m as u64 }),
+            angle_type(TypeArg::BoundedNat { n: n as u64 }),
+        ],
+        vec![angle_type(TypeArg::BoundedNat { n: l as u64 })],
     ))
 }
 
