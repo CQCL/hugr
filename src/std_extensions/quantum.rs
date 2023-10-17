@@ -1,6 +1,7 @@
 //! Basic HUGR quantum operations
 
 use std::cmp::max;
+use std::f64::consts::TAU;
 use std::num::NonZeroU64;
 
 use smol_str::SmolStr;
@@ -75,7 +76,7 @@ pub struct ConstAngle {
 }
 
 impl ConstAngle {
-    /// Create a new [`ConstAngle`]
+    /// Create a new [`ConstAngle`] from a log-denominator and a numerator
     pub fn new(log_denom: u8, value: u64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_denom(log_denom) {
             return Err(ConstTypeError::CustomCheckFail(
@@ -92,6 +93,23 @@ impl ConstAngle {
             ));
         }
         Ok(Self { log_denom, value })
+    }
+
+    /// Create a new [`ConstAngle`] from a log-denominator and a floating-point value in radians,
+    /// rounding to the nearest corresponding value. (Ties round away from zero.)
+    pub fn from_radians(log_denom: u8, theta: f64) -> Result<Self, ConstTypeError> {
+        if !is_valid_log_denom(log_denom) {
+            return Err(ConstTypeError::CustomCheckFail(
+                crate::types::CustomCheckFailure::Message(
+                    "Invalid angle log-denominator.".to_owned(),
+                ),
+            ));
+        }
+        let a = (((1u64 << log_denom) as f64) * theta / TAU).round() as i64;
+        Ok(Self {
+            log_denom,
+            value: a.rem_euclid(1i64 << log_denom) as u64,
+        })
     }
 
     /// Returns the value of the constant
