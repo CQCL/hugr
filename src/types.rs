@@ -261,9 +261,9 @@ impl Type {
         Self(TypeEnum::Sum(SumType::Simple { size }), TypeBound::Eq)
     }
 
-    /// New type variable (for use in type schemes only),
-    /// with bound matching that in the type scheme
-    /// (i.e. the variable must be declared as a [TypeParam::Type])
+    /// New use (occurrence) of the type variable with specified DeBruijn index.
+    /// For use in type schemes only: `bound` must match that with which the
+    /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
     }
@@ -375,6 +375,8 @@ pub(crate) fn check_typevar_decl(
             num_decls: decls.len(),
         }),
         Some(actual) => {
+            // The cache here just mirrors the declaration. The typevar can be used
+            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
             if actual == cached_decl {
                 Ok(())
             } else {
