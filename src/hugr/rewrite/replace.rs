@@ -18,9 +18,9 @@ use super::Rewrite;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewEdgeSpec {
-    src: Node,
-    tgt: Node,
-    kind: NewEdgeKind,
+    pub src: Node,
+    pub tgt: Node,
+    pub kind: NewEdgeKind,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,25 +38,25 @@ pub struct Replacement {
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
     /// Must be non-empty - otherwise there is no parent under which to place [replacement],
     /// and no possible [in_edges], [out_edges] or [transfers].
-    removal: HashSet<Node>,
+    pub removal: HashSet<Node>,
     /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
-    replacement: Hugr,
+    pub replacement: Hugr,
     /// Map from container nodes in [replacement] that have no children, to container nodes
     /// that are descended from [nodes]. The keys are the new parents for the children of the
     /// values, i.e. said children are transferred to new locations rather than removed from the graph.
     /// Note no value may be ancestor/descendant of another. "R" is the set of descendants of [nodes]
     /// that are not descendants of values here.
-    transfers: HashMap<Node, Node>,
+    pub transfers: HashMap<Node, Node>,
     /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
     /// to inserted nodes ([NewEdgeSpec::tgt] in [replacement]). `$\mu_\inp$` in the spec.
-    mu_inp: Vec<NewEdgeSpec>,
+    pub mu_inp: Vec<NewEdgeSpec>,
     /// Edges from inserted nodes ([NewEdgeSpec::src] in [replacement]) to existing nodes not removed
     /// ([NewEdgeSpec::tgt] in Gamma \ R). `$\mu_\out$` in the spec.
-    mu_out: Vec<NewEdgeSpec>,
+    pub mu_out: Vec<NewEdgeSpec>,
     /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
     /// For example, in cases where the source had an edge to a removed node, and the target had an
     /// edge from a removed node, this would allow source to be directly connected to target.
-    mu_new: Vec<NewEdgeSpec>,
+    pub mu_new: Vec<NewEdgeSpec>,
 }
 
 impl Rewrite for Replacement {
