@@ -155,15 +155,27 @@ impl Rewrite for Replacement {
                     e.tgt
                 )));
             }
+            fn strict_desc(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
+                while let Some(p) = h.get_parent(descendant) {
+                    if ancestor == p {
+                        return true;
+                    };
+                    descendant = p;
+                }
+                return false;
+            }
             match e.kind {
                 NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } => match h
                     .linked_ports(e.tgt, Port::new(Direction::Incoming, tgt_pos))
                     .exactly_one()
                 {
-                    // TODO What about an edge from a 'moved' subtree of the original Hugr.
-                    // ATM we require this to be unchanged, yet moving could invalidate
-                    // a nonlocal edge....
-                    Ok((src_n, _)) if removed.contains(&src_n) => (),
+                    // The descendant check is to allow the case where the old edge is nonlocal
+                    // from a part of the Hugr being moved (which may require changing source,
+                    // depending on where the transplanted portion ends up). While this subsumes
+                    // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+                    Ok((src_n, _)) if removed.contains(&src_n) || strict_desc(h, parent, src_n) => {
+                        ()
+                    }
                     _ => {
                         return Err(ReplaceError::Msg(format!(
                             "Target of Edge {:?} did not have incoming edge being removed",
@@ -172,9 +184,8 @@ impl Rewrite for Replacement {
                     }
                 },
                 _ => (),
-            }
+            };
         }
-
         Ok(())
     }
 
