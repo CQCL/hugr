@@ -108,7 +108,7 @@ impl ConstAngle {
 #[typetag::serde]
 impl CustomConst for ConstAngle {
     fn name(&self) -> SmolStr {
-        format!("a(2π*{}/{})", self.value, 1u64 << self.log_denom).into()
+        format!("a(2π*{}/2^{})", self.value, self.log_denom).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
         if typ.clone() == angle_custom_type(type_arg(self.log_denom)) {
