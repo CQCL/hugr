@@ -12,7 +12,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::OpTrait;
 use crate::types::EdgeKind;
-use crate::{Hugr, HugrView, Node, Port};
+use crate::{Direction, Hugr, HugrView, Node, Port};
 
 use super::Rewrite;
 
@@ -117,11 +117,64 @@ impl Rewrite for Replacement {
             }
         }
         if !transferred.is_empty() {
+            // This also occurs if some RHS was reachable from another
             return Err(ReplaceError::Msg(
                 "Some transferred nodes were not to be removed".to_string(),
             ));
         }
-        // TODO check edges??
+        // Edge sources...
+        for e in self.in_edges.iter().chain(self.new_edges.iter()) {
+            if !h.contains_node(e.src) || removed.contains(&e.src) {
+                return Err(ReplaceError::Msg(format!(
+                    "Edge source not in retained nodes: {:?}",
+                    e.src
+                )));
+            }
+        }
+        self.out_edges.iter().try_for_each(|e| {
+            self.replacement.valid_non_root(e.src).map_err(|_| {
+                ReplaceError::Msg(format!(
+                    "Out-edge source not in replacement Hugr: {:?}",
+                    e.src
+                ))
+            })
+        })?;
+        // Edge targets...
+        self.in_edges.iter().try_for_each(|e| {
+            self.replacement.valid_non_root(e.tgt).map_err(|_| {
+                ReplaceError::Msg(format!(
+                    "In-edge target not in replacement Hugr: {:?}",
+                    e.tgt
+                ))
+            })
+        })?;
+        for e in self.out_edges.iter().chain(self.new_edges.iter()) {
+            if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
+                return Err(ReplaceError::Msg(format!(
+                    "Edge target not in retained nodes: {:?}",
+                    e.tgt
+                )));
+            }
+            match e.kind {
+                NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } => match h
+                    .linked_ports(e.tgt, Port::new(Direction::Incoming, tgt_pos))
+                    .exactly_one()
+                {
+                    // TODO What about an edge from a 'moved' subtree of the original Hugr.
+                    // ATM we require this to be unchanged, yet moving could invalidate
+                    // a nonlocal edge....
+                    Ok((src_n, _)) if removed.contains(&src_n) => (),
+                    _ => {
+                        return Err(ReplaceError::Msg(format!(
+                            "Target of Edge {:?} did not have incoming edge being removed",
+                            e
+                        )))
+                    }
+                },
+                _ => (),
+            }
+        }
+
         Ok(())
     }
 
@@ -213,7 +266,7 @@ fn transfer_edges<'a>(
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if remove_existing {
-                    h.disconnect(tgt, Port::new(portgraph::Direction::Incoming, tgt_pos))
+                    h.disconnect(tgt, Port::new(Direction::Incoming, tgt_pos))
                         .unwrap();
                 }
                 h.connect(src, src_pos, tgt, tgt_pos).unwrap();
