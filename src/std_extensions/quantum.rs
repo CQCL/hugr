@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 
 use smol_str::SmolStr;
 
-use crate::extension::prelude::{BOOL_T, ERROR_TYPE, QB_T};
+use crate::extension::prelude::{BOOL_T, QB_T};
 use crate::extension::{ExtensionId, SignatureError};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::type_row;
@@ -133,7 +133,7 @@ fn atrunc_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     }
     Ok(FunctionType::new(
         vec![angle_type(arg0.clone())],
-        vec![Type::new_sum(vec![angle_type(arg1.clone()), ERROR_TYPE])],
+        vec![angle_type(arg1.clone())],
     ))
 }
 
