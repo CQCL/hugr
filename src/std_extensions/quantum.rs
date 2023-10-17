@@ -22,73 +22,75 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("quantum");
 /// Identifier for the angle type.
 const ANGLE_TYPE_ID: SmolStr = SmolStr::new_inline("angle");
 
-fn angle_custom_type(precision_arg: TypeArg) -> CustomType {
-    CustomType::new(ANGLE_TYPE_ID, [precision_arg], EXTENSION_ID, TypeBound::Eq)
+fn angle_custom_type(log_denom_arg: TypeArg) -> CustomType {
+    CustomType::new(ANGLE_TYPE_ID, [log_denom_arg], EXTENSION_ID, TypeBound::Eq)
 }
 
-/// Angle type of a given precision (specified by the TypeArg).
+/// Angle type with a given log-denominator (specified by the TypeArg).
 ///
 /// This type is capable of representing angles that are multiples of 2π / 2^N where N is the
-/// precision.
-pub(super) fn angle_type(precision_arg: TypeArg) -> Type {
-    Type::new_extension(angle_custom_type(precision_arg))
+/// log-denominator.
+pub(super) fn angle_type(log_denom_arg: TypeArg) -> Type {
+    Type::new_extension(angle_custom_type(log_denom_arg))
 }
 
-/// The smallest forbidden precision.
-pub const PRECISION_BOUND: u8 = 54;
+/// The smallest forbidden log-denominator.
+pub const LOG_DENOM_BOUND: u8 = 54;
 
-const fn is_valid_precision(n: u8) -> bool {
-    n < PRECISION_BOUND
+const fn is_valid_log_denom(n: u8) -> bool {
+    n < LOG_DENOM_BOUND
 }
 
-/// Type parameter for the precision of an angle.
+/// Type parameter for the log-denominator of an angle.
 // SAFETY: unsafe block should be ok as the value is definitely not zero.
 #[allow(clippy::assertions_on_constants)]
-pub const PRECISION_TYPE_PARAM: TypeParam = TypeParam::bounded_nat(unsafe {
-    assert!(PRECISION_BOUND > 0);
-    NonZeroU64::new_unchecked(PRECISION_BOUND as u64)
+pub const LOG_DENOM_TYPE_PARAM: TypeParam = TypeParam::bounded_nat(unsafe {
+    assert!(LOG_DENOM_BOUND > 0);
+    NonZeroU64::new_unchecked(LOG_DENOM_BOUND as u64)
 });
 
-/// Get the precision of the specified type argument or error if the argument is invalid.
-pub(super) fn get_precision(arg: &TypeArg) -> Result<u8, TypeArgError> {
+/// Get the log-denominator of the specified type argument or error if the argument is invalid.
+pub(super) fn get_log_denom(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
-        TypeArg::BoundedNat { n } if is_valid_precision(*n as u8) => Ok(*n as u8),
+        TypeArg::BoundedNat { n } if is_valid_log_denom(*n as u8) => Ok(*n as u8),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
-            param: PRECISION_TYPE_PARAM,
+            param: LOG_DENOM_TYPE_PARAM,
         }),
     }
 }
 
-pub(super) const fn type_arg(precision: u8) -> TypeArg {
+pub(super) const fn type_arg(log_denom: u8) -> TypeArg {
     TypeArg::BoundedNat {
-        n: precision as u64,
+        n: log_denom as u64,
     }
 }
 
 /// An angle
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstAngle {
-    precision: u8,
+    log_denom: u8,
     value: u64,
 }
 
 impl ConstAngle {
     /// Create a new [`ConstAngle`]
-    pub fn new(precision: u8, value: u64) -> Result<Self, ConstTypeError> {
-        if !is_valid_precision(precision) {
+    pub fn new(log_denom: u8, value: u64) -> Result<Self, ConstTypeError> {
+        if !is_valid_log_denom(log_denom) {
             return Err(ConstTypeError::CustomCheckFail(
-                crate::types::CustomCheckFailure::Message("Invalid angle precision.".to_owned()),
+                crate::types::CustomCheckFailure::Message(
+                    "Invalid angle log-denominator.".to_owned(),
+                ),
             ));
         }
-        if value >= (1u64 << precision) {
+        if value >= (1u64 << log_denom) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
                     "Invalid unsigned integer value.".to_owned(),
                 ),
             ));
         }
-        Ok(Self { precision, value })
+        Ok(Self { log_denom, value })
     }
 
     /// Returns the value of the constant
@@ -96,19 +98,19 @@ impl ConstAngle {
         self.value
     }
 
-    /// Returns the precision of the constant
-    pub fn precision(&self) -> u8 {
-        self.precision
+    /// Returns the log-denominator of the constant
+    pub fn log_denom(&self) -> u8 {
+        self.log_denom
     }
 }
 
 #[typetag::serde]
 impl CustomConst for ConstAngle {
     fn name(&self) -> SmolStr {
-        format!("a(2π*{}/{})", self.value, 1u64 << self.precision).into()
+        format!("a(2π*{}/{})", self.value, 1u64 << self.log_denom).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == angle_custom_type(type_arg(self.precision)) {
+        if typ.clone() == angle_custom_type(type_arg(self.log_denom)) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -123,8 +125,8 @@ impl CustomConst for ConstAngle {
 
 fn atrunc_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_precision(arg0)?;
-    let n: u8 = get_precision(arg1)?;
+    let m: u8 = get_log_denom(arg0)?;
+    let n: u8 = get_log_denom(arg1)?;
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
@@ -136,8 +138,8 @@ fn atrunc_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
 
 fn awiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_precision(arg0)?;
-    let n: u8 = get_precision(arg1)?;
+    let m: u8 = get_log_denom(arg0)?;
+    let n: u8 = get_log_denom(arg1)?;
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
@@ -180,8 +182,8 @@ fn extension() -> Extension {
     extension
         .add_type(
             ANGLE_TYPE_ID,
-            vec![PRECISION_TYPE_PARAM],
-            "angle value with a given precision".to_owned(),
+            vec![LOG_DENOM_TYPE_PARAM],
+            "angle value with a given log-denominator".to_owned(),
             TypeBound::Eq.into(),
         )
         .unwrap();
@@ -189,10 +191,10 @@ fn extension() -> Extension {
     extension
         .add_op_custom_sig_simple(
             "atrunc".into(),
-            "truncate an angle to a lower-precision one with the same value, rounding down in \
-            [0, 2π) if necessary"
+            "truncate an angle to one with a lower log-denominator with the same value, rounding \
+            down in [0, 2π) if necessary"
                 .to_owned(),
-            vec![PRECISION_TYPE_PARAM, PRECISION_TYPE_PARAM],
+            vec![LOG_DENOM_TYPE_PARAM, LOG_DENOM_TYPE_PARAM],
             atrunc_sig,
         )
         .unwrap();
@@ -200,8 +202,8 @@ fn extension() -> Extension {
     extension
         .add_op_custom_sig_simple(
             "awiden".into(),
-            "widen an angle to a higher-precision one with the same value".to_owned(),
-            vec![PRECISION_TYPE_PARAM, PRECISION_TYPE_PARAM],
+            "widen an angle to one with a higher log-denominator with the same value".to_owned(),
+            vec![LOG_DENOM_TYPE_PARAM, LOG_DENOM_TYPE_PARAM],
             awiden_sig,
         )
         .unwrap();
@@ -210,7 +212,7 @@ fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "aadd".into(),
             "addition of angles".to_owned(),
-            vec![PRECISION_TYPE_PARAM],
+            vec![LOG_DENOM_TYPE_PARAM],
             abinop_sig,
         )
         .unwrap();
@@ -219,7 +221,7 @@ fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "asub".into(),
             "subtraction of the second angle from the first".to_owned(),
-            vec![PRECISION_TYPE_PARAM],
+            vec![LOG_DENOM_TYPE_PARAM],
             abinop_sig,
         )
         .unwrap();
@@ -228,7 +230,7 @@ fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "aneg".into(),
             "negation of an angle".to_owned(),
-            vec![PRECISION_TYPE_PARAM],
+            vec![LOG_DENOM_TYPE_PARAM],
             aunop_sig,
         )
         .unwrap();
@@ -288,7 +290,7 @@ pub(crate) mod test {
     use crate::{
         extension::EMPTY_REG,
         ops::LeafOp,
-        std_extensions::quantum::{get_precision, ConstAngle},
+        std_extensions::quantum::{get_log_denom, ConstAngle},
         types::{type_param::TypeArgError, ConstTypeError, TypeArg},
     };
 
@@ -314,13 +316,13 @@ pub(crate) mod test {
     }
 
     #[test]
-    fn test_angle_precisions() {
+    fn test_angle_log_denoms() {
         let type_arg_53 = TypeArg::BoundedNat { n: 53 };
-        assert_matches!(get_precision(&type_arg_53), Ok(53));
+        assert_matches!(get_log_denom(&type_arg_53), Ok(53));
 
         let type_arg_54 = TypeArg::BoundedNat { n: 54 };
         assert_matches!(
-            get_precision(&type_arg_54),
+            get_log_denom(&type_arg_54),
             Err(TypeArgError::TypeMismatch { .. })
         );
     }

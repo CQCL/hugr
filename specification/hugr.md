@@ -1762,10 +1762,11 @@ operations we can state the program only uses `N` qubits.
 
 The Quantum extension also defines a specialized `angle<N>` type which is used
 to express parameters of rotation gates. The type is parametrized by the
-_precision_, which is an integer $N \in [0, 53]$; angles with precision $N$ are
-multiples of $2 \pi / 2^N$, where the multiplier is an unsigned `int<N>`. The maximum precision $53$ is effectively
- that of a `float64` value; but note that unlike `float64` all angle values are equatable and
- hashable.
+_log-denominator_, which is an integer $N \in [0, 53]$; angles with
+log-denominator $N$ are multiples of $2 \pi / 2^N$, where the multiplier is an
+unsigned `int<N>`. The maximum log-denominator $53$ effectively gives the
+resolution of a `float64` value; but note that unlike `float64` all angle values
+are equatable and hashable.
 
 The following operations are defined:
 
