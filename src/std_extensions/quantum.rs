@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 
 use smol_str::SmolStr;
 
-use crate::extension::prelude::{BOOL_T, QB_T};
+use crate::extension::prelude::{BOOL_T, ERROR_TYPE, QB_T};
 use crate::extension::{ExtensionId, SignatureError};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::type_row;
@@ -137,16 +137,11 @@ fn atrunc_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     ))
 }
 
-fn awiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn aconvert_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_log_denom(arg0)?;
-    let n: u8 = get_log_denom(arg1)?;
-    if m > n {
-        return Err(SignatureError::InvalidTypeArgs);
-    }
     Ok(FunctionType::new(
         vec![angle_type(arg0.clone())],
-        vec![angle_type(arg1.clone())],
+        vec![Type::new_sum(vec![angle_type(arg1.clone()), ERROR_TYPE])],
     ))
 }
 
@@ -208,10 +203,12 @@ fn extension() -> Extension {
 
     extension
         .add_op_custom_sig_simple(
-            "awiden".into(),
-            "widen an angle to one with a higher log-denominator with the same value".to_owned(),
+            "aconvert".into(),
+            "convert an angle to one with another log-denominator having the same value, if \
+            possible, otherwise return an error"
+                .to_owned(),
             vec![LOG_DENOM_TYPE_PARAM, LOG_DENOM_TYPE_PARAM],
-            awiden_sig,
+            aconvert_sig,
         )
         .unwrap();
 
