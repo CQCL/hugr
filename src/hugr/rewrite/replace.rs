@@ -49,14 +49,14 @@ pub struct Replacement {
     transfers: HashMap<Node, Node>,
     /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
     /// to inserted nodes ([NewEdgeSpec::tgt] in [replacement]). `$\mu_\inp$` in the spec.
-    in_edges: Vec<NewEdgeSpec>,
+    mu_inp: Vec<NewEdgeSpec>,
     /// Edges from inserted nodes ([NewEdgeSpec::src] in [replacement]) to existing nodes not removed
     /// ([NewEdgeSpec::tgt] in Gamma \ R). `$\mu_\out$` in the spec.
-    out_edges: Vec<NewEdgeSpec>,
+    mu_out: Vec<NewEdgeSpec>,
     /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
     /// For example, in cases where the source had an edge to a removed node, and the target had an
     /// edge from a removed node, this would allow source to be directly connected to target.
-    new_edges: Vec<NewEdgeSpec>,
+    mu_new: Vec<NewEdgeSpec>,
 }
 
 impl Rewrite for Replacement {
@@ -123,7 +123,7 @@ impl Rewrite for Replacement {
             ));
         }
         // Edge sources...
-        for e in self.in_edges.iter().chain(self.new_edges.iter()) {
+        for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
                 return Err(ReplaceError::Msg(format!(
                     "Edge source not in retained nodes: {:?}",
@@ -131,7 +131,7 @@ impl Rewrite for Replacement {
                 )));
             }
         }
-        self.out_edges.iter().try_for_each(|e| {
+        self.mu_out.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.src).map_err(|_| {
                 ReplaceError::Msg(format!(
                     "Out-edge source not in replacement Hugr: {:?}",
@@ -140,7 +140,7 @@ impl Rewrite for Replacement {
             })
         })?;
         // Edge targets...
-        self.in_edges.iter().try_for_each(|e| {
+        self.mu_inp.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.tgt).map_err(|_| {
                 ReplaceError::Msg(format!(
                     "In-edge target not in replacement Hugr: {:?}",
@@ -148,7 +148,7 @@ impl Rewrite for Replacement {
                 ))
             })
         })?;
-        for e in self.out_edges.iter().chain(self.new_edges.iter()) {
+        for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::Msg(format!(
                     "Edge target not in retained nodes: {:?}",
@@ -197,15 +197,15 @@ impl Rewrite for Replacement {
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| *node_map.get(&n).unwrap();
         let id = |n| n;
-        transfer_edges(h, self.in_edges.iter(), id, translate_idx, false)?;
+        transfer_edges(h, self.mu_inp.iter(), id, translate_idx, false)?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.out_edges.iter(), translate_idx, id, true)?;
+        transfer_edges(h, self.mu_out.iter(), translate_idx, id, true)?;
 
         //4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.new_edges.iter(), id, id, true)?;
+        transfer_edges(h, self.mu_new.iter(), id, id, true)?;
 
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
