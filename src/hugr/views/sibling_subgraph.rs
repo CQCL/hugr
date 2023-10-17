@@ -424,9 +424,7 @@ impl SiblingSubgraph {
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
-        let node_map = extracted
-            .insert_subgraph(extracted.root(), hugr, self)?
-            .node_map;
+        let node_map = extracted.insert_subgraph(extracted.root(), hugr, self)?;
 
         // Connect the inserted nodes in-between the input and output nodes.
         let [inp, out] = extracted.get_io(extracted.root()).unwrap();
