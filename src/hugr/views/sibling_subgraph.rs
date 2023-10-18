@@ -357,17 +357,16 @@ impl SiblingSubgraph {
 
         // TODO: handle state order edges. For now panic if any are present.
         // See https://github.com/CQCL-DEV/hugr/discussions/432
-        let rep_inputs = replacement
-            .node_ports(rep_input, Direction::Outgoing)
-            .map(|p| (rep_input, p));
-        let rep_outputs = replacement
-            .node_ports(rep_output, Direction::Incoming)
-            .map(|p| (rep_output, p));
+        let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
+        let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
         let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) =
             rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
         let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
             rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        let mut order_ports = in_order_ports.into_iter().chain(out_order_ports);
+        let mut order_ports = in_order_ports
+            .into_iter()
+            .map(|(n, p)| (n, p.into()))
+            .chain(out_order_ports.into_iter().map(|(n, p)| (n, p.into())));
         if order_ports.any(|(n, p)| is_order_edge(&replacement, n, p)) {
             unimplemented!("Found state order edges in replacement graph");
         }
@@ -377,13 +376,11 @@ impl SiblingSubgraph {
             .zip_eq(&self.inputs)
             .flat_map(|((rep_source_n, rep_source_p), self_targets)| {
                 replacement
-                    .linked_ports(rep_source_n, rep_source_p)
+                    .linked_inputs(rep_source_n, rep_source_p)
                     .flat_map(move |rep_target| {
                         self_targets
                             .iter()
-                            .map(move |&(self_target_n, self_target_p)| {
-                                (rep_target, (self_target_n, self_target_p.into()))
-                            })
+                            .map(move |&self_target| (rep_target, self_target))
                     })
             })
             .collect();
@@ -392,7 +389,7 @@ impl SiblingSubgraph {
             .iter()
             .zip_eq(rep_outputs)
             .flat_map(|(&(self_source_n, self_source_p), (_, rep_target_p))| {
-                hugr.linked_ports(self_source_n, self_source_p)
+                hugr.linked_inputs(self_source_n, self_source_p)
                     .map(move |self_target| (self_target, rep_target_p))
             })
             .collect();
