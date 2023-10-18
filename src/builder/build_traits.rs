@@ -60,7 +60,7 @@ pub trait Container {
     /// [`other_outputs`]: crate::ops::OpTrait::other_output
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
-        Ok(Wire::new(src, src_port.as_outgoing().unwrap()))
+        Ok(Wire::new(src, src_port))
     }
 
     /// Add a constant value to the container and return a handle to it.

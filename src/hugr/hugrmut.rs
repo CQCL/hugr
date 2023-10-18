@@ -136,8 +136,11 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// [`OpTrait::other_input`]: crate::ops::OpTrait::other_input
     /// [`OpTrait::other_output`]: crate::ops::OpTrait::other_output
-    // TODO make this return (OutgoingPort, IncomingPort)
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+    fn add_other_edge(
+        &mut self,
+        src: Node,
+        dst: Node,
+    ) -> Result<(OutgoingPort, IncomingPort), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
         self.hugr_mut().add_other_edge(src, dst)
@@ -276,7 +279,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         Ok(())
     }
 
-    fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
+    fn add_other_edge(
+        &mut self,
+        src: Node,
+        dst: Node,
+    ) -> Result<(OutgoingPort, IncomingPort), HugrError> {
         let src_port = self
             .get_optype(src)
             .other_port_index(Direction::Outgoing)
@@ -288,7 +295,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
             .expect("Destination operation has no non-dataflow incoming edges")
             .as_incoming()?;
         self.connect(src, src_port, dst, dst_port)?;
-        Ok((src_port.into(), dst_port.into()))
+        Ok((src_port, dst_port))
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<InsertionResult, HugrError> {
