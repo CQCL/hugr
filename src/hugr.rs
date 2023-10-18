@@ -511,13 +511,13 @@ impl NodeIndex for Node {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
-pub struct Wire(Node, usize);
+pub struct Wire(Node, OutgoingPort);
 
 impl Wire {
     /// Create a new wire from a node and a port.
     #[inline]
     pub fn new(node: Node, port: impl Into<OutgoingPort>) -> Self {
-        Self(node, Port::new_outgoing(port).index())
+        Self(node, port.into())
     }
 
     /// The node that this wire is connected to.
@@ -529,7 +529,7 @@ impl Wire {
     /// The output port that this wire is connected to.
     #[inline]
     pub fn source(&self) -> OutgoingPort {
-        OutgoingPort::from(self.1)
+        self.1
     }
 }
 
