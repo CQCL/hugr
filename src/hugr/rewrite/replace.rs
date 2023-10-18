@@ -211,7 +211,6 @@ impl Rewrite for Replacement {
         // (these will be correct places after removing nodes)
         let mut remove = self.removal.iter();
         for new_node in h.children(new_root).collect::<Vec<Node>>().into_iter() {
-            let new_node = *node_map.get(&new_node).unwrap();
             if let Some(to_remove) = remove.next() {
                 h.move_before_sibling(new_node, *to_remove).unwrap();
             } else {
