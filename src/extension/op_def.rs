@@ -333,6 +333,8 @@ impl Extension {
 
     /// Create an OpDef with custom binary code to compute the signature,
     /// which is not polymorphic; and no "misc" or "lowering functions" defined.
+    /// TODO: reconsider this when more custom binaries have been converted
+    ///   to type schemes and the requirements for the remaining ones are clearer.
     pub fn add_op_custom_sig_simple(
         &mut self,
         name: SmolStr,
