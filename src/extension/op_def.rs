@@ -98,10 +98,10 @@ pub(super) enum SignatureFunc {
     TypeScheme(PolyFuncType),
     #[serde(skip)]
     CustomFunc {
-        /// All type parameters (both those passed to [func] and any passed
-        /// to the PolyFuncType returned by that)
+        /// All type parameters - the first [num_static_params] which are passed to [func]
+        /// and any further passed to the [PolyFuncType] returned by [func]
         all_params: Vec<TypeParam>,
-        /// The number (of `all_params`) that are passed to [self::func]
+        /// The number (of [all_params]) that are passed to [func]
         num_static_params: usize,
         func: Box<dyn CustomSignatureFunc>,
     },
