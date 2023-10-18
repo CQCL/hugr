@@ -441,10 +441,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┌───┐
     /// ┤ H ├
     /// └───┘
-    fn test_simple_replacement_with_empty_wires(
-        simple_hugr: Hugr,
-        dfg_hugr2: Hugr
-    ) {
+    fn test_simple_replacement_with_empty_wires(simple_hugr: Hugr, dfg_hugr2: Hugr) {
         let mut h: Hugr = simple_hugr;
 
         // 1. Locate the CX in h
@@ -607,7 +604,9 @@ pub(in crate::hugr::rewrite) mod test {
             .nu_inp
             .iter()
             .map(|((tgt, tgt_port), (r_n, r_p))| {
-                if *tgt == out {unimplemented!()};
+                if *tgt == out {
+                    unimplemented!()
+                };
                 let (src, src_port) = h.linked_ports(*r_n, *r_p).exactly_one().ok().unwrap();
                 NewEdgeSpec {
                     src,
@@ -628,7 +627,9 @@ pub(in crate::hugr::rewrite) mod test {
                     .exactly_one()
                     .ok()
                     .unwrap();
-                if src == in_ {unimplemented!()};
+                if src == in_ {
+                    unimplemented!()
+                };
                 NewEdgeSpec {
                     src,
                     tgt: *tgt,
