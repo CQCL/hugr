@@ -133,18 +133,19 @@ impl Rewrite for SimpleReplacement {
         // 3.2. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
         // predecessor of p to (the new copy of) q.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
+            let rem_inp_port = rem_inp_port.as_incoming().unwrap();
             if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_ports(*rem_inp_node, *rem_inp_port)
+                    .linked_outputs(*rem_inp_node, rem_inp_port)
                     .exactly_one()
                     .ok() // PortLinks does not implement Debug
                     .unwrap();
-                h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
+                h.disconnect(*rem_inp_node, rem_inp_port).unwrap();
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
                     rem_inp_pred_node,
-                    rem_inp_pred_port.as_outgoing().unwrap(),
+                    rem_inp_pred_port,
                     *new_inp_node,
                     rep_inp_port.as_incoming().unwrap(),
                 )

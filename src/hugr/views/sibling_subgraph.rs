@@ -585,9 +585,8 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
     let inputs = dfg_inputs
         .into_iter()
         .map(|p| {
-            hugr.linked_ports(inp, p)
+            hugr.linked_inputs(inp, p)
                 .filter(|&(n, _)| n != out)
-                .map(|(n, p)| (n, p.as_incoming().unwrap()))
                 .collect_vec()
         })
         .filter(|v| !v.is_empty())
@@ -596,8 +595,7 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
     // direct wires to the input.
     let outputs = dfg_outputs
         .into_iter()
-        .filter_map(|p| hugr.linked_ports(out, p).find(|&(n, _)| n != inp))
-        .map(|(n, p)| (n, p.as_outgoing().unwrap()))
+        .filter_map(|p| hugr.linked_outputs(out, p).find(|&(n, _)| n != inp))
         .collect();
     (inputs, outputs)
 }
@@ -894,17 +892,12 @@ mod tests {
         SiblingSubgraph::try_new(
             hugr.node_outputs(inp)
                 .take(2)
-                .map(|p| {
-                    hugr.linked_ports(inp, p)
-                        .map(|(n, p)| (n, p.as_incoming().unwrap()))
-                        .collect_vec()
-                })
+                .map(|p| hugr.linked_inputs(inp, p).collect_vec())
                 .filter(|ps| !ps.is_empty())
                 .collect(),
             hugr.node_inputs(out)
                 .take(2)
-                .filter_map(|p| hugr.linked_ports(out, p).exactly_one().ok())
-                .map(|(n, p)| (n, p.as_outgoing().unwrap()))
+                .filter_map(|p| hugr.linked_outputs(out, p).exactly_one().ok())
                 .collect(),
             &func,
         )

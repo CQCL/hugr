@@ -169,6 +169,24 @@ pub trait HugrView: sealed::HugrInternals {
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
+    /// Iterator over the nodes and output ports connected to a given *input* port
+    fn linked_outputs(
+        &self,
+        node: Node,
+        port: impl Into<IncomingPort>,
+    ) -> OutgoingNodePorts<Self::PortLinks<'_>> {
+        OutgoingNodePorts(self.linked_ports(node, port.into()))
+    }
+
+    /// Iterator over the nodes and input ports connected to a given *output* port
+    fn linked_inputs(
+        &self,
+        node: Node,
+        port: impl Into<OutgoingPort>,
+    ) -> IncomingNodePorts<Self::PortLinks<'_>> {
+        IncomingNodePorts(self.linked_ports(node, port.into()))
+    }
+
     /// Iterator the links between two nodes.
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
 
@@ -312,7 +330,6 @@ impl<T: Iterator<Item = Port>> Iterator for OutgoingPorts<T> {
         self.0.next().map(|p| p.as_outgoing().unwrap())
     }
 }
-
 /// Wraps an iterator over [Port]s that are known to be [IncomingPort]s
 #[derive(Debug)]
 pub struct IncomingPorts<T>(T);
@@ -321,6 +338,27 @@ impl<T: Iterator<Item = Port>> Iterator for IncomingPorts<T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|p| p.as_incoming().unwrap())
+    }
+}
+
+/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [OutgoingPort]s
+#[derive(Debug)]
+pub struct OutgoingNodePorts<T>(T);
+impl<T: Iterator<Item = (Node, Port)>> Iterator for OutgoingNodePorts<T> {
+    type Item = (Node, OutgoingPort);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(n, p)| (n, p.as_outgoing().unwrap()))
+    }
+}
+/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [IncomingPort]s
+#[derive(Debug)]
+pub struct IncomingNodePorts<T>(T);
+impl<T: Iterator<Item = (Node, Port)>> Iterator for IncomingNodePorts<T> {
+    type Item = (Node, IncomingPort);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
 }
 
