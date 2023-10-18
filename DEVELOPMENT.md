@@ -79,8 +79,29 @@ We also check for clippy warnings, which are a set of linting rules for rust. To
 cargo clippy --all-targets
 ```
 
-## Contributing to HUGR
+## 🌐 Contributing to HUGR
 
 We welcome contributions to HUGR! Please open [an issue](https://github.com/CQCL/hugr/issues/new) or [pull request](https://github.com/CQCL/hugr/compare) if you have any questions or suggestions.
 
 PRs should be made against the `main` branch, and should pass all CI checks before being merged. This includes using the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) format for the PR title.
+
+The general format of a contribution title should be:
+
+```
+<type>(<scope>)!: <description>
+```
+
+Where the scope is optional, and the `!` is only includes if this is a semver breaking change that requires a major version bump.
+
+We accept the following contribution types:
+
+- feat: New features.
+- fix: Bug fixes.
+- docs: Improvements to the documentation.
+- style: Formatting, missing semi colons, etc; no code change.
+- refactor: Refactoring code without changing behaviour.
+- perf: Code refactoring focused on improving performance.
+- test: Adding missing tests, refactoring tests; no production code change.
+- ci: CI related changes. These changes are not published in the changelog.
+- chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog..
+- revert: Reverting previous commits.
