@@ -65,7 +65,7 @@ impl PolyFuncType {
         external_type_vars: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // TODO should we add a mechanism to validate a TypeParam?
-        let mut v;
+        let mut v; // Declared here so live until end of scope
         let all_type_vars = if self.params.is_empty() {
             external_type_vars
         } else {
