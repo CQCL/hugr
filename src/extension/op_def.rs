@@ -306,25 +306,27 @@ impl Extension {
     }
 
     /// Create an OpDef with custom binary code to compute the signature
+    // # TODO: rethink add_op functions after converting binaries to [SignatureFunc::TypeScheme]s
+    #[allow(clippy::too_many_arguments)]
     pub fn add_op_custom_sig(
         &mut self,
         name: SmolStr,
         description: String,
-        params: (Vec<TypeParam>, Vec<TypeParam>),
+        mut static_params: Vec<TypeParam>,
+        type_scheme_params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
-        let mut all_params = params.0;
-        let num_static_params = all_params.len();
-        all_params.extend(params.1);
+        let num_static_params = static_params.len();
+        static_params.extend(type_scheme_params);
         self.add_op(
             name,
             description,
             misc,
             lower_funcs,
             SignatureFunc::CustomFunc {
-                all_params,
+                all_params: static_params,
                 num_static_params,
                 func: Box::new(signature_func),
             },
@@ -345,7 +347,8 @@ impl Extension {
         self.add_op_custom_sig(
             name,
             description,
-            (static_params, vec![]),
+            static_params,
+            vec![],
             HashMap::default(),
             Vec::new(),
             signature_func,
