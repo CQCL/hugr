@@ -2,7 +2,7 @@
 
 use std::iter;
 
-use crate::hugr::{HugrMut, Node};
+use crate::hugr::{HugrMut, IncomingPort, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, HugrView, Port};
@@ -18,13 +18,12 @@ pub struct IdentityInsertion {
     /// The node following the identity to be inserted.
     pub post_node: Node,
     /// The port following the identity to be inserted.
-    // TODO: make this an IncomingPort
-    pub post_port: Port,
+    pub post_port: IncomingPort,
 }
 
 impl IdentityInsertion {
     /// Create a new [`IdentityInsertion`] specification.
-    pub fn new(post_node: Node, post_port: Port) -> Self {
+    pub fn new(post_node: Node, post_port: IncomingPort) -> Self {
         Self {
             post_node,
             post_port,
@@ -72,10 +71,6 @@ impl Rewrite for IdentityInsertion {
         unimplemented!()
     }
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, IdentityInsertionError> {
-        if self.post_port.direction() != Direction::Incoming {
-            return Err(IdentityInsertionError::PortIsOutput);
-        }
-
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));
@@ -100,13 +95,8 @@ impl Rewrite for IdentityInsertion {
         h.connect(pre_node, pre_port.as_outgoing().unwrap(), new_node, 0)
             .expect("Should only fail if ports don't exist.");
 
-        h.connect(
-            new_node,
-            0,
-            self.post_node,
-            self.post_port.as_incoming().unwrap(),
-        )
-        .expect("Should only fail if ports don't exist.");
+        h.connect(new_node, 0, self.post_node, self.post_port)
+            .expect("Should only fail if ports don't exist.");
         Ok(new_node)
     }
 
@@ -142,7 +132,7 @@ mod tests {
 
         let final_node_port = h.node_inputs(final_node).next().unwrap();
 
-        let rw = IdentityInsertion::new(final_node, final_node_port);
+        let rw = IdentityInsertion::new(final_node, final_node_port.as_incoming().unwrap());
 
         let noop_node = h.apply_rewrite(rw).unwrap();
 
@@ -161,14 +151,9 @@ mod tests {
 
         let final_node = tail.node();
 
-        let final_node_output = h.node_outputs(final_node).next().unwrap();
-        let rw = IdentityInsertion::new(final_node, final_node_output);
-        let apply_result = h.apply_rewrite(rw);
-        assert_eq!(apply_result, Err(IdentityInsertionError::PortIsOutput));
-
         let final_node_input = h.node_inputs(final_node).next().unwrap();
 
-        let rw = IdentityInsertion::new(final_node, final_node_input);
+        let rw = IdentityInsertion::new(final_node, final_node_input.as_incoming().unwrap());
 
         let apply_result = h.apply_rewrite(rw);
         assert_eq!(
