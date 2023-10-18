@@ -207,7 +207,7 @@ impl TypeArg {
             },
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => sub.apply_var(*idx, cached_decl),
+            } => sub.apply_to_var(*idx, cached_decl),
         }
     }
 }

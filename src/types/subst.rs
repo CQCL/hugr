@@ -34,7 +34,7 @@ impl<'a, T: Into<Cow<'a, [TypeArg]>>> From<T> for Substitution<'a> {
 }
 
 impl<'a> Substitution<'a> {
-    pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+    pub(crate) fn apply_to_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         if idx < self.leave_lowest {
             return TypeArg::new_var_use(idx, decl.clone());
         }
@@ -47,8 +47,8 @@ impl<'a> Substitution<'a> {
         }
     }
 
-    pub(super) fn get_type(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type {ty} = self.apply_var(idx, &TypeParam::Type(bound))
+    pub(super) fn apply_to_type_var(&self, idx: usize, bound: TypeBound) -> Type {
+        let TypeArg::Type {ty} = self.apply_to_var(idx, &TypeParam::Type(bound))
            else {panic!("Var of kind 'type' did not produce a Type")};
         ty
     }

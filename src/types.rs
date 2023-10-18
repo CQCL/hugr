@@ -341,7 +341,7 @@ impl Type {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => sub.get_type(*idx, *bound),
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => sub.apply_to_type_var(*idx, *bound),
             TypeEnum::Prim(PrimType::Extension(cty)) => {
                 Type::new_extension(cty.substitute(exts, sub))
             }
