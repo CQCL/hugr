@@ -94,7 +94,7 @@ impl PolyFuncType {
         let remaining = self.params.get(args.len()..).unwrap_or_default();
         let mut v;
         let args = if remaining.is_empty() {
-            args
+            args // instantiate_all below will fail if there were too many
         } else {
             // Partial application - renumber remaining params (still bound) downward
             v = args.to_vec();
