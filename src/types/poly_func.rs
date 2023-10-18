@@ -62,19 +62,19 @@ impl PolyFuncType {
     pub(super) fn validate(
         &self,
         reg: &ExtensionRegistry,
-        external_type_vars: &[TypeParam],
+        external_var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // TODO should we add a mechanism to validate a TypeParam?
         let mut v; // Declared here so live until end of scope
-        let all_type_vars = if self.params.is_empty() {
-            external_type_vars
+        let all_var_decls = if self.params.is_empty() {
+            external_var_decls
         } else {
             // Type vars declared here go at lowest indices (as per DeBruijn)
             v = self.params.clone();
-            v.extend_from_slice(external_type_vars);
+            v.extend_from_slice(external_var_decls);
             v.as_slice()
         };
-        self.body.validate(reg, all_type_vars)
+        self.body.validate(reg, all_var_decls)
     }
 
     pub(super) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
