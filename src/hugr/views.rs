@@ -149,6 +149,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over output ports of node.
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
+    // TODO: make this return an iterator of OutgoingPort
     #[inline]
     fn node_outputs(&self, node: Node) -> Self::NodePorts<'_> {
         self.node_ports(node, Direction::Outgoing)
@@ -156,6 +157,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over inputs ports of node.
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
+    // TODO: make this return an iterator of IncomingPort
     #[inline]
     fn node_inputs(&self, node: Node) -> Self::NodePorts<'_> {
         self.node_ports(node, Direction::Incoming)
@@ -165,13 +167,13 @@ pub trait HugrView: sealed::HugrInternals {
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
 
     /// Iterator over the nodes and ports connected to a port.
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
     /// Iterator the links between two nodes.
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
 
     /// Returns whether a port is connected.
-    fn is_linked(&self, node: Node, port: Port) -> bool {
+    fn is_linked(&self, node: Node, port: impl Into<Port>) -> bool {
         self.linked_ports(node, port).next().is_some()
     }
 
@@ -391,7 +393,8 @@ impl<T: AsRef<Hugr>> HugrView for T {
     }
 
     #[inline]
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
+        let port = port.into();
         let hugr = self.as_ref();
         let port = hugr.graph.port_index(node.index, port.offset).unwrap();
         hugr.graph

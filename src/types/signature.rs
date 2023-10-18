@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 
 use std::fmt::{self, Display, Write};
 
-use crate::hugr::{Direction, PortIndex};
+use crate::hugr::{Direction, IncomingPort, OutgoingPort, PortIndex};
 
 use super::{Type, TypeRow};
 
@@ -103,7 +103,8 @@ impl FunctionType {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
-    pub fn get(&self, port: Port) -> Option<&Type> {
+    pub fn get(&self, port: impl Into<Port>) -> Option<&Type> {
+        let port = port.into();
         match port.direction() {
             Direction::Incoming => self.input.get(port),
             Direction::Outgoing => self.output.get(port),
@@ -201,14 +202,16 @@ impl FunctionType {
 
     /// Returns the incoming `Port`s in the signature.
     #[inline]
-    pub fn input_ports(&self) -> impl Iterator<Item = Port> {
+    pub fn input_ports(&self) -> impl Iterator<Item = IncomingPort> {
         self.ports(Direction::Incoming)
+            .map(|p| p.as_incoming().unwrap())
     }
 
     /// Returns the outgoing `Port`s in the signature.
     #[inline]
-    pub fn output_ports(&self) -> impl Iterator<Item = Port> {
+    pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> {
         self.ports(Direction::Outgoing)
+            .map(|p| p.as_outgoing().unwrap())
     }
 }
 

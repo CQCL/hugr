@@ -110,9 +110,9 @@ pub trait HugrMut: HugrMutInternals {
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl TryInto<OutgoingPort>,
+        src_port: impl Into<OutgoingPort>,
         dst: Node,
-        dst_port: impl TryInto<IncomingPort>,
+        dst_port: impl Into<IncomingPort>,
     ) -> Result<(), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
@@ -123,7 +123,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// The port is left in place.
     #[inline]
-    fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
+    fn disconnect(&mut self, node: Node, port: impl Into<Port>) -> Result<(), HugrError> {
         self.valid_node(node)?;
         self.hugr_mut().disconnect(node, port)
     }
@@ -136,6 +136,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// [`OpTrait::other_input`]: crate::ops::OpTrait::other_input
     /// [`OpTrait::other_output`]: crate::ops::OpTrait::other_output
+    // TODO make this return (OutgoingPort, IncomingPort)
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
         self.valid_node(src)?;
         self.valid_node(dst)?;
@@ -249,20 +250,21 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     fn connect(
         &mut self,
         src: Node,
-        src_port: impl TryInto<OutgoingPort>,
+        src_port: impl Into<OutgoingPort>,
         dst: Node,
-        dst_port: impl TryInto<IncomingPort>,
+        dst_port: impl Into<IncomingPort>,
     ) -> Result<(), HugrError> {
         self.as_mut().graph.link_nodes(
             src.index,
-            Port::try_new_outgoing(src_port)?.index(),
+            Port::new_outgoing(src_port).index(),
             dst.index,
-            Port::try_new_incoming(dst_port)?.index(),
+            Port::new_incoming(dst_port).index(),
         )?;
         Ok(())
     }
 
-    fn disconnect(&mut self, node: Node, port: Port) -> Result<(), HugrError> {
+    fn disconnect(&mut self, node: Node, port: impl Into<Port>) -> Result<(), HugrError> {
+        let port = port.into();
         let offset = port.offset;
         let port = self.as_mut().graph.port_index(node.index, offset).ok_or(
             portgraph::LinkError::UnknownOffset {
@@ -275,16 +277,18 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn add_other_edge(&mut self, src: Node, dst: Node) -> Result<(Port, Port), HugrError> {
-        let src_port: Port = self
+        let src_port = self
             .get_optype(src)
             .other_port_index(Direction::Outgoing)
-            .expect("Source operation has no non-dataflow outgoing edges");
-        let dst_port: Port = self
+            .expect("Source operation has no non-dataflow outgoing edges")
+            .as_outgoing()?;
+        let dst_port = self
             .get_optype(dst)
             .other_port_index(Direction::Incoming)
-            .expect("Destination operation has no non-dataflow incoming edges");
+            .expect("Destination operation has no non-dataflow incoming edges")
+            .as_incoming()?;
         self.connect(src, src_port, dst, dst_port)?;
-        Ok((src_port, dst_port))
+        Ok((src_port.into(), dst_port.into()))
     }
 
     fn insert_hugr(&mut self, root: Node, mut other: Hugr) -> Result<InsertionResult, HugrError> {

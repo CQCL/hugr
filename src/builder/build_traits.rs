@@ -1,7 +1,7 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
-use crate::hugr::{IncomingPort, Node, NodeMetadata, OutgoingPort, Port, ValidationError};
+use crate::hugr::{IncomingPort, Node, NodeMetadata, OutgoingPort, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
 
 use std::iter;
@@ -60,7 +60,7 @@ pub trait Container {
     /// [`other_outputs`]: crate::ops::OpTrait::other_output
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
         let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
-        Ok(Wire::new(src, src_port))
+        Ok(Wire::new(src, src_port.as_outgoing().unwrap()))
     }
 
     /// Add a constant value to the container and return a handle to it.
@@ -368,7 +368,7 @@ pub trait Dataflow: Container {
                 input_extensions,
             ),
             // Constant wire from the constant value node
-            vec![Wire::new(const_node, Port::new_outgoing(0))],
+            vec![Wire::new(const_node, OutgoingPort::from(0))],
         )?;
 
         Ok(load_n.out_wire(0))
@@ -658,12 +658,12 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
-    src_port: impl TryInto<OutgoingPort>,
+    src_port: impl Into<OutgoingPort>,
     dst: Node,
-    dst_port: impl TryInto<IncomingPort>,
+    dst_port: impl Into<IncomingPort>,
 ) -> Result<bool, BuildError> {
-    let src_port = Port::try_new_outgoing(src_port)?;
-    let dst_port = Port::try_new_incoming(dst_port)?;
+    let src_port: OutgoingPort = src_port.into();
+    let dst_port: IncomingPort = dst_port.into();
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
@@ -675,9 +675,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             if !typ.copyable() {
                 let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                     ty: EdgeKind::Value(typ),
                 }
                 .into();
@@ -693,9 +693,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                 }
                 .into();
                 return Err(val_err.into());
