@@ -212,9 +212,7 @@ impl Rewrite for OutlineCfg {
             SiblingMut::try_new(h, new_block).unwrap();
         let mut in_cfg_view: SiblingMut<'_, CfgID> =
             SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
-        in_cfg_view
-            .connect(exit, exit_port.as_outgoing().unwrap(), inner_exit, 0)
-            .unwrap();
+        in_cfg_view.connect(exit, exit_port, inner_exit, 0).unwrap();
 
         Ok((new_block, cfg_node))
     }

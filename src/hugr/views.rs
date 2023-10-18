@@ -20,7 +20,9 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
+use super::{
+    Hugr, HugrError, IncomingPort, NodeMetadata, NodeType, OutgoingPort, DEFAULT_NODETYPE,
+};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -149,18 +151,16 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Iterator over output ports of node.
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
-    // TODO: make this return an iterator of OutgoingPort
     #[inline]
-    fn node_outputs(&self, node: Node) -> Self::NodePorts<'_> {
-        self.node_ports(node, Direction::Outgoing)
+    fn node_outputs(&self, node: Node) -> OutgoingPorts<Self::NodePorts<'_>> {
+        OutgoingPorts(self.node_ports(node, Direction::Outgoing))
     }
 
     /// Iterator over inputs ports of node.
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
-    // TODO: make this return an iterator of IncomingPort
     #[inline]
-    fn node_inputs(&self, node: Node) -> Self::NodePorts<'_> {
-        self.node_ports(node, Direction::Incoming)
+    fn node_inputs(&self, node: Node) -> IncomingPorts<Self::NodePorts<'_>> {
+        IncomingPorts(self.node_ports(node, Direction::Incoming))
     }
 
     /// Iterator over both the input and output ports of node.
@@ -299,6 +299,28 @@ pub trait HugrView: sealed::HugrInternals {
                 }
             })
             .finish()
+    }
+}
+
+/// Wraps an iterator over [Port]s that are known to be [OutgoingPort]s
+#[derive(Debug)]
+pub struct OutgoingPorts<T>(T);
+impl<T: Iterator<Item = Port>> Iterator for OutgoingPorts<T> {
+    type Item = OutgoingPort;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|p| p.as_outgoing().unwrap())
+    }
+}
+
+/// Wraps an iterator over [Port]s that are known to be [IncomingPort]s
+#[derive(Debug)]
+pub struct IncomingPorts<T>(T);
+impl<T: Iterator<Item = Port>> Iterator for IncomingPorts<T> {
+    type Item = IncomingPort;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|p| p.as_incoming().unwrap())
     }
 }
 

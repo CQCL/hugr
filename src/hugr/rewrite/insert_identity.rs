@@ -5,7 +5,7 @@ use std::iter;
 use crate::hugr::{HugrMut, IncomingPort, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
-use crate::{Direction, HugrView, Port};
+use crate::HugrView;
 
 use super::Rewrite;
 
@@ -132,7 +132,7 @@ mod tests {
 
         let final_node_port = h.node_inputs(final_node).next().unwrap();
 
-        let rw = IdentityInsertion::new(final_node, final_node_port.as_incoming().unwrap());
+        let rw = IdentityInsertion::new(final_node, final_node_port);
 
         let noop_node = h.apply_rewrite(rw).unwrap();
 
@@ -153,7 +153,7 @@ mod tests {
 
         let final_node_input = h.node_inputs(final_node).next().unwrap();
 
-        let rw = IdentityInsertion::new(final_node, final_node_input.as_incoming().unwrap());
+        let rw = IdentityInsertion::new(final_node, final_node_input);
 
         let apply_result = h.apply_rewrite(rw);
         assert_eq!(

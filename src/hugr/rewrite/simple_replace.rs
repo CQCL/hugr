@@ -116,7 +116,6 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
-                let outport = outport.as_outgoing().unwrap();
                 for target in self.replacement.linked_ports(node, outport) {
                     if self.replacement.get_optype(target.0).tag() != OpTag::Output {
                         let new_target = index_map.get(&target.0).unwrap();
@@ -476,10 +475,13 @@ pub(in crate::hugr::rewrite) mod test {
         // 3.4. Construct the maps
         let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
         let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
-        nu_inp.insert((n_node_output, n_port_0), (h_node_cx, h_port_0));
-        nu_inp.insert((n_node_h, n_port_2), (h_node_cx, h_port_1));
-        nu_out.insert((h_node_h0, h_port_2), n_port_0);
-        nu_out.insert((h_node_h1, h_port_3), n_port_1);
+        nu_inp.insert(
+            (n_node_output, n_port_0.into()),
+            (h_node_cx, h_port_0.into()),
+        );
+        nu_inp.insert((n_node_h, n_port_2.into()), (h_node_cx, h_port_1.into()));
+        nu_out.insert((h_node_h0, h_port_2), n_port_0.into());
+        nu_out.insert((h_node_h1, h_port_3), n_port_1.into());
         // 4. Define the replacement
         let r = SimpleReplacement {
             subgraph: SiblingSubgraph::try_from_nodes(s, &h).unwrap(),
@@ -525,6 +527,7 @@ pub(in crate::hugr::rewrite) mod test {
         let outputs = h
             .node_inputs(output)
             .filter(|&p| h.get_optype(output).signature().get(p).is_some())
+            .map_into()
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
@@ -577,6 +580,7 @@ pub(in crate::hugr::rewrite) mod test {
         let outputs = repl
             .node_inputs(repl_output)
             .filter(|&p| repl.get_optype(repl_output).signature().get(p).is_some())
+            .map_into()
             .map(|p| ((repl_output, p), p))
             .collect();
 
