@@ -91,7 +91,7 @@ The general format of a contribution title should be:
 <type>(<scope>)!: <description>
 ```
 
-Where the scope is optional, and the `!` is only includes if this is a semver breaking change that requires a major version bump.
+Where the scope is optional, and the `!` is only included if this is a semver breaking change that requires a major version bump.
 
 We accept the following contribution types:
 
@@ -103,5 +103,5 @@ We accept the following contribution types:
 - perf: Code refactoring focused on improving performance.
 - test: Adding missing tests, refactoring tests; no production code change.
 - ci: CI related changes. These changes are not published in the changelog.
-- chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog..
+- chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog.
 - revert: Reverting previous commits.
