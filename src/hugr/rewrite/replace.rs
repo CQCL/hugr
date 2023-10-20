@@ -16,19 +16,71 @@ use crate::{Direction, Hugr, HugrView, Node, Port};
 
 use super::Rewrite;
 
+/// Specifies how to create a new edge.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewEdgeSpec {
+    /// The source of the new edge. For [Replacement::mu_inp] and [Replacement::mu_new], this is in the
+    /// existing Hugr; for edges in [Replacement::mu_out] this is in the [Replacement::replacement]
     pub src: Node,
+    /// The target of the new edge. For [Replacement::mu_inp], this is in the [Replacement::replacement];
+    /// for edges in [Replacement::mu_out] and [Replacement::mu_new], this is in the existing Hugr.
     pub tgt: Node,
+    /// The kind of edge to create, and any port specifiers required
     pub kind: NewEdgeKind,
 }
 
+/// Describes an edge that should be created between two nodes already given
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NewEdgeKind {
+    /// An [EdgeKind::StateOrder] edge (between DFG nodes only)
     Order,
-    Value { src_pos: usize, tgt_pos: usize },
-    Static { src_pos: usize, tgt_pos: usize },
-    ControlFlow { src_pos: usize },
+    /// An [EdgeKind::Value] edge (between DFG nodes only)
+    Value {
+        /// The source port
+        src_pos: usize,
+        /// The target port
+        tgt_pos: usize,
+    },
+    /// An [EdgeKind::Static] edge
+    Static {
+        /// The source port
+        src_pos: usize,
+        /// The target port
+        tgt_pos: usize,
+    },
+    /// A [EdgeKind::ControlFlow] edge (between CFG nodes only)
+    ControlFlow {
+        /// Identifies a control-flow output (successor) of the source node.
+        src_pos: usize,
+    },
+}
+
+/// Specification of a `Replace` operation
+#[derive(Debug, Clone)] // PartialEq? Eq probably doesn't make sense because of ordering.
+pub struct Replacement {
+    /// The nodes to remove from the existing Hugr (known as Gamma).
+    /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
+    /// Must be non-empty - otherwise there is no parent under which to place [replacement],
+    /// and no possible [in_edges], [out_edges] or [transfers].
+    pub removal: HashSet<Node>,
+    /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
+    pub replacement: Hugr,
+    /// Map from container nodes in [replacement] that have no children, to container nodes
+    /// that are descended from [nodes]. The keys are the new parents for the children of the
+    /// values, i.e. said children are transferred to new locations rather than removed from the graph.
+    /// Note no value may be ancestor/descendant of another. "R" is the set of descendants of [nodes]
+    /// that are not descendants of values here.
+    pub transfers: HashMap<Node, Node>,
+    /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
+    /// to inserted nodes ([NewEdgeSpec::tgt] in [replacement]). `$\mu_\inp$` in the spec.
+    pub mu_inp: Vec<NewEdgeSpec>,
+    /// Edges from inserted nodes ([NewEdgeSpec::src] in [replacement]) to existing nodes not removed
+    /// ([NewEdgeSpec::tgt] in Gamma \ R). `$\mu_\out$` in the spec.
+    pub mu_out: Vec<NewEdgeSpec>,
+    /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
+    /// For example, in cases where the source had an edge to a removed node, and the target had an
+    /// edge from a removed node, this would allow source to be directly connected to target.
+    pub mu_new: Vec<NewEdgeSpec>,
 }
 
 impl NewEdgeSpec {
@@ -90,34 +142,6 @@ impl NewEdgeSpec {
         };
         Ok(())
     }
-}
-
-/// Specification of a `Replace` operation
-#[derive(Debug, Clone)] // PartialEq? Eq probably doesn't make sense because of ordering.
-pub struct Replacement {
-    /// The nodes to remove from the existing Hugr (known as Gamma).
-    /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
-    /// Must be non-empty - otherwise there is no parent under which to place [replacement],
-    /// and no possible [in_edges], [out_edges] or [transfers].
-    pub removal: HashSet<Node>,
-    /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
-    pub replacement: Hugr,
-    /// Map from container nodes in [replacement] that have no children, to container nodes
-    /// that are descended from [nodes]. The keys are the new parents for the children of the
-    /// values, i.e. said children are transferred to new locations rather than removed from the graph.
-    /// Note no value may be ancestor/descendant of another. "R" is the set of descendants of [nodes]
-    /// that are not descendants of values here.
-    pub transfers: HashMap<Node, Node>,
-    /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
-    /// to inserted nodes ([NewEdgeSpec::tgt] in [replacement]). `$\mu_\inp$` in the spec.
-    pub mu_inp: Vec<NewEdgeSpec>,
-    /// Edges from inserted nodes ([NewEdgeSpec::src] in [replacement]) to existing nodes not removed
-    /// ([NewEdgeSpec::tgt] in Gamma \ R). `$\mu_\out$` in the spec.
-    pub mu_out: Vec<NewEdgeSpec>,
-    /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
-    /// For example, in cases where the source had an edge to a removed node, and the target had an
-    /// edge from a removed node, this would allow source to be directly connected to target.
-    pub mu_new: Vec<NewEdgeSpec>,
 }
 
 impl Replacement {
@@ -382,6 +406,7 @@ pub enum WhichHugr {
     /// The newly-inserted nodes, i.e. the [Replacement::replacement]
     Replacement,
     /// Nodes in the existing Hugr that are not [Replacement::removal]
+    /// (or are on the RHS of an entry in [Replacement::transfers])
     Retained,
 }
 
