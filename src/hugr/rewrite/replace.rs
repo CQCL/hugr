@@ -31,6 +31,49 @@ pub enum NewEdgeKind {
     ControlFlow { src_pos: usize },
 }
 
+impl NewEdgeSpec {
+    fn check_src(&self, h: &impl HugrView) -> Result<(), ReplaceError> {
+        let optype = h.get_optype(self.src);
+        let ok = match self.kind {
+            NewEdgeKind::Order => optype.other_output() == Some(EdgeKind::StateOrder),
+            NewEdgeKind::Value { src_pos, .. } => matches!(
+                optype.port_kind(Port::new_outgoing(src_pos)),
+                Some(EdgeKind::Value(_))
+            ),
+            NewEdgeKind::Static { src_pos, .. } => matches!(
+                optype.port_kind(Port::new_outgoing(src_pos)),
+                Some(EdgeKind::Static(_))
+            ),
+            NewEdgeKind::ControlFlow { src_pos } => matches!(
+                optype.port_kind(Port::new_outgoing(src_pos)),
+                Some(EdgeKind::ControlFlow)
+            ),
+        };
+        ok.then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(self.clone()))
+    }
+    fn check_tgt(&self, h: &impl HugrView) -> Result<(), ReplaceError> {
+        let optype = h.get_optype(self.tgt);
+        let ok = match self.kind {
+            NewEdgeKind::Order => optype.other_input() == Some(EdgeKind::StateOrder),
+            NewEdgeKind::Value { tgt_pos, .. } => matches!(
+                optype.port_kind(Port::new_incoming(tgt_pos)),
+                Some(EdgeKind::Value(_))
+            ),
+            NewEdgeKind::Static { tgt_pos, .. } => matches!(
+                optype.port_kind(Port::new_incoming(tgt_pos)),
+                Some(EdgeKind::Static(_))
+            ),
+            NewEdgeKind::ControlFlow { .. } => matches!(
+                optype.port_kind(Port::new_incoming(0)),
+                Some(EdgeKind::ControlFlow)
+            ),
+        };
+        ok.then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(self.clone()))
+    }
+}
+
 /// Specification of a `Replace` operation
 #[derive(Debug, Clone)] // PartialEq? Eq probably doesn't make sense because of ordering.
 pub struct Replacement {
@@ -130,17 +173,20 @@ impl Rewrite for Replacement {
                     e.src,
                 ));
             }
+            e.check_src(h)?;
         }
         self.mu_out.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.src).map_err(|_| {
                 ReplaceError::BadEdgeSpec("Out-edge source", WhichHugr::Replacement, e.src)
-            })
+            })?;
+            e.check_src(&self.replacement)
         })?;
         // Edge targets...
         self.mu_inp.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.tgt).map_err(|_| {
                 ReplaceError::BadEdgeSpec("In-edge target", WhichHugr::Replacement, e.tgt)
-            })
+            })?;
+            e.check_tgt(&self.replacement)
         })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
@@ -150,6 +196,7 @@ impl Rewrite for Replacement {
                     e.tgt,
                 ));
             }
+            e.check_tgt(h)?;
             if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = e.kind
             {
                 fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
