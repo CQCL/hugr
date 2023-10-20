@@ -420,3 +420,120 @@ impl std::fmt::Display for WhichHugr {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::{HashMap, HashSet};
+
+    use crate::builder::{Dataflow, HugrBuilder};
+    use crate::extension::prelude::USIZE_T;
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::hugr::{HugrMut, NodeType};
+    use crate::ops::handle::NodeHandle;
+    use crate::ops::{self, BasicBlock, Const, LeafOp, DFG};
+    use crate::std_extensions::collections;
+    use crate::types::{Type, TypeArg, TypeRow};
+    use crate::{builder::CFGBuilder, types::FunctionType};
+    use crate::{type_row, Hugr, HugrView};
+
+    use super::{NewEdgeKind, NewEdgeSpec, Replacement};
+
+    #[test]
+    fn cfg() -> Result<(), Box<dyn std::error::Error>> {
+        let reg: ExtensionRegistry = [PRELUDE.to_owned(), collections::EXTENSION.to_owned()].into();
+        let listy = Type::new_extension(
+            collections::EXTENSION
+                .get_type(collections::LIST_TYPENAME.as_str())
+                .unwrap()
+                .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                .unwrap(),
+        );
+        let pop: LeafOp = collections::EXTENSION
+            .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .unwrap()
+            .into();
+        let push: LeafOp = collections::EXTENSION
+            .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .unwrap()
+            .into();
+        let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
+
+        let mut cfg = CFGBuilder::new(FunctionType::new(vec![listy.clone()], vec![listy.clone()]))?;
+        let mut entry = cfg.simple_entry_builder(
+            intermed.clone(),
+            1,
+            ExtensionSet::singleton(&collections::EXTENSION_NAME),
+        )?;
+        let [ent_in] = entry.input_wires_arr();
+        let popped = entry.add_dataflow_op(pop, [ent_in])?;
+        let pred = entry.add_load_const(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let entry = entry.finish_with_outputs(pred, popped.outputs())?;
+
+        let mut bb2 =
+            cfg.simple_block_builder(FunctionType::new(intermed.clone(), vec![listy.clone()]), 1)?;
+        let pushed = bb2.add_dataflow_op(push, bb2.input_wires())?;
+        let pred = bb2.add_load_const(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let bb2 = bb2.finish_with_outputs(pred, pushed.outputs())?;
+        cfg.branch(&entry, 0, &bb2)?;
+
+        let exit = cfg.exit_block();
+        cfg.branch(&bb2, 0, &exit)?;
+        let mut h = cfg.finish_hugr(&reg)?;
+
+        // Replacement: one BB with two DFGs inside.
+        // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
+        let mut replacement = Hugr::new(NodeType::open_extensions(BasicBlock::DFB {
+            inputs: vec![listy.clone()].into(),
+            predicate_variants: vec![type_row![]],
+            other_outputs: vec![listy.clone()].into(),
+            extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
+        }));
+        let rroot = replacement.root();
+        let inp = replacement.add_op_with_parent(
+            rroot,
+            ops::Input {
+                types: vec![listy.clone()].into(),
+            },
+        )?;
+        let df1 = replacement.add_op_with_parent(
+            rroot,
+            DFG {
+                signature: FunctionType::new(vec![listy.clone()], intermed.clone()),
+            },
+        )?;
+        replacement.connect(inp, 0, df1, 0)?;
+
+        let df2 = replacement.add_op_with_parent(
+            rroot,
+            DFG {
+                signature: FunctionType::new(intermed, vec![listy.clone()]),
+            },
+        )?;
+        [0, 1]
+            .iter()
+            .try_for_each(|p| replacement.connect(df1, *p, df2, *p))?;
+
+        let ex = replacement.add_op_with_parent(
+            rroot,
+            ops::Output {
+                types: vec![listy.clone()].into(),
+            },
+        )?;
+        replacement.connect(df2, 0, ex, 0)?;
+
+        h.apply_rewrite(Replacement {
+            removal: HashSet::from([entry.node(), bb2.node()]),
+            replacement,
+            transfers: HashMap::from([(df1.node(), entry.node()), (df2.node(), bb2.node())]),
+            mu_inp: vec![],
+            mu_out: vec![NewEdgeSpec {
+                src: rroot,
+                tgt: exit.node(),
+                kind: NewEdgeKind::ControlFlow { src_pos: 0 },
+            }],
+            mu_new: vec![],
+        })?;
+        h.validate(&reg)?;
+        Ok(())
+    }
+}
