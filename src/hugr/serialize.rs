@@ -274,6 +274,7 @@ pub mod test {
     use super::*;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::OutgoingPort;
     use crate::{
         builder::{
             test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
@@ -283,7 +284,6 @@ pub mod test {
         hugr::NodeType,
         ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
         types::{FunctionType, Type},
-        Port,
     };
     use itertools::Itertools;
     use portgraph::{
@@ -466,7 +466,7 @@ pub mod test {
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
-        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();

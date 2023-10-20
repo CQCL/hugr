@@ -387,14 +387,6 @@ impl Port {
         }
     }
 
-    /// Creates a new incoming port.
-    #[inline]
-    pub fn new_incoming(port: impl Into<IncomingPort>) -> Self {
-        Self {
-            offset: portgraph::PortOffset::new_incoming(port.into().index()),
-        }
-    }
-
     /// Converts to an [IncomingPort] if this port is one; else fails with
     /// [HugrError::InvalidPortDirection]
     #[inline]
@@ -404,14 +396,6 @@ impl Port {
                 index: self.index() as u16,
             }),
             dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
-        }
-    }
-
-    /// Creates a new outgoing port.
-    #[inline]
-    pub fn new_outgoing(port: impl Into<OutgoingPort>) -> Self {
-        Self {
-            offset: portgraph::PortOffset::new_outgoing(port.into().index()),
         }
     }
 
@@ -492,13 +476,17 @@ impl From<usize> for OutgoingPort {
 
 impl From<IncomingPort> for Port {
     fn from(value: IncomingPort) -> Self {
-        Port::new_incoming(value)
+        Self {
+            offset: portgraph::PortOffset::new_incoming(value.index()),
+        }
     }
 }
 
 impl From<OutgoingPort> for Port {
     fn from(value: OutgoingPort) -> Self {
-        Port::new_outgoing(value)
+        Self {
+            offset: portgraph::PortOffset::new_outgoing(value.index()),
+        }
     }
 }
 

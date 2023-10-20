@@ -259,9 +259,9 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     ) -> Result<(), HugrError> {
         self.as_mut().graph.link_nodes(
             src.index,
-            Port::new_outgoing(src_port).index(),
+            src_port.into().index(),
             dst.index,
-            Port::new_incoming(dst_port).index(),
+            dst_port.into().index(),
         )?;
         Ok(())
     }

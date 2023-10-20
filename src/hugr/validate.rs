@@ -746,7 +746,7 @@ mod test {
         Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
     };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::hugr::{HugrError, HugrMut, NodeType};
+    use crate::hugr::{HugrError, HugrMut, IncomingPort, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
@@ -1146,7 +1146,7 @@ mod test {
             h.update_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
-                port: Port::new_incoming(1),
+                port: IncomingPort::from(1).into(),
                 port_kind: EdgeKind::Value(BOOL_T)
             })
         );
