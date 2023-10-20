@@ -139,6 +139,35 @@ impl Replacement {
         };
         Ok(parent)
     }
+
+    fn get_removed_nodes(&self, h: &impl HugrView) -> Result<HashSet<Node>, ReplaceError> {
+        let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
+        if transferred.len() != self.transfers.values().len() {
+            return Err(ReplaceError::ConflictingTransfers(
+                self.transfers
+                    .values()
+                    .filter(|v| !transferred.remove(v))
+                    .copied()
+                    .collect(),
+            ));
+        }
+
+        let mut removed = HashSet::new();
+        let mut queue = VecDeque::from_iter(self.removal.iter().copied());
+        while let Some(n) = queue.pop_front() {
+            let new = removed.insert(n);
+            debug_assert!(new); // Fails only if h's hierarchy has merges (is not a tree)
+            if !transferred.remove(&n) {
+                h.children(n).for_each(|ch| queue.push_back(ch))
+            }
+        }
+        if !transferred.is_empty() {
+            return Err(ReplaceError::TransfersNotSeparateDescendants(
+                transferred.into_iter().collect(),
+            ));
+        }
+        Ok(removed)
+    }
 }
 impl Rewrite for Replacement {
     type Error = ReplaceError;
@@ -158,30 +187,7 @@ impl Rewrite for Replacement {
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
         let parent = self.check_parent(h)?;
-        let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
-        if transferred.len() != self.transfers.values().len() {
-            return Err(ReplaceError::ConflictingTransfers(
-                self.transfers
-                    .values()
-                    .filter(|v| !transferred.remove(v))
-                    .copied()
-                    .collect(),
-            ));
-        }
-        let mut removed = HashSet::new();
-        let mut queue = VecDeque::from_iter(self.removal.iter().copied());
-        while let Some(n) = queue.pop_front() {
-            let new = removed.insert(n);
-            debug_assert!(new); // Fails only if h's hierarchy has merges (is not a tree)
-            if !transferred.remove(&n) {
-                h.children(n).for_each(|ch| queue.push_back(ch))
-            }
-        }
-        if !transferred.is_empty() {
-            return Err(ReplaceError::TransfersNotSeparateDescendants(
-                transferred.into_iter().collect(),
-            ));
-        }
+        let removed = self.get_removed_nodes(h)?;
         // Edge sources...
         for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
