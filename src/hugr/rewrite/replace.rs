@@ -72,6 +72,24 @@ impl NewEdgeSpec {
         ok.then_some(())
             .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
     }
+
+    fn check_existing_edge(
+        &self,
+        h: &impl HugrView,
+        src_ok: impl Fn(Node) -> bool,
+    ) -> Result<(), ReplaceError> {
+        if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
+        {
+            let found_incoming = h
+                .linked_ports(self.tgt, Port::new_incoming(tgt_pos))
+                .exactly_one()
+                .is_ok_and(|(src_n, _)| src_ok(src_n));
+            if !found_incoming {
+                return Err(ReplaceError::NoRemovedEdge(self.clone()));
+            };
+        };
+        Ok(())
+    }
 }
 
 /// Specification of a `Replace` operation
@@ -197,31 +215,12 @@ impl Rewrite for Replacement {
                 ));
             }
             e.check_tgt(h)?;
-            if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = e.kind
-            {
-                fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
-                    while descendant != ancestor {
-                        let Some(p) = h.get_parent(descendant) else {return false};
-                        descendant = p;
-                    }
-                    true
-                }
-                let found_incoming = h
-                    .linked_ports(e.tgt, Port::new(Direction::Incoming, tgt_pos))
-                    .exactly_one()
-                    .is_ok_and(|(src_n, _)| {
-                        // The descendant check is to allow the case where the old edge is nonlocal
-                        // from a part of the Hugr being moved (which may require changing source,
-                        // depending on where the transplanted portion ends up). While this subsumes
-                        // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-                        removed.contains(&src_n) || descends(h, parent, src_n)
-                    });
-                if !found_incoming {
-                    return Err(ReplaceError::NoRemovedEdge(e.clone()));
-                };
-            }
+            // The descendant check is to allow the case where the old edge is nonlocal
+            // from a part of the Hugr being moved (which may require changing source,
+            // depending on where the transplanted portion ends up). While this subsumes
+            // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+            e.check_existing_edge(h, |n| removed.contains(&n) || descends(h, parent, n))?;
         }
-        // TODO check ports and/or node types appropriate for kind of edge added
         Ok(())
     }
 
@@ -235,15 +234,15 @@ impl Rewrite for Replacement {
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| *node_map.get(&n).unwrap();
         let id = |n| n;
-        transfer_edges(h, self.mu_inp.iter(), id, translate_idx, false)?;
+        transfer_edges(h, self.mu_inp.iter(), id, translate_idx, None)?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.mu_out.iter(), translate_idx, id, true)?;
+        transfer_edges(h, self.mu_out.iter(), translate_idx, id, Some(parent))?;
 
         //4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.mu_new.iter(), id, id, true)?;
+        transfer_edges(h, self.mu_new.iter(), id, id, Some(parent))?;
 
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
@@ -288,28 +287,41 @@ impl Rewrite for Replacement {
     }
 }
 
+fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
+    while descendant != ancestor {
+        let Some(p) = h.get_parent(descendant) else {return false};
+        descendant = p;
+    }
+    true
+}
+
 fn transfer_edges<'a>(
     h: &mut impl HugrMut,
     edges: impl Iterator<Item = &'a NewEdgeSpec>,
     trans_src: impl Fn(Node) -> Node,
     trans_tgt: impl Fn(Node) -> Node,
-    remove_existing: bool,
+    existing_src_ancestor: Option<Node>,
 ) -> Result<(), ReplaceError> {
     for e in edges {
-        let src = trans_src(e.src);
-        let tgt = trans_tgt(e.tgt);
+        let e = NewEdgeSpec {
+            src: trans_src(e.src),
+            tgt: trans_tgt(e.tgt),
+            ..e.clone()
+        };
+        e.check_src(h)?;
+        e.check_tgt(h)?;
         match e.kind {
             NewEdgeKind::Order => {
-                h.add_other_edge(src, tgt).unwrap();
+                h.add_other_edge(e.src, e.tgt).unwrap();
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
-                if remove_existing {
-                    h.disconnect(tgt, Port::new(Direction::Incoming, tgt_pos))
-                        .unwrap();
+                if let Some(anc) = existing_src_ancestor {
+                    e.check_existing_edge(h, |n| descends(h, anc, n))?;
+                    h.disconnect(e.tgt, Port::new_incoming(tgt_pos)).unwrap();
                 }
-                h.connect(src, src_pos, tgt, tgt_pos).unwrap();
+                h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
             }
-            NewEdgeKind::ControlFlow { src_pos } => h.connect(src, src_pos, tgt, 0).unwrap(),
+            NewEdgeKind::ControlFlow { src_pos } => h.connect(e.src, src_pos, e.tgt, 0).unwrap(),
         }
     }
     Ok(())
