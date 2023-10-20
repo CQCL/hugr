@@ -43,10 +43,6 @@ pub enum IdentityInsertionError {
     /// Invalid port kind.
     #[error("post_port has invalid kind {0:?}. Must be Value.")]
     InvalidPortKind(Option<EdgeKind>),
-
-    /// Must be input port.
-    #[error("post_port is an output port, must be input.")]
-    PortIsOutput,
 }
 
 impl Rewrite for IdentityInsertion {

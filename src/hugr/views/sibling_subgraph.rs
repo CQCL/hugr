@@ -661,12 +661,6 @@ pub enum InvalidSubgraph {
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum InvalidSubgraphBoundary {
-    /// A node in the input boundary is not Incoming.
-    #[error("Expected (node {0:?}, port {1:?}) in the input boundary to be an incoming port.")]
-    InputPortDirection(Node, Port),
-    /// A node in the output boundary is not Outgoing.
-    #[error("Expected (node {0:?}, port {1:?}) in the input boundary to be an outgoing port.")]
-    OutputPortDirection(Node, Port),
     /// A boundary port's node is not in the set of nodes.
     #[error("(node {0:?}, port {1:?}) is in the boundary, but node {0:?} is not in the set.")]
     PortNodeNotInSet(Node, Port),
