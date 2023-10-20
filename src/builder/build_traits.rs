@@ -662,8 +662,8 @@ fn wire_up<T: Dataflow + ?Sized>(
     dst: Node,
     dst_port: impl Into<IncomingPort>,
 ) -> Result<bool, BuildError> {
-    let src_port: OutgoingPort = src_port.into();
-    let dst_port: IncomingPort = dst_port.into();
+    let src_port = src_port.into();
+    let dst_port = dst_port.into();
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
