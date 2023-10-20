@@ -50,7 +50,7 @@ impl NewEdgeSpec {
             ),
         };
         ok.then_some(())
-            .ok_or(ReplaceError::BadEdgeKind(self.clone()))
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Outgoing, self.clone()))
     }
     fn check_tgt(&self, h: &impl HugrView) -> Result<(), ReplaceError> {
         let optype = h.get_optype(self.tgt);
@@ -70,7 +70,7 @@ impl NewEdgeSpec {
             ),
         };
         ok.then_some(())
-            .ok_or(ReplaceError::BadEdgeKind(self.clone()))
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
     }
 }
 
@@ -300,9 +300,6 @@ fn transfer_edges<'a>(
         let tgt = trans_tgt(e.tgt);
         match e.kind {
             NewEdgeKind::Order => {
-                if h.get_optype(src).other_output() != Some(EdgeKind::StateOrder) {
-                    return Err(ReplaceError::BadEdgeKind(e.clone()));
-                }
                 h.add_other_edge(src, tgt).unwrap();
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
@@ -345,9 +342,9 @@ pub enum ReplaceError {
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
     NoRemovedEdge(NewEdgeSpec),
-    /// The {NewEdgeKind} was not applicable for the source/target node(s)
-    #[error("The edge kind was not applicable to the node(s)")]
-    BadEdgeKind(NewEdgeSpec),
+    /// The [NewEdgeKind] was not applicable for the source/target node(s)
+    #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
+    BadEdgeKind(Direction, NewEdgeSpec),
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
