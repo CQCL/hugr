@@ -146,17 +146,15 @@ impl Rewrite for Replacement {
                     e.tgt,
                 ));
             }
-            fn strict_desc(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
-                while let Some(p) = h.get_parent(descendant) {
-                    if ancestor == p {
-                        return true;
-                    };
-                    descendant = p;
-                }
-                false
-            }
             if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = e.kind
             {
+                fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
+                    while descendant != ancestor {
+                        let Some(p) = h.get_parent(descendant) else {return false};
+                        descendant = p;
+                    }
+                    true
+                }
                 let found_incoming = h
                     .linked_ports(e.tgt, Port::new(Direction::Incoming, tgt_pos))
                     .exactly_one()
@@ -165,7 +163,7 @@ impl Rewrite for Replacement {
                         // from a part of the Hugr being moved (which may require changing source,
                         // depending on where the transplanted portion ends up). While this subsumes
                         // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-                        removed.contains(&src_n) || strict_desc(h, parent, src_n)
+                        removed.contains(&src_n) || descends(h, parent, src_n)
                     });
                 if !found_incoming {
                     return Err(ReplaceError::NoRemovedEdge(e.clone()));
