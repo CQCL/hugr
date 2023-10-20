@@ -234,14 +234,19 @@ impl Rewrite for Replacement {
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied();
         let id = |n| Some(n);
+        // TODO would be good to check the edge sources here are not being removed. Could do after removal?
         transfer_edges(h, self.mu_inp.iter(), id, translate_idx, None)?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
+        // TODO good to check targets are not being removed, but we can't do after removal,
+        // as then we'd be unable to check that the targets had edges FROM (re/)moved nodes.
         transfer_edges(h, self.mu_out.iter(), translate_idx, id, Some(parent))?;
 
-        //4. Add new edges between existing nodes according to mu_new,
-        // replacing existing value/static edges incoming to targets
+        // 4. Add new edges between existing nodes according to mu_new,
+        // replacing existing value/static edges incoming to targets.
+        // TODO check neither edge sources nor targets are being removed,
+        // but can't do after removal as we need to check there are existing edges FROM (re/)moved nodes
         transfer_edges(h, self.mu_new.iter(), id, id, Some(parent))?;
 
         // 5. Put newly-added copies into correct places in hierarchy
