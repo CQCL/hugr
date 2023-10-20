@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::{HugrError, HugrMut};
-use crate::ops::OpTrait;
+use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, Node, Port};
 
@@ -84,27 +84,23 @@ impl Rewrite for Replacement {
             .exactly_one()
         {
             Ok(Some(p)) => Ok(p),
-            Ok(None) => Err(ReplaceError::Msg(
-                "Cannot replace the top node of the Hugr".to_string(),
-            )), // maybe we SHOULD be able to??
-            Err(e) => Err(ReplaceError::Msg(format!(
-                "Nodes to remove do not share a parent: {}",
-                e
-            ))),
+            Ok(None) => Err(ReplaceError::CantReplaceRoot),
+            Err(e) => Err(ReplaceError::MultipleParents(e.flatten().collect())),
         }?;
         // Should we require exactly equality?
-        let expected_tag = h.get_optype(parent).tag();
-        let found_tag = self.replacement.root_type().tag();
-        if expected_tag != found_tag {
-            return Err(ReplaceError::Msg(format!(
-                "Expected replacement to have root node w/tag {} but found {}",
-                expected_tag, found_tag
-            )));
+        let expected = h.get_optype(parent).tag();
+        let actual = self.replacement.root_type().tag();
+        if expected != actual {
+            return Err(ReplaceError::WrongRootNodeTag { expected, actual });
         };
         let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
         if transferred.len() != self.transfers.values().len() {
-            return Err(ReplaceError::Msg(
-                "Repeated nodes in RHS of transfer map".to_string(),
+            return Err(ReplaceError::ConflictingTransfers(
+                self.transfers
+                    .values()
+                    .filter(|v| !transferred.remove(v))
+                    .copied()
+                    .collect(),
             ));
         }
         let mut removed = HashSet::new();
@@ -117,43 +113,38 @@ impl Rewrite for Replacement {
             }
         }
         if !transferred.is_empty() {
-            // This also occurs if some RHS was reachable from another
-            return Err(ReplaceError::Msg(
-                "Some transferred nodes were not to be removed".to_string(),
+            return Err(ReplaceError::TransfersNotSeparateDescendants(
+                transferred.into_iter().collect(),
             ));
         }
         // Edge sources...
         for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
-                return Err(ReplaceError::Msg(format!(
-                    "Edge source not in retained nodes: {:?}",
-                    e.src
-                )));
+                return Err(ReplaceError::BadEdgeSpec(
+                    "Edge source",
+                    WhichHugr::Retained,
+                    e.src,
+                ));
             }
         }
         self.mu_out.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.src).map_err(|_| {
-                ReplaceError::Msg(format!(
-                    "Out-edge source not in replacement Hugr: {:?}",
-                    e.src
-                ))
+                ReplaceError::BadEdgeSpec("Out-edge source", WhichHugr::Replacement, e.src)
             })
         })?;
         // Edge targets...
         self.mu_inp.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.tgt).map_err(|_| {
-                ReplaceError::Msg(format!(
-                    "In-edge target not in replacement Hugr: {:?}",
-                    e.tgt
-                ))
+                ReplaceError::BadEdgeSpec("In-edge target", WhichHugr::Replacement, e.tgt)
             })
         })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
-                return Err(ReplaceError::Msg(format!(
-                    "Edge target not in retained nodes: {:?}",
-                    e.tgt
-                )));
+                return Err(ReplaceError::BadEdgeSpec(
+                    "Edge target",
+                    WhichHugr::Retained,
+                    e.tgt,
+                ));
             }
             fn strict_desc(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
                 while let Some(p) = h.get_parent(descendant) {
@@ -176,16 +167,12 @@ impl Rewrite for Replacement {
                     Ok((src_n, _)) if removed.contains(&src_n) || strict_desc(h, parent, src_n) => {
                         ()
                     }
-                    _ => {
-                        return Err(ReplaceError::Msg(format!(
-                            "Target of Edge {:?} did not have incoming edge being removed",
-                            e
-                        )))
-                    }
+                    _ => return Err(ReplaceError::NoRemovedEdge(e.clone())),
                 },
                 _ => (),
             };
         }
+        // TODO check ports and/or node types appropriate for kind of edge added
         Ok(())
     }
 
@@ -263,14 +250,7 @@ fn transfer_edges<'a>(
         match e.kind {
             NewEdgeKind::Order => {
                 if h.get_optype(src).other_output() != Some(EdgeKind::StateOrder) {
-                    return Err(ReplaceError::Msg(
-                        "Can't insert Order edge except from DFG node".to_string(),
-                    ));
-                }
-                if h.get_parent(tgt) != h.get_parent(src) {
-                    return Err(ReplaceError::Msg(
-                        "Order edge target not at top level".to_string(),
-                    ));
+                    return Err(ReplaceError::BadEdgeKind(e.clone()));
                 }
                 h.add_other_edge(src, tgt).unwrap();
             }
@@ -290,8 +270,51 @@ fn transfer_edges<'a>(
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum ReplaceError {
-    #[error("{0}")]
-    Msg(String),
+    /// The node(s) to replace had no parent i.e. were root(s).
+    // (Perhaps if there is only one node to replace we should be able to?)
+    #[error("Cannot replace the root node of the Hugr")]
+    CantReplaceRoot,
+    /// The nodes to replace did not have a unique common parent
+    #[error("Removed nodes had different parents {0:?}")]
+    MultipleParents(Vec<Node>),
+    /// Replacement root node had different tag from parent of removed nodes
+    #[error("Expected replacement root with tag {expected} but found {actual}")]
+    #[allow(missing_docs)]
+    WrongRootNodeTag { expected: OpTag, actual: OpTag },
+    /// Values in transfer map were not unique - contains the repeated elements
+    #[error("Nodes cannot be transferred to multiple locations: {0:?}")]
+    ConflictingTransfers(Vec<Node>),
+    /// Some values in the transfer map were either descendants of other values,
+    /// or not descendants of the removed nodes
+    #[error("Nodes not free to be moved into new locations: {0:?}")]
+    TransfersNotSeparateDescendants(Vec<Node>),
+    /// A node at one end of a [NewEdgeSpec] was not found
+    #[error("{0} not in {1}: {2:?}")]
+    BadEdgeSpec(&'static str, WhichHugr, Node),
+    /// The target of the edge was found, but there was no existing edge to replace
+    #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
+    NoRemovedEdge(NewEdgeSpec),
+    /// The {NewEdgeKind} was not applicable for the source/target node(s)
+    #[error("The edge kind was not applicable to the node(s)")]
+    BadEdgeKind(NewEdgeSpec),
     #[error(transparent)]
     Hugr(#[from] HugrError),
+}
+
+/// A Hugr or portion thereof that is part of the [Replacement]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WhichHugr {
+    /// The newly-inserted nodes, i.e. the [Replacement::replacement]
+    Replacement,
+    /// Nodes in the existing Hugr that are not [Replacement::removal]
+    Retained,
+}
+
+impl std::fmt::Display for WhichHugr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Replacement => "replacement Hugr",
+            Self::Retained => "retained portion of Hugr",
+        })
+    }
 }
