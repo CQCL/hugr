@@ -232,6 +232,10 @@ impl Rewrite for Replacement {
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         let parent = self.check_parent(h)?;
+        // Calculate removed nodes here. (Does not include transfers, so enumerates only
+        // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
+        let to_remove = self.get_removed_nodes(h)?;
+
         // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
         let InsertionResult { new_root, node_map } =
@@ -239,28 +243,26 @@ impl Rewrite for Replacement {
 
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
-        let id = |n| Ok(n);
-        // TODO would be good to check the edge sources here are not being removed. Could do after removal?
-        transfer_edges(h, self.mu_inp.iter(), id, translate_idx, None)?;
+        let kept = |n| {
+            let keep = !to_remove.contains(&n);
+            keep.then_some(n).ok_or(WhichHugr::Retained)
+        };
+        transfer_edges(h, self.mu_inp.iter(), kept, translate_idx, None)?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
-        // TODO good to check targets are not being removed, but we can't do after removal,
-        // as then we'd be unable to check that the targets had edges FROM (re/)moved nodes.
-        transfer_edges(h, self.mu_out.iter(), translate_idx, id, Some(parent))?;
+        transfer_edges(h, self.mu_out.iter(), translate_idx, kept, Some(parent))?;
 
         // 4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets.
-        // TODO check neither edge sources nor targets are being removed,
-        // but can't do after removal as we need to check there are existing edges FROM (re/)moved nodes
-        transfer_edges(h, self.mu_new.iter(), id, id, Some(parent))?;
+        transfer_edges(h, self.mu_new.iter(), kept, kept, Some(parent))?;
 
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
-        let mut remove = self.removal.iter();
+        let mut remove_top_sibs = self.removal.iter();
         for new_node in h.children(new_root).collect::<Vec<Node>>().into_iter() {
-            if let Some(to_remove) = remove.next() {
-                h.move_before_sibling(new_node, *to_remove).unwrap();
+            if let Some(top_sib) = remove_top_sibs.next() {
+                h.move_before_sibling(new_node, *top_sib).unwrap();
             } else {
                 h.set_parent(new_node, parent).unwrap();
             }
@@ -280,12 +282,7 @@ impl Rewrite for Replacement {
         }
 
         // 7. Remove remaining nodes
-        let mut to_remove = VecDeque::from_iter(self.removal);
-        while let Some(n) = to_remove.pop_front() {
-            // Nodes may have no children if they were moved in step 6
-            to_remove.extend(h.children(n));
-            h.remove_node(n).unwrap();
-        }
+        to_remove.into_iter().for_each(|n| h.remove_node(n).unwrap());
         Ok(())
     }
 
@@ -313,15 +310,21 @@ fn transfer_edges<'a>(
     trans_tgt: impl Fn(Node) -> Result<Node, WhichHugr>,
     existing_src_ancestor: Option<Node>,
 ) -> Result<(), ReplaceError> {
-    for e in edges {
+    for oe in edges {
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
-            src: trans_src(e.src)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, e.clone()))?,
-            tgt: trans_tgt(e.tgt)
-                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, e.clone()))?,
-            ..e.clone()
+            src: trans_src(oe.src)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, oe.clone()))?,
+            tgt: trans_tgt(oe.tgt)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, oe.clone()))?,
+            ..oe.clone()
         };
+        h.valid_node(e.src).map_err(|_| {
+            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, oe.clone())
+        })?;
+        h.valid_node(e.tgt).map_err(|_| {
+            ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
+        })?;
         e.check_src(h)?;
         e.check_tgt(h)?;
         match e.kind {
