@@ -153,7 +153,7 @@ impl Rewrite for Replacement {
                     };
                     descendant = p;
                 }
-                return false;
+                false
             }
             match e.kind {
                 NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } => match h
@@ -165,7 +165,6 @@ impl Rewrite for Replacement {
                     // depending on where the transplanted portion ends up). While this subsumes
                     // the first "removed.contains" check, we'll keep that as a common-case fast-path.
                     Ok((src_n, _)) if removed.contains(&src_n) || strict_desc(h, parent, src_n) => {
-                        ()
                     }
                     _ => return Err(ReplaceError::NoRemovedEdge(e.clone())),
                 },
