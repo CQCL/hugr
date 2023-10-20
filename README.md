@@ -11,7 +11,7 @@ ecosystem.
 It provides a high-fidelity representation of operations, that facilitates
 compilation and encodes runnable programs.
 
-The HUGR specification (still in draft) is [here](specification/hugr.md).
+The HUGR specification is [here](specification/hugr.md).
 
 ## Features
 
@@ -27,6 +27,10 @@ quantinuum-hugr = "0.1"
 ```
 
 The library crate is called `hugr`.
+
+## Development
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on setting up the development environment.
 
 ## License
 
