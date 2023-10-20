@@ -155,21 +155,22 @@ impl Rewrite for Replacement {
                 }
                 false
             }
-            match e.kind {
-                NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } => match h
+            if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = e.kind
+            {
+                let found_incoming = h
                     .linked_ports(e.tgt, Port::new(Direction::Incoming, tgt_pos))
                     .exactly_one()
-                {
-                    // The descendant check is to allow the case where the old edge is nonlocal
-                    // from a part of the Hugr being moved (which may require changing source,
-                    // depending on where the transplanted portion ends up). While this subsumes
-                    // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-                    Ok((src_n, _)) if removed.contains(&src_n) || strict_desc(h, parent, src_n) => {
-                    }
-                    _ => return Err(ReplaceError::NoRemovedEdge(e.clone())),
-                },
-                _ => (),
-            };
+                    .is_ok_and(|(src_n, _)| {
+                        // The descendant check is to allow the case where the old edge is nonlocal
+                        // from a part of the Hugr being moved (which may require changing source,
+                        // depending on where the transplanted portion ends up). While this subsumes
+                        // the first "removed.contains" check, we'll keep that as a common-case fast-path.
+                        removed.contains(&src_n) || strict_desc(h, parent, src_n)
+                    });
+                if !found_incoming {
+                    return Err(ReplaceError::NoRemovedEdge(e.clone()));
+                };
+            }
         }
         // TODO check ports and/or node types appropriate for kind of edge added
         Ok(())
