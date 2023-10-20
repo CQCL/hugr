@@ -306,7 +306,9 @@ impl Rewrite for Replacement {
         }
 
         // 7. Remove remaining nodes
-        to_remove.into_iter().for_each(|n| h.remove_node(n).unwrap());
+        to_remove
+            .into_iter()
+            .for_each(|n| h.remove_node(n).unwrap());
         Ok(())
     }
 
