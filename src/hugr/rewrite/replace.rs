@@ -186,32 +186,32 @@ impl Rewrite for Replacement {
         for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.src) || removed.contains(&e.src) {
                 return Err(ReplaceError::BadEdgeSpec(
-                    "Edge source",
+                    Direction::Outgoing,
                     WhichHugr::Retained,
-                    e.src,
+                    e.clone(),
                 ));
             }
             e.check_src(h)?;
         }
         self.mu_out.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.src).map_err(|_| {
-                ReplaceError::BadEdgeSpec("Out-edge source", WhichHugr::Replacement, e.src)
+                ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, e.clone())
             })?;
             e.check_src(&self.replacement)
         })?;
         // Edge targets...
         self.mu_inp.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.tgt).map_err(|_| {
-                ReplaceError::BadEdgeSpec("In-edge target", WhichHugr::Replacement, e.tgt)
+                ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Replacement, e.clone())
             })?;
             e.check_tgt(&self.replacement)
         })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
-                    "Edge target",
+                    Direction::Incoming,
                     WhichHugr::Retained,
-                    e.tgt,
+                    e.clone(),
                 ));
             }
             e.check_tgt(h)?;
@@ -349,8 +349,8 @@ pub enum ReplaceError {
     #[error("Nodes not free to be moved into new locations: {0:?}")]
     TransfersNotSeparateDescendants(Vec<Node>),
     /// A node at one end of a [NewEdgeSpec] was not found
-    #[error("{0} not in {1}: {2:?}")]
-    BadEdgeSpec(&'static str, WhichHugr, Node),
+    #[error("{0:?} end of edge {2:?} not found in {1}")]
+    BadEdgeSpec(Direction, WhichHugr, NewEdgeSpec),
     /// The target of the edge was found, but there was no existing edge to replace
     #[error("Target of edge {0:?} did not have a corresponding incoming edge being removed")]
     NoRemovedEdge(NewEdgeSpec),
