@@ -59,6 +59,26 @@ pub struct Replacement {
     pub mu_new: Vec<NewEdgeSpec>,
 }
 
+impl Replacement {
+    fn check_parent(&self, h: &impl HugrView) -> Result<Node, ReplaceError> {
+        let parent = self
+            .removal
+            .iter()
+            .map(|n| h.get_parent(*n))
+            .unique()
+            .exactly_one()
+            .map_err(|ex_one| ReplaceError::MultipleParents(ex_one.flatten().collect()))?
+            .ok_or(ReplaceError::CantReplaceRoot)?; // If no parent
+
+        // Check replacement parent is of same tag. Should we require exactly OpType equality?
+        let expected = h.get_optype(parent).tag();
+        let actual = self.replacement.root_type().tag();
+        if expected != actual {
+            return Err(ReplaceError::WrongRootNodeTag { expected, actual });
+        };
+        Ok(parent)
+    }
+}
 impl Rewrite for Replacement {
     type Error = ReplaceError;
 
@@ -76,23 +96,7 @@ impl Rewrite for Replacement {
     const UNCHANGED_ON_FAILURE: bool = false;
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
-        let parent = match self
-            .removal
-            .iter()
-            .map(|n| h.get_parent(*n))
-            .unique()
-            .exactly_one()
-        {
-            Ok(Some(p)) => Ok(p),
-            Ok(None) => Err(ReplaceError::CantReplaceRoot),
-            Err(e) => Err(ReplaceError::MultipleParents(e.flatten().collect())),
-        }?;
-        // Should we require exactly equality?
-        let expected = h.get_optype(parent).tag();
-        let actual = self.replacement.root_type().tag();
-        if expected != actual {
-            return Err(ReplaceError::WrongRootNodeTag { expected, actual });
-        };
+        let parent = self.check_parent(h)?;
         let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
         if transferred.len() != self.transfers.values().len() {
             return Err(ReplaceError::ConflictingTransfers(
@@ -175,7 +179,7 @@ impl Rewrite for Replacement {
     }
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
-        let parent = h.get_parent(*self.removal.iter().next().unwrap()).unwrap();
+        let parent = self.check_parent(h)?;
         // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement)?;
 
