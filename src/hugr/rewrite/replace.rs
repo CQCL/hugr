@@ -9,7 +9,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::{HugrError, HugrMut};
+use crate::hugr::HugrMut;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
 use crate::{Direction, Hugr, HugrView, Node, Port};
@@ -180,8 +180,10 @@ impl Rewrite for Replacement {
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         let parent = self.check_parent(h)?;
-        // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want
-        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement)?;
+        // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
+        // TODO what would an error here mean? e.g. malformed self.replacement??
+        let InsertionResult { new_root, node_map } =
+            h.insert_hugr(parent, self.replacement).unwrap();
 
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| *node_map.get(&n).unwrap();
@@ -299,8 +301,6 @@ pub enum ReplaceError {
     /// The {NewEdgeKind} was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the node(s)")]
     BadEdgeKind(NewEdgeSpec),
-    #[error(transparent)]
-    Hugr(#[from] HugrError),
 }
 
 /// A Hugr or portion thereof that is part of the [Replacement]
