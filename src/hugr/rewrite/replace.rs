@@ -238,8 +238,8 @@ impl Rewrite for Replacement {
             h.insert_hugr(parent, self.replacement).unwrap();
 
         // 2. Add new edges from existing to copied nodes according to mu_in
-        let translate_idx = |n| node_map.get(&n).copied();
-        let id = |n| Some(n);
+        let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
+        let id = |n| Ok(n);
         // TODO would be good to check the edge sources here are not being removed. Could do after removal?
         transfer_edges(h, self.mu_inp.iter(), id, translate_idx, None)?;
 
@@ -309,23 +309,17 @@ fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
 fn transfer_edges<'a>(
     h: &mut impl HugrMut,
     edges: impl Iterator<Item = &'a NewEdgeSpec>,
-    trans_src: impl Fn(Node) -> Option<Node>,
-    trans_tgt: impl Fn(Node) -> Option<Node>,
+    trans_src: impl Fn(Node) -> Result<Node, WhichHugr>,
+    trans_tgt: impl Fn(Node) -> Result<Node, WhichHugr>,
     existing_src_ancestor: Option<Node>,
 ) -> Result<(), ReplaceError> {
     for e in edges {
         let e = NewEdgeSpec {
             // Translation can only fail for Nodes that are supposed to be in the replacement
-            src: trans_src(e.src).ok_or(ReplaceError::BadEdgeSpec(
-                Direction::Outgoing,
-                WhichHugr::Replacement,
-                e.clone(),
-            ))?,
-            tgt: trans_tgt(e.tgt).ok_or(ReplaceError::BadEdgeSpec(
-                Direction::Incoming,
-                WhichHugr::Replacement,
-                e.clone(),
-            ))?,
+            src: trans_src(e.src)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Outgoing, h, e.clone()))?,
+            tgt: trans_tgt(e.tgt)
+                .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, e.clone()))?,
             ..e.clone()
         };
         e.check_src(h)?;
