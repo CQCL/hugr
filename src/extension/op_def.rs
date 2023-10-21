@@ -1,4 +1,5 @@
 use crate::Hugr;
+use std::cmp::min;
 use std::collections::hash_map::Entry;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -98,11 +99,9 @@ pub(super) enum SignatureFunc {
     TypeScheme(PolyFuncType),
     #[serde(skip)]
     CustomFunc {
-        /// All type parameters - the first [num_static_params] which are passed to [func]
-        /// and any further passed to the [PolyFuncType] returned by [func]
-        all_params: Vec<TypeParam>,
-        /// The number (of [all_params]) that are passed to [func]
-        num_static_params: usize,
+        /// Type parameters passed to [func]. (The returned [PolyFuncType]
+        /// may require further type parameters, not declared here.)
+        static_params: Vec<TypeParam>,
         func: Box<dyn CustomSignatureFunc>,
     },
 }
@@ -196,17 +195,14 @@ impl OpDef {
         let (pf, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (ts, args),
             SignatureFunc::CustomFunc {
-                all_params,
-                num_static_params,
+                static_params,
                 func,
             } => {
-                check_type_args(args, all_params)?;
-                let (binary_args, ts_args) = args.split_at(*num_static_params);
-                let ts = func.compute_signature(&self.name, binary_args, &self.misc, exts)?;
-                assert_eq!(ts.params, all_params.iter().skip(*num_static_params).cloned().collect::<Vec<_>>(),
-                    "Custom binary function returned polymorphic type scheme whose parameters did not match");
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+                check_type_args(static_args, static_params)?;
+                let ts = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
                 temp = Some(ts);
-                (temp.as_ref().unwrap(), ts_args)
+                (temp.as_ref().unwrap(), other_args)
             }
         };
         // Hugr's are monomorphic, so check the args have no free variables
@@ -275,7 +271,7 @@ impl OpDef {
     pub fn params(&self) -> &[TypeParam] {
         match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => &ts.params,
-            SignatureFunc::CustomFunc { all_params, .. } => all_params,
+            SignatureFunc::CustomFunc { static_params, .. } => static_params,
         }
     }
 }
@@ -312,29 +308,25 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        mut static_params: Vec<TypeParam>,
-        type_scheme_params: Vec<TypeParam>,
+        static_params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
-        let num_static_params = static_params.len();
-        static_params.extend(type_scheme_params);
         self.add_op(
             name,
             description,
             misc,
             lower_funcs,
             SignatureFunc::CustomFunc {
-                all_params: static_params,
-                num_static_params,
+                static_params,
                 func: Box::new(signature_func),
             },
         )
     }
 
-    /// Create an OpDef with custom binary code to compute the signature,
-    /// which is not polymorphic; and no "misc" or "lowering functions" defined.
+    /// Create an OpDef with custom binary code to compute the type scheme
+    /// (which may be polymorphic); and no "misc" or "lowering functions" defined.
     /// TODO: reconsider this when more custom binaries have been converted
     ///   to type schemes and the requirements for the remaining ones are clearer.
     pub fn add_op_custom_sig_simple(
@@ -348,7 +340,6 @@ impl Extension {
             name,
             description,
             static_params,
-            vec![],
             HashMap::default(),
             Vec::new(),
             signature_func,
