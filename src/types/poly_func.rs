@@ -77,11 +77,9 @@ impl PolyFuncType {
         self.body.validate(reg, all_var_decls)
     }
 
-    pub(super) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
+    pub(super) fn substitute(&self, sub: &Substitution) -> Self {
         Self {
-            body: self
-                .body
-                .substitute(exts, &sub.enter_scope(self.params.len(), exts)),
+            body: self.body.substitute(&sub.enter_scope(self.params.len())),
             params: self.params.clone(),
         }
     }
@@ -115,10 +113,10 @@ impl PolyFuncType {
     pub(crate) fn instantiate_all(
         &self,
         args: &[TypeArg],
-        extension_registry: &ExtensionRegistry,
+        ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
-        Ok(self.body.substitute(extension_registry, &args.into()))
+        Ok(self.body.substitute(&Substitution::new(args, ext_reg)))
     }
 }
 

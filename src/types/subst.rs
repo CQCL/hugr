@@ -13,6 +13,7 @@ pub(crate) struct Substitution<'a> {
     leave_lowest: usize,
     /// What to do to variables that are affected
     mapping: Mapping<'a>,
+    reg: &'a ExtensionRegistry,
 }
 
 #[derive(Clone, Debug)]
@@ -24,16 +25,19 @@ enum Mapping<'a> {
     AddToIndex(usize),
 }
 
-impl<'a, T: Into<Cow<'a, [TypeArg]>>> From<T> for Substitution<'a> {
-    fn from(value: T) -> Self {
+impl<'a> Substitution<'a> {
+    pub(crate) fn new(argvals: impl Into<Cow<'a, [TypeArg]>>, reg: &'a ExtensionRegistry) -> Self {
         Self {
             leave_lowest: 0,
-            mapping: Mapping::Values(value.into()),
+            mapping: Mapping::Values(argvals.into()),
+            reg,
         }
     }
-}
 
-impl<'a> Substitution<'a> {
+    pub(crate) fn extension_registry(&self) -> &ExtensionRegistry {
+        self.reg
+    }
+
     pub(crate) fn apply_to_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         if idx < self.leave_lowest {
             return TypeArg::new_var_use(idx, decl.clone());
@@ -54,7 +58,7 @@ impl<'a> Substitution<'a> {
     }
 
     // A bit unfortunate to need the Extension registry here. We could move `exts` into Substitution?
-    pub(super) fn enter_scope(&self, new_vars: usize, exts: &ExtensionRegistry) -> Self {
+    pub(super) fn enter_scope(&self, new_vars: usize) -> Self {
         Self {
             leave_lowest: self.leave_lowest + new_vars,
             mapping: match &self.mapping {
@@ -63,18 +67,20 @@ impl<'a> Substitution<'a> {
                     let renum = Substitution {
                         leave_lowest: 0,
                         mapping: Mapping::AddToIndex(new_vars),
+                        reg: self.reg,
                     };
-                    vals.iter().map(|v| v.substitute(exts, &renum)).collect()
+                    vals.iter().map(|v| v.substitute(&renum)).collect()
                 }),
                 Mapping::AddToIndex(i) => Mapping::AddToIndex(*i),
             },
+            reg: self.reg,
         }
     }
 
-    pub(super) fn apply_row(&self, row: &TypeRow, exts: &ExtensionRegistry) -> TypeRow {
+    pub(super) fn apply_row(&self, row: &TypeRow) -> TypeRow {
         let res = row
             .iter()
-            .map(|t| t.substitute(exts, self))
+            .map(|t| t.substitute(self))
             .collect::<Vec<_>>()
             .into();
         res

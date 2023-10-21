@@ -336,18 +336,16 @@ impl Type {
     /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
     /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
     /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, sub: &Substitution) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => sub.apply_to_type_var(*idx, *bound),
-            TypeEnum::Prim(PrimType::Extension(cty)) => {
-                Type::new_extension(cty.substitute(exts, sub))
-            }
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, sub)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(sub.apply_row(elems, exts)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(sub.apply_row(row, exts)),
+            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(sub)),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(sub)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(sub.apply_row(elems)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(sub.apply_row(row)),
         }
     }
 }

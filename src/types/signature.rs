@@ -73,10 +73,10 @@ impl FunctionType {
         self.extension_reqs.validate(var_decls)
     }
 
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, sub: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, sub: &Substitution) -> Self {
         FunctionType {
-            input: sub.apply_row(&self.input, exts),
-            output: sub.apply_row(&self.output, exts),
+            input: sub.apply_row(&self.input),
+            output: sub.apply_row(&self.output),
             extension_reqs: self.extension_reqs.substitute(sub),
         }
     }
