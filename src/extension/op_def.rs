@@ -191,6 +191,9 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
+        // Hugr's are monomorphic, so check the args have no free variables
+        args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
+
         let temp: Option<PolyFuncType>; // to keep alive
         let (pf, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (ts, args),
@@ -205,8 +208,6 @@ impl OpDef {
                 (temp.as_ref().unwrap(), other_args)
             }
         };
-        // Hugr's are monomorphic, so check the args have no free variables
-        args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
 
         let res = pf.instantiate_all(args, exts)?;
         // TODO bring this assert back once resource inference is done?
