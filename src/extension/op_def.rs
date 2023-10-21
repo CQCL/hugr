@@ -302,7 +302,6 @@ impl Extension {
     }
 
     /// Create an OpDef with custom binary code to compute the signature
-    // # TODO: rethink add_op functions after converting binaries to [SignatureFunc::TypeScheme]s
     #[allow(clippy::too_many_arguments)]
     pub fn add_op_custom_sig(
         &mut self,
@@ -327,8 +326,6 @@ impl Extension {
 
     /// Create an OpDef with custom binary code to compute the type scheme
     /// (which may be polymorphic); and no "misc" or "lowering functions" defined.
-    /// TODO: reconsider this when more custom binaries have been converted
-    ///   to type schemes and the requirements for the remaining ones are clearer.
     pub fn add_op_custom_sig_simple(
         &mut self,
         name: SmolStr,
