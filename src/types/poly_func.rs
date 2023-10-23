@@ -368,6 +368,7 @@ pub(crate) mod test {
             )
         };
         let reg = [EXTENSION.to_owned()].into();
+        // forall A. A -> (forall C. C -> List(Tuple(C, A))
         let pf = PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any)],
             FunctionType::new(
@@ -394,6 +395,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             res,
+            // F -> forall C. (C -> List(Tuple(C, F)))
             FunctionType::new(
                 vec![Type::new_var_use(FREE, TypeBound::Eq)],
                 vec![Type::new_function(new_pf1(
@@ -427,7 +429,8 @@ pub(crate) mod test {
         assert_eq!(
             res,
             FunctionType::new(
-                vec![rhs(FREE)],
+                vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
+                // Output: forall C. C -> List(Tuple(C, Input))
                 vec![Type::new_function(new_pf1(
                     TypeParam::Type(TypeBound::Copyable),
                     Type::new_var_use(0, TypeBound::Copyable),
@@ -444,6 +447,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_instantiate() -> Result<(), SignatureError> {
+        // forall A,N.(Array<A,N> -> A)
         let array_max = PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
             FunctionType::new(
@@ -465,6 +469,7 @@ pub(crate) mod test {
 
         assert_eq!(actual, concrete.into());
 
+        // forall N.(Array<usize,N> -> usize)
         let partial = PolyFuncType::new_validated(
             vec![TypeParam::max_nat()],
             FunctionType::new(
@@ -485,6 +490,7 @@ pub(crate) mod test {
     #[test]
     fn test_type_apply_nested() -> Result<(), SignatureError> {
         let inner_var = Type::new_var_use(0, TypeBound::Any);
+        // forall A. (Array<A, FREE_NAT> -> A)
         let inner = PolyFuncType {
             params: vec![TypeParam::Type(TypeBound::Any)],
             body: FunctionType::new(
@@ -495,12 +501,14 @@ pub(crate) mod test {
                 vec![inner_var.clone()],
             ),
         };
+        // forall N. ( -> `inner`)
         let outer = PolyFuncType::new_validated(
             vec![TypeParam::max_nat()],
             FunctionType::new(vec![], vec![Type::new_function(inner)]),
             &PRELUDE_REGISTRY,
         )?;
 
+        // ( -> forall A. (Array<A, 5> -> A) )
         let outer_applied = FunctionType::new(
             vec![],
             vec![Type::new_function(PolyFuncType::new_validated(
