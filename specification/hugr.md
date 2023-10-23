@@ -335,18 +335,18 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type (see below), whose
+The first input to the Conditional-node is of TupleSum type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
-contents of the Predicate with all remaining inputs to Conditional
+contents of the TupleSum with all remaining inputs to Conditional
 appended are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
-defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
-system](#type-system)), where `#ti` is the *i*th Row defining it.
+A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
+defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
+system](#type-system)), where `#Ti` is the *i*th Row defining it.
 
 ```mermaid
 flowchart
@@ -362,7 +362,7 @@ flowchart
         end
         Case0 ~~~ Case1
     end
-    Pred["case 0 inputs | case 1 inputs"] --> Conditional
+    TupleSum["case 0 inputs | case 1 inputs"] --> Conditional
     OI["other inputs"] --> Conditional
     Conditional --> outputs
 ```
@@ -371,13 +371,13 @@ flowchart
 
 These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
-first element has type `Predicate(#I, #O)` and the remainder is a row `#X`
+first element has type `TupleSum(#I, #O)` and the remainder is a row `#X`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
 are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
-inside the `Predicate` unpacked).
+inside the `TupleSum` unpacked).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
-and evaluating it.  The `Predicate` produced controls iteration of the loop:
+and evaluating it.  The `TupleSum` produced controls iteration of the loop:
    * The first variant (`#I`) means that these values, along with the other
      sibling-graph outputs `#X`, are fed back into the top of the loop,
      and the body is evaluated again (thus perhaps many times)
@@ -405,7 +405,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
+`TupleSum(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -431,7 +431,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Const" are simply generating a predicate with one empty
+The three nodes labelled "Const" are simply generating a TupleSum with one empty
 value to pass to the Output node.
 
 ```mermaid
@@ -1125,7 +1125,6 @@ run, which removes the `HigherOrder` extension requirement:
 ```
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
->>>>>>> c6abd39 ([doc] Tidy hugr specification)
 ```
 
 Before we can run the circuit.
@@ -1391,8 +1390,8 @@ use an empty node in the replacement and have B map this node to the old
 one.
 
 We can, for example, implement “turning a Conditional-node with known
-predicate into a DFG-node” by a `Replace` where the Conditional (and its
-preceding predicate) is replaced by an empty DFG and the map B specifies
+TupleSum into a DFG-node” by a `Replace` where the Conditional (and its
+preceding TupleSum) is replaced by an empty DFG and the map B specifies
 the “good” child of the Conditional as the surrogate parent of the new
 DFG’s children. (If the good child was just an Op, we could either
 remove it and include it in the replacement, or – to avoid this overhead

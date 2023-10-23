@@ -86,7 +86,7 @@ pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
 /// Unsigned size type.
 pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 /// Boolean type - Sum of two units.
-pub const BOOL_T: Type = Type::new_simple_predicate(2);
+pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
 pub fn array_type(element_ty: Type, size: u64) -> Type {

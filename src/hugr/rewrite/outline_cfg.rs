@@ -139,10 +139,10 @@ impl Rewrite for OutlineCfg {
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
-            let predicate = new_block_bldr
-                .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
+            let unit_sum = new_block_bldr
+                .add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())
                 .unwrap();
-            let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
+            let pred_wire = new_block_bldr.load_const(&unit_sum).unwrap();
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
                 .unwrap();
