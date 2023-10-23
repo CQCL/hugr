@@ -207,7 +207,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_node(NodeType::open_extensions(op));
+        let node = self.as_mut().add_op(op);
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
