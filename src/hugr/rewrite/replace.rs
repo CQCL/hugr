@@ -563,23 +563,35 @@ mod test {
         let output = hugr.add_node_with_parent(
             bb,
             NodeType::open_extensions(ops::Output {
-                types: op_sig.output.clone(),
+                types: TypeRow::from(
+                    Some(Type::new_simple_predicate(1))
+                        .into_iter()
+                        .chain(op_sig.output.iter().cloned()).collect::<Vec<_>>())
+            }        ))?;
+
+        const PRED_T: Type = Type::new_simple_predicate(1);
+        let load_pred = hugr.add_node_with_parent(
+            bb,
+            NodeType::pure(ops::LoadConstant {
+                datatype: PRED_T
             }),
         )?;
+        let mut load_pred_lifted = load_pred;
+        for e in op.signature().extension_reqs.iter() {
+            let new_lift = hugr.add_node_with_parent(bb,
+            NodeType::pure(LeafOp::Lift { type_row: type_row![PRED_T], new_extension: e.clone() }))?;
+            hugr.connect(load_pred_lifted, 0, new_lift, 0)?;
+            load_pred_lifted = new_lift;
+        }
+        hugr.connect(pred_const, 0, load_pred, 0)?;
+        hugr.connect(load_pred_lifted, 0, output, 0)?;
+
         let op = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
 
         for (p, _) in op_sig.input().iter().enumerate() {
             hugr.connect(input, p, op, p)?;
         }
-        let pred = hugr.add_node_with_parent(
-            bb,
-            NodeType::open_extensions(ops::LoadConstant {
-                datatype: Type::new_simple_predicate(1),
-            }),
-        )?;
 
-        hugr.connect(pred_const, 0, pred, 0)?;
-        hugr.connect(pred, 0, output, 0)?;
         for (p, _) in op_sig.output().iter().enumerate() {
             hugr.connect(op, p, output, p + 1)?;
         }
