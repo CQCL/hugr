@@ -845,7 +845,7 @@ mod test {
         assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(ops::Module);
+        let other = b.add_node(NodeType::pure(ops::Module));
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)

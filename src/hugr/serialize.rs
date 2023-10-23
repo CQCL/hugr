@@ -273,7 +273,7 @@ pub mod test {
 
     use super::*;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+
     use crate::{
         builder::{
             test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
@@ -465,10 +465,11 @@ pub mod test {
         hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([QB].to_vec()));
+        let new_in = hugr
+            .add_op_before(old_in, Input::new([QB].to_vec()))
+            .unwrap();
         hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
-        hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();
         hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
 

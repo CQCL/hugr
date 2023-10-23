@@ -303,12 +303,6 @@ impl Hugr {
         }
     }
 
-    /// Add a node to the graph, with the default conversion from OpType to NodeType
-    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-        self.add_node(NodeType::pure(op))
-    }
-
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
         let node = self
