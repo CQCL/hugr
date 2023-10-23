@@ -439,18 +439,6 @@ pub(crate) mod sealed {
             self.hugr_mut().set_parent(node, parent)
         }
 
-        /// Move a node in the hierarchy to be the subsequent sibling of another
-        /// node.
-        ///
-        /// The sibling node's parent becomes the new node's parent.
-        ///
-        /// The node becomes the parent's last child.
-        fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-            self.valid_non_root(node)?;
-            self.valid_non_root(after)?;
-            self.hugr_mut().move_after_sibling(node, after)
-        }
-
         /// Move a node in the hierarchy to be the prior sibling of another node.
         ///
         /// The sibling node's parent becomes the new node's parent.
@@ -519,14 +507,6 @@ pub(crate) mod sealed {
             self.hugr_mut()
                 .hierarchy
                 .push_child(node.index, parent.index)?;
-            Ok(())
-        }
-
-        fn move_after_sibling(&mut self, node: Node, after: Node) -> Result<(), HugrError> {
-            self.hugr_mut().hierarchy.detach(node.index);
-            self.hugr_mut()
-                .hierarchy
-                .insert_after(node.index, after.index)?;
             Ok(())
         }
 
