@@ -374,7 +374,7 @@ impl UnificationContext {
             .iter()
             .find(|(_, m)| **m == m2 || self.resolve(**m) == m2)
             .map(|a| a.0);
-        let err = if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
+        if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
             // N.B. We're looking for the case where an equality constraint
             // arose because the two locations are connected by an edge
 
@@ -392,43 +392,35 @@ impl UnificationContext {
                     [(node2, rs2.clone()), (node1, rs1.clone())]
                 };
 
-                if src_rs.is_subset(&tgt_rs) {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::TgtExceedsSrcExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
+                return InferExtensionError::EdgeMismatch(if src_rs.is_subset(&tgt_rs) {
+                    ExtensionError::TgtExceedsSrcExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
                 } else {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::SrcExceedsTgtExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
-                }
-            } else {
-                None
+                    ExtensionError::SrcExceedsTgtExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
+                });
             }
-        } else {
-            None
-        };
+        }
         if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
-            err.unwrap_or(InferExtensionError::MismatchedConcreteWithLocations {
+            InferExtensionError::MismatchedConcreteWithLocations {
                 expected_loc: *loc1,
                 expected: rs1,
                 actual_loc: *loc2,
                 actual: rs2,
-            })
+            }
         } else {
-            err.unwrap_or(InferExtensionError::MismatchedConcrete {
+            InferExtensionError::MismatchedConcrete {
                 expected: rs1,
                 actual: rs2,
-            })
+            }
         }
     }
 
