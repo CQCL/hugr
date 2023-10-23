@@ -99,12 +99,11 @@ impl Rewrite for SimpleReplacement {
             .collect::<Vec<Node>>();
         // slice of nodes omitting Input and Output:
         let replacement_inner_nodes = &replacement_nodes[2..];
-        let self_output_node = h.children(parent).nth(1).unwrap();
         let replacement_output_node = *replacement_nodes.get(1).unwrap();
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
-            let new_node = h.add_op_after(self_output_node, op.clone()).unwrap();
+            let new_node = h.add_op_with_parent(parent, op.clone()).unwrap();
             index_map.insert(node, new_node);
 
             // Move the metadata

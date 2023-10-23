@@ -1039,8 +1039,8 @@ mod test {
 
         // Add an internal exit node
         let exit2 = b
-            .add_op_after(
-                exit,
+            .add_op_with_parent(
+                cfg,
                 ops::BasicBlock::Exit {
                     cfg_outputs: type_row![BOOL_T],
                 },

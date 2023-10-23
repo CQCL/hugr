@@ -75,20 +75,6 @@ pub trait HugrMut: HugrMutInternals {
         self.hugr_mut().add_node_before(sibling, nodetype)
     }
 
-    /// Add a node to the graph as the next sibling of another node.
-    ///
-    /// The sibling node's parent becomes the new node's parent.
-    ///
-    /// # Errors
-    ///
-    ///  - If the sibling node does not have a parent.
-    ///  - If the attachment would introduce a cycle.
-    #[inline]
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.valid_non_root(sibling)?;
-        self.hugr_mut().add_op_after(sibling, op)
-    }
-
     /// Remove a node from the graph.
     ///
     /// # Panics
@@ -224,14 +210,6 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         self.as_mut()
             .hierarchy
             .insert_before(node.index, sibling.index)?;
-        Ok(node)
-    }
-
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_op(op);
-        self.as_mut()
-            .hierarchy
-            .insert_after(node.index, sibling.index)?;
         Ok(node)
     }
 
