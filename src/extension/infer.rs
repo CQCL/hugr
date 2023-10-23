@@ -759,7 +759,7 @@ impl UnificationContext {
                 .flat_map(|m| self.get_constraints(m).unwrap())
                 .filter_map(|c| match c {
                     Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)),
-                    Constraint::Equal(_) => None, // Or should we include this??
+                    Constraint::Equal(_) => None,
                 })
                 .fold(ExtensionSet::new(), |a, b| a.union(b));
 
