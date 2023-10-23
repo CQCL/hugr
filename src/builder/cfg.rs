@@ -146,8 +146,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             // TODO: Make extensions a parameter
             self.hugr_mut().add_op_before(exit, op)
         } else {
-            // TODO: Make extensions a parameter
-            self.hugr_mut().add_op_with_parent(parent, op)
+            self.hugr_mut()
+                .add_node_with_parent(parent, NodeType::open_extensions(op))
         }?;
 
         BlockBuilder::create(
