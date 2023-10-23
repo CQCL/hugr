@@ -34,7 +34,7 @@ impl Const {
         &self.typ
     }
 
-    /// Sum of Tuples, used  for branching.
+    /// Sum of Tuples, used for branching.
     /// Tuple rows are defined in order by input rows.
     pub fn tuple_sum(
         tag: usize,

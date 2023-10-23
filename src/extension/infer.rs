@@ -1206,15 +1206,15 @@ mod test {
         hugr: &mut Hugr,
         root: Node,
         inputs: TypeRow,
-        entry_predicates: Vec<TypeRow>,
+        entry_variants: Vec<TypeRow>,
         entry_extensions: ExtensionSet,
         exit_types: impl Into<TypeRow>,
     ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-        let entry_predicate_type = Type::new_tuple_sum(entry_predicates.clone());
+        let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: type_row![],
-            tuple_sum_rows: entry_predicates,
+            tuple_sum_rows: entry_variants,
             extension_delta: entry_extensions,
         };
 
@@ -1233,7 +1233,7 @@ mod test {
         let entry_out = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(ops::Output {
-                types: vec![entry_predicate_type].into(),
+                types: vec![entry_tuple_sum].into(),
             }),
         )?;
 
