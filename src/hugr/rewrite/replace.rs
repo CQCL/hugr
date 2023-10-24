@@ -482,21 +482,26 @@ mod test {
         h.update_validate(&reg)?;
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
-        let mut replacement = Hugr::new(NodeType::open_extensions(BasicBlock::DFB {
-            inputs: vec![listy.clone()].into(),
-            predicate_variants: vec![type_row![]],
-            other_outputs: vec![listy.clone()].into(),
-            extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
+        let mut replacement = Hugr::new(NodeType::open_extensions(ops::CFG {
+            signature: FunctionType::new_linear(just_list.clone()),
         }));
-        let rroot = replacement.root();
+        let bb = replacement.add_node_with_parent(
+            replacement.root(),
+            NodeType::open_extensions(BasicBlock::DFB {
+                inputs: vec![listy.clone()].into(),
+                predicate_variants: vec![type_row![]],
+                other_outputs: vec![listy.clone()].into(),
+                extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
+            }),
+        )?;
         let inp = replacement.add_op_with_parent(
-            rroot,
+            bb,
             ops::Input {
                 types: vec![listy.clone()].into(),
             },
         )?;
         let df1 = replacement.add_op_with_parent(
-            rroot,
+            bb,
             DFG {
                 signature: FunctionType::new(vec![listy.clone()], intermed.clone()),
             },
@@ -504,7 +509,7 @@ mod test {
         replacement.connect(inp, 0, df1, 0)?;
 
         let df2 = replacement.add_op_with_parent(
-            rroot,
+            bb,
             DFG {
                 signature: FunctionType::new(intermed, vec![listy.clone()]),
             },
@@ -514,7 +519,7 @@ mod test {
             .try_for_each(|p| replacement.connect(df1, *p, df2, *p))?;
 
         let ex = replacement.add_op_with_parent(
-            rroot,
+            bb,
             ops::Output {
                 types: vec![listy.clone()].into(),
             },
@@ -527,7 +532,7 @@ mod test {
             transfers: HashMap::from([(df1.node(), entry.node()), (df2.node(), bb2.node())]),
             mu_inp: vec![],
             mu_out: vec![NewEdgeSpec {
-                src: rroot,
+                src: bb,
                 tgt: exit.node(),
                 kind: NewEdgeKind::ControlFlow { src_pos: 0 },
             }],
@@ -566,20 +571,24 @@ mod test {
                 types: TypeRow::from(
                     Some(Type::new_simple_predicate(1))
                         .into_iter()
-                        .chain(op_sig.output.iter().cloned()).collect::<Vec<_>>())
-            }        ))?;
-
-        const PRED_T: Type = Type::new_simple_predicate(1);
-        let load_pred = hugr.add_node_with_parent(
-            bb,
-            NodeType::pure(ops::LoadConstant {
-                datatype: PRED_T
+                        .chain(op_sig.output.iter().cloned())
+                        .collect::<Vec<_>>(),
+                ),
             }),
         )?;
+
+        const PRED_T: Type = Type::new_simple_predicate(1);
+        let load_pred =
+            hugr.add_node_with_parent(bb, NodeType::pure(ops::LoadConstant { datatype: PRED_T }))?;
         let mut load_pred_lifted = load_pred;
         for e in op.signature().extension_reqs.iter() {
-            let new_lift = hugr.add_node_with_parent(bb,
-            NodeType::pure(LeafOp::Lift { type_row: type_row![PRED_T], new_extension: e.clone() }))?;
+            let new_lift = hugr.add_node_with_parent(
+                bb,
+                NodeType::pure(LeafOp::Lift {
+                    type_row: type_row![PRED_T],
+                    new_extension: e.clone(),
+                }),
+            )?;
             hugr.connect(load_pred_lifted, 0, new_lift, 0)?;
             load_pred_lifted = new_lift;
         }
