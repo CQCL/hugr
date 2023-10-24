@@ -165,6 +165,14 @@ impl Replacement {
     }
 
     fn get_removed_nodes(&self, h: &impl HugrView) -> Result<HashSet<Node>, ReplaceError> {
+        // Check the keys of the transfer map too, the values we'll use imminently
+        self.transfers.keys().try_for_each(|&n| {
+            (self.replacement.contains_node(n)
+                && self.replacement.get_optype(n).is_container()
+                && self.replacement.children(n).next().is_none())
+            .then_some(())
+            .ok_or(ReplaceError::InvalidTransferTarget(n))
+        })?;
         let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
         if transferred.len() != self.transfers.values().len() {
             return Err(ReplaceError::ConflictingTransfers(
@@ -389,6 +397,9 @@ pub enum ReplaceError {
     /// Values in transfer map were not unique - contains the repeated elements
     #[error("Nodes cannot be transferred to multiple locations: {0:?}")]
     ConflictingTransfers(Vec<Node>),
+    /// Keys in transfer map were not valid container nodes in replacement
+    #[error("Node {0:?} was not an empty container node in the replacement")]
+    InvalidTransferTarget(Node),
     /// Some values in the transfer map were either descendants of other values,
     /// or not descendants of the removed nodes
     #[error("Nodes not free to be moved into new locations: {0:?}")]
