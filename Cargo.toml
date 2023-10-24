@@ -1,18 +1,18 @@
 [package]
 name = "quantinuum-hugr"
-version = "0.1.0"
-license = "Apache-2.0"
+version.workspace = true
+license.workspace = true
 
 readme = "README.md"
 #documentation = "https://docs.rs/hugr/"
-repository = "https://github.com/CQCL/hugr"
+repository.workspace = true
 
 description = "Hierarchical Unified Graph Representation"
 #keywords = [] # TODO
 #categories = [] # TODO
 
-edition = "2021"
-rust-version = "1.70"
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 # Using different names for the lib and for the package is supported, but may be confusing.
@@ -62,7 +62,18 @@ webbrowser = "0.8.10"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 paste = "1.0"
+quantinuum-hugr-utils = {path = "./hugr-utils" }
 
 [[bench]]
 name = "bench_main"
 harness = false
+
+[workspace]
+members = ["hugr-utils"]
+
+[workspace.package]
+repository = "https://github.com/CQCL/hugr"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.70"

@@ -728,11 +728,11 @@ mod tests {
             handle::{DfgID, FuncID, NodeHandle},
             OpType,
         },
-        std_extensions::{
-            logic::test::{and_op, not_op},
-            quantum::test::cx_gate,
-        },
         type_row,
+    };
+    use hugr_utils::examples::{
+        logic::{and_op, not_op},
+        quantum::cx_gate,
     };
 
     use super::*;

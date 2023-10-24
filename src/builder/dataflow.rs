@@ -231,88 +231,15 @@ pub(crate) mod test {
     use super::super::test::simple_dfg_hugr;
     use super::*;
     #[test]
-    fn nested_identity() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let _f_id = {
-                let mut func_builder = module_builder.define_function(
-                    "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).pure(),
-                )?;
-
-                let [int, qb] = func_builder.input_wires_arr();
-
-                let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
-
-                let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
-                    None,
-                    [int],
-                )?;
-                let inner_id = n_identity(inner_builder)?;
-
-                func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
-            };
-            module_builder.finish_prelude_hugr()
-        };
-
-        assert_eq!(build_result.err(), None);
-
-        Ok(())
+    fn nested_identity() {
+        assert_matches!(hugr_utils::examples::nested_identity(), Ok(_));
     }
 
-    // Scaffolding for copy insertion tests
-    fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
-    where
-        F: FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
-    {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let f_build = module_builder.define_function(
-                "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).pure(),
-            )?;
-
-            f(f_build)?;
-
-            module_builder.finish_hugr(&EMPTY_REG)
-        };
-        assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
-
-        Ok(())
-    }
     #[test]
-    fn copy_insertion() -> Result<(), BuildError> {
-        copy_scaffold(
-            |f_build| {
-                let [b1] = f_build.input_wires_arr();
-                f_build.finish_with_outputs([b1, b1])
-            },
-            "Copy input and output",
-        )?;
-
-        copy_scaffold(
-            |mut f_build| {
-                let [b1] = f_build.input_wires_arr();
-                let xor = f_build.add_dataflow_op(and_op(), [b1, b1])?;
-                f_build.finish_with_outputs([xor.out_wire(0), b1])
-            },
-            "Copy input and use with binary function",
-        )?;
-
-        copy_scaffold(
-            |mut f_build| {
-                let [b1] = f_build.input_wires_arr();
-                let xor1 = f_build.add_dataflow_op(and_op(), [b1, b1])?;
-                let xor2 = f_build.add_dataflow_op(and_op(), [b1, xor1.out_wire(0)])?;
-                f_build.finish_with_outputs([xor2.out_wire(0), b1])
-            },
-            "Copy multiple times",
-        )?;
-
-        Ok(())
+    fn copy_insertion() {
+        assert_matches!(hugr_utils::examples::copy_input_and_output(), Ok(_));
+        assert_matches!(hugr_utils::examples::copy_input_and_output(), Ok(_));
+        assert_matches!(hugr_utils::examples::copy_multiple_times(), Ok(_));
     }
 
     #[test]
@@ -336,27 +263,7 @@ pub(crate) mod test {
 
     #[test]
     fn simple_inter_graph_edge() {
-        let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                FunctionType::new(type_row![BIT], type_row![BIT]).pure(),
-            )?;
-
-            let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
-            let i1 = noop.out_wire(0);
-
-            let mut nested =
-                f_build.dfg_builder(FunctionType::new(type_row![], type_row![BIT]), None, [])?;
-
-            let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
-
-            let nested = nested.finish_with_outputs([id.out_wire(0)])?;
-
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &EMPTY_REG)
-        };
-
-        assert_matches!(builder(), Ok(_));
+        assert_matches!(hugr_utils::examples::simple_inter_graph_edge(), Ok(_));
     }
 
     #[test]

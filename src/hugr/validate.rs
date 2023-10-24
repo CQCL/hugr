@@ -751,10 +751,10 @@ mod test {
     use crate::ops::dataflow::IOTrait;
     use crate::ops::{self, LeafOp, OpType};
     use crate::std_extensions::logic;
-    use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
     use crate::{type_row, Direction, Node};
+    use hugr_utils::examples::logic::{and_op, not_op};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;

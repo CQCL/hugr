@@ -322,75 +322,14 @@ impl BlockBuilder<Hugr> {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::build_traits::HugrBuilder;
-    use crate::builder::{DataflowSubContainer, ModuleBuilder};
-
-    use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
-    use super::*;
     #[test]
-    fn basic_module_cfg() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-            let mut func_builder = module_builder
-                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).pure())?;
-            let _f_id = {
-                let [int] = func_builder.input_wires_arr();
-
-                let cfg_id = {
-                    let mut cfg_builder = func_builder.cfg_builder(
-                        vec![(NAT, int)],
-                        None,
-                        type_row![NAT],
-                        ExtensionSet::new(),
-                    )?;
-                    build_basic_cfg(&mut cfg_builder)?;
-
-                    cfg_builder.finish_sub_container()?
-                };
-
-                func_builder.finish_with_outputs(cfg_id.outputs())?
-            };
-            module_builder.finish_prelude_hugr()
-        };
-
-        assert_eq!(build_result.err(), None);
-
-        Ok(())
+    fn basic_module_cfg() {
+        assert_matches!(hugr_utils::examples::basic_module_cfg(), Ok(_));
     }
     #[test]
-    fn basic_cfg_hugr() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
-
-        Ok(())
-    }
-
-    fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg_builder: &mut CFGBuilder<T>,
-    ) -> Result<(), BuildError> {
-        let sum2_variants = vec![type_row![NAT], type_row![NAT]];
-        let mut entry_b =
-            cfg_builder.entry_builder(sum2_variants.clone(), type_row![], ExtensionSet::new())?;
-        let entry = {
-            let [inw] = entry_b.input_wires_arr();
-
-            let sum = entry_b.make_tuple_sum(1, sum2_variants, [inw])?;
-            entry_b.finish_with_outputs(sum, [])?
-        };
-        let mut middle_b = cfg_builder
-            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
-        let middle = {
-            let c = middle_b.add_load_const(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
-            let [inw] = middle_b.input_wires_arr();
-            middle_b.finish_with_outputs(c, [inw])?
-        };
-        let exit = cfg_builder.exit_block();
-        cfg_builder.branch(&entry, 0, &middle)?;
-        cfg_builder.branch(&middle, 0, &exit)?;
-        cfg_builder.branch(&entry, 1, &exit)?;
-        Ok(())
+    fn basic_cfg_hugr() {
+        assert_matches!(hugr_utils::examples::basic_cfg(), Ok(_));
     }
 }

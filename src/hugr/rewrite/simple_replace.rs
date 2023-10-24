@@ -235,10 +235,10 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::hugr::{Hugr, HugrMut, Node, Rewrite};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
-    use crate::std_extensions::logic::test::and_op;
-    use crate::std_extensions::quantum::test::{cx_gate, h_gate};
     use crate::types::{FunctionType, Type};
     use crate::{type_row, Port};
+    use hugr_utils::examples::logic::and_op;
+    use hugr_utils::examples::quantum::{cx_gate, h_gate};
 
     use super::SimpleReplacement;
 

@@ -136,14 +136,6 @@ pub(crate) mod test {
         }
     }
 
-    /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn and_op() -> LeafOp {
-        EXTENSION
-            .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
-            .unwrap()
-            .into()
-    }
-
     /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn not_op() -> LeafOp {
         EXTENSION

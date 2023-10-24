@@ -113,25 +113,6 @@ pub(crate) mod test {
     pub(super) const BIT: Type = crate::extension::prelude::BOOL_T;
     pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
-    /// Wire up inputs of a Dataflow container to the outputs.
-    pub(super) fn n_identity<T: DataflowSubContainer>(
-        dataflow_builder: T,
-    ) -> Result<T::ContainerHandle, BuildError> {
-        let w = dataflow_builder.input_wires();
-        dataflow_builder.finish_with_outputs(w)
-    }
-
-    pub(super) fn build_main(
-        signature: Signature,
-        f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
-    ) -> Result<Hugr, BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-        let f_builder = module_builder.define_function("main", signature)?;
-
-        f(f_builder)?;
-        Ok(module_builder.finish_prelude_hugr()?)
-    }
-
     #[fixture]
     pub(crate) fn simple_dfg_hugr() -> Hugr {
         let dfg_builder =

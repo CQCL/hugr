@@ -1,0 +1,18 @@
+[package]
+name = "quantinuum-hugr-utils"
+version.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+# authors.workspace = true
+description = "TODO"
+#keywords.workspace = true # TODO
+#categories.workspace = true # TODO
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+quantinuum-hugr = { path = ".." }
+
+[lib]
+name = "hugr_utils"

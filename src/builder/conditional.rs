@@ -208,15 +208,8 @@ mod test {
 
     use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
 
-    use crate::{
-        builder::{
-            test::{n_identity, NAT},
-            Dataflow,
-        },
-        extension::ExtensionSet,
-        ops::Const,
-        type_row,
-    };
+    use crate::{builder::Dataflow, extension::ExtensionSet, ops::Const, type_row};
+    use hugr_utils::{examples::NAT, n_identity};
 
     use super::*;
 
