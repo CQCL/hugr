@@ -39,7 +39,6 @@ pub trait HugrMut: HugrMutInternals {
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
         self.add_node_with_parent(parent, NodeType::open_extensions(op))
     }
 
@@ -216,7 +215,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.add_node_before(sibling, NodeType::pure(op))
+        self.add_node_before(sibling, NodeType::open_extensions(op))
     }
 
     fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
