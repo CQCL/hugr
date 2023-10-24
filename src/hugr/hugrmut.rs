@@ -40,7 +40,7 @@ pub trait HugrMut: HugrMutInternals {
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
         // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-        self.add_node_with_parent(parent, NodeType::pure(op))
+        self.add_node_with_parent(parent, NodeType::open_extensions(op))
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -584,16 +584,15 @@ mod test {
 
     #[test]
     fn simple_function() {
-        // Starts an empty builder
-        let mut builder = Hugr::default();
+        let mut hugr = Hugr::default();
 
         // Create the root module definition
-        let module: Node = builder.root();
+        let module: Node = hugr.root();
 
         // Start a main function with two nat inputs.
         //
         // `add_op` is equivalent to `add_root_op` followed by `set_parent`
-        let f: Node = builder
+        let f: Node = hugr
             .add_op_with_parent(
                 module,
                 ops::FuncDefn {
@@ -604,22 +603,21 @@ mod test {
             .expect("Failed to add function definition node");
 
         {
-            let f_in = builder
-                .add_op_with_parent(f, ops::Input::new(type_row![NAT]))
+            let f_in = hugr
+                .add_node_with_parent(f, NodeType::pure(ops::Input::new(type_row![NAT])))
                 .unwrap();
-            let f_out = builder
+            let f_out = hugr
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
-            let noop = builder
+            let noop = hugr
                 .add_op_with_parent(f, LeafOp::Noop { ty: NAT })
                 .unwrap();
 
-            assert!(builder.connect(f_in, 0, noop, 0).is_ok());
-            assert!(builder.connect(noop, 0, f_out, 0).is_ok());
-            assert!(builder.connect(noop, 0, f_out, 1).is_ok());
+            hugr.connect(f_in, 0, noop, 0).unwrap();
+            hugr.connect(noop, 0, f_out, 0).unwrap();
+            hugr.connect(noop, 0, f_out, 1).unwrap();
         }
 
-        // Finish the construction and create the HUGR
-        builder.validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 }
