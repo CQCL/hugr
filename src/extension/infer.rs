@@ -1220,7 +1220,7 @@ mod test {
             }),
         )?;
 
-        let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
+        let entry = hugr.add_op_before(exit,dfb)?;
         let entry_in = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(ops::Input { types: inputs }),
