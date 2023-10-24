@@ -14,7 +14,7 @@ use super::{ExtensionId, ExtensionSet};
 use crate::{
     hugr::views::HugrView,
     hugr::Node,
-    ops::{OpTag, OpTrait, OpType},
+    ops::{OpTag, OpTrait},
     types::EdgeKind,
     Direction,
 };
@@ -328,7 +328,7 @@ impl UnificationContext {
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
-            let sig: &OpType = hugr.get_nodetype(tgt_node).into();
+            let sig = hugr.get_nodetype(tgt_node).op();
             // Incoming ports with an edge that should mean equal extension reqs
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(
@@ -695,6 +695,7 @@ mod test {
     use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
+    use crate::ops::OpType;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};

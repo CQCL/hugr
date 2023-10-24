@@ -121,6 +121,13 @@ impl NodeType {
 }
 
 impl NodeType {
+    /// Gets the underlying [OpType] i.e. without any [input_extensions]
+    ///
+    /// [input_extensions]: NodeType::input_extensions
+    pub fn op(&self) -> &OpType {
+        &self.op
+    }
+
     delegate! {
         to self.op {
             /// Tag identifying the operation.
@@ -130,12 +137,6 @@ impl NodeType {
             /// Returns the number of outputs ports for the operation.
             pub fn output_count(&self) -> usize;
         }
-    }
-}
-
-impl<'a> From<&'a NodeType> for &'a OpType {
-    fn from(nt: &'a NodeType) -> Self {
-        &nt.op
     }
 }
 
