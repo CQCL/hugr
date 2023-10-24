@@ -507,37 +507,41 @@ mod test {
                 extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
             }),
         )?;
-        let r_df1 = replacement.add_op_with_parent(
+        let r_df1 = replacement.add_node_with_parent(
             r_bb,
-            DFG {
-                signature: FunctionType::new(vec![listy.clone()], intermed.clone()),
-            },
+            NodeType::open_extensions(DFG {
+                signature: FunctionType::new(
+                    vec![listy.clone()],
+                    simple_unary_plus(intermed.clone()),
+                ),
+            }),
         )?;
-        let r_df2 = replacement.add_op_with_parent(
+        let r_df2 = replacement.add_node_with_parent(
             r_bb,
-            DFG {
-                signature: FunctionType::new(intermed, vec![listy.clone()]),
-            },
+            NodeType::open_extensions(DFG {
+                signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
+            }),
         )?;
         [0, 1]
             .iter()
-            .try_for_each(|p| replacement.connect(r_df1, *p, r_df2, *p))?;
+            .try_for_each(|p| replacement.connect(r_df1, *p + 1, r_df2, *p))?;
 
         {
-            let inp = replacement.add_op_before(
+            let inp = replacement.add_node_before(
                 r_df1,
-                ops::Input {
-                    types: vec![listy.clone()].into(),
-                },
+                NodeType::open_extensions(ops::Input {
+                    types: just_list.clone(),
+                }),
             )?;
-            let out = replacement.add_op_with_parent(
-                r_bb,
-                ops::Output {
-                    types: vec![listy.clone()].into(),
-                },
+            let out = replacement.add_node_before(
+                r_df1,
+                NodeType::open_extensions(ops::Output {
+                    types: simple_unary_plus(just_list),
+                }),
             )?;
             replacement.connect(inp, 0, r_df1, 0)?;
             replacement.connect(r_df2, 0, out, 0)?;
+            replacement.connect(r_df2, 1, out, 1)?;
         }
 
         h.apply_rewrite(Replacement {
@@ -552,7 +556,7 @@ mod test {
             }],
             mu_new: vec![],
         })?;
-        h.validate(&reg)?;
+        h.update_validate(&reg)?;
         Ok(())
     }
 
@@ -582,12 +586,7 @@ mod test {
         let output = hugr.add_node_with_parent(
             bb,
             NodeType::open_extensions(ops::Output {
-                types: TypeRow::from(
-                    Some(Type::new_simple_predicate(1))
-                        .into_iter()
-                        .chain(op_sig.output.iter().cloned())
-                        .collect::<Vec<_>>(),
-                ),
+                types: simple_unary_plus(op_sig.output.clone()),
             }),
         )?;
 
@@ -598,7 +597,7 @@ mod test {
         for e in op.signature().extension_reqs.iter() {
             let new_lift = hugr.add_node_with_parent(
                 bb,
-                NodeType::pure(LeafOp::Lift {
+                NodeType::open_extensions(LeafOp::Lift {
                     type_row: type_row![PRED_T],
                     new_extension: e.clone(),
                 }),
@@ -619,5 +618,11 @@ mod test {
             hugr.connect(op, p, output, p + 1)?;
         }
         Ok(bb)
+    }
+
+    fn simple_unary_plus(t: TypeRow) -> TypeRow {
+        let mut v = t.into_owned();
+        v.insert(0, Type::new_simple_predicate(1));
+        v.into()
     }
 }
