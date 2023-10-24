@@ -498,7 +498,7 @@ mod test {
         let mut replacement = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()),
         }));
-        let bb = replacement.add_node_with_parent(
+        let r_bb = replacement.add_node_with_parent(
             replacement.root(),
             NodeType::open_extensions(BasicBlock::DFB {
                 inputs: vec![listy.clone()].into(),
@@ -507,45 +507,46 @@ mod test {
                 extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
             }),
         )?;
-        let inp = replacement.add_op_with_parent(
-            bb,
-            ops::Input {
-                types: vec![listy.clone()].into(),
-            },
-        )?;
-        let df1 = replacement.add_op_with_parent(
-            bb,
+        let r_df1 = replacement.add_op_with_parent(
+            r_bb,
             DFG {
                 signature: FunctionType::new(vec![listy.clone()], intermed.clone()),
             },
         )?;
-        replacement.connect(inp, 0, df1, 0)?;
-
-        let df2 = replacement.add_op_with_parent(
-            bb,
+        let r_df2 = replacement.add_op_with_parent(
+            r_bb,
             DFG {
                 signature: FunctionType::new(intermed, vec![listy.clone()]),
             },
         )?;
         [0, 1]
             .iter()
-            .try_for_each(|p| replacement.connect(df1, *p, df2, *p))?;
+            .try_for_each(|p| replacement.connect(r_df1, *p, r_df2, *p))?;
 
-        let ex = replacement.add_op_with_parent(
-            bb,
-            ops::Output {
-                types: vec![listy.clone()].into(),
-            },
-        )?;
-        replacement.connect(df2, 0, ex, 0)?;
+        {
+            let inp = replacement.add_op_before(
+                r_df1,
+                ops::Input {
+                    types: vec![listy.clone()].into(),
+                },
+            )?;
+            let out = replacement.add_op_with_parent(
+                r_bb,
+                ops::Output {
+                    types: vec![listy.clone()].into(),
+                },
+            )?;
+            replacement.connect(inp, 0, r_df1, 0)?;
+            replacement.connect(r_df2, 0, out, 0)?;
+        }
 
         h.apply_rewrite(Replacement {
             removal: vec![entry.node(), bb2.node()],
             replacement,
-            transfers: HashMap::from([(df1.node(), entry.node()), (df2.node(), bb2.node())]),
+            transfers: HashMap::from([(r_df1.node(), entry.node()), (r_df2.node(), bb2.node())]),
             mu_inp: vec![],
             mu_out: vec![NewEdgeSpec {
-                src: bb,
+                src: r_bb,
                 tgt: exit.node(),
                 kind: NewEdgeKind::ControlFlow { src_pos: 0 },
             }],
