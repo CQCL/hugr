@@ -295,12 +295,14 @@ impl Rewrite for Replacement {
         h.remove_node(new_root).unwrap();
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
-        fn first_child(h: &impl HugrView, parent: Node) -> Option<crate::Node> {
-            h.children(parent).next()
-        }
-        for (new_parent, old_parent) in self.transfers.iter() {
-            debug_assert!(h.children(*old_parent).next().is_some());
-            while let Some(ch) = first_child(h, *old_parent) {
+        for (new_parent, &old_parent) in self.transfers.iter() {
+            let new_parent = node_map.get(new_parent).unwrap();
+            debug_assert!(h.children(old_parent).next().is_some());
+            loop {
+                let ch = match h.children(old_parent).next() {
+                    None => break,
+                    Some(c) => c,
+                };
                 h.set_parent(ch, *new_parent).unwrap();
             }
         }
