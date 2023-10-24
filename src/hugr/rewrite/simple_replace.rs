@@ -643,7 +643,7 @@ pub(in crate::hugr::rewrite) mod test {
         replacement.remove_node(in_).unwrap();
         replacement.remove_node(out).unwrap();
         Replacement {
-            removal: s.subgraph.nodes().iter().copied().collect(),
+            removal: s.subgraph.nodes().to_vec(),
             replacement,
             transfers: HashMap::new(),
             mu_inp,

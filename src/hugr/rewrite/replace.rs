@@ -1,9 +1,9 @@
 //! Implementation of the `Replace` operation.
 
 use std::collections::hash_map::Values;
-use std::collections::hash_set::Iter;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::{Chain, Copied, Take};
+use std::slice::Iter;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -62,7 +62,7 @@ pub struct Replacement {
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
     /// Must be non-empty - otherwise there is no parent under which to place [replacement],
     /// and no possible [in_edges], [out_edges] or [transfers].
-    pub removal: HashSet<Node>,
+    pub removal: Vec<Node>,
     /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
     pub replacement: Hugr,
     /// Map from container nodes in [replacement] that have no children, to container nodes
@@ -436,7 +436,7 @@ impl std::fmt::Display for WhichHugr {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
@@ -540,7 +540,7 @@ mod test {
         replacement.connect(df2, 0, ex, 0)?;
 
         h.apply_rewrite(Replacement {
-            removal: HashSet::from([entry.node(), bb2.node()]),
+            removal: vec![entry.node(), bb2.node()],
             replacement,
             transfers: HashMap::from([(df1.node(), entry.node()), (df2.node(), bb2.node())]),
             mu_inp: vec![],
