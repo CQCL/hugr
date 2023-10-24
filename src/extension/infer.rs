@@ -268,11 +268,6 @@ impl UnificationContext {
     where
         T: HugrView,
     {
-        if hugr.root_type().signature().is_none() {
-            let m_input = self.make_or_get_meta(hugr.root(), Direction::Incoming);
-            self.variables.insert(m_input);
-        }
-
         for node in hugr.nodes() {
             let m_input = self.make_or_get_meta(node, Direction::Incoming);
             let m_output = self.make_or_get_meta(node, Direction::Outgoing);
@@ -317,6 +312,14 @@ impl UnificationContext {
                         m_output,
                         node_type.op_signature().extension_reqs,
                     );
+                    let sig: &OpType = hugr.get_nodetype(node).into();
+                    if hugr.all_node_ports(node).all(|p| {
+                        sig.port_kind(p) == Some(EdgeKind::StateOrder)
+                            || hugr.linked_ports(node, p).next().is_none()
+                    }) {
+                        // Node has no edges that would constrain its extensions
+                        self.variables.insert(m_input);
+                    }
                 }
                 // We have a solution for everything!
                 Some(sig) => {
