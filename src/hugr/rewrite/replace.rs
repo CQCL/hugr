@@ -264,16 +264,15 @@ impl Rewrite for Replacement {
 
     fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
         let parent = self.check_parent(h)?;
-        println!("ALAN got parent");
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
         // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
         let to_remove = self.get_removed_nodes(h)?;
-        println!("ALAN got removed nodes");
+
         // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
         let InsertionResult { new_root, node_map } =
             h.insert_hugr(parent, self.replacement).unwrap();
-        println!("ALAN inserted");
+
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
         let kept = |n| {
@@ -289,7 +288,7 @@ impl Rewrite for Replacement {
         // 4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets.
         transfer_edges(h, self.mu_new.iter(), kept, kept, Some(parent))?;
-        println!("ALAN edges transferred");
+
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
         let mut remove_top_sibs = self.removal.iter();
@@ -302,7 +301,7 @@ impl Rewrite for Replacement {
         }
         debug_assert!(h.children(new_root).next().is_none());
         h.remove_node(new_root).unwrap();
-        println!("ALAN transferring subtrees...");
+
         // 6. Transfer to keys of `transfers` children of the corresponding values.
         for (new_parent, &old_parent) in self.transfers.iter() {
             let new_parent = node_map.get(new_parent).unwrap();
@@ -315,7 +314,6 @@ impl Rewrite for Replacement {
                 h.set_parent(ch, *new_parent).unwrap();
             }
         }
-        println!("ALAN Transfers done");
 
         // 7. Remove remaining nodes
         to_remove
@@ -540,7 +538,7 @@ mod test {
             },
         )?;
         replacement.connect(df2, 0, ex, 0)?;
-        println!("ALAN calling apply_rewrite");
+
         h.apply_rewrite(Replacement {
             removal: HashSet::from([entry.node(), bb2.node()]),
             replacement,
@@ -553,7 +551,6 @@ mod test {
             }],
             mu_new: vec![],
         })?;
-        panic!("ALAN apply_rewrite done; validating");
         h.validate(&reg)?;
         Ok(())
     }
