@@ -341,16 +341,16 @@ impl UnificationContext {
                         | Some(EdgeKind::ControlFlow)
                 )
             }) {
+                let m_tgt = *self
+                    .extensions
+                    .get(&(tgt_node, Direction::Incoming))
+                    .unwrap();
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
                     let m_src = self
                         .extensions
                         .get(&(src_node, Direction::Outgoing))
                         .unwrap();
-                    let m_tgt = self
-                        .extensions
-                        .get(&(tgt_node, Direction::Incoming))
-                        .unwrap();
-                    self.add_constraint(*m_src, Constraint::Equal(*m_tgt));
+                    self.add_constraint(*m_src, Constraint::Equal(m_tgt));
                 }
             }
         }
