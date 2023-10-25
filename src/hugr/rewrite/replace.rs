@@ -475,7 +475,7 @@ mod test {
         let mut h = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
         }));
-        let pred_const = h.add_op_with_parent(h.root(), ops::Const::simple_unary_predicate())?;
+        let pred_const = h.add_op_with_parent(h.root(), ops::Const::unary_unit_sum())?;
 
         let entry = single_node_block(&mut h, pop, pred_const)?;
         let bb2 = single_node_block(&mut h, push, pred_const)?;
@@ -502,7 +502,7 @@ mod test {
             replacement.root(),
             NodeType::open_extensions(BasicBlock::DFB {
                 inputs: vec![listy.clone()].into(),
-                predicate_variants: vec![type_row![]],
+                tuple_sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
                 extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
             }),
@@ -573,7 +573,7 @@ mod test {
             NodeType::open_extensions(BasicBlock::DFB {
                 inputs: op_sig.input.clone(),
                 other_outputs: op_sig.output.clone(),
-                predicate_variants: vec![type_row![]],
+                tuple_sum_rows: vec![type_row![]],
                 extension_delta: op_sig.extension_reqs.clone(),
             }),
         )?;
@@ -590,7 +590,7 @@ mod test {
             }),
         )?;
 
-        const PRED_T: Type = Type::new_simple_predicate(1);
+        const PRED_T: Type = Type::new_unit_sum(1);
         let load_pred =
             hugr.add_node_with_parent(bb, NodeType::pure(ops::LoadConstant { datatype: PRED_T }))?;
         let mut load_pred_lifted = load_pred;
@@ -622,7 +622,7 @@ mod test {
 
     fn simple_unary_plus(t: TypeRow) -> TypeRow {
         let mut v = t.into_owned();
-        v.insert(0, Type::new_simple_predicate(1));
+        v.insert(0, Type::new_unit_sum(1));
         v.into()
     }
 }
