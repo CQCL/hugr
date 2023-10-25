@@ -303,7 +303,6 @@ impl Extension {
     }
 
     /// Create an OpDef with custom binary code to compute the signature
-    #[allow(clippy::too_many_arguments)]
     pub fn add_op_custom_sig(
         &mut self,
         name: SmolStr,
