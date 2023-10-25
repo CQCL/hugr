@@ -13,6 +13,10 @@ pub(crate) struct Substitution<'a> {
     leave_lowest: usize,
     /// What to do to variables that are affected
     mapping: Mapping<'a>,
+    /// Since applying the substitution could narrow [TypeBound]s,
+    /// we need this to recompute bounds of any [CustomType]s
+    /// 
+    /// [CustomType]: super::CustomType
     reg: &'a ExtensionRegistry,
 }
 
