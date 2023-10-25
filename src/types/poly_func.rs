@@ -64,7 +64,6 @@ impl PolyFuncType {
         reg: &ExtensionRegistry,
         external_var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        // TODO should we add a mechanism to validate a TypeParam?
         let mut v; // Declared here so live until end of scope
         let all_var_decls = if self.params.is_empty() {
             external_var_decls
