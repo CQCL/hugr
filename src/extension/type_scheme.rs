@@ -22,6 +22,15 @@ pub struct OpDefTypeScheme {
     body: FunctionType,
 }
 
+impl From<FunctionType> for OpDefTypeScheme {
+    fn from(body: FunctionType) -> Self {
+        Self {
+            params: vec![],
+            body,
+        }
+    }
+}
+
 impl OpDefTypeScheme {
     /// Create a new OpDefTypeScheme.
     /// The [ExtensionRegistry] should be the same (or a subset) of that which will later
