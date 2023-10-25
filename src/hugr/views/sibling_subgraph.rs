@@ -166,8 +166,8 @@ impl SiblingSubgraph {
         outgoing: OutgoingPorts,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let mut checker = ConvexChecker::new(hugr);
-        Self::try_new_with_checker(incoming, outgoing, hugr, &mut checker)
+        let checker = ConvexChecker::new(hugr);
+        Self::try_new_with_checker(incoming, outgoing, hugr, &checker)
     }
 
     /// Create a new convex sibling subgraph from input and output boundaries.
@@ -182,7 +182,7 @@ impl SiblingSubgraph {
         inputs: IncomingPorts,
         outputs: OutgoingPorts,
         hugr: &'h H,
-        checker: &'c mut ConvexChecker<'h, H>,
+        checker: &'c ConvexChecker<'h, H>,
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
@@ -201,7 +201,7 @@ impl SiblingSubgraph {
         let nodes = subpg.nodes_iter().map_into().collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
-        if !subpg.is_convex_with_checker(&mut checker.0) {
+        if !subpg.is_convex_with_checker(&checker.0) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
@@ -231,8 +231,8 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let mut checker = ConvexChecker::new(hugr);
-        Self::try_from_nodes_with_checker(nodes, hugr, &mut checker)
+        let checker = ConvexChecker::new(hugr);
+        Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
     /// Create a subgraph from a set of nodes.
@@ -246,7 +246,7 @@ impl SiblingSubgraph {
     pub fn try_from_nodes_with_checker<'c, 'h: 'c, H: HugrView>(
         nodes: impl Into<Vec<Node>>,
         hugr: &'h H,
-        checker: &'c mut ConvexChecker<'h, H>,
+        checker: &'c ConvexChecker<'h, H>,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
