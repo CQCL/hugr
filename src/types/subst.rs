@@ -15,7 +15,7 @@ pub(crate) struct Substitution<'a> {
     mapping: Mapping<'a>,
     /// Since applying the substitution could narrow [TypeBound]s,
     /// we need this to recompute bounds of any [CustomType]s
-    /// 
+    ///
     /// [CustomType]: super::CustomType
     reg: &'a ExtensionRegistry,
 }

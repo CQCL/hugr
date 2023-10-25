@@ -495,21 +495,22 @@ pub(crate) mod test {
     #[test]
     fn test_type_apply_nested() -> Result<(), SignatureError> {
         let inner_var = Type::new_var_use(0, TypeBound::Any);
-        // forall A. (Array<A, FREE_NAT> -> A)
-        let inner = PolyFuncType {
-            params: vec![TypeParam::Type(TypeBound::Any)],
-            body: FunctionType::new(
-                vec![new_array(
-                    inner_var.clone(),
-                    TypeArg::new_var_use(1, TypeParam::max_nat()),
-                )],
-                vec![inner_var.clone()],
-            ),
-        };
-        // forall N. ( -> `inner`)
+        // forall N. ( -> forall A. (Array<A, N> -> A) )
         let outer = PolyFuncType::new_validated(
             vec![TypeParam::max_nat()],
-            FunctionType::new(vec![], vec![Type::new_function(inner)]),
+            FunctionType::new(
+                vec![],
+                vec![Type::new_function(PolyFuncType {
+                    params: vec![TypeParam::Type(TypeBound::Any)],
+                    body: FunctionType::new(
+                        vec![new_array(
+                            inner_var.clone(),
+                            TypeArg::new_var_use(1, TypeParam::max_nat()),
+                        )],
+                        vec![inner_var.clone()],
+                    ),
+                })],
+            ),
             &PRELUDE_REGISTRY,
         )?;
 
