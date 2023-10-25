@@ -307,19 +307,19 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
+                    if node == hugr.root()
+                        || matches!(
+                            node_type.tag(),
+                            OpTag::Alias | OpTag::FuncDefn | OpTag::Function
+                        )
+                    {
+                        self.variables.insert(m_input);
+                    }
                     self.gen_union_constraint(
                         m_input,
                         m_output,
                         node_type.op_signature().extension_reqs,
                     );
-                    let sig: &OpType = hugr.get_nodetype(node).into();
-                    if hugr.all_node_ports(node).all(|p| {
-                        sig.port_kind(p) == Some(EdgeKind::StateOrder)
-                            || hugr.linked_ports(node, p).next().is_none()
-                    }) {
-                        // Node has no edges that would constrain its extensions
-                        self.variables.insert(m_input);
-                    }
                 }
                 // We have a solution for everything!
                 Some(sig) => {

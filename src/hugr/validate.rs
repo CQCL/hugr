@@ -928,6 +928,7 @@ mod test {
             b.update_validate(&EMPTY_REG),
             Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
         );
+        let closure = b.infer_extensions().unwrap();
         b.set_parent(new_def, root).unwrap();
 
         // After moving the previous definition to a valid place,
@@ -936,7 +937,7 @@ mod test {
             .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
-            b.update_validate(&EMPTY_REG),
+            b.validate_with_extension_closure(closure, &EMPTY_REG),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
     }
