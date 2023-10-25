@@ -119,6 +119,12 @@ impl PolyFuncType {
     }
 }
 
+impl PartialEq<FunctionType> for PolyFuncType {
+    fn eq(&self, other: &FunctionType) -> bool {
+        self.params.is_empty() && &self.body == other
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;
@@ -466,7 +472,7 @@ pub(crate) mod test {
         let actual =
             array_max.instantiate(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
 
-        assert_eq!(actual, concrete.into());
+        assert_eq!(actual, concrete);
 
         // forall N.(Array<usize,N> -> usize)
         let partial = PolyFuncType::new_validated(
@@ -523,7 +529,7 @@ pub(crate) mod test {
         );
 
         let res = outer.instantiate(&[TypeArg::BoundedNat { n: 5 }], &PRELUDE_REGISTRY)?;
-        assert_eq!(res, outer_applied.into());
+        assert_eq!(res, outer_applied);
         Ok(())
     }
 }

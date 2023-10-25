@@ -65,8 +65,7 @@ impl PrimType {
                 Ok(())
             }
             (PrimType::Function(t), PrimValue::Function { hugr: v })
-                if t.params.is_empty() // Hugr's still monomorphic
-                && Some(&t.body) == v.get_function_type() =>
+                if v.get_function_type().is_some_and(|f| &**t == f) =>
             {
                 // exact signature equality, in future this may need to be
                 // relaxed to be compatibility checks between the signatures.
