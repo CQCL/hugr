@@ -152,7 +152,8 @@ pub trait HugrView: sealed::HugrInternals {
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
 
     /// Iterator over output ports of node.
-    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
+    /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
+    /// but preserves knowledge that the ports are [OutgoingPort]s.
     #[inline]
     fn node_outputs(&self, node: Node) -> OutgoingPorts<Self::NodePorts<'_>> {
         self.node_ports(node, Direction::Outgoing)
@@ -160,7 +161,8 @@ pub trait HugrView: sealed::HugrInternals {
     }
 
     /// Iterator over inputs ports of node.
-    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
+    /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
+    /// but preserves knowledge that the ports are [IncomingPort]s.
     #[inline]
     fn node_inputs(&self, node: Node) -> IncomingPorts<Self::NodePorts<'_>> {
         self.node_ports(node, Direction::Incoming)
@@ -173,7 +175,9 @@ pub trait HugrView: sealed::HugrInternals {
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
-    /// Iterator over the nodes and output ports connected to a given *input* port
+    /// Iterator over the nodes and output ports connected to a given *input* port.
+    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
+    /// that the linked ports are [OutgoingPort]s.
     fn linked_outputs(
         &self,
         node: Node,
@@ -184,6 +188,8 @@ pub trait HugrView: sealed::HugrInternals {
     }
 
     /// Iterator over the nodes and input ports connected to a given *output* port
+    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
+    /// that the linked ports are [IncomingPort]s.
     fn linked_inputs(
         &self,
         node: Node,
