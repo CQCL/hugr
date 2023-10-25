@@ -437,42 +437,26 @@ pub(crate) mod test {
 
     #[test]
     fn test_instantiate_nested() -> Result<(), SignatureError> {
-        let inner_var = Type::new_var_use(0, TypeBound::Any);
-        // forall N. ( -> forall A. (Array<A, N> -> A) )
-        let outer = PolyFuncType::new_validated(
-            vec![TypeParam::max_nat()],
-            FunctionType::new(
-                vec![],
-                vec![Type::new_function(PolyFuncType {
-                    params: vec![TypeParam::Type(TypeBound::Any)],
-                    body: FunctionType::new(
-                        vec![new_array(
-                            inner_var.clone(),
-                            TypeArg::new_var_use(1, TypeParam::max_nat()),
-                        )],
-                        vec![inner_var.clone()],
-                    ),
-                })],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
+        let outer = nested_func();
+        let reg: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
 
-        // ( -> forall A. (Array<A, 5> -> A) )
+        let arg = new_array(USIZE_T, TypeArg::BoundedNat { n: 5 });
+        // `arg` -> (forall C. C -> List(Tuple(C, `arg`)))
         let outer_applied = FunctionType::new(
-            vec![],
-            vec![Type::new_function(PolyFuncType::new_validated(
-                vec![TypeParam::Type(TypeBound::Any)],
-                FunctionType::new(
-                    // We are checking that the substitution has been applied to the right var
-                    // - NOT to the inner_var which has index 0 here
-                    vec![new_array(inner_var.clone(), TypeArg::BoundedNat { n: 5 })],
-                    vec![inner_var.clone()],
+            vec![arg.clone()], // This had index 0, but is replaced
+            vec![Type::new_function(new_pf1(
+                TypeParam::Type(TypeBound::Copyable),
+                // We are checking that the substitution has been applied to the right var
+                // - NOT to the inner_var which has index 0 here
+                Type::new_var_use(0, TypeBound::Copyable),
+                list_of_tup(
+                    Type::new_var_use(0, TypeBound::Copyable),
+                    arg.clone(), // This had index 1, but is replaced
                 ),
-                &PRELUDE_REGISTRY,
-            )?)],
+            ))],
         );
 
-        let res = outer.instantiate(&[TypeArg::BoundedNat { n: 5 }], &PRELUDE_REGISTRY)?;
+        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &reg)?;
         assert_eq!(res, outer_applied);
         Ok(())
     }
