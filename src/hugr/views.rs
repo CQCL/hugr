@@ -179,7 +179,8 @@ pub trait HugrView: sealed::HugrInternals {
         node: Node,
         port: impl Into<IncomingPort>,
     ) -> OutgoingNodePorts<Self::PortLinks<'_>> {
-        OutgoingNodePorts(self.linked_ports(node, port.into()))
+        self.linked_ports(node, port.into())
+            .map(|(n, p)| (n, p.as_outgoing().unwrap()))
     }
 
     /// Iterator over the nodes and input ports connected to a given *output* port
@@ -188,7 +189,8 @@ pub trait HugrView: sealed::HugrInternals {
         node: Node,
         port: impl Into<OutgoingPort>,
     ) -> IncomingNodePorts<Self::PortLinks<'_>> {
-        IncomingNodePorts(self.linked_ports(node, port.into()))
+        self.linked_ports(node, port.into())
+            .map(|(n, p)| (n, p.as_incoming().unwrap()))
     }
 
     /// Iterator the links between two nodes.
@@ -331,25 +333,10 @@ pub type OutgoingPorts<I> = Map<I, fn(Port) -> OutgoingPort>;
 pub type IncomingPorts<I> = Map<I, fn(Port) -> IncomingPort>;
 
 /// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [OutgoingPort]s
-#[derive(Debug)]
-pub struct OutgoingNodePorts<T>(T);
-impl<T: Iterator<Item = (Node, Port)>> Iterator for OutgoingNodePorts<T> {
-    type Item = (Node, OutgoingPort);
+pub type OutgoingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, OutgoingPort)>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(n, p)| (n, p.as_outgoing().unwrap()))
-    }
-}
 /// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [IncomingPort]s
-#[derive(Debug)]
-pub struct IncomingNodePorts<T>(T);
-impl<T: Iterator<Item = (Node, Port)>> Iterator for IncomingNodePorts<T> {
-    type Item = (Node, IncomingPort);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(n, p)| (n, p.as_incoming().unwrap()))
-    }
-}
+pub type IncomingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, IncomingPort)>;
 
 /// Trait for views that provides a guaranteed bound on the type of the root node.
 pub trait RootTagged: HugrView {
