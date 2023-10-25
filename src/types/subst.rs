@@ -61,7 +61,6 @@ impl<'a> Substitution<'a> {
         ty
     }
 
-    // A bit unfortunate to need the Extension registry here. We could move `exts` into Substitution?
     pub(super) fn enter_scope(&self, new_vars: usize) -> Self {
         Self {
             leave_lowest: self.leave_lowest + new_vars,
