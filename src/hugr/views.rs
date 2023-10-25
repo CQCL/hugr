@@ -9,6 +9,8 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use std::iter::Map;
+
 pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
 pub use root_checked::RootChecked;
@@ -153,14 +155,16 @@ pub trait HugrView: sealed::HugrInternals {
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
     #[inline]
     fn node_outputs(&self, node: Node) -> OutgoingPorts<Self::NodePorts<'_>> {
-        OutgoingPorts(self.node_ports(node, Direction::Outgoing))
+        self.node_ports(node, Direction::Outgoing)
+            .map(|p| p.as_outgoing().unwrap())
     }
 
     /// Iterator over inputs ports of node.
     /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
     #[inline]
     fn node_inputs(&self, node: Node) -> IncomingPorts<Self::NodePorts<'_>> {
-        IncomingPorts(self.node_ports(node, Direction::Incoming))
+        self.node_ports(node, Direction::Incoming)
+            .map(|p| p.as_incoming().unwrap())
     }
 
     /// Iterator over both the input and output ports of node.
@@ -321,25 +325,10 @@ pub trait HugrView: sealed::HugrInternals {
 }
 
 /// Wraps an iterator over [Port]s that are known to be [OutgoingPort]s
-#[derive(Debug)]
-pub struct OutgoingPorts<T>(T);
-impl<T: Iterator<Item = Port>> Iterator for OutgoingPorts<T> {
-    type Item = OutgoingPort;
+pub type OutgoingPorts<I> = Map<I, fn(Port) -> OutgoingPort>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|p| p.as_outgoing().unwrap())
-    }
-}
 /// Wraps an iterator over [Port]s that are known to be [IncomingPort]s
-#[derive(Debug)]
-pub struct IncomingPorts<T>(T);
-impl<T: Iterator<Item = Port>> Iterator for IncomingPorts<T> {
-    type Item = IncomingPort;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|p| p.as_incoming().unwrap())
-    }
-}
+pub type IncomingPorts<I> = Map<I, fn(Port) -> IncomingPort>;
 
 /// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [OutgoingPort]s
 #[derive(Debug)]
