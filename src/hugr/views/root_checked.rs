@@ -97,7 +97,7 @@ mod test {
         let bb = NodeType::pure(BasicBlock::DFB {
             inputs: type_row![],
             other_outputs: type_row![],
-            predicate_variants: vec![type_row![]],
+            tuple_sum_rows: vec![type_row![]],
             extension_delta: ExtensionSet::new(),
         });
         let r = dfg_v.replace_op(root, bb.clone());
