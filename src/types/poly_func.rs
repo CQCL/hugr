@@ -360,94 +360,6 @@ pub(crate) mod test {
         )
     }
 
-    #[test]
-    fn substitute_under_binder() {
-        let list_def = EXTENSION.get_type(LIST_TYPENAME.as_str()).unwrap();
-        let list_of_tup = |t1, t2| {
-            Type::new_extension(
-                list_def
-                    .instantiate([TypeArg::Type {
-                        ty: Type::new_tuple(vec![t1, t2]),
-                    }])
-                    .unwrap(),
-            )
-        };
-        let reg = [EXTENSION.to_owned()].into();
-        // forall A. A -> (forall C. C -> List(Tuple(C, A))
-        let pf = PolyFuncType::new_validated(
-            vec![TypeParam::Type(TypeBound::Any)],
-            FunctionType::new(
-                vec![Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
-                    Type::new_var_use(0, TypeBound::Copyable),
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable),
-                        Type::new_var_use(1, TypeBound::Any), // The outer variable (renumbered)
-                    ),
-                ))],
-            ),
-            &reg,
-        )
-        .unwrap();
-
-        // Now substitute in a free var from further outside
-        let reg = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
-        const FREE: usize = 3;
-        const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
-        let res = pf
-            .instantiate_all(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
-            .unwrap();
-        assert_eq!(
-            res,
-            // F -> forall C. (C -> List(Tuple(C, F)))
-            FunctionType::new(
-                vec![Type::new_var_use(FREE, TypeBound::Eq)],
-                vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
-                    Type::new_var_use(0, TypeBound::Copyable), // unchanged
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable),
-                        // Next is the free variable that we substituted in (hence Eq)
-                        // - renumbered because of the intervening forall (Copyable)
-                        Type::new_var_use(FREE + 1, TypeBound::Eq)
-                    )
-                ))]
-            )
-        );
-
-        // Also try substituting in a type containing both free and bound vars
-        let rhs = |i| {
-            Type::new_function(new_pf1(
-                TP_EQ,
-                Type::new_var_use(0, TypeBound::Eq),
-                new_array(
-                    Type::new_var_use(0, TypeBound::Eq),
-                    TypeArg::new_var_use(i, TypeParam::max_nat()),
-                ),
-            ))
-        };
-
-        let res = pf
-            .instantiate_all(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
-            .unwrap();
-        assert_eq!(
-            res,
-            FunctionType::new(
-                vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
-                // Output: forall C. C -> List(Tuple(C, Input))
-                vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
-                    Type::new_var_use(0, TypeBound::Copyable),
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable), // not renumbered...
-                        rhs(FREE + 1)                              // renumbered
-                    )
-                ))]
-            )
-        )
-    }
-
     const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
 
     #[test]
@@ -492,8 +404,39 @@ pub(crate) mod test {
         Ok(())
     }
 
+    fn list_of_tup(t1: Type, t2: Type) -> Type {
+        let list_def = EXTENSION.get_type(LIST_TYPENAME.as_str()).unwrap();
+        Type::new_extension(
+            list_def
+                .instantiate([TypeArg::Type {
+                    ty: Type::new_tuple(vec![t1, t2]),
+                }])
+                .unwrap(),
+        )
+    }
+
+    // forall A. A -> (forall C. C -> List(Tuple(C, A))
+    fn nested_func() -> PolyFuncType {
+        PolyFuncType::new_validated(
+            vec![TypeParam::Type(TypeBound::Any)],
+            FunctionType::new(
+                vec![Type::new_var_use(0, TypeBound::Any)],
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_var_use(0, TypeBound::Copyable),
+                    list_of_tup(
+                        Type::new_var_use(0, TypeBound::Copyable),
+                        Type::new_var_use(1, TypeBound::Any), // The outer variable (renumbered)
+                    ),
+                ))],
+            ),
+            &[EXTENSION.to_owned()].into(),
+        )
+        .unwrap()
+    }
+
     #[test]
-    fn test_type_apply_nested() -> Result<(), SignatureError> {
+    fn test_instantiate_nested() -> Result<(), SignatureError> {
         let inner_var = Type::new_var_use(0, TypeBound::Any);
         // forall N. ( -> forall A. (Array<A, N> -> A) )
         let outer = PolyFuncType::new_validated(
@@ -532,5 +475,66 @@ pub(crate) mod test {
         let res = outer.instantiate(&[TypeArg::BoundedNat { n: 5 }], &PRELUDE_REGISTRY)?;
         assert_eq!(res, outer_applied);
         Ok(())
+    }
+
+    #[test]
+    fn free_var_under_binder() {
+        let outer = nested_func();
+
+        // Now substitute in a free var from further outside
+        let reg = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
+        const FREE: usize = 3;
+        const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
+        let res = outer
+            .instantiate_all(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
+            .unwrap();
+        assert_eq!(
+            res,
+            // F -> forall C. (C -> List(Tuple(C, F)))
+            FunctionType::new(
+                vec![Type::new_var_use(FREE, TypeBound::Eq)],
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_var_use(0, TypeBound::Copyable), // unchanged
+                    list_of_tup(
+                        Type::new_var_use(0, TypeBound::Copyable),
+                        // Next is the free variable that we substituted in (hence Eq)
+                        // - renumbered because of the intervening forall (Copyable)
+                        Type::new_var_use(FREE + 1, TypeBound::Eq)
+                    )
+                ))]
+            )
+        );
+
+        // Also try substituting in a type containing both free and bound vars
+        let rhs = |i| {
+            Type::new_function(new_pf1(
+                TP_EQ,
+                Type::new_var_use(0, TypeBound::Eq),
+                new_array(
+                    Type::new_var_use(0, TypeBound::Eq),
+                    TypeArg::new_var_use(i, TypeParam::max_nat()),
+                ),
+            ))
+        };
+
+        let res = outer
+            .instantiate_all(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .unwrap();
+        assert_eq!(
+            res,
+            FunctionType::new(
+                vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
+                // Output: forall C. C -> List(Tuple(C, Input))
+                vec![Type::new_function(new_pf1(
+                    TypeParam::Type(TypeBound::Copyable),
+                    Type::new_var_use(0, TypeBound::Copyable),
+                    list_of_tup(
+                        Type::new_var_use(0, TypeBound::Copyable), // not renumbered...
+                        rhs(FREE + 1)                              // renumbered
+                    )
+                ))]
+            )
+        )
     }
 }
