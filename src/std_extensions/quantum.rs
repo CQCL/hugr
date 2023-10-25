@@ -78,13 +78,20 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::{extension::EMPTY_REG, ops::LeafOp};
+    use lazy_static::lazy_static;
 
     use super::EXTENSION;
+    use crate::extension::{ExtensionRegistry, PRELUDE};
+    use crate::ops::LeafOp;
+
+    lazy_static! {
+        /// Quantum extension definition.
+        static ref REG: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
+    }
 
     fn get_gate(gate_name: &str) -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(gate_name, [], &EMPTY_REG)
+            .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
             .into()
     }

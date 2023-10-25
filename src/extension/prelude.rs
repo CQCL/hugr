@@ -14,7 +14,7 @@ use crate::{
     Extension,
 };
 
-use super::{ExtensionRegistry, EMPTY_REG};
+use super::ExtensionRegistry;
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
@@ -112,7 +112,7 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
                 TypeArg::Type { ty: element_ty },
                 TypeArg::BoundedNat { n: size },
             ],
-            &EMPTY_REG,
+            &PRELUDE_REGISTRY,
         )
         .unwrap()
         .into()
