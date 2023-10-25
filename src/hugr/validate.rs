@@ -997,8 +997,11 @@ mod test {
             .map_into()
             .collect_tuple()
             .unwrap();
-        let mut closure = b.infer_extensions().unwrap();
-        assert!(closure.remove(&copy).is_some());
+        // Write Extension annotations into the Hugr while it's still well-formed
+        // enough for us to compute them
+        let closure = b.infer_extensions().unwrap();
+        b.instantiate_extensions(closure);
+        b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
@@ -1006,11 +1009,8 @@ mod test {
             }),
         )
         .unwrap();
-        // We feed in the closure from above because we can't compute the closure
-        // (i.e. update_and_validate) on such a malformed Hugr, and pure `validate(&EMPTY_REG)`
-        // fails because of missing extension annotations (contained in the closure)
         assert_matches!(
-            b.validate_with_extension_closure(closure, &EMPTY_REG),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
         );
         let cfg = copy;
