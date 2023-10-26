@@ -11,8 +11,8 @@ use std::fmt::{self, Display, Write};
 
 use crate::hugr::{Direction, PortIndex};
 
-use super::type_param::{TypeArg, TypeParam};
-use super::{subst_row, Type, TypeRow};
+use super::type_param::TypeParam;
+use super::{Type, TypeRow};
 
 use crate::hugr::Port;
 
@@ -71,14 +71,6 @@ impl FunctionType {
             .chain(self.output.iter())
             .try_for_each(|t| t.validate(extension_registry, var_decls))?;
         self.extension_reqs.validate(var_decls)
-    }
-
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
-        FunctionType {
-            input: subst_row(&self.input, exts, args),
-            output: subst_row(&self.output, exts, args),
-            extension_reqs: self.extension_reqs.substitute(args),
-        }
     }
 }
 

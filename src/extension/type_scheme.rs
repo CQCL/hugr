@@ -4,8 +4,8 @@
 //!
 //! [OpDef]: super::OpDef
 
-use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::FunctionType;
+use crate::types::type_param::{check_type_arg, check_type_args, TypeArg, TypeParam};
+use crate::types::{CustomType, FunctionType, Type, TypeTransformer};
 
 use super::{ExtensionRegistry, SignatureError};
 
@@ -49,7 +49,30 @@ impl OpDefTypeScheme {
         // Hugr's are monomorphic, so check the args have no free variables
         args.iter()
             .try_for_each(|ta| ta.validate(extension_registry, &[]))?;
-        Ok(self.body.substitute(extension_registry, args))
+        Ok(Instantiation(args, extension_registry).apply_function(&self.body))
+    }
+}
+
+struct Instantiation<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+
+impl<'a> TypeTransformer for Instantiation<'a> {
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        let arg = self
+            .0
+            .get(idx)
+            .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        arg.clone()
+    }
+
+    fn apply_custom(&self, ct: &CustomType) -> crate::types::Type {
+        let args = ct
+            .args()
+            .iter()
+            .map(|arg| arg.transform(self))
+            .collect::<Vec<_>>();
+        let def = ct.get_type_def(self.1).expect("Call validate first?");
+        Type::new_extension(def.instantiate(args).unwrap())
     }
 }
 

@@ -16,6 +16,7 @@ use super::check_typevar_decl;
 use super::CustomType;
 use super::Type;
 use super::TypeBound;
+use super::TypeTransformer;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -179,10 +180,10 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(crate) fn transform(&self, t: &impl TypeTransformer) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
-                ty: ty.substitute(exts, args),
+                ty: ty.transform(t),
             },
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
@@ -190,21 +191,21 @@ impl TypeArg {
             } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(exts, args), typ);
+                debug_assert!(match t.apply_custom(typ).0 {
+                    super::TypeEnum::Prim(super::PrimType::Extension(c)) => &c == typ,
+                    _ => false,
+                });
                 self.clone()
             }
             TypeArg::Sequence { elems } => TypeArg::Sequence {
-                elems: elems.iter().map(|ta| ta.substitute(exts, args)).collect(),
+                elems: elems.iter().map(|ta| ta.transform(t)).collect(),
             },
             TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(args),
+                es: es.transform(t),
             },
             TypeArg::Variable {
-                v: TypeArgVariable { idx, .. },
-            } => args
-                .get(*idx)
-                .expect("validate + check_type_args should rule this out")
-                .clone(),
+                v: TypeArgVariable { idx, cached_decl },
+            } => t.apply_var(*idx, cached_decl),
         }
     }
 }

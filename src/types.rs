@@ -316,49 +316,46 @@ impl Type {
         }
     }
 
-    /// Substitute the specified [TypeArg]s for type variables in this type.
-    ///
-    /// # Arguments
-    ///
-    /// * `args`: values to substitute in; there must be at least enough for the
-    /// typevars in this type (partial substitution is not supported).
-    ///
-    /// * `extension_registry`: for looking up [TypeDef]s in order to recompute [TypeBound]s
-    /// as these may get narrower after substitution
-    ///
-    /// # Panics
-    ///
-    /// If a [TypeArg] (that is referenced by a typevar in this type) does not contain a [Type],
-    /// contains a type with an incorrect [TypeBound], or there are not enough `args`.
-    /// These conditions can be detected ahead of time by [Type::validate]ing against the [TypeParam]s
-    /// and [check_type_args]ing the [TypeArg]s against the [TypeParam]s.
-    pub(crate) fn substitute(&self, exts: &ExtensionRegistry, args: &[TypeArg]) -> Self {
+    pub(crate) fn transform(&self, t: &impl TypeTransformer) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => match args.get(*idx) {
-                Some(TypeArg::Type { ty }) => ty.clone(),
-                Some(v) => panic!(
-                    "Value of variable {:?} did not match cached param {}",
-                    v, bound
-                ),
-                None => panic!("No value found for variable"), // No need to support partial substitution for just type schemes
-            },
-            TypeEnum::Prim(PrimType::Extension(cty)) => {
-                Type::new_extension(cty.substitute(exts, args))
-            }
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(exts, args)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, exts, args)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, exts, args)),
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Prim(PrimType::Extension(cty)) => t.apply_custom(cty),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(t.apply_function(&**bf)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(transform_row(elems, t)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(transform_row(row, t)),
         }
     }
 }
 
-fn subst_row(row: &TypeRow, exts: &ExtensionRegistry, args: &[TypeArg]) -> TypeRow {
+pub(crate) trait TypeTransformer: Sized {
+    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
+        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
+            else {panic!("Variable was not a type - try validate() first")};
+        ty
+    }
+
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
+
+    fn apply_function(&self, func_ty: &FunctionType) -> FunctionType {
+        FunctionType {
+            input: transform_row(&func_ty.input, self),
+            output: transform_row(&func_ty.output, self),
+            extension_reqs: func_ty.extension_reqs.transform(self),
+        }
+    }
+
+    // Returning [Type] allows representing type vars as [CustomType]s,
+    // but with separate [PrimType::Variable] we could just return [CustomType]
+    fn apply_custom(&self, ct: &CustomType) -> Type;
+}
+
+fn transform_row(row: &TypeRow, tr: &impl TypeTransformer) -> TypeRow {
     let res = row
         .iter()
-        .map(|t| t.substitute(exts, args))
+        .map(|ty| ty.transform(tr))
         .collect::<Vec<_>>()
         .into();
     res
