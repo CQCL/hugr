@@ -11,17 +11,7 @@ use crate::hugr::HugrError;
 
 /// A handle to a node in the HUGR.
 #[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Debug,
-    From,
-    serde::Serialize,
-    serde::Deserialize,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, serde::Serialize, serde::Deserialize,
 )]
 #[serde(transparent)]
 #[cfg_attr(feature = "pyo3", pyclass)]
@@ -39,7 +29,6 @@ pub struct Node {
     Ord,
     Hash,
     Default,
-    Debug,
     From,
     serde::Serialize,
     serde::Deserialize,
@@ -63,13 +52,13 @@ pub trait NodeIndex {
 }
 
 /// A port in the incoming direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct IncomingPort {
     index: u16,
 }
 
 /// A port in the outgoing direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct OutgoingPort {
     index: u16,
 }
@@ -77,7 +66,7 @@ pub struct OutgoingPort {
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
 pub struct Wire(Node, usize);
@@ -249,7 +238,7 @@ impl Wire {
 ///
 /// Falls back to [`Wire`] if the wire is not linear or if it's not possible to
 /// track the origin.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CircuitUnit {
     /// Arbitrary input wire.
     Wire(Wire),
@@ -280,3 +269,65 @@ impl From<Wire> for CircuitUnit {
         CircuitUnit::Wire(value)
     }
 }
+
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Node").field(&self.index()).finish()
+    }
+}
+
+impl std::fmt::Debug for Port {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Port")
+            .field(&self.offset.direction())
+            .field(&self.index())
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for IncomingPort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("IncomingPort").field(&self.index).finish()
+    }
+}
+
+impl std::fmt::Debug for OutgoingPort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("OutgoingPort").field(&self.index).finish()
+    }
+}
+
+impl std::fmt::Debug for Wire {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Wire")
+            .field("node", &self.0.index())
+            .field("port", &self.1)
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for CircuitUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Wire(w) => f
+                .debug_struct("WireUnit")
+                .field("node", &w.0.index())
+                .field("port", &w.1)
+                .finish(),
+            Self::Linear(id) => f.debug_tuple("LinearUnit").field(id).finish(),
+        }
+    }
+}
+
+macro_rules! impl_display_from_debug {
+    ($($t:ty),*) => {
+        $(
+            impl std::fmt::Display for $t {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    <Self as std::fmt::Debug>::fmt(self, f)
+                }
+            }
+        )*
+    };
+}
+impl_display_from_debug!(Node, Port, IncomingPort, OutgoingPort, Wire, CircuitUnit);
