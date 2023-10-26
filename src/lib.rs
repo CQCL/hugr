@@ -25,3 +25,5 @@ pub mod values;
 
 pub use crate::extension::Extension;
 pub use crate::hugr::{Direction, Hugr, HugrView, Node, Port, SimpleReplacement, Wire};
+
+pub mod walker;
