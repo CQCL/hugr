@@ -1,12 +1,13 @@
 //! Polymorphic Function Types
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::{
+    extension::{ExtensionRegistry, SignatureError},
+    types::type_param::check_type_arg,
+};
 use itertools::Itertools;
 
-use super::{
-    type_param::{check_type_args, TypeArg, TypeParam},
-    FunctionType, Substitution,
-};
+use super::type_param::{check_type_args, TypeArg, TypeParam};
+use super::{FunctionType, TypeTransformer};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -76,10 +77,10 @@ impl PolyFuncType {
         self.body.validate(reg, all_var_decls)
     }
 
-    pub(super) fn substitute(&self, sub: &Substitution) -> Self {
-        Self {
-            body: self.body.substitute(&sub.enter_scope(self.params.len())),
+    pub(super) fn transform(&self, t: &impl TypeTransformer) -> Self {
+        PolyFuncType {
             params: self.params.clone(),
+            body: self.body.transform(&EnterScope(self.params.len(), t)),
         }
     }
 
@@ -115,13 +116,61 @@ impl PolyFuncType {
         ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
-        Ok(self.body.substitute(&Substitution::new(args, ext_reg)))
+        Ok(self.body.transform(&Instantiation(args, ext_reg)))
     }
 }
+
+struct Instantiation<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl PartialEq<FunctionType> for PolyFuncType {
     fn eq(&self, other: &FunctionType) -> bool {
         self.params.is_empty() && &self.body == other
+    }
+}
+
+impl<'a> TypeTransformer for Instantiation<'a> {
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        let arg = self
+            .0
+            .get(idx)
+            .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        arg.clone()
+    }
+
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1
+    }
+}
+
+struct Renumber<'a>(usize, &'a ExtensionRegistry);
+
+impl<'a> TypeTransformer for Renumber<'a> {
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        TypeArg::new_var_use(idx + self.0, decl.clone())
+    }
+
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1
+    }
+}
+
+struct EnterScope<'a, T>(usize, &'a T);
+
+impl<'a, T: TypeTransformer> TypeTransformer for EnterScope<'a, T> {
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        // Don't touch the first <self.0> variables
+        if idx < self.0 {
+            return TypeArg::new_var_use(idx, decl.clone());
+        }
+        let under = self.1.apply_var(idx - self.0, decl);
+        // Make returned value (from underlying substitution, outside the
+        // new binders) avoid the variables newly bound
+        under.transform(&Renumber(self.0, self.extension_registry()))
+    }
+
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1.extension_registry()
     }
 }
 

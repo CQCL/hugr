@@ -12,11 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::check_typevar_decl;
-use super::CustomType;
-use super::Substitution;
-use super::Type;
-use super::TypeBound;
+use super::{check_typevar_decl, CustomType, Type, TypeBound, TypeTransformer};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -186,10 +182,10 @@ impl TypeArg {
         }
     }
 
-    pub(super) fn substitute(&self, sub: &Substitution) -> Self {
+    pub(crate) fn transform(&self, t: &impl TypeTransformer) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
-                ty: ty.substitute(sub),
+                ty: ty.transform(t),
             },
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
@@ -197,18 +193,18 @@ impl TypeArg {
             } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(sub), typ);
+                debug_assert_eq!(&typ.transform(t), typ);
                 self.clone()
             }
             TypeArg::Sequence { elems } => TypeArg::Sequence {
-                elems: elems.iter().map(|ta| ta.substitute(sub)).collect(),
+                elems: elems.iter().map(|ta| ta.transform(t)).collect(),
             },
             TypeArg::Extensions { es } => TypeArg::Extensions {
-                es: es.substitute(sub),
+                es: es.transform(t),
             },
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => sub.apply_to_var(*idx, cached_decl),
+            } => t.apply_var(*idx, cached_decl),
         }
     }
 }

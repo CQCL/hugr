@@ -8,7 +8,7 @@ use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
 use super::{
     type_param::{TypeArg, TypeParam},
-    Substitution, TypeBound,
+    TypeBound, TypeTransformer,
 };
 
 /// An opaque type element. Contains the unique identifier of its definition.
@@ -88,26 +88,23 @@ impl CustomType {
             })
     }
 
-    pub(super) fn substitute(&self, sub: &Substitution) -> Self {
+    pub(super) fn transform(&self, tr: &impl TypeTransformer) -> Self {
         let args = self
             .args
             .iter()
-            .map(|arg| arg.substitute(sub))
+            .map(|arg| arg.transform(tr))
             .collect::<Vec<_>>();
-        let bound = self
-            .get_type_def(sub.extension_registry())
-            .expect("validate should rule this out")
-            .bound(&args);
-        assert!(self.bound.contains(bound));
+        let def = self
+            .get_type_def(tr.extension_registry())
+            .expect("Call validate first?");
+        let bound = def.bound(&args);
         Self {
             args,
             bound,
             ..self.clone()
         }
     }
-}
 
-impl CustomType {
     /// unique name of the type.
     pub fn name(&self) -> &SmolStr {
         &self.id
