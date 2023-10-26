@@ -332,7 +332,7 @@ impl Type {
     }
 }
 
-pub(crate) trait TypeTransformer: Sized {
+pub(crate) trait TypeTransformer {
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
         let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
             else {panic!("Variable was not a type - try validate() first")};

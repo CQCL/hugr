@@ -80,7 +80,9 @@ impl PolyFuncType {
     pub(super) fn transform(&self, t: &impl TypeTransformer) -> Self {
         PolyFuncType {
             params: self.params.clone(),
-            body: self.body.transform(&EnterScope(self.params.len(), t)),
+            body: self
+                .body
+                .transform(&EnterScope(self.params.len(), t)),
         }
     }
 
@@ -155,9 +157,9 @@ impl<'a> TypeTransformer for Renumber<'a> {
     }
 }
 
-struct EnterScope<'a, T>(usize, &'a T);
+struct EnterScope<'a>(usize, &'a dyn TypeTransformer);
 
-impl<'a, T: TypeTransformer> TypeTransformer for EnterScope<'a, T> {
+impl<'a> TypeTransformer for EnterScope<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         // Don't touch the first <self.0> variables
         if idx < self.0 {
