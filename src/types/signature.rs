@@ -12,7 +12,7 @@ use std::fmt::{self, Display, Write};
 use crate::hugr::{Direction, PortIndex};
 
 use super::type_param::TypeParam;
-use super::{Type, TypeRow};
+use super::{transform_row, Type, TypeRow, TypeTransformer};
 
 use crate::hugr::Port;
 
@@ -71,6 +71,14 @@ impl FunctionType {
             .chain(self.output.iter())
             .try_for_each(|t| t.validate(extension_registry, var_decls))?;
         self.extension_reqs.validate(var_decls)
+    }
+
+    pub(crate) fn transform(&self, t: &impl TypeTransformer) -> FunctionType {
+        FunctionType {
+            input: transform_row(&self.input, t),
+            output: transform_row(&self.output, t),
+            extension_reqs: self.extension_reqs.transform(t),
+        }
     }
 }
 

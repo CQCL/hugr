@@ -49,7 +49,9 @@ impl OpDefTypeScheme {
         // Hugr's are monomorphic, so check the args have no free variables
         args.iter()
             .try_for_each(|ta| ta.validate(extension_registry, &[]))?;
-        Ok(Instantiation(args, extension_registry).apply_function(&self.body))
+        Ok(self
+            .body
+            .transform(&Instantiation(args, extension_registry)))
     }
 }
 
@@ -65,14 +67,8 @@ impl<'a> TypeTransformer for Instantiation<'a> {
         arg.clone()
     }
 
-    fn apply_custom(&self, ct: &CustomType) -> crate::types::Type {
-        let args = ct
-            .args()
-            .iter()
-            .map(|arg| arg.transform(self))
-            .collect::<Vec<_>>();
-        let def = ct.get_type_def(self.1).expect("Call validate first?");
-        Type::new_extension(def.instantiate(args).unwrap())
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1
     }
 }
 

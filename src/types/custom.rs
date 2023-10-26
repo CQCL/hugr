@@ -73,7 +73,7 @@ impl CustomType {
         def.check_custom(self)
     }
 
-    pub(crate) fn get_type_def<'a>(
+    fn get_type_def<'a>(
         &self,
         extension_registry: &'a ExtensionRegistry,
     ) -> Result<&'a TypeDef, SignatureError> {
@@ -86,6 +86,23 @@ impl CustomType {
                 exn: self.extension.clone(),
                 typ: self.id.clone(),
             })
+    }
+
+    pub(super) fn transform(&self, tr: &impl TypeTransformer) -> Self {
+        let args = self
+            .args
+            .iter()
+            .map(|arg| arg.transform(tr))
+            .collect::<Vec<_>>();
+        let def = self
+            .get_type_def(tr.extension_registry())
+            .expect("Call validate first?");
+        let bound = def.bound(&args);
+        Self {
+            args,
+            bound,
+            ..self.clone()
+        }
     }
 
     /// unique name of the type.

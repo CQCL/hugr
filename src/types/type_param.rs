@@ -191,10 +191,7 @@ impl TypeArg {
             } => {
                 // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
                 // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert!(match t.apply_custom(typ).0 {
-                    super::TypeEnum::Prim(super::PrimType::Extension(c)) => &c == typ,
-                    _ => false,
-                });
+                debug_assert_eq!(&typ.transform(t), typ);
                 self.clone()
             }
             TypeArg::Sequence { elems } => TypeArg::Sequence {

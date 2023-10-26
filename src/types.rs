@@ -322,8 +322,8 @@ impl Type {
                 self.clone()
             }
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
-            TypeEnum::Prim(PrimType::Extension(cty)) => t.apply_custom(cty),
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(t.apply_function(&**bf)),
+            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.transform(t)),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.transform(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(transform_row(elems, t)),
             TypeEnum::Sum(SumType::General { row }) => Type::new_sum(transform_row(row, t)),
         }
@@ -339,17 +339,7 @@ pub(crate) trait TypeTransformer: Sized {
 
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
-    fn apply_function(&self, func_ty: &FunctionType) -> FunctionType {
-        FunctionType {
-            input: transform_row(&func_ty.input, self),
-            output: transform_row(&func_ty.output, self),
-            extension_reqs: func_ty.extension_reqs.transform(self),
-        }
-    }
-
-    // Returning [Type] allows representing type vars as [CustomType]s,
-    // but with separate [PrimType::Variable] we could just return [CustomType]
-    fn apply_custom(&self, ct: &CustomType) -> Type;
+    fn extension_registry(&self) -> &ExtensionRegistry;
 }
 
 fn transform_row(row: &TypeRow, tr: &impl TypeTransformer) -> TypeRow {
