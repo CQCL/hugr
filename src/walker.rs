@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
-use std::rc::Rc;
+
+use std::ops::{Deref, DerefMut};
 
 use itertools::Itertools;
-use lazy_static::__Deref;
 
 use crate::{ops::OpType, HugrView, Node};
 
@@ -18,9 +18,24 @@ pub enum WalkOrder {
     Postorder,
 }
 
-struct WalkerCallback<'a, T, E>(Box<dyn 'a + Fn(Node, OpType, T) -> Result<T, E>>);
+struct WalkerCallback<'a, T, E>(Box<dyn 'a + FnMut(Node, OpType, T) -> Result<T, E>>);
 
-impl<'a, T, E, F: 'a + Fn(Node, OpType, T) -> Result<T, E>> From<F> for WalkerCallback<'a, T, E> {
+impl<'a, T, E> Deref for WalkerCallback<'a, T, E> {
+    type Target = dyn 'a + FnMut(Node, OpType, T) -> Result<T, E>;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl<'a, T, E> DerefMut for WalkerCallback<'a, T, E> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.deref_mut()
+    }
+}
+
+impl<'a, T, E, F: 'a + FnMut(Node, OpType, T) -> Result<T, E>> From<F>
+    for WalkerCallback<'a, T, E>
+{
     fn from(f: F) -> Self {
         Self(Box::new(f))
     }
@@ -29,21 +44,6 @@ impl<'a, T, E, F: 'a + Fn(Node, OpType, T) -> Result<T, E>> From<F> for WalkerCa
 pub struct Walker<'a, T, E> {
     pre_callbacks: Vec<WalkerCallback<'a, T, E>>,
     post_callbacks: Vec<WalkerCallback<'a, T, E>>,
-}
-
-fn call_back<O, T, E>(
-    n: Node,
-    o: OpType,
-    t: T,
-    f: &impl Fn(Node, O, T) -> Result<T, E>,
-) -> Result<T, E>
-where
-    OpType: TryInto<O>,
-{
-    match o.try_into() {
-        Ok(x) => f(n, x, t),
-        _ => Ok(t),
-    }
 }
 
 enum WorkItem {
@@ -59,24 +59,44 @@ impl<'a, T, E> Walker<'a, T, E> {
         }
     }
 
-    pub fn visit<O, F: 'a + Fn(Node, O, T) -> Result<T, E>>(
+    pub fn previsit<O, F: 'a + FnMut(Node, O, T) -> Result<T, E>>(&mut self, f: F) -> &mut Self
+    where
+        OpType: TryInto<O>,
+    {
+        self.visit(WalkOrder::Preorder, f)
+    }
+
+    pub fn postvisit<O, F: 'a + FnMut(Node, O, T) -> Result<T, E>>(&mut self, f: F) -> &mut Self
+    where
+        OpType: TryInto<O>,
+    {
+        self.visit(WalkOrder::Postorder, f)
+    }
+
+    fn mut_callbacks(&mut self, order: WalkOrder) -> &mut Vec<WalkerCallback<'a, T, E>> {
+        match order {
+            WalkOrder::Preorder => &mut self.pre_callbacks,
+            WalkOrder::Postorder => &mut self.post_callbacks,
+        }
+    }
+
+    pub fn visit<O, F: 'a + FnMut(Node, O, T) -> Result<T, E>>(
         &mut self,
         walk_order: WalkOrder,
-        f: F,
+        mut f: F,
     ) -> &mut Self
     where
         OpType: TryInto<O>,
     {
-        let g = Rc::new(f);
-        let callbacks = match walk_order {
-            WalkOrder::Preorder => &mut self.pre_callbacks,
-            WalkOrder::Postorder => &mut self.post_callbacks,
+        let cb = move |n, o: OpType, t| match o.try_into() {
+            Ok(x) => f(n, x, t),
+            _ => Ok(t),
         };
-        callbacks.push((move |n, o, t| call_back(n, o, t, g.as_ref())).into());
+        self.mut_callbacks(walk_order).push(cb.into());
         self
     }
 
-    pub fn walk(&self, hugr: impl HugrView, mut t: T) -> Result<T, E> {
+    pub fn walk(&mut self, hugr: impl HugrView, mut t: T) -> Result<T, E> {
         // We intentionally avoid recursion so that we can robustly accept very deep hugrs
         let mut worklist = vec![WorkItem::Visit(hugr.root())];
 
@@ -86,19 +106,17 @@ impl<'a, T, E> Walker<'a, T, E> {
                     worklist.push(WorkItem::Callback(WalkOrder::Postorder, n));
                     // TODO we should add children in topological order
                     let children = hugr.children(n).collect_vec();
+                    // extend in reverse so that the first child is the top of the stack
                     worklist.extend(children.into_iter().rev().map(WorkItem::Visit));
                     worklist.push(WorkItem::Callback(WalkOrder::Preorder, n));
                 }
                 WorkItem::Callback(order, n) => {
-                    let callbacks = match order {
-                        WalkOrder::Preorder => &self.pre_callbacks,
-                        WalkOrder::Postorder => &self.post_callbacks,
-                    };
                     let optype = hugr.get_optype(n);
-                    for cb in callbacks.iter() {
-                        // this clone is unfortunate, to avoid this we would need a TryInto variant:
+                    for cb in self.mut_callbacks(order).iter_mut() {
+                        // this clone is unfortunate, to avoid this we would
+                        // need a TryInto variant like:
                         // try_into(&O) -> Option<&T>
-                        t = cb.0.as_ref()(n, optype.clone(), t)?;
+                        t = cb(n, optype.clone(), t)?;
                     }
                 }
             }
@@ -115,6 +133,7 @@ mod test {
     use crate::{
         builder::{Container, HugrBuilder, ModuleBuilder, SubContainer},
         extension::{ExtensionRegistry, ExtensionSet},
+        ops::{FuncDefn, Module},
         type_row,
         types::FunctionType,
     };
@@ -138,17 +157,17 @@ mod test {
         let hugr = module_builder.finish_hugr(&ExtensionRegistry::new())?;
 
         let s = Walker::<_, Box<dyn Error>>::new()
-            .visit(WalkOrder::Preorder, |_, crate::ops::Module, mut r| {
+            .visit(WalkOrder::Preorder, |_, Module, mut r| {
                 r += ";prem";
                 Ok(r)
             })
-            .visit(WalkOrder::Postorder, |_, crate::ops::Module, mut r| {
+            .visit(WalkOrder::Postorder, |_, Module, mut r| {
                 r += ";postm";
                 Ok(r)
             })
             .visit(
                 WalkOrder::Preorder,
-                |_, crate::ops::FuncDefn { ref name, .. }, mut r| {
+                |_, FuncDefn { ref name, .. }, mut r| {
                     r += ";pre";
                     r += name.as_ref();
                     Ok(r)
@@ -156,7 +175,7 @@ mod test {
             )
             .visit(
                 WalkOrder::Postorder,
-                |_, crate::ops::FuncDefn { ref name, .. }, mut r| {
+                |_, FuncDefn { ref name, .. }, mut r| {
                     r += ";post";
                     r += name.as_ref();
                     Ok(r)
