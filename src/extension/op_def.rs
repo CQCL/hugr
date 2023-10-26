@@ -195,7 +195,7 @@ impl OpDef {
         // Check the args have no free variables
         args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
 
-        let temp: Option<OpDefTypeScheme>; // to keep alive
+        let temp: OpDefTypeScheme; // to keep alive
         let (ts, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (ts, args),
             SignatureFunc::CustomFunc {
@@ -204,9 +204,8 @@ impl OpDef {
             } => {
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
                 check_type_args(static_args, static_params)?;
-                let ts = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
-                temp = Some(ts);
-                (temp.as_ref().unwrap(), other_args)
+                temp = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
+                (&temp, other_args)
             }
         };
 
