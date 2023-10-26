@@ -186,7 +186,10 @@ impl SiblingSubgraph {
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
-        let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
+        let to_pg = |(n, p): (Node, Port)| {
+            pg.port_index(n.pg_index(), p.pg_offset())
+                .expect("invalid port")
+        };
 
         // Ordering of the edges here is preserved and becomes ordering of the signature.
         let subpg = Subgraph::new_subgraph(

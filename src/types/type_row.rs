@@ -8,8 +8,8 @@ use std::{
 };
 
 use super::Type;
-use crate::hugr::PortIndex;
 use crate::utils::display_list;
+use crate::PortIndex;
 use delegate::delegate;
 
 #[cfg(feature = "pyo3")]
