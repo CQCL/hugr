@@ -9,11 +9,9 @@ use smol_str::SmolStr;
 
 use std::fmt::{self, Display, Write};
 
-use crate::hugr::{Direction, PortIndex};
+use crate::{Direction, Port, PortIndex};
 
 use super::{Type, TypeRow};
-
-use crate::hugr::Port;
 
 use crate::extension::ExtensionSet;
 use delegate::delegate;

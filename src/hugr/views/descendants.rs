@@ -72,7 +72,7 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(node.index)
+        self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
@@ -92,16 +92,19 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.graph.port_offsets(node.index, dir).map_into()
+        self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.graph.all_port_offsets(node.index).map_into()
+        self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
-        let port = self.graph.port_index(node.index, port.offset).unwrap();
+        let port = self
+            .graph
+            .port_index(node.pg_index(), port.pg_offset())
+            .unwrap();
         self.graph
             .port_links(port)
             .with_context(self)
@@ -115,7 +118,7 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
 
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
         self.graph
-            .get_connections(node.index, other.index)
+            .get_connections(node.pg_index(), other.pg_index())
             .with_context(self)
             .map_with_context(|(p1, p2), hugr| {
                 [p1, p2].map(|link| {
@@ -127,25 +130,29 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.index, dir)
+        self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
-        match self.graph.contains_node(node.index) {
-            true => self.base_hugr().hierarchy.children(node.index).map_into(),
+        match self.graph.contains_node(node.pg_index()) {
+            true => self
+                .base_hugr()
+                .hierarchy
+                .children(node.pg_index())
+                .map_into(),
             false => portgraph::hierarchy::Children::default().map_into(),
         }
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.graph.neighbours(node.index, dir).map_into()
+        self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.graph.all_neighbours(node.index).map_into()
+        self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
 impl<'g, Root: NodeHandle> RootTagged for DescendantsGraph<'g, Root> {
@@ -161,7 +168,7 @@ where
         let hugr = hugr.base_hugr();
         Ok(Self {
             root,
-            graph: RegionGraph::new_region(&hugr.graph, &hugr.hierarchy, root.index),
+            graph: RegionGraph::new_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         })
