@@ -355,8 +355,8 @@ pub trait Dataflow: Container {
         let const_node = cid.node();
         let nodetype = self.hugr().get_nodetype(const_node);
         let input_extensions = nodetype.input_extensions().cloned();
-        let op: &OpType = nodetype.into();
-        let op: ops::Const = op
+        let op: ops::Const = nodetype
+            .op()
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
