@@ -360,11 +360,10 @@ impl SiblingSubgraph {
             rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
         let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
             rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        let mut order_ports = in_order_ports
-            .into_iter()
-            .map(|(n, p)| (n, p.into()))
-            .chain(out_order_ports.into_iter().map(|(n, p)| (n, p.into())));
-        if order_ports.any(|(n, p)| is_order_edge(&replacement, n, p)) {
+
+        if combine_in_out(&vec![out_order_ports], &in_order_ports)
+            .any(|(n, p)| is_order_edge(&replacement, n, p))
+        {
             unimplemented!("Found state order edges in replacement graph");
         }
 
