@@ -100,10 +100,10 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
         self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
         let port = self
             .graph
-            .port_index(node.pg_index(), port.pg_offset())
+            .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
         self.graph
             .port_links(port)

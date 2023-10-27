@@ -131,10 +131,10 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
         self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
         let port = self
             .graph
-            .port_index(node.pg_index(), port.pg_offset())
+            .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
         self.graph
             .port_links(port)
@@ -316,7 +316,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
         }
     }
 
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
         // Need to filter only to links inside the sibling graph
         SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
             .linked_ports(node, port)

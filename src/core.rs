@@ -69,7 +69,7 @@ pub type Direction = portgraph::Direction;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
-pub struct Wire(Node, usize);
+pub struct Wire(Node, OutgoingPort);
 
 impl Node {
     /// Returns the node as a portgraph `NodeIndex`.
@@ -88,29 +88,29 @@ impl Port {
         }
     }
 
-    /// Creates a new incoming port.
+    /// Converts to an [IncomingPort] if this port is one; else fails with
+    /// [HugrError::InvalidPortDirection]
     #[inline]
-    pub fn new_incoming(port: impl Into<IncomingPort>) -> Self {
-        Self::try_new_incoming(port).unwrap()
+    pub fn as_incoming(&self) -> Result<IncomingPort, HugrError> {
+        match self.direction() {
+            Direction::Incoming => Ok(IncomingPort {
+                index: self.index() as u16,
+            }),
+            dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
+        }
     }
 
-    /// Creates a new outgoing port.
+    /// Converts to an [OutgoingPort] if this port is one; else fails with
+    /// [HugrError::InvalidPortDirection]
     #[inline]
-    pub fn new_outgoing(port: impl Into<OutgoingPort>) -> Self {
-        Self::try_new_outgoing(port).unwrap()
+    pub fn as_outgoing(&self) -> Result<OutgoingPort, HugrError> {
+        match self.direction() {
+            Direction::Outgoing => Ok(OutgoingPort {
+                index: self.index() as u16,
+            }),
+            dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
+        }
     }
-
-    /// Creates a new incoming port.
-    #[inline]
-    pub fn try_new_incoming(port: impl TryInto<IncomingPort>) -> Result<Self, HugrError> {
-        let Ok(port) = port.try_into() else {
-            return Err(HugrError::InvalidPortDirection(Direction::Outgoing));
-        };
-        Ok(Self {
-            offset: portgraph::PortOffset::new_incoming(port.index()),
-        })
-    }
-
     /// Creates a new outgoing port.
     #[inline]
     pub fn try_new_outgoing(port: impl TryInto<OutgoingPort>) -> Result<Self, HugrError> {
@@ -181,28 +181,18 @@ impl From<usize> for OutgoingPort {
     }
 }
 
-impl TryFrom<Port> for IncomingPort {
-    type Error = HugrError;
-    #[inline(always)]
-    fn try_from(port: Port) -> Result<Self, Self::Error> {
-        match port.direction() {
-            Direction::Incoming => Ok(Self {
-                index: port.index() as u16,
-            }),
-            dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
+impl From<IncomingPort> for Port {
+    fn from(value: IncomingPort) -> Self {
+        Self {
+            offset: portgraph::PortOffset::new_incoming(value.index()),
         }
     }
 }
 
-impl TryFrom<Port> for OutgoingPort {
-    type Error = HugrError;
-    #[inline(always)]
-    fn try_from(port: Port) -> Result<Self, Self::Error> {
-        match port.direction() {
-            Direction::Outgoing => Ok(Self {
-                index: port.index() as u16,
-            }),
-            dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
+impl From<OutgoingPort> for Port {
+    fn from(value: OutgoingPort) -> Self {
+        Self {
+            offset: portgraph::PortOffset::new_outgoing(value.index()),
         }
     }
 }
@@ -216,8 +206,8 @@ impl NodeIndex for Node {
 impl Wire {
     /// Create a new wire from a node and a port.
     #[inline]
-    pub fn new(node: Node, port: impl TryInto<OutgoingPort>) -> Self {
-        Self(node, Port::try_new_outgoing(port).unwrap().index())
+    pub fn new(node: Node, port: impl Into<OutgoingPort>) -> Self {
+        Self(node, port.into())
     }
 
     /// The node that this wire is connected to.
@@ -228,8 +218,8 @@ impl Wire {
 
     /// The output port that this wire is connected to.
     #[inline]
-    pub fn source(&self) -> Port {
-        Port::new_outgoing(self.1)
+    pub fn source(&self) -> OutgoingPort {
+        self.1
     }
 }
 

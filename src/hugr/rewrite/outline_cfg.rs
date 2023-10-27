@@ -158,7 +158,7 @@ impl Rewrite for OutlineCfg {
 
         // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
-            .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
+            .linked_outputs(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {

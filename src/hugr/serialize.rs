@@ -268,19 +268,17 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::builder::{
+        test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    };
+    use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::{
-        builder::{
-            test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
-            DataflowSubContainer, HugrBuilder, ModuleBuilder,
-        },
-        extension::prelude::BOOL_T,
-        hugr::NodeType,
-        ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{FunctionType, Type},
-        Port,
-    };
+    use crate::hugr::NodeType;
+    use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::types::{FunctionType, Type};
+    use crate::OutgoingPort;
     use itertools::Itertools;
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
@@ -462,7 +460,7 @@ pub mod test {
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
-        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();

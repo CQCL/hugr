@@ -756,7 +756,7 @@ mod test {
     use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
-    use crate::{type_row, Direction, Node};
+    use crate::{type_row, Direction, IncomingPort, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;
@@ -1145,7 +1145,7 @@ mod test {
             h.update_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
-                port: Port::new_incoming(1),
+                port: IncomingPort::from(1).into(),
                 port_kind: EdgeKind::Value(BOOL_T)
             })
         );

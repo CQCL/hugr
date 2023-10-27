@@ -3,7 +3,7 @@ use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
-use crate::{IncomingPort, Node, OutgoingPort, Port};
+use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
 
@@ -369,7 +369,7 @@ pub trait Dataflow: Container {
                 input_extensions,
             ),
             // Constant wire from the constant value node
-            vec![Wire::new(const_node, Port::new_outgoing(0))],
+            vec![Wire::new(const_node, OutgoingPort::from(0))],
         )?;
 
         Ok(load_n.out_wire(0))
@@ -659,12 +659,12 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
-    src_port: impl TryInto<OutgoingPort>,
+    src_port: impl Into<OutgoingPort>,
     dst: Node,
-    dst_port: impl TryInto<IncomingPort>,
+    dst_port: impl Into<IncomingPort>,
 ) -> Result<bool, BuildError> {
-    let src_port = Port::try_new_outgoing(src_port)?;
-    let dst_port = Port::try_new_incoming(dst_port)?;
+    let src_port = src_port.into();
+    let dst_port = dst_port.into();
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
@@ -676,9 +676,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             if !typ.copyable() {
                 let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                     ty: EdgeKind::Value(typ),
                 }
                 .into();
@@ -694,9 +694,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                 }
                 .into();
                 return Err(val_err.into());
