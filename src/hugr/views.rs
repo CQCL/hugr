@@ -107,7 +107,7 @@ pub trait HugrView: sealed::HugrInternals {
         self.valid_non_root(node).ok()?;
         self.base_hugr()
             .hierarchy
-            .parent(node.index)
+            .parent(node.pg_index())
             .map(Into::into)
     }
 
@@ -121,7 +121,7 @@ pub trait HugrView: sealed::HugrInternals {
     #[inline]
     fn get_nodetype(&self, node: Node) -> &NodeType {
         match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(node.index),
+            true => self.base_hugr().op_types.get(node.pg_index()),
             false => &DEFAULT_NODETYPE,
         }
     }
@@ -130,7 +130,7 @@ pub trait HugrView: sealed::HugrInternals {
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         match self.contains_node(node) {
-            true => self.base_hugr().metadata.get(node.index),
+            true => self.base_hugr().metadata.get(node.pg_index()),
             false => &NodeMetadata::Null,
         }
     }
@@ -362,7 +362,7 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.as_ref().graph.contains_node(node.index)
+        self.as_ref().graph.contains_node(node.pg_index())
     }
 
     #[inline]
@@ -382,18 +382,27 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.as_ref().graph.port_offsets(node.index, dir).map_into()
+        self.as_ref()
+            .graph
+            .port_offsets(node.pg_index(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.as_ref().graph.all_port_offsets(node.index).map_into()
+        self.as_ref()
+            .graph
+            .all_port_offsets(node.pg_index())
+            .map_into()
     }
 
     #[inline]
     fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
         let hugr = self.as_ref();
-        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
+        let port = hugr
+            .graph
+            .port_index(node.pg_index(), port.pg_offset())
+            .unwrap();
         hugr.graph
             .port_links(port)
             .with_context(hugr)
@@ -410,7 +419,7 @@ impl<T: AsRef<Hugr>> HugrView for T {
         let hugr = self.as_ref();
 
         hugr.graph
-            .get_connections(node.index, other.index)
+            .get_connections(node.pg_index(), other.pg_index())
             .with_context(hugr)
             .map_with_context(|(p1, p2), hugr| {
                 [p1, p2].map(|link| {
@@ -422,22 +431,28 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.as_ref().graph.num_ports(node.index, dir)
+        self.as_ref().graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
-        self.as_ref().hierarchy.children(node.index).map_into()
+        self.as_ref().hierarchy.children(node.pg_index()).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.as_ref().graph.neighbours(node.index, dir).map_into()
+        self.as_ref()
+            .graph
+            .neighbours(node.pg_index(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.as_ref().graph.all_neighbours(node.index).map_into()
+        self.as_ref()
+            .graph
+            .all_neighbours(node.pg_index())
+            .map_into()
     }
 }
 

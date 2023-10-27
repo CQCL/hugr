@@ -5,10 +5,11 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
 
-use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::ConstTypeError;
 use crate::types::Type;
+use crate::{Node, Wire};
 
 pub mod handle;
 pub use handle::BuildHandle;

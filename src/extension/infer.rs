@@ -13,10 +13,9 @@
 use super::{ExtensionId, ExtensionSet};
 use crate::{
     hugr::views::HugrView,
-    hugr::Node,
     ops::{OpTag, OpTrait},
     types::EdgeKind,
-    Direction,
+    Direction, Node,
 };
 
 use super::validate::ExtensionError;
