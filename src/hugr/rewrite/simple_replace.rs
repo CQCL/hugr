@@ -7,12 +7,9 @@ use std::slice;
 use itertools::Itertools;
 
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrMut, HugrView, IncomingPort, NodeMetadata};
-use crate::{
-    hugr::{Node, Rewrite},
-    ops::{OpTag, OpTrait, OpType},
-    Hugr,
-};
+use crate::hugr::{HugrMut, HugrView, NodeMetadata, Rewrite};
+use crate::ops::{OpTag, OpTrait, OpType};
+use crate::{Hugr, IncomingPort, Node};
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
@@ -233,13 +230,14 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{Hugr, HugrMut, IncomingPort, Node, Rewrite};
+    use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::quantum::test::{cx_gate, h_gate};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
+    use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
 

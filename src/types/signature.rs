@@ -3,20 +3,14 @@
 #[cfg(feature = "pyo3")]
 use pyo3::{pyclass, pymethods};
 
+use delegate::delegate;
+use smol_str::SmolStr;
+use std::fmt::{self, Display, Write};
 use std::ops::Index;
 
-use smol_str::SmolStr;
-
-use std::fmt::{self, Display, Write};
-
-use crate::hugr::{Direction, IncomingPort, OutgoingPort, PortIndex};
-
-use super::{Type, TypeRow};
-
-use crate::hugr::Port;
-
 use crate::extension::ExtensionSet;
-use delegate::delegate;
+use crate::types::{Type, TypeRow};
+use crate::{Direction, IncomingPort, OutgoingPort, Port, PortIndex};
 
 #[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -1,8 +1,9 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
-use crate::hugr::{IncomingPort, Node, NodeMetadata, OutgoingPort, ValidationError};
+use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
+use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
 

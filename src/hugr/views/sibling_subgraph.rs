@@ -18,18 +18,12 @@ use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
 use crate::extension::ExtensionSet;
-use crate::hugr::{HugrError, HugrMut, IncomingPort, OutgoingPort};
+use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
+use crate::ops::handle::{ContainerHandle, DataflowOpID};
+use crate::ops::{OpTag, OpTrait};
 use crate::types::Signature;
-use crate::{
-    ops::{
-        handle::{ContainerHandle, DataflowOpID},
-        OpTag, OpTrait,
-    },
-    types::{FunctionType, Type},
-    Hugr, Node, Port, SimpleReplacement,
-};
-
-use super::{HugrView, RootTagged};
+use crate::types::{FunctionType, Type};
+use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
@@ -186,7 +180,10 @@ impl SiblingSubgraph {
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
-        let to_pg = |(n, p): (Node, Port)| pg.port_index(n.index, p.offset).expect("invalid port");
+        let to_pg = |(n, p): (Node, Port)| {
+            pg.port_index(n.pg_index(), p.pg_offset())
+                .expect("invalid port")
+        };
 
         // Ordering of the edges here is preserved and becomes ordering of the signature.
         let subpg =

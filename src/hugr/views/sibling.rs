@@ -63,7 +63,7 @@ macro_rules! impl_base_members {
 
         #[inline]
         fn node_count(&self) -> usize {
-            self.base_hugr().hierarchy.child_count(self.root.index) + 1
+            self.base_hugr().hierarchy.child_count(self.root.pg_index()) + 1
         }
 
         #[inline]
@@ -80,7 +80,7 @@ macro_rules! impl_base_members {
             let children = self
                 .base_hugr()
                 .hierarchy
-                .children(self.root.index)
+                .children(self.root.pg_index())
                 .map_into();
             iter::once(self.root).chain(children)
         }
@@ -88,7 +88,7 @@ macro_rules! impl_base_members {
         fn children(&self, node: Node) -> Self::Children<'_> {
             // Same as SiblingGraph
             match node == self.root {
-                true => self.base_hugr().hierarchy.children(node.index).map_into(),
+                true => self.base_hugr().hierarchy.children(node.pg_index()).map_into(),
                 false => portgraph::hierarchy::Children::default().map_into(),
             }
         }
@@ -118,23 +118,23 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(node.index)
+        self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.graph.port_offsets(node.index, dir).map_into()
+        self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.graph.all_port_offsets(node.index).map_into()
+        self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
         let port = self
             .graph
-            .port_index(node.index, port.into().offset)
+            .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
         self.graph
             .port_links(port)
@@ -149,7 +149,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
 
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
         self.graph
-            .get_connections(node.index, other.index)
+            .get_connections(node.pg_index(), other.pg_index())
             .with_context(self)
             .map_with_context(|(p1, p2), hugr| {
                 [p1, p2].map(|link| {
@@ -161,17 +161,17 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.index, dir)
+        self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.graph.neighbours(node.index, dir).map_into()
+        self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.graph.all_neighbours(node.index).map_into()
+        self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
 impl<'g, Root: NodeHandle> RootTagged for SiblingGraph<'g, Root> {
@@ -183,7 +183,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
         let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
+            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -270,7 +270,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
         FlatRegionGraph::new_flat_region(
             &self.base_hugr().graph,
             &self.base_hugr().hierarchy,
-            self.root.index,
+            self.root.pg_index(),
         )
     }
 

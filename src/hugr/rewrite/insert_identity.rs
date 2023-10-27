@@ -2,10 +2,10 @@
 
 use std::iter;
 
-use crate::hugr::{HugrMut, IncomingPort, Node};
+use crate::hugr::{HugrMut, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
-use crate::HugrView;
+use crate::{HugrView, IncomingPort};
 
 use super::Rewrite;
 
