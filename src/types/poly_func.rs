@@ -80,9 +80,7 @@ impl PolyFuncType {
     pub(super) fn transform(&self, t: &impl TypeTransformer) -> Self {
         PolyFuncType {
             params: self.params.clone(),
-            body: self
-                .body
-                .transform(&EnterScope(self.params.len(), t)),
+            body: self.body.transform(&InsideBinders(self.params.len(), t)),
         }
     }
 
@@ -157,9 +155,11 @@ impl<'a> TypeTransformer for Renumber<'a> {
     }
 }
 
-struct EnterScope<'a>(usize, &'a dyn TypeTransformer);
+/// Given a [TypeTransformer] defined outside a binder (i.e. [PolyFuncType]),
+/// applies that transformer to types inside the binder (i.e. arguments/results of said function)
+struct InsideBinders<'a>(usize, &'a dyn TypeTransformer);
 
-impl<'a> TypeTransformer for EnterScope<'a> {
+impl<'a> TypeTransformer for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         // Don't touch the first <self.0> variables
         if idx < self.0 {
