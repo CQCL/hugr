@@ -410,7 +410,7 @@ impl ExtensionSet {
     pub(crate) fn transform(&self, t: &impl TypeTransformer) -> Self {
         Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
             None => vec![e.clone()],
-            Some(i) => match t.apply_var(i) {
+            Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
                 TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
                 _ => panic!("value for type var was not extension set - type scheme should be validate()d first"),
             },

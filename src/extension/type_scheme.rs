@@ -4,7 +4,7 @@
 //!
 //! [OpDef]: super::OpDef
 
-use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
+use crate::types::type_param::{check_type_arg, check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, TypeTransformer};
 
 use super::{ExtensionRegistry, SignatureError};
@@ -58,11 +58,13 @@ impl OpDefTypeScheme {
 struct Instantiation<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> TypeTransformer for Instantiation<'a> {
-    fn apply_var(&self, idx: usize) -> TypeArg {
-        self.0
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        let arg = self
+            .0
             .get(idx)
-            .expect("Undeclared type variable - call validate() ?")
-            .clone()
+            .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        arg.clone()
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
