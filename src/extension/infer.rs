@@ -268,6 +268,11 @@ impl UnificationContext {
     where
         T: HugrView,
     {
+        if hugr.root_type().signature().is_none() {
+            let m_input = self.make_or_get_meta(hugr.root(), Direction::Incoming);
+            self.variables.insert(m_input);
+        }
+
         for node in hugr.nodes() {
             let m_input = self.make_or_get_meta(node, Direction::Incoming);
             let m_output = self.make_or_get_meta(node, Direction::Outgoing);
@@ -307,19 +312,17 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
-                    if node == hugr.root()
-                        || matches!(
-                            node_type.tag(),
-                            OpTag::Alias | OpTag::FuncDefn | OpTag::Function
-                        )
-                    {
-                        self.variables.insert(m_input);
-                    }
                     self.gen_union_constraint(
                         m_input,
                         m_output,
                         node_type.op_signature().extension_reqs,
                     );
+                    if matches!(
+                        node_type.tag(),
+                        OpTag::Alias | OpTag::Function | OpTag::FuncDefn
+                    ) {
+                        self.add_solution(m_input, ExtensionSet::new());
+                    }
                 }
                 // We have a solution for everything!
                 Some(sig) => {
