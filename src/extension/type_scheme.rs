@@ -5,7 +5,7 @@
 //! [OpDef]: super::OpDef
 
 use crate::types::type_param::{check_type_arg, check_type_args, TypeArg, TypeParam};
-use crate::types::{CustomType, FunctionType, Type, TypeTransformer};
+use crate::types::{FunctionType, TypeTransformer};
 
 use super::{ExtensionRegistry, SignatureError};
 
