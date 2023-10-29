@@ -321,7 +321,7 @@ impl Type {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Prim(PrimType::Variable(idx, ..)) => t.apply_typevar(*idx),
             TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.transform(t)),
             TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.transform(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(transform_row(elems, t)),
@@ -331,13 +331,13 @@ impl Type {
 }
 
 pub(crate) trait TypeTransformer {
-    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
+    fn apply_typevar(&self, idx: usize) -> Type {
+        let TypeArg::Type { ty } = self.apply_var(idx)
             else {panic!("Variable was not a type - try validate() first")};
         ty
     }
 
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
+    fn apply_var(&self, idx: usize) -> TypeArg;
 
     fn extension_registry(&self) -> &ExtensionRegistry;
 }

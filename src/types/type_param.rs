@@ -201,8 +201,8 @@ impl TypeArg {
                 es: es.transform(t),
             },
             TypeArg::Variable {
-                v: TypeArgVariable { idx, cached_decl },
-            } => t.apply_var(*idx, cached_decl),
+                v: TypeArgVariable { idx, .. },
+            } => t.apply_var(*idx),
         }
     }
 }
