@@ -84,7 +84,7 @@ impl PolyFuncType {
         }
         PolyFuncType {
             params: self.params.clone(),
-            body: self.body.transform(&t.enter_scope(self.params.len())),
+            body: self.body.transform(&InsideBinders(self.params.len(), t)),
         }
     }
 
@@ -133,8 +133,6 @@ impl PartialEq<FunctionType> for PolyFuncType {
 }
 
 impl<'a> TypeTransformer for Instantiation<'a> {
-    type ES<'b> = InsideBinders<'b, Self> where Self: 'b;
-
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
@@ -142,10 +140,6 @@ impl<'a> TypeTransformer for Instantiation<'a> {
             .expect("Undeclared type variable - call validate() ?");
         debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
         arg.clone()
-    }
-
-    fn enter_scope(&self, num_vars: usize) -> Self::ES<'_> {
-        InsideBinders(num_vars, self)
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
@@ -156,15 +150,10 @@ impl<'a> TypeTransformer for Instantiation<'a> {
 struct Renumber<'a>(usize, &'a ExtensionRegistry);
 
 impl<'a> TypeTransformer for Renumber<'a> {
-    type ES<'b> = InsideBinders<'b, Self> where Self: 'b;
-
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         TypeArg::new_var_use(idx + self.0, decl.clone())
     }
 
-    fn enter_scope(&self, num_vars: usize) -> Self::ES<'_> {
-        InsideBinders(num_vars, self)
-    }
     fn extension_registry(&self) -> &ExtensionRegistry {
         self.1
     }
@@ -172,11 +161,9 @@ impl<'a> TypeTransformer for Renumber<'a> {
 
 /// Given a [TypeTransformer] defined outside a binder (i.e. [PolyFuncType]),
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
-struct InsideBinders<'a, T>(usize, &'a T);
+struct InsideBinders<'a>(usize, &'a dyn TypeTransformer);
 
-impl<'a, T: TypeTransformer> TypeTransformer for InsideBinders<'a, T> {
-    type ES<'b> = InsideBinders<'b, T> where Self: 'b;
-
+impl<'a> TypeTransformer for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         // Don't touch the first <self.0> variables
         if idx < self.0 {
@@ -186,10 +173,6 @@ impl<'a, T: TypeTransformer> TypeTransformer for InsideBinders<'a, T> {
         // Make returned value (from underlying substitution, outside the
         // new binders) avoid the variables newly bound
         under.transform(&Renumber(self.0, self.extension_registry()))
-    }
-
-    fn enter_scope(&self, num_vars: usize) -> Self::ES<'_> {
-        InsideBinders(self.0 + num_vars, self.1)
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {

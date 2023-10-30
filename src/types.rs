@@ -333,10 +333,6 @@ impl Type {
 }
 
 pub(crate) trait TypeTransformer {
-    type ES<'a>: TypeTransformer
-    where
-        Self: 'a;
-
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
         let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
             else {panic!("Variable was not a type - try validate() first")};
@@ -344,8 +340,6 @@ pub(crate) trait TypeTransformer {
     }
 
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
-
-    fn enter_scope(&self, num_vars: usize) -> Self::ES<'_>;
 
     fn extension_registry(&self) -> &ExtensionRegistry;
 }
