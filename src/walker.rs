@@ -30,9 +30,10 @@ impl<'a, T, E, F: 'a + FnMut(Node, OpType, T) -> Result<T, E>> From<F>
     }
 }
 
-pub struct Walker<'a, T, E> {
+pub struct Walker<'a, H: HugrView, T, E> {
     pre_callbacks: Vec<WalkerCallback<'a, T, E>>,
     post_callbacks: Vec<WalkerCallback<'a, T, E>>,
+    hugr: &'a H,
 }
 
 enum WorkItem {
@@ -40,11 +41,12 @@ enum WorkItem {
     Callback(WalkOrder, Node),
 }
 
-impl<'a, T, E> Walker<'a, T, E> {
-    pub fn new() -> Self {
+impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
+    pub fn new(hugr: &'a H) -> Self {
         Self {
             pre_callbacks: Vec::new(),
             post_callbacks: Vec::new(),
+            hugr,
         }
     }
 
@@ -85,9 +87,9 @@ impl<'a, T, E> Walker<'a, T, E> {
         self
     }
 
-    pub fn walk(&mut self, hugr: impl HugrView, mut t: T) -> Result<T, E> {
+    pub fn walk(&mut self, mut t: T) -> Result<T, E> {
         // We intentionally avoid recursion so that we can robustly accept very deep hugrs
-        let mut worklist = vec![WorkItem::Visit(hugr.root())];
+        let mut worklist = vec![WorkItem::Visit(self.hugr.root())];
 
         while let Some(wi) = worklist.pop() {
             match wi {
@@ -102,9 +104,9 @@ impl<'a, T, E> Walker<'a, T, E> {
                     // the input node. (For example, LoadConstant nodes may not
                     // be reachable from the input node). So we do a second
                     // unordered traversal afterwards.
-                    if let Some([input, _]) = hugr.get_io(n) {
+                    if let Some([input, _]) = self.hugr.get_io(n) {
                         use crate::hugr::views::PetgraphWrapper;
-                        let wrapper = PetgraphWrapper { hugr: &hugr };
+                        let wrapper = PetgraphWrapper { hugr: self.hugr };
                         let mut dfs = ::petgraph::visit::DfsPostOrder::new(&wrapper, input);
                         while let Some(x) = dfs.next(&wrapper) {
                             worklist.push(WorkItem::Visit(x));
@@ -112,7 +114,8 @@ impl<'a, T, E> Walker<'a, T, E> {
                         }
                     }
 
-                    let rest_children = hugr
+                    let rest_children = self
+                        .hugr
                         .children(n)
                         .filter(|x| !pushed_children.contains(x))
                         .collect_vec();
@@ -121,7 +124,7 @@ impl<'a, T, E> Walker<'a, T, E> {
                     worklist.push(WorkItem::Callback(WalkOrder::Preorder, n));
                 }
                 WorkItem::Callback(order, n) => {
-                    let optype = hugr.get_optype(n);
+                    let optype = self.hugr.get_optype(n);
                     for cb in self.mut_callbacks(order).iter_mut() {
                         // this clone is unfortunate, to avoid this we would
                         // need a TryInto variant like:
@@ -170,7 +173,7 @@ mod test {
 
         let hugr = module_builder.finish_hugr(&ExtensionRegistry::new())?;
 
-        let s = Walker::<_, Box<dyn Error>>::new()
+        let s = Walker::<_, _, Box<dyn Error>>::new(&hugr)
             .visit(WalkOrder::Preorder, |_, Module, mut r| {
                 r += ";prem";
                 Ok(r)
@@ -195,7 +198,7 @@ mod test {
                     Ok(r)
                 },
             )
-            .walk(&hugr, String::new())?;
+            .walk(String::new())?;
 
         assert_eq!(s, ";prem;pref1;postf1;pref2;postf2;postm");
         Ok(())
@@ -228,12 +231,12 @@ mod test {
         h.hugr_mut()
             .move_before_sibling(noop2.handle().node(), noop1.handle().node())?;
 
-        let v = Walker::<Vec<Node>, Box<dyn Error>>::new()
+        let v = Walker::<_, Vec<Node>, Box<dyn Error>>::new(&h)
             .previsit(|n, Noop, mut v| {
                 v.push(n);
                 Ok(v)
             })
-            .walk(&h, Vec::new())?;
+            .walk(Vec::new())?;
         assert_eq!(
             &[noop1.handle().node(), noop2.handle().node()],
             v.as_slice()
