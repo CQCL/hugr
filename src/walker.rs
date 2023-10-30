@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::collections::HashSet;
+
 use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 
@@ -91,10 +93,31 @@ impl<'a, T, E> Walker<'a, T, E> {
             match wi {
                 WorkItem::Visit(n) => {
                     worklist.push(WorkItem::Callback(WalkOrder::Postorder, n));
-                    // TODO we should add children in topological order
-                    let children = hugr.children(n).collect_vec();
+                    let mut pushed_children = HashSet::new();
+                    // We intend to only visit direct children.
+                    //
+                    // If the nodes children form a dataflow sibling graph we
+                    // visit them in post dfs order. This traversal is not
+                    // guaranteed to visit all nodes, only those reachable from
+                    // the input node. (For example, LoadConstant nodes may not
+                    // be reachable from the input node). So we do a second
+                    // unordered traversal afterwards.
+                    if let Some([input, _]) = hugr.get_io(n) {
+                        use crate::hugr::views::PetgraphWrapper;
+                        let wrapper = PetgraphWrapper { hugr: &hugr };
+                        let mut dfs = ::petgraph::visit::DfsPostOrder::new(&wrapper, input);
+                        while let Some(x) = dfs.next(&wrapper) {
+                            worklist.push(WorkItem::Visit(x));
+                            pushed_children.insert(x);
+                        }
+                    }
+
+                    let rest_children = hugr
+                        .children(n)
+                        .filter(|x| !pushed_children.contains(x))
+                        .collect_vec();
                     // extend in reverse so that the first child is the top of the stack
-                    worklist.extend(children.into_iter().rev().map(WorkItem::Visit));
+                    worklist.extend(rest_children.into_iter().rev().map(WorkItem::Visit));
                     worklist.push(WorkItem::Callback(WalkOrder::Preorder, n));
                 }
                 WorkItem::Callback(order, n) => {
@@ -116,9 +139,13 @@ impl<'a, T, E> Walker<'a, T, E> {
 mod test {
     use std::error::Error;
 
+    use crate::builder::{Dataflow, DataflowHugr};
+    use crate::extension::prelude::USIZE_T;
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::ops;
     use crate::types::Signature;
     use crate::{
-        builder::{Container, HugrBuilder, ModuleBuilder, SubContainer},
+        builder::{Container, FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer},
         extension::{ExtensionRegistry, ExtensionSet},
         ops::{FuncDefn, Module},
         type_row,
@@ -171,6 +198,46 @@ mod test {
             .walk(&hugr, String::new())?;
 
         assert_eq!(s, ";prem;pref1;postf1;pref2;postf2;postm");
+        Ok(())
+    }
+
+    struct Noop;
+
+    impl TryFrom<ops::OpType> for Noop {
+        type Error = ops::OpType;
+        fn try_from(ot: ops::OpType) -> Result<Self, Self::Error> {
+            match ot {
+                ops::OpType::LeafOp(ops::LeafOp::Noop { .. }) => Ok(Noop),
+                x => Err(x),
+            }
+        }
+    }
+    #[test]
+    fn test2() -> Result<(), Box<dyn Error>> {
+        use ops::handle::NodeHandle;
+        let sig = Signature {
+            signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
+            input_extensions: ExtensionSet::new(),
+        };
+        let mut fun_builder = FunctionBuilder::new("f3", sig)?;
+        let [i] = fun_builder.input_wires_arr();
+        let noop1 = fun_builder.add_dataflow_op(ops::LeafOp::Noop { ty: USIZE_T }, [i])?;
+        let noop2 =
+            fun_builder.add_dataflow_op(ops::LeafOp::Noop { ty: USIZE_T }, [noop1.out_wire(0)])?;
+        let mut h = fun_builder.finish_prelude_hugr_with_outputs([noop2.out_wire(0)])?;
+        h.hugr_mut()
+            .move_before_sibling(noop2.handle().node(), noop1.handle().node())?;
+
+        let v = Walker::<Vec<Node>, Box<dyn Error>>::new()
+            .previsit(|n, Noop, mut v| {
+                v.push(n);
+                Ok(v)
+            })
+            .walk(&h, Vec::new())?;
+        assert_eq!(
+            &[noop1.handle().node(), noop2.handle().node()],
+            v.as_slice()
+        );
         Ok(())
     }
 }
