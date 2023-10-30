@@ -329,7 +329,7 @@ impl Rewrite for Replacement {
 fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
     while descendant != ancestor {
         let Some(p) = h.get_parent(descendant) else {
-            return false
+            return false;
         };
         descendant = p;
     }
