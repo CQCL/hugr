@@ -537,27 +537,21 @@ impl UnificationContext {
     /// available. When there are variables, we should leave the graph as it is,
     /// but make sure that no matter what they're instantiated to, the graph
     /// still makes sense (should pass the extension validation check)
-    pub fn results(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+    pub fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
         let mut results: ExtensionSolution = HashMap::new();
         for (loc, meta) in self.extensions.iter() {
-            let rs = match self.get_solution(meta) {
-                Some(rs) => Ok(rs.clone()),
-                None => {
-                    // If it depends on some other live meta, that's bad news.
-                    // If it only depends on graph variables, then we don't have
-                    // a *solution*, but it's fine
-                    if self.live_var(meta).is_some() {
-                        Err(InferExtensionError::Unsolved { location: *loc })
-                    } else {
-                        continue;
-                    }
+            if let Some(rs) = self.get_solution(meta) {
+                if loc.1 == Direction::Incoming {
+                    results.insert(loc.0, rs.clone());
                 }
-            }?;
-            if loc.1 == Direction::Incoming {
-                results.insert(loc.0, rs);
+            } else if self.live_var(meta).is_some() {
+                // If it depends on some other live meta, that's bad news.
+                return Err(InferExtensionError::Unsolved { location: *loc });
             }
+            // If it only depends on graph variables, then we don't have
+            // a *solution*, but it's fine
         }
         debug_assert!(self.live_metas().is_empty());
         Ok(results)
