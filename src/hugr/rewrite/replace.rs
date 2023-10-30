@@ -12,7 +12,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::HugrMut;
 use crate::ops::{OpTag, OpTrait};
 use crate::types::EdgeKind;
-use crate::{Direction, Hugr, HugrView, Node, Port};
+use crate::{Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::Rewrite;
 
@@ -37,21 +37,21 @@ pub enum NewEdgeKind {
     /// An [EdgeKind::Value] edge (between DFG nodes only)
     Value {
         /// The source port
-        src_pos: usize,
+        src_pos: OutgoingPort,
         /// The target port
-        tgt_pos: usize,
+        tgt_pos: IncomingPort,
     },
     /// An [EdgeKind::Static] edge
     Static {
         /// The source port
-        src_pos: usize,
+        src_pos: OutgoingPort,
         /// The target port
-        tgt_pos: usize,
+        tgt_pos: IncomingPort,
     },
     /// A [EdgeKind::ControlFlow] edge (between CFG nodes only)
     ControlFlow {
         /// Identifies a control-flow output (successor) of the source node.
-        src_pos: usize,
+        src_pos: OutgoingPort,
     },
 }
 
@@ -88,18 +88,15 @@ impl NewEdgeSpec {
         let optype = h.get_optype(self.src);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_output() == Some(EdgeKind::StateOrder),
-            NewEdgeKind::Value { src_pos, .. } => matches!(
-                optype.port_kind(Port::new_outgoing(src_pos)),
-                Some(EdgeKind::Value(_))
-            ),
-            NewEdgeKind::Static { src_pos, .. } => matches!(
-                optype.port_kind(Port::new_outgoing(src_pos)),
-                Some(EdgeKind::Static(_))
-            ),
-            NewEdgeKind::ControlFlow { src_pos } => matches!(
-                optype.port_kind(Port::new_outgoing(src_pos)),
-                Some(EdgeKind::ControlFlow)
-            ),
+            NewEdgeKind::Value { src_pos, .. } => {
+                matches!(optype.port_kind(src_pos), Some(EdgeKind::Value(_)))
+            }
+            NewEdgeKind::Static { src_pos, .. } => {
+                matches!(optype.port_kind(src_pos), Some(EdgeKind::Static(_)))
+            }
+            NewEdgeKind::ControlFlow { src_pos } => {
+                matches!(optype.port_kind(src_pos), Some(EdgeKind::ControlFlow))
+            }
         };
         ok.then_some(())
             .ok_or(ReplaceError::BadEdgeKind(Direction::Outgoing, self.clone()))
@@ -108,16 +105,14 @@ impl NewEdgeSpec {
         let optype = h.get_optype(self.tgt);
         let ok = match self.kind {
             NewEdgeKind::Order => optype.other_input() == Some(EdgeKind::StateOrder),
-            NewEdgeKind::Value { tgt_pos, .. } => matches!(
-                optype.port_kind(Port::new_incoming(tgt_pos)),
-                Some(EdgeKind::Value(_))
-            ),
-            NewEdgeKind::Static { tgt_pos, .. } => matches!(
-                optype.port_kind(Port::new_incoming(tgt_pos)),
-                Some(EdgeKind::Static(_))
-            ),
+            NewEdgeKind::Value { tgt_pos, .. } => {
+                matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Value(_)))
+            }
+            NewEdgeKind::Static { tgt_pos, .. } => {
+                matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Static(_)))
+            }
             NewEdgeKind::ControlFlow { .. } => matches!(
-                optype.port_kind(Port::new_incoming(0)),
+                optype.port_kind(IncomingPort::from(0)),
                 Some(EdgeKind::ControlFlow)
             ),
         };
@@ -133,7 +128,7 @@ impl NewEdgeSpec {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
         {
             let found_incoming = h
-                .linked_ports(self.tgt, Port::new_incoming(tgt_pos))
+                .linked_ports(self.tgt, tgt_pos)
                 .exactly_one()
                 .is_ok_and(|(src_n, _)| src_ok(src_n));
             if !found_incoming {
@@ -372,7 +367,7 @@ fn transfer_edges<'a>(
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if let Some(anc) = existing_src_ancestor {
                     e.check_existing_edge(h, |n| descends(h, anc, n))?;
-                    h.disconnect(e.tgt, Port::new_incoming(tgt_pos)).unwrap();
+                    h.disconnect(e.tgt, IncomingPort::from(tgt_pos)).unwrap();
                 }
                 h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
             }
@@ -448,7 +443,7 @@ mod test {
     use crate::ops::{self, BasicBlock, LeafOp, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
-    use crate::{type_row, Hugr, HugrView, Node};
+    use crate::{type_row, Hugr, HugrView, Node, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, Replacement};
 
@@ -557,7 +552,9 @@ mod test {
             mu_out: vec![NewEdgeSpec {
                 src: r_bb,
                 tgt: exit.node(),
-                kind: NewEdgeKind::ControlFlow { src_pos: 0 },
+                kind: NewEdgeKind::ControlFlow {
+                    src_pos: OutgoingPort::from(0),
+                },
             }],
             mu_new: vec![],
         })?;

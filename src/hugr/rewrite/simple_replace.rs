@@ -584,7 +584,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::hugr::rewrite::replace::Replacement;
     fn to_replace(h: &impl HugrView, s: SimpleReplacement) -> Replacement {
         use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec};
-        use crate::hugr::PortIndex;
+
         let mut replacement = s.replacement;
         let (in_, out) = replacement
             .children(replacement.root())
@@ -598,13 +598,13 @@ pub(in crate::hugr::rewrite) mod test {
                 if *tgt == out {
                     unimplemented!()
                 };
-                let (src, src_port) = h.linked_ports(*r_n, *r_p).exactly_one().ok().unwrap();
+                let (src, src_port) = h.linked_outputs(*r_n, *r_p).exactly_one().ok().unwrap();
                 NewEdgeSpec {
                     src,
                     tgt: *tgt,
                     kind: NewEdgeKind::Value {
-                        src_pos: src_port.index(),
-                        tgt_pos: tgt_port.index(),
+                        src_pos: src_port,
+                        tgt_pos: *tgt_port,
                     },
                 }
             })
@@ -614,7 +614,7 @@ pub(in crate::hugr::rewrite) mod test {
             .iter()
             .map(|((tgt, tgt_port), out_port)| {
                 let (src, src_port) = replacement
-                    .linked_ports(out, *out_port)
+                    .linked_outputs(out, *out_port)
                     .exactly_one()
                     .ok()
                     .unwrap();
@@ -625,8 +625,8 @@ pub(in crate::hugr::rewrite) mod test {
                     src,
                     tgt: *tgt,
                     kind: NewEdgeKind::Value {
-                        src_pos: src_port.index(),
-                        tgt_pos: tgt_port.index(),
+                        src_pos: src_port,
+                        tgt_pos: *tgt_port,
                     },
                 }
             })
