@@ -691,10 +691,11 @@ mod test {
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
+    use crate::hugr::HugrError;
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
-    use crate::ops::OpType;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
+    use crate::ops::{BasicBlock, OpType};
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
 
@@ -1556,5 +1557,108 @@ mod test {
         hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn cfg_that_sometimes_overflows_stack() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::extension::{prelude::USIZE_T, ExtensionRegistry, PRELUDE};
+        use crate::hugr::hugrmut::sealed::HugrMutInternals;
+        use crate::ops::LeafOp;
+        use crate::std_extensions::collections;
+        use crate::types::TypeArg;
+        let reg: ExtensionRegistry = [PRELUDE.to_owned(), collections::EXTENSION.to_owned()].into();
+        let listy = Type::new_extension(
+            collections::EXTENSION
+                .get_type(collections::LIST_TYPENAME.as_str())
+                .unwrap()
+                .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                .unwrap(),
+        );
+        let pop: LeafOp = collections::EXTENSION
+            .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .unwrap()
+            .into();
+        let push: LeafOp = collections::EXTENSION
+            .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .unwrap()
+            .into();
+        let just_list = TypeRow::from(vec![listy.clone()]);
+        let exset = ExtensionSet::singleton(&collections::EXTENSION_NAME);
+
+        let mut h = Hugr::new(NodeType::open_extensions(ops::CFG {
+            signature: FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
+        }));
+        let pred_const = h.add_op_with_parent(h.root(), ops::Const::unary_unit_sum())?;
+
+        let entry = single_node_block(&mut h, pop, pred_const)?;
+        let bb2 = single_node_block(&mut h, push, pred_const)?;
+
+        let exit = h.add_op_with_parent(
+            h.root(),
+            BasicBlock::Exit {
+                cfg_outputs: just_list.clone(),
+            },
+        )?;
+        h.move_before_sibling(entry, pred_const)?;
+        h.move_before_sibling(exit, pred_const)?;
+
+        h.connect(entry, 0, bb2, 0)?;
+        h.connect(bb2, 0, exit, 0)?;
+
+        h.update_validate(&reg)?;
+        Ok(())
+    }
+
+    fn single_node_block(
+        hugr: &mut Hugr,
+        op: impl Into<OpType>,
+        pred_const: Node,
+    ) -> Result<Node, HugrError> {
+        let op: OpType = op.into();
+        let op_sig = op.signature();
+
+        let bb = hugr.add_op_with_parent(
+            hugr.root(),
+            BasicBlock::DFB {
+                inputs: op_sig.input.clone(),
+                other_outputs: op_sig.output.clone(),
+                tuple_sum_rows: vec![type_row![]],
+                extension_delta: op_sig.extension_reqs.clone(),
+            },
+        )?;
+        let input = hugr.add_op_with_parent(
+            bb,
+            ops::Input {
+                types: op_sig.input.clone(),
+            },
+        )?;
+        let output = hugr.add_op_with_parent(
+            bb,
+            ops::Output {
+                types: simple_unary_plus(op_sig.output.clone()),
+            },
+        )?;
+
+        const PRED_T: Type = Type::new_unit_sum(1);
+        let load_pred = hugr.add_op_with_parent(bb, ops::LoadConstant { datatype: PRED_T })?;
+        hugr.connect(pred_const, 0, load_pred, 0)?;
+        hugr.connect(load_pred, 0, output, 0)?;
+
+        let op = hugr.add_op_with_parent(bb, op)?;
+
+        for (p, _) in op_sig.input().iter().enumerate() {
+            hugr.connect(input, p, op, p)?;
+        }
+
+        for (p, _) in op_sig.output().iter().enumerate() {
+            hugr.connect(op, p, output, p + 1)?;
+        }
+        Ok(bb)
+    }
+
+    fn simple_unary_plus(t: TypeRow) -> TypeRow {
+        let mut v = t.into_owned();
+        v.insert(0, Type::new_unit_sum(1));
+        v.into()
     }
 }
