@@ -94,10 +94,11 @@ impl CustomType {
             .iter()
             .map(|arg| arg.transform(tr))
             .collect::<Vec<_>>();
-        let def = self
+        let bound = self
             .get_type_def(tr.extension_registry())
-            .expect("Call validate first?");
-        let bound = def.bound(&args);
+            .expect("validate should rule this out")
+            .bound(&args);
+        assert!(self.bound.contains(bound));
         Self {
             args,
             bound,
