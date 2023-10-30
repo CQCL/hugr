@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
-use std::ops::{Deref, DerefMut};
-
+use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 
 use crate::{ops::OpType, HugrView, Node};
@@ -18,20 +17,8 @@ pub enum WalkOrder {
     Postorder,
 }
 
+#[derive(Deref, DerefMut)]
 struct WalkerCallback<'a, T, E>(Box<dyn 'a + FnMut(Node, OpType, T) -> Result<T, E>>);
-
-impl<'a, T, E> Deref for WalkerCallback<'a, T, E> {
-    type Target = dyn 'a + FnMut(Node, OpType, T) -> Result<T, E>;
-    fn deref(&self) -> &Self::Target {
-        self.0.deref()
-    }
-}
-
-impl<'a, T, E> DerefMut for WalkerCallback<'a, T, E> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.deref_mut()
-    }
-}
 
 impl<'a, T, E, F: 'a + FnMut(Node, OpType, T) -> Result<T, E>> From<F>
     for WalkerCallback<'a, T, E>
