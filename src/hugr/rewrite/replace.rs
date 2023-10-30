@@ -475,7 +475,10 @@ mod test {
         let mut h = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
         }));
-        let pred_const = h.add_op_with_parent(h.root(), ops::Const::unary_unit_sum())?;
+        let pred_const = h.add_node_with_parent(
+            h.root(),
+            NodeType::open_extensions(ops::Const::unary_unit_sum()),
+        )?;
 
         let entry = single_node_block(&mut h, pop, pred_const)?;
         let bb2 = single_node_block(&mut h, push, pred_const)?;
@@ -591,22 +594,12 @@ mod test {
         )?;
 
         const PRED_T: Type = Type::new_unit_sum(1);
-        let load_pred =
-            hugr.add_node_with_parent(bb, NodeType::pure(ops::LoadConstant { datatype: PRED_T }))?;
-        let mut load_pred_lifted = load_pred;
-        for e in op.signature().extension_reqs.iter() {
-            let new_lift = hugr.add_node_with_parent(
-                bb,
-                NodeType::open_extensions(LeafOp::Lift {
-                    type_row: type_row![PRED_T],
-                    new_extension: e.clone(),
-                }),
-            )?;
-            hugr.connect(load_pred_lifted, 0, new_lift, 0)?;
-            load_pred_lifted = new_lift;
-        }
+        let load_pred = hugr.add_node_with_parent(
+            bb,
+            NodeType::open_extensions(ops::LoadConstant { datatype: PRED_T }),
+        )?;
         hugr.connect(pred_const, 0, load_pred, 0)?;
-        hugr.connect(load_pred_lifted, 0, output, 0)?;
+        hugr.connect(load_pred, 0, output, 0)?;
 
         let op = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
 
