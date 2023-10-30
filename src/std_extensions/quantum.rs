@@ -97,7 +97,7 @@ impl ConstAngle {
 
     /// Create a new [`ConstAngle`] from a log-denominator and a floating-point value in radians,
     /// rounding to the nearest corresponding value. (Ties round away from zero.)
-    pub fn from_radians(log_denom: u8, theta: f64) -> Result<Self, ConstTypeError> {
+    pub fn from_radians_rounding(log_denom: u8, theta: f64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_denom(log_denom) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message(
