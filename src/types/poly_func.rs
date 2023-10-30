@@ -78,6 +78,10 @@ impl PolyFuncType {
     }
 
     pub(super) fn transform(&self, t: &impl TypeTransformer) -> Self {
+        if self.params.is_empty() {
+            // Avoid using complex code for simple Monomorphic case
+            return self.body.transform(t).into();
+        }
         PolyFuncType {
             params: self.params.clone(),
             body: self.body.transform(&InsideBinders(self.params.len(), t)),
