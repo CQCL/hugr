@@ -440,7 +440,7 @@ impl UnificationContext {
                     continue;
                 }
 
-                if let Some(cs) = self.constraints.get(m) {
+                if let Some(cs) = self.constraints.remove(m) {
                     for c in cs
                         .iter()
                         .filter(|c| !matches!(c, Constraint::Equal(_)))
@@ -450,7 +450,6 @@ impl UnificationContext {
                     {
                         self.add_constraint(combined_meta, c.clone());
                     }
-                    self.constraints.remove(m).unwrap();
                     merged.insert(*m);
                     // Record a new meta the first time that we use it; don't
                     // bother recording a new meta if we don't add any
