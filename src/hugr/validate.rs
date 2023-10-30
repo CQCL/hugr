@@ -119,7 +119,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
             // The root node has no edges.
-            if self.hugr.graph.num_outputs(node.index) + self.hugr.graph.num_inputs(node.index) != 0
+            if self.hugr.graph.num_outputs(node.pg_index())
+                + self.hugr.graph.num_inputs(node.pg_index())
+                != 0
             {
                 return Err(ValidationError::RootWithEdges { node });
             }
@@ -142,7 +144,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
             for dir in Direction::BOTH {
                 // Check that we have the correct amount of ports and edges.
-                let num_ports = self.hugr.graph.num_ports(node.index, dir);
+                let num_ports = self.hugr.graph.num_ports(node.pg_index(), dir);
                 if num_ports != op_type.port_count(dir) {
                     return Err(ValidationError::WrongNumberOfPorts {
                         node,
@@ -154,7 +156,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 }
 
                 // Check port connections
-                for (i, port_index) in self.hugr.graph.ports(node.index, dir).enumerate() {
+                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
                     let port = Port::new(dir, i);
                     self.validate_port(node, port, port_index, op_type)?;
                 }
@@ -292,7 +294,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         let op_type = &node_type.op;
         let flags = op_type.validity_flags();
 
-        if self.hugr.hierarchy.child_count(node.index) > 0 {
+        if self.hugr.hierarchy.child_count(node.pg_index()) > 0 {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
@@ -328,7 +330,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 }
             }
             // Additional validations running over the full list of children optypes
-            let children_optypes = all_children.map(|c| (c.index, self.hugr.get_optype(c)));
+            let children_optypes = all_children.map(|c| (c.pg_index(), self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
@@ -339,9 +341,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
             // Additional validations running over the edges of the contained graph
             if let Some(edge_check) = flags.edge_check {
-                for source in self.hugr.hierarchy.children(node.index) {
+                for source in self.hugr.hierarchy.children(node.pg_index()) {
                     for target in self.hugr.graph.output_neighbours(source) {
-                        if self.hugr.hierarchy.parent(target) != Some(node.index) {
+                        if self.hugr.hierarchy.parent(target) != Some(node.pg_index()) {
                             continue;
                         }
                         let source_op = self.hugr.get_optype(source.into());
@@ -387,7 +389,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Inter-graph edges are ignored. Only internal dataflow, constant, or
     /// state order edges are considered.
     fn validate_children_dag(&self, parent: Node, op_type: &OpType) -> Result<(), ValidationError> {
-        if !self.hugr.hierarchy.has_children(parent.index) {
+        if !self.hugr.hierarchy.has_children(parent.pg_index()) {
             // No children, nothing to do
             return Ok(());
         };
@@ -479,7 +481,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     // Must have an order edge.
                     self.hugr
                         .graph
-                        .get_connections(from.index, ancestor.index)
+                        .get_connections(from.pg_index(), ancestor.pg_index())
                         .find(|&(p, _)| {
                             let offset = self.hugr.graph.port_offset(p).unwrap();
                             from_optype.port_kind(offset) == Some(EdgeKind::StateOrder)
@@ -754,7 +756,7 @@ mod test {
     use crate::std_extensions::logic::test::{and_op, not_op};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
-    use crate::{type_row, Direction, Node};
+    use crate::{type_row, Direction, IncomingPort, Node};
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const Q: Type = crate::extension::prelude::QB_T;
@@ -800,18 +802,18 @@ mod test {
         (input, copy, output)
     }
 
-    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^pred_size), tag(BOOL_T^pred_size), and
-    /// output{Sum{unit^pred_size}, BOOL_T} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^tuple_sum_size), tag(BOOL_T^tuple_sum_size), and
+    /// output{Sum{unit^tuple_sum_size}, BOOL_T} operation to a dataflow container.
     /// Intended to be used to populate a BasicBlock node in a CFG.
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(
         b: &mut Hugr,
         parent: Node,
-        predicate_size: usize,
+        tuple_sum_size: usize,
     ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::simple_predicate(0, predicate_size as u8);
-        let tag_type = Type::new_simple_predicate(predicate_size as u8);
+        let const_op = ops::Const::unit_sum(0, tuple_sum_size as u8);
+        let tag_type = Type::new_unit_sum(tuple_sum_size as u8);
 
         let input = b
             .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
@@ -858,7 +860,7 @@ mod test {
         // Make the hugr root not a hierarchy root
         {
             let mut hugr = b.clone();
-            hugr.root = other.index;
+            hugr.root = other.pg_index();
             assert_matches!(
                 hugr.validate(&EMPTY_REG),
                 Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
@@ -900,7 +902,7 @@ mod test {
         let root = b.root();
         let (_input, copy, _output) = b
             .hierarchy
-            .children(def.index)
+            .children(def.pg_index())
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -947,7 +949,7 @@ mod test {
         let (mut b, def) = make_simple_hugr(2);
         let (_input, output, copy) = b
             .hierarchy
-            .children(def.index)
+            .children(def.pg_index())
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -966,7 +968,7 @@ mod test {
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
-                => {assert_eq!(parent, def); assert_eq!(child, output.index)}
+                => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
         );
         b.replace_op(
             output,
@@ -983,7 +985,7 @@ mod test {
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
-                => {assert_eq!(parent, def); assert_eq!(child, copy.index)}
+                => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
         );
     }
 
@@ -993,7 +995,7 @@ mod test {
         let (mut b, def) = make_simple_hugr(1);
         let (_input, _output, copy) = b
             .hierarchy
-            .children(def.index)
+            .children(def.pg_index())
             .map_into()
             .collect_tuple()
             .unwrap();
@@ -1017,7 +1019,7 @@ mod test {
                 cfg,
                 ops::BasicBlock::DFB {
                     inputs: type_row![BOOL_T],
-                    predicate_variants: vec![type_row![]],
+                    tuple_sum_rows: vec![type_row![]],
                     other_outputs: type_row![BOOL_T],
                     extension_delta: ExtensionSet::new(),
                 },
@@ -1049,7 +1051,7 @@ mod test {
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.index)}
+                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
         );
         b.remove_node(exit2).unwrap();
 
@@ -1058,23 +1060,20 @@ mod test {
             block,
             NodeType::pure(ops::BasicBlock::DFB {
                 inputs: type_row![Q],
-                predicate_variants: vec![type_row![]],
+                tuple_sum_rows: vec![type_row![]],
                 other_outputs: type_row![Q],
                 extension_delta: ExtensionSet::new(),
             }),
         )
         .unwrap();
-        let mut block_children = b.hierarchy.children(block.index);
+        let mut block_children = b.hierarchy.children(block.pg_index());
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
         b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])))
             .unwrap();
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(type_row![
-                Type::new_simple_predicate(1),
-                Q
-            ])),
+            NodeType::pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
         )
         .unwrap();
         assert_matches!(
@@ -1146,7 +1145,7 @@ mod test {
             h.update_validate(&EMPTY_REG),
             Err(ValidationError::UnconnectedPort {
                 node: and,
-                port: Port::new_incoming(1),
+                port: IncomingPort::from(1).into(),
                 port_kind: EdgeKind::Value(BOOL_T)
             })
         );

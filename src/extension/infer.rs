@@ -13,10 +13,9 @@
 use super::{ExtensionId, ExtensionSet};
 use crate::{
     hugr::views::HugrView,
-    hugr::Node,
-    ops::{OpTag, OpTrait, OpType},
+    ops::{OpTag, OpTrait},
     types::EdgeKind,
-    Direction,
+    Direction, Node,
 };
 
 use super::validate::ExtensionError;
@@ -328,7 +327,7 @@ impl UnificationContext {
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
-            let sig: &OpType = hugr.get_nodetype(tgt_node).into();
+            let sig = hugr.get_nodetype(tgt_node).op();
             // Incoming ports with an edge that should mean equal extension reqs
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(
@@ -374,7 +373,7 @@ impl UnificationContext {
             .iter()
             .find(|(_, m)| **m == m2 || self.resolve(**m) == m2)
             .map(|a| a.0);
-        let err = if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
+        if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
             // N.B. We're looking for the case where an equality constraint
             // arose because the two locations are connected by an edge
 
@@ -392,43 +391,35 @@ impl UnificationContext {
                     [(node2, rs2.clone()), (node1, rs1.clone())]
                 };
 
-                if src_rs.is_subset(&tgt_rs) {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::TgtExceedsSrcExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
+                return InferExtensionError::EdgeMismatch(if src_rs.is_subset(&tgt_rs) {
+                    ExtensionError::TgtExceedsSrcExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
                 } else {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::SrcExceedsTgtExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
-                }
-            } else {
-                None
+                    ExtensionError::SrcExceedsTgtExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
+                });
             }
-        } else {
-            None
-        };
+        }
         if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
-            err.unwrap_or(InferExtensionError::MismatchedConcreteWithLocations {
+            InferExtensionError::MismatchedConcreteWithLocations {
                 expected_loc: *loc1,
                 expected: rs1,
                 actual_loc: *loc2,
                 actual: rs2,
-            })
+            }
         } else {
-            err.unwrap_or(InferExtensionError::MismatchedConcrete {
+            InferExtensionError::MismatchedConcrete {
                 expected: rs1,
                 actual: rs2,
-            })
+            }
         }
     }
 
@@ -703,6 +694,7 @@ mod test {
     use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
+    use crate::ops::OpType;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
@@ -1048,14 +1040,14 @@ mod test {
             Ok(case)
         }
 
-        let predicate_inputs = vec![type_row![]; 2];
+        let tuple_sum_rows = vec![type_row![]; 2];
         let rs = ExtensionSet::from_iter([A, B]);
 
         let inputs = type_row![NAT];
         let outputs = type_row![NAT];
 
         let op = ops::Conditional {
-            predicate_inputs,
+            tuple_sum_rows,
             other_inputs: inputs.clone(),
             outputs: outputs.clone(),
             extension_delta: rs.clone(),
@@ -1169,16 +1161,17 @@ mod test {
         hugr: &mut Hugr,
         bb_parent: Node,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Node, Box<dyn Error>> {
-        let predicate_type = Type::new_predicate(predicate_variants.clone());
-        let dfb_sig = FunctionType::new(inputs.clone(), vec![predicate_type])
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
+        let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
+        let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
             .with_extension_delta(&extension_delta.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs,
             other_outputs: type_row![],
-            predicate_variants,
+            tuple_sum_rows,
             extension_delta,
         };
         let op = make_opaque(UNKNOWN_EXTENSION, dfb_sig.clone());
@@ -1194,26 +1187,26 @@ mod test {
     }
 
     fn oneway(ty: Type) -> Vec<Type> {
-        vec![Type::new_predicate([vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty]])]
     }
 
     fn twoway(ty: Type) -> Vec<Type> {
-        vec![Type::new_predicate([vec![ty.clone()], vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty.clone()], vec![ty]])]
     }
 
     fn create_entry_exit(
         hugr: &mut Hugr,
         root: Node,
         inputs: TypeRow,
-        entry_predicates: Vec<TypeRow>,
+        entry_variants: Vec<TypeRow>,
         entry_extensions: ExtensionSet,
         exit_types: impl Into<TypeRow>,
     ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-        let entry_predicate_type = Type::new_predicate(entry_predicates.clone());
+        let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: type_row![],
-            predicate_variants: entry_predicates,
+            tuple_sum_rows: entry_variants,
             extension_delta: entry_extensions,
         };
 
@@ -1232,7 +1225,7 @@ mod test {
         let entry_out = hugr.add_node_with_parent(
             entry,
             NodeType::open_extensions(ops::Output {
-                types: vec![entry_predicate_type].into(),
+                types: vec![entry_tuple_sum].into(),
             }),
         )?;
 
