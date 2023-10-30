@@ -573,14 +573,23 @@ impl UnificationContext {
         // TODO: We should be doing something to ensure that these are the same check...
         if self.get_solution(m).is_none() {
             if let Some(cs) = self.get_constraints(m) {
-                for c in cs {
-                    match c {
-                        Constraint::Plus(_, m) => return self.live_var(m),
+                let other_ms = cs
+                    .iter()
+                    .map(|c| match c {
+                        Constraint::Plus(_, other_m) => *other_m,
                         _ => panic!("we shouldn't be here!"),
-                    }
-                }
+                    })
+                    .collect::<Vec<_>>();
+                // Ideally, we should properly detect cycles. TODO.
+                if other_ms.contains(&m) {
+                    // If iteration order happened to pick that element,
+                    // we'd have an infinite loop
+                    panic!("Node is Plus on itself")
+                };
+                other_ms.iter().filter_map(|m| self.live_var(m)).next()
+            } else {
+                Some(*m)
             }
-            Some(*m)
         } else {
             None
         }
