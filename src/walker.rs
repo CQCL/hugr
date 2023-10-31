@@ -106,7 +106,7 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
                     // unordered traversal afterwards.
                     if let Some([input, _]) = self.hugr.get_io(n) {
                         use crate::hugr::views::PetgraphWrapper;
-                        let wrapper = PetgraphWrapper { hugr: self.hugr };
+                        let wrapper = self.hugr.as_petgraph();
                         let mut dfs = ::petgraph::visit::DfsPostOrder::new(&wrapper, input);
                         while let Some(x) = dfs.next(&wrapper) {
                             worklist.push(WorkItem::Visit(x));
