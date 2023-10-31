@@ -239,8 +239,7 @@ impl Hugr {
 
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-        self.add_node(NodeType::pure(op))
+        self.add_node(NodeType::open_extensions(op))
     }
 
     /// Add a node to the graph.
@@ -356,7 +355,7 @@ impl From<HugrError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use super::{Hugr, HugrView, NodeType};
+    use super::{Hugr, HugrView};
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
@@ -392,12 +391,12 @@ mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
-        let lift = hugr.add_node_with_parent(
+        let lift = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::LeafOp::Lift {
+            ops::LeafOp::Lift {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
-            }),
+            },
         )?;
         hugr.connect(input, 0, lift, 0)?;
         hugr.connect(lift, 0, output, 0)?;
