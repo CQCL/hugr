@@ -316,10 +316,7 @@ impl UnificationContext {
                         m_output,
                         node_type.op_signature().extension_reqs,
                     );
-                    if matches!(
-                        node_type.tag(),
-                        OpTag::Alias | OpTag::Function | OpTag::FuncDefn
-                    ) {
+                    if OpTag::ModuleOp.is_superset(node_type.tag()) {
                         self.add_solution(m_input, ExtensionSet::new());
                     }
                 }
