@@ -886,13 +886,13 @@ mod test {
         let mut b = Hugr::new(NodeType::pure(dfg_op));
         let root = b.root();
         add_df_children(&mut b, root, 1);
-        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+        assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
     fn simple_hugr() {
-        let b = make_simple_hugr(2).0;
-        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+        let mut b = make_simple_hugr(2).0;
+        assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
     }
 
     #[test]
@@ -919,7 +919,7 @@ mod test {
             )
             .unwrap();
         assert_matches!(
-            b.validate(&EMPTY_REG),
+            b.update_validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
         );
 
@@ -927,9 +927,10 @@ mod test {
         add_df_children(&mut b, new_def, 2);
         b.set_parent(new_def, copy).unwrap();
         assert_matches!(
-            b.validate(&EMPTY_REG),
+            b.update_validate(&EMPTY_REG),
             Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
         );
+        let closure = b.infer_extensions().unwrap();
         b.set_parent(new_def, root).unwrap();
 
         // After moving the previous definition to a valid place,
@@ -938,7 +939,7 @@ mod test {
             .add_op_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
-            b.validate(&EMPTY_REG),
+            b.validate_with_extension_closure(closure, &EMPTY_REG),
             Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
         );
     }
@@ -999,7 +1000,11 @@ mod test {
             .map_into()
             .collect_tuple()
             .unwrap();
-
+        // Write Extension annotations into the Hugr while it's still well-formed
+        // enough for us to compute them
+        let closure = b.infer_extensions().unwrap();
+        b.instantiate_extensions(closure);
+        b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,
             NodeType::pure(ops::CFG {
@@ -1035,7 +1040,7 @@ mod test {
             )
             .unwrap();
         b.add_other_edge(block, exit).unwrap();
-        assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+        assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
 
         // Test malformed errors
 
@@ -1377,7 +1382,7 @@ mod test {
     }
     #[test]
     fn unregistered_extension() {
-        let (h, def) = identity_hugr_with_type(USIZE_T);
+        let (mut h, def) = identity_hugr_with_type(USIZE_T);
         assert_eq!(
             h.validate(&EMPTY_REG),
             Err(ValidationError::SignatureError {
@@ -1385,7 +1390,7 @@ mod test {
                 cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
             })
         );
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]
@@ -1416,7 +1421,9 @@ mod test {
             TypeBound::Any,
         ));
         assert_eq!(
-            identity_hugr_with_type(valid.clone()).0.validate(&reg),
+            identity_hugr_with_type(valid.clone())
+                .0
+                .update_validate(&reg),
             Ok(())
         );
 
