@@ -44,11 +44,10 @@ const fn is_valid_log_denom(n: u8) -> bool {
 }
 
 /// Type parameter for the log-denominator of an angle.
-// SAFETY: unsafe block should be ok as the value is definitely not zero.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_DENOM_TYPE_PARAM: TypeParam = TypeParam::bounded_nat(unsafe {
+pub const LOG_DENOM_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
     assert!(LOG_DENOM_BOUND > 0);
-    NonZeroU64::new_unchecked(LOG_DENOM_BOUND as u64)
+    NonZeroU64::MIN.saturating_add((LOG_DENOM_BOUND - 1) as u64)
 });
 
 /// Get the log-denominator of the specified type argument or error if the argument is invalid.
