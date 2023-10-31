@@ -222,10 +222,7 @@ impl TryFrom<SerHugrV0> for Hugr {
         for node_ser in nodes {
             hugr.add_node_with_parent(
                 node_ser.parent,
-                match node_ser.input_extensions {
-                    None => NodeType::new_open(node_ser.op),
-                    Some(rs) => NodeType::new(node_ser.op, rs),
-                },
+                NodeType::new(node_ser.op, node_ser.input_extensions),
             )?;
         }
 
