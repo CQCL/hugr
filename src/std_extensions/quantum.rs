@@ -298,6 +298,8 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use std::f64::consts::TAU;
+
     use cool_asserts::assert_matches;
 
     use crate::{
@@ -342,12 +344,12 @@ pub(crate) mod test {
 
     #[test]
     fn test_angle_consts() {
-        let const_a32_7 = ConstAngle::new(5, 7);
-        let const_a33_7 = ConstAngle::new(6, 7);
-        let const_a32_8 = ConstAngle::new(6, 8);
+        let const_a32_7 = ConstAngle::new(5, 7).unwrap();
+        let const_a33_7 = ConstAngle::new(6, 7).unwrap();
+        let const_a32_8 = ConstAngle::new(6, 8).unwrap();
         assert_ne!(const_a32_7, const_a33_7);
         assert_ne!(const_a32_7, const_a32_8);
-        assert_eq!(const_a32_7, ConstAngle::new(5, 7));
+        assert_eq!(const_a32_7, ConstAngle::new(5, 7).unwrap());
         assert_matches!(
             ConstAngle::new(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
@@ -356,5 +358,8 @@ pub(crate) mod test {
             ConstAngle::new(54, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
+        let const_af1 = ConstAngle::from_radians_rounding(5, 0.21874 * TAU).unwrap();
+        assert_eq!(const_af1.value(), 7);
+        assert_eq!(const_af1.log_denom(), 5);
     }
 }
