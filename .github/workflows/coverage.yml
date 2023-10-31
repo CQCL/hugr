@@ -25,8 +25,15 @@ jobs:
           # Downloads the artifact from the most recent successful run
           workflow: 'coverage.yml'
           name: coverage-summary
-      - name: Rename file
-        run: mv coverage-summary.txt coverage-summary-prev.txt
+          if_no_artifact_found: ignore
+      - name: Rename file or load default
+        run: |
+          if [ -f coverage-summary.txt ];
+          then
+            mv coverage-summary.txt coverage-summary-prev.txt
+          else
+            echo -n "0.0" > coverage-summary-prev.txt
+          fi
       - name: Run tests with coverage instrumentation
         run: |
             cargo llvm-cov clean --workspace
