@@ -91,7 +91,7 @@ impl NodeType {
 
     /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
-    pub fn open_extensions(op: impl Into<OpType>) -> Self {
+    pub fn new_open(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: None,
@@ -239,7 +239,7 @@ impl Hugr {
 
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        self.add_node(NodeType::open_extensions(op))
+        self.add_node(NodeType::new_open(op))
     }
 
     /// Add a node to the graph.

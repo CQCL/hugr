@@ -723,7 +723,7 @@ mod test {
             signature: main_sig,
         };
 
-        let root_node = NodeType::open_extensions(op);
+        let root_node = NodeType::new_open(op);
         let mut hugr = Hugr::new(root_node);
 
         let input = ops::Input::new(type_row![NAT, NAT]);
@@ -1084,7 +1084,7 @@ mod test {
     fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
         let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::DFG {
             signature: df_sig
                 .clone()
                 .with_extension_delta(&ExtensionSet::from_iter([A, B])),
@@ -1255,7 +1255,7 @@ mod test {
         let b = ExtensionSet::singleton(&B);
         let c = ExtensionSet::singleton(&C);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&abc),
         }));
 
@@ -1353,7 +1353,7 @@ mod test {
     ///             +--------------------+
     #[test]
     fn multi_entry() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
         }));
         let cfg = hugr.root();
@@ -1436,7 +1436,7 @@ mod test {
     ) -> Result<Hugr, Box<dyn Error>> {
         let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&hugr_delta),
         }));

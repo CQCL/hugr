@@ -223,7 +223,7 @@ impl TryFrom<SerHugrV0> for Hugr {
             hugr.add_node_with_parent(
                 node_ser.parent,
                 match node_ser.input_extensions {
-                    None => NodeType::open_extensions(node_ser.op),
+                    None => NodeType::new_open(node_ser.op),
                     Some(rs) => NodeType::new(node_ser.op, rs),
                 },
             )?;
@@ -332,7 +332,7 @@ pub mod test {
         let mut h = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::new();
 
-        op_types[root] = NodeType::open_extensions(gen_optype(&g, root));
+        op_types[root] = NodeType::new_open(gen_optype(&g, root));
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
