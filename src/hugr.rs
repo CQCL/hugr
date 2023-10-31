@@ -98,6 +98,17 @@ impl NodeType {
         }
     }
 
+    /// Instantiate an [OpType] with the default set of input extensions
+    /// for that OpType.
+    pub fn new_default(op: impl Into<OpType>) -> Self {
+        let op = op.into();
+        if OpTag::ModuleOp.is_superset(op.tag()) {
+            Self::new_pure(op)
+        } else {
+            Self::new_open(op)
+        }
+    }
+
     /// Use the input extensions to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
         self.input_extensions
@@ -237,7 +248,7 @@ impl Hugr {
 
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        self.add_node(NodeType::new_open(op))
+        self.add_node(NodeType::new_default(op))
     }
 
     /// Add a node to the graph.

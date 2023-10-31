@@ -200,7 +200,7 @@ pub trait Dataflow: Container {
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_node(NodeType::new_open(op), input_wires)
+        self.add_dataflow_node(NodeType::new_default(op), input_wires)
     }
 
     /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
@@ -628,7 +628,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    add_node_with_wires(data_builder, NodeType::new_open(optype), inputs)
+    add_node_with_wires(data_builder, NodeType::new_default(optype), inputs)
 }
 
 fn add_node_with_wires<T: Dataflow + ?Sized>(
