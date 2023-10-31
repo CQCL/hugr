@@ -8,12 +8,6 @@ use itertools::Itertools;
 use crate::{ops::OpType, HugrView, Node};
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
-pub enum WalkResult {
-    Advance,
-    Interrupt,
-}
-
-#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
 pub enum WalkOrder {
     Preorder,
     Postorder,
@@ -127,8 +121,7 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
                     let optype = self.hugr.get_optype(n);
                     for cb in self.mut_callbacks(order).iter_mut() {
                         // this clone is unfortunate, to avoid this we would
-                        // need a TryInto variant like:
-                        // try_into(&O) -> Option<&T>
+                        // need a TryInto variant like: try_into(&O) -> Option<&T>
                         t = cb(n, optype.clone(), t)?;
                     }
                 }
