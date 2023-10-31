@@ -36,19 +36,17 @@ pub(super) fn angle_type(log_denom_arg: TypeArg) -> Type {
     Type::new_extension(angle_custom_type(log_denom_arg))
 }
 
-/// The smallest forbidden log-denominator.
-pub const LOG_DENOM_BOUND: u8 = 54;
+/// The largest permitted log-denominator.
+pub const LOG_DENOM_MAX: u8 = 53;
 
 const fn is_valid_log_denom(n: u8) -> bool {
-    n < LOG_DENOM_BOUND
+    n <= LOG_DENOM_MAX
 }
 
 /// Type parameter for the log-denominator of an angle.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_DENOM_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
-    assert!(LOG_DENOM_BOUND > 0);
-    NonZeroU64::MIN.saturating_add((LOG_DENOM_BOUND - 1) as u64)
-});
+pub const LOG_DENOM_TYPE_PARAM: TypeParam =
+    TypeParam::bounded_nat(NonZeroU64::MIN.saturating_add(LOG_DENOM_MAX as u64));
 
 /// Get the log-denominator of the specified type argument or error if the argument is invalid.
 pub(super) fn get_log_denom(arg: &TypeArg) -> Result<u8, TypeArgError> {
