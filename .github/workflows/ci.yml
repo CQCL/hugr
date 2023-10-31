@@ -89,3 +89,28 @@ jobs:
         run: cargo test --verbose --no-default-features
       - name: Tests with all features
         run: cargo test --verbose --all-features
+
+  coverage:
+    if: github.event_name != 'merge_group'
+    needs: [tests, check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run tests with coverage instrumentation
+        run: |
+            cargo llvm-cov clean --workspace
+            cargo llvm-cov --doctests
+      - name: Generate coverage report
+        run: cargo llvm-cov report --codecov --output-path coverage.json
+      - name: Upload coverage to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.json
+          name: ubuntu
+          token: ${{ secrets.CODECOV_TOKEN }}
