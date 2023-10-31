@@ -119,9 +119,7 @@ impl NodeType {
     pub fn input_extensions(&self) -> Option<&ExtensionSet> {
         self.input_extensions.as_ref()
     }
-}
 
-impl NodeType {
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
     ///
     /// [input_extensions]: NodeType::input_extensions
