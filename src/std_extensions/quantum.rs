@@ -176,21 +176,15 @@ fn abinop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
 
 fn aunop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg] = collect_array(arg_values);
-    Ok(FunctionType::new(
-        vec![angle_type(arg.clone())],
-        vec![angle_type(arg.clone())],
-    ))
+    Ok(FunctionType::new_linear(vec![angle_type(arg.clone())]))
 }
 
 fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType::new(type_row![QB_T], type_row![QB_T]))
+    Ok(FunctionType::new_linear(type_row![QB_T]))
 }
 
 fn two_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType::new(
-        type_row![QB_T, QB_T],
-        type_row![QB_T, QB_T],
-    ))
+    Ok(FunctionType::new_linear(type_row![QB_T, QB_T]))
 }
 
 fn extension() -> Extension {
