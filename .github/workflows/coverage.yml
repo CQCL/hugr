@@ -1,0 +1,64 @@
+name: Coverage
+
+on:
+  schedule:
+    # 04:00 daily
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  check-coverage:
+    runs-on: ubuntu-latest
+    outputs:
+      msg: ${{ steps.make_msg.outputs.msg }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Download previous summary
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          # Downloads the artifact from the most recent successful run
+          workflow: 'coverage.yml'
+          name: coverage-summary
+      - name: Rename file
+        run: mv coverage-summary.txt coverage-summary-prev.txt
+      - name: Run tests with coverage instrumentation
+        run: |
+            cargo llvm-cov clean --workspace
+            cargo llvm-cov --doctests
+      - name: Generate coverage report and summary
+        run: |
+          cargo llvm-cov report --summary-only | grep TOTAL | awk '{print $10}' | tr -dc '[:digit:].' > coverage-summary.txt
+      - name: Upload summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-summary
+          path: coverage-summary.txt
+      - name: Compare with previous summary and make message
+        id: make_msg
+        run: |
+          change="`cat coverage-summary-prev.txt`% --> `cat coverage-summary.txt`%"
+          codecov="https://codecov.io/gh/${{ github.repository }}?search=&trend=7%20days"
+          if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.04" | bc -l) ))
+          then
+            echo "msg=Coverage check for hugr shows no regression (${change}). ✅ ${codecov}" >> "$GITHUB_OUTPUT"
+          else
+            echo "msg=Coverage check for hugr shows regression (${change}). ❌ ${codecov}" >> "$GITHUB_OUTPUT"
+          fi
+  notify-slack:
+    needs: check-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: 'C04SHCL4FKP'
+          slack-message: ${{ needs.check-coverage.outputs.msg }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
