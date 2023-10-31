@@ -82,7 +82,7 @@ impl NodeType {
     }
 
     /// Instantiate an OpType with no input extensions
-    pub fn pure(op: impl Into<OpType>) -> Self {
+    pub fn new_pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: Some(ExtensionSet::new()),
@@ -153,7 +153,7 @@ impl OpType {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(NodeType::pure(crate::ops::Module))
+        Self::new(NodeType::new_pure(crate::ops::Module))
     }
 }
 

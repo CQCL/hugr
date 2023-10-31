@@ -336,7 +336,7 @@ pub mod test {
 
         for n in [a, b, c] {
             h.push_child(n, root).unwrap();
-            op_types[n] = NodeType::pure(gen_optype(&g, n));
+            op_types[n] = NodeType::new_pure(gen_optype(&g, n));
         }
 
         let hg = Hugr {

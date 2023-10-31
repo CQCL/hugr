@@ -620,7 +620,7 @@ mod test {
 
         {
             let f_in = hugr
-                .add_node_with_parent(f, NodeType::pure(ops::Input::new(type_row![NAT])))
+                .add_node_with_parent(f, NodeType::new_pure(ops::Input::new(type_row![NAT])))
                 .unwrap();
             let f_out = hugr
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
