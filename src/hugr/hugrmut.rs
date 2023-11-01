@@ -37,7 +37,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        self.add_node_with_parent(parent, NodeType::new_default(op))
+        self.add_node_with_parent(parent, NodeType::new_auto(op))
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -217,7 +217,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.add_node_before(sibling, NodeType::new_default(op))
+        self.add_node_before(sibling, NodeType::new_auto(op))
     }
 
     fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
