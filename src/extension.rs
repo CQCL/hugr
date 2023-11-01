@@ -6,7 +6,7 @@
 use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::{BuildHasher, BuildHasherDefault, Hasher};
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use smol_str::SmolStr;
@@ -310,11 +310,10 @@ impl std::hash::Hash for ExtensionSet {
         // Hash each item individually and combine with a *weak* hash combiner
         // (i.e. that is associative and commutative, hence item iteration order doesn't matter).
         // Here we just use xor.
-        let item_h = BuildHasherDefault::<DefaultHasher>::default();
         self.0
             .iter()
             .map(|e_id| {
-                let mut h = item_h.build_hasher();
+                let mut h = DefaultHasher::new();
                 e_id.hash(&mut h);
                 h.finish()
             })
