@@ -363,7 +363,7 @@ impl ExtensionSet {
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+        ExtensionSet::from_iter(other.0.difference(&self.0).cloned())
     }
 
     /// Iterate over the contained ExtensionIds
