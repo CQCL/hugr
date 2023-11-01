@@ -230,17 +230,6 @@ impl UnificationContext {
         self.solved.get(&self.resolve(*m))
     }
 
-    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
-        self.add_constraint(
-            output,
-            if delta.is_empty() {
-                Constraint::Equal(input)
-            } else {
-                Constraint::Plus(delta, input)
-            },
-        );
-    }
-
     /// Return the metavariable corresponding to the given location on the
     /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
@@ -302,11 +291,13 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
-                    self.gen_union_constraint(
-                        m_input,
-                        m_output,
-                        node_type.op_signature().extension_reqs,
-                    );
+                    let delta = node_type.op_signature().extension_reqs;
+                    let c = if delta.is_empty() {
+                        Constraint::Equal(m_input)
+                    } else {
+                        Constraint::Plus(delta, m_input)
+                    };
+                    self.add_constraint(m_output, c);
                     if matches!(
                         node_type.tag(),
                         OpTag::Alias | OpTag::Function | OpTag::FuncDefn
