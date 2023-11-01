@@ -372,6 +372,11 @@ impl ExtensionSet {
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
     }
+
+    /// True if this set contains no [ExtensionId]s
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl Display for ExtensionSet {

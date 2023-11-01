@@ -233,7 +233,7 @@ impl UnificationContext {
     fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
         self.add_constraint(
             output,
-            if delta.is_subset(&ExtensionSet::new()) {
+            if delta.is_empty() {
                 Constraint::Equal(input)
             } else {
                 Constraint::Plus(delta, input)
