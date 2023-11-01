@@ -3,10 +3,9 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::{DefaultHasher, Entry};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hasher;
 use std::sync::Arc;
 
 use smol_str::SmolStr;
@@ -302,30 +301,13 @@ pub enum ExtensionBuildError {
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionSet(HashSet<ExtensionId>);
-
-impl std::hash::Hash for ExtensionSet {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash each item individually and combine with a *weak* hash combiner
-        // (i.e. that is associative and commutative, hence item iteration order doesn't matter).
-        // Here we just use xor.
-        self.0
-            .iter()
-            .map(|e_id| {
-                let mut h = DefaultHasher::new();
-                e_id.hash(&mut h);
-                h.finish()
-            })
-            .fold(0, |a, b| a ^ b)
-            .hash(state);
-    }
-}
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
     pub fn new() -> Self {
-        Self(HashSet::new())
+        Self(BTreeSet::new())
     }
 
     /// Adds a extension to the set.
@@ -385,6 +367,6 @@ impl Display for ExtensionSet {
 
 impl FromIterator<ExtensionId> for ExtensionSet {
     fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
-        Self(HashSet::from_iter(iter))
+        Self(BTreeSet::from_iter(iter))
     }
 }
