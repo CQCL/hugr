@@ -3,9 +3,10 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::Entry;
+use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::{BuildHasher, BuildHasherDefault};
 use std::sync::Arc;
 
 use smol_str::SmolStr;
@@ -303,6 +304,20 @@ pub enum ExtensionBuildError {
 /// A set of extensions identified by their unique [`ExtensionId`].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExtensionSet(HashSet<ExtensionId>);
+
+impl std::hash::Hash for ExtensionSet {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash each item individually and combine with a *weak* hash combiner
+        // (i.e. that is associative and commutative, hence item iteration order doesn't matter).
+        // Here we just use xor.
+        let item_h = BuildHasherDefault::<DefaultHasher>::default();
+        self.0
+            .iter()
+            .map(|e_id| item_h.hash_one(e_id))
+            .fold(0, |a, b| a ^ b)
+            .hash(state);
+    }
+}
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
