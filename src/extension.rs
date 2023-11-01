@@ -306,7 +306,7 @@ pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(BTreeSet::new())
     }
 
