@@ -44,7 +44,6 @@ const fn is_valid_log_denom(n: u8) -> bool {
 }
 
 /// Type parameter for the log-denominator of an angle.
-#[allow(clippy::assertions_on_constants)]
 pub const LOG_DENOM_TYPE_PARAM: TypeParam =
     TypeParam::bounded_nat(NonZeroU64::MIN.saturating_add(LOG_DENOM_MAX as u64));
 

@@ -48,11 +48,10 @@ const fn is_valid_log_width(n: u8) -> bool {
 pub const LOG_WIDTH_BOUND: u8 = 7;
 
 /// Type parameter for the log width of the integer.
-// SAFETY: unsafe block should be ok as the value is definitely not zero.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat(unsafe {
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
     assert!(LOG_WIDTH_BOUND > 0);
-    NonZeroU64::new_unchecked(LOG_WIDTH_BOUND as u64)
+    NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
 });
 
 /// Get the log width  of the specified type argument or error if the argument
