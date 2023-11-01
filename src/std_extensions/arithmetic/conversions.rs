@@ -1,7 +1,5 @@
 //! Conversions between integer and floating-point values.
 
-use std::collections::HashSet;
-
 use crate::{
     extension::{ExtensionId, ExtensionSet, SignatureError},
     type_row,
@@ -39,10 +37,10 @@ fn itof_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
         EXTENSION_ID,
-        ExtensionSet::new_from_extensions(HashSet::from_iter(vec![
+        ExtensionSet::from_iter(vec![
             super::int_types::EXTENSION_ID,
             super::float_types::EXTENSION_ID,
-        ])),
+        ]),
     );
 
     extension

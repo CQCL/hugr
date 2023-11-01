@@ -328,11 +328,6 @@ impl ExtensionSet {
         Self(HashSet::new())
     }
 
-    /// Creates a new extension set from some extensions.
-    pub fn new_from_extensions(extensions: impl Into<HashSet<ExtensionId>>) -> Self {
-        Self(extensions.into())
-    }
-
     /// Adds a extension to the set.
     pub fn insert(&mut self, extension: &ExtensionId) {
         self.0.insert(extension.clone());
