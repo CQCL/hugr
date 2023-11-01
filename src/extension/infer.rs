@@ -704,7 +704,7 @@ mod test {
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
-    use crate::ops::{BasicBlock, LeafOp, OpType};
+    use crate::ops::{BasicBlock, OpType};
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
 
@@ -1597,10 +1597,10 @@ mod test {
         let mut h = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
         }));
-        let pred_const = h.add_op_with_parent(h.root(), ops::Const::unary_unit_sum())?;
+        let pred_const = h.add_node_with_parent(h.root(), NodeType::new(ops::Const::unary_unit_sum(), ExtensionSet::singleton(&collections::EXTENSION_NAME)))?;
 
-        let entry = single_node_block(&mut h, pop, pred_const, None)?;
-        let bb2 = single_node_block(&mut h, push, pred_const, Some(collections::EXTENSION_NAME))?;
+        let entry = single_node_block(&mut h, pop, pred_const)?;
+        let bb2 = single_node_block(&mut h, push, pred_const)?;
 
         let exit = h.add_op_with_parent(
             h.root(),
@@ -1622,7 +1622,6 @@ mod test {
         hugr: &mut Hugr,
         op: impl Into<OpType>,
         pred_const: Node,
-        lift: Option<ExtensionId>,
     ) -> Result<Node, HugrError> {
         let op: OpType = op.into();
         let op_sig = op.signature();
@@ -1651,23 +1650,8 @@ mod test {
 
         const PRED_T: Type = Type::new_unit_sum(1);
         let load_pred = hugr.add_op_with_parent(bb, ops::LoadConstant { datatype: PRED_T })?;
-        let load_pred_lifted = match lift {
-            None => load_pred,
-            Some(new_extension) => {
-                let lift = hugr.add_node_with_parent(
-                    bb,
-                    NodeType::open_extensions(LeafOp::Lift {
-                        type_row: type_row![PRED_T],
-                        new_extension,
-                    }),
-                )?;
-                hugr.connect(load_pred, 0, lift, 0)?;
-                lift
-            }
-        };
-
         hugr.connect(pred_const, 0, load_pred, 0)?;
-        hugr.connect(load_pred_lifted, 0, output, 0)?;
+        hugr.connect(load_pred, 0, output, 0)?;
 
         let op = hugr.add_op_with_parent(bb, op)?;
 
