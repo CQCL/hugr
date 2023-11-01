@@ -6,7 +6,7 @@
 use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::{BuildHasher, BuildHasherDefault};
+use std::hash::{BuildHasher, BuildHasherDefault, Hasher};
 use std::sync::Arc;
 
 use smol_str::SmolStr;
@@ -313,7 +313,11 @@ impl std::hash::Hash for ExtensionSet {
         let item_h = BuildHasherDefault::<DefaultHasher>::default();
         self.0
             .iter()
-            .map(|e_id| item_h.hash_one(e_id))
+            .map(|e_id| {
+                let mut h = item_h.build_hasher();
+                e_id.hash(&mut h);
+                h.finish()
+            })
             .fold(0, |a, b| a ^ b)
             .hash(state);
     }
