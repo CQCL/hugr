@@ -30,11 +30,6 @@ pub struct Walker<'a, H: HugrView, T, E> {
     hugr: &'a H,
 }
 
-enum WorkItem {
-    Visit(Node),
-    Callback(WalkOrder, Node),
-}
-
 impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
     pub fn new(hugr: &'a H) -> Self {
         Self {
@@ -82,8 +77,17 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
     }
 
     pub fn walk(&mut self, mut t: T) -> Result<T, E> {
+        enum WorkItem {
+            Visit(Node),
+            Callback(WalkOrder, Node),
+        }
+        impl From<Node> for WorkItem {
+            fn from(n: Node) -> Self {
+                WorkItem::Visit(n)
+            }
+        }
         // We intentionally avoid recursion so that we can robustly accept very deep hugrs
-        let mut worklist = vec![WorkItem::Visit(self.hugr.root())];
+        let mut worklist = vec![self.hugr.root().into()];
 
         while let Some(wi) = worklist.pop() {
             match wi {
@@ -93,35 +97,45 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
                     // We intend to only visit direct children.
                     //
                     // If the nodes children form a dataflow sibling graph we
-                    // visit them in post dfs order. This traversal is not
-                    // guaranteed to visit all nodes, only those reachable from
-                    // the input node. (For example, LoadConstant nodes may not
-                    // be reachable from the input node). So we do a second
-                    // unordered traversal afterwards.
+                    // visit them in post dfs order starting from the Input
+                    // node. Then (whether or not it's a dataflow sibling graph)
+                    // we visit each remaining unvisited child in children() order.
+                    //
+                    // The second traversal is required to ensure we visit both
+                    // nodes unreachable from Input in a dataflow sibling graph
+                    // (e.g. LoadConstant) and the children of non dataflow
+                    // sibling graph nodes (e.g. the children of CFG or Conditional
+                    // nodes)
                     if let Some([input, _]) = self.hugr.get_io(n) {
-                        use crate::hugr::views::PetgraphWrapper;
-                        let wrapper = self.hugr.as_petgraph();
-                        let mut dfs = ::petgraph::visit::DfsPostOrder::new(&wrapper, input);
-                        while let Some(x) = dfs.next(&wrapper) {
-                            worklist.push(WorkItem::Visit(x));
+                        let petgraph = self.hugr.as_petgraph();
+                        // Here we visit the nodes in DfsPostOrder(i.e. we have
+                        // visited all the out_neighbors() of a node before we
+                        // visit that node), and push a node onto the worklist
+                        // stack when we visit it. So once we are done the stack
+                        // will have the Input node at the top, and a nodes
+                        // out_neighbors are always under that node on the
+                        // worklist stack.
+                        let mut dfs = ::petgraph::visit::DfsPostOrder::new(&petgraph, input);
+                        while let Some(x) = dfs.next(&petgraph) {
+                            worklist.push(x.into());
                             pushed_children.insert(x);
                         }
                     }
 
+                    // Here we collect all children that were not visited by the
+                    // DfsPostOrder traversal above, in children() order
                     let rest_children = self
                         .hugr
                         .children(n)
                         .filter(|x| !pushed_children.contains(x))
                         .collect_vec();
-                    // extend in reverse so that the first child is the top of the stack
+                    // We extend in reverse so that the first child is the top of the stack
                     worklist.extend(rest_children.into_iter().rev().map(WorkItem::Visit));
                     worklist.push(WorkItem::Callback(WalkOrder::Preorder, n));
                 }
                 WorkItem::Callback(order, n) => {
                     let optype = self.hugr.get_optype(n);
                     for cb in self.mut_callbacks(order).iter_mut() {
-                        // this clone is unfortunate, to avoid this we would
-                        // need a TryInto variant like: try_into(&O) -> Option<&T>
                         t = cb(n, optype.clone(), t)?;
                     }
                 }
@@ -129,6 +143,31 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
         }
         Ok(t)
     }
+}
+
+/// An example of use using the Walker to implement an iterator over all nodes,
+/// nodes are visited in preorder where possible. More precisely, nodes are
+/// visited before their children, and nodes in a dataflow sibling graph are
+/// visited before their out_neighbours.
+pub fn hugr_walk_iter(h: &impl HugrView) -> impl Iterator<Item = Node> {
+    let mut walker = Walker::<_, Vec<Node>, std::convert::Infallible>::new(h);
+    walker.previsit(|n, _: OpType, mut v| {
+        v.push(n);
+        Ok(v)
+    });
+    walker.walk(Vec::new()).unwrap().into_iter()
+}
+
+/// An example of use using the Walker to implement a search.
+/// This demonstrates terminating a walk early.
+pub fn hugr_walk_find<O, V>(h: &impl HugrView, mut f: impl FnMut(Node, O) -> Option<V>) -> Option<V>
+where
+    OpType: TryInto<O>,
+{
+    Walker::new(h)
+        .previsit(|n, o: O, ()| f(n, o).map_or(Ok(()), Result::Err))
+        .walk(())
+        .map_or_else(Option::Some, |()| None)
 }
 
 #[cfg(test)]
@@ -235,5 +274,39 @@ mod test {
             v.as_slice()
         );
         Ok(())
+    }
+
+    #[test]
+    fn leaf_op_out_degree() {
+        use std::collections::HashMap;
+        let h: crate::Hugr = todo!();
+        let mut walker = Walker::new(&h);
+        walker.postvisit(|n, _: crate::ops::LeafOp, mut r| {
+            r.insert(n, h.node_outputs(n).map(|o| h.linked_ports(n, o).count()));
+            Ok(r)
+        });
+        let r = walker.walk(HashMap::new()).unwrap();
+        // TODO construct example and assert result of walk
+    }
+
+    #[test]
+    fn pretty_printer() {
+        struct PPCtx(usize, String);
+        let h: crate::Hugr = todo!();
+        let pp_out = Walker::<_, _, std::convert::Infallible>::new(&h)
+            .previsit(|n, _: OpType, PPCtx(mut indent, mut r)| {
+                use crate::hugr::NodeIndex;
+                r += format!(
+                    "{}{}\n",
+                    std::iter::repeat(' ').take(indent).collect::<String>(),
+                    n.index()
+                )
+                .as_str();
+                Ok(PPCtx(indent + 2, r))
+            })
+            .postvisit(|_, _: OpType, PPCtx(mut indent, r)| Ok(PPCtx(indent - 2, r)))
+            .walk(PPCtx(0, "".to_string()))
+            .unwrap();
+        // TODO construct example and assert result of walk
     }
 }
