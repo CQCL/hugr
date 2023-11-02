@@ -367,7 +367,7 @@ fn transfer_edges<'a>(
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if let Some(anc) = existing_src_ancestor {
                     e.check_existing_edge(h, |n| descends(h, anc, n))?;
-                    h.disconnect(e.tgt, IncomingPort::from(tgt_pos)).unwrap();
+                    h.disconnect(e.tgt, tgt_pos).unwrap();
                 }
                 h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
             }
@@ -443,7 +443,7 @@ mod test {
     use crate::ops::{self, BasicBlock, LeafOp, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
-    use crate::{type_row, Hugr, HugrView, Node, OutgoingPort};
+    use crate::{type_row, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, Replacement};
 
