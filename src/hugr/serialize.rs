@@ -8,17 +8,18 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
 
+use crate::core::NodeIndex;
 use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpTrait;
 use crate::ops::OpType;
-use crate::Node;
+use crate::{Node, PortIndex};
 use portgraph::hierarchy::AttachError;
-use portgraph::{Direction, LinkError, NodeIndex, PortView};
+use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrError, HugrMut, HugrView, PortIndex};
+use super::{HugrError, HugrMut, HugrView};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -138,7 +139,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.node_count());
         for (order, node) in hugr.canonical_order(hugr.root()).enumerate() {
-            node_rekey.insert(node, NodeIndex::new(order).into());
+            node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
         let mut nodes = vec![None; hugr.node_count()];
@@ -146,7 +147,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_nodetype(n);
-            let new_node = node_rekey[&n].index.index();
+            let new_node = node_rekey[&n].index();
             nodes[new_node] = Some(NodeSer {
                 parent,
                 input_extensions: opt.input_extensions.clone(),
@@ -176,12 +177,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                     .flat_map(move |(src_offset, port)| {
                         let src = find_offset(node, src_offset, Direction::Outgoing, hugr);
                         hugr.linked_ports(node, port).map(move |(tgt_node, tgt)| {
-                            let tgt = find_offset(
-                                tgt_node,
-                                tgt.offset.index(),
-                                Direction::Incoming,
-                                hugr,
-                            );
+                            let tgt = find_offset(tgt_node, tgt.index(), Direction::Incoming, hugr);
                             [src, tgt]
                         })
                     })
@@ -212,7 +208,7 @@ impl TryFrom<SerHugrV0> for Hugr {
             input_extensions,
             op: root_type,
         } = nodes.next().unwrap();
-        if root_parent.index.index() != 0 {
+        if root_parent.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
         }
         // if there are any unconnected ports or copy nodes the capacity will be
@@ -234,12 +230,12 @@ impl TryFrom<SerHugrV0> for Hugr {
         }
 
         for (node, metadata) in metadata.into_iter().enumerate() {
-            let node = NodeIndex::new(node).into();
+            let node = portgraph::NodeIndex::new(node).into();
             hugr.set_metadata(node, metadata)?;
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
-            if !hugr.graph.contains_node(node.index) {
+            if !hugr.graph.contains_node(node.pg_index()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
             }
             let offset = match offset {
@@ -272,19 +268,17 @@ impl TryFrom<SerHugrV0> for Hugr {
 pub mod test {
 
     use super::*;
+    use crate::builder::{
+        test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    };
+    use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::{
-        builder::{
-            test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
-            DataflowSubContainer, HugrBuilder, ModuleBuilder,
-        },
-        extension::prelude::BOOL_T,
-        hugr::NodeType,
-        ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG},
-        types::{FunctionType, Type},
-        Port,
-    };
+    use crate::hugr::NodeType;
+    use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::types::{FunctionType, Type};
+    use crate::OutgoingPort;
     use itertools::Itertools;
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
@@ -305,7 +299,7 @@ pub mod test {
     }
 
     /// Generate an optype for a node with a matching amount of inputs and outputs.
-    fn gen_optype(g: &MultiPortGraph, node: NodeIndex) -> OpType {
+    fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
         let inputs = g.num_inputs(node);
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
@@ -466,7 +460,7 @@ pub mod test {
 
         // Now add a new input
         let new_in = hugr.add_op(Input::new([QB].to_vec()));
-        hugr.disconnect(old_in, Port::new_outgoing(0)).unwrap();
+        hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();
         hugr.remove_node(old_in).unwrap();

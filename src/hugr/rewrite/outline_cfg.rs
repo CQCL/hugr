@@ -10,10 +10,11 @@ use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::{HugrMut, HugrView, PortIndex};
+use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{BasicBlock, OpTrait, OpType};
+use crate::PortIndex;
 use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -157,7 +158,7 @@ impl Rewrite for OutlineCfg {
 
         // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
-            .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
+            .linked_outputs(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
@@ -303,7 +304,7 @@ mod test {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         do_outline_cfg_test(&mut h, head, tail, 1);
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     fn do_outline_cfg_test(
@@ -405,7 +406,7 @@ mod test {
         let (new_block, new_cfg) = h
             .apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
         assert_matches!(
             h.get_optype(new_block),

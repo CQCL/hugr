@@ -133,6 +133,11 @@ impl ConstUsize {
     pub fn new(value: u64) -> Self {
         Self(value)
     }
+
+    /// Returns the value of the constant.
+    pub fn value(&self) -> u64 {
+        self.0
+    }
 }
 
 #[typetag::serde]

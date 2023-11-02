@@ -3,11 +3,11 @@
 use crate::hugr::HugrView;
 use crate::ops::OpType;
 use crate::types::EdgeKind;
+use crate::NodeIndex;
 use crate::{Node, Port};
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use petgraph::visit as pv;
-use portgraph::NodeIndex;
 
 /// Wrapper for a HugrView that implements petgraph's traits.
 ///
@@ -50,11 +50,11 @@ where
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
-        ix.index.into()
+        ix.index()
     }
 
     fn from_index(&self, ix: usize) -> Self::NodeId {
-        NodeIndex::new(ix).into()
+        portgraph::NodeIndex::new(ix).into()
     }
 }
 

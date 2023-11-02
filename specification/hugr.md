@@ -1659,12 +1659,18 @@ Other operations:
 | `isub<N>`              | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                    |
 | `ineg<N>`              | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `imul<N>`              | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                 |
-| `idivmod_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
-| `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
-| `idiv_u<N,M>`          | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_u` but discarding the second output                                                                                                          |
-| `imod_u<N,M>`          | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_u` but discarding the first output                                                                                                           |
-| `idiv_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_s` but discarding the second output                                                                                                          |
-| `imod_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_s` but discarding the first output                                                                                                           |
+| `idivmod_checked_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
+| `idivmod_u<N,M>` | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
+| `idivmod_checked_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
+| `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
+| `idiv_checked_u<N,M>` ( \* )          | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_u` but discarding the second output                                                                                                          |
+| `idiv_u<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_u` but discarding the second output                                                                                                          |
+| `imod_checked_u<N,M>` ( \* )         | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_u` but discarding the first output                                                                                                           |
+| `imod_u<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_u` but discarding the first output                                                                                                           |
+| `idiv_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_s` but discarding the second output                                                                                                          |
+| `idiv_s<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_s` but discarding the second output                                                                                                          |
+| `imod_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_s` but discarding the first output                                                                                                           |
+| `imod_s<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_s` but discarding the first output                                                                                                           |
 | `iabs<N>`              | `int<N>`           | `int<N>`                           | convert signed to unsigned by taking absolute value                                                                                                      |
 | `iand<N>`              | `int<N>`, `int<N>` | `int<N>`                           | bitwise AND                                                                                                                                              |
 | `ior<N>`               | `int<N>`, `int<N>` | `int<N>`                           | bitwise OR                                                                                                                                               |
@@ -1734,7 +1740,7 @@ Note there are also `measurez: Qubit -> (i1, Qubit)` and on supported
 targets `reset: Qubit -> Qubit` operations to measure or reset a qubit
 without losing a handle to it.
 
-**Dynamic vs static allocation**
+#### Dynamic vs static allocation
 
 With these operations the programmer/front-end can request dynamic qubit
 allocation, and the compiler can add/remove/move these operations to use
@@ -1756,6 +1762,28 @@ in. The implicit bijection from input `Qubit` to output allows register
 allocation for all `Qubit` wires. 
 If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
+
+#### Angles
+
+The Quantum extension also defines a specialized `angle<N>` type which is used
+to express parameters of rotation gates. The type is parametrized by the
+_log-denominator_, which is an integer $N \in [0, 53]$; angles with
+log-denominator $N$ are multiples of $2 \pi / 2^N$, where the multiplier is an
+unsigned `int<N>` in the range $[0, 2^N]$. The maximum log-denominator $53$
+effectively gives the resolution of a `float64` value; but note that unlike
+`float64` all angle values are equatable and hashable; and two `angle<N>` that
+differ by a multiple of $2 \pi$ are _equal_.
+
+The following operations are defined:
+
+| Name           | Inputs     | Outputs    | Meaning |
+| -------------- | ---------- | ---------- | ------- |
+| `aconst<N, x>` | none       | `angle<N>` | const node producing angle $2 \pi x / 2^N$ (where $0 \leq x \lt 2^N$) |
+| `atrunc<M,N>`  | `angle<M>` | `angle<N>` | round `angle<M>` to `angle<N>`, where $M \geq N$, rounding down in $[0, 2\pi)$ if necessary |
+| `aconvert<M,N>`  | `angle<M>` | `Sum(angle<N>, ErrorType)` | convert `angle<M>` to `angle<N>`, returning an error if $M \gt N$ and exact conversion is impossible |
+| `aadd<M,N>`    | `angle<M>`, `angle<N>` | `angle<max(M,N)>` | add two angles |
+| `asub<M,N>`    | `angle<M>`, `angle<N>` | `angle<max(M,N)>` | subtract the second angle from the first |
+| `aneg<N>`      | `angle<N>` | `angle<N>` | negate an angle |
 
 ### Higher-order (Tierkreis) Extension
 

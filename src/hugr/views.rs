@@ -9,6 +9,8 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use std::iter::Map;
+
 pub use self::petgraph::PetgraphWrapper;
 pub use descendants::DescendantsGraph;
 pub use root_checked::RootChecked;
@@ -24,7 +26,7 @@ use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
-use crate::{Direction, Node, Port};
+use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -107,7 +109,7 @@ pub trait HugrView: sealed::HugrInternals {
         self.valid_non_root(node).ok()?;
         self.base_hugr()
             .hierarchy
-            .parent(node.index)
+            .parent(node.pg_index())
             .map(Into::into)
     }
 
@@ -121,7 +123,7 @@ pub trait HugrView: sealed::HugrInternals {
     #[inline]
     fn get_nodetype(&self, node: Node) -> &NodeType {
         match self.contains_node(node) {
-            true => self.base_hugr().op_types.get(node.index),
+            true => self.base_hugr().op_types.get(node.pg_index()),
             false => &DEFAULT_NODETYPE,
         }
     }
@@ -130,7 +132,7 @@ pub trait HugrView: sealed::HugrInternals {
     #[inline]
     fn get_metadata(&self, node: Node) -> &NodeMetadata {
         match self.contains_node(node) {
-            true => self.base_hugr().metadata.get(node.index),
+            true => self.base_hugr().metadata.get(node.pg_index()),
             false => &NodeMetadata::Null,
         }
     }
@@ -148,30 +150,58 @@ pub trait HugrView: sealed::HugrInternals {
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_>;
 
     /// Iterator over output ports of node.
-    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`.
+    /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Outgoing)`
+    /// but preserves knowledge that the ports are [OutgoingPort]s.
     #[inline]
-    fn node_outputs(&self, node: Node) -> Self::NodePorts<'_> {
+    fn node_outputs(&self, node: Node) -> OutgoingPorts<Self::NodePorts<'_>> {
         self.node_ports(node, Direction::Outgoing)
+            .map(|p| p.as_outgoing().unwrap())
     }
 
     /// Iterator over inputs ports of node.
-    /// Shorthand for [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`.
+    /// Like [`node_ports`][HugrView::node_ports]`(node, Direction::Incoming)`
+    /// but preserves knowledge that the ports are [IncomingPort]s.
     #[inline]
-    fn node_inputs(&self, node: Node) -> Self::NodePorts<'_> {
+    fn node_inputs(&self, node: Node) -> IncomingPorts<Self::NodePorts<'_>> {
         self.node_ports(node, Direction::Incoming)
+            .map(|p| p.as_incoming().unwrap())
     }
 
     /// Iterator over both the input and output ports of node.
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_>;
 
     /// Iterator over the nodes and ports connected to a port.
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_>;
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
+
+    /// Iterator over the nodes and output ports connected to a given *input* port.
+    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
+    /// that the linked ports are [OutgoingPort]s.
+    fn linked_outputs(
+        &self,
+        node: Node,
+        port: impl Into<IncomingPort>,
+    ) -> OutgoingNodePorts<Self::PortLinks<'_>> {
+        self.linked_ports(node, port.into())
+            .map(|(n, p)| (n, p.as_outgoing().unwrap()))
+    }
+
+    /// Iterator over the nodes and input ports connected to a given *output* port
+    /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
+    /// that the linked ports are [IncomingPort]s.
+    fn linked_inputs(
+        &self,
+        node: Node,
+        port: impl Into<OutgoingPort>,
+    ) -> IncomingNodePorts<Self::PortLinks<'_>> {
+        self.linked_ports(node, port.into())
+            .map(|(n, p)| (n, p.as_incoming().unwrap()))
+    }
 
     /// Iterator the links between two nodes.
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_>;
 
     /// Returns whether a port is connected.
-    fn is_linked(&self, node: Node, port: Port) -> bool {
+    fn is_linked(&self, node: Node, port: impl Into<Port>) -> bool {
         self.linked_ports(node, port).next().is_some()
     }
 
@@ -300,6 +330,18 @@ pub trait HugrView: sealed::HugrInternals {
     }
 }
 
+/// Wraps an iterator over [Port]s that are known to be [OutgoingPort]s
+pub type OutgoingPorts<I> = Map<I, fn(Port) -> OutgoingPort>;
+
+/// Wraps an iterator over [Port]s that are known to be [IncomingPort]s
+pub type IncomingPorts<I> = Map<I, fn(Port) -> IncomingPort>;
+
+/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [OutgoingPort]s
+pub type OutgoingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, OutgoingPort)>;
+
+/// Wraps an iterator over `(`[`Node`],[`Port`]`)` when the ports are known to be [IncomingPort]s
+pub type IncomingNodePorts<I> = Map<I, fn((Node, Port)) -> (Node, IncomingPort)>;
+
 /// Trait for views that provides a guaranteed bound on the type of the root node.
 pub trait RootTagged: HugrView {
     /// The kind of handle that can be used to refer to the root node.
@@ -362,7 +404,7 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.as_ref().graph.contains_node(node.index)
+        self.as_ref().graph.contains_node(node.pg_index())
     }
 
     #[inline]
@@ -382,18 +424,28 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.as_ref().graph.port_offsets(node.index, dir).map_into()
+        self.as_ref()
+            .graph
+            .port_offsets(node.pg_index(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.as_ref().graph.all_port_offsets(node.index).map_into()
+        self.as_ref()
+            .graph
+            .all_port_offsets(node.pg_index())
+            .map_into()
     }
 
     #[inline]
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
+        let port = port.into();
         let hugr = self.as_ref();
-        let port = hugr.graph.port_index(node.index, port.offset).unwrap();
+        let port = hugr
+            .graph
+            .port_index(node.pg_index(), port.pg_offset())
+            .unwrap();
         hugr.graph
             .port_links(port)
             .with_context(hugr)
@@ -410,7 +462,7 @@ impl<T: AsRef<Hugr>> HugrView for T {
         let hugr = self.as_ref();
 
         hugr.graph
-            .get_connections(node.index, other.index)
+            .get_connections(node.pg_index(), other.pg_index())
             .with_context(hugr)
             .map_with_context(|(p1, p2), hugr| {
                 [p1, p2].map(|link| {
@@ -422,22 +474,28 @@ impl<T: AsRef<Hugr>> HugrView for T {
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.as_ref().graph.num_ports(node.index, dir)
+        self.as_ref().graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn children(&self, node: Node) -> Self::Children<'_> {
-        self.as_ref().hierarchy.children(node.index).map_into()
+        self.as_ref().hierarchy.children(node.pg_index()).map_into()
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.as_ref().graph.neighbours(node.index, dir).map_into()
+        self.as_ref()
+            .graph
+            .neighbours(node.pg_index(), dir)
+            .map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.as_ref().graph.all_neighbours(node.index).map_into()
+        self.as_ref()
+            .graph
+            .all_neighbours(node.pg_index())
+            .map_into()
     }
 }
 
