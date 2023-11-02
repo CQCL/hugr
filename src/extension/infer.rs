@@ -550,7 +550,7 @@ impl UnificationContext {
             let mut h: HashMap<Meta, Vec<Meta>> = HashMap::new();
             for (m, m2) in self.constraints.iter().flat_map(|(m, cs)| {
                 cs.iter().flat_map(|c| match c {
-                    Constraint::Plus(_, m2) => Some((*m, *m2)),
+                    Constraint::Plus(_, m2) => Some((*m, self.resolve(*m2))),
                     _ => None,
                 })
             }) {
@@ -558,20 +558,15 @@ impl UnificationContext {
             }
             h
         };
-        // Calculate "live" metas, i.e. those that depend upon an unsolved non-variable
-        let mut live_metas = HashSet::new();
-        // Start with definitively live metas:
-        let mut queue = VecDeque::from_iter(self.extensions.values().filter(|m| {
-            let m = self.resolve(**m);
-            !self.variables.contains(&m)
-                    && !self.solved.contains_key(&m)
-                    // if it depends on anything, it might not be live
-                    // (thus, nodes on cycles considered non-live, and "ok" for below.)
-                    // TODO: remove cycles of plus constraints first?
-                    && !dependees.contains_key(&m)
-        }));
+        // Calculate everything dependent upon a variable.
+        // Note it would be better to find metas ALL of whose dependencies
+        // were only on variables, but this is more complex, and hard to define
+        // if there are cycles of PLUS constraints, so leaving that as a TODO
+        // until we've handled such cycles.
+        let mut var_deps = HashSet::new();
+        let mut queue = VecDeque::from_iter(self.variables.iter());
         while let Some(m) = queue.pop_front() {
-            if live_metas.insert(m) {
+            if var_deps.insert(m) {
                 if let Some(d) = dependees.get(m) {
                     queue.extend(d.iter())
                 }
@@ -584,7 +579,7 @@ impl UnificationContext {
                 if loc.1 == Direction::Incoming {
                     results.insert(loc.0, rs.clone());
                 }
-            } else if live_metas.contains(meta) {
+            } else if !var_deps.contains(&self.resolve(*meta)) {
                 // If it depends on some other live meta, that's bad news.
                 return Err(InferExtensionError::Unsolved { location: *loc });
             }
@@ -594,7 +589,7 @@ impl UnificationContext {
         debug_assert!(self
             .extensions
             .values()
-            .all(|m| !live_metas.contains(&self.resolve(*m))));
+            .all(|m| self.get_solution(m).is_some() || var_deps.contains(&self.resolve(*m))));
         Ok(results)
     }
 
