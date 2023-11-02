@@ -22,7 +22,7 @@ use super::validate::ExtensionError;
 
 use petgraph::graph as pg;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use thiserror::Error;
 
@@ -546,57 +546,56 @@ impl UnificationContext {
     pub fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
+        let dependees = {
+            let mut h: HashMap<Meta, Vec<Meta>> = HashMap::new();
+            for (m, m2) in self.constraints.iter().flat_map(|(m, cs)| {
+                cs.iter().flat_map(|c| match c {
+                    Constraint::Plus(_, m2) => Some((*m, *m2)),
+                    _ => None,
+                })
+            }) {
+                h.entry(m2).or_default().push(m);
+            }
+            h
+        };
+        // Calculate "live" metas, i.e. those that depend upon an unsolved non-variable
+        let mut live_metas = HashSet::new();
+        // Start with definitively live metas:
+        let mut queue = VecDeque::from_iter(self.extensions.values().filter(|m| {
+            let m = self.resolve(**m);
+            !self.variables.contains(&m)
+                    && !self.solved.contains_key(&m)
+                    // if it depends on anything, it might not be live
+                    // (thus, nodes on cycles considered non-live, and "ok" for below.)
+                    // TODO: remove cycles of plus constraints first?
+                    && !dependees.contains_key(&m)
+        }));
+        while let Some(m) = queue.pop_front() {
+            if live_metas.insert(m) {
+                if let Some(d) = dependees.get(m) {
+                    queue.extend(d.iter())
+                }
+            }
+        }
+
         let mut results: ExtensionSolution = HashMap::new();
         for (loc, meta) in self.extensions.iter() {
             if let Some(rs) = self.get_solution(meta) {
                 if loc.1 == Direction::Incoming {
                     results.insert(loc.0, rs.clone());
                 }
-            } else if self.live_var(meta).is_some() {
+            } else if live_metas.contains(meta) {
                 // If it depends on some other live meta, that's bad news.
                 return Err(InferExtensionError::Unsolved { location: *loc });
             }
             // If it only depends on graph variables, then we don't have
             // a *solution*, but it's fine
         }
-        debug_assert!(self.live_metas().is_empty());
-        Ok(results)
-    }
-
-    // Get the live var associated with a meta.
-    // TODO: This should really be a list
-    fn live_var(&self, m: &Meta) -> Option<Meta> {
-        if self.variables.contains(m) || self.variables.contains(&self.resolve(*m)) {
-            return None;
-        }
-
-        // TODO: We should be doing something to ensure that these are the same check...
-        if self.get_solution(m).is_none() {
-            if let Some(cs) = self.get_constraints(m) {
-                for c in cs {
-                    match c {
-                        Constraint::Plus(_, m) => return self.live_var(m),
-                        _ => panic!("we shouldn't be here!"),
-                    }
-                }
-            }
-            Some(*m)
-        } else {
-            None
-        }
-    }
-
-    /// Return the set of "live" metavariables in the context.
-    /// "Live" here means a metavariable:
-    ///   - Is associated to a location in the graph in `UnifyContext.extensions`
-    ///   - Is still unsolved
-    ///   - Isn't a variable
-    fn live_metas(&self) -> HashSet<Meta> {
-        self.extensions
+        debug_assert!(self
+            .extensions
             .values()
-            .filter_map(|m| self.live_var(m))
-            .filter(|m| !self.variables.contains(m))
-            .collect()
+            .all(|m| !live_metas.contains(&self.resolve(*m))));
+        Ok(results)
     }
 
     /// Iterates over a set of metas (the argument) and tries to solve
