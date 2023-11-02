@@ -435,11 +435,11 @@ impl std::fmt::Display for WhichHugr {
 mod test {
     use std::collections::HashMap;
 
+    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::hugr::{HugrError, HugrMut, NodeType};
-    use crate::ops::handle::NodeHandle;
+    use crate::hugr::{HugrMut, NodeType};
+    use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, BasicBlock, LeafOp, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
@@ -469,69 +469,64 @@ mod test {
         let exset = ExtensionSet::singleton(&collections::EXTENSION_NAME);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
-        let mut h = Hugr::new(NodeType::open_extensions(ops::CFG {
-            signature: FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
-        }));
-        let pred_const = h.add_node_with_parent(
-            h.root(),
-            NodeType::open_extensions(ops::Const::unary_unit_sum()),
+        let mut cfg = CFGBuilder::new(
+            FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
         )?;
 
-        let entry = single_node_block(&mut h, pop, pred_const)?;
-        let bb2 = single_node_block(&mut h, push, pred_const)?;
-
-        let exit = h.add_node_with_parent(
-            h.root(),
-            NodeType::open_extensions(BasicBlock::Exit {
-                cfg_outputs: just_list.clone(),
-            }),
+        let pred_const = cfg.add_constant(
+            ops::Const::unary_unit_sum(),
+            // Slightly awkward we have to specify this, and the choice is non-obvious:
+            ExtensionSet::singleton(&collections::EXTENSION_NAME),
         )?;
-        h.move_before_sibling(entry, pred_const)?;
-        h.move_before_sibling(exit, pred_const)?;
 
-        h.connect(entry, 0, bb2, 0)?;
-        h.connect(bb2, 0, exit, 0)?;
+        let entry = single_node_block(&mut cfg, pop, &pred_const, true)?;
+        let bb2 = single_node_block(&mut cfg, push, &pred_const, false)?;
 
-        h.update_validate(&reg)?;
+        let exit = cfg.exit_block();
+        cfg.branch(&entry, 0, &bb2)?;
+        cfg.branch(&bb2, 0, &exit)?;
+
+        let mut h = cfg.finish_hugr(&reg).unwrap();
+
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
         let mut replacement = Hugr::new(NodeType::open_extensions(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()),
         }));
-        let r_bb = replacement.add_node_with_parent(
+        let r_bb = replacement.add_op_with_parent(
             replacement.root(),
-            NodeType::open_extensions(BasicBlock::DFB {
+            BasicBlock::DFB {
                 inputs: vec![listy.clone()].into(),
                 tuple_sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
                 extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
-            }),
+            },
         )?;
-        let r_df1 = replacement.add_node_with_parent(
+        let r_df1 = replacement.add_op_with_parent(
             r_bb,
-            NodeType::open_extensions(DFG {
+            DFG {
                 signature: FunctionType::new(
                     vec![listy.clone()],
                     simple_unary_plus(intermed.clone()),
                 ),
-            }),
+            },
         )?;
-        let r_df2 = replacement.add_node_with_parent(
+        let r_df2 = replacement.add_op_with_parent(
             r_bb,
-            NodeType::open_extensions(DFG {
+            DFG {
                 signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
-            }),
+            },
         )?;
         [0, 1]
             .iter()
             .try_for_each(|p| replacement.connect(r_df1, *p + 1, r_df2, *p))?;
 
         {
-            let inp = replacement.add_node_before(
+            let inp = replacement.add_op_before(
                 r_df1,
-                NodeType::open_extensions(ops::Input {
+                ops::Input {
                     types: just_list.clone(),
-                }),
+                },
             )?;
             let out = replacement.add_node_before(
                 r_df1,
@@ -562,54 +557,30 @@ mod test {
         Ok(())
     }
 
-    fn single_node_block(
-        hugr: &mut Hugr,
+    fn single_node_block<T: AsRef<Hugr> + AsMut<Hugr>>(
+        h: &mut CFGBuilder<T>,
         op: impl Into<OpType>,
-        pred_const: Node,
-    ) -> Result<Node, HugrError> {
+        pred_const: &ConstID,
+        entry: bool,
+    ) -> Result<BasicBlockID, BuildError> {
         let op: OpType = op.into();
         let op_sig = op.signature();
+        let mut bb = if entry {
+            assert_eq!(
+                match h.hugr().get_optype(h.container_node()) {
+                    OpType::CFG(c) => &c.signature.input,
+                    _ => panic!(),
+                },
+                op_sig.input()
+            );
+            h.simple_entry_builder(op_sig.output, 1, op_sig.extension_reqs.clone())?
+        } else {
+            h.simple_block_builder(op_sig, 1)?
+        };
 
-        let bb = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(BasicBlock::DFB {
-                inputs: op_sig.input.clone(),
-                other_outputs: op_sig.output.clone(),
-                tuple_sum_rows: vec![type_row![]],
-                extension_delta: op_sig.extension_reqs.clone(),
-            }),
-        )?;
-        let input = hugr.add_node_with_parent(
-            bb,
-            NodeType::open_extensions(ops::Input {
-                types: op_sig.input.clone(),
-            }),
-        )?;
-        let output = hugr.add_node_with_parent(
-            bb,
-            NodeType::open_extensions(ops::Output {
-                types: simple_unary_plus(op_sig.output.clone()),
-            }),
-        )?;
-
-        const PRED_T: Type = Type::new_unit_sum(1);
-        let load_pred = hugr.add_node_with_parent(
-            bb,
-            NodeType::open_extensions(ops::LoadConstant { datatype: PRED_T }),
-        )?;
-        hugr.connect(pred_const, 0, load_pred, 0)?;
-        hugr.connect(load_pred, 0, output, 0)?;
-
-        let op = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
-
-        for (p, _) in op_sig.input().iter().enumerate() {
-            hugr.connect(input, p, op, p)?;
-        }
-
-        for (p, _) in op_sig.output().iter().enumerate() {
-            hugr.connect(op, p, output, p + 1)?;
-        }
-        Ok(bb)
+        let op = bb.add_dataflow_op(op, bb.input_wires())?;
+        let load_pred = bb.load_const(pred_const)?;
+        bb.finish_with_outputs(load_pred, op.outputs())
     }
 
     fn simple_unary_plus(t: TypeRow) -> TypeRow {
