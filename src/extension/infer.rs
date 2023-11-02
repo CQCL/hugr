@@ -559,10 +559,9 @@ impl UnificationContext {
             h
         };
         // Calculate everything dependent upon a variable.
-        // Note it would be better to find metas ALL of whose dependencies
-        // were only on variables, but this is more complex, and hard to define
-        // if there are cycles of PLUS constraints, so leaving that as a TODO
-        // until we've handled such cycles.
+        // Note it would be better to find metas ALL of whose dependencies were (transitively)
+        // on variables, but this is more complex, and hard to define if there are cycles
+        // of PLUS constraints, so leaving that as a TODO until we've handled such cycles.
         let mut var_deps = HashSet::new();
         let mut queue = VecDeque::from_iter(self.variables.iter());
         while let Some(m) = queue.pop_front() {
@@ -1595,12 +1594,11 @@ mod test {
         // Constrain q1 as EQUALS(q2) by using both together
         dfg.finish_hugr_with_outputs([q1, q2], &PRELUDE_REGISTRY)?;
         // The combined q1+q2 variable now has two PLUS constraints - on itself and the inputs.
-        // That leads to this stack-overflowing ~50% of the time
         Ok(())
     }
 
-    /// [plus_on_self] has about a 50% rate of failing with stack overflow.
-    /// So if we run 10 times, that should succeed about 1 run in 2^10, i.e. <0.1%
+    /// [plus_on_self] had about a 50% rate of failing with stack overflow.
+    /// So if we run 10 times, that would succeed about 1 run in 2^10, i.e. <0.1%
     #[test]
     fn plus_on_self_10_times() {
         [0; 10].iter().for_each(|_| plus_on_self().unwrap())
