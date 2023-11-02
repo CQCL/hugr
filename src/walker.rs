@@ -14,11 +14,9 @@ pub enum WalkOrder {
 }
 
 #[derive(Deref, DerefMut)]
-struct WalkerCallback<'a, T, E>(Box<dyn 'a + FnMut(Node, OpType, T) -> Result<T, E>>);
+struct WalkerCallback<'a, T, E>(Box<dyn 'a + FnMut(Node, T) -> Result<T, E>>);
 
-impl<'a, T, E, F: 'a + FnMut(Node, OpType, T) -> Result<T, E>> From<F>
-    for WalkerCallback<'a, T, E>
-{
+impl<'a, T, E, F: 'a + FnMut(Node, T) -> Result<T, E>> From<F> for WalkerCallback<'a, T, E> {
     fn from(f: F) -> Self {
         Self(Box::new(f))
     }
@@ -68,7 +66,8 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
     where
         OpType: TryInto<O>,
     {
-        let cb = move |n, o: OpType, t| match o.try_into() {
+        let hugr = self.hugr;
+        let cb = move |n, t| match hugr.get_optype(n).clone().try_into() {
             Ok(x) => f(n, x, t),
             _ => Ok(t),
         };
@@ -134,9 +133,8 @@ impl<'a, H: HugrView, T, E> Walker<'a, H, T, E> {
                     worklist.push(WorkItem::Callback(WalkOrder::Preorder, n));
                 }
                 WorkItem::Callback(order, n) => {
-                    let optype = self.hugr.get_optype(n);
                     for cb in self.mut_callbacks(order).iter_mut() {
-                        t = cb(n, optype.clone(), t)?;
+                        t = cb(n, t)?;
                     }
                 }
             }
