@@ -690,11 +690,15 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::prelude::QB_T;
     use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
-    use crate::ops::OpType;
+    use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
+    use crate::ops::{LeafOp, OpType};
+
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
 
@@ -1556,5 +1560,55 @@ mod test {
         hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
+    }
+
+    /// This was stack-overflowing approx 50% of the time,
+    /// see https://github.com/CQCL/hugr/issues/633
+    #[test]
+    fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
+        let ext = ExtensionId::new("unknown1").unwrap();
+        let delta = ExtensionSet::singleton(&ext);
+        let ft = FunctionType::new_linear(type_row![QB_T, QB_T]).with_extension_delta(&delta);
+        let mut dfg = DFGBuilder::new(ft.clone())?;
+
+        // While https://github.com/CQCL-DEV/hugr/issues/388 is unsolved,
+        // most operations have empty extension_reqs (not including their own extension).
+        // Define some that do.
+        let binop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+            ext.clone(),
+            "2qb_op",
+            String::new(),
+            vec![],
+            Some(ft),
+        ))
+        .into();
+        let unary_sig = FunctionType::new_linear(type_row![QB_T])
+            .with_extension_delta(&ExtensionSet::singleton(&ext));
+        let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+            ext,
+            "1qb_op",
+            String::new(),
+            vec![],
+            Some(unary_sig),
+        ))
+        .into();
+        // Constrain q1,q2 as PLUS(ext1, inputs):
+        let [q1, q2] = dfg
+            .add_dataflow_op(binop.clone(), dfg.input_wires())?
+            .outputs_arr();
+        // Constrain q1 as PLUS(ext2, q2):
+        let [q1] = dfg.add_dataflow_op(unop, [q1])?.outputs_arr();
+        // Constrain q1 as EQUALS(q2) by using both together
+        dfg.finish_hugr_with_outputs([q1, q2], &PRELUDE_REGISTRY)?;
+        // The combined q1+q2 variable now has two PLUS constraints - on itself and the inputs.
+        // That leads to this stack-overflowing ~50% of the time
+        Ok(())
+    }
+
+    /// [plus_on_self] has about a 50% rate of failing with stack overflow.
+    /// So if we run 10 times, that should succeed about 1 run in 2^10, i.e. <0.1%
+    #[test]
+    fn plus_on_self_10_times() {
+        [0; 10].iter().for_each(|_| plus_on_self().unwrap())
     }
 }
