@@ -546,7 +546,7 @@ impl UnificationContext {
     pub fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
-        let dependees = {
+        let depended_upon = {
             let mut h: HashMap<Meta, Vec<Meta>> = HashMap::new();
             for (m, m2) in self.constraints.iter().flat_map(|(m, cs)| {
                 cs.iter().flat_map(|c| match c {
@@ -562,11 +562,11 @@ impl UnificationContext {
         // Note it would be better to find metas ALL of whose dependencies were (transitively)
         // on variables, but this is more complex, and hard to define if there are cycles
         // of PLUS constraints, so leaving that as a TODO until we've handled such cycles.
-        let mut var_deps = HashSet::new();
+        let mut depends_on_var = HashSet::new();
         let mut queue = VecDeque::from_iter(self.variables.iter());
         while let Some(m) = queue.pop_front() {
-            if var_deps.insert(m) {
-                if let Some(d) = dependees.get(m) {
+            if depends_on_var.insert(m) {
+                if let Some(d) = depended_upon.get(m) {
                     queue.extend(d.iter())
                 }
             }
@@ -578,17 +578,17 @@ impl UnificationContext {
                 if loc.1 == Direction::Incoming {
                     results.insert(loc.0, rs.clone());
                 }
-            } else if !var_deps.contains(&self.resolve(*meta)) {
+            } else if !depends_on_var.contains(&self.resolve(*meta)) {
                 // If it depends on some other live meta, that's bad news.
                 return Err(InferExtensionError::Unsolved { location: *loc });
             }
-            // If it only depends on graph variables, then we don't have
+            // If it ("only"??) depends on graph variables, then we don't have
             // a *solution*, but it's fine
         }
         debug_assert!(self
             .extensions
             .values()
-            .all(|m| self.get_solution(m).is_some() || var_deps.contains(&self.resolve(*m))));
+            .all(|m| self.get_solution(m).is_some() || depends_on_var.contains(&self.resolve(*m))));
         Ok(results)
     }
 
