@@ -103,10 +103,11 @@ impl FunctionType {
         }
     }
 
-    /// Returns the type of a value [`Port`]. Returns `None` if the port is out
-    /// of bounds.
+    /// Returns a mutable reference to the type of a value [`Port`].
+    /// Returns `None` if the port is out of bounds.
     #[inline]
-    pub fn get_mut(&mut self, port: Port) -> Option<&mut Type> {
+    pub fn get_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
+        let port = port.into();
         match port.direction() {
             Direction::Incoming => self.input.get_mut(port),
             Direction::Outgoing => self.output.get_mut(port),
@@ -228,5 +229,33 @@ impl Display for Signature {
         to self.signature {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result;
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{extension::prelude::USIZE_T, type_row};
+
+    use super::*;
+    #[test]
+    fn test_function_type() {
+        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        assert_eq!(f_type.input_count(), 1);
+        assert_eq!(f_type.output_count(), 1);
+
+        assert_eq!(f_type.input_types(), &[Type::UNIT]);
+
+        assert_eq!(
+            f_type.get(Port::new(Direction::Incoming, 0)),
+            Some(&Type::UNIT)
+        );
+
+        let out = Port::new(Direction::Outgoing, 0);
+        *(f_type.get_mut(out).unwrap()) = USIZE_T;
+
+        assert_eq!(f_type.get(out), Some(&USIZE_T));
+
+        assert_eq!(f_type.input_types(), &[Type::UNIT]);
+        assert_eq!(f_type.output_types(), &[USIZE_T]);
     }
 }
