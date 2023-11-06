@@ -4,7 +4,7 @@
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -301,18 +301,13 @@ pub enum ExtensionBuildError {
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ExtensionSet(HashSet<ExtensionId>);
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
-    pub fn new() -> Self {
-        Self(HashSet::new())
-    }
-
-    /// Creates a new extension set from some extensions.
-    pub fn new_from_extensions(extensions: impl Into<HashSet<ExtensionId>>) -> Self {
-        Self(extensions.into())
+    pub const fn new() -> Self {
+        Self(BTreeSet::new())
     }
 
     /// Adds a extension to the set.
@@ -350,12 +345,17 @@ impl ExtensionSet {
 
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
-        ExtensionSet(HashSet::from_iter(other.0.difference(&self.0).cloned()))
+        ExtensionSet::from_iter(other.0.difference(&self.0).cloned())
     }
 
     /// Iterate over the contained ExtensionIds
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionId> {
         self.0.iter()
+    }
+
+    /// True if this set contains no [ExtensionId]s
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -367,6 +367,6 @@ impl Display for ExtensionSet {
 
 impl FromIterator<ExtensionId> for ExtensionSet {
     fn from_iter<I: IntoIterator<Item = ExtensionId>>(iter: I) -> Self {
-        Self(HashSet::from_iter(iter))
+        Self(BTreeSet::from_iter(iter))
     }
 }
