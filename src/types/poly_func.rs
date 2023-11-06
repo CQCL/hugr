@@ -120,11 +120,9 @@ impl PolyFuncType {
         ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
-        Ok(self.body.substitute(&Instantiation(args, ext_reg)))
+        Ok(self.body.substitute(&SubstValues(args, ext_reg)))
     }
 }
-
-struct Instantiation<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl PartialEq<FunctionType> for PolyFuncType {
     fn eq(&self, other: &FunctionType) -> bool {
@@ -132,7 +130,9 @@ impl PartialEq<FunctionType> for PolyFuncType {
     }
 }
 
-impl<'a> Substitution for Instantiation<'a> {
+struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+
+impl<'a> Substitution for SubstValues<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
