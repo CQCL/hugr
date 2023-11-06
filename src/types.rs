@@ -318,7 +318,7 @@ impl Type {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &impl TypeTransformer) -> Self {
+    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
@@ -332,7 +332,7 @@ impl Type {
     }
 }
 
-pub(crate) trait TypeTransformer {
+pub(crate) trait Substitution {
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
         let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
             else {panic!("Variable was not a type - try validate() first")};
@@ -344,7 +344,7 @@ pub(crate) trait TypeTransformer {
     fn extension_registry(&self) -> &ExtensionRegistry;
 }
 
-fn subst_row(row: &TypeRow, tr: &impl TypeTransformer) -> TypeRow {
+fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
     let res = row
         .iter()
         .map(|ty| ty.substitute(tr))

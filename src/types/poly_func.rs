@@ -7,7 +7,7 @@ use crate::{
 use itertools::Itertools;
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, TypeTransformer};
+use super::{FunctionType, Substitution};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -77,7 +77,7 @@ impl PolyFuncType {
         self.body.validate(reg, all_var_decls)
     }
 
-    pub(super) fn substitute(&self, t: &impl TypeTransformer) -> Self {
+    pub(super) fn substitute(&self, t: &impl Substitution) -> Self {
         if self.params.is_empty() {
             // Avoid using complex code for simple Monomorphic case
             return self.body.substitute(t).into();
@@ -132,7 +132,7 @@ impl PartialEq<FunctionType> for PolyFuncType {
     }
 }
 
-impl<'a> TypeTransformer for Instantiation<'a> {
+impl<'a> Substitution for Instantiation<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
@@ -149,7 +149,7 @@ impl<'a> TypeTransformer for Instantiation<'a> {
 
 struct Renumber<'a>(usize, &'a ExtensionRegistry);
 
-impl<'a> TypeTransformer for Renumber<'a> {
+impl<'a> Substitution for Renumber<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         TypeArg::new_var_use(idx + self.0, decl.clone())
     }
@@ -159,11 +159,11 @@ impl<'a> TypeTransformer for Renumber<'a> {
     }
 }
 
-/// Given a [TypeTransformer] defined outside a binder (i.e. [PolyFuncType]),
+/// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
-struct InsideBinders<'a>(usize, &'a dyn TypeTransformer);
+struct InsideBinders<'a>(usize, &'a dyn Substitution);
 
-impl<'a> TypeTransformer for InsideBinders<'a> {
+impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         // Don't touch the first <self.0> variables
         if idx < self.0 {

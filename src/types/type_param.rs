@@ -12,7 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::{check_typevar_decl, CustomType, Type, TypeBound, TypeTransformer};
+use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -182,7 +182,7 @@ impl TypeArg {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &impl TypeTransformer) -> Self {
+    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
                 ty: ty.substitute(t),
