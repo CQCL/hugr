@@ -84,7 +84,10 @@ impl PolyFuncType {
         }
         PolyFuncType {
             params: self.params.clone(),
-            body: self.body.substitute(&InsideBinders(self.params.len(), t)),
+            body: self.body.substitute(&InsideBinders {
+                skip_lowest: self.params.len(),
+                underlying: t,
+            }),
         }
     }
 
@@ -119,7 +122,9 @@ impl PolyFuncType {
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        check_type_args(args, &self.params)?; // Ensures applicability AND totality
+        // Check that args are applicable, and that we have a value for each binder,
+        // i.e. each possible free variable within the body.
+        check_type_args(args, &self.params)?;
         Ok(self.body.substitute(&SubstValues(args, ext_reg)))
     }
 }
@@ -147,36 +152,45 @@ impl<'a> Substitution for SubstValues<'a> {
     }
 }
 
-struct Renumber<'a>(usize, &'a ExtensionRegistry);
+struct Renumber<'a> {
+    offset: usize,
+    exts: &'a ExtensionRegistry,
+}
 
 impl<'a> Substitution for Renumber<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        TypeArg::new_var_use(idx + self.0, decl.clone())
+        TypeArg::new_var_use(idx + self.offset, decl.clone())
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
+        self.exts
     }
 }
 
 /// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
-struct InsideBinders<'a>(usize, &'a dyn Substitution);
+struct InsideBinders<'a> {
+    skip_lowest: usize,
+    underlying: &'a dyn Substitution,
+}
 
 impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         // Don't touch the first <self.0> variables
-        if idx < self.0 {
+        if idx < self.skip_lowest {
             return TypeArg::new_var_use(idx, decl.clone());
         }
-        let under = self.1.apply_var(idx - self.0, decl);
+        let result_in_outer_scope = self.underlying.apply_var(idx - self.skip_lowest, decl);
         // Make returned value (from underlying substitution, outside the
         // new binders) avoid the variables newly bound
-        under.substitute(&Renumber(self.0, self.extension_registry()))
+        result_in_outer_scope.substitute(&Renumber {
+            offset: self.skip_lowest,
+            exts: self.extension_registry(),
+        })
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1.extension_registry()
+        self.underlying.extension_registry()
     }
 }
 
