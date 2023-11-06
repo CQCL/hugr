@@ -78,15 +78,12 @@ impl VarIdx {
         TypeArg::new_var_use(self.0, decl)
     }
 
-    #[allow(unused)]
-    fn as_type(&self, bound: TypeBound) -> Type {
+    pub(super) fn as_type(&self, bound: TypeBound) -> Type {
         Type::new_var_use(self.0, bound)
     }
-}
 
-impl From<VarIdx> for usize {
-    fn from(value: VarIdx) -> Self {
-        value.0
+    pub(super) fn index<'a, T>(&self, elems: &'a [T]) -> Option<&'a T> {
+        elems.get(self.0)
     }
 }
 
@@ -205,9 +202,8 @@ struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> Substitution for SubstValues<'a> {
     fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
-        let arg = self
-            .0
-            .get(usize::from(idx))
+        let arg = idx
+            .index(self.0)
             .expect("Undeclared type variable - call validate() ?");
         debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
         arg.clone()

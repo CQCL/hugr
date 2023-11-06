@@ -368,7 +368,7 @@ pub(crate) fn check_typevar_decl(
     idx: VarIdx,
     cached_decl: &TypeParam,
 ) -> Result<(), SignatureError> {
-    match decls.get(usize::from(idx)) {
+    match idx.index(decls) {
         None => Err(SignatureError::FreeTypeVar {
             idx,
             num_decls: decls.len(),
