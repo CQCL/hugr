@@ -270,7 +270,7 @@ impl OpDef {
     /// Returns a reference to the params of this [`OpDef`].
     pub fn params(&self) -> &[TypeParam] {
         match &self.signature_func {
-            SignatureFunc::TypeScheme(ts) => &ts.params,
+            SignatureFunc::TypeScheme(ts) => ts.params(),
             SignatureFunc::CustomFunc { static_params, .. } => static_params,
         }
     }

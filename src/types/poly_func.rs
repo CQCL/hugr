@@ -29,7 +29,7 @@ pub struct PolyFuncType {
     /// variables are bound from right to left.
     ///
     /// [TypeArg]: super::type_param::TypeArg
-    pub(crate) params: Vec<TypeParam>,
+    params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     pub(super) body: FunctionType,
 }
@@ -44,6 +44,11 @@ impl From<FunctionType> for PolyFuncType {
 }
 
 impl PolyFuncType {
+    /// The type parameters, aka binders, over which this type is polymorphic
+    pub fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
     /// Create a new PolyFuncType and validates it. (This will only succeed
     /// for outermost PolyFuncTypes i.e. with no free type-variables.)
     /// The [ExtensionRegistry] should be the same (or a subset) of that which will later
