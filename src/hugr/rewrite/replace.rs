@@ -56,7 +56,7 @@ pub enum NewEdgeKind {
 }
 
 /// Specification of a `Replace` operation
-#[derive(Debug, Clone)] // PartialEq? Eq probably doesn't make sense because of ordering.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Replacement {
     /// The nodes to remove from the existing Hugr (known as Gamma).
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
