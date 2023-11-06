@@ -1236,10 +1236,10 @@ The `Replace` method takes as input:
     $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
     $G$ and `TgtNode` in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe
-    an existing incoming edge of that kind from a node in $S\*$.
+    an existing incoming edge of that kind from a node in $S^\*$.
   - a list $\mu\_\textrm{new}$ of `NewEdgeSpec` which all have both `SrcNode` and `TgtNode`
     in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
-    edge of that kind from a node in $S\*$.
+    edge of that kind from a node in $S^\*$.
 
 Note that considering all three $\mu$ lists together,
    - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
