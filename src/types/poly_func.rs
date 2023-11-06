@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use super::{
     type_param::{check_type_args, TypeArg, TypeParam},
-    VarIdx,
+    Type, TypeBound,
 };
 use super::{FunctionType, Substitution};
 
@@ -43,6 +43,50 @@ impl From<FunctionType> for PolyFuncType {
             params: vec![],
             body,
         }
+    }
+}
+
+/// Index of a type variable.
+/// Roughly DeBruijn, noting that when many variables are declared by the same [PolyFuncType],
+/// index 0 ("the closest binder") refers to the first element of [PolyFuncType::params],
+/// i.e. the binders are processed from right to left
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[display(fmt = "<{}>", _0)]
+pub struct VarIdx(pub(super) usize);
+
+impl VarIdx {
+    /// Constructor, given DeBruijn index
+    pub const fn new(idx: usize) -> Self {
+        Self(idx)
+    }
+
+    fn in_outer_scope(&self, num_binders: usize) -> Option<Self> {
+        self.0.checked_sub(num_binders).map(VarIdx)
+    }
+
+    fn as_typearg(&self, decl: TypeParam) -> TypeArg {
+        TypeArg::new_var_use(self.0, decl)
+    }
+
+    #[allow(unused)]
+    fn as_type(&self, bound: TypeBound) -> Type {
+        Type::new_var_use(self.0, bound)
+    }
+}
+
+impl From<VarIdx> for usize {
+    fn from(value: VarIdx) -> Self {
+        value.0
     }
 }
 
@@ -233,10 +277,10 @@ pub(crate) mod test {
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{CustomType, FunctionType, Type, TypeBound, VarIdx};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound};
     use crate::Extension;
 
-    use super::PolyFuncType;
+    use super::{PolyFuncType, VarIdx};
 
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {

@@ -11,7 +11,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
-pub use poly_func::PolyFuncType;
+pub use poly_func::{PolyFuncType, VarIdx};
 pub use signature::{FunctionType, Signature, SignatureDescription};
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -26,7 +26,7 @@ use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
-pub use self::primitive::{PrimType, VarIdx};
+pub use self::primitive::PrimType;
 use self::type_param::TypeParam;
 
 #[cfg(feature = "pyo3")]
