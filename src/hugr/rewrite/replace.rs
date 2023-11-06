@@ -60,22 +60,24 @@ pub enum NewEdgeKind {
 pub struct Replacement {
     /// The nodes to remove from the existing Hugr (known as Gamma).
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
-    /// Must be non-empty - otherwise there is no parent under which to place [replacement],
-    /// and no possible [in_edges], [out_edges] or [transfers].
+    /// Must be non-empty - otherwise there is no parent under which to place [Self::replacement],
+    /// and there would be no possible [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
     pub removal: Vec<Node>,
-    /// A hugr whose root is the same type as the parent of all the [nodes]. "G" in the spec.
+    /// A hugr (not necessarily valid, as it may be missing edges and/or nodes), whose root
+    /// is the same type as the root of [Self::replacement].  "G" in the spec.
     pub replacement: Hugr,
-    /// Map from container nodes in [replacement] that have no children, to container nodes
-    /// that are descended from [nodes]. The keys are the new parents for the children of the
-    /// values, i.e. said children are transferred to new locations rather than removed from the graph.
-    /// Note no value may be ancestor/descendant of another. "R" is the set of descendants of [nodes]
-    /// that are not descendants of values here.
-    pub transfers: HashMap<Node, Node>,
+    /// Describes how parts of the Hugr that would otherwise be removed should instead be preserved but
+    /// with new parents amongst the newly-inserted nodes.  This is a Map from container nodes in
+    /// [Self::replacement] that have no children, to container nodes that are descended from [Self::removal].
+    /// The keys are the new parents for the children of the values.  Note no value may be ancestor or
+    /// descendant of another.  This is "B" in the spec; "R" is the set of descendants of [Self::removal]
+    ///  that are not descendants of values here.
+    pub adoptions: HashMap<Node, Node>,
     /// Edges from nodes in the existing Hugr that are not removed ([NewEdgeSpec::src] in Gamma\R)
-    /// to inserted nodes ([NewEdgeSpec::tgt] in [replacement]). `$\mu_\inp$` in the spec.
+    /// to inserted nodes ([NewEdgeSpec::tgt] in [Self::replacement]).
     pub mu_inp: Vec<NewEdgeSpec>,
-    /// Edges from inserted nodes ([NewEdgeSpec::src] in [replacement]) to existing nodes not removed
-    /// ([NewEdgeSpec::tgt] in Gamma \ R). `$\mu_\out$` in the spec.
+    /// Edges from inserted nodes ([NewEdgeSpec::src] in [Self::replacement]) to existing nodes not removed
+    /// ([NewEdgeSpec::tgt] in Gamma \ R).
     pub mu_out: Vec<NewEdgeSpec>,
     /// Edges to add between existing nodes (both [NewEdgeSpec::src] and [NewEdgeSpec::tgt] in Gamma \ R).
     /// For example, in cases where the source had an edge to a removed node, and the target had an
@@ -161,17 +163,17 @@ impl Replacement {
 
     fn get_removed_nodes(&self, h: &impl HugrView) -> Result<HashSet<Node>, ReplaceError> {
         // Check the keys of the transfer map too, the values we'll use imminently
-        self.transfers.keys().try_for_each(|&n| {
+        self.adoptions.keys().try_for_each(|&n| {
             (self.replacement.contains_node(n)
                 && self.replacement.get_optype(n).is_container()
                 && self.replacement.children(n).next().is_none())
             .then_some(())
             .ok_or(ReplaceError::InvalidTransferTarget(n))
         })?;
-        let mut transferred: HashSet<Node> = self.transfers.values().copied().collect();
-        if transferred.len() != self.transfers.values().len() {
+        let mut transferred: HashSet<Node> = self.adoptions.values().copied().collect();
+        if transferred.len() != self.adoptions.values().len() {
             return Err(ReplaceError::ConflictingTransfers(
-                self.transfers
+                self.adoptions
                     .values()
                     .filter(|v| !transferred.remove(v))
                     .copied()
@@ -298,7 +300,7 @@ impl Rewrite for Replacement {
         h.remove_node(new_root).unwrap();
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
-        for (new_parent, &old_parent) in self.transfers.iter() {
+        for (new_parent, &old_parent) in self.adoptions.iter() {
             let new_parent = node_map.get(new_parent).unwrap();
             debug_assert!(h.children(old_parent).next().is_some());
             loop {
@@ -321,7 +323,7 @@ impl Rewrite for Replacement {
         self.removal
             .iter()
             .copied()
-            .chain(self.transfers.values().copied())
+            .chain(self.adoptions.values().copied())
             .chain(self.removal.iter().take(1).copied())
     }
 }
@@ -418,7 +420,7 @@ pub enum WhichHugr {
     /// The newly-inserted nodes, i.e. the [Replacement::replacement]
     Replacement,
     /// Nodes in the existing Hugr that are not [Replacement::removal]
-    /// (or are on the RHS of an entry in [Replacement::transfers])
+    /// (or are on the RHS of an entry in [Replacement::adoptions])
     Retained,
 }
 
@@ -542,7 +544,7 @@ mod test {
         h.apply_rewrite(Replacement {
             removal: vec![entry.node(), bb2.node()],
             replacement,
-            transfers: HashMap::from([(r_df1.node(), entry.node()), (r_df2.node(), bb2.node())]),
+            adoptions: HashMap::from([(r_df1.node(), entry.node()), (r_df2.node(), bb2.node())]),
             mu_inp: vec![],
             mu_out: vec![NewEdgeSpec {
                 src: r_bb,

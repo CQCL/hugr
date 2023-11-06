@@ -636,7 +636,7 @@ pub(in crate::hugr::rewrite) mod test {
         Replacement {
             removal: s.subgraph.nodes().to_vec(),
             replacement,
-            transfers: HashMap::new(),
+            adoptions: HashMap::new(),
             mu_inp,
             mu_out,
             mu_new: vec![],
