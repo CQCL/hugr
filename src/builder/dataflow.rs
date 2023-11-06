@@ -79,7 +79,7 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(NodeType::open_extensions(dfg_op));
+        let base = Hugr::new(NodeType::new_open(dfg_op));
         let root = base.root();
         DFGBuilder::create_with_io(base, root, signature, None)
     }

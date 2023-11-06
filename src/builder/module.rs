@@ -90,7 +90,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            NodeType::pure(ops::FuncDefn {
+            NodeType::new_pure(ops::FuncDefn {
                 name,
                 signature: signature.clone(),
             }),

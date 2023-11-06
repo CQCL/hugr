@@ -7,7 +7,7 @@ use super::{OpName, OpTag, OpTrait, StaticTag};
 
 use crate::{
     extension::{ExtensionId, ExtensionSet},
-    types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
+    types::{EdgeKind, FunctionType, Type, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -115,15 +115,6 @@ impl OpTrait for LeafOp {
                 new_extension,
             } => FunctionType::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(&ExtensionSet::singleton(new_extension)),
-        }
-    }
-
-    /// Optional description of the ports in the signature.
-    fn signature_desc(&self) -> SignatureDescription {
-        match self {
-            LeafOp::CustomOp(ext) => ext.signature_desc(),
-            // TODO: More port descriptions
-            _ => Default::default(),
         }
     }
 

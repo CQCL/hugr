@@ -9,7 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::types::{EdgeKind, FunctionType, SignatureDescription, Type};
+use crate::types::{EdgeKind, FunctionType, Type};
 use crate::PortIndex;
 use crate::{Direction, Port};
 
@@ -187,12 +187,6 @@ pub trait OpTrait {
     ///
     /// Only dataflow operations have a non-empty signature.
     fn signature(&self) -> FunctionType {
-        Default::default()
-    }
-    /// Optional description of the ports in the signature.
-    ///
-    /// Only dataflow operations have a non-empty signature.
-    fn signature_desc(&self) -> SignatureDescription {
         Default::default()
     }
 
