@@ -169,23 +169,6 @@ impl FunctionType {
 }
 
 impl FunctionType {
-    /// Returns the linear part of the signature
-    /// TODO: This fails when mixing different linear types.
-    #[inline(always)]
-    pub fn linear(&self) -> impl Iterator<Item = &Type> {
-        debug_assert_eq!(
-            self.input
-                .iter()
-                .filter(|t| !t.copyable())
-                .collect::<Vec<_>>(),
-            self.output
-                .iter()
-                .filter(|t| !t.copyable())
-                .collect::<Vec<_>>()
-        );
-        self.input.iter().filter(|t| !t.copyable())
-    }
-
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
     pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
