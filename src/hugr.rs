@@ -242,11 +242,6 @@ impl Hugr {
         }
     }
 
-    /// Add a node to the graph, with the default conversion from OpType to NodeType
-    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        self.add_node(NodeType::new_auto(op))
-    }
-
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
         let node = self
@@ -396,7 +391,7 @@ mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
-        let lift = hugr.add_op_with_parent(
+        let lift = hugr.add_node_with_parent(
             hugr.root(),
             ops::LeafOp::Lift {
                 type_row: type_row![BIT],

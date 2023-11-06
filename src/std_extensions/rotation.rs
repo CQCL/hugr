@@ -40,7 +40,7 @@ pub fn extension() -> Extension {
     RotationType::Quaternion.add_to_extension(&mut extension);
 
     extension
-        .add_op_custom_sig_simple(
+        .add_node_custom_sig_simple(
             "AngleAdd".into(),
             "".into(),
             vec![],
