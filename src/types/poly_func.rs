@@ -77,14 +77,14 @@ impl PolyFuncType {
         self.body.validate(reg, all_var_decls)
     }
 
-    pub(super) fn transform(&self, t: &impl TypeTransformer) -> Self {
+    pub(super) fn substitute(&self, t: &impl TypeTransformer) -> Self {
         if self.params.is_empty() {
             // Avoid using complex code for simple Monomorphic case
-            return self.body.transform(t).into();
+            return self.body.substitute(t).into();
         }
         PolyFuncType {
             params: self.params.clone(),
-            body: self.body.transform(&InsideBinders(self.params.len(), t)),
+            body: self.body.substitute(&InsideBinders(self.params.len(), t)),
         }
     }
 
@@ -120,7 +120,7 @@ impl PolyFuncType {
         ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
         check_type_args(args, &self.params)?; // Ensures applicability AND totality
-        Ok(self.body.transform(&Instantiation(args, ext_reg)))
+        Ok(self.body.substitute(&Instantiation(args, ext_reg)))
     }
 }
 
@@ -172,7 +172,7 @@ impl<'a> TypeTransformer for InsideBinders<'a> {
         let under = self.1.apply_var(idx - self.0, decl);
         // Make returned value (from underlying substitution, outside the
         // new binders) avoid the variables newly bound
-        under.transform(&Renumber(self.0, self.extension_registry()))
+        under.substitute(&Renumber(self.0, self.extension_registry()))
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {

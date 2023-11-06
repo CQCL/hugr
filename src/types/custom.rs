@@ -88,11 +88,11 @@ impl CustomType {
             })
     }
 
-    pub(super) fn transform(&self, tr: &impl TypeTransformer) -> Self {
+    pub(super) fn substitute(&self, tr: &impl TypeTransformer) -> Self {
         let args = self
             .args
             .iter()
-            .map(|arg| arg.transform(tr))
+            .map(|arg| arg.substitute(tr))
             .collect::<Vec<_>>();
         let bound = self
             .get_type_def(tr.extension_registry())

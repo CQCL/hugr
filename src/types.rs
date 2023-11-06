@@ -318,16 +318,16 @@ impl Type {
         }
     }
 
-    pub(crate) fn transform(&self, t: &impl TypeTransformer) -> Self {
+    pub(crate) fn substitute(&self, t: &impl TypeTransformer) -> Self {
         match &self.0 {
             TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Simple { .. }) => {
                 self.clone()
             }
             TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
-            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.transform(t)),
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.transform(t)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(transform_row(elems, t)),
-            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(transform_row(row, t)),
+            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(t)),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(t)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, t)),
         }
     }
 }
@@ -344,10 +344,10 @@ pub(crate) trait TypeTransformer {
     fn extension_registry(&self) -> &ExtensionRegistry;
 }
 
-fn transform_row(row: &TypeRow, tr: &impl TypeTransformer) -> TypeRow {
+fn subst_row(row: &TypeRow, tr: &impl TypeTransformer) -> TypeRow {
     let res = row
         .iter()
-        .map(|ty| ty.transform(tr))
+        .map(|ty| ty.substitute(tr))
         .collect::<Vec<_>>()
         .into();
     res
