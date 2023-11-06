@@ -150,16 +150,6 @@ impl NodeType {
     }
 }
 
-impl OpType {
-    /// Convert an OpType to a NodeType by giving it some input extensions
-    pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
-        NodeType {
-            op: self,
-            input_extensions: Some(rs),
-        }
-    }
-}
-
 impl Default for Hugr {
     fn default() -> Self {
         Self::new(NodeType::new_pure(crate::ops::Module))
