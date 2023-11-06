@@ -22,7 +22,7 @@ use super::{type_param::TypeParam, CustomType, PolyFuncType, Type, TypeArg, Type
     serde::Deserialize,
 )]
 #[display(fmt = "<{}>", _0)]
-pub struct VarIdx(usize);
+pub struct VarIdx(pub(super) usize);
 
 impl VarIdx {
     /// Constructor, given DeBruijn index
@@ -47,14 +47,6 @@ impl VarIdx {
 impl From<VarIdx> for usize {
     fn from(value: VarIdx) -> Self {
         value.0
-    }
-}
-
-impl std::ops::Add<usize> for VarIdx {
-    type Output = VarIdx;
-
-    fn add(self, rhs: usize) -> Self {
-        Self(self.0 + rhs)
     }
 }
 

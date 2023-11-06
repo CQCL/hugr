@@ -183,7 +183,7 @@ struct Renumber<'a> {
 
 impl<'a> Substitution for Renumber<'a> {
     fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
-        (idx + self.offset).as_typearg(decl.clone())
+        TypeArg::new_var_use(idx.0 + self.offset, decl.clone())
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
@@ -580,7 +580,7 @@ pub(crate) mod test {
                         Type::new_var_use(0, TypeBound::Copyable),
                         // Next is the free variable that we substituted in (hence Eq)
                         // - renumbered because of the intervening forall (Copyable)
-                        (FREE + 1).as_type(TypeBound::Eq)
+                        Type::new_var_use(3 + 1, TypeBound::Eq)
                     )
                 ))]
             )
@@ -611,7 +611,7 @@ pub(crate) mod test {
                     Type::new_var_use(0, TypeBound::Copyable),
                     list_of_tup(
                         Type::new_var_use(0, TypeBound::Copyable), // not renumbered...
-                        rhs(FREE + 1)                              // renumbered
+                        rhs(VarIdx::new(3 + 1))                    // renumbered
                     )
                 ))]
             )
