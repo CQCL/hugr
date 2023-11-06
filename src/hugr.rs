@@ -150,6 +150,12 @@ impl NodeType {
     }
 }
 
+impl<T: Into<OpType>> From<T> for NodeType {
+    fn from(value: T) -> Self {
+        NodeType::new_auto(value.into())
+    }
+}
+
 impl Default for Hugr {
     fn default() -> Self {
         Self::new(NodeType::new_pure(crate::ops::Module))
