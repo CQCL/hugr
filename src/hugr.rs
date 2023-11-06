@@ -14,23 +14,25 @@ use std::iter;
 pub(crate) use self::hugrmut::HugrMut;
 pub use self::validate::ValidationError;
 
-use derive_more::From;
 pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, NodeIndex, PortMut, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
 
 pub use self::views::{HugrView, RootTagged};
+use crate::core::NodeIndex;
 use crate::extension::{
     infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
 };
+use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::{FunctionType, Signature};
+use crate::{Direction, Node};
 
 use delegate::delegate;
 
@@ -80,7 +82,7 @@ impl NodeType {
     }
 
     /// Instantiate an OpType with no input extensions
-    pub fn pure(op: impl Into<OpType>) -> Self {
+    pub fn new_pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: Some(ExtensionSet::new()),
@@ -89,10 +91,21 @@ impl NodeType {
 
     /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
-    pub fn open_extensions(op: impl Into<OpType>) -> Self {
+    pub fn new_open(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: None,
+        }
+    }
+
+    /// Instantiate an [OpType] with the default set of input extensions
+    /// for that OpType.
+    pub fn new_auto(op: impl Into<OpType>) -> Self {
+        let op = op.into();
+        if OpTag::ModuleOp.is_superset(op.tag()) {
+            Self::new_pure(op)
+        } else {
+            Self::new_open(op)
         }
     }
 
@@ -117,9 +130,14 @@ impl NodeType {
     pub fn input_extensions(&self) -> Option<&ExtensionSet> {
         self.input_extensions.as_ref()
     }
-}
 
-impl NodeType {
+    /// Gets the underlying [OpType] i.e. without any [input_extensions]
+    ///
+    /// [input_extensions]: NodeType::input_extensions
+    pub fn op(&self) -> &OpType {
+        &self.op
+    }
+
     delegate! {
         to self.op {
             /// Tag identifying the operation.
@@ -129,12 +147,6 @@ impl NodeType {
             /// Returns the number of outputs ports for the operation.
             pub fn output_count(&self) -> usize;
         }
-    }
-}
-
-impl<'a> From<&'a NodeType> for &'a OpType {
-    fn from(nt: &'a NodeType) -> Self {
-        &nt.op
     }
 }
 
@@ -150,7 +162,7 @@ impl OpType {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(NodeType::pure(crate::ops::Module))
+        Self::new(NodeType::new_pure(crate::ops::Module))
     }
 }
 
@@ -166,75 +178,17 @@ impl AsMut<Hugr> for Hugr {
     }
 }
 
-/// A handle to a node in the HUGR.
-#[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Debug,
-    From,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(transparent)]
-#[cfg_attr(feature = "pyo3", pyclass)]
-pub struct Node {
-    index: portgraph::NodeIndex,
-}
-
-/// A handle to a port for a node in the HUGR.
-#[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    PartialOrd,
-    Eq,
-    Ord,
-    Hash,
-    Default,
-    Debug,
-    From,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(transparent)]
-#[cfg_attr(feature = "pyo3", pyclass)]
-pub struct Port {
-    offset: portgraph::PortOffset,
-}
-
-/// A trait for getting the undirected index of a port.
-pub trait PortIndex {
-    /// Returns the offset of the port.
-    fn index(self) -> usize;
-}
-
-/// A port in the incoming direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
-pub struct IncomingPort {
-    index: u16,
-}
-
-/// A port in the outgoing direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, Debug)]
-pub struct OutgoingPort {
-    index: u16,
-}
-
-/// The direction of a port.
-pub type Direction = portgraph::Direction;
+/// Arbitrary metadata for a node.
+pub type NodeMetadata = serde_json::Value;
 
 /// Public API for HUGRs.
 impl Hugr {
-    /// Run resource inference and pass the closure into validation
-    pub fn infer_and_validate(
+    /// Resolve extension ops, infer extensions used, and pass the closure into validation
+    pub fn update_validate(
         &mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
+        resolve_extension_ops(self, extension_registry)?;
         let closure = self.infer_extensions()?;
         self.validate_with_extension_closure(closure, extension_registry)?;
         Ok(())
@@ -254,7 +208,7 @@ impl Hugr {
         // We only care about inferred _input_ extensions, because `NodeType`
         // uses those to infer the output extensions
         for (node, input_extensions) in solution.iter() {
-            let nodetype = self.op_types.try_get_mut(node.index).unwrap();
+            let nodetype = self.op_types.try_get_mut(node.pg_index()).unwrap();
             match &nodetype.input_extensions {
                 None => nodetype.input_extensions = Some(input_extensions.clone()),
                 Some(existing_ext_reqs) => {
@@ -264,9 +218,6 @@ impl Hugr {
         }
     }
 }
-
-/// Arbitrary metadata for a node.
-pub type NodeMetadata = serde_json::Value;
 
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
@@ -297,8 +248,7 @@ impl Hugr {
 
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        // TODO: Default to `NodeType::open_extensions` once we can infer extensions
-        self.add_node(NodeType::pure(op))
+        self.add_node(NodeType::new_auto(op))
     }
 
     /// Add a node to the graph.
@@ -349,208 +299,26 @@ impl Hugr {
             // Find the element's location. If it originally came from a previous position
             // then it has been swapped somewhere else, so we follow the permutation chain.
             let mut source: Node = ordered[position];
-            while position > source.index.index() {
-                source = ordered[source.index.index()];
+            while position > source.index() {
+                source = ordered[source.index()];
             }
 
-            let target: Node = NodeIndex::new(position).into();
+            let target: Node = portgraph::NodeIndex::new(position).into();
             if target != source {
-                self.graph.swap_nodes(target.index, source.index);
-                self.op_types.swap(target.index, source.index);
-                self.hierarchy.swap_nodes(target.index, source.index);
+                let pg_target = target.pg_index();
+                let pg_source = source.pg_index();
+                self.graph.swap_nodes(pg_target, pg_source);
+                self.op_types.swap(pg_target, pg_source);
+                self.hierarchy.swap_nodes(pg_target, pg_source);
                 rekey(source, target);
             }
         }
-        self.root = NodeIndex::new(0);
+        self.root = portgraph::NodeIndex::new(0);
 
         // Finish by compacting the copy nodes.
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
         self.graph.compact_nodes(|_, _| {});
-    }
-}
-
-impl Port {
-    /// Creates a new port.
-    #[inline]
-    pub fn new(direction: Direction, port: usize) -> Self {
-        Self {
-            offset: portgraph::PortOffset::new(direction, port),
-        }
-    }
-
-    /// Creates a new incoming port.
-    #[inline]
-    pub fn new_incoming(port: impl Into<IncomingPort>) -> Self {
-        Self::try_new_incoming(port).unwrap()
-    }
-
-    /// Creates a new outgoing port.
-    #[inline]
-    pub fn new_outgoing(port: impl Into<OutgoingPort>) -> Self {
-        Self::try_new_outgoing(port).unwrap()
-    }
-
-    /// Creates a new incoming port.
-    #[inline]
-    pub fn try_new_incoming(port: impl TryInto<IncomingPort>) -> Result<Self, HugrError> {
-        let Ok(port) = port.try_into() else {
-            return Err(HugrError::InvalidPortDirection(Direction::Outgoing));
-        };
-        Ok(Self {
-            offset: portgraph::PortOffset::new_incoming(port.index()),
-        })
-    }
-
-    /// Creates a new outgoing port.
-    #[inline]
-    pub fn try_new_outgoing(port: impl TryInto<OutgoingPort>) -> Result<Self, HugrError> {
-        let Ok(port) = port.try_into() else {
-            return Err(HugrError::InvalidPortDirection(Direction::Incoming));
-        };
-        Ok(Self {
-            offset: portgraph::PortOffset::new_outgoing(port.index()),
-        })
-    }
-
-    /// Returns the direction of the port.
-    #[inline]
-    pub fn direction(self) -> Direction {
-        self.offset.direction()
-    }
-}
-
-impl PortIndex for Port {
-    #[inline(always)]
-    fn index(self) -> usize {
-        self.offset.index()
-    }
-}
-
-impl PortIndex for usize {
-    #[inline(always)]
-    fn index(self) -> usize {
-        self
-    }
-}
-
-impl PortIndex for IncomingPort {
-    #[inline(always)]
-    fn index(self) -> usize {
-        self.index as usize
-    }
-}
-
-impl PortIndex for OutgoingPort {
-    #[inline(always)]
-    fn index(self) -> usize {
-        self.index as usize
-    }
-}
-
-impl From<usize> for IncomingPort {
-    #[inline(always)]
-    fn from(index: usize) -> Self {
-        Self {
-            index: index as u16,
-        }
-    }
-}
-
-impl From<usize> for OutgoingPort {
-    #[inline(always)]
-    fn from(index: usize) -> Self {
-        Self {
-            index: index as u16,
-        }
-    }
-}
-
-impl TryFrom<Port> for IncomingPort {
-    type Error = HugrError;
-    #[inline(always)]
-    fn try_from(port: Port) -> Result<Self, Self::Error> {
-        match port.direction() {
-            Direction::Incoming => Ok(Self {
-                index: port.index() as u16,
-            }),
-            dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
-        }
-    }
-}
-
-impl TryFrom<Port> for OutgoingPort {
-    type Error = HugrError;
-    #[inline(always)]
-    fn try_from(port: Port) -> Result<Self, Self::Error> {
-        match port.direction() {
-            Direction::Outgoing => Ok(Self {
-                index: port.index() as u16,
-            }),
-            dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// A DataFlow wire, defined by a Value-kind output port of a node
-// Stores node and offset to output port
-pub struct Wire(Node, usize);
-
-impl Wire {
-    /// Create a new wire from a node and a port.
-    #[inline]
-    pub fn new(node: Node, port: impl TryInto<OutgoingPort>) -> Self {
-        Self(node, Port::try_new_outgoing(port).unwrap().index())
-    }
-
-    /// The node that this wire is connected to.
-    #[inline]
-    pub fn node(&self) -> Node {
-        self.0
-    }
-
-    /// The output port that this wire is connected to.
-    #[inline]
-    pub fn source(&self) -> Port {
-        Port::new_outgoing(self.1)
-    }
-}
-
-/// Enum for uniquely identifying the origin of linear wires in a circuit-like
-/// dataflow region.
-///
-/// Falls back to [`Wire`] if the wire is not linear or if it's not possible to
-/// track the origin.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum CircuitUnit {
-    /// Arbitrary input wire.
-    Wire(Wire),
-    /// Index to region input.
-    Linear(usize),
-}
-
-impl CircuitUnit {
-    /// Check if this is a wire.
-    pub fn is_wire(&self) -> bool {
-        matches!(self, CircuitUnit::Wire(_))
-    }
-
-    /// Check if this is a linear unit.
-    pub fn is_linear(&self) -> bool {
-        matches!(self, CircuitUnit::Linear(_))
-    }
-}
-
-impl From<usize> for CircuitUnit {
-    fn from(value: usize) -> Self {
-        CircuitUnit::Linear(value)
-    }
-}
-
-impl From<Wire> for CircuitUnit {
-    fn from(value: Wire) -> Self {
-        CircuitUnit::Wire(value)
     }
 }
 
@@ -596,7 +364,7 @@ impl From<HugrError> for PyErr {
 
 #[cfg(test)]
 mod test {
-    use super::{Hugr, HugrView, NodeType};
+    use super::{Hugr, HugrView};
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
@@ -632,12 +400,12 @@ mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
-        let lift = hugr.add_node_with_parent(
+        let lift = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::LeafOp::Lift {
+            ops::LeafOp::Lift {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
-            }),
+            },
         )?;
         hugr.connect(input, 0, lift, 0)?;
         hugr.connect(lift, 0, output, 0)?;

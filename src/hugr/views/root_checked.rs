@@ -79,7 +79,7 @@ mod test {
 
     #[test]
     fn root_checked() {
-        let root_type = NodeType::pure(ops::DFG {
+        let root_type = NodeType::new_pure(ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
         });
         let mut h = Hugr::new(root_type.clone());
@@ -94,10 +94,10 @@ mod test {
         let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
         // That is a HugrMutInternal, so we can try:
         let root = dfg_v.root();
-        let bb = NodeType::pure(BasicBlock::DFB {
+        let bb = NodeType::new_pure(BasicBlock::DFB {
             inputs: type_row![],
             other_outputs: type_row![],
-            predicate_variants: vec![type_row![]],
+            tuple_sum_rows: vec![type_row![]],
             extension_delta: ExtensionSet::new(),
         });
         let r = dfg_v.replace_op(root, bb.clone());
@@ -129,7 +129,7 @@ mod test {
         let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
 
         // And it's a HugrMut:
-        let nodetype = NodeType::pure(LeafOp::MakeTuple { tys: type_row![] });
+        let nodetype = NodeType::new_pure(LeafOp::MakeTuple { tys: type_row![] });
         bb_v.add_node_with_parent(bb_v.root(), nodetype).unwrap();
     }
 }

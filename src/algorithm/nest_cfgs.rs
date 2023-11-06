@@ -605,10 +605,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
@@ -648,7 +646,7 @@ pub(crate) mod test {
             ])
         );
         transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
@@ -755,7 +753,7 @@ pub(crate) mod test {
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
         for n in [split, left, right, merge] {
@@ -889,10 +887,8 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2, ExtensionSet::new())?,
@@ -933,10 +929,8 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,

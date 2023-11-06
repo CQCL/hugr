@@ -335,18 +335,18 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of Predicate type (see below), whose
+The first input to the Conditional-node is of TupleSum type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
 the constructor (tag) selects which child to execute; the unpacked
-contents of the Predicate with all remaining inputs to Conditional
+contents of the TupleSum with all remaining inputs to Conditional
 appended are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-A **Predicate(T0, T1…TN)** type is an algebraic “sum of products” type,
-defined as `Sum(Tuple(#t0), Tuple(#t1), ...Tuple(#tn))` (see [type
-system](#type-system)), where `#ti` is the *i*th Row defining it.
+A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
+defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
+system](#type-system)), where `#Ti` is the *i*th Row defining it.
 
 ```mermaid
 flowchart
@@ -362,20 +362,27 @@ flowchart
         end
         Case0 ~~~ Case1
     end
-    Pred["case 0 inputs | case 1 inputs"] --> Conditional
+    TupleSum["case 0 inputs | case 1 inputs"] --> Conditional
     OI["other inputs"] --> Conditional
     Conditional --> outputs
 ```
 
 ##### `TailLoop` nodes
 
-These provide tail-controlled loops: the data sibling graph within the
-TailLoop-node computes a value of 2-ary `Predicate(#i, #o)`; the first
-variant means to repeat the loop with the values of the tuple unpacked
-and “fed” in at at the top; the second variant means to exit the loop
-with those values unpacked. The graph may additionally take in a row
-`#x` (appended to `#i`) and return the same row (appended to `#o`). The
-contained graph may thus be evaluated more than once.
+These provide tail-controlled loops. The dataflow sibling graph within the
+TailLoop-node defines the loop body: this computes a row of outputs, whose
+first element has type `TupleSum(#I, #O)` and the remainder is a row `#X`
+(perhaps empty). Inputs to the contained graph and to the TailLoop node itself
+are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
+inside the `TupleSum` unpacked).
+
+Evaluation of the node begins by feeding the node inputs into the child graph
+and evaluating it.  The `TupleSum` produced controls iteration of the loop:
+   * The first variant (`#I`) means that these values, along with the other
+     sibling-graph outputs `#X`, are fed back into the top of the loop,
+     and the body is evaluated again (thus perhaps many times)
+   * The second variant (`#O`) means that evaluation of the `TailLoop` node
+     terminates, returning all the values produced as a row of outputs `#O:#X`.
 
 ##### Control Flow Graphs
 
@@ -398,7 +405,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the DSG contained in a `BasicBlock` has type
-`Predicate(#t0,...#t(n-1))`, where the node has `n` successors, and the
+`TupleSum(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -424,7 +431,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Const" are simply generating a predicate with one empty
+The three nodes labelled "Const" are simply generating a TupleSum with one empty
 value to pass to the Output node.
 
 ```mermaid
@@ -1118,7 +1125,6 @@ run, which removes the `HigherOrder` extension requirement:
 ```
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
->>>>>>> c6abd39 ([doc] Tidy hugr specification)
 ```
 
 Before we can run the circuit.
@@ -1213,9 +1219,6 @@ It contains the following fields:
   - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
     the incoming ports to the new node.
 
-Note that in a `NewEdgeSpec` one of `SrcNode` and `TgtNode` is an existing node
-in the hugr and the other is a new node.
-
 The `Replace` method takes as input:
   - the ID of a container node $P$ in $\Gamma$;
   - a set $S$ of IDs of nodes that are children of $P$
@@ -1232,8 +1235,15 @@ The `Replace` method takes as input:
   - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
     $G$ and `SrcNode` in $\Gamma \setminus R$;
   - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus R$ (where `TgtNode` and `TgtPos` describe
-    an existing incoming edge of that kind from a node in $R$).
+    $G$ and `TgtNode` in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe
+    an existing incoming edge of that kind from a node in $R$.
+  - a list $\mu\_\textrm{new}$ of `NewEdgeSpec` which all have both `SrcNode` and `TgtNode`
+    in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
+    edge of that kind from a node in $R$.
+
+Note that considering all three $\mu$ lists together,
+   - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
+   - and similarly for `EdgeKind` == `Static`
 
 The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
    - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
@@ -1251,16 +1261,19 @@ The new hugr is then derived as follows:
     the existing edges are replaced.
 3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
     copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-    The target port must have an existing edge whose source is in $R$; this edge
-    is removed.
-4.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
+    For Value or Static edges, the target port must have an existing edge whose source is in $R$;
+    this edge is removed.
+4.  For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
+    between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
+    the target port must have an existing edge whose source is in $R$; this edge is removed.
+5.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
     For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
     target the next node in $N$. Stop if there are no more nodes in $N$.
     Add any remaining nodes in $N$ to the end of $P$'s list of children.
-5.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
+6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
-6.  Remove all nodes in $R$ and edges adjoining them.
+7.  Remove all nodes in $R$ and edges adjoining them.
 
 ##### Outlining methods
 
@@ -1377,8 +1390,8 @@ use an empty node in the replacement and have B map this node to the old
 one.
 
 We can, for example, implement “turning a Conditional-node with known
-predicate into a DFG-node” by a `Replace` where the Conditional (and its
-preceding predicate) is replaced by an empty DFG and the map B specifies
+TupleSum into a DFG-node” by a `Replace` where the Conditional (and its
+preceding TupleSum) is replaced by an empty DFG and the map B specifies
 the “good” child of the Conditional as the surrogate parent of the new
 DFG’s children. (If the good child was just an Op, we could either
 remove it and include it in the replacement, or – to avoid this overhead
@@ -1646,12 +1659,18 @@ Other operations:
 | `isub<N>`              | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                    |
 | `ineg<N>`              | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `imul<N>`              | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                 |
-| `idivmod_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
-| `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
-| `idiv_u<N,M>`          | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_u` but discarding the second output                                                                                                          |
-| `imod_u<N,M>`          | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_u` but discarding the first output                                                                                                           |
-| `idiv_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_s` but discarding the second output                                                                                                          |
-| `imod_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_s` but discarding the first output                                                                                                           |
+| `idivmod_checked_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
+| `idivmod_u<N,M>` | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
+| `idivmod_checked_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
+| `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
+| `idiv_checked_u<N,M>` ( \* )          | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_u` but discarding the second output                                                                                                          |
+| `idiv_u<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_u` but discarding the second output                                                                                                          |
+| `imod_checked_u<N,M>` ( \* )         | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_u` but discarding the first output                                                                                                           |
+| `imod_u<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_u` but discarding the first output                                                                                                           |
+| `idiv_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_s` but discarding the second output                                                                                                          |
+| `idiv_s<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_s` but discarding the second output                                                                                                          |
+| `imod_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_s` but discarding the first output                                                                                                           |
+| `imod_s<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_s` but discarding the first output                                                                                                           |
 | `iabs<N>`              | `int<N>`           | `int<N>`                           | convert signed to unsigned by taking absolute value                                                                                                      |
 | `iand<N>`              | `int<N>`, `int<N>` | `int<N>`                           | bitwise AND                                                                                                                                              |
 | `ior<N>`               | `int<N>`, `int<N>` | `int<N>`                           | bitwise OR                                                                                                                                               |
@@ -1721,7 +1740,7 @@ Note there are also `measurez: Qubit -> (i1, Qubit)` and on supported
 targets `reset: Qubit -> Qubit` operations to measure or reset a qubit
 without losing a handle to it.
 
-**Dynamic vs static allocation**
+#### Dynamic vs static allocation
 
 With these operations the programmer/front-end can request dynamic qubit
 allocation, and the compiler can add/remove/move these operations to use
@@ -1743,6 +1762,28 @@ in. The implicit bijection from input `Qubit` to output allows register
 allocation for all `Qubit` wires. 
 If further the program does not contain any `qalloc` or `qfree`
 operations we can state the program only uses `N` qubits.
+
+#### Angles
+
+The Quantum extension also defines a specialized `angle<N>` type which is used
+to express parameters of rotation gates. The type is parametrized by the
+_log-denominator_, which is an integer $N \in [0, 53]$; angles with
+log-denominator $N$ are multiples of $2 \pi / 2^N$, where the multiplier is an
+unsigned `int<N>` in the range $[0, 2^N]$. The maximum log-denominator $53$
+effectively gives the resolution of a `float64` value; but note that unlike
+`float64` all angle values are equatable and hashable; and two `angle<N>` that
+differ by a multiple of $2 \pi$ are _equal_.
+
+The following operations are defined:
+
+| Name           | Inputs     | Outputs    | Meaning |
+| -------------- | ---------- | ---------- | ------- |
+| `aconst<N, x>` | none       | `angle<N>` | const node producing angle $2 \pi x / 2^N$ (where $0 \leq x \lt 2^N$) |
+| `atrunc<M,N>`  | `angle<M>` | `angle<N>` | round `angle<M>` to `angle<N>`, where $M \geq N$, rounding down in $[0, 2\pi)$ if necessary |
+| `aconvert<M,N>`  | `angle<M>` | `Sum(angle<N>, ErrorType)` | convert `angle<M>` to `angle<N>`, returning an error if $M \gt N$ and exact conversion is impossible |
+| `aadd<M,N>`    | `angle<M>`, `angle<N>` | `angle<max(M,N)>` | add two angles |
+| `asub<M,N>`    | `angle<M>`, `angle<N>` | `angle<max(M,N)>` | subtract the second angle from the first |
+| `aneg<N>`      | `angle<N>` | `angle<N>` | negate an angle |
 
 ### Higher-order (Tierkreis) Extension
 

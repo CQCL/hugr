@@ -78,7 +78,7 @@ fn iunop_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     ))
 }
 
-fn idivmod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn idivmod_checked_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let intpair: TypeRow = vec![int_type(arg0.clone()), int_type(arg1.clone())].into();
     Ok(FunctionType::new(
@@ -87,7 +87,16 @@ fn idivmod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     ))
 }
 
-fn idiv_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn idivmod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    let [arg0, arg1] = collect_array(arg_values);
+    let intpair: TypeRow = vec![int_type(arg0.clone()), int_type(arg1.clone())].into();
+    Ok(FunctionType::new(
+        intpair.clone(),
+        vec![Type::new_tuple(intpair)],
+    ))
+}
+
+fn idiv_checked_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     Ok(FunctionType::new(
         vec![int_type(arg0.clone()), int_type(arg1.clone())],
@@ -95,11 +104,27 @@ fn idiv_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     ))
 }
 
-fn imod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn idiv_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    let [arg0, arg1] = collect_array(arg_values);
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone()), int_type(arg1.clone())],
+        vec![int_type(arg0.clone())],
+    ))
+}
+
+fn imod_checked_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     Ok(FunctionType::new(
         vec![int_type(arg0.clone()), int_type(arg1.clone())],
         vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])],
+    ))
+}
+
+fn imod_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+    let [arg0, arg1] = collect_array(arg_values);
+    Ok(FunctionType::new(
+        vec![int_type(arg0.clone()), int_type(arg1.clone())],
+        vec![int_type(arg1.clone())],
     ))
 }
 
@@ -313,9 +338,19 @@ pub fn extension() -> Extension {
         .unwrap();
     extension
         .add_op_custom_sig_simple(
-            "idivmod_u".into(),
+            "idivmod_checked_u".into(),
             "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 is an error)"
+                .to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            idivmod_checked_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            "idivmod_u".into(),
+            "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
+            q*m+r=n, 0<=r<m (m=0 will call panic)"
                 .to_owned(),
             vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
             idivmod_sig,
@@ -323,12 +358,30 @@ pub fn extension() -> Extension {
         .unwrap();
     extension
         .add_op_custom_sig_simple(
-            "idivmod_s".into(),
+            "idivmod_checked_s".into(),
             "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)"
                 .to_owned(),
             vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            idivmod_checked_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            "idivmod_s".into(),
+            "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
+            signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)"
+                .to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
             idivmod_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            "idiv_checked_u".into(),
+            "as idivmod_checked_u but discarding the second output".to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            idiv_checked_sig,
         )
         .unwrap();
     extension
@@ -341,10 +394,26 @@ pub fn extension() -> Extension {
         .unwrap();
     extension
         .add_op_custom_sig_simple(
+            "imod_checked_u".into(),
+            "as idivmod_checked_u but discarding the first output".to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            imod_checked_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
             "imod_u".into(),
             "as idivmod_u but discarding the first output".to_owned(),
             vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            idiv_sig,
+            imod_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            "idiv_checked_s".into(),
+            "as idivmod_checked_s but discarding the second output".to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            idiv_checked_sig,
         )
         .unwrap();
     extension
@@ -352,7 +421,15 @@ pub fn extension() -> Extension {
             "idiv_s".into(),
             "as idivmod_s but discarding the second output".to_owned(),
             vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            imod_sig,
+            idiv_sig,
+        )
+        .unwrap();
+    extension
+        .add_op_custom_sig_simple(
+            "imod_checked_s".into(),
+            "as idivmod_checked_s but discarding the first output".to_owned(),
+            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+            imod_checked_sig,
         )
         .unwrap();
     extension

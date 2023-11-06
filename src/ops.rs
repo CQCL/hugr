@@ -9,8 +9,8 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::hugr::PortIndex;
 use crate::types::{EdgeKind, FunctionType, SignatureDescription, Type};
+use crate::PortIndex;
 use crate::{Direction, Port};
 
 use portgraph::NodeIndex;

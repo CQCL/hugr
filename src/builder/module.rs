@@ -60,7 +60,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, ValidationError> {
-        self.0.infer_and_validate(extension_registry)?;
+        self.0.update_validate(extension_registry)?;
         Ok(self.0)
     }
 }
@@ -90,7 +90,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
         self.hugr_mut().replace_op(
             f_node,
-            NodeType::pure(ops::FuncDefn {
+            NodeType::new_pure(ops::FuncDefn {
                 name,
                 signature: signature.clone(),
             }),
