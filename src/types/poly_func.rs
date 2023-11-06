@@ -91,6 +91,7 @@ impl PolyFuncType {
         }
     }
 
+    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders
     pub(crate) fn instantiate(
         &self,
         args: &[TypeArg],
@@ -117,6 +118,12 @@ impl PolyFuncType {
         })
     }
 
+    /// Instantiates an outer [PolyFuncType], i.e. with no free variables
+    /// (as ensured by [Self::validate]), into a monomorphic type.
+    ///
+    /// # Errors
+    /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
+    /// or an arg does not fit into its corresponding [TypeParam]
     pub(crate) fn instantiate_all(
         &self,
         args: &[TypeArg],
@@ -135,6 +142,8 @@ impl PartialEq<FunctionType> for PolyFuncType {
     }
 }
 
+/// A [Substitution] with a finite list of known values.
+/// (Variables out of the range of the list will result in a panic)
 struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> Substitution for SubstValues<'a> {
@@ -152,6 +161,8 @@ impl<'a> Substitution for SubstValues<'a> {
     }
 }
 
+/// A [Substitution] that renumbers any type variable to another (of the same kind)
+/// with a index increased by a fixed `usize``.
 struct Renumber<'a> {
     offset: usize,
     exts: &'a ExtensionRegistry,
@@ -170,19 +181,22 @@ impl<'a> Substitution for Renumber<'a> {
 /// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
 struct InsideBinders<'a> {
+    /// The number of binders we have entered since (beneath where) we started to apply
+    /// [Self::underlying]). (Thus, all variable indices `< skip_lowest` have been bound since.)
     skip_lowest: usize,
+    /// Substitution that was being applied outside those binders (i.e. in outer scope)
     underlying: &'a dyn Substitution,
 }
 
 impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        // Don't touch the first <self.0> variables
+        // Don't touch the first <self.0> variables: `underlying` does not refer to or know about these
         if idx < self.skip_lowest {
             return TypeArg::new_var_use(idx, decl.clone());
         }
+        // Transform variable index into same scope (frame of reference) as when `underlying` was declared
         let result_in_outer_scope = self.underlying.apply_var(idx - self.skip_lowest, decl);
-        // Make returned value (from underlying substitution, outside the
-        // new binders) avoid the variables newly bound
+        // Transform returned value into the current scope, i.e. avoid the variables newly bound
         result_in_outer_scope.substitute(&Renumber {
             offset: self.skip_lowest,
             exts: self.extension_registry(),

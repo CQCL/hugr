@@ -332,13 +332,19 @@ impl Type {
     }
 }
 
+/// A function that replaces type variables with values.
+/// (The values depend upon the implementation, to allow dynamic computation;
+/// and [Substitution] deals only with type variables, other/containing types/typeargs
+/// are handled by [Type::substitute], [TypeArg::substitute] and friends.)
 pub(crate) trait Substitution {
+    /// Apply to a variable of kind [TypeParam::Type]
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
         let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
             else {panic!("Variable was not a type - try validate() first")};
         ty
     }
 
+    /// Apply to a variable whose kind is any given [TypeParam]
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
     fn extension_registry(&self) -> &ExtensionRegistry;

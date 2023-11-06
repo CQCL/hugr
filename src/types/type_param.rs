@@ -38,8 +38,11 @@ impl UpperBound {
     }
 }
 
-/// A parameter declared by an OpDef. Specifies a value
-/// that must be provided by each operation node.
+/// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] (e.g. [OpDef]),
+/// specifying a value that may (resp. must) be provided to instantiate it.
+///
+/// [PolyFuncType]: super::PolyFuncType
+/// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
