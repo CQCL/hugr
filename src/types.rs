@@ -339,8 +339,9 @@ impl Type {
 pub(crate) trait Substitution {
     /// Apply to a variable of kind [TypeParam::Type]
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound))
-            else {panic!("Variable was not a type - try validate() first")};
+        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound)) else {
+            panic!("Variable was not a type - try validate() first")
+        };
         ty
     }
 
