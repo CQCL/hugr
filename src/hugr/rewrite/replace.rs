@@ -442,6 +442,9 @@ impl std::fmt::Display for WhichHugr {
 mod test {
     use std::collections::HashMap;
 
+    use itertools::Itertools;
+
+    use crate::algorithm::nest_cfgs::test::depth;
     use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
@@ -494,6 +497,26 @@ mod test {
         cfg.branch(&bb2, 0, &exit)?;
 
         let mut h = cfg.finish_hugr(&reg).unwrap();
+        {
+            let pop = find_node(&h, "pop");
+            let push = find_node(&h, "push");
+            assert_eq!(depth(&h, pop), 2); // BB, CFG
+            assert_eq!(depth(&h, push), 2);
+
+            let popp = h.get_parent(pop).unwrap();
+            let pushp = h.get_parent(push).unwrap();
+            assert_ne!(popp, pushp); // Two different BBs
+            assert!(matches!(
+                h.get_optype(popp),
+                OpType::BasicBlock(BasicBlock::DFB { .. })
+            ));
+            assert!(matches!(
+                h.get_optype(pushp),
+                OpType::BasicBlock(BasicBlock::DFB { .. })
+            ));
+
+            assert_eq!(h.get_parent(popp).unwrap(), h.get_parent(pushp).unwrap());
+        }
 
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
@@ -561,7 +584,35 @@ mod test {
             mu_new: vec![],
         })?;
         h.update_validate(&reg)?;
+        {
+            let pop = find_node(&h, "pop");
+            let push = find_node(&h, "push");
+            assert_eq!(depth(&h, pop), 3); // DFG, BB, CFG
+            assert_eq!(depth(&h, push), 3);
+
+            let popp = h.get_parent(pop).unwrap();
+            let pushp = h.get_parent(push).unwrap();
+            assert_ne!(popp, pushp); // Two different DFGs
+            assert!(matches!(h.get_optype(popp), OpType::DFG(_)));
+            assert!(matches!(h.get_optype(pushp), OpType::DFG(_)));
+
+            let grandp = h.get_parent(popp).unwrap();
+            assert_eq!(grandp, h.get_parent(pushp).unwrap());
+            assert!(matches!(
+                h.get_optype(grandp),
+                OpType::BasicBlock(BasicBlock::DFB { .. })
+            ));
+        }
+
         Ok(())
+    }
+
+    fn find_node(h: &Hugr, s: &str) -> crate::Node {
+        h.nodes()
+            .filter(|n| format!("{:?}", h.get_optype(*n)).contains(s))
+            .exactly_one()
+            .ok()
+            .unwrap()
     }
 
     fn single_node_block<T: AsRef<Hugr> + AsMut<Hugr>>(
