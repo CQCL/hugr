@@ -6,10 +6,7 @@ use crate::{
 };
 use itertools::Itertools;
 
-use super::{
-    type_param::{check_type_args, TypeArg, TypeParam},
-    Type, TypeBound,
-};
+use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::{FunctionType, Substitution};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
@@ -72,14 +69,6 @@ impl VarIdx {
 
     fn in_outer_scope(&self, num_binders: usize) -> Option<Self> {
         self.0.checked_sub(num_binders).map(VarIdx)
-    }
-
-    fn as_typearg(&self, decl: TypeParam) -> TypeArg {
-        TypeArg::new_var_use(self.0, decl)
-    }
-
-    pub(super) fn as_type(&self, bound: TypeBound) -> Type {
-        Type::new_var_use(self.0, bound)
     }
 
     pub(super) fn index<'a, T>(&self, elems: &'a [T]) -> Option<&'a T> {
@@ -244,7 +233,7 @@ struct InsideBinders<'a> {
 impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
         match idx.in_outer_scope(self.skip_lowest) {
-            None => idx.as_typearg(decl.clone()), // Bound locally, unknown to `underlying`
+            None => TypeArg::new_var_use(idx.0, decl.clone()), // Bound locally, unknown to `underlying`
             Some(idx_in_outer_scope) => {
                 let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
                 // Transform returned value into the current scope, i.e. avoid the variables newly bound

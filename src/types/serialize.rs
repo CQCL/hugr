@@ -54,7 +54,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Array { inner, len } => array_type((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
-            SerSimpleType::V { i, b } => i.as_type(b),
+            SerSimpleType::V { i, b } => Type::new_var_use(i.0, b),
         }
     }
 }
