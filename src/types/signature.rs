@@ -234,7 +234,10 @@ impl Display for Signature {
 
 #[cfg(test)]
 mod test {
-    use crate::{extension::prelude::USIZE_T, type_row};
+    use crate::{
+        extension::{prelude::USIZE_T, ExtensionId},
+        type_row,
+    };
 
     use super::*;
     #[test]
@@ -257,5 +260,25 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
+    }
+
+    #[test]
+    fn test_signature() {
+        let f_type = FunctionType::new(type_row![Type::UNIT], type_row![USIZE_T]);
+
+        let sig: Signature = f_type.pure();
+
+        assert_eq!(sig.input(), &type_row![Type::UNIT]);
+        assert_eq!(sig.output(), &type_row![USIZE_T]);
+    }
+
+    #[test]
+    fn test_display() {
+        let f_type = FunctionType::new(type_row![Type::UNIT], type_row![USIZE_T]);
+        assert_eq!(f_type.to_string(), "[Tuple([])] -> [[]][usize([])]");
+        let sig: Signature = f_type.with_input_extensions(ExtensionSet::singleton(
+            &ExtensionId::new("Example").unwrap(),
+        ));
+        assert_eq!(sig.to_string(), "[Tuple([])] -> [[]][usize([])]");
     }
 }
