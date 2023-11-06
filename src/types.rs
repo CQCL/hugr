@@ -268,7 +268,7 @@ impl Type {
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(
-            TypeEnum::Prim(PrimType::Variable(VarIdx::new(idx), bound)),
+            TypeEnum::Prim(PrimType::Variable(VarIdx(idx), bound)),
             bound,
         )
     }

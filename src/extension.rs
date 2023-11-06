@@ -406,7 +406,7 @@ fn as_typevar(e: &ExtensionId) -> Option<VarIdx> {
     // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
     // we assume it must be a type variable, and fail fast if it isn't.
     match e.chars().next() {
-        Some(c) if c.is_ascii_digit() => Some(VarIdx::new(str::parse(e).unwrap())),
+        Some(c) if c.is_ascii_digit() => Some(VarIdx::from_str(e).unwrap()),
         _ => None,
     }
 }

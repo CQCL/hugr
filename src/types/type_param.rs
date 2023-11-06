@@ -143,7 +143,7 @@ impl TypeArg {
     /// with the specified DeBruijn index. For use within type schemes only:
     /// `bound` must match that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
-        let v = VarIdx::new(idx);
+        let v = VarIdx(idx);
         match decl {
             TypeParam::Type(b) => TypeArg::Type {
                 ty: Type::new_var_use(idx, b),

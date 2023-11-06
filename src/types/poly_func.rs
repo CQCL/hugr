@@ -1,5 +1,7 @@
 //! Polymorphic Function Types
 
+use std::num::ParseIntError;
+
 use crate::{
     extension::{ExtensionRegistry, SignatureError},
     types::type_param::check_type_arg,
@@ -62,11 +64,9 @@ impl From<FunctionType> for PolyFuncType {
 pub struct VarIdx(pub(super) usize);
 
 impl VarIdx {
-    /// Constructor, given DeBruijn index
-    pub const fn new(idx: usize) -> Self {
-        Self(idx)
+    pub(crate) fn from_str(s: &str) -> Result<Self, ParseIntError> {
+        str::parse(s).map(Self)
     }
-
     fn in_outer_scope(&self, num_binders: usize) -> Option<Self> {
         self.0.checked_sub(num_binders).map(VarIdx)
     }
@@ -381,7 +381,7 @@ pub(crate) mod test {
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
-                idx: VarIdx::new(0),
+                idx: VarIdx(0),
                 num_decls: 0
             })
         );
