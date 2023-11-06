@@ -152,7 +152,8 @@ impl Replacement {
             .map_err(|ex_one| ReplaceError::MultipleParents(ex_one.flatten().collect()))?
             .ok_or(ReplaceError::CantReplaceRoot)?; // If no parent
 
-        // Check replacement parent is of same tag. Should we require exactly OpType equality?
+        // Check replacement parent is of same tag. Note we do not require exact equality
+        // of OpType/Signature, e.g. to ease changing of Input/Output node signatures too. 
         let expected = h.get_optype(parent).tag();
         let actual = self.replacement.root_type().tag();
         if expected != actual {
