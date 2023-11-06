@@ -153,11 +153,14 @@ impl Replacement {
             .ok_or(ReplaceError::CantReplaceRoot)?; // If no parent
 
         // Check replacement parent is of same tag. Note we do not require exact equality
-        // of OpType/Signature, e.g. to ease changing of Input/Output node signatures too. 
-        let expected = h.get_optype(parent).tag();
-        let actual = self.replacement.root_type().tag();
-        if expected != actual {
-            return Err(ReplaceError::WrongRootNodeTag { expected, actual });
+        // of OpType/Signature, e.g. to ease changing of Input/Output node signatures too.
+        let removed = h.get_optype(parent).tag();
+        let replacement = self.replacement.root_type().tag();
+        if removed != replacement {
+            return Err(ReplaceError::WrongRootNodeTag {
+                removed,
+                replacement,
+            });
         };
         Ok(parent)
     }
@@ -391,9 +394,13 @@ pub enum ReplaceError {
     #[error("Removed nodes had different parents {0:?}")]
     MultipleParents(Vec<Node>),
     /// Replacement root node had different tag from parent of removed nodes
-    #[error("Expected replacement root with tag {expected} but found {actual}")]
-    #[allow(missing_docs)]
-    WrongRootNodeTag { expected: OpTag, actual: OpTag },
+    #[error("Expected replacement root with tag {removed} but found {replacement}")]
+    WrongRootNodeTag {
+        /// The tag of the parent of the removed nodes
+        removed: OpTag,
+        /// The tag of the root in the replacement Hugr
+        replacement: OpTag,
+    },
     /// Values in transfer map were not unique - contains the repeated elements
     #[error("Nodes cannot be transferred to multiple locations: {0:?}")]
     ConflictingTransfers(Vec<Node>),
