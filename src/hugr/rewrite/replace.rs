@@ -176,7 +176,7 @@ impl Replacement {
         })?;
         let mut transferred: HashSet<Node> = self.adoptions.values().copied().collect();
         if transferred.len() != self.adoptions.values().len() {
-            return Err(ReplaceError::ConflictingTransfers(
+            return Err(ReplaceError::TransfersNotSeparateDescendants(
                 self.adoptions
                     .values()
                     .filter(|v| !transferred.remove(v))
@@ -401,9 +401,6 @@ pub enum ReplaceError {
         /// The tag of the root in the replacement Hugr
         replacement: OpTag,
     },
-    /// Values in transfer map were not unique - contains the repeated elements
-    #[error("Nodes cannot be transferred to multiple locations: {0:?}")]
-    ConflictingTransfers(Vec<Node>),
     /// Keys in transfer map were not valid container nodes in replacement
     #[error("Node {0:?} was not an empty container node in the replacement")]
     InvalidTransferTarget(Node),
