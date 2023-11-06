@@ -500,7 +500,7 @@ mod test {
 
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
-        let mut replacement = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()),
         }));
         let r_bb = replacement.add_op_with_parent(
@@ -538,11 +538,11 @@ mod test {
                     types: just_list.clone(),
                 },
             )?;
-            let out = replacement.add_node_before(
+            let out = replacement.add_op_before(
                 r_df1,
-                NodeType::open_extensions(ops::Output {
+                ops::Output {
                     types: simple_unary_plus(just_list),
-                }),
+                },
             )?;
             replacement.connect(inp, 0, r_df1, 0)?;
             replacement.connect(r_df2, 0, out, 0)?;
