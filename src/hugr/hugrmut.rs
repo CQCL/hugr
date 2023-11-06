@@ -37,7 +37,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Node,
         op: impl Into<OpType>,
     ) -> Result<Node, HugrError> {
-        self.add_node_with_parent(parent, NodeType::open_extensions(op))
+        self.add_node_with_parent(parent, NodeType::new_auto(op))
     }
 
     /// Add a node to the graph with a parent in the hierarchy.
@@ -217,7 +217,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
     }
 
     fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.add_node_before(sibling, NodeType::open_extensions(op))
+        self.add_node_before(sibling, NodeType::new_auto(op))
     }
 
     fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
@@ -620,7 +620,7 @@ mod test {
 
         {
             let f_in = hugr
-                .add_node_with_parent(f, NodeType::pure(ops::Input::new(type_row![NAT])))
+                .add_node_with_parent(f, NodeType::new_pure(ops::Input::new(type_row![NAT])))
                 .unwrap();
             let f_out = hugr
                 .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))

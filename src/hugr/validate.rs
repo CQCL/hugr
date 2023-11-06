@@ -853,7 +853,7 @@ mod test {
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
         );
         b.set_parent(other, root).unwrap();
-        b.replace_op(other, NodeType::pure(declare_op)).unwrap();
+        b.replace_op(other, NodeType::new_pure(declare_op)).unwrap();
         b.add_ports(other, Direction::Outgoing, 1);
         assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
@@ -872,7 +872,7 @@ mod test {
     fn leaf_root() {
         let leaf_op: OpType = LeafOp::Noop { ty: USIZE_T }.into();
 
-        let b = Hugr::new(NodeType::pure(leaf_op));
+        let b = Hugr::new(NodeType::new_pure(leaf_op));
         assert_eq!(b.validate(&EMPTY_REG), Ok(()));
     }
 
@@ -883,7 +883,7 @@ mod test {
         }
         .into();
 
-        let mut b = Hugr::new(NodeType::pure(dfg_op));
+        let mut b = Hugr::new(NodeType::new_pure(dfg_op));
         let root = b.root();
         add_df_children(&mut b, root, 1);
         assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
@@ -956,7 +956,7 @@ mod test {
             .unwrap();
 
         // Replace the output operation of the df subgraph with a copy
-        b.replace_op(output, NodeType::pure(LeafOp::Noop { ty: NAT }))
+        b.replace_op(output, NodeType::new_pure(LeafOp::Noop { ty: NAT }))
             .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
@@ -964,8 +964,11 @@ mod test {
         );
 
         // Revert it back to an output, but with the wrong number of ports
-        b.replace_op(output, NodeType::pure(ops::Output::new(type_row![BOOL_T])))
-            .unwrap();
+        b.replace_op(
+            output,
+            NodeType::new_pure(ops::Output::new(type_row![BOOL_T])),
+        )
+        .unwrap();
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
@@ -973,14 +976,14 @@ mod test {
         );
         b.replace_op(
             output,
-            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+            NodeType::new_pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
         )
         .unwrap();
 
         // After fixing the output back, replace the copy with an output op
         b.replace_op(
             copy,
-            NodeType::pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
+            NodeType::new_pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
         )
         .unwrap();
         assert_matches!(
@@ -1007,7 +1010,7 @@ mod test {
         b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,
-            NodeType::pure(ops::CFG {
+            NodeType::new_pure(ops::CFG {
                 signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
         )
@@ -1063,7 +1066,7 @@ mod test {
         // Change the types in the BasicBlock node to work on qubits instead of bits
         b.replace_op(
             block,
-            NodeType::pure(ops::BasicBlock::DFB {
+            NodeType::new_pure(ops::BasicBlock::DFB {
                 inputs: type_row![Q],
                 tuple_sum_rows: vec![type_row![]],
                 other_outputs: type_row![Q],
@@ -1074,11 +1077,14 @@ mod test {
         let mut block_children = b.hierarchy.children(block.pg_index());
         let block_input = block_children.next().unwrap().into();
         let block_output = block_children.next_back().unwrap().into();
-        b.replace_op(block_input, NodeType::pure(ops::Input::new(type_row![Q])))
-            .unwrap();
+        b.replace_op(
+            block_input,
+            NodeType::new_pure(ops::Input::new(type_row![Q])),
+        )
+        .unwrap();
         b.replace_op(
             block_output,
-            NodeType::pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
+            NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
         )
         .unwrap();
         assert_matches!(
@@ -1310,12 +1316,12 @@ mod test {
         let main_signature =
             FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: main_signature,
         }));
         let input = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Input {
+            NodeType::new_pure(ops::Input {
                 types: type_row![NAT],
             }),
         )?;
