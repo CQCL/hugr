@@ -445,10 +445,16 @@ mod test {
     use itertools::Itertools;
 
     use crate::algorithm::nest_cfgs::test::depth;
-    use crate::builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder};
-    use crate::extension::prelude::USIZE_T;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::builder::{
+        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, SubContainer,
+    };
+    use crate::extension::prelude::{BOOL_T, USIZE_T};
+    use crate::extension::{
+        ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
+    };
     use crate::hugr::{HugrMut, NodeType};
+    use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, BasicBlock, LeafOp, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
@@ -645,5 +651,42 @@ mod test {
         let mut v = t.into_owned();
         v.insert(0, Type::new_unit_sum(1));
         v.into()
+    }
+
+    #[test]
+    fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
+        let utou = FunctionType::new_linear(vec![USIZE_T]);
+        let mk_op = |s| {
+            LeafOp::from(ExternalOp::Opaque(OpaqueOp::new(
+                ExtensionId::new("unknown_ext").unwrap(),
+                s,
+                String::new(),
+                vec![],
+                Some(utou.clone()),
+            )))
+        };
+        let mut h = DFGBuilder::new(FunctionType::new(
+            type_row![USIZE_T, BOOL_T],
+            type_row![USIZE_T],
+        ))?;
+        let [i, b] = h.input_wires_arr();
+        let mut cond = h.conditional_builder(
+            (vec![type_row![]; 2], b),
+            [(USIZE_T, i)],
+            type_row![USIZE_T],
+            ExtensionSet::new(),
+        )?;
+        let mut case_t = cond.case_builder(0)?;
+        let foo = case_t.add_dataflow_op(mk_op("foo"), case_t.input_wires())?;
+        case_t.finish_with_outputs(foo.outputs())?;
+        let mut case_f = cond.case_builder(1)?;
+        let bar = case_f.add_dataflow_op(mk_op("bar"), case_f.input_wires())?;
+        let mut baz_dfg = case_f.dfg_builder(utou.clone(), None, bar.outputs())?;
+        let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
+        let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
+        case_f.finish_with_outputs(baz_dfg.outputs())?;
+        let cond = cond.finish_sub_container()?;
+        let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
+        Ok(())
     }
 }
