@@ -93,7 +93,10 @@ impl PolyFuncType {
         }
     }
 
-    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders
+    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
+    /// Note that indices into `args` correspond to the same index within [Self::params],
+    /// so we instantiate the lowest-index [Self::params] first, even though these
+    /// would be considered "innermost" / "closest" according to DeBruijn numbering.
     pub(crate) fn instantiate(
         &self,
         args: &[TypeArg],
