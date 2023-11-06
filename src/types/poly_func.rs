@@ -190,17 +190,18 @@ struct InsideBinders<'a> {
 
 impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        // Don't touch the first <self.0> variables: `underlying` does not refer to or know about these
-        if idx < self.skip_lowest {
-            return TypeArg::new_var_use(idx, decl.clone());
+        // Convert variable index into outer scope
+        match idx.checked_sub(self.skip_lowest) {
+            None => TypeArg::new_var_use(idx, decl.clone()), // Bound locally, unknown to `underlying`
+            Some(idx_in_outer_scope) => {
+                let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
+                // Transform returned value into the current scope, i.e. avoid the variables newly bound
+                result_in_outer_scope.substitute(&Renumber {
+                    offset: self.skip_lowest,
+                    exts: self.extension_registry(),
+                })
+            }
         }
-        // Transform variable index into same scope (frame of reference) as when `underlying` was declared
-        let result_in_outer_scope = self.underlying.apply_var(idx - self.skip_lowest, decl);
-        // Transform returned value into the current scope, i.e. avoid the variables newly bound
-        result_in_outer_scope.substitute(&Renumber {
-            offset: self.skip_lowest,
-            exts: self.extension_registry(),
-        })
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
