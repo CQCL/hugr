@@ -454,7 +454,7 @@ mod test {
         );
 
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
-        let bad_nodetype = NodeType::open_extensions(crate::ops::CFG { signature });
+        let bad_nodetype = NodeType::new_open(crate::ops::CFG { signature });
         assert_eq!(
             sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
             Err(HugrError::InvalidTag {
@@ -471,7 +471,7 @@ mod test {
     #[rstest]
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
-        let case_nodetype = NodeType::open_extensions(crate::ops::Case {
+        let case_nodetype = NodeType::new_open(crate::ops::Case {
             signature: simple_dfg_hugr.root_type().op_signature(),
         });
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();

@@ -298,12 +298,6 @@ impl UnificationContext {
                         Constraint::Plus(delta, m_input)
                     };
                     self.add_constraint(m_output, c);
-                    if matches!(
-                        node_type.tag(),
-                        OpTag::Alias | OpTag::Function | OpTag::FuncDefn
-                    ) {
-                        self.add_solution(m_input, ExtensionSet::new());
-                    }
                 }
                 // We have a solution for everything!
                 Some(sig) => {
@@ -705,7 +699,7 @@ mod test {
             signature: main_sig,
         };
 
-        let root_node = NodeType::open_extensions(op);
+        let root_node = NodeType::new_open(op);
         let mut hugr = Hugr::new(root_node);
 
         let input = ops::Input::new(type_row![NAT, NAT]);
@@ -821,21 +815,21 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&ExtensionSet::singleton(&A)),
         }));
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Input {
+            NodeType::new_pure(ops::Input {
                 types: type_row![NAT],
             }),
         )?;
 
         let output = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Output {
+            NodeType::new_pure(ops::Output {
                 types: type_row![NAT],
             }),
         )?;
@@ -1037,7 +1031,7 @@ mod test {
             extension_delta: rs.clone(),
         };
 
-        let mut hugr = Hugr::new(NodeType::pure(op));
+        let mut hugr = Hugr::new(NodeType::new_pure(op));
         let conditional_node = hugr.root();
 
         let case_op = ops::Case {
@@ -1072,7 +1066,7 @@ mod test {
     fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
         let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::DFG {
             signature: df_sig
                 .clone()
                 .with_extension_delta(&ExtensionSet::from_iter([A, B])),
@@ -1243,7 +1237,7 @@ mod test {
         let b = ExtensionSet::singleton(&B);
         let c = ExtensionSet::singleton(&C);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&abc),
         }));
 
@@ -1341,7 +1335,7 @@ mod test {
     ///             +--------------------+
     #[test]
     fn multi_entry() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
         }));
         let cfg = hugr.root();
@@ -1424,7 +1418,7 @@ mod test {
     ) -> Result<Hugr, Box<dyn Error>> {
         let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&hugr_delta),
         }));
