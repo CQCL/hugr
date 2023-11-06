@@ -35,7 +35,7 @@ impl From<Type> for SerSimpleType {
                 PrimType::Extension(c) => SerSimpleType::Opaque(c),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
                 PrimType::Function(sig) => SerSimpleType::G(sig),
-                PrimType::Variable(i, b) => SerSimpleType::V { i, b },
+                PrimType::Variable(i, b) => SerSimpleType::V { i: i.into(), b },
             },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },

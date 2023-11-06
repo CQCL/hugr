@@ -26,7 +26,7 @@ use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
-pub use self::primitive::PrimType;
+pub use self::primitive::{PrimType, VarIdx};
 use self::type_param::TypeParam;
 
 #[cfg(feature = "pyo3")]
@@ -267,7 +267,10 @@ impl Type {
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
+        Self(
+            TypeEnum::Prim(PrimType::Variable(VarIdx::new(idx), bound)),
+            bound,
+        )
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -338,7 +341,7 @@ impl Type {
 /// are handled by [Type::substitute], [TypeArg::substitute] and friends.)
 pub(crate) trait Substitution {
     /// Apply to a variable of kind [TypeParam::Type]
-    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
+    fn apply_typevar(&self, idx: VarIdx, bound: TypeBound) -> Type {
         let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound)) else {
             panic!("Variable was not a type - try validate() first")
         };
@@ -346,7 +349,7 @@ pub(crate) trait Substitution {
     }
 
     /// Apply to a variable whose kind is any given [TypeParam]
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
+    fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg;
 
     fn extension_registry(&self) -> &ExtensionRegistry;
 }
@@ -362,10 +365,10 @@ fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
 
 pub(crate) fn check_typevar_decl(
     decls: &[TypeParam],
-    idx: usize,
+    idx: VarIdx,
     cached_decl: &TypeParam,
 ) -> Result<(), SignatureError> {
-    match decls.get(idx) {
+    match decls.get(usize::from(idx)) {
         None => Err(SignatureError::FreeTypeVar {
             idx,
             num_decls: decls.len(),

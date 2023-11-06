@@ -12,6 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
+use super::VarIdx;
 use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -133,7 +134,7 @@ pub enum TypeArg {
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TypeArgVariable {
-    idx: usize,
+    idx: VarIdx,
     cached_decl: TypeParam,
 }
 
@@ -142,16 +143,17 @@ impl TypeArg {
     /// with the specified DeBruijn index. For use within type schemes only:
     /// `bound` must match that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
+        let v = VarIdx::new(idx);
         match decl {
             TypeParam::Type(b) => TypeArg::Type {
                 ty: Type::new_var_use(idx, b),
             },
             TypeParam::Extensions => TypeArg::Extensions {
-                es: ExtensionSet::type_var(idx),
+                es: ExtensionSet::type_var(v),
             },
             _ => TypeArg::Variable {
                 v: TypeArgVariable {
-                    idx,
+                    idx: v,
                     cached_decl: decl,
                 },
             },

@@ -6,7 +6,10 @@ use crate::{
 };
 use itertools::Itertools;
 
-use super::type_param::{check_type_args, TypeArg, TypeParam};
+use super::{
+    type_param::{check_type_args, TypeArg, TypeParam},
+    VarIdx,
+};
 use super::{FunctionType, Substitution};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
@@ -157,10 +160,10 @@ impl PartialEq<FunctionType> for PolyFuncType {
 struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> Substitution for SubstValues<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+    fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
-            .get(idx)
+            .get(usize::from(idx))
             .expect("Undeclared type variable - call validate() ?");
         debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
         arg.clone()
@@ -179,8 +182,8 @@ struct Renumber<'a> {
 }
 
 impl<'a> Substitution for Renumber<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        TypeArg::new_var_use(idx + self.offset, decl.clone())
+    fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
+        (idx + self.offset).as_typearg(decl.clone())
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
@@ -199,10 +202,9 @@ struct InsideBinders<'a> {
 }
 
 impl<'a> Substitution for InsideBinders<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        // Convert variable index into outer scope
-        match idx.checked_sub(self.skip_lowest) {
-            None => TypeArg::new_var_use(idx, decl.clone()), // Bound locally, unknown to `underlying`
+    fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
+        match idx.in_outer_scope(self.skip_lowest) {
+            None => idx.as_typearg(decl.clone()), // Bound locally, unknown to `underlying`
             Some(idx_in_outer_scope) => {
                 let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
                 // Transform returned value into the current scope, i.e. avoid the variables newly bound
@@ -231,7 +233,7 @@ pub(crate) mod test {
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{CustomType, FunctionType, Type, TypeBound};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound, VarIdx};
     use crate::Extension;
 
     use super::PolyFuncType;
@@ -350,7 +352,7 @@ pub(crate) mod test {
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
-                idx: 0,
+                idx: VarIdx::new(0),
                 num_decls: 0
             })
         );
@@ -561,16 +563,16 @@ pub(crate) mod test {
 
         // Now substitute in a free var from further outside
         let reg = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
-        const FREE: usize = 3;
+        const FREE: VarIdx = VarIdx::new(3);
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = outer
-            .instantiate_all(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
+            .instantiate_all(&[FREE.as_typearg(TP_EQ)], &reg)
             .unwrap();
         assert_eq!(
             res,
             // F -> forall C. (C -> List(Tuple(C, F)))
             FunctionType::new(
-                vec![Type::new_var_use(FREE, TypeBound::Eq)],
+                vec![FREE.as_type(TypeBound::Eq)],
                 vec![Type::new_function(new_pf1(
                     TypeParam::Type(TypeBound::Copyable),
                     Type::new_var_use(0, TypeBound::Copyable), // unchanged
@@ -578,20 +580,20 @@ pub(crate) mod test {
                         Type::new_var_use(0, TypeBound::Copyable),
                         // Next is the free variable that we substituted in (hence Eq)
                         // - renumbered because of the intervening forall (Copyable)
-                        Type::new_var_use(FREE + 1, TypeBound::Eq)
+                        (FREE + 1).as_type(TypeBound::Eq)
                     )
                 ))]
             )
         );
 
         // Also try substituting in a type containing both free and bound vars
-        let rhs = |i| {
+        let rhs = |i: VarIdx| {
             Type::new_function(new_pf1(
                 TP_EQ,
                 Type::new_var_use(0, TypeBound::Eq),
                 new_array(
                     Type::new_var_use(0, TypeBound::Eq),
-                    TypeArg::new_var_use(i, TypeParam::max_nat()),
+                    i.as_typearg(TypeParam::max_nat()),
                 ),
             ))
         };

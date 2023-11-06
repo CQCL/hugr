@@ -16,7 +16,7 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
+use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound, VarIdx};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -99,7 +99,7 @@ pub enum SignatureError {
     },
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
-    FreeTypeVar { idx: usize, num_decls: usize },
+    FreeTypeVar { idx: VarIdx, num_decls: usize },
     /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
     /// [ExtensionRegistry].
     ///
@@ -326,7 +326,7 @@ impl ExtensionSet {
     }
 
     /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
-    pub fn insert_type_var(&mut self, idx: usize) {
+    pub fn insert_type_var(&mut self, idx: VarIdx) {
         // Represent type vars as string representation of DeBruijn index.
         // This is not a legal IdentList or ExtensionId so should not conflict.
         self.0
@@ -357,7 +357,7 @@ impl ExtensionSet {
 
     /// An ExtensionSet containing a single type variable
     /// (which must have been declared as a [TypeParam::Extensions])
-    pub fn type_var(idx: usize) -> Self {
+    pub fn type_var(idx: VarIdx) -> Self {
         let mut set = Self::new();
         set.insert_type_var(idx);
         set
@@ -401,12 +401,12 @@ impl ExtensionSet {
     }
 }
 
-fn as_typevar(e: &ExtensionId) -> Option<usize> {
+fn as_typevar(e: &ExtensionId) -> Option<VarIdx> {
     // Type variables are represented as radix-10 numbers, which are illegal
     // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
     // we assume it must be a type variable, and fail fast if it isn't.
     match e.chars().next() {
-        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
+        Some(c) if c.is_ascii_digit() => Some(VarIdx::new(str::parse(e).unwrap())),
         _ => None,
     }
 }
