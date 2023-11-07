@@ -172,11 +172,11 @@ impl Replacement {
                 && self.replacement.get_optype(n).is_container()
                 && self.replacement.children(n).next().is_none())
             .then_some(())
-            .ok_or(ReplaceError::InvalidTransferTarget(n))
+            .ok_or(ReplaceError::InvalidAdoptingParent(n))
         })?;
         let mut transferred: HashSet<Node> = self.adoptions.values().copied().collect();
         if transferred.len() != self.adoptions.values().len() {
-            return Err(ReplaceError::TransfersNotSeparateDescendants(
+            return Err(ReplaceError::AdopteesNotSeparateDescendants(
                 self.adoptions
                     .values()
                     .filter(|v| !transferred.remove(v))
@@ -195,7 +195,7 @@ impl Replacement {
             }
         }
         if !transferred.is_empty() {
-            return Err(ReplaceError::TransfersNotSeparateDescendants(
+            return Err(ReplaceError::AdopteesNotSeparateDescendants(
                 transferred.into_iter().collect(),
             ));
         }
@@ -401,13 +401,13 @@ pub enum ReplaceError {
         /// The tag of the root in the replacement Hugr
         replacement: OpTag,
     },
-    /// Keys in transfer map were not valid container nodes in replacement
+    /// Keys in [Replacement::adoptions] were not valid container nodes in [Replacement::replacement]
     #[error("Node {0:?} was not an empty container node in the replacement")]
-    InvalidTransferTarget(Node),
-    /// Some values in the transfer map were either descendants of other values,
-    /// or not descendants of the removed nodes
+    InvalidAdoptingParent(Node),
+    /// Some values in [Replacement::adoptions] were either descendants of other values,
+    /// or not descendants of the [Replacement::removal]
     #[error("Nodes not free to be moved into new locations: {0:?}")]
-    TransfersNotSeparateDescendants(Vec<Node>),
+    AdopteesNotSeparateDescendants(Vec<Node>),
     /// A node at one end of a [NewEdgeSpec] was not found
     #[error("{0:?} end of edge {2:?} not found in {1}")]
     BadEdgeSpec(Direction, WhichHugr, NewEdgeSpec),
@@ -738,7 +738,7 @@ mod test {
                 ..r.clone()
             }
             .verify(&h),
-            Err(ReplaceError::InvalidTransferTarget(r.replacement.root()))
+            Err(ReplaceError::InvalidAdoptingParent(r.replacement.root()))
         );
         assert_eq!(
             Replacement {
@@ -746,7 +746,7 @@ mod test {
                 ..r.clone()
             }
             .verify(&h),
-            Err(ReplaceError::TransfersNotSeparateDescendants(vec![case1]))
+            Err(ReplaceError::AdopteesNotSeparateDescendants(vec![case1]))
         );
         assert_eq!(
             Replacement {
@@ -762,7 +762,7 @@ mod test {
                 ..r.clone()
             }
             .verify(&h),
-            Err(ReplaceError::TransfersNotSeparateDescendants(vec![
+            Err(ReplaceError::AdopteesNotSeparateDescendants(vec![
                 baz_dfg.node()
             ]))
         );
