@@ -12,9 +12,26 @@ use petgraph::visit as pv;
 /// Wrapper for a HugrView that implements petgraph's traits.
 ///
 /// It can be used to apply petgraph's algorithms to a Hugr.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct PetgraphWrapper<'a, T> {
     pub(crate) hugr: &'a T,
+}
+
+impl<'a, T> Clone for PetgraphWrapper<'a, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, T> Copy for PetgraphWrapper<'a, T> {}
+
+impl<'a, T> From<&'a T> for PetgraphWrapper<'a, T>
+where
+    T: HugrView,
+{
+    fn from(hugr: &'a T) -> Self {
+        Self { hugr }
+    }
 }
 
 impl<'a, T> pv::GraphBase for PetgraphWrapper<'a, T>
@@ -31,6 +48,8 @@ where
 {
     type EdgeType = petgraph::Directed;
 }
+
+impl<'a, T> pv::GraphRef for PetgraphWrapper<'a, T> where T: HugrView {}
 
 impl<'a, T> pv::NodeCount for PetgraphWrapper<'a, T>
 where
@@ -75,12 +94,12 @@ where
     type EdgeWeight = EdgeKind;
 }
 
-impl<'g, 'a, T> pv::IntoNodeReferences for &'g PetgraphWrapper<'a, T>
+impl<'a, T> pv::IntoNodeReferences for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NodeRef = HugrNodeRef<'g>;
-    type NodeReferences = MapWithCtx<<T as HugrView>::Nodes<'g>, Self, HugrNodeRef<'g>>;
+    type NodeRef = HugrNodeRef<'a>;
+    type NodeReferences = MapWithCtx<<T as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
 
     fn node_references(self) -> Self::NodeReferences {
         self.hugr
@@ -90,33 +109,33 @@ where
     }
 }
 
-impl<'g, 'a, T> pv::IntoNodeIdentifiers for &'g PetgraphWrapper<'a, T>
+impl<'a, T> pv::IntoNodeIdentifiers for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NodeIdentifiers = <T as HugrView>::Nodes<'g>;
+    type NodeIdentifiers = <T as HugrView>::Nodes<'a>;
 
     fn node_identifiers(self) -> Self::NodeIdentifiers {
         self.hugr.nodes()
     }
 }
 
-impl<'g, 'a, T> pv::IntoNeighbors for &'g PetgraphWrapper<'a, T>
+impl<'a, T> pv::IntoNeighbors for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type Neighbors = <T as HugrView>::Neighbours<'g>;
+    type Neighbors = <T as HugrView>::Neighbours<'a>;
 
     fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
         self.hugr.output_neighbours(n)
     }
 }
 
-impl<'g, 'a, T> pv::IntoNeighborsDirected for &'g PetgraphWrapper<'a, T>
+impl<'a, T> pv::IntoNeighborsDirected for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NeighborsDirected = <T as HugrView>::Neighbours<'g>;
+    type NeighborsDirected = <T as HugrView>::Neighbours<'a>;
 
     fn neighbors_directed(
         self,
