@@ -454,13 +454,14 @@ mod test {
         ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
     };
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, NodeType, Rewrite};
     use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
-    use crate::{type_row, Hugr, HugrView, OutgoingPort};
+    use crate::{type_row, Direction, Hugr, HugrView, Node, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 
@@ -689,6 +690,7 @@ mod test {
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
 
+        // Note wrong root type here - we'll replace children of the *Conditional*
         let mut rep1 = Hugr::new(h.root_type().clone());
         let r1 = rep1.add_op_with_parent(
             rep1.root(),
@@ -723,7 +725,8 @@ mod test {
         )?;
         assert_eq!(r.verify(&h), Ok(()));
 
-        // And test some bad variants (using the same `replacement` Hugr)
+        // And test some bad Replacements (using the same `replacement` Hugr).
+        // First, removed nodes...
         assert_eq!(
             Replacement {
                 removal: vec![h.root()],
@@ -732,6 +735,15 @@ mod test {
             .verify(&h),
             Err(ReplaceError::CantReplaceRoot)
         );
+        assert_eq!(
+            Replacement {
+                removal: vec![case1, baz_dfg.node()],
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
+        );
+        // Adoptions...
         assert_eq!(
             Replacement {
                 adoptions: HashMap::from([(r1, case1), (r.replacement.root(), case2)]),
@@ -750,14 +762,6 @@ mod test {
         );
         assert_eq!(
             Replacement {
-                removal: vec![case1, baz_dfg.node()],
-                ..r.clone()
-            }
-            .verify(&h),
-            Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
-        );
-        assert_eq!(
-            Replacement {
                 adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
                 ..r.clone()
             }
@@ -765,6 +769,24 @@ mod test {
             Err(ReplaceError::AdopteesNotSeparateDescendants(vec![
                 baz_dfg.node()
             ]))
+        );
+        // Edges....
+        let bad_edge = NewEdgeSpec {
+            src: cond.node(),
+            tgt: h.nodes().max().unwrap(),
+            kind: NewEdgeKind::Order,
+        };
+        assert_eq!(
+            Replacement {
+                mu_inp: vec![bad_edge.clone()],
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::BadEdgeSpec(
+                Direction::Incoming,
+                WhichHugr::Replacement,
+                bad_edge
+            ))
         );
 
         Ok(())
