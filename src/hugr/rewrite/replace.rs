@@ -122,20 +122,27 @@ impl NewEdgeSpec {
             .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
     }
 
-    // Note that we return () for error here because the caller needs to construct the error
-    // in order to report useful edge indices (in `self` they may have been translated).
     fn check_existing_edge(
         &self,
         h: &impl HugrView,
-        src_ok: impl Fn(Node) -> bool,
+        legal_src_ancestors: &HashSet<Node>,
         err_edge: impl Fn() -> NewEdgeSpec,
     ) -> Result<(), ReplaceError> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
         {
+            let descends_from_legal = |mut descendant: Node| -> bool {
+                while !legal_src_ancestors.contains(&descendant) {
+                    let Some(p) = h.get_parent(descendant) else {
+                        return false;
+                    };
+                    descendant = p;
+                }
+                true
+            };
             let found_incoming = h
                 .linked_ports(self.tgt, tgt_pos)
                 .exactly_one()
-                .is_ok_and(|(src_n, _)| src_ok(src_n));
+                .is_ok_and(|(src_n, _)| descends_from_legal(src_n));
             if !found_incoming {
                 return Err(ReplaceError::NoRemovedEdge(err_edge()));
             };
@@ -261,11 +268,7 @@ impl Rewrite for Replacement {
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
             // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-            e.check_existing_edge(
-                h,
-                |n| removed.contains(&n) || descends_any(h, &removed, n),
-                || e.clone(),
-            )?;
+            e.check_existing_edge(h, &removed, || e.clone())?;
         }
         Ok(())
     }
@@ -339,16 +342,6 @@ impl Rewrite for Replacement {
     }
 }
 
-fn descends_any(h: &impl HugrView, ancestors: &HashSet<Node>, mut descendant: Node) -> bool {
-    while !ancestors.contains(&descendant) {
-        let Some(p) = h.get_parent(descendant) else {
-            return false;
-        };
-        descendant = p;
-    }
-    true
-}
-
 fn transfer_edges<'a>(
     h: &mut impl HugrMut,
     edges: impl Iterator<Item = &'a NewEdgeSpec>,
@@ -379,11 +372,7 @@ fn transfer_edges<'a>(
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if let Some(legal_src_ancestors) = legal_src_ancestors {
-                    e.check_existing_edge(
-                        h,
-                        |n| descends_any(h, legal_src_ancestors, n),
-                        || oe.clone(),
-                    )?;
+                    e.check_existing_edge(h, legal_src_ancestors, || oe.clone())?;
                     h.disconnect(e.tgt, tgt_pos).unwrap();
                 }
                 h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
