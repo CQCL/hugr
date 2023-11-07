@@ -1,27 +1,20 @@
-use crate::Hugr;
 use std::cmp::min;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+
+use smol_str::SmolStr;
 
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
     TypeParametrised,
 };
 
-use crate::types::{PolyFuncType, SignatureDescription};
-
-use crate::types::FunctionType;
-
-use crate::types::type_param::{check_type_args, TypeArg};
-
 use crate::ops::custom::OpaqueOp;
-
-use std::collections::HashMap;
-
-use crate::types::type_param::TypeParam;
-
-use smol_str::SmolStr;
+use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
+use crate::types::{FunctionType, PolyFuncType};
+use crate::Hugr;
 
 /// Trait for extensions to provide custom binary code for computing signature.
 pub trait CustomSignatureFunc: Send + Sync {
@@ -35,18 +28,6 @@ pub trait CustomSignatureFunc: Send + Sync {
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncType, SignatureError>;
-
-    /// Describe the signature of a node, given the operation name,
-    /// values for the type parameters,
-    /// and 'misc' data from the extension definition YAML.
-    fn describe_signature(
-        &self,
-        _name: &SmolStr,
-        _arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> SignatureDescription {
-        SignatureDescription::default()
-    }
 }
 
 // Note this is very much a utility, rather than definitive;
@@ -208,21 +189,11 @@ impl OpDef {
             }
         };
 
-        let res = pf.instantiate_all(args, exts)?;
+        let res = pf.instantiate(args, exts)?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
         Ok(res)
-    }
-
-    /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
-        match &self.signature_func {
-            SignatureFunc::TypeScheme { .. } => todo!(),
-            SignatureFunc::CustomFunc { func, .. } => {
-                func.describe_signature(&self.name, args, &self.misc)
-            }
-        }
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {

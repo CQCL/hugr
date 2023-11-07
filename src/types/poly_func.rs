@@ -122,14 +122,14 @@ impl PolyFuncType {
         PolyFuncType {
             params: self.params.clone(),
             body: self.body.substitute(&InsideBinders {
-                skip_lowest: self.params.len(),
+                num_binders: self.params.len(),
                 underlying: t,
             }),
         }
     }
 
     /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
-    pub(crate) fn instantiate(
+    pub(crate) fn instantiate_poly(
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
@@ -137,7 +137,7 @@ impl PolyFuncType {
         let remaining = self.params.get(args.len()..).unwrap_or_default();
         let mut v;
         let args = if remaining.is_empty() {
-            args // instantiate_all below will fail if there were too many
+            args // instantiate below will fail if there were too many
         } else {
             // Partial application - renumber remaining params (still bound) downward
             v = args.to_vec();
@@ -155,7 +155,7 @@ impl PolyFuncType {
         };
         Ok(Self {
             params: remaining.to_vec(),
-            body: self.instantiate_all(args, exts)?,
+            body: self.instantiate(args, exts)?,
         })
     }
 
@@ -165,7 +165,7 @@ impl PolyFuncType {
     /// # Errors
     /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
     /// or an arg does not fit into its corresponding [TypeParam]
-    pub(crate) fn instantiate_all(
+    pub(crate) fn instantiate(
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
@@ -222,21 +222,22 @@ impl<'a> Substitution for Renumber<'a> {
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
 struct InsideBinders<'a> {
     /// The number of binders we have entered since (beneath where) we started to apply
-    /// [Self::underlying]). (Thus, all variable indices `< skip_lowest` have been bound since.)
-    skip_lowest: usize,
+    /// [Self::underlying]).
+    /// That is, the lowest `num_binders` variable indices refer to locals bound since then.
+    num_binders: usize,
     /// Substitution that was being applied outside those binders (i.e. in outer scope)
     underlying: &'a dyn Substitution,
 }
 
 impl<'a> Substitution for InsideBinders<'a> {
     fn apply_var(&self, idx: VarIdx, decl: &TypeParam) -> TypeArg {
-        match idx.in_outer_scope(self.skip_lowest) {
+        match idx.in_outer_scope(self.num_binders) {
             None => TypeArg::new_var_use(idx.0, decl.clone()), // Bound locally, unknown to `underlying`
             Some(idx_in_outer_scope) => {
                 let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
                 // Transform returned value into the current scope, i.e. avoid the variables newly bound
                 result_in_outer_scope.substitute(&Renumber {
-                    offset: self.skip_lowest,
+                    offset: self.num_binders,
                     exts: self.extension_registry(),
                 })
             }
@@ -277,7 +278,7 @@ pub(crate) mod test {
             &reg,
         )?;
 
-        let t = list_len.instantiate_all(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
+        let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
         assert_eq!(
             t,
             FunctionType::new(
@@ -310,12 +311,12 @@ pub(crate) mod test {
             PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
-        good_ts.instantiate_all(
+        good_ts.instantiate(
             &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &PRELUDE_REGISTRY,
         )?;
 
-        let wrong_args = good_ts.instantiate_all(
+        let wrong_args = good_ts.instantiate(
             &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &PRELUDE_REGISTRY,
         );
@@ -486,7 +487,7 @@ pub(crate) mod test {
     const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
 
     #[test]
-    fn test_instantiate() -> Result<(), SignatureError> {
+    fn partial_instantiate() -> Result<(), SignatureError> {
         // forall A,N.(Array<A,N> -> A)
         let array_max = PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
@@ -504,8 +505,8 @@ pub(crate) mod test {
             vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
             vec![USIZE_T],
         );
-        let actual =
-            array_max.instantiate(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
+        let actual = array_max
+            .instantiate_poly(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
 
         assert_eq!(actual, concrete);
 
@@ -521,7 +522,7 @@ pub(crate) mod test {
             ),
             &PRELUDE_REGISTRY,
         )?;
-        let res = array_max.instantiate(&[USIZE_TA], &PRELUDE_REGISTRY)?;
+        let res = array_max.instantiate_poly(&[USIZE_TA], &PRELUDE_REGISTRY)?;
         assert_eq!(res, partial);
 
         Ok(())
@@ -593,7 +594,7 @@ pub(crate) mod test {
         const FREE: usize = 3;
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = outer
-            .instantiate_all(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
+            .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
             .unwrap();
         assert_eq!(
             res,
@@ -626,7 +627,7 @@ pub(crate) mod test {
         };
 
         let res = outer
-            .instantiate_all(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .instantiate(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
             .unwrap();
         assert_eq!(
             res,

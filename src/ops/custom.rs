@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
-use crate::types::{type_param::TypeArg, FunctionType, SignatureDescription};
+use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{Hugr, Node};
 
 use super::tag::OpTag;
@@ -73,13 +73,6 @@ impl OpTrait for ExternalOp {
         match self {
             Self::Opaque(op) => op.description.as_str(),
             Self::Extension(ExtensionOp { def, .. }) => def.description(),
-        }
-    }
-
-    fn signature_desc(&self) -> SignatureDescription {
-        match self {
-            Self::Opaque(_) => SignatureDescription::default(),
-            Self::Extension(ExtensionOp { def, args, .. }) => def.signature_desc(args),
         }
     }
 
