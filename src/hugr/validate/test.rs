@@ -1,4 +1,5 @@
 use cool_asserts::assert_matches;
+use coverage_helper::test;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
