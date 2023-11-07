@@ -690,6 +690,12 @@ mod test {
         let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
+        let verify_apply = |r: Replacement| {
+            let verify_res = r.verify(&h);
+            let apply_res = r.apply(&mut h.clone());
+            assert_eq!(verify_res, apply_res);
+            verify_res
+        };
 
         // Note wrong root type here - we'll replace children of the *Conditional*
         let mut rep1 = Hugr::new(h.root_type().clone());
@@ -714,7 +720,7 @@ mod test {
             mu_new: vec![],
         };
         assert_eq!(
-            r.verify(&h),
+            verify_apply(r.clone()),
             Err(ReplaceError::WrongRootNodeTag {
                 removed: OpTag::Conditional,
                 replacement: OpTag::Dfg
@@ -724,49 +730,44 @@ mod test {
             r.replacement.root(),
             NodeType::new_open(h.get_optype(cond.node()).clone()),
         )?;
-        assert_eq!(r.verify(&h), Ok(()));
+        assert_eq!(verify_apply(r.clone()), Ok(()));
 
         // And test some bad Replacements (using the same `replacement` Hugr).
         // First, removed nodes...
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 removal: vec![h.root()],
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::CantReplaceRoot)
         );
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 removal: vec![case1, baz_dfg.node()],
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
         );
         // Adoptions...
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 adoptions: HashMap::from([(r1, case1), (r.replacement.root(), case2)]),
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::InvalidAdoptingParent(r.replacement.root()))
         );
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::AdopteesNotSeparateDescendants(vec![case1]))
         );
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::AdopteesNotSeparateDescendants(vec![
                 baz_dfg.node()
             ]))
@@ -778,11 +779,10 @@ mod test {
             kind: NewEdgeKind::Order,
         };
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 mu_inp: vec![edge_from_removed.clone()],
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 WhichHugr::Retained,
@@ -795,11 +795,10 @@ mod test {
             kind: NewEdgeKind::Order,
         };
         assert_eq!(
-            Replacement {
+            verify_apply(Replacement {
                 mu_out: vec![bad_out_edge.clone()],
                 ..r.clone()
-            }
-            .verify(&h),
+            }),
             Err(ReplaceError::BadEdgeSpec(
                 Direction::Outgoing,
                 WhichHugr::Replacement,
@@ -808,14 +807,14 @@ mod test {
         );
         let bad_order_edge = NewEdgeSpec {
             src: cond.node(),
-            tgt: r1.node(),
-            kind: NewEdgeKind::Order,
+            tgt: h.get_io(h.root()).unwrap()[1],
+            kind: NewEdgeKind::ControlFlow { src_pos: 0.into() },
         };
         assert_matches!(
-            Replacement {
-                mu_inp: vec![bad_order_edge.clone()],
+            verify_apply(Replacement {
+                mu_new: vec![bad_order_edge.clone()],
                 ..r.clone()
-            }.verify(&h),
+            }),
             Err(ReplaceError::BadEdgeKind(_, e)) => e == bad_order_edge
         );
         Ok(())
