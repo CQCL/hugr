@@ -1651,4 +1651,25 @@ mod test {
     fn plus_on_self_10_times() {
         [0; 10].iter().for_each(|_| plus_on_self().unwrap())
     }
+
+    #[test]
+    fn failing_sccs_test() {
+        let hugr = Hugr::default();
+        let mut ctx = UnificationContext::new(&hugr);
+        let m1 = ctx.fresh_meta();
+        let m2 = ctx.fresh_meta();
+        let m3 = ctx.fresh_meta();
+        // Outside of the connected component
+        let m_other = ctx.fresh_meta();
+        ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
+        ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m_other));
+        ctx.extensions.insert((NodeIndex::new(1).into(), Direction::Incoming), m1);
+        ctx.extensions.insert((NodeIndex::new(2).into(), Direction::Incoming), m2);
+        ctx.extensions.insert((NodeIndex::new(3).into(), Direction::Incoming), m3);
+        ctx.extensions.insert((NodeIndex::new(4).into(), Direction::Incoming), m_other);
+        ctx.main_loop().unwrap();
+        ctx.results().unwrap();
+    }
 }
