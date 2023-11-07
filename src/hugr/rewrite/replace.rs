@@ -676,42 +676,42 @@ mod test {
             type_row![USIZE_T],
             ExtensionSet::new(),
         )?;
-        let mut case_t = cond.case_builder(0)?;
-        let foo = case_t.add_dataflow_op(mk_op("foo"), case_t.input_wires())?;
-        let case_t = case_t.finish_with_outputs(foo.outputs())?.node();
-        let mut case_f = cond.case_builder(1)?;
-        let bar = case_f.add_dataflow_op(mk_op("bar"), case_f.input_wires())?;
-        let mut baz_dfg = case_f.dfg_builder(utou.clone(), None, bar.outputs())?;
+        let mut case1 = cond.case_builder(0)?;
+        let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires())?;
+        let case1 = case1.finish_with_outputs(foo.outputs())?.node();
+        let mut case2 = cond.case_builder(1)?;
+        let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires())?;
+        let mut baz_dfg = case2.dfg_builder(utou.clone(), None, bar.outputs())?;
         let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
-        let case_f = case_f.finish_with_outputs(baz_dfg.outputs())?.node();
+        let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
 
         let mut rep1 = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
-        let r_t = rep1.add_op_with_parent(
+        let r1 = rep1.add_op_with_parent(
             rep1.root(),
             Case {
                 signature: utou.clone(),
             },
         )?;
-        let r_f = rep1.add_op_with_parent(
+        let r2 = rep1.add_op_with_parent(
             rep1.root(),
             Case {
                 signature: utou.clone(),
             },
         )?;
         let r = Replacement {
-            removal: vec![case_t, case_f],
+            removal: vec![case1, case2],
             replacement: rep1,
-            adoptions: HashMap::from_iter([(r_t, case_t), (r_f, case_t)]),
+            adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
             mu_inp: vec![],
             mu_out: vec![],
             mu_new: vec![],
         };
         assert_eq!(
             r.verify(&h),
-            Err(ReplaceError::TransfersNotSeparateDescendants(vec![case_t]))
+            Err(ReplaceError::TransfersNotSeparateDescendants(vec![case1]))
         );
         Ok(())
     }
