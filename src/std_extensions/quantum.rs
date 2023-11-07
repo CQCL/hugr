@@ -300,6 +300,7 @@ pub(crate) mod test {
     use std::f64::consts::TAU;
 
     use cool_asserts::assert_matches;
+    use coverage_helper::test;
 
     use crate::{
         extension::EMPTY_REG,

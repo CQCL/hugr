@@ -459,6 +459,7 @@ mod test {
     use crate::{ops, type_row};
     use crate::{ops::dataflow::IOTrait, ops::LeafOp};
     use cool_asserts::assert_matches;
+    use coverage_helper::test;
 
     use super::*;
 

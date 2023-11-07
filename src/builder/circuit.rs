@@ -131,6 +131,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 mod test {
     use super::*;
     use cool_asserts::assert_matches;
+    use coverage_helper::test;
 
     use crate::{
         builder::{

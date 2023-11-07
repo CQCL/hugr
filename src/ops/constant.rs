@@ -134,6 +134,8 @@ mod test {
         },
     };
     use cool_asserts::assert_matches;
+    use coverage_helper::test;
+
     use serde_yaml::Value as YamlValue;
 
     use super::*;

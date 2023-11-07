@@ -368,6 +368,8 @@ mod test {
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
+    use cool_asserts::assert_matches;
+    use coverage_helper::test;
     use std::error::Error;
 
     #[test]
@@ -381,7 +383,6 @@ mod test {
     #[test]
     fn io_node() {
         use crate::builder::test::simple_dfg_hugr;
-        use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
