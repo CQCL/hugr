@@ -1651,4 +1651,27 @@ mod test {
     fn plus_on_self_10_times() {
         [0; 10].iter().for_each(|_| plus_on_self().unwrap())
     }
+
+    #[test]
+    // Test that logic for dealing with self-referential constraints doesn't
+    // fall over when a self-referencing group of metas also references a meta
+    // outside the group
+    fn failing_sccs_test() {
+        let hugr = Hugr::default();
+        let mut ctx = UnificationContext::new(&hugr);
+        let m1 = ctx.fresh_meta();
+        let m2 = ctx.fresh_meta();
+        let m3 = ctx.fresh_meta();
+        // Outside of the connected component
+        let m_other = ctx.fresh_meta();
+        // These 3 metavariables form a loop
+        ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
+        ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
+        // This other meta is outside the loop, but depended on by one of the loop metas
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m_other));
+        ctx.variables.insert(m1);
+        ctx.variables.insert(m_other);
+        ctx.instantiate_variables();
+    }
 }
