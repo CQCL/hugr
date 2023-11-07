@@ -453,10 +453,11 @@ mod test {
     use crate::extension::{
         ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
     };
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrMut, NodeType, Rewrite};
     use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTrait, OpType, DFG};
+    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Hugr, HugrView, OutgoingPort};
@@ -688,7 +689,7 @@ mod test {
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
 
-        let mut rep1 = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
+        let mut rep1 = Hugr::new(h.root_type().clone());
         let r1 = rep1.add_op_with_parent(
             rep1.root(),
             Case {
@@ -701,18 +702,39 @@ mod test {
                 signature: utou.clone(),
             },
         )?;
-        let r = Replacement {
+        let mut r = Replacement {
             removal: vec![case1, case2],
             replacement: rep1,
-            adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
+            adoptions: HashMap::from_iter([(r1, case1), (r2, baz_dfg.node())]),
             mu_inp: vec![],
             mu_out: vec![],
             mu_new: vec![],
         };
         assert_eq!(
             r.verify(&h),
+            Err(ReplaceError::WrongRootNodeTag {
+                removed: OpTag::Conditional,
+                replacement: OpTag::Dfg
+            })
+        );
+        r.replacement.replace_op(
+            r.replacement.root(),
+            NodeType::new_open(h.get_optype(cond.node()).clone()),
+        )?;
+        assert_eq!(r.verify(&h), Ok(()));
+        r.adoptions = HashMap::from_iter([(r1, case1), (r2, case1)]);
+        assert_eq!(
+            r.verify(&h),
             Err(ReplaceError::TransfersNotSeparateDescendants(vec![case1]))
         );
+        r.adoptions = HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]);
+        assert_eq!(
+            r.verify(&h),
+            Err(ReplaceError::TransfersNotSeparateDescendants(vec![
+                baz_dfg.node()
+            ]))
+        );
+
         Ok(())
     }
 }
