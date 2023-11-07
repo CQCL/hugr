@@ -8,8 +8,6 @@ use super::{
     TypeParametrised,
 };
 
-use crate::types::SignatureDescription;
-
 use crate::types::FunctionType;
 
 use crate::types::type_param::TypeArg;
@@ -34,18 +32,6 @@ pub trait CustomSignatureFunc: Send + Sync {
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError>;
-
-    /// Describe the signature of a node, given the operation name,
-    /// values for the type parameters,
-    /// and 'misc' data from the extension definition YAML.
-    fn describe_signature(
-        &self,
-        _name: &SmolStr,
-        _arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-    ) -> SignatureDescription {
-        SignatureDescription::default()
-    }
 }
 
 // Note this is very much a utility, rather than definitive;
@@ -206,16 +192,6 @@ impl OpDef {
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
         Ok(res)
-    }
-
-    /// Optional description of the ports in the signature.
-    pub fn signature_desc(&self, args: &[TypeArg]) -> SignatureDescription {
-        match &self.signature_func {
-            SignatureFunc::FromDecl { .. } => {
-                todo!()
-            }
-            SignatureFunc::CustomFunc(bf) => bf.describe_signature(&self.name, args, &self.misc),
-        }
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {

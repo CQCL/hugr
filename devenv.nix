@@ -6,10 +6,9 @@
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified 
   # otherwise a linker error ocurs on rust packages
-  packages = lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk; [
+  packages = [pkgs.just] ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk; [
     frameworks.CoreServices
     frameworks.CoreFoundation
-    pkgs.just
   ]);
 
   # https://devenv.sh/scripts/
