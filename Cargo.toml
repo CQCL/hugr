@@ -62,7 +62,6 @@ webbrowser = "0.8.10"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 paste = "1.0"
-coverage-helper = "0.2.0"
 
 [[bench]]
 name = "bench_main"

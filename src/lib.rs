@@ -11,9 +11,6 @@
 // Unstable check, may cause false positives.
 // https://github.com/rust-lang/rust-clippy/issues/5112
 #![warn(clippy::debug_assert_with_mut_call)]
-// https://crates.io/crates/coverage-helper to allow selectively ignoring tests
-// in coverage.
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod algorithm;
 pub mod builder;
