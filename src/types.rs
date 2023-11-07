@@ -10,7 +10,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
-pub use signature::{FunctionType, Signature, SignatureDescription};
+pub use signature::{FunctionType, Signature};
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 

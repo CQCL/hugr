@@ -10,7 +10,7 @@
 //! depend on these open variables, then the validation check for extensions
 //! will succeed regardless of what the variable is instantiated to.
 
-use super::{ExtensionId, ExtensionSet};
+use super::ExtensionSet;
 use crate::{
     hugr::views::HugrView,
     ops::{OpTag, OpTrait},
@@ -65,8 +65,8 @@ impl Meta {
 enum Constraint {
     /// A variable has the same value as another variable
     Equal(Meta),
-    /// Variable extends the value of another by one extension
-    Plus(ExtensionId, Meta),
+    /// Variable extends the value of another by a set of extensions
+    Plus(ExtensionSet, Meta),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -230,26 +230,6 @@ impl UnificationContext {
         self.solved.get(&self.resolve(*m))
     }
 
-    /// Convert an extension *set* difference in terms of a sequence of fresh
-    /// metas with `Plus` constraints which each add only one extension req.
-    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
-        let mut last_meta = input;
-        // Create fresh metavariables with `Plus` constraints for
-        // each extension that should be added by the node
-        // Hence a extension delta [A, B] would lead to
-        // > ma = fresh_meta()
-        // > add_constraint(ma, Plus(a, input)
-        // > mb = fresh_meta()
-        // > add_constraint(mb, Plus(b, ma)
-        // > add_constraint(output, Equal(mb))
-        for r in delta.0.into_iter() {
-            let curr_meta = self.fresh_meta();
-            self.add_constraint(curr_meta, Constraint::Plus(r, last_meta));
-            last_meta = curr_meta;
-        }
-        self.add_constraint(output, Constraint::Equal(last_meta));
-    }
-
     /// Return the metavariable corresponding to the given location on the
     /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
@@ -311,17 +291,13 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
-                    self.gen_union_constraint(
-                        m_input,
-                        m_output,
-                        node_type.op_signature().extension_reqs,
-                    );
-                    if matches!(
-                        node_type.tag(),
-                        OpTag::Alias | OpTag::Function | OpTag::FuncDefn
-                    ) {
-                        self.add_solution(m_input, ExtensionSet::new());
-                    }
+                    let delta = node_type.op_signature().extension_reqs;
+                    let c = if delta.is_empty() {
+                        Constraint::Equal(m_input)
+                    } else {
+                        Constraint::Plus(delta, m_input)
+                    };
+                    self.add_constraint(m_output, c);
                 }
                 // We have a solution for everything!
                 Some(sig) => {
@@ -510,8 +486,7 @@ impl UnificationContext {
                 // to a set which already contained it.
                 Constraint::Plus(r, other_meta) => {
                     if let Some(rs) = self.get_solution(other_meta) {
-                        let mut rrs = rs.clone();
-                        rrs.insert(r);
+                        let rrs = rs.clone().union(r);
                         match self.get_solution(&meta) {
                             // Let's check that this is right?
                             Some(rs) => {
@@ -657,19 +632,19 @@ impl UnificationContext {
                 // Handle the case where the constraints for `m` contain a self
                 // reference, i.e. "m = Plus(E, m)", in which case the variable
                 // should be instantiated to E rather than the empty set.
-                let solution =
-                    ExtensionSet::from_iter(self.get_constraints(&m).unwrap().iter().filter_map(
-                        |c| match c {
-                            // If `m` has been merged, [`self.variables`] entry
-                            // will have already been updated to the merged
-                            // value by [`self.merge_equal_metas`] so we don't
-                            // need to worry about resolving it.
-                            Constraint::Plus(x, other_m) if m == self.resolve(*other_m) => {
-                                Some(x.clone())
-                            }
-                            _ => None,
-                        },
-                    ));
+                let solution = self
+                    .get_constraints(&m)
+                    .unwrap()
+                    .iter()
+                    .filter_map(|c| match c {
+                        // If `m` has been merged, [`self.variables`] entry
+                        // will have already been updated to the merged
+                        // value by [`self.merge_equal_metas`] so we don't
+                        // need to worry about resolving it.
+                        Constraint::Plus(x, other_m) if m == self.resolve(*other_m) => Some(x),
+                        _ => None,
+                    })
+                    .fold(ExtensionSet::new(), ExtensionSet::union);
                 self.add_solution(m, solution);
             }
         }
@@ -685,6 +660,7 @@ mod test {
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::prelude::QB_T;
+    use crate::extension::ExtensionId;
     use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
@@ -720,7 +696,7 @@ mod test {
             signature: main_sig,
         };
 
-        let root_node = NodeType::open_extensions(op);
+        let root_node = NodeType::new_open(op);
         let mut hugr = Hugr::new(root_node);
 
         let input = ops::Input::new(type_row![NAT, NAT]);
@@ -804,8 +780,14 @@ mod test {
 
         ctx.solved.insert(metas[2], ExtensionSet::singleton(&A));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
-        ctx.add_constraint(metas[0], Constraint::Plus(B, metas[2]));
-        ctx.add_constraint(metas[4], Constraint::Plus(C, metas[0]));
+        ctx.add_constraint(
+            metas[0],
+            Constraint::Plus(ExtensionSet::singleton(&B), metas[2]),
+        );
+        ctx.add_constraint(
+            metas[4],
+            Constraint::Plus(ExtensionSet::singleton(&C), metas[0]),
+        );
         ctx.add_constraint(metas[3], Constraint::Equal(metas[4]));
         ctx.add_constraint(metas[5], Constraint::Equal(metas[0]));
         ctx.main_loop()?;
@@ -830,21 +812,21 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&ExtensionSet::singleton(&A)),
         }));
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Input {
+            NodeType::new_pure(ops::Input {
                 types: type_row![NAT],
             }),
         )?;
 
         let output = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Output {
+            NodeType::new_pure(ops::Output {
                 types: type_row![NAT],
             }),
         )?;
@@ -878,8 +860,8 @@ mod test {
             .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
         ctx.variables.insert(a);
         ctx.variables.insert(b);
-        ctx.add_constraint(ab, Constraint::Plus(A, b));
-        ctx.add_constraint(ab, Constraint::Plus(B, a));
+        ctx.add_constraint(ab, Constraint::Plus(ExtensionSet::singleton(&A), b));
+        ctx.add_constraint(ab, Constraint::Plus(ExtensionSet::singleton(&B), a));
         let solution = ctx.main_loop()?;
         // We'll only find concrete solutions for the Incoming extension reqs of
         // the main node created by `Hugr::default`
@@ -1046,7 +1028,7 @@ mod test {
             extension_delta: rs.clone(),
         };
 
-        let mut hugr = Hugr::new(NodeType::pure(op));
+        let mut hugr = Hugr::new(NodeType::new_pure(op));
         let conditional_node = hugr.root();
 
         let case_op = ops::Case {
@@ -1081,7 +1063,7 @@ mod test {
     fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
         let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::DFG {
             signature: df_sig
                 .clone()
                 .with_extension_delta(&ExtensionSet::from_iter([A, B])),
@@ -1252,7 +1234,7 @@ mod test {
         let b = ExtensionSet::singleton(&B);
         let c = ExtensionSet::singleton(&C);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&abc),
         }));
 
@@ -1350,7 +1332,7 @@ mod test {
     ///             +--------------------+
     #[test]
     fn multi_entry() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
         }));
         let cfg = hugr.root();
@@ -1433,7 +1415,7 @@ mod test {
     ) -> Result<Hugr, Box<dyn Error>> {
         let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&hugr_delta),
         }));

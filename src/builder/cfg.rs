@@ -62,7 +62,7 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(NodeType::open_extensions(cfg_op));
+        let base = Hugr::new(NodeType::new_open(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }

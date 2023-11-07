@@ -82,7 +82,7 @@ impl NodeType {
     }
 
     /// Instantiate an OpType with no input extensions
-    pub fn pure(op: impl Into<OpType>) -> Self {
+    pub fn new_pure(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: Some(ExtensionSet::new()),
@@ -91,10 +91,21 @@ impl NodeType {
 
     /// Instantiate an OpType with an unknown set of input extensions
     /// (to be inferred later)
-    pub fn open_extensions(op: impl Into<OpType>) -> Self {
+    pub fn new_open(op: impl Into<OpType>) -> Self {
         NodeType {
             op: op.into(),
             input_extensions: None,
+        }
+    }
+
+    /// Instantiate an [OpType] with the default set of input extensions
+    /// for that OpType.
+    pub fn new_auto(op: impl Into<OpType>) -> Self {
+        let op = op.into();
+        if OpTag::ModuleOp.is_superset(op.tag()) {
+            Self::new_pure(op)
+        } else {
+            Self::new_open(op)
         }
     }
 
@@ -119,9 +130,7 @@ impl NodeType {
     pub fn input_extensions(&self) -> Option<&ExtensionSet> {
         self.input_extensions.as_ref()
     }
-}
 
-impl NodeType {
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
     ///
     /// [input_extensions]: NodeType::input_extensions
@@ -153,7 +162,7 @@ impl OpType {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(NodeType::pure(crate::ops::Module))
+        Self::new(NodeType::new_pure(crate::ops::Module))
     }
 }
 
@@ -239,7 +248,7 @@ impl Hugr {
 
     /// Add a node to the graph, with the default conversion from OpType to NodeType
     pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        self.add_node(NodeType::open_extensions(op))
+        self.add_node(NodeType::new_auto(op))
     }
 
     /// Add a node to the graph.
