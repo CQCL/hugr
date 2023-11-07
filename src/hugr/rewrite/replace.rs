@@ -122,10 +122,13 @@ impl NewEdgeSpec {
             .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
     }
 
+    // Note that we return () for error here because the caller needs to construct the error
+    // in order to report useful edge indices (in `self` they may have been translated).
     fn check_existing_edge(
         &self,
         h: &impl HugrView,
         src_ok: impl Fn(Node) -> bool,
+        err_edge: impl Fn() -> NewEdgeSpec,
     ) -> Result<(), ReplaceError> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
         {
@@ -134,7 +137,7 @@ impl NewEdgeSpec {
                 .exactly_one()
                 .is_ok_and(|(src_n, _)| src_ok(src_n));
             if !found_incoming {
-                return Err(ReplaceError::NoRemovedEdge(self.clone()));
+                return Err(ReplaceError::NoRemovedEdge(err_edge()));
             };
         };
         Ok(())
@@ -219,7 +222,7 @@ impl Rewrite for Replacement {
     const UNCHANGED_ON_FAILURE: bool = false;
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
-        let parent = self.check_parent(h)?;
+        self.check_parent(h)?;
         let removed = self.get_removed_nodes(h)?;
         // Edge sources...
         for e in self.mu_inp.iter().chain(self.mu_new.iter()) {
@@ -258,7 +261,11 @@ impl Rewrite for Replacement {
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
             // the first "removed.contains" check, we'll keep that as a common-case fast-path.
-            e.check_existing_edge(h, |n| removed.contains(&n) || descends(h, parent, n))?;
+            e.check_existing_edge(
+                h,
+                |n| removed.contains(&n) || descends_any(h, &removed, n),
+                || e.clone(),
+            )?;
         }
         Ok(())
     }
@@ -284,11 +291,11 @@ impl Rewrite for Replacement {
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
         // replacing existing value/static edges incoming to targets
-        transfer_edges(h, self.mu_out.iter(), translate_idx, kept, Some(parent))?;
+        transfer_edges(h, self.mu_out.iter(), translate_idx, kept, Some(&to_remove))?;
 
         // 4. Add new edges between existing nodes according to mu_new,
         // replacing existing value/static edges incoming to targets.
-        transfer_edges(h, self.mu_new.iter(), kept, kept, Some(parent))?;
+        transfer_edges(h, self.mu_new.iter(), kept, kept, Some(&to_remove))?;
 
         // 5. Put newly-added copies into correct places in hierarchy
         // (these will be correct places after removing nodes)
@@ -332,8 +339,8 @@ impl Rewrite for Replacement {
     }
 }
 
-fn descends(h: &impl HugrView, ancestor: Node, mut descendant: Node) -> bool {
-    while descendant != ancestor {
+fn descends_any(h: &impl HugrView, ancestors: &HashSet<Node>, mut descendant: Node) -> bool {
+    while !ancestors.contains(&descendant) {
         let Some(p) = h.get_parent(descendant) else {
             return false;
         };
@@ -347,7 +354,7 @@ fn transfer_edges<'a>(
     edges: impl Iterator<Item = &'a NewEdgeSpec>,
     trans_src: impl Fn(Node) -> Result<Node, WhichHugr>,
     trans_tgt: impl Fn(Node) -> Result<Node, WhichHugr>,
-    existing_src_ancestor: Option<Node>,
+    legal_src_ancestors: Option<&HashSet<Node>>,
 ) -> Result<(), ReplaceError> {
     for oe in edges {
         let e = NewEdgeSpec {
@@ -371,8 +378,12 @@ fn transfer_edges<'a>(
                 h.add_other_edge(e.src, e.tgt).unwrap();
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
-                if let Some(anc) = existing_src_ancestor {
-                    e.check_existing_edge(h, |n| descends(h, anc, n))?;
+                if let Some(legal_src_ancestors) = legal_src_ancestors {
+                    e.check_existing_edge(
+                        h,
+                        |n| descends_any(h, legal_src_ancestors, n),
+                        || oe.clone(),
+                    )?;
                     h.disconnect(e.tgt, tgt_pos).unwrap();
                 }
                 h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
