@@ -190,3 +190,73 @@ impl OpTrait for LeafOp {
         Some(EdgeKind::StateOrder)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::prelude::BOOL_T;
+    use crate::extension::SignatureError;
+    use crate::extension::{prelude::USIZE_T, PRELUDE};
+    use crate::hugr::ValidationError;
+    use crate::ops::handle::NodeHandle;
+    use crate::std_extensions::collections::EXTENSION;
+    use crate::types::Type;
+    use crate::types::{test::nested_func, FunctionType, TypeArg};
+
+    use super::{LeafOp, TypeApplication};
+
+    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
+
+    #[test]
+    fn hugr_with_type_apply() -> Result<(), Box<dyn std::error::Error>> {
+        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let pf_in = nested_func();
+        let pf_out = pf_in.instantiate(&[USIZE_TA], &reg)?;
+        let mut dfg = DFGBuilder::new(FunctionType::new(
+            vec![Type::new_function(pf_in.clone())],
+            vec![Type::new_function(pf_out)],
+        ))?;
+        let ta = dfg.add_dataflow_op(
+            LeafOp::TypeApply {
+                ta: TypeApplication::try_new(pf_in, [USIZE_TA], &reg).unwrap(),
+            },
+            dfg.input_wires(),
+        )?;
+        dfg.finish_hugr_with_outputs(ta.outputs(), &reg)?;
+        Ok(())
+    }
+
+    #[test]
+    fn bad_type_apply() -> Result<(), Box<dyn std::error::Error>> {
+        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let pf = nested_func();
+        let pf_usz = pf.instantiate_poly(&[USIZE_TA], &reg)?;
+        let pf_bool = pf.instantiate_poly(&[TypeArg::Type { ty: BOOL_T }], &reg)?;
+        let mut dfg = DFGBuilder::new(FunctionType::new(
+            vec![Type::new_function(pf.clone())],
+            vec![Type::new_function(pf_usz.clone())],
+        ))?;
+        let ta = dfg.add_dataflow_op(
+            LeafOp::TypeApply {
+                ta: TypeApplication {
+                    input: pf,
+                    args: vec![TypeArg::Type { ty: BOOL_T }],
+                    output: pf_usz.clone(),
+                },
+            },
+            dfg.input_wires(),
+        )?;
+        let res = dfg.finish_hugr_with_outputs(ta.outputs(), &reg);
+        assert_eq!(
+            res.unwrap_err(),
+            BuildError::InvalidHUGR(ValidationError::SignatureError {
+                node: ta.node(),
+                cause: SignatureError::TypeApplyIncorrectCache {
+                    cached: pf_usz,
+                    expected: pf_bool
+                }
+            })
+        );
+        Ok(())
+    }
+}
