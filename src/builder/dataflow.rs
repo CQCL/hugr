@@ -219,6 +219,7 @@ pub(crate) mod test {
 
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::quantum::test::h_gate;
+    use crate::types::Type;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -498,6 +499,57 @@ pub(crate) mod test {
         let [w] = add_c.outputs_arr();
         parent.finish_hugr_with_outputs([w], &EMPTY_REG)?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn non_cfg_ancestor() -> Result<(), BuildError> {
+        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut b = DFGBuilder::new(unit_sig.clone())?;
+        let b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
+        let b_child_in_wire = b_child.input().out_wire(0);
+        b_child.finish_with_outputs([])?;
+        let b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+
+        // DFG block has edge coming a sibling block, which is only valid for
+        // CFGs
+        let b_child_2_handle = b_child_2.finish_with_outputs([b_child_in_wire])?;
+
+        let res = b.finish_prelude_hugr_with_outputs([b_child_2_handle.out_wire(0)]);
+
+        assert_matches!(
+            res,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCFGAncestor { .. })
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_relation_edge() -> Result<(), BuildError> {
+        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut b = DFGBuilder::new(unit_sig.clone())?;
+        let mut b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
+        let b_child_child =
+            b_child.dfg_builder(unit_sig.clone(), None, [b_child.input().out_wire(0)])?;
+        let b_child_child_in_wire = b_child_child.input().out_wire(0);
+
+        b_child_child.finish_with_outputs([])?;
+        b_child.finish_with_outputs([])?;
+
+        let mut b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+        let b_child_2_child =
+            b_child_2.dfg_builder(unit_sig.clone(), None, [b_child_2.input().out_wire(0)])?;
+
+        let res = b_child_2_child.finish_with_outputs([b_child_child_in_wire]);
+
+        assert_matches!(
+            res.map(|h| h.handle().node()), // map to something that implements Debug
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NoRelation { .. })
+            ))
+        );
         Ok(())
     }
 }
