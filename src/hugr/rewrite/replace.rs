@@ -722,14 +722,30 @@ mod test {
             NodeType::new_open(h.get_optype(cond.node()).clone()),
         )?;
         assert_eq!(r.verify(&h), Ok(()));
-        r.adoptions = HashMap::from_iter([(r1, case1), (r2, case1)]);
+
+        // And test some bad variants (using the same `replacement` Hugr)
         assert_eq!(
-            r.verify(&h),
+            Replacement {
+                removal: vec![h.root()],
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::CantReplaceRoot)
+        );
+        assert_eq!(
+            Replacement {
+                adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
+                ..r.clone()
+            }
+            .verify(&h),
             Err(ReplaceError::TransfersNotSeparateDescendants(vec![case1]))
         );
-        r.adoptions = HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]);
         assert_eq!(
-            r.verify(&h),
+            Replacement {
+                adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
+                ..r.clone()
+            }
+            .verify(&h),
             Err(ReplaceError::TransfersNotSeparateDescendants(vec![
                 baz_dfg.node()
             ]))
