@@ -404,8 +404,8 @@ pub enum ReplaceError {
     /// Keys in [Replacement::adoptions] were not valid container nodes in [Replacement::replacement]
     #[error("Node {0:?} was not an empty container node in the replacement")]
     InvalidAdoptingParent(Node),
-    /// Some values in [Replacement::adoptions] were either descendants of other values,
-    /// or not descendants of the [Replacement::removal]
+    /// Some values in [Replacement::adoptions] were either descendants of other values, or not
+    /// descendants of the [Replacement::removal]. The nodes are indicated on a best-effort basis.
     #[error("Nodes not free to be moved into new locations: {0:?}")]
     AdopteesNotSeparateDescendants(Vec<Node>),
     /// A node at one end of a [NewEdgeSpec] was not found
