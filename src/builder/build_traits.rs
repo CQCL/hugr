@@ -73,9 +73,9 @@ pub trait Container {
     fn add_constant(
         &mut self,
         constant: ops::Const,
-        extensions: ExtensionSet,
+        extensions: impl Into<Option<ExtensionSet>>,
     ) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant, extensions))?;
+        let const_n = self.add_child_node(NodeType::new(constant, extensions.into()))?;
 
         Ok(const_n.into())
     }

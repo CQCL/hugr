@@ -492,11 +492,7 @@ mod test {
             FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
         )?;
 
-        let pred_const = cfg.add_constant(
-            ops::Const::unary_unit_sum(),
-            // Slightly awkward we have to specify this, and the choice is non-obvious:
-            ExtensionSet::singleton(&collections::EXTENSION_NAME),
-        )?;
+        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum(), None)?;
 
         let entry = single_node_block(&mut cfg, pop, &pred_const, true)?;
         let bb2 = single_node_block(&mut cfg, push, &pred_const, false)?;
