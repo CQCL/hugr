@@ -110,7 +110,7 @@ impl PolyFuncType {
         let remaining = self.params.get(args.len()..).unwrap_or_default();
         let mut v;
         let args = if remaining.is_empty() {
-            args // instantiate_all below will fail if there were too many
+            args // instantiate below will fail if there were too many
         } else {
             // Partial application - renumber remaining params (still bound) downward
             v = args.to_vec();
@@ -124,7 +124,7 @@ impl PolyFuncType {
         };
         Ok(Self {
             params: remaining.to_vec(),
-            body: self.instantiate_all(args, exts)?,
+            body: self.instantiate(args, exts)?,
         })
     }
 
@@ -134,7 +134,7 @@ impl PolyFuncType {
     /// # Errors
     /// If there is not exactly one [TypeArg] for each binder ([Self::params]),
     /// or an arg does not fit into its corresponding [TypeParam]
-    pub(crate) fn instantiate_all(
+    pub(crate) fn instantiate(
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
@@ -249,7 +249,7 @@ pub(crate) mod test {
             &reg,
         )?;
 
-        let t = list_len.instantiate_all(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
+        let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
         assert_eq!(
             t,
             FunctionType::new(
@@ -282,12 +282,12 @@ pub(crate) mod test {
             PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
-        good_ts.instantiate_all(
+        good_ts.instantiate(
             &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &PRELUDE_REGISTRY,
         )?;
 
-        let wrong_args = good_ts.instantiate_all(
+        let wrong_args = good_ts.instantiate(
             &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &PRELUDE_REGISTRY,
         );
@@ -551,7 +551,7 @@ pub(crate) mod test {
             ))],
         );
 
-        let res = outer.instantiate_all(&[TypeArg::Type { ty: arg }], &reg)?;
+        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &reg)?;
         assert_eq!(res, outer_applied);
         Ok(())
     }
@@ -565,7 +565,7 @@ pub(crate) mod test {
         const FREE: usize = 3;
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = outer
-            .instantiate_all(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
+            .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
             .unwrap();
         assert_eq!(
             res,
@@ -598,7 +598,7 @@ pub(crate) mod test {
         };
 
         let res = outer
-            .instantiate_all(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .instantiate(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
             .unwrap();
         assert_eq!(
             res,
