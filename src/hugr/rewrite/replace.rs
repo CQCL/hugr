@@ -817,6 +817,23 @@ mod test {
             }),
             Err(ReplaceError::BadEdgeKind(_, e)) => e == bad_order_edge
         );
+        let op = OutgoingPort::from(0);
+        let (tgt, ip) = h.linked_inputs(cond.node(), op).next().unwrap();
+        let new_out_edge = NewEdgeSpec {
+            src: r1.node(),
+            tgt,
+            kind: NewEdgeKind::Value {
+                src_pos: op,
+                tgt_pos: ip,
+            },
+        };
+        assert_eq!(
+            verify_apply(Replacement {
+                mu_out: vec![new_out_edge.clone()],
+                ..r.clone()
+            }),
+            Err(ReplaceError::NoRemovedEdge(new_out_edge))
+        );
         Ok(())
     }
 }
