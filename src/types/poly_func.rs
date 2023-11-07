@@ -102,7 +102,7 @@ impl PolyFuncType {
     /// Note that indices into `args` correspond to the same index within [Self::params],
     /// so we instantiate the lowest-index [Self::params] first, even though these
     /// would be considered "innermost" / "closest" according to DeBruijn numbering.
-    pub(crate) fn instantiate(
+    pub(crate) fn instantiate_poly(
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
@@ -458,7 +458,7 @@ pub(crate) mod test {
     const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
 
     #[test]
-    fn test_instantiate() -> Result<(), SignatureError> {
+    fn partial_instantiate() -> Result<(), SignatureError> {
         // forall A,N.(Array<A,N> -> A)
         let array_max = PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
@@ -476,8 +476,8 @@ pub(crate) mod test {
             vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
             vec![USIZE_T],
         );
-        let actual =
-            array_max.instantiate(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
+        let actual = array_max
+            .instantiate_poly(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
 
         assert_eq!(actual, concrete);
 
@@ -493,7 +493,7 @@ pub(crate) mod test {
             ),
             &PRELUDE_REGISTRY,
         )?;
-        let res = array_max.instantiate(&[USIZE_TA], &PRELUDE_REGISTRY)?;
+        let res = array_max.instantiate_poly(&[USIZE_TA], &PRELUDE_REGISTRY)?;
         assert_eq!(res, partial);
 
         Ok(())
@@ -551,7 +551,7 @@ pub(crate) mod test {
             ))],
         );
 
-        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &reg)?;
+        let res = outer.instantiate_all(&[TypeArg::Type { ty: arg }], &reg)?;
         assert_eq!(res, outer_applied);
         Ok(())
     }

@@ -83,7 +83,7 @@ impl TypeApplication {
         let args = args.into();
         // Should we require >=1 `arg`s here? Or that input declares >=1 params?
         // At the moment we allow an identity TypeApply on a monomorphic function type.
-        let output = input.instantiate(&args, extension_registry)?;
+        let output = input.instantiate_poly(&args, extension_registry)?;
         Ok(Self {
             input,
             args,
