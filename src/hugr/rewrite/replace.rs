@@ -453,15 +453,15 @@ mod test {
     use crate::extension::{
         ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
     };
-    use crate::hugr::{HugrMut, NodeType};
+    use crate::hugr::{HugrMut, NodeType, Rewrite};
     use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, BasicBlock, LeafOp, OpTrait, OpType, DFG};
+    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Hugr, HugrView, OutgoingPort};
 
-    use super::{NewEdgeKind, NewEdgeSpec, Replacement};
+    use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 
     #[test]
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
@@ -678,15 +678,41 @@ mod test {
         )?;
         let mut case_t = cond.case_builder(0)?;
         let foo = case_t.add_dataflow_op(mk_op("foo"), case_t.input_wires())?;
-        case_t.finish_with_outputs(foo.outputs())?;
+        let case_t = case_t.finish_with_outputs(foo.outputs())?.node();
         let mut case_f = cond.case_builder(1)?;
         let bar = case_f.add_dataflow_op(mk_op("bar"), case_f.input_wires())?;
         let mut baz_dfg = case_f.dfg_builder(utou.clone(), None, bar.outputs())?;
         let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
-        case_f.finish_with_outputs(baz_dfg.outputs())?;
+        let case_f = case_f.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
+
+        let mut rep1 = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
+        let r_t = rep1.add_op_with_parent(
+            rep1.root(),
+            Case {
+                signature: utou.clone(),
+            },
+        )?;
+        let r_f = rep1.add_op_with_parent(
+            rep1.root(),
+            Case {
+                signature: utou.clone(),
+            },
+        )?;
+        let r = Replacement {
+            removal: vec![case_t, case_f],
+            replacement: rep1,
+            adoptions: HashMap::from_iter([(r_t, case_t), (r_f, case_t)]),
+            mu_inp: vec![],
+            mu_out: vec![],
+            mu_new: vec![],
+        };
+        assert_eq!(
+            r.verify(&h),
+            Err(ReplaceError::TransfersNotSeparateDescendants(vec![case_t]))
+        );
         Ok(())
     }
 }
