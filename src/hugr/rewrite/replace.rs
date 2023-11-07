@@ -734,6 +734,14 @@ mod test {
         );
         assert_eq!(
             Replacement {
+                adoptions: HashMap::from([(r1, case1), (r.replacement.root(), case2)]),
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::InvalidTransferTarget(r.replacement.root()))
+        );
+        assert_eq!(
+            Replacement {
                 adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
                 ..r.clone()
             }
