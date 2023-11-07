@@ -742,6 +742,14 @@ mod test {
         );
         assert_eq!(
             Replacement {
+                removal: vec![case1, baz_dfg.node()],
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
+        );
+        assert_eq!(
+            Replacement {
                 adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
                 ..r.clone()
             }
