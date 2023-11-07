@@ -442,6 +442,7 @@ impl std::fmt::Display for WhichHugr {
 mod test {
     use std::collections::HashMap;
 
+    use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use crate::algorithm::nest_cfgs::test::depth;
@@ -805,7 +806,18 @@ mod test {
                 bad_out_edge
             ))
         );
-
+        let bad_order_edge = NewEdgeSpec {
+            src: cond.node(),
+            tgt: r1.node(),
+            kind: NewEdgeKind::Order,
+        };
+        assert_matches!(
+            Replacement {
+                mu_inp: vec![bad_order_edge.clone()],
+                ..r.clone()
+            }.verify(&h),
+            Err(ReplaceError::BadEdgeKind(_, e)) => e == bad_order_edge
+        );
         Ok(())
     }
 }
