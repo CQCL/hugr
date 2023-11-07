@@ -2,9 +2,11 @@
 //!
 //! These types are re-exported in the root of the crate.
 
-use derive_more::From;
+pub use itertools::Either;
 
-use either::Either::{self, Left, Right};
+use derive_more::From;
+use itertools::Either::{Left, Right};
+
 #[cfg(feature = "pyo3")]
 use pyo3::pyclass;
 
