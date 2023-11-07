@@ -268,8 +268,6 @@ mod test {
     use crate::types::FunctionType;
     use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
-
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};

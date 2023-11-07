@@ -207,8 +207,6 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 #[cfg(test)]
 pub(crate) mod test {
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
-
     use rstest::rstest;
     use serde_json::json;
 

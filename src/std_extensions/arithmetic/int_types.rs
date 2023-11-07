@@ -201,7 +201,6 @@ pub fn extension() -> Extension {
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
 
     use super::*;
 

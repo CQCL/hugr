@@ -679,7 +679,6 @@ mod tests {
     use std::error::Error;
 
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
 
     use crate::extension::PRELUDE_REGISTRY;
     use crate::{

@@ -748,8 +748,6 @@ mod test {
     use crate::types::{FunctionType, Type, TypeRow};
 
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
-
     use itertools::Itertools;
     use portgraph::NodeIndex;
 

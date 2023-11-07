@@ -91,7 +91,6 @@ impl TailLoopBuilder<Hugr> {
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
 
     use crate::{
         builder::{

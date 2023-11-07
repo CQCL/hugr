@@ -329,7 +329,6 @@ mod test {
     use crate::hugr::ValidationError;
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
-    use coverage_helper::test;
 
     use super::*;
     #[test]
