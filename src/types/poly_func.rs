@@ -446,7 +446,7 @@ pub(crate) mod test {
     }
 
     // The standard library new_array does not allow passing in a variable for size.
-    pub(crate) fn new_array(ty: Type, s: TypeArg) -> Type {
+    fn new_array(ty: Type, s: TypeArg) -> Type {
         let array_def = PRELUDE.get_type("array").unwrap();
         Type::new_extension(
             array_def
@@ -511,7 +511,7 @@ pub(crate) mod test {
     }
 
     // forall A. A -> (forall C. C -> List(Tuple(C, A))
-    fn nested_func() -> PolyFuncType {
+    pub(crate) fn nested_func() -> PolyFuncType {
         PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any)],
             FunctionType::new(

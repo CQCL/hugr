@@ -400,6 +400,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
+    pub(crate) use poly_func::test::nested_func;
 
     use super::*;
     use crate::{
