@@ -1,9 +1,11 @@
 //! Implementation of the `InsertIdentity` operation.
 
+use std::iter;
+
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{LeafOp, OpTag, OpTrait};
 use crate::types::EdgeKind;
-use crate::{Direction, HugrView, Port};
+use crate::{HugrView, IncomingPort};
 
 use super::Rewrite;
 
@@ -16,12 +18,12 @@ pub struct IdentityInsertion {
     /// The node following the identity to be inserted.
     pub post_node: Node,
     /// The port following the identity to be inserted.
-    pub post_port: Port,
+    pub post_port: IncomingPort,
 }
 
 impl IdentityInsertion {
     /// Create a new [`IdentityInsertion`] specification.
-    pub fn new(post_node: Node, post_port: Port) -> Self {
+    pub fn new(post_node: Node, post_port: IncomingPort) -> Self {
         Self {
             post_node,
             post_port,
@@ -41,16 +43,15 @@ pub enum IdentityInsertionError {
     /// Invalid port kind.
     #[error("post_port has invalid kind {0:?}. Must be Value.")]
     InvalidPortKind(Option<EdgeKind>),
-
-    /// Must be input port.
-    #[error("post_port is an output port, must be input.")]
-    PortIsOutput,
 }
 
 impl Rewrite for IdentityInsertion {
     type Error = IdentityInsertionError;
     /// The inserted node.
     type ApplyResult = Node;
+    type InvalidationSet<'a> = iter::Once<Node>
+    where
+        Self: 'a;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, _h: &impl HugrView) -> Result<(), IdentityInsertionError> {
         /*
@@ -66,17 +67,13 @@ impl Rewrite for IdentityInsertion {
         unimplemented!()
     }
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, IdentityInsertionError> {
-        if self.post_port.direction() != Direction::Incoming {
-            return Err(IdentityInsertionError::PortIsOutput);
-        }
-
         let kind = h.get_optype(self.post_node).port_kind(self.post_port);
         let Some(EdgeKind::Value(ty)) = kind else {
             return Err(IdentityInsertionError::InvalidPortKind(kind));
         };
 
         let (pre_node, pre_port) = h
-            .linked_ports(self.post_node, self.post_port)
+            .linked_outputs(self.post_node, self.post_port)
             .exactly_one()
             .ok()
             .expect("Value kind input can only have one connection.");
@@ -98,6 +95,11 @@ impl Rewrite for IdentityInsertion {
             .expect("Should only fail if ports don't exist.");
         Ok(new_node)
     }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        iter::once(self.post_node)
+    }
 }
 
 #[cfg(test)]
@@ -110,7 +112,7 @@ mod tests {
         algorithm::nest_cfgs::test::build_conditional_in_loop_cfg,
         extension::{prelude::QB_T, PRELUDE_REGISTRY},
         ops::handle::NodeHandle,
-        Hugr,
+        Hugr, HugrView,
     };
 
     #[rstest]
@@ -136,7 +138,7 @@ mod tests {
 
         assert_eq!(noop, LeafOp::Noop { ty: QB_T });
 
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]
@@ -144,11 +146,6 @@ mod tests {
         let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
 
         let final_node = tail.node();
-
-        let final_node_output = h.node_outputs(final_node).next().unwrap();
-        let rw = IdentityInsertion::new(final_node, final_node_output);
-        let apply_result = h.apply_rewrite(rw);
-        assert_eq!(apply_result, Err(IdentityInsertionError::PortIsOutput));
 
         let final_node_input = h.node_inputs(final_node).next().unwrap();
 

@@ -79,7 +79,7 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(NodeType::open_extensions(dfg_op));
+        let base = Hugr::new(NodeType::new_open(dfg_op));
         let root = base.root();
         DFGBuilder::create_with_io(base, root, signature, None)
     }
@@ -90,7 +90,7 @@ impl HugrBuilder for DFGBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, ValidationError> {
-        self.base.infer_and_validate(extension_registry)?;
+        self.base.update_validate(extension_registry)?;
         Ok(self.base)
     }
 }

@@ -4,6 +4,7 @@ on:
   schedule:
     # 04:00 daily
     - cron: '0 4 * * *'
+  workflow_dispatch: {}
 
 jobs:
   check-coverage:
@@ -12,33 +13,34 @@ jobs:
       msg: ${{ steps.make_msg.outputs.msg }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install llvm
-        uses: KyleMayes/install-llvm-action@v1
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          version: "16.0" # should match version used by rustc
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
       - name: Download previous summary
         uses: dawidd6/action-download-artifact@v2
         with:
           # Downloads the artifact from the most recent successful run
           workflow: 'coverage.yml'
           name: coverage-summary
-      - name: Rename file
-        run: mv coverage-summary.txt coverage-summary-prev.txt
-      - name: Generate coverage report and summary
-        env:
-          RUSTFLAGS: "-C instrument-coverage"
+          if_no_artifact_found: ignore
+      - name: Rename file or load default
         run: |
-          TGT=`cargo test --tests 2>&1 | grep Running | awk -F'[()]' '{print $2}'`
-          llvm-profdata merge -sparse default_*.profraw -o hugr.profdata
-          llvm-cov show --format=html --ignore-filename-regex='/.cargo/registry' --instr-profile=hugr.profdata --output-dir coverage --object ${TGT}
-          llvm-cov report --ignore-filename-regex='/.cargo/registry' --instr-profile=hugr.profdata --object ${TGT} | grep TOTAL | awk '{print $10}' | tr -dc '[:digit:].' > coverage-summary.txt
-      - name: Upload full report
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage
-          path: coverage/
+          if [ -f coverage-summary.txt ];
+          then
+            mv coverage-summary.txt coverage-summary-prev.txt
+          else
+            echo -n "0.0" > coverage-summary-prev.txt
+          fi
+      - name: Run tests with coverage instrumentation
+        run: |
+            cargo llvm-cov clean --workspace
+            cargo llvm-cov --doctests
+      - name: Generate coverage report and summary
+        run: |
+          cargo llvm-cov report --summary-only | grep TOTAL | awk '{print $10}' | tr -dc '[:digit:].' > coverage-summary.txt
       - name: Upload summary
         uses: actions/upload-artifact@v3
         with:
@@ -48,11 +50,12 @@ jobs:
         id: make_msg
         run: |
           change="`cat coverage-summary-prev.txt`% --> `cat coverage-summary.txt`%"
+          codecov="https://codecov.io/gh/${{ github.repository }}?search=&trend=7%20days"
           if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.04" | bc -l) ))
           then
-            echo "msg=Coverage check for hugr shows no regression (${change}). ✅ ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "msg=Coverage check for hugr shows no regression (${change}). ✅ ${codecov}" >> "$GITHUB_OUTPUT"
           else
-            echo "msg=Coverage check for hugr shows regression (${change}). ❌ ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "msg=Coverage check for hugr shows regression (${change}). ❌ ${codecov}" >> "$GITHUB_OUTPUT"
           fi
   notify-slack:
     needs: check-coverage

@@ -14,6 +14,7 @@
 
 pub mod algorithm;
 pub mod builder;
+mod core;
 pub mod extension;
 pub mod hugr;
 pub mod macros;
@@ -23,5 +24,8 @@ pub mod types;
 mod utils;
 pub mod values;
 
+pub use crate::core::{
+    CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
+};
 pub use crate::extension::Extension;
-pub use crate::hugr::{Direction, Hugr, HugrView, Node, Port, SimpleReplacement, Wire};
+pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};

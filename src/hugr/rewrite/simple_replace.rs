@@ -1,16 +1,15 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
+use std::iter::{self, Copied};
+use std::slice;
 
 use itertools::Itertools;
 
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrMut, HugrView, NodeMetadata};
-use crate::{
-    hugr::{Node, Rewrite},
-    ops::{OpTag, OpTrait, OpType},
-    Hugr, Port,
-};
+use crate::hugr::{HugrMut, HugrView, NodeMetadata, Rewrite};
+use crate::ops::{OpTag, OpTrait, OpType};
+use crate::{Hugr, IncomingPort, Node};
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
@@ -22,19 +21,20 @@ pub struct SimpleReplacement {
     replacement: Hugr,
     /// A map from (target ports of edges from the Input node of `replacement`) to (target ports of
     /// edges from nodes not in `removal` to nodes in `removal`).
-    nu_inp: HashMap<(Node, Port), (Node, Port)>,
+    nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
     /// A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
     /// (input ports of the Output node of `replacement`).
-    nu_out: HashMap<(Node, Port), Port>,
+    nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
 }
 
 impl SimpleReplacement {
     /// Create a new [`SimpleReplacement`] specification.
+    #[inline]
     pub fn new(
         subgraph: SiblingSubgraph,
         replacement: Hugr,
-        nu_inp: HashMap<(Node, Port), (Node, Port)>,
-        nu_out: HashMap<(Node, Port), Port>,
+        nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)>,
+        nu_out: HashMap<(Node, IncomingPort), IncomingPort>,
     ) -> Self {
         Self {
             subgraph,
@@ -45,19 +45,30 @@ impl SimpleReplacement {
     }
 
     /// The replacement hugr.
+    #[inline]
     pub fn replacement(&self) -> &Hugr {
         &self.replacement
     }
 
     /// Subgraph to be replaced.
+    #[inline]
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
 }
 
+type SubgraphNodesIter<'a> = Copied<slice::Iter<'a, Node>>;
+type NuOutNodesIter<'a> = iter::Map<
+    hash_map::Keys<'a, (Node, IncomingPort), IncomingPort>,
+    fn(&'a (Node, IncomingPort)) -> Node,
+>;
+
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
     type ApplyResult = ();
+    type InvalidationSet<'a> = iter::Chain<SubgraphNodesIter<'a>, NuOutNodesIter<'a>>
+    where
+        Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -104,7 +115,7 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
-                for target in self.replacement.linked_ports(node, outport) {
+                for target in self.replacement.linked_inputs(node, outport) {
                     if self.replacement.get_optype(target.0).tag() != OpTag::Output {
                         let new_target = index_map.get(&target.0).unwrap();
                         h.connect(*new_node, outport, *new_target, target.1)
@@ -119,7 +130,7 @@ impl Rewrite for SimpleReplacement {
             if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_ports(*rem_inp_node, *rem_inp_port)
+                    .linked_outputs(*rem_inp_node, *rem_inp_port)
                     .exactly_one()
                     .ok() // PortLinks does not implement Debug
                     .unwrap();
@@ -139,7 +150,7 @@ impl Rewrite for SimpleReplacement {
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
             let (rep_out_pred_node, rep_out_pred_port) = self
                 .replacement
-                .linked_ports(replacement_output_node, *rep_out_port)
+                .linked_outputs(replacement_output_node, *rep_out_port)
                 .exactly_one()
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
@@ -161,7 +172,7 @@ impl Rewrite for SimpleReplacement {
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
                 // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_ports(*rem_inp_node, *rem_inp_port)
+                    .linked_outputs(*rem_inp_node, *rem_inp_port)
                     .exactly_one()
                     .ok() // PortLinks does not implement Debug
                     .unwrap();
@@ -182,6 +193,14 @@ impl Rewrite for SimpleReplacement {
         }
         Ok(())
     }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let get_node: fn(&(Node, IncomingPort)) -> Node = |key| key.0;
+        let out_neighs = self.nu_out.keys().map(get_node);
+        subcirc.chain(out_neighs)
+    }
 }
 
 /// Error from a [`SimpleReplacement`] operation.
@@ -201,9 +220,8 @@ pub enum SimpleReplacementError {
 #[cfg(test)]
 pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
-    use portgraph::Direction;
     use rstest::{fixture, rstest};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -212,13 +230,14 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
-    use crate::hugr::{Hugr, HugrMut, Node};
+    use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::quantum::test::{cx_gate, h_gate};
+    use crate::type_row;
     use crate::types::{FunctionType, Type};
-    use crate::{type_row, Port};
+    use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
 
@@ -351,28 +370,20 @@ pub(in crate::hugr::rewrite) mod test {
             .unwrap();
         let (n_node_h0, n_node_h1) = n.input_neighbours(n_node_cx).collect_tuple().unwrap();
         // 3.2. Locate the ports we need to specify as "glue" in n
-        let n_port_0 = n.node_ports(n_node_h0, Direction::Incoming).next().unwrap();
-        let n_port_1 = n.node_ports(n_node_h1, Direction::Incoming).next().unwrap();
-        let (n_cx_out_0, n_cx_out_1) = n
-            .node_ports(n_node_cx, Direction::Outgoing)
-            .take(2)
-            .collect_tuple()
-            .unwrap();
-        let n_port_2 = n.linked_ports(n_node_cx, n_cx_out_0).next().unwrap().1;
-        let n_port_3 = n.linked_ports(n_node_cx, n_cx_out_1).next().unwrap().1;
+        let n_port_0 = n.node_inputs(n_node_h0).next().unwrap();
+        let n_port_1 = n.node_inputs(n_node_h1).next().unwrap();
+        let (n_cx_out_0, n_cx_out_1) = n.node_outputs(n_node_cx).take(2).collect_tuple().unwrap();
+        let n_port_2 = n.linked_inputs(n_node_cx, n_cx_out_0).next().unwrap().1;
+        let n_port_3 = n.linked_inputs(n_node_cx, n_cx_out_1).next().unwrap().1;
         // 3.3. Locate the ports we need to specify as "glue" in h
-        let (h_port_0, h_port_1) = h
-            .node_ports(h_node_cx, Direction::Incoming)
-            .take(2)
-            .collect_tuple()
-            .unwrap();
-        let h_h0_out = h.node_ports(h_node_h0, Direction::Outgoing).next().unwrap();
-        let h_h1_out = h.node_ports(h_node_h1, Direction::Outgoing).next().unwrap();
-        let (h_outp_node, h_port_2) = h.linked_ports(h_node_h0, h_h0_out).next().unwrap();
-        let h_port_3 = h.linked_ports(h_node_h1, h_h1_out).next().unwrap().1;
+        let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
+        let h_h0_out = h.node_outputs(h_node_h0).next().unwrap();
+        let h_h1_out = h.node_outputs(h_node_h1).next().unwrap();
+        let (h_outp_node, h_port_2) = h.linked_inputs(h_node_h0, h_h0_out).next().unwrap();
+        let h_port_3 = h.linked_inputs(h_node_h1, h_h1_out).next().unwrap().1;
         // 3.4. Construct the maps
-        let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
-        let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
+        let mut nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)> = HashMap::new();
+        let mut nu_out: HashMap<(Node, IncomingPort), IncomingPort> = HashMap::new();
         nu_inp.insert((n_node_h0, n_port_0), (h_node_cx, h_port_0));
         nu_inp.insert((n_node_h1, n_port_1), (h_node_cx, h_port_1));
         nu_out.insert((h_outp_node, h_port_2), n_port_2);
@@ -384,6 +395,11 @@ pub(in crate::hugr::rewrite) mod test {
             nu_inp,
             nu_out,
         };
+        assert_eq!(
+            HashSet::<_>::from_iter(r.invalidation_set()),
+            HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
+        );
+
         h.apply_rewrite(r).unwrap();
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
@@ -391,7 +407,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌─┴─┐
         // ┤ H ├┤ H ├┤ X ├
         // └───┘└───┘└───┘
-        assert_eq!(h.infer_and_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[rstest]
@@ -440,11 +456,11 @@ pub(in crate::hugr::rewrite) mod test {
         // 3.3. Locate the ports we need to specify as "glue" in h
         let (h_port_0, h_port_1) = h.node_inputs(h_node_cx).take(2).collect_tuple().unwrap();
         let (h_node_h0, h_node_h1) = h.output_neighbours(h_node_cx).collect_tuple().unwrap();
-        let h_port_2 = h.node_ports(h_node_h0, Direction::Incoming).next().unwrap();
-        let h_port_3 = h.node_ports(h_node_h1, Direction::Incoming).next().unwrap();
+        let h_port_2 = h.node_inputs(h_node_h0).next().unwrap();
+        let h_port_3 = h.node_inputs(h_node_h1).next().unwrap();
         // 3.4. Construct the maps
-        let mut nu_inp: HashMap<(Node, Port), (Node, Port)> = HashMap::new();
-        let mut nu_out: HashMap<(Node, Port), Port> = HashMap::new();
+        let mut nu_inp: HashMap<(Node, IncomingPort), (Node, IncomingPort)> = HashMap::new();
+        let mut nu_out: HashMap<(Node, IncomingPort), IncomingPort> = HashMap::new();
         nu_inp.insert((n_node_output, n_port_0), (h_node_cx, h_port_0));
         nu_inp.insert((n_node_h, n_port_2), (h_node_cx, h_port_1));
         nu_out.insert((h_node_h0, h_port_2), n_port_0);
@@ -463,7 +479,7 @@ pub(in crate::hugr::rewrite) mod test {
         // ├───┤├───┤┌───┐
         // ┤ H ├┤ H ├┤ H ├
         // └───┘└───┘└───┘
-        assert_eq!(h.infer_and_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
     }
 
     #[test]
@@ -487,7 +503,7 @@ pub(in crate::hugr::rewrite) mod test {
             .node_outputs(input)
             .filter(|&p| h.get_optype(input).signature().get(p).is_some())
             .map(|p| {
-                let link = h.linked_ports(input, p).next().unwrap();
+                let link = h.linked_inputs(input, p).next().unwrap();
                 (link, link)
             })
             .collect();
@@ -537,10 +553,10 @@ pub(in crate::hugr::rewrite) mod test {
             .collect_vec();
 
         let first_out_p = h.node_outputs(input).next().unwrap();
-        let embedded_inputs = h.linked_ports(input, first_out_p);
+        let embedded_inputs = h.linked_inputs(input, first_out_p);
         let repl_inputs = repl
             .node_outputs(repl_input)
-            .map(|p| repl.linked_ports(repl_input, p).next().unwrap());
+            .map(|p| repl.linked_inputs(repl_input, p).next().unwrap());
         let inputs = embedded_inputs.zip(repl_inputs).collect();
 
         let outputs = repl

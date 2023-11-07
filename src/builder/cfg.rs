@@ -62,7 +62,7 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(NodeType::open_extensions(cfg_op));
+        let base = Hugr::new(NodeType::new_open(cfg_op));
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
@@ -73,7 +73,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.infer_and_validate(extension_registry)?;
+        self.base.update_validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -103,8 +103,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching predicate Sum value
-    /// specified by `predicate_variants`.
+    /// and `outputs` and the variants of the branching TupleSum value
+    /// specified by `tuple_sum_rows`.
     ///
     /// # Errors
     ///
@@ -112,13 +112,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     pub fn block_builder(
         &mut self,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         extension_delta: ExtensionSet,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.any_block_builder(
             inputs,
-            predicate_variants,
+            tuple_sum_rows,
             other_outputs,
             extension_delta,
             false,
@@ -128,15 +128,16 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     fn any_block_builder(
         &mut self,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
         extension_delta: ExtensionSet,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
         let op = OpType::BasicBlock(BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
-            predicate_variants: predicate_variants.clone(),
+            tuple_sum_rows: tuple_sum_rows.clone(),
             extension_delta,
         });
         let parent = self.container_node();
@@ -152,14 +153,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         BlockBuilder::create(
             self.hugr_mut(),
             block_n,
-            predicate_variants,
+            tuple_sum_rows,
             other_outputs,
             inputs,
         )
     }
 
     /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -178,15 +179,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching predicate Sum value
-    /// specified by `predicate_variants`.
+    /// and `outputs` and the variants of the branching TupleSum value
+    /// specified by `tuple_sum_rows`.
     ///
     /// # Errors
     ///
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder(
         &mut self,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
@@ -194,17 +195,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.any_block_builder(
-            inputs,
-            predicate_variants,
-            other_outputs,
-            extension_delta,
-            true,
-        )
+        self.any_block_builder(inputs, tuple_sum_rows, other_outputs, extension_delta, true)
     }
 
     /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
-    /// and `outputs` and a simple predicate type: a Sum of `n_cases` unit types.
+    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -244,8 +239,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
-    /// Set the outputs of the block, with `branch_wire` being the value of the
-    /// predicate.  `outputs` are the remaining outputs.
+    /// Set the outputs of the block, with `branch_wire` carrying  the value of the
+    /// branch controlling TupleSum value.  `outputs` are the remaining outputs.
     pub fn set_outputs(
         &mut self,
         branch_wire: Wire,
@@ -256,13 +251,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     fn create(
         base: B,
         block_n: Node,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
         inputs: TypeRow,
     ) -> Result<Self, BuildError> {
-        // The node outputs a predicate before the data outputs of the block node
-        let predicate_type = Type::new_predicate(predicate_variants);
-        let mut node_outputs = vec![predicate_type];
+        // The node outputs a TupleSum before the data outputs of the block node
+        let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows);
+        let mut node_outputs = vec![tuple_sum_type];
         node_outputs.extend_from_slice(&other_outputs);
         let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
         let inp_ex = base
@@ -293,23 +288,23 @@ impl BlockBuilder<Hugr> {
     pub fn new(
         inputs: impl Into<TypeRow>,
         input_extensions: impl Into<Option<ExtensionSet>>,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
-        let predicate_variants: Vec<_> = predicate_variants.into_iter().collect();
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
         let other_outputs = other_outputs.into();
         let op = BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
-            predicate_variants: predicate_variants.clone(),
+            tuple_sum_rows: tuple_sum_rows.clone(),
             extension_delta,
         };
 
         let base = Hugr::new(NodeType::new(op, input_extensions));
         let root = base.root();
-        Self::create(base, root, predicate_variants, other_outputs, inputs)
+        Self::create(base, root, tuple_sum_rows, other_outputs, inputs)
     }
 
     /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).
@@ -382,14 +377,13 @@ mod test {
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
-            let sum = entry_b.make_predicate(1, sum2_variants, [inw])?;
+            let sum = entry_b.make_tuple_sum(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
-            let c = middle_b
-                .add_load_const(ops::Const::simple_unary_predicate(), ExtensionSet::new())?;
+            let c = middle_b.add_load_const(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };

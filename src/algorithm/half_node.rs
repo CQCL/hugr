@@ -2,8 +2,9 @@ use std::hash::Hash;
 
 use super::nest_cfgs::CfgNodeMap;
 
-use crate::hugr::views::HugrView;
+use crate::hugr::RootTagged;
 
+use crate::ops::handle::CfgID;
 use crate::ops::{OpTag, OpTrait};
 
 use crate::{Direction, Node};
@@ -30,7 +31,7 @@ struct HalfNodeView<H> {
     exit: Node,
 }
 
-impl<H: HugrView> HalfNodeView<H> {
+impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
     #[allow(unused)]
     pub(crate) fn new(h: H) -> Self {
         let (entry, exit) = {
@@ -62,7 +63,7 @@ impl<H: HugrView> HalfNodeView<H> {
     }
 }
 
-impl<H: HugrView> CfgNodeMap<HalfNode> for HalfNodeView<H> {
+impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H> {
     type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)
@@ -97,6 +98,7 @@ mod test {
     use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
     use crate::builder::BuildError;
+    use crate::hugr::views::RootChecked;
     use crate::ops::handle::NodeHandle;
 
     use itertools::Itertools;
@@ -116,7 +118,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
-        let v = HalfNodeView::new(&h);
+        let v = HalfNodeView::new(RootChecked::try_new(&h).unwrap());
 
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;

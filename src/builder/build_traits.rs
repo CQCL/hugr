@@ -1,8 +1,9 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
-use crate::hugr::{IncomingPort, Node, NodeMetadata, OutgoingPort, Port, ValidationError};
+use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTrait, OpType};
+use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
 
@@ -199,7 +200,7 @@ pub trait Dataflow: Container {
         op: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_node(NodeType::open_extensions(op), input_wires)
+        self.add_dataflow_node(NodeType::new_auto(op), input_wires)
     }
 
     /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
@@ -231,7 +232,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr(hugr)?.new_root.unwrap();
+        let node = self.add_hugr(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -252,7 +253,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
-        let node = self.add_hugr_view(hugr)?.new_root.unwrap();
+        let node = self.add_hugr_view(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -354,8 +355,8 @@ pub trait Dataflow: Container {
         let const_node = cid.node();
         let nodetype = self.hugr().get_nodetype(const_node);
         let input_extensions = nodetype.input_extensions().cloned();
-        let op: &OpType = nodetype.into();
-        let op: ops::Const = op
+        let op: ops::Const = nodetype
+            .op()
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
@@ -368,7 +369,7 @@ pub trait Dataflow: Container {
                 input_extensions,
             ),
             // Constant wire from the constant value node
-            vec![Wire::new(const_node, Port::new_outgoing(0))],
+            vec![Wire::new(const_node, OutgoingPort::from(0))],
         )?;
 
         Ok(load_n.out_wire(0))
@@ -421,8 +422,8 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
-    /// `predicate_inputs` and `predicate_wire` define the type of the predicate
-    /// variants and the wire carrying the predicate respectively.
+    /// `tuple_sum_rows` and `tuple_sum_wire` define the type of the TupleSum
+    /// variants and the wire carrying the TupleSum respectively.
     ///
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -434,24 +435,24 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (predicate_inputs, predicate_wire): (impl IntoIterator<Item = TypeRow>, Wire),
+        (tuple_sum_rows, tuple_sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
-        let mut input_wires = vec![predicate_wire];
+        let mut input_wires = vec![tuple_sum_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
         input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
-        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
-        let n_cases = predicate_inputs.len();
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
+        let n_cases = tuple_sum_rows.len();
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
             ops::Conditional {
-                predicate_inputs,
+                tuple_sum_rows,
                 other_inputs: inputs,
                 outputs: output_types,
                 extension_delta,
@@ -534,15 +535,15 @@ pub trait Dataflow: Container {
     }
 
     /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
-    /// `tag` variant of a predicate (sum-of-tuples) type.
-    fn make_predicate(
+    /// `tag` variant of a TupleSum type.
+    fn make_tuple_sum(
         &mut self,
         tag: usize,
-        predicate_variants: impl IntoIterator<Item = TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let tuple = self.make_tuple(values)?;
-        let variants = crate::types::predicate_variants_row(predicate_variants);
+        let variants = crate::types::tuple_sum_row(tuple_sum_rows);
         let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
         Ok(make_op.out_wire(0))
     }
@@ -561,7 +562,7 @@ pub trait Dataflow: Container {
         tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
+        self.make_tuple_sum(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -578,7 +579,7 @@ pub trait Dataflow: Container {
         loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_predicate(1, [loop_op.just_inputs, loop_op.just_outputs], values)
+        self.make_tuple_sum(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
     /// Add a [`ops::Call`] node, calling `function`, with inputs
@@ -627,7 +628,7 @@ fn add_op_with_wires<T: Dataflow + ?Sized>(
     optype: impl Into<OpType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    add_node_with_wires(data_builder, NodeType::open_extensions(optype), inputs)
+    add_node_with_wires(data_builder, NodeType::new_auto(optype), inputs)
 }
 
 fn add_node_with_wires<T: Dataflow + ?Sized>(
@@ -658,12 +659,12 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
-    src_port: impl TryInto<OutgoingPort>,
+    src_port: impl Into<OutgoingPort>,
     dst: Node,
-    dst_port: impl TryInto<IncomingPort>,
+    dst_port: impl Into<IncomingPort>,
 ) -> Result<bool, BuildError> {
-    let src_port = Port::try_new_outgoing(src_port)?;
-    let dst_port = Port::try_new_incoming(dst_port)?;
+    let src_port = src_port.into();
+    let dst_port = dst_port.into();
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
@@ -675,9 +676,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             if !typ.copyable() {
                 let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                     ty: EdgeKind::Value(typ),
                 }
                 .into();
@@ -693,9 +694,9 @@ fn wire_up<T: Dataflow + ?Sized>(
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
                     from: src,
-                    from_offset: src_port,
+                    from_offset: src_port.into(),
                     to: dst,
-                    to_offset: dst_port,
+                    to_offset: dst_port.into(),
                 }
                 .into();
                 return Err(val_err.into());

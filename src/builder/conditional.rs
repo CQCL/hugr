@@ -126,10 +126,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let case_node =
             // add case before any existing subsequent cases
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
-                // TODO: Allow this to be non-pure
-                self.hugr_mut().add_node_before(sibling_node, NodeType::open_extensions(case_op))?
+                self.hugr_mut().add_op_before(sibling_node, case_op)?
             } else {
-                self.add_child_node(NodeType::open_extensions(case_op))?
+                self.add_child_op(case_op)?
             };
 
         self.case_nodes[case] = Some(case_node);
@@ -150,7 +149,7 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
         mut self,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Hugr, crate::hugr::ValidationError> {
-        self.base.infer_and_validate(extension_registry)?;
+        self.base.update_validate(extension_registry)?;
         Ok(self.base)
     }
 }
@@ -158,26 +157,26 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        predicate_inputs: impl IntoIterator<Item = TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
-        let predicate_inputs: Vec<_> = predicate_inputs.into_iter().collect();
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
         let other_inputs = other_inputs.into();
         let outputs = outputs.into();
 
         let n_out_wires = outputs.len();
-        let n_cases = predicate_inputs.len();
+        let n_cases = tuple_sum_rows.len();
 
         let op = ops::Conditional {
-            predicate_inputs,
+            tuple_sum_rows,
             other_inputs,
             outputs,
             extension_delta,
         };
         // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::open_extensions(op));
+        let base = Hugr::new(NodeType::new_open(op));
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -195,7 +194,7 @@ impl CaseBuilder<Hugr> {
         let op = ops::Case {
             signature: signature.clone(),
         };
-        let base = Hugr::new(NodeType::open_extensions(op));
+        let base = Hugr::new(NodeType::new_open(op));
         let root = base.root();
         let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
 
@@ -222,9 +221,8 @@ mod test {
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
         let mut conditional_b = ConditionalBuilder::new(
-            predicate_inputs,
+            [type_row![], type_row![]],
             type_row![NAT],
             type_row![NAT],
             ExtensionSet::new(),
@@ -248,11 +246,10 @@ mod test {
                 let const_wire = fbuild.load_const(&tru_const)?;
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
-                    let predicate_inputs = vec![type_row![]; 2];
                     let other_inputs = vec![(NAT, int)];
                     let outputs = vec![NAT].into();
                     let mut conditional_b = fbuild.conditional_builder(
-                        (predicate_inputs, const_wire),
+                        ([type_row![], type_row![]], const_wire),
                         other_inputs,
                         outputs,
                         ExtensionSet::new(),
@@ -276,9 +273,8 @@ mod test {
 
     #[test]
     fn test_not_all_cases() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
         let mut builder = ConditionalBuilder::new(
-            predicate_inputs,
+            [type_row![], type_row![]],
             type_row![],
             type_row![],
             ExtensionSet::new(),
@@ -295,9 +291,8 @@ mod test {
 
     #[test]
     fn test_case_already_built() -> Result<(), BuildError> {
-        let predicate_inputs = vec![type_row![]; 2];
         let mut builder = ConditionalBuilder::new(
-            predicate_inputs,
+            [type_row![], type_row![]],
             type_row![],
             type_row![],
             ExtensionSet::new(),
