@@ -26,7 +26,9 @@ use super::{FunctionType, Substitution};
 )]
 pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
-    /// the same number of [TypeArg]s before the function can be called.
+    /// the same number of [TypeArg]s before the function can be called. Note that within
+    /// the [Self::body], variable (DeBruijn) index 0 is element 0 of this array, i.e. the
+    /// variables are bound from right to left.
     ///
     /// [TypeArg]: super::type_param::TypeArg
     params: Vec<TypeParam>,
@@ -43,7 +45,10 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-/// Index of a type variable (DeBruijn, 0=closest=rightmost)
+/// Index of a type variable.
+/// Roughly DeBruijn, noting that when many variables are declared by the same [PolyFuncType],
+/// index 0 ("the closest binder") refers to the first element of [PolyFuncType::params],
+/// i.e. the binders are processed from right to left
 #[derive(
     Clone,
     Copy,
@@ -67,9 +72,7 @@ impl VarIdx {
     }
 
     pub(super) fn index<'a, T>(&self, elems: &'a [T]) -> Option<&'a T> {
-        // DeBruijn indices apply from the rightmost element (closest binder first)
-        // The fancy checked_sub is so we return None for out-of-range rather than panic.
-        elems.get(elems.len().checked_sub(self.0 + 1)?)
+        elems.get(self.0)
     }
 }
 
@@ -106,9 +109,9 @@ impl PolyFuncType {
         let all_var_decls = if self.params.is_empty() {
             external_var_decls
         } else {
-            // Type vars declared here go at highest indices (DeBruijn indices right-to-left)
-            v = external_var_decls.to_vec();
-            v.extend_from_slice(&self.params);
+            // Type vars declared here go at lowest indices (as per DeBruijn)
+            v = self.params.clone();
+            v.extend_from_slice(external_var_decls);
             v.as_slice()
         };
         self.body.validate(reg, all_var_decls)
@@ -129,6 +132,9 @@ impl PolyFuncType {
     }
 
     /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
+    /// Note that indices into `args` correspond to the same index within [Self::params],
+    /// so we instantiate the lowest-index [Self::params] first, even though these
+    /// would be considered "innermost" / "closest" according to DeBruijn numbering.
     pub(crate) fn instantiate_poly(
         &self,
         args: &[TypeArg],
@@ -142,13 +148,9 @@ impl PolyFuncType {
             // Partial application - renumber remaining params (still bound) downward
             v = args.to_vec();
             v.extend(
-                // The double reverse is so we reverse only the enumerate-indices,
-                // i.e. counting down to 0 = the rightmost element (right-to-left DeBruijn)
                 remaining
                     .iter()
-                    .rev()
                     .enumerate()
-                    .rev()
                     .map(|(i, decl)| TypeArg::new_var_use(i, decl.clone())),
             );
             v.as_slice()
@@ -303,7 +305,7 @@ pub(crate) mod test {
         let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
         let [tyvar, szvar] =
-            [0, 1].map(|i| TypeArg::new_var_use(1 - i, typarams.get(i).unwrap().clone()));
+            [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
@@ -493,10 +495,10 @@ pub(crate) mod test {
             vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
             FunctionType::new(
                 vec![new_array(
-                    Type::new_var_use(1, TypeBound::Any),
-                    TypeArg::new_var_use(0, TypeParam::max_nat()),
+                    Type::new_var_use(0, TypeBound::Any),
+                    TypeArg::new_var_use(1, TypeParam::max_nat()),
                 )],
-                vec![Type::new_var_use(1, TypeBound::Any)],
+                vec![Type::new_var_use(0, TypeBound::Any)],
             ),
             &PRELUDE_REGISTRY,
         )?;
