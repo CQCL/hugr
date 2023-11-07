@@ -10,7 +10,7 @@ use crate::types::type_param::TypeArg;
 use crate::types::PolyFuncType;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
-    types::{EdgeKind, FunctionType, SignatureDescription, Type, TypeRow},
+    types::{EdgeKind, FunctionType, Type, TypeRow},
 };
 
 /// Dataflow operations with no children.
@@ -179,15 +179,6 @@ impl OpTrait for LeafOp {
                 vec![Type::new_function(ta.input.clone())],
                 vec![Type::new_function(ta.output.clone())],
             ),
-        }
-    }
-
-    /// Optional description of the ports in the signature.
-    fn signature_desc(&self) -> SignatureDescription {
-        match self {
-            LeafOp::CustomOp(ext) => ext.signature_desc(),
-            // TODO: More port descriptions
-            _ => Default::default(),
         }
     }
 
