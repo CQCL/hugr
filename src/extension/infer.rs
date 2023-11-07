@@ -553,17 +553,13 @@ impl UnificationContext {
                 if loc.1 == Direction::Incoming {
                     results.insert(loc.0, rs.clone());
                 }
-            } else if !depends_on_var.contains(&self.resolve(*meta)) {
-                // If it depends on some other live meta, that's bad news.
-                return Err(InferExtensionError::Unsolved { location: *loc });
+            } else {
+                // Unsolved nodes must be unsolved because they depend on graph variables.
+                if !depends_on_var.contains(&self.resolve(*meta)) {
+                    return Err(InferExtensionError::Unsolved { location: *loc });
+                }
             }
-            // If it ("only"??) depends on graph variables, then we don't have
-            // a *solution*, but it's fine
         }
-        debug_assert!(self
-            .extensions
-            .values()
-            .all(|m| self.get_solution(m).is_some() || depends_on_var.contains(&self.resolve(*m))));
         Ok(results)
     }
 
