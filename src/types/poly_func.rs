@@ -303,7 +303,7 @@ pub(crate) mod test {
         let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
         let [tyvar, szvar] =
-            [0, 1].map(|i| TypeArg::new_var_use(1-i, typarams.get(i).unwrap().clone()));
+            [0, 1].map(|i| TypeArg::new_var_use(1 - i, typarams.get(i).unwrap().clone()));
 
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
@@ -608,7 +608,7 @@ pub(crate) mod test {
                         Type::new_var_use(0, TypeBound::Copyable),
                         // Next is the free variable that we substituted in (hence Eq)
                         // - renumbered because of the intervening forall (Copyable)
-                        Type::new_var_use(3 + 1, TypeBound::Eq)
+                        Type::new_var_use(FREE + 1, TypeBound::Eq)
                     )
                 ))]
             )
