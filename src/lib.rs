@@ -14,7 +14,7 @@
 
 pub mod algorithm;
 pub mod builder;
-mod core;
+pub mod core;
 pub mod extension;
 pub mod hugr;
 pub mod macros;
