@@ -461,7 +461,7 @@ mod test {
     use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpTrait, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
-    use crate::{type_row, Direction, Hugr, HugrView, Node, OutgoingPort};
+    use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 
@@ -771,21 +771,38 @@ mod test {
             ]))
         );
         // Edges....
-        let bad_edge = NewEdgeSpec {
-            src: cond.node(),
-            tgt: h.nodes().max().unwrap(),
+        let edge_from_removed = NewEdgeSpec {
+            src: case1,
+            tgt: r2,
             kind: NewEdgeKind::Order,
         };
         assert_eq!(
             Replacement {
-                mu_inp: vec![bad_edge.clone()],
+                mu_inp: vec![edge_from_removed.clone()],
                 ..r.clone()
             }
             .verify(&h),
             Err(ReplaceError::BadEdgeSpec(
-                Direction::Incoming,
+                Direction::Outgoing,
+                WhichHugr::Retained,
+                edge_from_removed
+            ))
+        );
+        let bad_out_edge = NewEdgeSpec {
+            src: h.nodes().max().unwrap(), // not valid in replacement
+            tgt: cond.node(),
+            kind: NewEdgeKind::Order,
+        };
+        assert_eq!(
+            Replacement {
+                mu_out: vec![bad_out_edge.clone()],
+                ..r.clone()
+            }
+            .verify(&h),
+            Err(ReplaceError::BadEdgeSpec(
+                Direction::Outgoing,
                 WhichHugr::Replacement,
-                bad_edge
+                bad_out_edge
             ))
         );
 
