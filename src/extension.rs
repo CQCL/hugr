@@ -395,7 +395,7 @@ impl ExtensionSet {
             None => vec![e.clone()],
             Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
                 TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
-                _ => panic!("value for type var was not extension set - type scheme should be validate()d first"),
+                _ => panic!("value for type var was not extension set - type scheme should be validated first"),
             },
         }))
     }
