@@ -687,7 +687,7 @@ impl UnificationContext {
                         });
 
                 let (rs, other_ms): (Vec<_>, Vec<_>) = plus_constraints.unzip();
-                let solution = rs.iter().fold(ExtensionSet::new(), |e1, e2| e1.union(e2));
+                let solution = rs.iter().fold(ExtensionSet::new(), ExtensionSet::union);
                 let unresolved_metas = other_ms
                     .into_iter()
                     .filter(|other_m| m != *other_m)
