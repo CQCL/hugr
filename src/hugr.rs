@@ -150,13 +150,9 @@ impl NodeType {
     }
 }
 
-impl OpType {
-    /// Convert an OpType to a NodeType by giving it some input extensions
-    pub fn with_extensions(self, rs: ExtensionSet) -> NodeType {
-        NodeType {
-            op: self,
-            input_extensions: Some(rs),
-        }
+impl<T: Into<OpType>> From<T> for NodeType {
+    fn from(value: T) -> Self {
+        NodeType::new_auto(value.into())
     }
 }
 
@@ -244,11 +240,6 @@ impl Hugr {
             op_types,
             metadata: UnmanagedDenseMap::with_capacity(nodes),
         }
-    }
-
-    /// Add a node to the graph, with the default conversion from OpType to NodeType
-    pub(crate) fn add_op(&mut self, op: impl Into<OpType>) -> Node {
-        self.add_node(NodeType::new_auto(op))
     }
 
     /// Add a node to the graph.
@@ -400,7 +391,7 @@ mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
-        let lift = hugr.add_op_with_parent(
+        let lift = hugr.add_node_with_parent(
             hugr.root(),
             ops::LeafOp::Lift {
                 type_row: type_row![BIT],

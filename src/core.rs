@@ -2,7 +2,10 @@
 //!
 //! These types are re-exported in the root of the crate.
 
+pub use itertools::Either;
+
 use derive_more::From;
+use itertools::Either::{Left, Right};
 
 #[cfg(feature = "pyo3")]
 use pyo3::pyclass;
@@ -92,34 +95,31 @@ impl Port {
     /// [HugrError::InvalidPortDirection]
     #[inline]
     pub fn as_incoming(&self) -> Result<IncomingPort, HugrError> {
-        match self.direction() {
-            Direction::Incoming => Ok(IncomingPort {
-                index: self.index() as u16,
-            }),
-            dir @ Direction::Outgoing => Err(HugrError::InvalidPortDirection(dir)),
-        }
+        self.as_directed()
+            .left()
+            .ok_or(HugrError::InvalidPortDirection(self.direction()))
     }
 
     /// Converts to an [OutgoingPort] if this port is one; else fails with
     /// [HugrError::InvalidPortDirection]
     #[inline]
     pub fn as_outgoing(&self) -> Result<OutgoingPort, HugrError> {
+        self.as_directed()
+            .right()
+            .ok_or(HugrError::InvalidPortDirection(self.direction()))
+    }
+
+    /// Converts to either an [IncomingPort] or an [OutgoingPort], as appropriate.
+    #[inline]
+    pub fn as_directed(&self) -> Either<IncomingPort, OutgoingPort> {
         match self.direction() {
-            Direction::Outgoing => Ok(OutgoingPort {
+            Direction::Incoming => Left(IncomingPort {
                 index: self.index() as u16,
             }),
-            dir @ Direction::Incoming => Err(HugrError::InvalidPortDirection(dir)),
+            Direction::Outgoing => Right(OutgoingPort {
+                index: self.index() as u16,
+            }),
         }
-    }
-    /// Creates a new outgoing port.
-    #[inline]
-    pub fn try_new_outgoing(port: impl TryInto<OutgoingPort>) -> Result<Self, HugrError> {
-        let Ok(port) = port.try_into() else {
-            return Err(HugrError::InvalidPortDirection(Direction::Incoming));
-        };
-        Ok(Self {
-            offset: portgraph::PortOffset::new_outgoing(port.index()),
-        })
     }
 
     /// Returns the direction of the port.

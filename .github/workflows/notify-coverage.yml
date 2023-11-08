@@ -1,4 +1,8 @@
-name: Coverage
+name: Notify coverage changes
+
+# Daily notification for coverage changes in `main`.
+#
+# PR coverage diffs are computed directly in the `Continuous Integration` workflow.
 
 on:
   schedule:

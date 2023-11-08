@@ -774,7 +774,7 @@ mod test {
         let mut b = Hugr::default();
         let root = b.root();
 
-        let def = b.add_op_with_parent(root, def_op).unwrap();
+        let def = b.add_node_with_parent(root, def_op).unwrap();
         let _ = add_df_children(&mut b, def, copies);
 
         (b, def)
@@ -785,13 +785,13 @@ mod test {
     /// Returns the node indices of each of the operations.
     fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
+            .add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]))
+            .add_node_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]))
             .unwrap();
         let copy = b
-            .add_op_with_parent(parent, LeafOp::Noop { ty: BOOL_T })
+            .add_node_with_parent(parent, LeafOp::Noop { ty: BOOL_T })
             .unwrap();
 
         b.connect(input, 0, copy, 0).unwrap();
@@ -816,14 +816,14 @@ mod test {
         let tag_type = Type::new_unit_sum(tuple_sum_size as u8);
 
         let input = b
-            .add_op_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
+            .add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
             .unwrap();
         let output = b
-            .add_op_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
+            .add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
             .unwrap();
-        let tag_def = b.add_op_with_parent(b.root(), const_op).unwrap();
+        let tag_def = b.add_node_with_parent(b.root(), const_op).unwrap();
         let tag = b
-            .add_op_with_parent(parent, ops::LoadConstant { datatype: tag_type })
+            .add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type })
             .unwrap();
 
         b.connect(tag_def, 0, tag, 0).unwrap();
@@ -847,7 +847,7 @@ mod test {
         assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
         // Add another hierarchy root
-        let other = b.add_op(ops::Module);
+        let other = b.add_node(ops::Module.into());
         assert_matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -910,7 +910,7 @@ mod test {
         // Add a definition without children
         let def_sig = FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
         let new_def = b
-            .add_op_with_parent(
+            .add_node_with_parent(
                 root,
                 ops::FuncDefn {
                     signature: def_sig,
@@ -936,7 +936,7 @@ mod test {
         // After moving the previous definition to a valid place,
         // add an input node to the module subgraph
         let new_input = b
-            .add_op_with_parent(root, ops::Input::new(type_row![]))
+            .add_node_with_parent(root, ops::Input::new(type_row![]))
             .unwrap();
         assert_matches!(
             b.validate_with_extension_closure(closure, &EMPTY_REG),
@@ -1023,7 +1023,7 @@ mod test {
 
         // Construct a valid CFG, with one BasicBlock node and one exit node
         let block = b
-            .add_op_with_parent(
+            .add_node_with_parent(
                 cfg,
                 ops::BasicBlock::DFB {
                     inputs: type_row![BOOL_T],
@@ -1035,7 +1035,7 @@ mod test {
             .unwrap();
         add_block_children(&mut b, block, 1);
         let exit = b
-            .add_op_with_parent(
+            .add_node_with_parent(
                 cfg,
                 ops::BasicBlock::Exit {
                     cfg_outputs: type_row![BOOL_T],
@@ -1049,7 +1049,7 @@ mod test {
 
         // Add an internal exit node
         let exit2 = b
-            .add_op_after(
+            .add_node_after(
                 exit,
                 ops::BasicBlock::Exit {
                     cfg_outputs: type_row![BOOL_T],
@@ -1103,7 +1103,7 @@ mod test {
         let [input, output] = h.get_io(h.root()).unwrap();
 
         // Nested DFG BOOL_T -> BOOL_T
-        let sub_dfg = h.add_op_with_parent(
+        let sub_dfg = h.add_node_with_parent(
             h.root(),
             ops::DFG {
                 signature: FunctionType::new_linear(type_row![BOOL_T]),
@@ -1111,9 +1111,10 @@ mod test {
         )?;
         // this Xor has its 2nd input unconnected
         let sub_op = {
-            let sub_input = h.add_op_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]))?;
-            let sub_output = h.add_op_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]))?;
-            let sub_op = h.add_op_with_parent(sub_dfg, and_op())?;
+            let sub_input = h.add_node_with_parent(sub_dfg, ops::Input::new(type_row![BOOL_T]))?;
+            let sub_output =
+                h.add_node_with_parent(sub_dfg, ops::Output::new(type_row![BOOL_T]))?;
+            let sub_op = h.add_node_with_parent(sub_dfg, and_op())?;
             h.connect(sub_input, 0, sub_op, 0)?;
             h.connect(sub_op, 0, sub_output, 0)?;
             sub_op
@@ -1149,7 +1150,7 @@ mod test {
     fn test_local_const() -> Result<(), HugrError> {
         let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
         let [input, output] = h.get_io(h.root()).unwrap();
-        let and = h.add_op_with_parent(h.root(), and_op())?;
+        let and = h.add_node_with_parent(h.root(), and_op())?;
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, output, 0)?;
         assert_eq!(
@@ -1166,8 +1167,8 @@ mod test {
             .typed_value()
             .clone();
         // Second input of Xor from a constant
-        let cst = h.add_op_with_parent(h.root(), const_op)?;
-        let lcst = h.add_op_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
+        let cst = h.add_node_with_parent(h.root(), const_op)?;
+        let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
         h.connect(cst, 0, lcst, 0)?;
         h.connect(lcst, 0, and, 1)?;
         // There is no edge from Input to LoadConstant, but that's OK:
@@ -1352,9 +1353,9 @@ mod test {
             type_row![BOOL_T],
         ));
         let [input, output] = h.get_io(h.root()).unwrap();
-        let and = h.add_op_with_parent(h.root(), and_op())?;
-        let not1 = h.add_op_with_parent(h.root(), not_op())?;
-        let not2 = h.add_op_with_parent(h.root(), not_op())?;
+        let and = h.add_node_with_parent(h.root(), and_op())?;
+        let not1 = h.add_node_with_parent(h.root(), not_op())?;
+        let not2 = h.add_node_with_parent(h.root(), not_op())?;
         h.connect(input, 0, and, 0)?;
         h.connect(and, 0, not1, 0)?;
         h.connect(not1, 0, and, 1)?;
@@ -1370,7 +1371,7 @@ mod test {
         let row: TypeRow = vec![t].into();
 
         let def = b
-            .add_op_with_parent(
+            .add_node_with_parent(
                 b.root(),
                 ops::FuncDefn {
                     name: "main".into(),
@@ -1380,9 +1381,9 @@ mod test {
             .unwrap();
 
         let input = b
-            .add_op_with_parent(def, ops::Input::new(row.clone()))
+            .add_node_with_parent(def, ops::Input::new(row.clone()))
             .unwrap();
-        let output = b.add_op_with_parent(def, ops::Output::new(row)).unwrap();
+        let output = b.add_node_with_parent(def, ops::Output::new(row)).unwrap();
         b.connect(input, 0, output, 0).unwrap();
         (b, def)
     }

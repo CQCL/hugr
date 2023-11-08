@@ -72,12 +72,10 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             POP_NAME,
             "Pop from back of list".into(),
             vec![TypeParam::Type(TypeBound::Any)],
-            Default::default(),
-            vec![],
             move |args: &[TypeArg]| {
                 let (list_type, element_type) = list_types(args)?;
                 Ok(FunctionType {
@@ -89,12 +87,10 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_op_custom_sig(
+        .add_op_custom_sig_simple(
             PUSH_NAME,
             "Push to back of list".into(),
             vec![TypeParam::Type(TypeBound::Any)],
-            Default::default(),
-            vec![],
             move |args: &[TypeArg]| {
                 let (list_type, element_type) = list_types(args)?;
                 Ok(FunctionType {

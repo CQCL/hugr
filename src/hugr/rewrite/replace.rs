@@ -528,7 +528,7 @@ mod test {
         let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new_linear(just_list.clone()),
         }));
-        let r_bb = replacement.add_op_with_parent(
+        let r_bb = replacement.add_node_with_parent(
             replacement.root(),
             BasicBlock::DFB {
                 inputs: vec![listy.clone()].into(),
@@ -537,7 +537,7 @@ mod test {
                 extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
             },
         )?;
-        let r_df1 = replacement.add_op_with_parent(
+        let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: FunctionType::new(
@@ -546,7 +546,7 @@ mod test {
                 ),
             },
         )?;
-        let r_df2 = replacement.add_op_with_parent(
+        let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
@@ -557,13 +557,13 @@ mod test {
             .try_for_each(|p| replacement.connect(r_df1, *p + 1, r_df2, *p))?;
 
         {
-            let inp = replacement.add_op_before(
+            let inp = replacement.add_node_before(
                 r_df1,
                 ops::Input {
                     types: just_list.clone(),
                 },
             )?;
-            let out = replacement.add_op_before(
+            let out = replacement.add_node_before(
                 r_df1,
                 ops::Output {
                     types: simple_unary_plus(just_list),
@@ -695,13 +695,13 @@ mod test {
 
         // Note wrong root type here - we'll replace children of the *Conditional*
         let mut rep1 = Hugr::new(h.root_type().clone());
-        let r1 = rep1.add_op_with_parent(
+        let r1 = rep1.add_node_with_parent(
             rep1.root(),
             Case {
                 signature: utou.clone(),
             },
         )?;
-        let r2 = rep1.add_op_with_parent(
+        let r2 = rep1.add_node_with_parent(
             rep1.root(),
             Case {
                 signature: utou.clone(),

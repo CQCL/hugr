@@ -82,11 +82,11 @@ jobs:
         with:
           prefix-key: v0-rust-${{ matrix.rust }}
       - name: Build with no features
-        run: cargo build --verbose --no-default-features
-      - name: Build with all features
-        run: cargo build --verbose --all-features
+        run: cargo test --verbose --no-default-features --no-run
       - name: Tests with no features
         run: cargo test --verbose --no-default-features
+      - name: Build with all features
+        run: cargo test --verbose --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose --all-features
 

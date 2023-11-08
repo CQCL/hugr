@@ -103,7 +103,7 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
-            let new_node = h.add_op_after(self_output_node, op.clone()).unwrap();
+            let new_node = h.add_node_after(self_output_node, op.clone()).unwrap();
             index_map.insert(node, new_node);
 
             // Move the metadata
