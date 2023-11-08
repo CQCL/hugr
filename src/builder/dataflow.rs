@@ -208,6 +208,7 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 pub(crate) mod test {
     use cool_asserts::assert_matches;
     use rstest::rstest;
+    use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
@@ -403,18 +404,25 @@ pub(crate) mod test {
         // Create a module, and insert the DFG into it
         let mut module_builder = ModuleBuilder::new();
 
-        {
+        let (dfg_node, f_node) = {
             let mut f_build = module_builder.define_function(
                 "main",
                 FunctionType::new(type_row![BIT], type_row![BIT]).pure(),
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
-            f_build.finish_with_outputs([id.out_wire(0)])?;
-        }
+            let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+            let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
+            module_builder.set_child_metadata(f.node(), "x", "hi")?;
+            (dfg.node(), f.node())
+        };
 
-        assert_eq!(module_builder.finish_hugr(&EMPTY_REG)?.node_count(), 7);
+        let hugr = module_builder.finish_hugr(&EMPTY_REG)?;
+        assert_eq!(hugr.node_count(), 7);
+
+        assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
+        assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
+        assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
 
         Ok(())
     }
