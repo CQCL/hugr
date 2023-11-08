@@ -5,10 +5,11 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
 
-use crate::hugr::{HugrError, Node, ValidationError, Wire};
+use crate::hugr::{HugrError, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::ConstTypeError;
 use crate::types::Type;
+use crate::{Node, Wire};
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -145,21 +146,21 @@ pub(crate) mod test {
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: signature.clone(),
         }));
-        hugr.add_node_with_parent(
+        hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::Input {
+            ops::Input {
                 types: signature.input,
-            }),
+            },
         )
         .unwrap();
-        hugr.add_node_with_parent(
+        hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::Output {
+            ops::Output {
                 types: signature.output,
-            }),
+            },
         )
         .unwrap();
         hugr

@@ -21,7 +21,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int
 const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
 fn int_custom_type(width_arg: TypeArg) -> CustomType {
-    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Copyable)
+    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
@@ -48,11 +48,10 @@ const fn is_valid_log_width(n: u8) -> bool {
 pub const LOG_WIDTH_BOUND: u8 = 7;
 
 /// Type parameter for the log width of the integer.
-// SAFETY: unsafe block should be ok as the value is definitely not zero.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat(unsafe {
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
     assert!(LOG_WIDTH_BOUND > 0);
-    NonZeroU64::new_unchecked(LOG_WIDTH_BOUND as u64)
+    NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
 });
 
 /// Get the log width  of the specified type argument or error if the argument
@@ -103,6 +102,16 @@ impl ConstIntU {
         }
         Ok(Self { log_width, value })
     }
+
+    /// Returns the value of the constant
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+
+    /// Returns the number of bits of the constant
+    pub fn log_width(&self) -> u8 {
+        self.log_width
+    }
 }
 
 impl ConstIntS {
@@ -122,6 +131,16 @@ impl ConstIntS {
             ));
         }
         Ok(Self { log_width, value })
+    }
+
+    /// Returns the value of the constant
+    pub fn value(&self) -> i64 {
+        self.value
+    }
+
+    /// Returns the number of bits of the constant
+    pub fn log_width(&self) -> u8 {
+        self.log_width
     }
 }
 
@@ -172,7 +191,7 @@ pub fn extension() -> Extension {
             INT_TYPE_ID,
             vec![LOG_WIDTH_TYPE_PARAM],
             "integral value of a given bit width".to_owned(),
-            TypeBound::Copyable.into(),
+            TypeBound::Eq.into(),
         )
         .unwrap();
 

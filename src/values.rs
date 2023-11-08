@@ -96,14 +96,14 @@ impl Value {
         Self::Tuple { vs: vec![] }
     }
 
-    /// Constant Sum over units, used as predicates.
-    pub fn simple_predicate(tag: usize) -> Self {
+    /// Constant Sum of a unit value, used to control branches.
+    pub fn unit_sum(tag: usize) -> Self {
         Self::sum(tag, Self::unit())
     }
 
-    /// Constant Sum over Tuples with just one variant of unit type
-    pub fn simple_unary_predicate() -> Self {
-        Self::simple_predicate(0)
+    /// Constant Sum with just one variant of unit type
+    pub fn unary_unit_sum() -> Self {
+        Self::unit_sum(0)
     }
 
     /// Tuple of values.
@@ -113,7 +113,7 @@ impl Value {
         }
     }
 
-    /// Sum value (could be of any compatible type, e.g. a predicate)
+    /// Sum value (could be of any compatible type - e.g., if `value` was a Tuple, a TupleSum type)
     pub fn sum(tag: usize, value: Value) -> Self {
         Self::Sum {
             tag,

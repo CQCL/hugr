@@ -10,13 +10,12 @@
 //! depend on these open variables, then the validation check for extensions
 //! will succeed regardless of what the variable is instantiated to.
 
-use super::{ExtensionId, ExtensionSet};
+use super::ExtensionSet;
 use crate::{
     hugr::views::HugrView,
-    hugr::Node,
-    ops::{OpTag, OpTrait, OpType},
+    ops::{OpTag, OpTrait},
     types::EdgeKind,
-    Direction,
+    Direction, Node,
 };
 
 use super::validate::ExtensionError;
@@ -24,7 +23,7 @@ use super::validate::ExtensionError;
 use petgraph::graph as pg;
 use petgraph::{Directed, EdgeType, Undirected};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use thiserror::Error;
 
@@ -67,8 +66,8 @@ impl Meta {
 enum Constraint {
     /// A variable has the same value as another variable
     Equal(Meta),
-    /// Variable extends the value of another by one extension
-    Plus(ExtensionId, Meta),
+    /// Variable extends the value of another by a set of extensions
+    Plus(ExtensionSet, Meta),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -134,8 +133,9 @@ impl<T: EdgeType> GraphContainer<T> {
         self.graph.add_edge(src_ix, tgt_ix, ());
     }
 
-    /// Return the connected components of the graph in terms of metavariables
-    fn ccs(&self) -> Vec<Vec<Meta>> {
+    /// Return the strongly connected components of the graph in terms of
+    /// metavariables. In the undirected case, return the connected components
+    fn sccs(&self) -> Vec<Vec<Meta>> {
         petgraph::algo::tarjan_scc(&self.graph)
             .into_iter()
             .map(|cc| {
@@ -244,26 +244,6 @@ impl UnificationContext {
         self.solved.get(&self.resolve(*m))
     }
 
-    /// Convert an extension *set* difference in terms of a sequence of fresh
-    /// metas with `Plus` constraints which each add only one extension req.
-    fn gen_union_constraint(&mut self, input: Meta, output: Meta, delta: ExtensionSet) {
-        let mut last_meta = input;
-        // Create fresh metavariables with `Plus` constraints for
-        // each extension that should be added by the node
-        // Hence a extension delta [A, B] would lead to
-        // > ma = fresh_meta()
-        // > add_constraint(ma, Plus(a, input)
-        // > mb = fresh_meta()
-        // > add_constraint(mb, Plus(b, ma)
-        // > add_constraint(output, Equal(mb))
-        for r in delta.0.into_iter() {
-            let curr_meta = self.fresh_meta();
-            self.add_constraint(curr_meta, Constraint::Plus(r, last_meta));
-            last_meta = curr_meta;
-        }
-        self.add_constraint(output, Constraint::Equal(last_meta));
-    }
-
     /// Return the metavariable corresponding to the given location on the
     /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
@@ -325,11 +305,13 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
-                    self.gen_union_constraint(
-                        m_input,
-                        m_output,
-                        node_type.op_signature().extension_reqs,
-                    );
+                    let delta = node_type.op_signature().extension_reqs;
+                    let c = if delta.is_empty() {
+                        Constraint::Equal(m_input)
+                    } else {
+                        Constraint::Plus(delta, m_input)
+                    };
+                    self.add_constraint(m_output, c);
                 }
                 // We have a solution for everything!
                 Some(sig) => {
@@ -341,7 +323,7 @@ impl UnificationContext {
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
-            let sig: &OpType = hugr.get_nodetype(tgt_node).into();
+            let sig = hugr.get_nodetype(tgt_node).op();
             // Incoming ports with an edge that should mean equal extension reqs
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(
@@ -351,16 +333,16 @@ impl UnificationContext {
                         | Some(EdgeKind::ControlFlow)
                 )
             }) {
+                let m_tgt = *self
+                    .extensions
+                    .get(&(tgt_node, Direction::Incoming))
+                    .unwrap();
                 for (src_node, _) in hugr.linked_ports(tgt_node, port) {
                     let m_src = self
                         .extensions
                         .get(&(src_node, Direction::Outgoing))
                         .unwrap();
-                    let m_tgt = self
-                        .extensions
-                        .get(&(tgt_node, Direction::Incoming))
-                        .unwrap();
-                    self.add_constraint(*m_src, Constraint::Equal(*m_tgt));
+                    self.add_constraint(*m_src, Constraint::Equal(m_tgt));
                 }
             }
         }
@@ -387,7 +369,7 @@ impl UnificationContext {
             .iter()
             .find(|(_, m)| **m == m2 || self.resolve(**m) == m2)
             .map(|a| a.0);
-        let err = if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
+        if let (Some((node1, dir1)), Some((node2, dir2))) = (loc1, loc2) {
             // N.B. We're looking for the case where an equality constraint
             // arose because the two locations are connected by an edge
 
@@ -405,43 +387,35 @@ impl UnificationContext {
                     [(node2, rs2.clone()), (node1, rs1.clone())]
                 };
 
-                if src_rs.is_subset(&tgt_rs) {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::TgtExceedsSrcExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
+                return InferExtensionError::EdgeMismatch(if src_rs.is_subset(&tgt_rs) {
+                    ExtensionError::TgtExceedsSrcExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
                 } else {
-                    Some(InferExtensionError::EdgeMismatch(
-                        ExtensionError::SrcExceedsTgtExtensions {
-                            from: *src,
-                            from_extensions: src_rs,
-                            to: *tgt,
-                            to_extensions: tgt_rs,
-                        },
-                    ))
-                }
-            } else {
-                None
+                    ExtensionError::SrcExceedsTgtExtensions {
+                        from: *src,
+                        from_extensions: src_rs,
+                        to: *tgt,
+                        to_extensions: tgt_rs,
+                    }
+                });
             }
-        } else {
-            None
-        };
+        }
         if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
-            err.unwrap_or(InferExtensionError::MismatchedConcreteWithLocations {
+            InferExtensionError::MismatchedConcreteWithLocations {
                 expected_loc: *loc1,
                 expected: rs1,
                 actual_loc: *loc2,
                 actual: rs2,
-            })
+            }
         } else {
-            err.unwrap_or(InferExtensionError::MismatchedConcrete {
+            InferExtensionError::MismatchedConcrete {
                 expected: rs1,
                 actual: rs2,
-            })
+            }
         }
     }
 
@@ -452,7 +426,7 @@ impl UnificationContext {
     fn merge_equal_metas(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
         let mut merged: HashSet<Meta> = HashSet::new();
         let mut new_metas: HashSet<Meta> = HashSet::new();
-        for cc in self.eq_graph.ccs().into_iter() {
+        for cc in self.eq_graph.sccs().into_iter() {
             // Within a connected component everything is equal
             let combined_meta = self.fresh_meta();
             for m in cc.iter() {
@@ -462,7 +436,7 @@ impl UnificationContext {
                     continue;
                 }
 
-                if let Some(cs) = self.constraints.get(m) {
+                if let Some(cs) = self.constraints.remove(m) {
                     for c in cs
                         .iter()
                         .filter(|c| !matches!(c, Constraint::Equal(_)))
@@ -472,7 +446,6 @@ impl UnificationContext {
                     {
                         self.add_constraint(combined_meta, c.clone());
                     }
-                    self.constraints.remove(m).unwrap();
                     merged.insert(*m);
                     // Record a new meta the first time that we use it; don't
                     // bother recording a new meta if we don't add any
@@ -527,8 +500,7 @@ impl UnificationContext {
                 // to a set which already contained it.
                 Constraint::Plus(r, other_meta) => {
                     if let Some(rs) = self.get_solution(other_meta) {
-                        let mut rrs = rs.clone();
-                        rrs.insert(r);
+                        let rrs = rs.clone().union(r);
                         match self.get_solution(&meta) {
                             // Let's check that this is right?
                             Some(rs) => {
@@ -560,66 +532,49 @@ impl UnificationContext {
     /// available. When there are variables, we should leave the graph as it is,
     /// but make sure that no matter what they're instantiated to, the graph
     /// still makes sense (should pass the extension validation check)
-    pub fn results(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+    pub fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
+        let depended_upon = {
+            let mut h: HashMap<Meta, Vec<Meta>> = HashMap::new();
+            for (m, m2) in self.constraints.iter().flat_map(|(m, cs)| {
+                cs.iter().flat_map(|c| match c {
+                    Constraint::Plus(_, m2) => Some((*m, self.resolve(*m2))),
+                    _ => None,
+                })
+            }) {
+                h.entry(m2).or_default().push(m);
+            }
+            h
+        };
+        // Calculate everything dependent upon a variable.
+        // Note it would be better to find metas ALL of whose dependencies were (transitively)
+        // on variables, but this is more complex, and hard to define if there are cycles
+        // of PLUS constraints, so leaving that as a TODO until we've handled such cycles.
+        let mut depends_on_var = HashSet::new();
+        let mut queue = VecDeque::from_iter(self.variables.iter());
+        while let Some(m) = queue.pop_front() {
+            if depends_on_var.insert(m) {
+                if let Some(d) = depended_upon.get(m) {
+                    queue.extend(d.iter())
+                }
+            }
+        }
+
         let mut results: ExtensionSolution = HashMap::new();
         for (loc, meta) in self.extensions.iter() {
-            let rs = match self.get_solution(meta) {
-                Some(rs) => Ok(rs.clone()),
-                None => {
-                    // If it depends on some other live meta, that's bad news.
-                    // If it only depends on graph variables, then we don't have
-                    // a *solution*, but it's fine
-                    if self.live_var(meta).is_some() {
-                        Err(InferExtensionError::Unsolved { location: *loc })
-                    } else {
-                        continue;
-                    }
+            if let Some(rs) = self.get_solution(meta) {
+                if loc.1 == Direction::Incoming {
+                    results.insert(loc.0, rs.clone());
                 }
-            }?;
-            if loc.1 == Direction::Incoming {
-                results.insert(loc.0, rs);
+            } else {
+                // Unsolved nodes must be unsolved because they depend on graph variables.
+                if !depends_on_var.contains(&self.resolve(*meta)) {
+                    return Err(InferExtensionError::Unsolved { location: *loc });
+                }
             }
         }
-        debug_assert!(self.live_metas().is_empty());
         Ok(results)
-    }
-
-    // Get the live var associated with a meta.
-    // TODO: This should really be a list
-    fn live_var(&self, m: &Meta) -> Option<Meta> {
-        if self.variables.contains(m) || self.variables.contains(&self.resolve(*m)) {
-            return None;
-        }
-
-        // TODO: We should be doing something to ensure that these are the same check...
-        if self.get_solution(m).is_none() {
-            if let Some(cs) = self.get_constraints(m) {
-                for c in cs {
-                    match c {
-                        Constraint::Plus(_, m) => return self.live_var(m),
-                        _ => panic!("we shouldn't be here!"),
-                    }
-                }
-            }
-            Some(*m)
-        } else {
-            None
-        }
-    }
-
-    /// Return the set of "live" metavariables in the context.
-    /// "Live" here means a metavariable:
-    ///   - Is associated to a location in the graph in `UnifyContext.extensions`
-    ///   - Is still unsolved
-    ///   - Isn't a variable
-    fn live_metas(&self) -> HashSet<Meta> {
-        self.extensions
-            .values()
-            .filter_map(|m| self.live_var(m))
-            .filter(|m| !self.variables.contains(m))
-            .collect()
     }
 
     /// Iterates over a set of metas (the argument) and tries to solve
@@ -732,7 +687,7 @@ impl UnificationContext {
                         });
 
                 let (rs, other_ms): (Vec<_>, Vec<_>) = plus_constraints.unzip();
-                let solution = ExtensionSet::from_iter(rs.into_iter());
+                let solution = rs.iter().fold(ExtensionSet::new(), |e1, e2| e1.union(e2));
                 let unresolved_metas = other_ms
                     .into_iter()
                     .filter(|other_m| m != *other_m)
@@ -751,7 +706,7 @@ impl UnificationContext {
         // Process the strongly-connected components. We need to deal with these
         // depended-upon before depender. ccs() gives them back in some order
         // - this might need to be reversed????
-        for cc in relations.ccs() {
+        for cc in relations.sccs() {
             // Strongly connected components are looping constraint dependencies.
             // This means that each metavariable in the CC has the same solution.
             let combined_solution = cc
@@ -778,13 +733,16 @@ mod test {
 
     use super::*;
     use crate::builder::test::closed_dfg_root_hugr;
-    use crate::extension::{
-        prelude::{PRELUDE_ID, PRELUDE_REGISTRY},
-        ExtensionSet,
-    };
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::prelude::QB_T;
+    use crate::extension::ExtensionId;
+    use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
     use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
     use crate::macros::const_extension_ids;
+    use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
+    use crate::ops::{LeafOp, OpType};
+
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
 
@@ -798,6 +756,7 @@ mod test {
         const A: ExtensionId = "A";
         const B: ExtensionId = "B";
         const C: ExtensionId = "C";
+        const UNKNOWN_EXTENSION: ExtensionId = "Unknown";
     }
 
     #[test]
@@ -812,14 +771,14 @@ mod test {
             signature: main_sig,
         };
 
-        let root_node = NodeType::open_extensions(op);
+        let root_node = NodeType::new_open(op);
         let mut hugr = Hugr::new(root_node);
 
-        let input = NodeType::open_extensions(ops::Input::new(type_row![NAT, NAT]));
-        let output = NodeType::open_extensions(ops::Output::new(type_row![NAT]));
+        let input = ops::Input::new(type_row![NAT, NAT]);
+        let output = ops::Output::new(type_row![NAT]);
 
-        let input = hugr.add_node_with_parent(hugr.root(), input)?;
-        let output = hugr.add_node_with_parent(hugr.root(), output)?;
+        let input = hugr.add_op_with_parent(hugr.root(), input)?;
+        let output = hugr.add_op_with_parent(hugr.root(), output)?;
 
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
@@ -835,29 +794,29 @@ mod test {
         let mult_c_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&C));
 
-        let add_a = hugr.add_node_with_parent(
+        let add_a = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: add_a_sig,
-            }),
+            },
         )?;
-        let add_b = hugr.add_node_with_parent(
+        let add_b = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: add_b_sig,
-            }),
+            },
         )?;
-        let add_ab = hugr.add_node_with_parent(
+        let add_ab = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: add_ab_sig,
-            }),
+            },
         )?;
-        let mult_c = hugr.add_node_with_parent(
+        let mult_c = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: mult_c_sig,
-            }),
+            },
         )?;
 
         hugr.connect(input, 0, add_a, 0)?;
@@ -896,8 +855,14 @@ mod test {
 
         ctx.solved.insert(metas[2], ExtensionSet::singleton(&A));
         ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
-        ctx.add_constraint(metas[0], Constraint::Plus(B, metas[2]));
-        ctx.add_constraint(metas[4], Constraint::Plus(C, metas[0]));
+        ctx.add_constraint(
+            metas[0],
+            Constraint::Plus(ExtensionSet::singleton(&B), metas[2]),
+        );
+        ctx.add_constraint(
+            metas[4],
+            Constraint::Plus(ExtensionSet::singleton(&C), metas[0]),
+        );
         ctx.add_constraint(metas[3], Constraint::Equal(metas[4]));
         ctx.add_constraint(metas[5], Constraint::Equal(metas[0]));
         ctx.main_loop()?;
@@ -922,21 +887,21 @@ mod test {
     // This generates a solution that causes validation to fail
     // because of a missing lift node
     fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::pure(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&ExtensionSet::singleton(&A)),
         }));
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Input {
+            NodeType::new_pure(ops::Input {
                 types: type_row![NAT],
             }),
         )?;
 
         let output = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::pure(ops::Output {
+            NodeType::new_pure(ops::Output {
                 types: type_row![NAT],
             }),
         )?;
@@ -947,7 +912,7 @@ mod test {
         // nodes and their parents and `report_mismatch` isn't yet smart enough
         // to handle that.
         assert_matches!(
-            hugr.infer_and_validate(&PRELUDE_REGISTRY),
+            hugr.update_validate(&PRELUDE_REGISTRY),
             Err(ValidationError::CantInfer(_))
         );
         Ok(())
@@ -970,8 +935,8 @@ mod test {
             .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
         ctx.variables.insert(a);
         ctx.variables.insert(b);
-        ctx.add_constraint(ab, Constraint::Plus(A, b));
-        ctx.add_constraint(ab, Constraint::Plus(B, a));
+        ctx.add_constraint(ab, Constraint::Plus(ExtensionSet::singleton(&A), b));
+        ctx.add_constraint(ab, Constraint::Plus(ExtensionSet::singleton(&B), a));
         let solution = ctx.main_loop()?;
         // We'll only find concrete solutions for the Incoming extension reqs of
         // the main node created by `Hugr::default`
@@ -991,29 +956,26 @@ mod test {
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let add_r_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
-        let add_r = hugr.add_node_with_parent(
+        let add_r = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: add_r_sig,
-            }),
+            },
         )?;
 
         // Dangling thingy
         let src_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&ExtensionSet::new());
 
-        let src = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::open_extensions(ops::DFG { signature: src_sig }),
-        )?;
+        let src = hugr.add_op_with_parent(hugr.root(), ops::DFG { signature: src_sig })?;
 
         let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
         // Mult has open extension requirements, which we should solve to be "R"
-        let mult = hugr.add_node_with_parent(
+        let mult = hugr.add_op_with_parent(
             hugr.root(),
-            NodeType::open_extensions(ops::DFG {
+            ops::DFG {
                 signature: mult_sig,
-            }),
+            },
         )?;
 
         hugr.connect(input, 0, add_r, 0)?;
@@ -1073,18 +1035,18 @@ mod test {
     ) -> Result<[Node; 3], Box<dyn Error>> {
         let op: OpType = op.into();
 
-        let node = hugr.add_node_with_parent(parent, NodeType::open_extensions(op))?;
-        let input = hugr.add_node_with_parent(
+        let node = hugr.add_op_with_parent(parent, op)?;
+        let input = hugr.add_op_with_parent(
             node,
-            NodeType::open_extensions(ops::Input {
+            ops::Input {
                 types: op_sig.input,
-            }),
+            },
         )?;
-        let output = hugr.add_node_with_parent(
+        let output = hugr.add_op_with_parent(
             node,
-            NodeType::open_extensions(ops::Output {
+            ops::Output {
                 types: op_sig.output,
-            }),
+            },
         )?;
         Ok([node, input, output])
     }
@@ -1105,20 +1067,20 @@ mod test {
                 Into::<OpType>::into(op).signature(),
             )?;
 
-            let lift1 = hugr.add_node_with_parent(
+            let lift1 = hugr.add_op_with_parent(
                 case,
-                NodeType::open_extensions(ops::LeafOp::Lift {
+                ops::LeafOp::Lift {
                     type_row: type_row![NAT],
                     new_extension: first_ext,
-                }),
+                },
             )?;
 
-            let lift2 = hugr.add_node_with_parent(
+            let lift2 = hugr.add_op_with_parent(
                 case,
-                NodeType::open_extensions(ops::LeafOp::Lift {
+                ops::LeafOp::Lift {
                     type_row: type_row![NAT],
                     new_extension: second_ext,
-                }),
+                },
             )?;
 
             hugr.connect(case_in, 0, lift1, 0)?;
@@ -1128,20 +1090,20 @@ mod test {
             Ok(case)
         }
 
-        let predicate_inputs = vec![type_row![]; 2];
+        let tuple_sum_rows = vec![type_row![]; 2];
         let rs = ExtensionSet::from_iter([A, B]);
 
         let inputs = type_row![NAT];
         let outputs = type_row![NAT];
 
         let op = ops::Conditional {
-            predicate_inputs,
+            tuple_sum_rows,
             other_inputs: inputs.clone(),
             outputs: outputs.clone(),
             extension_delta: rs.clone(),
         };
 
-        let mut hugr = Hugr::new(NodeType::pure(op));
+        let mut hugr = Hugr::new(NodeType::new_pure(op));
         let conditional_node = hugr.root();
 
         let case_op = ops::Case {
@@ -1176,24 +1138,24 @@ mod test {
     fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
         let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::DFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::DFG {
             signature: df_sig
                 .clone()
                 .with_extension_delta(&ExtensionSet::from_iter([A, B])),
         }));
 
         let root = hugr.root();
-        let input = hugr.add_node_with_parent(
+        let input = hugr.add_op_with_parent(
             root,
-            NodeType::open_extensions(ops::Input {
+            ops::Input {
                 types: type_row![NAT],
-            }),
+            },
         )?;
-        let output = hugr.add_node_with_parent(
+        let output = hugr.add_op_with_parent(
             root,
-            NodeType::open_extensions(ops::Output {
+            ops::Output {
                 types: type_row![NAT],
-            }),
+            },
         )?;
 
         // Make identical dataflow nodes which add extension requirement "A" or "B"
@@ -1214,12 +1176,12 @@ mod test {
                 .unwrap();
 
                 let lift = hugr
-                    .add_node_with_parent(
+                    .add_op_with_parent(
                         node,
-                        NodeType::open_extensions(ops::LeafOp::Lift {
+                        ops::LeafOp::Lift {
                             type_row: type_row![NAT],
                             new_extension: ext,
-                        }),
+                        },
                     )
                     .unwrap();
 
@@ -1235,7 +1197,7 @@ mod test {
         for (src, tgt) in nodes.into_iter().tuple_windows() {
             hugr.connect(src, 0, tgt, 0)?;
         }
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
         Ok(())
     }
 
@@ -1249,23 +1211,24 @@ mod test {
         hugr: &mut Hugr,
         bb_parent: Node,
         inputs: TypeRow,
-        predicate_variants: Vec<TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Node, Box<dyn Error>> {
-        let predicate_type = Type::new_predicate(predicate_variants.clone());
-        let dfb_sig = FunctionType::new(inputs.clone(), vec![predicate_type])
+        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
+        let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
+        let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
             .with_extension_delta(&extension_delta.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs,
             other_outputs: type_row![],
-            predicate_variants,
+            tuple_sum_rows,
             extension_delta,
         };
-        let op = make_opaque(PRELUDE_ID, dfb_sig.clone());
+        let op = make_opaque(UNKNOWN_EXTENSION, dfb_sig.clone());
 
         let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
-        let dfg = hugr.add_node_with_parent(bb, NodeType::open_extensions(op))?;
+        let dfg = hugr.add_op_with_parent(bb, op)?;
 
         hugr.connect(bb_in, 0, dfg, 0)?;
         hugr.connect(dfg, 0, bb_out, 0)?;
@@ -1274,46 +1237,43 @@ mod test {
     }
 
     fn oneway(ty: Type) -> Vec<Type> {
-        vec![Type::new_predicate([vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty]])]
     }
 
     fn twoway(ty: Type) -> Vec<Type> {
-        vec![Type::new_predicate([vec![ty.clone()], vec![ty]])]
+        vec![Type::new_tuple_sum([vec![ty.clone()], vec![ty]])]
     }
 
     fn create_entry_exit(
         hugr: &mut Hugr,
         root: Node,
         inputs: TypeRow,
-        entry_predicates: Vec<TypeRow>,
+        entry_variants: Vec<TypeRow>,
         entry_extensions: ExtensionSet,
         exit_types: impl Into<TypeRow>,
     ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-        let entry_predicate_type = Type::new_predicate(entry_predicates.clone());
+        let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
         let dfb = ops::BasicBlock::DFB {
             inputs: inputs.clone(),
             other_outputs: type_row![],
-            predicate_variants: entry_predicates,
+            tuple_sum_rows: entry_variants,
             extension_delta: entry_extensions,
         };
 
-        let exit = hugr.add_node_with_parent(
+        let exit = hugr.add_op_with_parent(
             root,
-            NodeType::open_extensions(ops::BasicBlock::Exit {
+            ops::BasicBlock::Exit {
                 cfg_outputs: exit_types.into(),
-            }),
+            },
         )?;
 
-        let entry = hugr.add_node_before(exit, NodeType::open_extensions(dfb))?;
-        let entry_in = hugr.add_node_with_parent(
+        let entry = hugr.add_op_before(exit, dfb)?;
+        let entry_in = hugr.add_op_with_parent(entry, ops::Input { types: inputs })?;
+        let entry_out = hugr.add_op_with_parent(
             entry,
-            NodeType::open_extensions(ops::Input { types: inputs }),
-        )?;
-        let entry_out = hugr.add_node_with_parent(
-            entry,
-            NodeType::open_extensions(ops::Output {
-                types: vec![entry_predicate_type].into(),
-            }),
+            ops::Output {
+                types: vec![entry_tuple_sum].into(),
+            },
         )?;
 
         Ok(([entry, entry_in, entry_out], exit))
@@ -1349,7 +1309,7 @@ mod test {
         let b = ExtensionSet::singleton(&B);
         let c = ExtensionSet::singleton(&C);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&abc),
         }));
 
@@ -1364,12 +1324,12 @@ mod test {
             type_row![NAT],
         )?;
 
-        let mkpred = hugr.add_node_with_parent(
+        let mkpred = hugr.add_op_with_parent(
             entry,
-            NodeType::open_extensions(make_opaque(
+            make_opaque(
                 A,
                 FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(&a),
-            )),
+            ),
         )?;
 
         // Internal wiring for DFGs
@@ -1447,7 +1407,7 @@ mod test {
     ///             +--------------------+
     #[test]
     fn multi_entry() -> Result<(), Box<dyn Error>> {
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
         }));
         let cfg = hugr.root();
@@ -1460,12 +1420,9 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_mid = hugr.add_node_with_parent(
+        let entry_mid = hugr.add_op_with_parent(
             entry,
-            NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
-                FunctionType::new(vec![NAT], twoway(NAT)),
-            )),
+            make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], twoway(NAT))),
         )?;
 
         hugr.connect(entry_in, 0, entry_mid, 0)?;
@@ -1501,7 +1458,7 @@ mod test {
         hugr.connect(bb1, 0, bb2, 0)?;
         hugr.connect(bb2, 0, exit, 0)?;
 
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }
@@ -1533,7 +1490,7 @@ mod test {
     ) -> Result<Hugr, Box<dyn Error>> {
         let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
 
-        let mut hugr = Hugr::new(NodeType::open_extensions(ops::CFG {
+        let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
             signature: FunctionType::new(type_row![NAT], type_row![NAT])
                 .with_extension_delta(&hugr_delta),
         }));
@@ -1549,12 +1506,12 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_dfg = hugr.add_node_with_parent(
+        let entry_dfg = hugr.add_op_with_parent(
             entry,
-            NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
+            make_opaque(
+                UNKNOWN_EXTENSION,
                 FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(&entry_ext),
-            )),
+            ),
         )?;
 
         hugr.connect(entry_in, 0, entry_dfg, 0)?;
@@ -1597,7 +1554,7 @@ mod test {
         }
         for (bb0, bb1, bb2) in variants.into_iter() {
             let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
-            hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+            hugr.update_validate(&PRELUDE_REGISTRY)?;
         }
         Ok(())
     }
@@ -1627,12 +1584,9 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_mid = hugr.add_node_with_parent(
+        let entry_mid = hugr.add_op_with_parent(
             entry,
-            NodeType::open_extensions(make_opaque(
-                PRELUDE_ID,
-                FunctionType::new(vec![NAT], oneway(NAT)),
-            )),
+            make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], oneway(NAT))),
         )?;
 
         hugr.connect(entry_in, 0, entry_mid, 0)?;
@@ -1650,8 +1604,78 @@ mod test {
         hugr.connect(bb, 0, bb, 0)?;
         hugr.connect(bb, 0, exit, 0)?;
 
-        hugr.infer_and_validate(&PRELUDE_REGISTRY)?;
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
+    }
+
+    /// This was stack-overflowing approx 50% of the time,
+    /// see https://github.com/CQCL/hugr/issues/633
+    #[test]
+    fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
+        let ext = ExtensionId::new("unknown1").unwrap();
+        let delta = ExtensionSet::singleton(&ext);
+        let ft = FunctionType::new_linear(type_row![QB_T, QB_T]).with_extension_delta(&delta);
+        let mut dfg = DFGBuilder::new(ft.clone())?;
+
+        // While https://github.com/CQCL-DEV/hugr/issues/388 is unsolved,
+        // most operations have empty extension_reqs (not including their own extension).
+        // Define some that do.
+        let binop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+            ext.clone(),
+            "2qb_op",
+            String::new(),
+            vec![],
+            Some(ft),
+        ))
+        .into();
+        let unary_sig = FunctionType::new_linear(type_row![QB_T])
+            .with_extension_delta(&ExtensionSet::singleton(&ext));
+        let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+            ext,
+            "1qb_op",
+            String::new(),
+            vec![],
+            Some(unary_sig),
+        ))
+        .into();
+        // Constrain q1,q2 as PLUS(ext1, inputs):
+        let [q1, q2] = dfg
+            .add_dataflow_op(binop.clone(), dfg.input_wires())?
+            .outputs_arr();
+        // Constrain q1 as PLUS(ext2, q2):
+        let [q1] = dfg.add_dataflow_op(unop, [q1])?.outputs_arr();
+        // Constrain q1 as EQUALS(q2) by using both together
+        dfg.finish_hugr_with_outputs([q1, q2], &PRELUDE_REGISTRY)?;
+        // The combined q1+q2 variable now has two PLUS constraints - on itself and the inputs.
+        Ok(())
+    }
+
+    /// [plus_on_self] had about a 50% rate of failing with stack overflow.
+    /// So if we run 10 times, that would succeed about 1 run in 2^10, i.e. <0.1%
+    #[test]
+    fn plus_on_self_10_times() {
+        [0; 10].iter().for_each(|_| plus_on_self().unwrap())
+    }
+
+    #[test]
+    fn failing_sccs_test() {
+        let hugr = Hugr::default();
+        let mut ctx = UnificationContext::new(&hugr);
+        let m1 = ctx.fresh_meta();
+        let m2 = ctx.fresh_meta();
+        let m3 = ctx.fresh_meta();
+        // Outside of the connected component
+        let m_other = ctx.fresh_meta();
+        ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
+        ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m_other));
+        ctx.extensions.insert((NodeIndex::new(1).into(), Direction::Incoming), m1);
+        ctx.extensions.insert((NodeIndex::new(2).into(), Direction::Incoming), m2);
+        ctx.extensions.insert((NodeIndex::new(3).into(), Direction::Incoming), m3);
+        ctx.extensions.insert((NodeIndex::new(4).into(), Direction::Incoming), m_other);
+        ctx.main_loop().unwrap();
+        ctx.results().unwrap();
     }
 }

@@ -2,12 +2,10 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::hugr::CircuitUnit;
-
 use crate::ops::OpType;
 
 use super::{BuildError, Dataflow};
-use crate::Wire;
+use crate::{CircuitUnit, Wire};
 
 /// Builder to build regions of dataflow graphs that look like Circuits,
 /// where some inputs of operations directly correspond to some outputs.

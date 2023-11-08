@@ -47,7 +47,7 @@ use thiserror::Error;
 use crate::hugr::rewrite::outline_cfg::OutlineCfg;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use crate::hugr::{HugrMut, Rewrite};
+use crate::hugr::{HugrMut, Rewrite, RootTagged};
 use crate::ops::handle::{BasicBlockID, CfgID};
 use crate::ops::OpTag;
 use crate::ops::OpTrait;
@@ -158,9 +158,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 pub fn transform_all_cfgs(h: &mut Hugr) {
     let mut node_stack = Vec::from([h.root()]);
     while let Some(n) = node_stack.pop() {
-        if h.get_optype(n).tag() == OpTag::Cfg {
-            // We've checked the optype so this should be fine
-            let s = SiblingMut::<CfgID>::try_new(h, n).unwrap();
+        if let Ok(s) = SiblingMut::<CfgID>::try_new(h, n) {
             transform_cfg_to_nested(&mut IdentityCfgMap::new(s));
         }
         node_stack.extend(h.children(n))
@@ -224,7 +222,7 @@ pub struct IdentityCfgMap<H> {
     entry: Node,
     exit: Node,
 }
-impl<H: HugrView> IdentityCfgMap<H> {
+impl<H: RootTagged<RootHandle = CfgID>> IdentityCfgMap<H> {
     /// Creates an [IdentityCfgMap] for the specified CFG
     pub fn new(h: H) -> Self {
         // Panic if malformed enough not to have two children
@@ -358,7 +356,7 @@ struct UndirectedDFSTree<T> {
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash> UndirectedDFSTree<T> {
-    pub fn new(cfg: &impl CfgNodeMap<T>) -> Self {
+    fn new(cfg: &impl CfgNodeMap<T>) -> Self {
         //1. Traverse backwards-only from exit building bitset of reachable nodes
         let mut reachable = HashSet::new();
         {
@@ -579,6 +577,7 @@ pub(crate) mod test {
     use crate::extension::PRELUDE_REGISTRY;
     use crate::extension::{prelude::USIZE_T, ExtensionSet};
 
+    use crate::hugr::views::RootChecked;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::Const;
     use crate::types::{FunctionType, Type};
@@ -606,10 +605,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
@@ -624,13 +621,10 @@ pub(crate) mod test {
         cfg_builder.branch(&tail, 0, &exit)?;
 
         let mut h = cfg_builder.finish_prelude_hugr()?;
-
+        let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        // There's no need to use a view of a region here but we do so just to check
-        // that we *can* (as we'll need to for "real" module Hugr's)
-        let v: SiblingGraph = SiblingGraph::try_new(&h, h.root()).unwrap();
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(v));
+        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.borrow()));
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -651,8 +645,8 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(&mut h));
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(1, depth(&h, exit));
         for n in [split, left, right, merge, head, tail] {
@@ -690,7 +684,8 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(&h));
+        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == entry)
@@ -728,7 +723,9 @@ pub(crate) mod test {
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
 
-        let v = IdentityCfgMap::new(&h);
+        // There's no need to use a view of a region here but we do so just to check
+        // that we *can* (as we'll need to for "real" module Hugr's)
+        let v = IdentityCfgMap::new(SiblingGraph::try_new(&h, h.root()).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         let [&left, &right] = edge_classes
@@ -751,12 +748,12 @@ pub(crate) mod test {
             ])
         );
 
-        // We could operate on the (&mut) Hugr directly here, but check that the transformation
-        // works on a SiblingMut (i.e. which only allows direct mutation at the top level)
+        // Again, there's no need for a view of a region here, but check that the
+        // transformation still works when we can only directly mutate the top level
         let root = h.root();
         let m = SiblingMut::<CfgID>::try_new(&mut h, root).unwrap();
         transform_cfg_to_nested(&mut IdentityCfgMap::new(m));
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(1, depth(&h, entry));
         assert_eq!(3, depth(&h, head));
         for n in [split, left, right, merge] {
@@ -779,7 +776,7 @@ pub(crate) mod test {
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
 
-        let v = IdentityCfgMap::new(&h);
+        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
@@ -890,10 +887,8 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2, ExtensionSet::new())?,
@@ -934,10 +929,8 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const =
-            cfg_builder.add_constant(Const::simple_predicate(0, 2), ExtensionSet::new())?; // Nothing here cares which branch
-        let const_unit =
-            cfg_builder.add_constant(Const::simple_unary_predicate(), ExtensionSet::new())?;
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2), ExtensionSet::new())?; // Nothing here cares which
+        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum(), ExtensionSet::new())?;
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,

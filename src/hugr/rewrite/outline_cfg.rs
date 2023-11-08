@@ -1,5 +1,6 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
-use std::collections::HashSet;
+use std::collections::{hash_set, HashSet};
+use std::iter;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -9,10 +10,11 @@ use crate::extension::ExtensionSet;
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::{HugrMut, HugrView, PortIndex};
+use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
 use crate::ops::{BasicBlock, OpTrait, OpType};
+use crate::PortIndex;
 use crate::{type_row, Node};
 
 /// Moves part of a Control-flow Sibling Graph into a new CFG-node
@@ -97,6 +99,9 @@ impl Rewrite for OutlineCfg {
     ///
     /// [CFG]: OpType::CFG
     type ApplyResult = (Node, Node);
+    type InvalidationSet<'a> = iter::Copied<hash_set::Iter<'a, Node>>
+        where
+            Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
@@ -135,10 +140,10 @@ impl Rewrite for OutlineCfg {
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
-            let predicate = new_block_bldr
-                .add_constant(ops::Const::simple_unary_predicate(), ExtensionSet::new())
+            let unit_sum = new_block_bldr
+                .add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())
                 .unwrap();
-            let pred_wire = new_block_bldr.load_const(&predicate).unwrap();
+            let pred_wire = new_block_bldr.load_const(&unit_sum).unwrap();
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
                 .unwrap();
@@ -146,14 +151,14 @@ impl Rewrite for OutlineCfg {
                 .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
                 .unwrap();
             (
-                ins_res.new_root.unwrap(),
+                ins_res.new_root,
                 *ins_res.node_map.get(&cfg.node()).unwrap(),
             )
         };
 
         // 3. Entry edges. Change any edges into entry_block from outside, to target new_block
         let preds: Vec<_> = h
-            .linked_ports(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
+            .linked_outputs(entry, h.node_inputs(entry).exactly_one().ok().unwrap())
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
@@ -210,6 +215,11 @@ impl Rewrite for OutlineCfg {
         in_cfg_view.connect(exit, exit_port, inner_exit, 0).unwrap();
 
         Ok((new_block, cfg_node))
+    }
+
+    #[inline]
+    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        self.blocks.iter().copied()
     }
 }
 
@@ -292,9 +302,9 @@ mod test {
     #[test]
     fn test_outline_cfg() {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
-        h.infer_and_validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         do_outline_cfg_test(&mut h, head, tail, 1);
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     fn do_outline_cfg_test(
@@ -396,7 +406,7 @@ mod test {
         let (new_block, new_cfg) = h
             .apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
             .unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
         assert_matches!(
             h.get_optype(new_block),

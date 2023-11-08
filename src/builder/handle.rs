@@ -1,13 +1,8 @@
 //! Handles to nodes in HUGR used during the building phase.
 //!
-use crate::{
-    ops::{
-        handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID},
-        OpTag,
-    },
-    Port,
-};
-use crate::{Node, Wire};
+use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID};
+use crate::ops::OpTag;
+use crate::{Node, OutgoingPort, Wire};
 
 use itertools::Itertools;
 use std::iter::FusedIterator;
@@ -64,7 +59,7 @@ impl<T: NodeHandle> BuildHandle<T> {
     /// Retrieve a [`Wire`] corresponding to the given offset.
     /// Does not check whether such a wire is valid for this node.
     pub fn out_wire(&self, offset: usize) -> Wire {
-        Wire::new(self.node(), Port::new_outgoing(offset))
+        Wire::new(self.node(), OutgoingPort::from(offset))
     }
 
     #[inline]
@@ -124,14 +119,12 @@ impl Iterator for Outputs {
     fn next(&mut self) -> Option<Self::Item> {
         self.range
             .next()
-            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
+            .map(|offset| Wire::new(self.node, OutgoingPort::from(offset)))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.range
-            .nth(n)
-            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
+        self.range.nth(n).map(|offset| Wire::new(self.node, offset))
     }
 
     #[inline]
@@ -157,7 +150,7 @@ impl DoubleEndedIterator for Outputs {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.range
             .next_back()
-            .map(|offset| Wire::new(self.node, Port::new_outgoing(offset)))
+            .map(|offset| Wire::new(self.node, offset))
     }
 }
 

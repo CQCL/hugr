@@ -11,7 +11,7 @@ use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView};
+use super::{check_tag, sealed::HugrInternals, HierarchyView, HugrView, RootTagged};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -63,7 +63,7 @@ macro_rules! impl_base_members {
 
         #[inline]
         fn node_count(&self) -> usize {
-            self.base_hugr().hierarchy.child_count(self.root.index) + 1
+            self.base_hugr().hierarchy.child_count(self.root.pg_index()) + 1
         }
 
         #[inline]
@@ -80,7 +80,7 @@ macro_rules! impl_base_members {
             let children = self
                 .base_hugr()
                 .hierarchy
-                .children(self.root.index)
+                .children(self.root.pg_index())
                 .map_into();
             iter::once(self.root).chain(children)
         }
@@ -88,19 +88,14 @@ macro_rules! impl_base_members {
         fn children(&self, node: Node) -> Self::Children<'_> {
             // Same as SiblingGraph
             match node == self.root {
-                true => self.base_hugr().hierarchy.children(node.index).map_into(),
+                true => self.base_hugr().hierarchy.children(node.pg_index()).map_into(),
                 false => portgraph::hierarchy::Children::default().map_into(),
             }
         }
     };
 }
 
-impl<'g, Root> HugrView for SiblingGraph<'g, Root>
-where
-    Root: NodeHandle,
-{
-    type RootHandle = Root;
-
+impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
     type Neighbours<'a> = MapInto<<FlatRegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
     where
         Self: 'a;
@@ -123,21 +118,24 @@ where
 
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
-        self.graph.contains_node(node.index)
+        self.graph.contains_node(node.pg_index())
     }
 
     #[inline]
     fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
-        self.graph.port_offsets(node.index, dir).map_into()
+        self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
-        self.graph.all_port_offsets(node.index).map_into()
+        self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
-        let port = self.graph.port_index(node.index, port.offset).unwrap();
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
+        let port = self
+            .graph
+            .port_index(node.pg_index(), port.into().pg_offset())
+            .unwrap();
         self.graph
             .port_links(port)
             .with_context(self)
@@ -151,7 +149,7 @@ where
 
     fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
         self.graph
-            .get_connections(node.index, other.index)
+            .get_connections(node.pg_index(), other.pg_index())
             .with_context(self)
             .map_with_context(|(p1, p2), hugr| {
                 [p1, p2].map(|link| {
@@ -163,18 +161,21 @@ where
 
     #[inline]
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
-        self.graph.num_ports(node.index, dir)
+        self.graph.num_ports(node.pg_index(), dir)
     }
 
     #[inline]
     fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
-        self.graph.neighbours(node.index, dir).map_into()
+        self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
     fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
-        self.graph.all_neighbours(node.index).map_into()
+        self.graph.all_neighbours(node.pg_index()).map_into()
     }
+}
+impl<'g, Root: NodeHandle> RootTagged for SiblingGraph<'g, Root> {
+    type RootHandle = Root;
 }
 
 impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
@@ -182,7 +183,7 @@ impl<'a, Root: NodeHandle> SiblingGraph<'a, Root> {
         let hugr = hugr.base_hugr();
         Self {
             root,
-            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.index),
+            graph: FlatRegionGraph::new_flat_region(&hugr.graph, &hugr.hierarchy, root.pg_index()),
             hugr,
             _phantom: std::marker::PhantomData,
         }
@@ -269,7 +270,7 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
         FlatRegionGraph::new_flat_region(
             &self.base_hugr().graph,
             &self.base_hugr().hierarchy,
-            self.root.index,
+            self.root.pg_index(),
         )
     }
 
@@ -283,8 +284,6 @@ impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
 }
 
 impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
-    type RootHandle = Root;
-
     type Neighbours<'a> = <Vec<Node> as IntoIterator>::IntoIter
     where
         Self: 'a;
@@ -317,7 +316,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
         }
     }
 
-    fn linked_ports(&self, node: Node, port: Port) -> Self::PortLinks<'_> {
+    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
         // Need to filter only to links inside the sibling graph
         SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
             .linked_ports(node, port)
@@ -355,7 +354,9 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
             .into_iter()
     }
 }
-
+impl<'g, Root: NodeHandle> RootTagged for SiblingMut<'g, Root> {
+    type RootHandle = Root;
+}
 impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
@@ -439,9 +440,7 @@ mod test {
 
     #[rstest]
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
-        simple_dfg_hugr
-            .infer_and_validate(&PRELUDE_REGISTRY)
-            .unwrap();
+        simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
         let signature = simple_dfg_hugr.get_function_type().unwrap().clone();
 
@@ -455,7 +454,7 @@ mod test {
         );
 
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
-        let bad_nodetype = NodeType::open_extensions(crate::ops::CFG { signature });
+        let bad_nodetype = NodeType::new_open(crate::ops::CFG { signature });
         assert_eq!(
             sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
             Err(HugrError::InvalidTag {
@@ -472,7 +471,7 @@ mod test {
     #[rstest]
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
-        let case_nodetype = NodeType::open_extensions(crate::ops::Case {
+        let case_nodetype = NodeType::new_open(crate::ops::Case {
             signature: simple_dfg_hugr.root_type().op_signature(),
         });
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
