@@ -706,7 +706,7 @@ impl UnificationContext {
         println!("{:?}", relations.graph);
 
         // Process the strongly-connected components. petgraph/sccs() returns these
-        // depended-upon before depender, as we need.
+        // depended-upon before dependant, as we need.
         for cc in relations.sccs() {
             // Strongly connected components are looping constraint dependencies.
             // This means that each metavariable in the CC has the same solution.
