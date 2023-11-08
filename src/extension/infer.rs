@@ -702,6 +702,8 @@ impl UnificationContext {
                 solutions.insert(m, solution);
             }
         }
+        println!("{:?}", relations.node_map);
+        println!("{:?}", relations.graph);
 
         // Process the strongly-connected components. We need to deal with these
         // depended-upon before depender. ccs() gives them back in some order
@@ -1671,11 +1673,19 @@ mod test {
         ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
         ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
         ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m_other));
-        ctx.extensions.insert((NodeIndex::new(1).into(), Direction::Incoming), m1);
-        ctx.extensions.insert((NodeIndex::new(2).into(), Direction::Incoming), m2);
-        ctx.extensions.insert((NodeIndex::new(3).into(), Direction::Incoming), m3);
-        ctx.extensions.insert((NodeIndex::new(4).into(), Direction::Incoming), m_other);
+        ctx.extensions
+            .insert((NodeIndex::new(2).into(), Direction::Incoming), m1);
+        ctx.extensions
+            .insert((NodeIndex::new(3).into(), Direction::Incoming), m2);
+        ctx.extensions
+            .insert((NodeIndex::new(4).into(), Direction::Incoming), m3);
+        ctx.extensions
+            .insert((NodeIndex::new(5).into(), Direction::Incoming), m_other);
+        ctx.variables.insert(m1);
+        ctx.variables.insert(m_other);
         ctx.main_loop().unwrap();
+        ctx.results().unwrap();
+        ctx.instantiate_variables();
         ctx.results().unwrap();
     }
 }
