@@ -1664,7 +1664,7 @@ mod test {
     // Test that logic for dealing with self-referential constraints doesn't
     // fall over when a self-referencing group of metas also references a meta
     // outside the group
-    fn failing_sccs_test() {
+    fn sccs() {
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
         let m1 = ctx.fresh_meta();
@@ -1677,9 +1677,10 @@ mod test {
         ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
         ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
         // This other meta is outside the loop, but depended on by one of the loop metas
-        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m_other));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&B), m_other));
         ctx.variables.insert(m1);
         ctx.variables.insert(m_other);
         ctx.instantiate_variables();
+        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::from_iter([A,B])));
     }
 }
