@@ -5,6 +5,9 @@ use smol_str::SmolStr;
 use super::custom::ExternalOp;
 use super::{OpName, OpTag, OpTrait, StaticTag};
 
+use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::types::type_param::TypeArg;
+use crate::types::PolyFuncType;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     types::{EdgeKind, FunctionType, Type, TypeRow},
@@ -49,6 +52,59 @@ pub enum LeafOp {
         /// The extensions which we're adding to the inputs
         new_extension: ExtensionId,
     },
+    /// Fixes some [TypeParam]s of a polymorphic type by providing [TypeArg]s
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    TypeApply {
+        /// The type and args, plus a cache of the resulting type
+        ta: TypeApplication,
+    },
+}
+
+/// Records details of an application of a [PolyFuncType] to some [TypeArg]s
+/// and the result (a less-, but still potentially-, polymorphic type).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TypeApplication {
+    input: PolyFuncType,
+    args: Vec<TypeArg>,
+    output: PolyFuncType, // cached
+}
+
+impl TypeApplication {
+    /// Checks that the specified args are correct for the [TypeParam]s of the polymorphic input.
+    /// Note the extension registry is required here to recompute [Type::least_upper_bound]s.
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    pub fn try_new(
+        input: PolyFuncType,
+        args: impl Into<Vec<TypeArg>>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let args = args.into();
+        // Should we require >=1 `arg`s here? Or that input declares >=1 params?
+        // At the moment we allow an identity TypeApply on a monomorphic function type.
+        let output = input.instantiate_poly(&args, extension_registry)?;
+        Ok(Self {
+            input,
+            args,
+            output,
+        })
+    }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let other = Self::try_new(self.input.clone(), self.args.clone(), extension_registry)?;
+        if other.output == self.output {
+            Ok(())
+        } else {
+            Err(SignatureError::TypeApplyIncorrectCache {
+                cached: self.output.clone(),
+                expected: other.output.clone(),
+            })
+        }
+    }
 }
 
 impl Default for LeafOp {
@@ -66,6 +122,7 @@ impl OpName for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple",
             LeafOp::Tag { .. } => "Tag",
             LeafOp::Lift { .. } => "Lift",
+            LeafOp::TypeApply { .. } => "TypeApply",
         }
         .into()
     }
@@ -85,6 +142,9 @@ impl OpTrait for LeafOp {
             LeafOp::UnpackTuple { tys: _ } => "UnpackTuple operation",
             LeafOp::Tag { .. } => "Tag Sum operation",
             LeafOp::Lift { .. } => "Add a extension requirement to an edge",
+            LeafOp::TypeApply { .. } => {
+                "Instantiate (perhaps partially) a polymorphic type with some type arguments"
+            }
         }
     }
 
@@ -115,6 +175,10 @@ impl OpTrait for LeafOp {
                 new_extension,
             } => FunctionType::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(&ExtensionSet::singleton(new_extension)),
+            LeafOp::TypeApply { ta } => FunctionType::new(
+                vec![Type::new_function(ta.input.clone())],
+                vec![Type::new_function(ta.output.clone())],
+            ),
         }
     }
 
@@ -124,5 +188,75 @@ impl OpTrait for LeafOp {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::prelude::BOOL_T;
+    use crate::extension::SignatureError;
+    use crate::extension::{prelude::USIZE_T, PRELUDE};
+    use crate::hugr::ValidationError;
+    use crate::ops::handle::NodeHandle;
+    use crate::std_extensions::collections::EXTENSION;
+    use crate::types::Type;
+    use crate::types::{test::nested_func, FunctionType, TypeArg};
+
+    use super::{LeafOp, TypeApplication};
+
+    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
+
+    #[test]
+    fn hugr_with_type_apply() -> Result<(), Box<dyn std::error::Error>> {
+        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let pf_in = nested_func();
+        let pf_out = pf_in.instantiate(&[USIZE_TA], &reg)?;
+        let mut dfg = DFGBuilder::new(FunctionType::new(
+            vec![Type::new_function(pf_in.clone())],
+            vec![Type::new_function(pf_out)],
+        ))?;
+        let ta = dfg.add_dataflow_op(
+            LeafOp::TypeApply {
+                ta: TypeApplication::try_new(pf_in, [USIZE_TA], &reg).unwrap(),
+            },
+            dfg.input_wires(),
+        )?;
+        dfg.finish_hugr_with_outputs(ta.outputs(), &reg)?;
+        Ok(())
+    }
+
+    #[test]
+    fn bad_type_apply() -> Result<(), Box<dyn std::error::Error>> {
+        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let pf = nested_func();
+        let pf_usz = pf.instantiate_poly(&[USIZE_TA], &reg)?;
+        let pf_bool = pf.instantiate_poly(&[TypeArg::Type { ty: BOOL_T }], &reg)?;
+        let mut dfg = DFGBuilder::new(FunctionType::new(
+            vec![Type::new_function(pf.clone())],
+            vec![Type::new_function(pf_usz.clone())],
+        ))?;
+        let ta = dfg.add_dataflow_op(
+            LeafOp::TypeApply {
+                ta: TypeApplication {
+                    input: pf,
+                    args: vec![TypeArg::Type { ty: BOOL_T }],
+                    output: pf_usz.clone(),
+                },
+            },
+            dfg.input_wires(),
+        )?;
+        let res = dfg.finish_hugr_with_outputs(ta.outputs(), &reg);
+        assert_eq!(
+            res.unwrap_err(),
+            BuildError::InvalidHUGR(ValidationError::SignatureError {
+                node: ta.node(),
+                cause: SignatureError::TypeApplyIncorrectCache {
+                    cached: pf_usz,
+                    expected: pf_bool
+                }
+            })
+        );
+        Ok(())
     }
 }

@@ -2,6 +2,7 @@
 
 mod check;
 pub mod custom;
+mod poly_func;
 mod primitive;
 mod serialize;
 mod signature;
@@ -10,6 +11,7 @@ pub mod type_row;
 
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
+pub use poly_func::PolyFuncType;
 pub use signature::{FunctionType, Signature};
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -25,6 +27,7 @@ use crate::type_row;
 use std::fmt::Debug;
 
 pub use self::primitive::PrimType;
+use self::type_param::TypeParam;
 
 #[cfg(feature = "pyo3")]
 use pyo3::pyclass;
@@ -212,8 +215,8 @@ impl Type {
     const UNIT_REF: &'static Self = &Self::UNIT;
 
     /// Initialize a new function type.
-    pub fn new_function(signature: FunctionType) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(signature))))
+    pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
+        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(fun_ty.into()))))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -260,6 +263,13 @@ impl Type {
         Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
     }
 
+    /// New use (occurrence) of the type variable with specified DeBruijn index.
+    /// For use in type schemes only: `bound` must match that with which the
+    /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
+    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
+        Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
+    }
+
     /// Report the least upper TypeBound, if there is one.
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
@@ -278,24 +288,99 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, and that for each [CustomType] the corresponding
+    /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
+    /// [validate] and fit into the def's declared parameters.
+    ///
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
-                row.iter().try_for_each(|t| t.validate(extension_registry))
-            }
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
+                .iter()
+                .try_for_each(|t| t.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
-            TypeEnum::Prim(PrimType::Extension(custy)) => custy.validate(extension_registry),
-            TypeEnum::Prim(PrimType::Function(ft)) => ft
-                .input
-                .iter()
-                .chain(ft.output.iter())
-                .try_for_each(|t| t.validate(extension_registry)),
+            TypeEnum::Prim(PrimType::Extension(custy)) => {
+                custy.validate(extension_registry, var_decls)
+            }
+            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, var_decls),
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
+                check_typevar_decl(var_decls, *idx, &TypeParam::Type(*bound))
+            }
+        }
+    }
+
+    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+        match &self.0 {
+            TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Unit { .. }) => {
+                self.clone()
+            }
+            TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(t)),
+            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(t)),
+            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
+            TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, t)),
+        }
+    }
+}
+
+/// A function that replaces type variables with values.
+/// (The values depend upon the implementation, to allow dynamic computation;
+/// and [Substitution] deals only with type variables, other/containing types/typeargs
+/// are handled by [Type::substitute], [TypeArg::substitute] and friends.)
+pub(crate) trait Substitution {
+    /// Apply to a variable of kind [TypeParam::Type]
+    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
+        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound)) else {
+            panic!("Variable was not a type - try validate() first")
+        };
+        ty
+    }
+
+    /// Apply to a variable whose kind is any given [TypeParam]
+    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
+
+    fn extension_registry(&self) -> &ExtensionRegistry;
+}
+
+fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
+    let res = row
+        .iter()
+        .map(|ty| ty.substitute(tr))
+        .collect::<Vec<_>>()
+        .into();
+    res
+}
+
+pub(crate) fn check_typevar_decl(
+    decls: &[TypeParam],
+    idx: usize,
+    cached_decl: &TypeParam,
+) -> Result<(), SignatureError> {
+    match decls.get(idx) {
+        None => Err(SignatureError::FreeTypeVar {
+            idx,
+            num_decls: decls.len(),
+        }),
+        Some(actual) => {
+            // The cache here just mirrors the declaration. The typevar can be used
+            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
+            if actual == cached_decl {
+                Ok(())
+            } else {
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    cached: cached_decl.clone(),
+                    actual: actual.clone(),
+                })
+            }
         }
     }
 }
@@ -315,6 +400,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
+    pub(crate) use poly_func::test::nested_func;
 
     use super::*;
     use crate::{
@@ -344,7 +430,8 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), Function([[]][]), my_custom([]), Alias(my_alias)])".to_string()
+            "Tuple([usize([]), Function(forall . [[]][]), my_custom([]), Alias(my_alias)])"
+                .to_string()
         );
     }
 

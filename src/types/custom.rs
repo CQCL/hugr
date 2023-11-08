@@ -4,9 +4,12 @@
 use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
-use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
-use super::{type_param::TypeArg, TypeBound};
+use super::{
+    type_param::{TypeArg, TypeParam},
+    Substitution, TypeBound,
+};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -59,27 +62,50 @@ impl CustomType {
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         // Check the args are individually ok
         self.args
             .iter()
-            .try_for_each(|a| a.validate(extension_registry))?;
+            .try_for_each(|a| a.validate(extension_registry, var_decls))?;
         // And check they fit into the TypeParams declared by the TypeDef
+        let def = self.get_type_def(extension_registry)?;
+        def.check_custom(self)
+    }
+
+    fn get_type_def<'a>(
+        &self,
+        extension_registry: &'a ExtensionRegistry,
+    ) -> Result<&'a TypeDef, SignatureError> {
         let ex = extension_registry.get(&self.extension);
         // Even if OpDef's (+binaries) are not available, the part of the Extension definition
         // describing the TypeDefs can easily be passed around (serialized), so should be available.
         let ex = ex.ok_or(SignatureError::ExtensionNotFound(self.extension.clone()))?;
-        let def = ex
-            .get_type(&self.id)
+        ex.get_type(&self.id)
             .ok_or(SignatureError::ExtensionTypeNotFound {
                 exn: self.extension.clone(),
                 typ: self.id.clone(),
-            })?;
-        def.check_custom(self)
+            })
     }
-}
 
-impl CustomType {
+    pub(super) fn substitute(&self, tr: &impl Substitution) -> Self {
+        let args = self
+            .args
+            .iter()
+            .map(|arg| arg.substitute(tr))
+            .collect::<Vec<_>>();
+        let bound = self
+            .get_type_def(tr.extension_registry())
+            .expect("validate should rule this out")
+            .bound(&args);
+        debug_assert!(self.bound.contains(bound));
+        Self {
+            args,
+            bound,
+            ..self.clone()
+        }
+    }
+
     /// unique name of the type.
     pub fn name(&self) -> &SmolStr {
         &self.id

@@ -4,21 +4,22 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
+use itertools::Itertools;
 use std::num::NonZeroU64;
-
 use thiserror::Error;
 
 use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::CustomType;
-use super::Type;
-use super::TypeBound;
+use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
+#[derive(
+    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
+#[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
     fn valid_value(&self, val: u64) -> bool {
@@ -28,11 +29,23 @@ impl UpperBound {
             _ => false,
         }
     }
+    fn contains(&self, other: &UpperBound) -> bool {
+        match (self.0, other.0) {
+            (None, _) => true,
+            (Some(b1), Some(b2)) if b1 >= b2 => true,
+            _ => false,
+        }
+    }
 }
 
-/// A parameter declared by an OpDef. Specifies a value
-/// that must be provided by each operation node.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+/// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] (e.g. [OpDef]),
+/// specifying a value that may (resp. must) be provided to instantiate it.
+///
+/// [PolyFuncType]: super::PolyFuncType
+/// [OpDef]: crate::extension::OpDef
+#[derive(
+    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
 #[non_exhaustive]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
@@ -44,6 +57,7 @@ pub enum TypeParam {
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
     List(Box<TypeParam>),
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
+    #[display(fmt = "Tuple({})", "_0.iter().map(|t|t.to_string()).join(\", \")")]
     Tuple(Vec<TypeParam>),
     /// Argument is a [TypeArg::Extensions]. A set of [ExtensionId]s.
     ///
@@ -60,6 +74,20 @@ impl TypeParam {
     /// [`TypeParam::BoundedNat`] with the stated upper bound (non-exclusive)
     pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNat(UpperBound(Some(upper_bound)))
+    }
+
+    fn contains(&self, other: &TypeParam) -> bool {
+        match (self, other) {
+            (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
+            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => b1.contains(b2),
+            (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
+            (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
+            (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+            }
+            (TypeParam::Extensions, TypeParam::Extensions) => true,
+            _ => false,
+        }
     }
 }
 
@@ -84,35 +112,102 @@ pub enum TypeArg {
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
-    /// sequence of arguments.
+    /// sequence of elements.
     Sequence {
         #[allow(missing_docs)]
-        args: Vec<TypeArg>,
+        elems: Vec<TypeArg>,
     },
     /// Instance of [TypeParam::Extensions], providing the extension ids.
     Extensions {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
+    /// Variable (used in type schemes only), that is not a [TypeArg::Type]
+    /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
+    Variable {
+        #[allow(missing_docs)]
+        v: TypeArgVariable,
+    },
+}
+
+/// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct TypeArgVariable {
+    idx: usize,
+    cached_decl: TypeParam,
 }
 
 impl TypeArg {
+    /// Makes a TypeArg representing a use (occurrence) of the type variable
+    /// with the specified DeBruijn index. For use within type schemes only:
+    /// `bound` must match that with which the variable was declared.
+    pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
+        match decl {
+            TypeParam::Type(b) => TypeArg::Type {
+                ty: Type::new_var_use(idx, b),
+            },
+            TypeParam::Extensions => TypeArg::Extensions {
+                es: ExtensionSet::type_var(idx),
+            },
+            _ => TypeArg::Variable {
+                v: TypeArgVariable {
+                    idx,
+                    cached_decl: decl,
+                },
+            },
+        }
+    }
+
+    /// Much as [Type::validate], also checks that the type of any [TypeArg::Opaque]
+    /// is valid and closed.
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry),
+            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
                 // here is a valid instance of the type.
-                custarg.typ.validate(extension_registry)
+                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
+                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
+                custarg.typ.validate(extension_registry, &[])
             }
-            TypeArg::Sequence { args } => {
-                args.iter().try_for_each(|a| a.validate(extension_registry))
-            }
+            TypeArg::Sequence { elems } => elems
+                .iter()
+                .try_for_each(|a| a.validate(extension_registry, var_decls)),
             TypeArg::Extensions { es: _ } => Ok(()),
+            TypeArg::Variable {
+                v: TypeArgVariable { idx, cached_decl },
+            } => check_typevar_decl(var_decls, *idx, cached_decl),
+        }
+    }
+
+    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+        match self {
+            TypeArg::Type { ty } => TypeArg::Type {
+                ty: ty.substitute(t),
+            },
+            TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
+            TypeArg::Opaque {
+                arg: CustomTypeArg { typ, .. },
+            } => {
+                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
+                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
+                debug_assert_eq!(&typ.substitute(t), typ);
+                self.clone()
+            }
+            TypeArg::Sequence { elems } => TypeArg::Sequence {
+                elems: elems.iter().map(|ta| ta.substitute(t)).collect(),
+            },
+            TypeArg::Extensions { es } => TypeArg::Extensions {
+                es: es.substitute(t),
+            },
+            TypeArg::Variable {
+                v: TypeArgVariable { idx, cached_decl },
+            } => t.apply_var(*idx, cached_decl),
         }
     }
 }
@@ -143,15 +238,21 @@ impl CustomTypeArg {
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
-        (TypeArg::Type { ty: t }, TypeParam::Type(bound))
-            if bound.contains(t.least_upper_bound()) =>
+        (
+            TypeArg::Variable {
+                v: TypeArgVariable { cached_decl, .. },
+            },
+            _,
+        ) if param.contains(cached_decl) => Ok(()),
+        (TypeArg::Type { ty }, TypeParam::Type(bound))
+            if bound.contains(ty.least_upper_bound()) =>
         {
             Ok(())
         }
-        (TypeArg::Sequence { args: items }, TypeParam::List(param)) => {
-            items.iter().try_for_each(|arg| check_type_arg(arg, param))
+        (TypeArg::Sequence { elems }, TypeParam::List(param)) => {
+            elems.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Sequence { args: items }, TypeParam::Tuple(types)) => {
+        (TypeArg::Sequence { elems: items }, TypeParam::Tuple(types)) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
@@ -178,6 +279,17 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             param: param.clone(),
         }),
     }
+}
+
+/// Check a list of type arguments match a list of required type parameters
+pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), TypeArgError> {
+    if args.len() != params.len() {
+        return Err(TypeArgError::WrongNumberArgs(args.len(), params.len()));
+    }
+    for (a, p) in args.iter().zip(params.iter()) {
+        check_type_arg(a, p)?;
+    }
+    Ok(())
 }
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]

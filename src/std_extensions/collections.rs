@@ -113,7 +113,7 @@ fn get_type(name: &str) -> &TypeDef {
 }
 
 fn list_types(args: &[TypeArg]) -> Result<(Type, Type), SignatureError> {
-    let list_custom_type = get_type(&LIST_TYPENAME).instantiate_concrete(args)?;
+    let list_custom_type = get_type(&LIST_TYPENAME).instantiate(args)?;
     let [TypeArg::Type { ty: element_type }] = args else {
         panic!("should be checked by def.")
     };
@@ -127,9 +127,9 @@ mod test {
     use crate::{
         extension::{
             prelude::{ConstUsize, QB_T, USIZE_T},
-            OpDef,
+            OpDef, PRELUDE,
         },
-        std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         types::{type_param::TypeArg, Type},
         Extension,
     };
@@ -152,11 +152,11 @@ mod test {
         let list_def = r.get_type(&LIST_TYPENAME).unwrap();
 
         let list_type = list_def
-            .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+            .instantiate([TypeArg::Type { ty: USIZE_T }])
             .unwrap();
 
         assert!(list_def
-            .instantiate_concrete([TypeArg::BoundedNat { n: 3 }])
+            .instantiate([TypeArg::BoundedNat { n: 3 }])
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();
@@ -170,7 +170,12 @@ mod test {
 
     #[test]
     fn test_list_ops() {
-        let reg = &[EXTENSION.to_owned()].into();
+        let reg = &[
+            EXTENSION.to_owned(),
+            PRELUDE.to_owned(),
+            float_types::extension(),
+        ]
+        .into();
         let pop_sig = get_op(&POP_NAME)
             .compute_signature(&[TypeArg::Type { ty: QB_T }], reg)
             .unwrap();

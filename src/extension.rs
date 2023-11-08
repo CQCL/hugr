@@ -14,9 +14,9 @@ use thiserror::Error;
 use crate::hugr::IdentList;
 use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::types::type_param::{check_type_arg, TypeArgError};
+use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomType, TypeBound};
+use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
 
 mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
@@ -91,6 +91,24 @@ pub enum SignatureError {
         actual: TypeBound,
         expected: TypeBound,
     },
+    /// A Type Variable's cache of its declared kind is incorrect
+    #[error("Type Variable claims to be {cached:?} but actual declaration {actual:?}")]
+    TypeVarDoesNotMatchDeclaration {
+        actual: TypeParam,
+        cached: TypeParam,
+    },
+    /// A type variable that was used has not been declared
+    #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
+    FreeTypeVar { idx: usize, num_decls: usize },
+    /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
+    /// [ExtensionRegistry].
+    ///
+    /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
+    #[error("Incorrect result of type application - cached {cached} but expected {expected}")]
+    TypeApplyIncorrectCache {
+        cached: PolyFuncType,
+        expected: PolyFuncType,
+    },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.
@@ -140,15 +158,7 @@ trait TypeParametrised {
     fn extension(&self) -> &ExtensionId;
     /// Check provided type arguments are valid against parameters.
     fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        if args.len() != self.params().len() {
-            return Err(SignatureError::TypeArgMismatch(
-                TypeArgError::WrongNumberArgs(args.len(), self.params().len()),
-            ));
-        }
-        for (a, p) in args.iter().zip(self.params().iter()) {
-            check_type_arg(a, p).map_err(SignatureError::TypeArgMismatch)?;
-        }
-        Ok(())
+        check_type_args(args, self.params()).map_err(SignatureError::TypeArgMismatch)
     }
 }
 
@@ -315,6 +325,14 @@ impl ExtensionSet {
         self.0.insert(extension.clone());
     }
 
+    /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
+    pub fn insert_type_var(&mut self, idx: usize) {
+        // Represent type vars as string representation of DeBruijn index.
+        // This is not a legal IdentList or ExtensionId so should not conflict.
+        self.0
+            .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
+    }
+
     /// Returns `true` if the set contains the given extension.
     pub fn contains(&self, extension: &ExtensionId) -> bool {
         self.0.contains(extension)
@@ -337,6 +355,14 @@ impl ExtensionSet {
         set
     }
 
+    /// An ExtensionSet containing a single type variable
+    /// (which must have been declared as a [TypeParam::Extensions])
+    pub fn type_var(idx: usize) -> Self {
+        let mut set = Self::new();
+        set.insert_type_var(idx);
+        set
+    }
+
     /// Returns the union of two extension sets.
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
@@ -356,6 +382,32 @@ impl ExtensionSet {
     /// True if this set contains no [ExtensionId]s
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub(crate) fn validate(&self, params: &[TypeParam]) -> Result<(), SignatureError> {
+        self.iter()
+            .filter_map(as_typevar)
+            .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
+    }
+
+    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+        Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
+            None => vec![e.clone()],
+            Some(i) => match t.apply_var(i, &TypeParam::Extensions) {
+                TypeArg::Extensions{es} => es.iter().cloned().collect::<Vec<_>>(),
+                _ => panic!("value for type var was not extension set - type scheme should be validated first"),
+            },
+        }))
+    }
+}
+
+fn as_typevar(e: &ExtensionId) -> Option<usize> {
+    // Type variables are represented as radix-10 numbers, which are illegal
+    // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
+    // we assume it must be a type variable, and fail fast if it isn't.
+    match e.chars().next() {
+        Some(c) if c.is_ascii_digit() => Some(str::parse(e).unwrap()),
+        _ => None,
     }
 }
 

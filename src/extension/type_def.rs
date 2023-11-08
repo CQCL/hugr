@@ -93,10 +93,7 @@ impl TypeDef {
     ///
     /// This function will return an error if the provided arguments are not
     /// valid instances of the type parameters.
-    pub fn instantiate_concrete(
-        &self,
-        args: impl Into<Vec<TypeArg>>,
-    ) -> Result<CustomType, SignatureError> {
+    pub fn instantiate(&self, args: impl Into<Vec<TypeArg>>) -> Result<CustomType, SignatureError> {
         let args = args.into();
         self.check_args_impl(&args)?;
         let bound = self.bound(&args);
@@ -188,21 +185,18 @@ mod test {
             bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(
-            def.instantiate_concrete(vec![TypeArg::Type {
+            def.instantiate(vec![TypeArg::Type {
                 ty: Type::new_function(FunctionType::new(vec![], vec![])),
             }])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(
-            def.instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
-                .unwrap(),
-        );
+        let typ2 = Type::new_extension(def.instantiate([TypeArg::Type { ty: USIZE_T }]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate_concrete([TypeArg::Type { ty: QB_T }]),
+            def.instantiate([TypeArg::Type { ty: QB_T }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     arg: TypeArg::Type { ty: QB_T },
@@ -212,12 +206,12 @@ mod test {
         );
         // Too few arguments:
         assert_eq!(
-            def.instantiate_concrete([]).unwrap_err(),
+            def.instantiate([]).unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(0, 1))
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate_concrete([
+            def.instantiate([
                 TypeArg::Type { ty: FLOAT64_TYPE },
                 TypeArg::Type { ty: FLOAT64_TYPE },
             ])

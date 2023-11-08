@@ -2,7 +2,7 @@
 
 use crate::ops::AliasDecl;
 
-use super::{CustomType, FunctionType, TypeBound};
+use super::{CustomType, PolyFuncType, TypeBound};
 
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
@@ -18,7 +18,11 @@ pub enum PrimType {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<FunctionType>),
+    Function(Box<PolyFuncType>),
+    // DeBruijn index, and cache of TypeBound (checked in validation)
+    #[allow(missing_docs)]
+    #[display(fmt = "Variable({})", _0)]
+    Variable(usize, TypeBound),
 }
 
 impl PrimType {
@@ -28,6 +32,7 @@ impl PrimType {
             PrimType::Extension(c) => c.bound(),
             PrimType::Alias(a) => a.bound,
             PrimType::Function(_) => TypeBound::Copyable,
+            PrimType::Variable(_, b) => *b,
         }
     }
 }

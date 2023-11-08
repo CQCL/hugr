@@ -1,8 +1,6 @@
-use super::{SumType, Type, TypeEnum, TypeRow};
+use super::{PolyFuncType, SumType, Type, TypeBound, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
-
-use super::FunctionType;
 
 use crate::extension::prelude::{array_type, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
@@ -13,12 +11,13 @@ use crate::types::primitive::PrimType;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<FunctionType>),
+    G(Box<PolyFuncType>),
     Tuple { inner: TypeRow },
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
+    V { i: usize, b: TypeBound },
 }
 
 impl From<Type> for SerSimpleType {
@@ -35,7 +34,8 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Prim(t) => match t {
                 PrimType::Extension(c) => SerSimpleType::Opaque(c),
                 PrimType::Alias(a) => SerSimpleType::Alias(a),
-                PrimType::Function(sig) => SerSimpleType::G(Box::new(*sig)),
+                PrimType::Function(sig) => SerSimpleType::G(sig),
+                PrimType::Variable(i, b) => SerSimpleType::V { i, b },
             },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
@@ -54,6 +54,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Array { inner, len } => array_type((*inner).into(), len),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
+            SerSimpleType::V { i, b } => Type::new_var_use(i, b),
         }
     }
 }

@@ -463,7 +463,7 @@ mod test {
             collections::EXTENSION
                 .get_type(collections::LIST_TYPENAME.as_str())
                 .unwrap()
-                .instantiate_concrete([TypeArg::Type { ty: USIZE_T }])
+                .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),
         );
         let pop: LeafOp = collections::EXTENSION

@@ -1,24 +1,20 @@
-use crate::Hugr;
+use std::cmp::min;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+
+use smol_str::SmolStr;
 
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
     TypeParametrised,
 };
 
-use crate::types::FunctionType;
-
-use crate::types::type_param::TypeArg;
-
 use crate::ops::custom::OpaqueOp;
-
-use std::collections::HashMap;
-
-use crate::types::type_param::TypeParam;
-
-use smol_str::SmolStr;
+use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
+use crate::types::{FunctionType, PolyFuncType};
+use crate::Hugr;
 
 /// Trait for extensions to provide custom binary code for computing signature.
 pub trait CustomSignatureFunc: Send + Sync {
@@ -31,14 +27,14 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError>;
+    ) -> Result<PolyFuncType, SignatureError>;
 }
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F> CustomSignatureFunc for F
+impl<F, R: Into<PolyFuncType>> CustomSignatureFunc for F
 where
-    F: Fn(&[TypeArg]) -> Result<FunctionType, SignatureError> + Send + Sync,
+    F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync,
 {
     fn compute_signature(
         &self,
@@ -46,8 +42,8 @@ where
         arg_values: &[TypeArg],
         _misc: &HashMap<String, serde_yaml::Value>,
         _extension_registry: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
-        self(arg_values)
+    ) -> Result<PolyFuncType, SignatureError> {
+        Ok(self(arg_values)?.into())
     }
 }
 
@@ -77,25 +73,25 @@ pub trait CustomLowerFunc: Send + Sync {
 /// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(super) enum SignatureFunc {
-    // Note: I'd prefer to make the YAML version just implement the same CustomSignatureFunc trait,
-    // and then just have a Box<dyn CustomSignatureFunc> instead of this enum, but that seems less likely
-    // to serialize well.
-    /// TODO: these types need to be whatever representation we want of a type scheme encoded in the YAML
+    // Note: except for serialization, we could have type schemes just implement the same
+    // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
+    // However instead we treat all CustomFunc's as non-serializable.
     #[serde(rename = "signature")]
-    FromDecl { inputs: String, outputs: String },
+    TypeScheme(PolyFuncType),
     #[serde(skip)]
-    CustomFunc(Box<dyn CustomSignatureFunc>),
+    CustomFunc {
+        /// Type parameters passed to [func]. (The returned [PolyFuncType]
+        /// may require further type parameters, not declared here.)
+        static_params: Vec<TypeParam>,
+        func: Box<dyn CustomSignatureFunc>,
+    },
 }
 
 impl Debug for SignatureFunc {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FromDecl { inputs, outputs } => f
-                .debug_struct("signature")
-                .field("inputs", inputs)
-                .field("outputs", outputs)
-                .finish(),
-            Self::CustomFunc(_) => f.write_str("<custom sig>"),
+            Self::TypeScheme(scheme) => scheme.fmt(f),
+            Self::CustomFunc { .. } => f.write_str("<custom sig>"),
         }
     }
 }
@@ -135,8 +131,6 @@ pub struct OpDef {
     name: SmolStr,
     /// Human readable description of the operation.
     description: String,
-    /// Declared type parameters, values must be provided for each operation node
-    params: Vec<TypeParam>,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     misc: HashMap<String, serde_yaml::Value>,
@@ -178,16 +172,24 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        self.check_args(args)?;
-        let res = match &self.signature_func {
-            SignatureFunc::FromDecl { .. } => {
-                // Sig should be computed solely from inputs + outputs + args.
-                todo!()
-            }
-            SignatureFunc::CustomFunc(bf) => {
-                bf.compute_signature(&self.name, args, &self.misc, exts)?
+        // Hugr's are monomorphic, so check the args have no free variables
+        args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
+
+        let temp: PolyFuncType; // to keep alive
+        let (pf, args) = match &self.signature_func {
+            SignatureFunc::TypeScheme(ts) => (ts, args),
+            SignatureFunc::CustomFunc {
+                static_params,
+                func,
+            } => {
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+                check_type_args(static_args, static_params)?;
+                temp = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
+                (&temp, other_args)
             }
         };
+
+        let res = pf.instantiate(args, exts)?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL-DEV/hugr/issues/425
         // assert!(res.contains(self.extension()));
@@ -196,8 +198,8 @@ impl OpDef {
 
     pub(crate) fn should_serialize_signature(&self) -> bool {
         match self.signature_func {
-            SignatureFunc::CustomFunc(_) => true,
-            SignatureFunc::FromDecl { .. } => false,
+            SignatureFunc::TypeScheme { .. } => true,
+            SignatureFunc::CustomFunc { .. } => false,
         }
     }
 
@@ -238,7 +240,10 @@ impl OpDef {
 
     /// Returns a reference to the params of this [`OpDef`].
     pub fn params(&self) -> &[TypeParam] {
-        self.params.as_ref()
+        match &self.signature_func {
+            SignatureFunc::TypeScheme(ts) => ts.params(),
+            SignatureFunc::CustomFunc { static_params, .. } => static_params,
+        }
     }
 }
 
@@ -248,7 +253,6 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: SignatureFunc,
@@ -257,7 +261,6 @@ impl Extension {
             extension: self.name.clone(),
             name,
             description,
-            params,
             misc,
             signature_func,
             lower_funcs,
@@ -274,7 +277,7 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
+        static_params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
@@ -282,50 +285,103 @@ impl Extension {
         self.add_op(
             name,
             description,
-            params,
             misc,
             lower_funcs,
-            SignatureFunc::CustomFunc(Box::new(signature_func)),
+            SignatureFunc::CustomFunc {
+                static_params,
+                func: Box::new(signature_func),
+            },
         )
     }
 
-    /// Create an OpDef with custom binary code to compute the signature, and no "misc" or "lowering
-    /// functions" defined.
+    /// Create an OpDef with custom binary code to compute the type scheme
+    /// (which may be polymorphic); and no "misc" or "lowering functions" defined.
     pub fn add_op_custom_sig_simple(
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
+        static_params: Vec<TypeParam>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op_custom_sig(
             name,
             description,
-            params,
+            static_params,
             HashMap::default(),
             Vec::new(),
             signature_func,
         )
     }
 
-    /// Create an OpDef with a signature (inputs+outputs) read from the
+    /// Create an OpDef with a signature (inputs+outputs) read from e.g.
     /// declarative YAML
-    pub fn add_op_decl_sig(
+    pub fn add_op_type_scheme(
         &mut self,
         name: SmolStr,
         description: String,
-        params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
-        (inputs, outputs): (String, String), // separating these makes clippy complain about too many args
+        type_scheme: PolyFuncType,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op(
             name,
             description,
-            params,
             misc,
             lower_funcs,
-            SignatureFunc::FromDecl { inputs, outputs },
+            SignatureFunc::TypeScheme(type_scheme),
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use smol_str::SmolStr;
+
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::prelude::USIZE_T;
+    use crate::extension::PRELUDE;
+    use crate::ops::custom::ExternalOp;
+    use crate::ops::LeafOp;
+    use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::Type;
+    use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
+    use crate::{const_extension_ids, Extension};
+
+    const_extension_ids! {
+        const EXT_ID: ExtensionId = "MyExt";
+    }
+
+    #[test]
+    fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
+        let reg1 = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        let mut e = Extension::new(EXT_ID);
+        const TP: TypeParam = TypeParam::Type(TypeBound::Any);
+        let list_of_var =
+            Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
+        const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
+        let type_scheme = PolyFuncType::new_validated(
+            vec![TP],
+            FunctionType::new_linear(vec![list_of_var]),
+            &reg1,
+        )?;
+        e.add_op_type_scheme(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
+
+        let list_usize =
+            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
+        let mut dfg = DFGBuilder::new(FunctionType::new_linear(vec![list_usize]))?;
+        let rev = dfg.add_dataflow_op(
+            LeafOp::from(ExternalOp::Extension(
+                e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg1)
+                    .unwrap(),
+            )),
+            dfg.input_wires(),
+        )?;
+        dfg.finish_hugr_with_outputs(
+            rev.outputs(),
+            &[PRELUDE.to_owned(), EXTENSION.to_owned(), e].into(),
+        )?;
+
+        Ok(())
     }
 }

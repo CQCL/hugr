@@ -6,8 +6,10 @@ use pyo3::{pyclass, pymethods};
 use delegate::delegate;
 use std::fmt::{self, Display, Write};
 
-use crate::extension::ExtensionSet;
-use crate::types::{Type, TypeRow};
+use super::type_param::TypeParam;
+use super::{subst_row, Substitution, Type, TypeRow};
+
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg_attr(feature = "pyo3", pyclass)]
@@ -50,6 +52,26 @@ impl FunctionType {
     /// Instantiate a signature with the empty set of extensions
     pub fn pure(self) -> Signature {
         self.with_input_extensions(ExtensionSet::new())
+    }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .try_for_each(|t| t.validate(extension_registry, var_decls))?;
+        self.extension_reqs.validate(var_decls)
+    }
+
+    pub(crate) fn substitute(&self, tr: &impl Substitution) -> Self {
+        FunctionType {
+            input: subst_row(&self.input, tr),
+            output: subst_row(&self.output, tr),
+            extension_reqs: self.extension_reqs.substitute(tr),
+        }
     }
 }
 

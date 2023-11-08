@@ -297,22 +297,27 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use lazy_static::lazy_static;
     use std::f64::consts::TAU;
 
     use cool_asserts::assert_matches;
 
     use crate::{
-        extension::EMPTY_REG,
+        extension::{ExtensionRegistry, PRELUDE},
         ops::LeafOp,
-        std_extensions::quantum::{get_log_denom, ConstAngle},
         types::{type_param::TypeArgError, ConstTypeError, TypeArg},
     };
 
-    use super::EXTENSION;
+    use super::{get_log_denom, ConstAngle, EXTENSION};
+
+    lazy_static! {
+        /// Quantum extension definition.
+        static ref REG: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
+    }
 
     fn get_gate(gate_name: &str) -> LeafOp {
         EXTENSION
-            .instantiate_extension_op(gate_name, [], &EMPTY_REG)
+            .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
             .into()
     }

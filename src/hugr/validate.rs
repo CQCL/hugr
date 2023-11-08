@@ -164,29 +164,38 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Check operation-specific constraints.
-        if let OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) = op_type {
-            // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
-            for arg in b.args() {
-                arg.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-            }
-            // Try to resolve serialized names to actual OpDefs in Extensions.
-            let e: Option<ExtensionOp>;
-            let ext_op = match &**b {
-                ExternalOp::Opaque(op) => {
-                    // If resolve_extension_ops has been called first, this would always return Ok(None)
-                    e = resolve_opaque_op(node, op, self.extension_registry)?;
-                    e.as_ref()
+        // TODO make a separate method for this (perhaps producing Result<(), SignatureError>)
+        match op_type {
+            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
+                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
+                for arg in b.args() {
+                    // Hugrs are monomorphic, so no type variables in scope
+                    arg.validate(self.extension_registry, &[])
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
                 }
-                ExternalOp::Extension(ext) => Some(ext),
-            };
-            // If successful, check TypeArgs are valid for the declared TypeParams
-            if let Some(ext_op) = ext_op {
-                ext_op
-                    .def()
-                    .check_args(ext_op.args())
+                // Try to resolve serialized names to actual OpDefs in Extensions.
+                let e: Option<ExtensionOp>;
+                let ext_op = match &**b {
+                    ExternalOp::Opaque(op) => {
+                        // If resolve_extension_ops has been called first, this would always return Ok(None)
+                        e = resolve_opaque_op(node, op, self.extension_registry)?;
+                        e.as_ref()
+                    }
+                    ExternalOp::Extension(ext) => Some(ext),
+                };
+                // If successful, check TypeArgs are valid for the declared TypeParams
+                if let Some(ext_op) = ext_op {
+                    ext_op
+                        .def()
+                        .check_args(ext_op.args())
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                }
+            }
+            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
+                ta.validate(self.extension_registry)
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
+            _ => (),
         }
         // Secondly that the node has correct children
         self.validate_children(node, node_type)?;
@@ -241,7 +250,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         match &port_kind {
             EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
-                .validate(self.extension_registry)
+                .validate(self.extension_registry, &[]) // no type vars inside the Hugr
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }
