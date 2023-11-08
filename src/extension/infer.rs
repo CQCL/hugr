@@ -1671,19 +1671,25 @@ mod test {
         let m2 = ctx.fresh_meta();
         let m3 = ctx.fresh_meta();
         ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
-        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&UNKNOWN_EXTENSION), m1));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&B), m1));
         ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
         // And a second scc
         let m4 = ctx.fresh_meta();
         let m5 = ctx.fresh_meta();
-        ctx.add_constraint(m4, Constraint::Plus(ExtensionSet::singleton(&B), m5));
-        ctx.add_constraint(m5, Constraint::Plus(ExtensionSet::singleton(&B), m4));
+        ctx.add_constraint(m4, Constraint::Plus(ExtensionSet::singleton(&C), m5));
+        ctx.add_constraint(m5, Constraint::Plus(ExtensionSet::singleton(&C), m4));
         // Make second component depend upon first
-        ctx.add_constraint(m4, Constraint::Plus(ExtensionSet::singleton(&C), m3));
+        ctx.add_constraint(
+            m4,
+            Constraint::Plus(ExtensionSet::singleton(&UNKNOWN_EXTENSION), m3),
+        );
         ctx.variables.insert(m1);
         ctx.variables.insert(m4);
         ctx.instantiate_variables();
-        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::from_iter([A, UNKNOWN_EXTENSION])));
+        assert_eq!(
+            ctx.get_solution(&m1),
+            Some(&ExtensionSet::from_iter([A, B]))
+        );
         assert_eq!(
             ctx.get_solution(&m4),
             Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
