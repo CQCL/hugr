@@ -199,7 +199,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "atrunc".into(),
             "truncate an angle to one with a lower log-denominator with the same value, rounding \
             down in [0, 2π) if necessary"
@@ -210,7 +210,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "aconvert".into(),
             "convert an angle to one with another log-denominator having the same value, if \
             possible, otherwise return an error"
@@ -221,7 +221,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "aadd".into(),
             "addition of angles".to_owned(),
             vec![LOG_DENOM_TYPE_PARAM],
@@ -230,7 +230,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "asub".into(),
             "subtraction of the second angle from the first".to_owned(),
             vec![LOG_DENOM_TYPE_PARAM],
@@ -239,7 +239,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "aneg".into(),
             "negation of an angle".to_owned(),
             vec![LOG_DENOM_TYPE_PARAM],
@@ -248,7 +248,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             SmolStr::new_inline("H"),
             "Hadamard".into(),
             vec![],
@@ -256,7 +256,7 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             SmolStr::new_inline("RzF64"),
             "Rotation specified by float".into(),
             vec![],
@@ -270,11 +270,11 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(SmolStr::new_inline("CX"), "CX".into(), vec![], two_qb_func)
+        .add_op_custom_sig_simple(SmolStr::new_inline("CX"), "CX".into(), vec![], two_qb_func)
         .unwrap();
 
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             SmolStr::new_inline("Measure"),
             "Measure a qubit, returning the qubit and the measurement result.".into(),
             vec![],
