@@ -1667,20 +1667,27 @@ mod test {
     fn sccs() {
         let hugr = Hugr::default();
         let mut ctx = UnificationContext::new(&hugr);
+        // Make a strongly-connected component (loop)
         let m1 = ctx.fresh_meta();
         let m2 = ctx.fresh_meta();
         let m3 = ctx.fresh_meta();
-        // Outside of the connected component
-        let m_other = ctx.fresh_meta();
-        // These 3 metavariables form a loop
         ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
         ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
         ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
-        // This other meta is outside the loop, but depended on by one of the loop metas
-        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&B), m_other));
+        // And a second scc
+        let m4 = ctx.fresh_meta();
+        let m5 = ctx.fresh_meta();
+        ctx.add_constraint(m4, Constraint::Plus(ExtensionSet::singleton(&B), m5));
+        ctx.add_constraint(m5, Constraint::Plus(ExtensionSet::singleton(&B), m4));
+        // Make second component depend upon first
+        ctx.add_constraint(m4, Constraint::Plus(ExtensionSet::singleton(&C), m3));
         ctx.variables.insert(m1);
-        ctx.variables.insert(m_other);
+        ctx.variables.insert(m4);
         ctx.instantiate_variables();
-        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::from_iter([A,B])));
+        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::singleton(&A)));
+        assert_eq!(
+            ctx.get_solution(&m4),
+            Some(&ExtensionSet::from_iter([A, B, C]))
+        );
     }
 }
