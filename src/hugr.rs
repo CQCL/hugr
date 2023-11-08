@@ -180,7 +180,7 @@ impl AsMut<Hugr> for Hugr {
 
 /// Arbitrary metadata entry for a node.
 ///
-/// Each `NodeMetadata` for a node is associated with to string key.
+/// Each entry is associated to a string key.
 pub type NodeMetadata = serde_json::Value;
 
 /// The container of all the metadata entries for a node.
