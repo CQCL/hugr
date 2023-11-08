@@ -1,7 +1,6 @@
 //! Serialization definition for [`Hugr`]
 //! [`Hugr`]: crate::hugr::Hugr
 
-use serde_json::json;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -55,6 +54,9 @@ struct SerHugrV0 {
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
     /// for each node: (metadata)
+    //
+    // TODO: Update to Vec<Option<Map<String,Value>>> to more closely
+    // match the internal representation.
     #[serde(default)]
     metadata: Vec<serde_json::Value>,
 }
@@ -143,7 +145,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
         }
 
         let mut nodes = vec![None; hugr.node_count()];
-        let mut metadata = vec![json!(null); hugr.node_count()];
+        let mut metadata = vec![serde_json::Value::Null; hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_nodetype(n);
@@ -153,7 +155,11 @@ impl TryFrom<&Hugr> for SerHugrV0 {
                 input_extensions: opt.input_extensions.clone(),
                 op: opt.op.clone(),
             });
-            metadata[new_node] = hugr.get_metadata(n).clone();
+            let node_metadata = hugr.metadata.get(n.pg_index()).clone();
+            metadata[new_node] = match node_metadata {
+                Some(m) => serde_json::Value::Object(m.clone()),
+                None => serde_json::Value::Null,
+            };
         }
         let nodes = nodes
             .into_iter()
@@ -227,8 +233,8 @@ impl TryFrom<SerHugrV0> for Hugr {
         }
 
         for (node, metadata) in metadata.into_iter().enumerate() {
-            let node = portgraph::NodeIndex::new(node).into();
-            hugr.set_metadata(node, metadata)?;
+            let node = portgraph::NodeIndex::new(node);
+            hugr.metadata[node] = metadata.as_object().cloned();
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
@@ -354,7 +360,7 @@ pub mod test {
     fn weighted_hugr_ser() {
         let hugr = {
             let mut module_builder = ModuleBuilder::new();
-            module_builder.set_metadata(json!({"name": "test"}));
+            module_builder.set_metadata("name", "test");
 
             let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
@@ -375,7 +381,7 @@ pub mod test {
                         .out_wire(0)
                 })
                 .collect_vec();
-            f_build.set_metadata(json!(42));
+            f_build.set_metadata("val", 42);
             f_build.finish_with_outputs(outputs).unwrap();
 
             module_builder.finish_prelude_hugr().unwrap()
@@ -456,7 +462,7 @@ pub mod test {
         hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([QB].to_vec()));
+        let new_in = hugr.add_node(Input::new([QB].to_vec()).into());
         hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();

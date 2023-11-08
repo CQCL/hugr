@@ -2,7 +2,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, LeafOp, OpTrait, OpType};
+use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
 use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
@@ -47,7 +47,7 @@ pub trait Container {
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_op_with_parent(parent, op)?)
+        Ok(self.hugr_mut().add_node_with_parent(parent, op)?)
     }
     /// Add a [`NodeType`] as the final child of the container.
     fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
@@ -73,9 +73,9 @@ pub trait Container {
     fn add_constant(
         &mut self,
         constant: ops::Const,
-        extensions: ExtensionSet,
+        extensions: impl Into<Option<ExtensionSet>>,
     ) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant, extensions))?;
+        let const_n = self.add_child_node(NodeType::new(constant, extensions.into()))?;
 
         Ok(const_n.into())
     }
@@ -122,17 +122,22 @@ pub trait Container {
     }
 
     /// Add metadata to the container node.
-    fn set_metadata(&mut self, meta: NodeMetadata) {
+    fn set_metadata(&mut self, key: impl AsRef<str>, meta: impl Into<NodeMetadata>) {
         let parent = self.container_node();
         // Implementor's container_node() should be a valid node
-        self.hugr_mut().set_metadata(parent, meta).unwrap();
+        self.hugr_mut().set_metadata(parent, key, meta).unwrap();
     }
 
     /// Add metadata to a child node.
     ///
     /// Returns an error if the specified `child` is not a child of this container
-    fn set_child_metadata(&mut self, child: Node, meta: NodeMetadata) -> Result<(), BuildError> {
-        self.hugr_mut().set_metadata(child, meta)?;
+    fn set_child_metadata(
+        &mut self,
+        child: Node,
+        key: impl AsRef<str>,
+        meta: impl Into<NodeMetadata>,
+    ) -> Result<(), BuildError> {
+        self.hugr_mut().set_metadata(child, key, meta)?;
         Ok(())
     }
 }
@@ -416,7 +421,7 @@ pub trait Dataflow: Container {
             rest: rest_types.into(),
         };
         // TODO: Make input extensions a parameter
-        let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
+        let (loop_node, _) = add_node_with_wires(self, tail_loop.clone(), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
     }
@@ -623,21 +628,14 @@ pub trait Dataflow: Container {
     }
 }
 
-fn add_op_with_wires<T: Dataflow + ?Sized>(
-    data_builder: &mut T,
-    optype: impl Into<OpType>,
-    inputs: Vec<Wire>,
-) -> Result<(Node, usize), BuildError> {
-    add_node_with_wires(data_builder, NodeType::new_auto(optype), inputs)
-}
-
 fn add_node_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    nodetype: NodeType,
+    nodetype: impl Into<NodeType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let op_node = data_builder.add_child_node(nodetype.clone())?;
+    let nodetype = nodetype.into();
     let sig = nodetype.op_signature();
+    let op_node = data_builder.add_child_node(nodetype)?;
 
     wire_up_inputs(inputs, op_node, data_builder)?;
 
@@ -668,6 +666,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
+    let src_parent_parent = src_parent.and_then(|src| base.get_parent(src));
     let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
     if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_port).unwrap() {
@@ -689,7 +688,10 @@ fn wire_up<T: Dataflow + ?Sized>(
             let Some(src_sibling) = iter::successors(dst_parent, |&p| base.get_parent(p))
                 .tuple_windows()
                 .find_map(|(ancestor, ancestor_parent)| {
-                    (ancestor_parent == src_parent).then_some(ancestor)
+                    (ancestor_parent == src_parent ||
+                        // Dom edge - in CFGs
+                        Some(ancestor_parent) == src_parent_parent)
+                        .then_some(ancestor)
                 })
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
@@ -702,9 +704,12 @@ fn wire_up<T: Dataflow + ?Sized>(
                 return Err(val_err.into());
             };
 
-            // TODO: Avoid adding duplicate edges
-            // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
-            base.add_other_edge(src, src_sibling)?;
+            if !OpTag::BasicBlock.is_superset(base.get_optype(src).tag())
+                && !OpTag::BasicBlock.is_superset(base.get_optype(src_sibling).tag())
+            {
+                // Add a state order constraint unless one of the nodes is a CFG BasicBlock
+                base.add_other_edge(src, src_sibling)?;
+            }
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuildError::NoCopyLinear(typ));

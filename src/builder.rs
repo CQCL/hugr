@@ -149,14 +149,14 @@ pub(crate) mod test {
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: signature.clone(),
         }));
-        hugr.add_op_with_parent(
+        hugr.add_node_with_parent(
             hugr.root(),
             ops::Input {
                 types: signature.input,
             },
         )
         .unwrap();
-        hugr.add_op_with_parent(
+        hugr.add_node_with_parent(
             hugr.root(),
             ops::Output {
                 types: signature.output,

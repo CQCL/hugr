@@ -92,7 +92,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let exit_node = base
             .as_mut()
             // Make the extensions a parameter
-            .add_op_with_parent(cfg_node, exit_block_type)?;
+            .add_node_with_parent(cfg_node, exit_block_type)?;
         Ok(Self {
             base,
             cfg_node,
@@ -144,10 +144,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let block_n = if entry {
             let exit = self.exit_node;
             // TODO: Make extensions a parameter
-            self.hugr_mut().add_op_before(exit, op)
+            self.hugr_mut().add_node_before(exit, op)
         } else {
             // TODO: Make extensions a parameter
-            self.hugr_mut().add_op_with_parent(parent, op)
+            self.hugr_mut().add_node_with_parent(parent, op)
         }?;
 
         BlockBuilder::create(
@@ -325,6 +325,8 @@ mod test {
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
+    use crate::hugr::validate::InterGraphEdgeError;
+    use crate::hugr::ValidationError;
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
@@ -391,6 +393,69 @@ mod test {
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
         cfg_builder.branch(&entry, 1, &exit)?;
+        Ok(())
+    }
+    #[test]
+    fn test_dom_edge() -> Result<(), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let sum_tuple_const =
+            cfg_builder.add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
+        let sum_variants = vec![type_row![]];
+
+        let mut entry_b =
+            cfg_builder.entry_builder(sum_variants.clone(), type_row![], ExtensionSet::new())?;
+        let [inw] = entry_b.input_wires_arr();
+        let entry = {
+            let sum = entry_b.load_const(&sum_tuple_const)?;
+
+            entry_b.finish_with_outputs(sum, [])?
+        };
+        let mut middle_b =
+            cfg_builder.simple_block_builder(FunctionType::new(type_row![], type_row![NAT]), 1)?;
+        let middle = {
+            let c = middle_b.load_const(&sum_tuple_const)?;
+            middle_b.finish_with_outputs(c, [inw])?
+        };
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&entry, 0, &middle)?;
+        cfg_builder.branch(&middle, 0, &exit)?;
+        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_non_dom_edge() -> Result<(), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let sum_tuple_const =
+            cfg_builder.add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
+        let sum_variants = vec![type_row![]];
+        let mut middle_b = cfg_builder
+            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+        let [inw] = middle_b.input_wires_arr();
+        let middle = {
+            let c = middle_b.load_const(&sum_tuple_const)?;
+            middle_b.finish_with_outputs(c, [inw])?
+        };
+
+        let mut entry_b =
+            cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT], ExtensionSet::new())?;
+        let entry = {
+            let sum = entry_b.load_const(&sum_tuple_const)?;
+            // entry block uses wire from middle block even though middle block
+            // does not dominate entry
+            entry_b.finish_with_outputs(sum, [inw])?
+        };
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&entry, 0, &middle)?;
+        cfg_builder.branch(&middle, 0, &exit)?;
+        assert_matches!(
+            cfg_builder.finish_prelude_hugr(),
+            Err(ValidationError::InterGraphEdgeError(
+                InterGraphEdgeError::NonDominatedAncestor { .. }
+            ))
+        );
+
         Ok(())
     }
 }

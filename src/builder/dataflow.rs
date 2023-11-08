@@ -219,6 +219,7 @@ pub(crate) mod test {
 
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::quantum::test::h_gate;
+    use crate::types::Type;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -398,24 +399,31 @@ pub(crate) mod test {
         // Create a simple DFG
         let mut dfg_builder = DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT]))?;
         let [i1] = dfg_builder.input_wires_arr();
-        dfg_builder.set_metadata(json!(42));
+        dfg_builder.set_metadata("x", 42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &EMPTY_REG)?;
 
         // Create a module, and insert the DFG into it
         let mut module_builder = ModuleBuilder::new();
 
-        {
+        let (dfg_node, f_node) = {
             let mut f_build = module_builder.define_function(
                 "main",
                 FunctionType::new(type_row![BIT], type_row![BIT]).pure(),
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let id = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
-            f_build.finish_with_outputs([id.out_wire(0)])?;
-        }
+            let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+            let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
+            module_builder.set_child_metadata(f.node(), "x", "hi")?;
+            (dfg.node(), f.node())
+        };
 
-        assert_eq!(module_builder.finish_hugr(&EMPTY_REG)?.node_count(), 7);
+        let hugr = module_builder.finish_hugr(&EMPTY_REG)?;
+        assert_eq!(hugr.node_count(), 7);
+
+        assert_eq!(hugr.get_metadata(hugr.root(), "x"), None);
+        assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
+        assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
 
         Ok(())
     }
@@ -491,6 +499,57 @@ pub(crate) mod test {
         let [w] = add_c.outputs_arr();
         parent.finish_hugr_with_outputs([w], &EMPTY_REG)?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn non_cfg_ancestor() -> Result<(), BuildError> {
+        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut b = DFGBuilder::new(unit_sig.clone())?;
+        let b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
+        let b_child_in_wire = b_child.input().out_wire(0);
+        b_child.finish_with_outputs([])?;
+        let b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+
+        // DFG block has edge coming a sibling block, which is only valid for
+        // CFGs
+        let b_child_2_handle = b_child_2.finish_with_outputs([b_child_in_wire])?;
+
+        let res = b.finish_prelude_hugr_with_outputs([b_child_2_handle.out_wire(0)]);
+
+        assert_matches!(
+            res,
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCFGAncestor { .. })
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_relation_edge() -> Result<(), BuildError> {
+        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut b = DFGBuilder::new(unit_sig.clone())?;
+        let mut b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
+        let b_child_child =
+            b_child.dfg_builder(unit_sig.clone(), None, [b_child.input().out_wire(0)])?;
+        let b_child_child_in_wire = b_child_child.input().out_wire(0);
+
+        b_child_child.finish_with_outputs([])?;
+        b_child.finish_with_outputs([])?;
+
+        let mut b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+        let b_child_2_child =
+            b_child_2.dfg_builder(unit_sig.clone(), None, [b_child_2.input().out_wire(0)])?;
+
+        let res = b_child_2_child.finish_with_outputs([b_child_child_in_wire]);
+
+        assert_matches!(
+            res.map(|h| h.handle().node()), // map to something that implements Debug
+            Err(BuildError::InvalidHUGR(
+                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NoRelation { .. })
+            ))
+        );
         Ok(())
     }
 }
