@@ -98,7 +98,7 @@ impl CustomType {
             .get_type_def(tr.extension_registry())
             .expect("validate should rule this out")
             .bound(&args);
-        assert!(self.bound.contains(bound));
+        debug_assert!(self.bound.contains(bound));
         Self {
             args,
             bound,
