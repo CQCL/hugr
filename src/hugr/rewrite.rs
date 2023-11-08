@@ -2,6 +2,7 @@
 
 pub mod insert_identity;
 pub mod outline_cfg;
+pub mod replace;
 pub mod simple_replace;
 
 use crate::{Hugr, HugrView, Node};

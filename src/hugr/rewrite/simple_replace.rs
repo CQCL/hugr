@@ -351,7 +351,11 @@ pub(in crate::hugr::rewrite) mod test {
     /// ├───┤┌─┴─┐
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
-    fn test_simple_replacement(simple_hugr: Hugr, dfg_hugr: Hugr) {
+    fn test_simple_replacement(
+        simple_hugr: Hugr,
+        dfg_hugr: Hugr,
+        #[values(apply_simple, apply_replace)] applicator: impl Fn(&mut Hugr, SimpleReplacement),
+    ) {
         let mut h: Hugr = simple_hugr;
         // 1. Locate the CX and its successor H's in h
         let h_node_cx: Node = h
@@ -400,7 +404,7 @@ pub(in crate::hugr::rewrite) mod test {
             HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1, h_outp_node]),
         );
 
-        h.apply_rewrite(r).unwrap();
+        applicator(&mut h, r);
         // Expect [DFG] to be replaced with:
         // ┌───┐┌───┐
         // ┤ H ├┤ H ├──■──
@@ -575,5 +579,75 @@ pub(in crate::hugr::rewrite) mod test {
 
         // Nothing changed
         assert_eq!(h.node_count(), orig.node_count());
+    }
+
+    use crate::hugr::rewrite::replace::Replacement;
+    fn to_replace(h: &impl HugrView, s: SimpleReplacement) -> Replacement {
+        use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec};
+
+        let mut replacement = s.replacement;
+        let (in_, out) = replacement
+            .children(replacement.root())
+            .take(2)
+            .collect_tuple()
+            .unwrap();
+        let mu_inp = s
+            .nu_inp
+            .iter()
+            .map(|((tgt, tgt_port), (r_n, r_p))| {
+                if *tgt == out {
+                    unimplemented!()
+                };
+                let (src, src_port) = h.linked_outputs(*r_n, *r_p).exactly_one().ok().unwrap();
+                NewEdgeSpec {
+                    src,
+                    tgt: *tgt,
+                    kind: NewEdgeKind::Value {
+                        src_pos: src_port,
+                        tgt_pos: *tgt_port,
+                    },
+                }
+            })
+            .collect();
+        let mu_out = s
+            .nu_out
+            .iter()
+            .map(|((tgt, tgt_port), out_port)| {
+                let (src, src_port) = replacement
+                    .linked_outputs(out, *out_port)
+                    .exactly_one()
+                    .ok()
+                    .unwrap();
+                if src == in_ {
+                    unimplemented!()
+                };
+                NewEdgeSpec {
+                    src,
+                    tgt: *tgt,
+                    kind: NewEdgeKind::Value {
+                        src_pos: src_port,
+                        tgt_pos: *tgt_port,
+                    },
+                }
+            })
+            .collect();
+        replacement.remove_node(in_).unwrap();
+        replacement.remove_node(out).unwrap();
+        Replacement {
+            removal: s.subgraph.nodes().to_vec(),
+            replacement,
+            adoptions: HashMap::new(),
+            mu_inp,
+            mu_out,
+            mu_new: vec![],
+        }
+    }
+
+    fn apply_simple(h: &mut Hugr, rw: SimpleReplacement) {
+        h.apply_rewrite(rw).unwrap()
+    }
+
+    fn apply_replace(h: &mut Hugr, rw: SimpleReplacement) {
+        h.apply_rewrite(to_replace(h, rw)).unwrap()
     }
 }
