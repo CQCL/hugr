@@ -1,8 +1,7 @@
 //! Implementation of the `Replace` operation.
 
-use std::collections::hash_map::Values;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::iter::{Chain, Copied, Take};
+use std::iter::Copied;
 use std::slice::Iter;
 
 use itertools::Itertools;
@@ -217,12 +216,7 @@ impl Rewrite for Replacement {
 
     type ApplyResult = ();
 
-    type InvalidationSet<'a> = //<Vec<Node> as IntoIterator>::IntoIter
-        Chain<
-            Chain<
-                Copied<Iter<'a, Node>>,
-                Copied<Values<'a, Node, Node>>>,
-            Copied<Take<Iter<'a, Node>>>>
+    type InvalidationSet<'a> = Copied<Iter<'a, Node>>
     where
         Self: 'a;
 
@@ -334,11 +328,7 @@ impl Rewrite for Replacement {
     }
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        self.removal
-            .iter()
-            .copied()
-            .chain(self.adoptions.values().copied())
-            .chain(self.removal.iter().take(1).copied())
+        self.removal.iter().copied()
     }
 }
 
