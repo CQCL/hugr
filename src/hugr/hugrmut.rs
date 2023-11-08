@@ -42,7 +42,8 @@ pub trait HugrMut: HugrMutInternals {
         key: impl AsRef<str>,
         metadata: impl Into<NodeMetadata>,
     ) -> Result<(), HugrError> {
-        *self.get_metadata_mut(node, key)? = metadata.into();
+        let entry = self.get_metadata_mut(node, key)?;
+        *entry = metadata.into();
         Ok(())
     }
 
