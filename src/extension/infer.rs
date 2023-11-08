@@ -1672,7 +1672,7 @@ mod test {
         let m2 = ctx.fresh_meta();
         let m3 = ctx.fresh_meta();
         ctx.add_constraint(m1, Constraint::Plus(ExtensionSet::singleton(&A), m3));
-        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&A), m1));
+        ctx.add_constraint(m2, Constraint::Plus(ExtensionSet::singleton(&UNKNOWN_EXTENSION), m1));
         ctx.add_constraint(m3, Constraint::Plus(ExtensionSet::singleton(&A), m2));
         // And a second scc
         let m4 = ctx.fresh_meta();
@@ -1684,10 +1684,10 @@ mod test {
         ctx.variables.insert(m1);
         ctx.variables.insert(m4);
         ctx.instantiate_variables();
-        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::singleton(&A)));
+        assert_eq!(ctx.get_solution(&m1), Some(&ExtensionSet::from_iter([A, UNKNOWN_EXTENSION])));
         assert_eq!(
             ctx.get_solution(&m4),
-            Some(&ExtensionSet::from_iter([A, B, C]))
+            Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
         );
     }
 }
