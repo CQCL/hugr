@@ -22,7 +22,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, HugrError, NodeMetadata, NodeType, DEFAULT_NODETYPE};
+use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::{EdgeKind, FunctionType};
@@ -130,11 +130,17 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the metadata associated with a node.
     #[inline]
-    fn get_metadata(&self, node: Node) -> &NodeMetadata {
+    fn get_metadata(&self, node: Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
         match self.contains_node(node) {
-            true => self.base_hugr().metadata.get(node.pg_index()),
-            false => &NodeMetadata::Null,
+            true => self.get_node_metadata(node)?.get(key.as_ref()),
+            false => None,
         }
+    }
+
+    /// Retrieve the complete metadata map for a node.
+    fn get_node_metadata(&self, node: Node) -> Option<&NodeMetadataMap> {
+        self.valid_node(node).ok()?;
+        self.base_hugr().metadata.get(node.pg_index()).as_ref()
     }
 
     /// Returns the number of nodes in the hugr.

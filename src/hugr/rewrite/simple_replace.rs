@@ -7,7 +7,7 @@ use std::slice;
 use itertools::Itertools;
 
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrMut, HugrView, NodeMetadata, Rewrite};
+use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node};
 use thiserror::Error;
@@ -76,7 +76,7 @@ impl Rewrite for SimpleReplacement {
         unimplemented!()
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
+    fn apply(mut self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
         let parent = self.subgraph.get_parent(h);
         // 1. Check the parent node exists and is a DataflowParent.
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
@@ -107,8 +107,8 @@ impl Rewrite for SimpleReplacement {
             index_map.insert(node, new_node);
 
             // Move the metadata
-            let meta: &NodeMetadata = self.replacement.get_metadata(node);
-            h.set_metadata(new_node, meta.clone()).unwrap();
+            let meta: Option<NodeMetadataMap> = self.replacement.take_node_metadata(node);
+            h.overwrite_node_metadata(new_node, meta).unwrap();
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.

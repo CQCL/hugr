@@ -122,17 +122,22 @@ pub trait Container {
     }
 
     /// Add metadata to the container node.
-    fn set_metadata(&mut self, meta: NodeMetadata) {
+    fn set_metadata(&mut self, key: impl AsRef<str>, meta: impl Into<NodeMetadata>) {
         let parent = self.container_node();
         // Implementor's container_node() should be a valid node
-        self.hugr_mut().set_metadata(parent, meta).unwrap();
+        self.hugr_mut().set_metadata(parent, key, meta).unwrap();
     }
 
     /// Add metadata to a child node.
     ///
     /// Returns an error if the specified `child` is not a child of this container
-    fn set_child_metadata(&mut self, child: Node, meta: NodeMetadata) -> Result<(), BuildError> {
-        self.hugr_mut().set_metadata(child, meta)?;
+    fn set_child_metadata(
+        &mut self,
+        child: Node,
+        key: impl AsRef<str>,
+        meta: impl Into<NodeMetadata>,
+    ) -> Result<(), BuildError> {
+        self.hugr_mut().set_metadata(child, key, meta)?;
         Ok(())
     }
 }
