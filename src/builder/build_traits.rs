@@ -2,7 +2,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, LeafOp, OpTrait, OpType};
+use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
 use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
@@ -666,6 +666,7 @@ fn wire_up<T: Dataflow + ?Sized>(
     let base = data_builder.hugr_mut();
 
     let src_parent = base.get_parent(src);
+    let src_parent_parent = src_parent.and_then(|src| base.get_parent(src));
     let dst_parent = base.get_parent(dst);
     let local_source = src_parent == dst_parent;
     if let EdgeKind::Value(typ) = base.get_optype(src).port_kind(src_port).unwrap() {
@@ -687,7 +688,10 @@ fn wire_up<T: Dataflow + ?Sized>(
             let Some(src_sibling) = iter::successors(dst_parent, |&p| base.get_parent(p))
                 .tuple_windows()
                 .find_map(|(ancestor, ancestor_parent)| {
-                    (ancestor_parent == src_parent).then_some(ancestor)
+                    (ancestor_parent == src_parent ||
+                        // Dom edge - in CFGs
+                        Some(ancestor_parent) == src_parent_parent)
+                        .then_some(ancestor)
                 })
             else {
                 let val_err: ValidationError = InterGraphEdgeError::NoRelation {
@@ -700,9 +704,12 @@ fn wire_up<T: Dataflow + ?Sized>(
                 return Err(val_err.into());
             };
 
-            // TODO: Avoid adding duplicate edges
-            // This should be easy with https://github.com/CQCL-DEV/hugr/issues/130
-            base.add_other_edge(src, src_sibling)?;
+            if !OpTag::BasicBlock.is_superset(base.get_optype(src).tag())
+                && !OpTag::BasicBlock.is_superset(base.get_optype(src_sibling).tag())
+            {
+                // Add a state order constraint unless one of the nodes is a CFG BasicBlock
+                base.add_other_edge(src, src_sibling)?;
+            }
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuildError::NoCopyLinear(typ));
