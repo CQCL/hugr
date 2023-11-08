@@ -705,9 +705,8 @@ impl UnificationContext {
         println!("{:?}", relations.node_map);
         println!("{:?}", relations.graph);
 
-        // Process the strongly-connected components. We need to deal with these
-        // depended-upon before depender. ccs() gives them back in some order
-        // - this might need to be reversed????
+        // Process the strongly-connected components. petgraph/sccs() returns these
+        // depended-upon before depender, as we need.
         for cc in relations.sccs() {
             // Strongly connected components are looping constraint dependencies.
             // This means that each metavariable in the CC has the same solution.
