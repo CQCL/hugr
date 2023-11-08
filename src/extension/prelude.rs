@@ -41,7 +41,7 @@ lazy_static! {
             .unwrap();
 
         prelude
-            .add_node_custom_sig_simple(
+            .add_op_custom_sig_simple(
                 SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
                 vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],

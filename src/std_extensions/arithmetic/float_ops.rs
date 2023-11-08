@@ -41,16 +41,16 @@ pub fn extension() -> Extension {
     );
 
     extension
-        .add_node_custom_sig_simple("feq".into(), "equality test".to_owned(), vec![], fcmp_sig)
+        .add_op_custom_sig_simple("feq".into(), "equality test".to_owned(), vec![], fcmp_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fne".into(), "inequality test".to_owned(), vec![], fcmp_sig)
+        .add_op_custom_sig_simple("fne".into(), "inequality test".to_owned(), vec![], fcmp_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("flt".into(), "\"less than\"".to_owned(), vec![], fcmp_sig)
+        .add_op_custom_sig_simple("flt".into(), "\"less than\"".to_owned(), vec![], fcmp_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "fgt".into(),
             "\"greater than\"".to_owned(),
             vec![],
@@ -58,7 +58,7 @@ pub fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "fle".into(),
             "\"less than or equal\"".to_owned(),
             vec![],
@@ -66,7 +66,7 @@ pub fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "fge".into(),
             "\"greater than or equal\"".to_owned(),
             vec![],
@@ -74,22 +74,22 @@ pub fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fmax".into(), "maximum".to_owned(), vec![], fbinop_sig)
+        .add_op_custom_sig_simple("fmax".into(), "maximum".to_owned(), vec![], fbinop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fmin".into(), "minimum".to_owned(), vec![], fbinop_sig)
+        .add_op_custom_sig_simple("fmin".into(), "minimum".to_owned(), vec![], fbinop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fadd".into(), "addition".to_owned(), vec![], fbinop_sig)
+        .add_op_custom_sig_simple("fadd".into(), "addition".to_owned(), vec![], fbinop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fsub".into(), "subtraction".to_owned(), vec![], fbinop_sig)
+        .add_op_custom_sig_simple("fsub".into(), "subtraction".to_owned(), vec![], fbinop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fneg".into(), "negation".to_owned(), vec![], funop_sig)
+        .add_op_custom_sig_simple("fneg".into(), "negation".to_owned(), vec![], funop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "fabs".into(),
             "absolute value".to_owned(),
             vec![],
@@ -97,7 +97,7 @@ pub fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple(
+        .add_op_custom_sig_simple(
             "fmul".into(),
             "multiplication".to_owned(),
             vec![],
@@ -105,13 +105,13 @@ pub fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fdiv".into(), "division".to_owned(), vec![], fbinop_sig)
+        .add_op_custom_sig_simple("fdiv".into(), "division".to_owned(), vec![], fbinop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("ffloor".into(), "floor".to_owned(), vec![], funop_sig)
+        .add_op_custom_sig_simple("ffloor".into(), "floor".to_owned(), vec![], funop_sig)
         .unwrap();
     extension
-        .add_node_custom_sig_simple("fceil".into(), "ceiling".to_owned(), vec![], funop_sig)
+        .add_op_custom_sig_simple("fceil".into(), "ceiling".to_owned(), vec![], funop_sig)
         .unwrap();
 
     extension
