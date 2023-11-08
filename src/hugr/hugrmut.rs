@@ -9,7 +9,6 @@ use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{Direction, HugrError, HugrView, Node, NodeType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
-use crate::ops::OpType;
 use crate::{Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
 use self::sealed::HugrMutInternals;
@@ -32,19 +31,11 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// The node becomes the parent's last child.
     #[inline]
-    fn add_op_with_parent(
+    fn add_node_with_parent(
         &mut self,
         parent: Node,
-        op: impl Into<OpType>,
+        op: impl Into<NodeType>,
     ) -> Result<Node, HugrError> {
-        self.add_node_with_parent(parent, NodeType::new_auto(op))
-    }
-
-    /// Add a node to the graph with a parent in the hierarchy.
-    ///
-    /// The node becomes the parent's last child.
-    #[inline]
-    fn add_node_with_parent(&mut self, parent: Node, op: NodeType) -> Result<Node, HugrError> {
         self.valid_node(parent)?;
         self.hugr_mut().add_node_with_parent(parent, op)
     }
@@ -52,22 +43,12 @@ pub trait HugrMut: HugrMutInternals {
     /// Add a node to the graph as the previous sibling of another node.
     ///
     /// The sibling node's parent becomes the new node's parent.
-    ///
-    /// # Errors
-    ///
-    ///  - If the sibling node does not have a parent.
-    ///  - If the attachment would introduce a cycle.
     #[inline]
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.valid_non_root(sibling)?;
-        self.hugr_mut().add_op_before(sibling, op)
-    }
-
-    /// Add a node to the graph as the previous sibling of another node.
-    ///
-    /// The sibling node's parent becomes the new node's parent.
-    #[inline]
-    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
+    fn add_node_before(
+        &mut self,
+        sibling: Node,
+        nodetype: impl Into<NodeType>,
+    ) -> Result<Node, HugrError> {
         self.valid_non_root(sibling)?;
         self.hugr_mut().add_node_before(sibling, nodetype)
     }
@@ -81,9 +62,13 @@ pub trait HugrMut: HugrMutInternals {
     ///  - If the sibling node does not have a parent.
     ///  - If the attachment would introduce a cycle.
     #[inline]
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
+    fn add_node_after(
+        &mut self,
+        sibling: Node,
+        op: impl Into<NodeType>,
+    ) -> Result<Node, HugrError> {
         self.valid_non_root(sibling)?;
-        self.hugr_mut().add_op_after(sibling, op)
+        self.hugr_mut().add_node_after(sibling, op)
     }
 
     /// Remove a node from the graph.
@@ -208,28 +193,36 @@ fn translate_indices(node_map: HashMap<NodeIndex, NodeIndex>) -> HashMap<Node, N
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
-    fn add_node_with_parent(&mut self, parent: Node, node: NodeType) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_node(node);
+    fn add_node_with_parent(
+        &mut self,
+        parent: Node,
+        node: impl Into<NodeType>,
+    ) -> Result<Node, HugrError> {
+        let node = self.as_mut().add_node(node.into());
         self.as_mut()
             .hierarchy
             .push_child(node.pg_index(), parent.pg_index())?;
         Ok(node)
     }
 
-    fn add_op_before(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        self.add_node_before(sibling, NodeType::new_auto(op))
-    }
-
-    fn add_node_before(&mut self, sibling: Node, nodetype: NodeType) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_node(nodetype);
+    fn add_node_before(
+        &mut self,
+        sibling: Node,
+        nodetype: impl Into<NodeType>,
+    ) -> Result<Node, HugrError> {
+        let node = self.as_mut().add_node(nodetype.into());
         self.as_mut()
             .hierarchy
             .insert_before(node.pg_index(), sibling.pg_index())?;
         Ok(node)
     }
 
-    fn add_op_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Result<Node, HugrError> {
-        let node = self.as_mut().add_op(op);
+    fn add_node_after(
+        &mut self,
+        sibling: Node,
+        op: impl Into<NodeType>,
+    ) -> Result<Node, HugrError> {
+        let node = self.as_mut().add_node(op.into());
         self.as_mut()
             .hierarchy
             .insert_after(node.pg_index(), sibling.pg_index())?;
@@ -606,10 +599,8 @@ mod test {
         let module: Node = hugr.root();
 
         // Start a main function with two nat inputs.
-        //
-        // `add_op` is equivalent to `add_root_op` followed by `set_parent`
         let f: Node = hugr
-            .add_op_with_parent(
+            .add_node_with_parent(
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
@@ -623,10 +614,10 @@ mod test {
                 .add_node_with_parent(f, NodeType::new_pure(ops::Input::new(type_row![NAT])))
                 .unwrap();
             let f_out = hugr
-                .add_op_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
+                .add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]))
                 .unwrap();
             let noop = hugr
-                .add_op_with_parent(f, LeafOp::Noop { ty: NAT })
+                .add_node_with_parent(f, LeafOp::Noop { ty: NAT })
                 .unwrap();
 
             hugr.connect(f_in, 0, noop, 0).unwrap();

@@ -34,7 +34,7 @@ fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
-        .add_op_custom_sig_simple(
+        .add_node_custom_sig_simple(
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
             vec![],
@@ -43,7 +43,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_op_custom_sig_simple(
+        .add_node_custom_sig_simple(
             SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
             vec![H_INT],
@@ -68,7 +68,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_op_custom_sig_simple(
+        .add_node_custom_sig_simple(
             SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
             vec![H_INT],

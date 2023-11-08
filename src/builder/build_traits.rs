@@ -47,7 +47,7 @@ pub trait Container {
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_op_with_parent(parent, op)?)
+        Ok(self.hugr_mut().add_node_with_parent(parent, op)?)
     }
     /// Add a [`NodeType`] as the final child of the container.
     fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
@@ -416,7 +416,7 @@ pub trait Dataflow: Container {
             rest: rest_types.into(),
         };
         // TODO: Make input extensions a parameter
-        let (loop_node, _) = add_op_with_wires(self, tail_loop.clone(), input_wires)?;
+        let (loop_node, _) = add_node_with_wires(self, tail_loop.clone(), input_wires)?;
 
         TailLoopBuilder::create_with_io(self.hugr_mut(), loop_node, &tail_loop)
     }
@@ -623,21 +623,14 @@ pub trait Dataflow: Container {
     }
 }
 
-fn add_op_with_wires<T: Dataflow + ?Sized>(
-    data_builder: &mut T,
-    optype: impl Into<OpType>,
-    inputs: Vec<Wire>,
-) -> Result<(Node, usize), BuildError> {
-    add_node_with_wires(data_builder, NodeType::new_auto(optype), inputs)
-}
-
 fn add_node_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    nodetype: NodeType,
+    nodetype: impl Into<NodeType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let op_node = data_builder.add_child_node(nodetype.clone())?;
+    let nodetype = nodetype.into();
     let sig = nodetype.op_signature();
+    let op_node = data_builder.add_child_node(nodetype)?;
 
     wire_up_inputs(inputs, op_node, data_builder)?;
 

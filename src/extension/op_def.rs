@@ -270,7 +270,7 @@ impl Extension {
     }
 
     /// Create an OpDef with custom binary code to compute the signature
-    pub fn add_op_custom_sig(
+    pub fn add_node_custom_sig(
         &mut self,
         name: SmolStr,
         description: String,
@@ -291,14 +291,14 @@ impl Extension {
 
     /// Create an OpDef with custom binary code to compute the signature, and no "misc" or "lowering
     /// functions" defined.
-    pub fn add_op_custom_sig_simple(
+    pub fn add_node_custom_sig_simple(
         &mut self,
         name: SmolStr,
         description: String,
         params: Vec<TypeParam>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op_custom_sig(
+        self.add_node_custom_sig(
             name,
             description,
             params,
@@ -310,7 +310,7 @@ impl Extension {
 
     /// Create an OpDef with a signature (inputs+outputs) read from the
     /// declarative YAML
-    pub fn add_op_decl_sig(
+    pub fn add_node_decl_sig(
         &mut self,
         name: SmolStr,
         description: String,

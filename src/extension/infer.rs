@@ -698,8 +698,8 @@ mod test {
         let input = ops::Input::new(type_row![NAT, NAT]);
         let output = ops::Output::new(type_row![NAT]);
 
-        let input = hugr.add_op_with_parent(hugr.root(), input)?;
-        let output = hugr.add_op_with_parent(hugr.root(), output)?;
+        let input = hugr.add_node_with_parent(hugr.root(), input)?;
+        let output = hugr.add_node_with_parent(hugr.root(), output)?;
 
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
@@ -715,25 +715,25 @@ mod test {
         let mult_c_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&C));
 
-        let add_a = hugr.add_op_with_parent(
+        let add_a = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: add_a_sig,
             },
         )?;
-        let add_b = hugr.add_op_with_parent(
+        let add_b = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: add_b_sig,
             },
         )?;
-        let add_ab = hugr.add_op_with_parent(
+        let add_ab = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: add_ab_sig,
             },
         )?;
-        let mult_c = hugr.add_op_with_parent(
+        let mult_c = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: mult_c_sig,
@@ -877,7 +877,7 @@ mod test {
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let add_r_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
 
-        let add_r = hugr.add_op_with_parent(
+        let add_r = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: add_r_sig,
@@ -888,11 +888,11 @@ mod test {
         let src_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(&ExtensionSet::new());
 
-        let src = hugr.add_op_with_parent(hugr.root(), ops::DFG { signature: src_sig })?;
+        let src = hugr.add_node_with_parent(hugr.root(), ops::DFG { signature: src_sig })?;
 
         let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
         // Mult has open extension requirements, which we should solve to be "R"
-        let mult = hugr.add_op_with_parent(
+        let mult = hugr.add_node_with_parent(
             hugr.root(),
             ops::DFG {
                 signature: mult_sig,
@@ -956,14 +956,14 @@ mod test {
     ) -> Result<[Node; 3], Box<dyn Error>> {
         let op: OpType = op.into();
 
-        let node = hugr.add_op_with_parent(parent, op)?;
-        let input = hugr.add_op_with_parent(
+        let node = hugr.add_node_with_parent(parent, op)?;
+        let input = hugr.add_node_with_parent(
             node,
             ops::Input {
                 types: op_sig.input,
             },
         )?;
-        let output = hugr.add_op_with_parent(
+        let output = hugr.add_node_with_parent(
             node,
             ops::Output {
                 types: op_sig.output,
@@ -988,7 +988,7 @@ mod test {
                 Into::<OpType>::into(op).signature(),
             )?;
 
-            let lift1 = hugr.add_op_with_parent(
+            let lift1 = hugr.add_node_with_parent(
                 case,
                 ops::LeafOp::Lift {
                     type_row: type_row![NAT],
@@ -996,7 +996,7 @@ mod test {
                 },
             )?;
 
-            let lift2 = hugr.add_op_with_parent(
+            let lift2 = hugr.add_node_with_parent(
                 case,
                 ops::LeafOp::Lift {
                     type_row: type_row![NAT],
@@ -1066,13 +1066,13 @@ mod test {
         }));
 
         let root = hugr.root();
-        let input = hugr.add_op_with_parent(
+        let input = hugr.add_node_with_parent(
             root,
             ops::Input {
                 types: type_row![NAT],
             },
         )?;
-        let output = hugr.add_op_with_parent(
+        let output = hugr.add_node_with_parent(
             root,
             ops::Output {
                 types: type_row![NAT],
@@ -1097,7 +1097,7 @@ mod test {
                 .unwrap();
 
                 let lift = hugr
-                    .add_op_with_parent(
+                    .add_node_with_parent(
                         node,
                         ops::LeafOp::Lift {
                             type_row: type_row![NAT],
@@ -1149,7 +1149,7 @@ mod test {
 
         let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
-        let dfg = hugr.add_op_with_parent(bb, op)?;
+        let dfg = hugr.add_node_with_parent(bb, op)?;
 
         hugr.connect(bb_in, 0, dfg, 0)?;
         hugr.connect(dfg, 0, bb_out, 0)?;
@@ -1181,16 +1181,16 @@ mod test {
             extension_delta: entry_extensions,
         };
 
-        let exit = hugr.add_op_with_parent(
+        let exit = hugr.add_node_with_parent(
             root,
             ops::BasicBlock::Exit {
                 cfg_outputs: exit_types.into(),
             },
         )?;
 
-        let entry = hugr.add_op_before(exit, dfb)?;
-        let entry_in = hugr.add_op_with_parent(entry, ops::Input { types: inputs })?;
-        let entry_out = hugr.add_op_with_parent(
+        let entry = hugr.add_node_before(exit, dfb)?;
+        let entry_in = hugr.add_node_with_parent(entry, ops::Input { types: inputs })?;
+        let entry_out = hugr.add_node_with_parent(
             entry,
             ops::Output {
                 types: vec![entry_tuple_sum].into(),
@@ -1245,7 +1245,7 @@ mod test {
             type_row![NAT],
         )?;
 
-        let mkpred = hugr.add_op_with_parent(
+        let mkpred = hugr.add_node_with_parent(
             entry,
             make_opaque(
                 A,
@@ -1341,7 +1341,7 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_mid = hugr.add_op_with_parent(
+        let entry_mid = hugr.add_node_with_parent(
             entry,
             make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], twoway(NAT))),
         )?;
@@ -1427,7 +1427,7 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_dfg = hugr.add_op_with_parent(
+        let entry_dfg = hugr.add_node_with_parent(
             entry,
             make_opaque(
                 UNKNOWN_EXTENSION,
@@ -1508,7 +1508,7 @@ mod test {
             type_row![NAT],
         )?;
 
-        let entry_mid = hugr.add_op_with_parent(
+        let entry_mid = hugr.add_node_with_parent(
             entry,
             make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], oneway(NAT))),
         )?;

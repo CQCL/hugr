@@ -456,7 +456,7 @@ pub mod test {
         hugr.connect(old_in, 0, out, 0).unwrap();
 
         // Now add a new input
-        let new_in = hugr.add_op(Input::new([QB].to_vec()));
+        let new_in = hugr.add_node(Input::new([QB].to_vec()).into());
         hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
         hugr.connect(new_in, 0, out, 0).unwrap();
         hugr.move_before_sibling(new_in, old_in).unwrap();

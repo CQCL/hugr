@@ -72,7 +72,7 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_op_custom_sig(
+        .add_node_custom_sig(
             POP_NAME,
             "Pop from back of list".into(),
             vec![TypeParam::Type(TypeBound::Any)],
@@ -89,7 +89,7 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_op_custom_sig(
+        .add_node_custom_sig(
             PUSH_NAME,
             "Push to back of list".into(),
             vec![TypeParam::Type(TypeBound::Any)],
