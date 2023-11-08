@@ -53,7 +53,7 @@ pub struct Hugr {
     op_types: UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Node metadata
-    metadata: UnmanagedDenseMap<portgraph::NodeIndex, NodeMetadata>,
+    metadata: UnmanagedDenseMap<portgraph::NodeIndex, Option<NodeMetadataMap>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -174,8 +174,13 @@ impl AsMut<Hugr> for Hugr {
     }
 }
 
-/// Arbitrary metadata for a node.
+/// Arbitrary metadata entry for a node.
+///
+/// Each entry is associated to a string key.
 pub type NodeMetadata = serde_json::Value;
+
+/// The container of all the metadata entries for a node.
+pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 
 /// Public API for HUGRs.
 impl Hugr {
