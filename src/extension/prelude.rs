@@ -66,6 +66,14 @@ lazy_static! {
             )
             .unwrap();
         prelude
+        .add_type(
+            ERROR_TYPE_NAME,
+            vec![],
+            "Simple opaque error type.".into(),
+            TypeDefBound::Explicit(TypeBound::Eq),
+        )
+        .unwrap();
+        prelude
     };
     /// An extension registry containing only the prelude
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry = [PRELUDE_DEF.to_owned()].into();
@@ -120,10 +128,13 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
 
 /// Unspecified opaque error type.
 pub const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
-    smol_str::SmolStr::new_inline("error"),
+    ERROR_TYPE_NAME,
     PRELUDE_ID,
     TypeBound::Eq,
 ));
+
+/// The string name of the error type.
+pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
@@ -182,5 +193,18 @@ mod test {
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
         b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+    }
+
+    #[test]
+    /// Test building a HUGR involving a new_array operation.
+    fn test_error_type() {
+        let ext_def = PRELUDE
+            .get_type(&ERROR_TYPE_NAME)
+            .unwrap()
+            .instantiate([])
+            .unwrap();
+
+        let ext_type = Type::new_extension(ext_def);
+        assert_eq!(ext_type, ERROR_TYPE);
     }
 }
