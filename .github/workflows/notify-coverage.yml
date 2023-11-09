@@ -16,51 +16,39 @@ jobs:
     outputs:
       msg: ${{ steps.make_msg.outputs.msg }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: llvm-tools-preview
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Download previous summary
-        uses: dawidd6/action-download-artifact@v2
-        with:
-          # Downloads the artifact from the most recent successful run
-          workflow: 'coverage.yml'
-          name: coverage-summary
-          if_no_artifact_found: ignore
-      - name: Rename file or load default
+      - name: Get today's and yesterday's coverage trends from codecov
+        # API reference: https://docs.codecov.com/reference/repos_totals_retrieve
         run: |
-          if [ -f coverage-summary.txt ];
-          then
-            mv coverage-summary.txt coverage-summary-prev.txt
-          else
-            echo -n "0.0" > coverage-summary-prev.txt
-          fi
-      - name: Run tests with coverage instrumentation
-        run: |
-            cargo llvm-cov clean --workspace
-            cargo llvm-cov --doctests
-      - name: Generate coverage report and summary
-        run: |
-          cargo llvm-cov report --summary-only | grep TOTAL | awk '{print $10}' | tr -dc '[:digit:].' > coverage-summary.txt
-      - name: Upload summary
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-summary
-          path: coverage-summary.txt
+          YESTERDAY=$( date -u +%Y-%m-%dT%H:%M:%SZ -d 'yesterday' )
+
+          curl --request GET \
+            --url "https://api.codecov.io/api/v2/github/${{ github.repository_owner }}/repos/${{ github.event.repository.name }}/coverage/?interval=1d&start_date=$YESTERDAY" \
+            --header 'accept: application/json' \
+            --header "authorization: Bearer ${{ secrets.CODECOV_GET_TOKEN }}" \
+            > coverage.json
+
+          echo "Coverage JSON:"
+          cat coverage.json
+          echo
+
+          cat coverage.json | jq ".results[0].max" > coverage-prev.txt
+          cat coverage.json | jq ".results[-1].max" > coverage.txt
+
+          echo "Previous coverage: `cat coverage-prev.txt`%"
+          echo "Current coverage: `cat coverage.txt`%"
       - name: Compare with previous summary and make message
         id: make_msg
         run: |
-          change="`cat coverage-summary-prev.txt`% --> `cat coverage-summary.txt`%"
+          change="`cat coverage-prev.txt`% --> `cat coverage.txt`%"
           codecov="https://codecov.io/gh/${{ github.repository }}?search=&trend=7%20days"
-          if (( $(echo "`cat coverage-summary-prev.txt` < `cat coverage-summary.txt` + 0.04" | bc -l) ))
+          if (( $(echo "`cat coverage-prev.txt` < `cat coverage.txt` + 0.04" | bc -l) ))
           then
-            echo "msg=Coverage check for hugr shows no regression (${change}). ✅ ${codecov}" >> "$GITHUB_OUTPUT"
+            MSG="msg=Coverage check for hugr shows no regression (${change}). ✅ ${codecov}"
           else
-            echo "msg=Coverage check for hugr shows regression (${change}). ❌ ${codecov}" >> "$GITHUB_OUTPUT"
+            MSG="msg=Coverage check for hugr shows regression (${change}). ❌ ${codecov}"
           fi
+          echo $MSG
+          echo $MSG  >> "$GITHUB_OUTPUT"
   notify-slack:
     needs: check-coverage
     runs-on: ubuntu-latest
