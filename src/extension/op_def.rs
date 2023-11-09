@@ -331,6 +331,23 @@ impl Extension {
             SignatureFunc::TypeScheme(type_scheme),
         )
     }
+
+    /// Create an OpDef with a signature (inputs+outputs) read from e.g.
+    /// declarative YAML; and no "misc" or "lowering functions" defined.
+    pub fn add_op_type_scheme_simple(
+        &mut self,
+        name: SmolStr,
+        description: String,
+        type_scheme: PolyFuncType,
+    ) -> Result<&OpDef, ExtensionBuildError> {
+        self.add_op(
+            name,
+            description,
+            Default::default(),
+            vec![],
+            SignatureFunc::TypeScheme(type_scheme),
+        )
+    }
 }
 
 #[cfg(test)]
