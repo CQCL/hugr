@@ -218,8 +218,8 @@ pub(crate) mod test {
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
-    use crate::std_extensions::quantum::test::h_gate;
     use crate::types::Type;
+    use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},

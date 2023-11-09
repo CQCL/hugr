@@ -681,6 +681,7 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::utils::test_quantum_extension::cx_gate;
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -696,10 +697,7 @@ mod tests {
             handle::{DfgID, FuncID, NodeHandle},
             OpType,
         },
-        std_extensions::{
-            logic::test::{and_op, not_op},
-            quantum::test::cx_gate,
-        },
+        std_extensions::logic::test::{and_op, not_op},
         type_row,
     };
 

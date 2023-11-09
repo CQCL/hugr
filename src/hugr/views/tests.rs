@@ -4,9 +4,9 @@ use crate::{
     builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::QB_T,
     ops::handle::NodeHandle,
-    std_extensions::quantum::test::cx_gate,
     type_row,
     types::FunctionType,
+    utils::test_quantum_extension::cx_gate,
     HugrView,
 };
 
