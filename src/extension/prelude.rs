@@ -118,7 +118,8 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
         .into()
 }
 
-pub(crate) const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
+/// Unspecified opaque error type.
+pub const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
     smol_str::SmolStr::new_inline("error"),
     PRELUDE_ID,
     TypeBound::Eq,
