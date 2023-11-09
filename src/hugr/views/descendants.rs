@@ -202,9 +202,9 @@ pub(super) mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::handle::NodeHandle,
-        std_extensions::quantum::test::h_gate,
         type_row,
         types::{FunctionType, Type},
+        utils::test_quantum_extension::h_gate,
     };
 
     use super::*;

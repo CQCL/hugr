@@ -139,9 +139,9 @@ mod test {
         },
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, LeafOp},
-        std_extensions::quantum::test::{cx_gate, h_gate, measure},
         type_row,
         types::FunctionType,
+        utils::test_quantum_extension::{cx_gate, h_gate, measure},
     };
 
     #[test]
