@@ -137,17 +137,22 @@ mod test {
             test::{build_main, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
-        extension::prelude::BOOL_T,
+        extension::{
+            prelude::{BOOL_T, PRELUDE_ID},
+            ExtensionSet,
+        },
         ops::{custom::OpaqueOp, LeafOp},
         type_row,
         types::FunctionType,
-        utils::test_quantum_extension::{cx_gate, h_gate, measure},
+        utils::test_quantum_extension::{self, cx_gate, h_gate, measure},
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).pure(),
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).with_input_extensions(
+                ExtensionSet::from_iter([PRELUDE_ID, test_quantum_extension::EXTENSION_ID]),
+            ),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
