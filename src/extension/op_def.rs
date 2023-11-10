@@ -189,10 +189,8 @@ impl OpDef {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL-DEV/hugr/issues/425
-        // assert!(res.contains(self.extension()));
+        let mut res = pf.instantiate(args, exts)?;
+        res.extension_reqs.insert(self.extension());
         Ok(res)
     }
 
