@@ -34,11 +34,10 @@ fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
-            vec![],
-            |_arg_values: &[TypeArg]| Ok(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
         )
         .unwrap();
 
