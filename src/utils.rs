@@ -34,23 +34,23 @@ pub(crate) mod test_quantum_extension {
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T},
-            ExtensionId, ExtensionRegistry, SignatureError, PRELUDE,
+            ExtensionId, ExtensionRegistry, PRELUDE,
         },
         ops::LeafOp,
         std_extensions::arithmetic::float_types::FLOAT64_TYPE,
         type_row,
-        types::{FunctionType, TypeArg},
+        types::{FunctionType, PolyFuncType},
         Extension,
     };
 
     use lazy_static::lazy_static;
 
-    fn one_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-        Ok(FunctionType::new_linear(type_row![QB_T]))
+    fn one_qb_func() -> PolyFuncType {
+        FunctionType::new_linear(type_row![QB_T]).into()
     }
 
-    fn two_qb_func(_: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-        Ok(FunctionType::new_linear(type_row![QB_T, QB_T]))
+    fn two_qb_func() -> PolyFuncType {
+        FunctionType::new_linear(type_row![QB_T, QB_T]).into()
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
@@ -58,42 +58,25 @@ pub(crate) mod test_quantum_extension {
         let mut extension = Extension::new(EXTENSION_ID);
 
         extension
-            .add_op_custom_sig_simple(
-                SmolStr::new_inline("H"),
-                "Hadamard".into(),
-                vec![],
-                one_qb_func,
-            )
+            .add_op_type_scheme_simple(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
             .unwrap();
         extension
-            .add_op_custom_sig_simple(
+            .add_op_type_scheme_simple(
                 SmolStr::new_inline("RzF64"),
                 "Rotation specified by float".into(),
-                vec![],
-                |_: &[_]| {
-                    Ok(FunctionType::new(
-                        type_row![QB_T, FLOAT64_TYPE],
-                        type_row![QB_T],
-                    ))
-                },
+                FunctionType::new(type_row![QB_T, FLOAT64_TYPE], type_row![QB_T]).into(),
             )
             .unwrap();
 
         extension
-            .add_op_custom_sig_simple(SmolStr::new_inline("CX"), "CX".into(), vec![], two_qb_func)
+            .add_op_type_scheme_simple(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
             .unwrap();
 
         extension
-            .add_op_custom_sig_simple(
+            .add_op_type_scheme_simple(
                 SmolStr::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-                vec![],
-                |_arg_values: &[TypeArg]| {
-                    Ok(FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]))
-                    // TODO add logic as an extension delta when inference is
-                    // done?
-                    // https://github.com/CQCL-DEV/hugr/issues/425
-                },
+                FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]).into(),
             )
             .unwrap();
 
