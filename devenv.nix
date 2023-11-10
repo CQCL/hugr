@@ -1,15 +1,22 @@
-{ pkgs, lib, config, ... }:
-
+{ pkgs, lib, config, inputs, ... }:
+let
+  pkgs-stable = import inputs.nixpkgs-stable { system = pkgs.stdenv.system; };
+in
 {
-  # https://devenv.sh/basics/
-
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified 
   # otherwise a linker error ocurs on rust packages
-  packages = [pkgs.just] ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk; [
-    frameworks.CoreServices
-    frameworks.CoreFoundation
-  ]);
+  packages = [
+    pkgs.just
+    pkgs.llvmPackages_16.libllvm
+    # cargo-llvm-cov is currently marked broken on nixpkgs unstable
+    pkgs-stable.cargo-llvm-cov
+  ] ++ lib.optionals
+    pkgs.stdenv.isDarwin
+    (with pkgs.darwin.apple_sdk; [
+      frameworks.CoreServices
+      frameworks.CoreFoundation
+    ]);
 
   # https://devenv.sh/scripts/
   scripts.hello.exec = "echo Welcome to hugr dev shell!";
@@ -17,6 +24,8 @@
   enterShell = ''
     hello
     cargo --version
+    export LLVM_COV="${pkgs.llvmPackages_16.libllvm}/bin/llvm-cov"
+    export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
   '';
 
   # https://devenv.sh/languages/
