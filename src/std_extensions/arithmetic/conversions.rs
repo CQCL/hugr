@@ -1,23 +1,17 @@
 //! Conversions between integer and floating-point values.
 
 use crate::{
-    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef, PRELUDE},
+    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE},
     type_row,
-    types::{type_param::TypeArg, FunctionType, PolyFuncType, Type},
+    types::{FunctionType, PolyFuncType, Type},
     Extension,
 };
 
-use super::int_types::INT_TYPE_ID;
+use super::int_types::{int_type_var, INT_TYPE_ID};
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
-
-fn int_type_var(var_id: usize, int_type_def: &TypeDef) -> Result<Type, SignatureError> {
-    Ok(Type::new_extension(int_type_def.instantiate(vec![
-        TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM),
-    ])?))
-}
 
 fn ftoi_sig(
     int_type_var: Type,
