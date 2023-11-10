@@ -217,6 +217,7 @@ pub(crate) mod test {
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
+    use crate::std_extensions::logic;
     use crate::std_extensions::logic::test::and_op;
     use crate::types::Type;
     use crate::utils::test_quantum_extension::h_gate;
@@ -273,7 +274,8 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).pure(),
+                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])
+                    .with_input_extensions(ExtensionSet::singleton(&logic::EXTENSION_ID)),
             )?;
 
             f(f_build)?;
