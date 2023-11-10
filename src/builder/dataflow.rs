@@ -220,7 +220,7 @@ pub(crate) mod test {
     use crate::std_extensions::logic;
     use crate::std_extensions::logic::test::and_op;
     use crate::types::Type;
-    use crate::utils::test_quantum_extension::h_gate;
+    use crate::utils::test_quantum_extension::{self, h_gate};
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -240,7 +240,10 @@ pub(crate) mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).pure(),
+                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB])
+                        .with_input_extensions(ExtensionSet::singleton(
+                            &test_quantum_extension::EXTENSION_ID,
+                        )),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
