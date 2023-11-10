@@ -189,7 +189,10 @@ mod test {
             .into(),
         );
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
+                .with_input_extensions(ExtensionSet::singleton(
+                    &test_quantum_extension::EXTENSION_ID,
+                )),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
