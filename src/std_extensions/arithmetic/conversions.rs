@@ -1,36 +1,46 @@
 //! Conversions between integer and floating-point values.
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef, PRELUDE},
     type_row,
-    types::{type_param::TypeArg, FunctionType, Type},
-    utils::collect_array,
+    types::{type_param::TypeArg, FunctionType, PolyFuncType, Type},
     Extension,
 };
 
-use super::int_types::int_type;
+use super::int_types::INT_TYPE_ID;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
-fn ftoi_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    let [arg] = collect_array(arg_values);
-    Ok(FunctionType::new(
-        type_row![FLOAT64_TYPE],
-        vec![Type::new_sum(vec![
-            int_type(arg.clone()),
-            crate::extension::prelude::ERROR_TYPE,
-        ])],
-    ))
+fn int_type_var(var_id: usize, int_type_def: &TypeDef) -> Result<Type, SignatureError> {
+    Ok(Type::new_extension(int_type_def.instantiate(vec![
+        TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM),
+    ])?))
 }
 
-fn itof_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    let [arg] = collect_array(arg_values);
-    Ok(FunctionType::new(
-        vec![int_type(arg.clone())],
+fn ftoi_sig(
+    int_type_var: Type,
+    temp_reg: &ExtensionRegistry,
+) -> Result<PolyFuncType, SignatureError> {
+    let body = FunctionType::new(
         type_row![FLOAT64_TYPE],
-    ))
+        vec![Type::new_sum(vec![
+            int_type_var,
+            crate::extension::prelude::ERROR_TYPE,
+        ])],
+    );
+
+    PolyFuncType::new_validated(vec![LOG_WIDTH_TYPE_PARAM], body, temp_reg)
+}
+
+fn itof_sig(
+    int_type_var: Type,
+    temp_reg: &ExtensionRegistry,
+) -> Result<PolyFuncType, SignatureError> {
+    let body = FunctionType::new(vec![int_type_var], type_row![FLOAT64_TYPE]);
+
+    PolyFuncType::new_validated(vec![LOG_WIDTH_TYPE_PARAM], body, temp_reg)
 }
 
 /// Extension for basic arithmetic operations.
@@ -42,37 +52,42 @@ pub fn extension() -> Extension {
             super::float_types::EXTENSION_ID,
         ]),
     );
-
+    let int_types_extension = super::int_types::extension();
+    let int_type_def = int_types_extension.get_type(&INT_TYPE_ID).unwrap();
+    let int_type_var = int_type_var(0, int_type_def).unwrap();
+    let temp_reg: ExtensionRegistry = [
+        extension.clone(),
+        int_types_extension,
+        super::float_types::extension(),
+        PRELUDE.to_owned(),
+    ]
+    .into();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM],
-            ftoi_sig,
+            ftoi_sig(int_type_var.clone(), &temp_reg).unwrap(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "trunc_s".into(),
             "float to signed int".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM],
-            ftoi_sig,
+            ftoi_sig(int_type_var.clone(), &temp_reg).unwrap(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM],
-            itof_sig,
+            itof_sig(int_type_var.clone(), &temp_reg).unwrap(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "convert_s".into(),
             "signed int to float".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM],
-            itof_sig,
+            itof_sig(int_type_var, &temp_reg).unwrap(),
         )
         .unwrap();
 

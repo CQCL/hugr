@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 
 /// Identifier for the integer type.
-const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
+pub const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
 fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
