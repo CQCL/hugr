@@ -612,7 +612,7 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let const_in_port = signature.output.len();
+        let const_in_port = signature.input.len();
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 

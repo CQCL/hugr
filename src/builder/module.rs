@@ -233,14 +233,14 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).pure(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).pure(),
             )?;
             let [wire] = local_build.input_wires_arr();
-            let f_id = local_build.finish_with_outputs([wire])?;
+            let f_id = local_build.finish_with_outputs([wire, wire])?;
 
             let call = f_build.call(f_id.handle(), f_build.input_wires())?;
 
