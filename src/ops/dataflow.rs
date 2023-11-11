@@ -11,10 +11,6 @@ pub(super) trait DataflowOpTrait {
     fn description(&self) -> &str;
     fn signature(&self) -> FunctionType;
 
-    /// Get the static input type of this operation if it has one.
-    fn static_input(&self) -> Option<Type> {
-        None
-    }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -125,10 +121,6 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
     }
-
-    fn static_input(&self) -> Option<Type> {
-        DataflowOpTrait::static_input(self)
-    }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
     const TAG: OpTag = T::TAG;
@@ -156,10 +148,12 @@ impl DataflowOpTrait for Call {
     fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
-
+}
+impl Call {
     #[inline]
-    fn static_input(&self) -> Option<Type> {
-        Some(Type::new_function(self.signature.clone()))
+    /// Return the signature of the function called by this op.
+    pub fn called_function_type(&self) -> &FunctionType {
+        &self.signature
     }
 }
 
@@ -204,10 +198,12 @@ impl DataflowOpTrait for LoadConstant {
     fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
-
+}
+impl LoadConstant {
     #[inline]
-    fn static_input(&self) -> Option<Type> {
-        Some(self.datatype.clone())
+    /// The type of the constant loaded by this op.
+    pub fn constant_type(&self) -> &Type {
+        &self.datatype
     }
 }
 

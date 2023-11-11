@@ -86,9 +86,9 @@ impl OpType {
             signature.get(port).cloned().map(EdgeKind::Value)
         } else if port.index() == port_count
             && dir == Direction::Incoming
-            && self.static_input().is_some()
+            && OpTag::StaticInput.is_superset(self.tag())
         {
-            self.static_input().map(EdgeKind::Static)
+            Some(EdgeKind::Static(static_in_type(self)))
         } else {
             self.other_port(dir)
         }
@@ -103,7 +103,7 @@ impl OpType {
         if self.other_port(dir).is_some() && non_df_count == 1 {
             // if there is a static input it comes before the non_df_ports
             let static_input =
-                (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+                (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
 
             Some(Port::new(
                 dir,
@@ -122,7 +122,8 @@ impl OpType {
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
         // if there is a static input it comes before the non_df_ports
-        let static_input = (dir == Direction::Incoming && self.static_input().is_some()) as usize;
+        let static_input =
+            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
         signature.port_count(dir) + non_df_count + static_input
     }
 
@@ -139,6 +140,14 @@ impl OpType {
     /// Checks whether the operation can contain children nodes.
     pub fn is_container(&self) -> bool {
         self.validity_flags().allowed_children != OpTag::None
+    }
+}
+
+fn static_in_type(op: &OpType) -> Type {
+    match op {
+        OpType::Call(call) => Type::new_function(call.called_function_type().clone()),
+        OpType::LoadConstant(load) => load.constant_type().clone(),
+        _ => panic!("this function should not be called if the optype is not known to be Call or LoadConst.")
     }
 }
 
@@ -188,14 +197,6 @@ pub trait OpTrait {
     fn signature(&self) -> FunctionType {
         Default::default()
     }
-
-    /// Get the static input type of this operation if it has one (only Some for
-    /// [`LoadConstant`] and [`Call`])
-    #[inline]
-    fn static_input(&self) -> Option<Type> {
-        None
-    }
-
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
