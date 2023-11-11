@@ -3,8 +3,8 @@
 use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
-use crate::type_row;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::{type_row, Direction};
 
 use super::dataflow::DataflowOpTrait;
 use super::OpTag;
@@ -175,6 +175,15 @@ impl OpTrait for BasicBlock {
                 extension_delta, ..
             } => FunctionType::new(type_row![], type_row![]).with_extension_delta(extension_delta),
             BasicBlock::Exit { .. } => FunctionType::new(type_row![], type_row![]),
+        }
+    }
+
+    fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
+        match self {
+            Self::DFB { tuple_sum_rows, .. } if dir == Direction::Outgoing => {
+                Some(tuple_sum_rows.len())
+            }
+            _ => None,
         }
     }
 }

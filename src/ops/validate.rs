@@ -11,7 +11,6 @@ use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
 use crate::types::{Type, TypeRow};
-use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
@@ -32,28 +31,10 @@ pub struct OpValidityFlags {
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of non-dataflow multiports.
-    ///
-    /// If not specified, the operation must have exactly one non-dataflow port
-    /// if the operation type has other_edges, or zero otherwise.
-    pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
-}
-
-impl OpValidityFlags {
-    /// Get the number of non-dataflow multiports.
-    ///
-    /// If None, the operation must have exactly one non-dataflow port
-    /// if the operation type has other_edges, or zero otherwise.
-    pub fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
-        match dir {
-            Direction::Incoming => self.non_df_ports.0,
-            Direction::Outgoing => self.non_df_ports.1,
-        }
-    }
 }
 
 impl Default for OpValidityFlags {
@@ -65,7 +46,6 @@ impl Default for OpValidityFlags {
             allowed_second_child: OpTag::Any,
             requires_children: false,
             requires_dag: false,
-            non_df_ports: (None, None),
             edge_check: None,
         }
     }
@@ -316,16 +296,12 @@ impl ValidateOp for BasicBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlock::DFB {
-                tuple_sum_rows: tuple_sum_variants,
-                ..
-            } => OpValidityFlags {
+            BasicBlock::DFB { .. } => OpValidityFlags {
                 allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(tuple_sum_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations

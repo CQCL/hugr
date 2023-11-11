@@ -99,7 +99,7 @@ impl OpType {
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port_index(&self, dir: Direction) -> Option<Port> {
-        let non_df_count = self.validity_flags().non_df_port_count(dir).unwrap_or(1);
+        let non_df_count = self.non_df_port_count(dir).unwrap_or(1);
         if self.other_port(dir).is_some() && non_df_count == 1 {
             // if there is a static input it comes before the non_df_ports
             let static_input =
@@ -119,7 +119,6 @@ impl OpType {
         let signature = self.signature();
         let has_other_ports = self.other_port(dir).is_some();
         let non_df_count = self
-            .validity_flags()
             .non_df_port_count(dir)
             .unwrap_or(has_other_ports as usize);
         // if there is a static input it comes before the non_df_ports
@@ -212,6 +211,14 @@ pub trait OpTrait {
     /// If not None, a single extra output multiport of that kind will be
     /// present.
     fn other_output(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    /// Get the number of non-dataflow multiports.
+    ///
+    /// If None, the operation must have exactly one non-dataflow port
+    /// if the operation type has other_edges, or zero otherwise.
+    fn non_df_port_count(&self, _dir: Direction) -> Option<usize> {
         None
     }
 }
