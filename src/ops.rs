@@ -10,8 +10,8 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::types::{EdgeKind, FunctionType, Type};
-use crate::PortIndex;
 use crate::{Direction, Port};
+use crate::{IncomingPort, PortIndex};
 
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
@@ -82,9 +82,10 @@ impl OpType {
         let dir = port.direction();
 
         let port_count = signature.port_count(dir);
+        let port_as_in = port.as_incoming().ok();
         if port.index() < port_count {
             signature.get(port).cloned().map(EdgeKind::Value)
-        } else if Some(port) == self.static_input_port() {
+        } else if port_as_in.is_some() && port_as_in == self.static_input_port() {
             Some(EdgeKind::Static(static_in_type(self)))
         } else {
             self.other_port_kind(dir)
@@ -124,13 +125,19 @@ impl OpType {
     }
 
     /// If the op has a static input (Call and LoadConstant), the port of that input.
-    pub fn static_input_port(&self) -> Option<Port> {
+    pub fn static_input_port(&self) -> Option<IncomingPort> {
         match self {
-            OpType::Call(call) => Some(Port::new(
-                Direction::Incoming,
-                call.called_function_type().input_count(),
-            )),
-            OpType::LoadConstant(_) => Some(Port::new(Direction::Incoming, 0)),
+            OpType::Call(call) => Some(
+                Port::new(
+                    Direction::Incoming,
+                    call.called_function_type().input_count(),
+                )
+                .as_incoming()
+                .unwrap(),
+            ),
+            OpType::LoadConstant(_) => {
+                Some(Port::new(Direction::Incoming, 0).as_incoming().unwrap())
+            }
             _ => None,
         }
     }

@@ -348,6 +348,13 @@ pub trait HugrView: sealed::HugrInternals {
             })
             .finish()
     }
+
+    /// If a node has a static input, return the source node.
+    fn static_source(&self, node: Node) -> Option<Node> {
+        self.linked_outputs(node, self.get_optype(node).static_input_port()?)
+            .next()
+            .map(|(n, _)| n)
+    }
 }
 
 /// Wraps an iterator over [Port]s that are known to be [OutgoingPort]s
