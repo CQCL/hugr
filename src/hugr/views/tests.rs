@@ -68,3 +68,52 @@ fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflo
 
     insta::assert_yaml_snapshot!(h.dot_string());
 }
+
+#[rustversion::since(1.75)] // uses impl in return position
+#[rstest]
+fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
+    use crate::hugr::Direction;
+    use crate::Port;
+    use itertools::Itertools;
+    let (h, n1, n2) = sample_hugr;
+
+    let all_output_ports = h.all_linked_outputs(n2.node()).collect_vec();
+
+    assert_eq!(
+        &all_output_ports[..],
+        &[
+            (
+                n1.node(),
+                Port::new(Direction::Outgoing, 1).as_outgoing().unwrap()
+            ),
+            (
+                n1.node(),
+                Port::new(Direction::Outgoing, 0).as_outgoing().unwrap()
+            ),
+            (
+                n1.node(),
+                Port::new(Direction::Outgoing, 2).as_outgoing().unwrap()
+            ),
+        ]
+    );
+
+    let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
+
+    assert_eq!(
+        &all_linked_inputs[..],
+        &[
+            (
+                n2.node(),
+                Port::new(Direction::Incoming, 1).as_incoming().unwrap()
+            ),
+            (
+                n2.node(),
+                Port::new(Direction::Incoming, 0).as_incoming().unwrap()
+            ),
+            (
+                n2.node(),
+                Port::new(Direction::Incoming, 2).as_incoming().unwrap()
+            ),
+        ]
+    );
+}

@@ -179,6 +179,20 @@ pub trait HugrView: sealed::HugrInternals {
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all the nodes and ports connected to a node's inputs..
+    fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)> {
+        self.node_inputs(node)
+            .flat_map(move |port| self.linked_outputs(node, port))
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all the nodes and ports connected to a node's outputs..
+    fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)> {
+        self.node_outputs(node)
+            .flat_map(move |port| self.linked_inputs(node, port))
+    }
+
     /// Iterator over the nodes and output ports connected to a given *input* port.
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
     /// that the linked ports are [OutgoingPort]s.
