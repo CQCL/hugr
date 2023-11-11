@@ -596,13 +596,13 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
 /// Whether a port is linked to a state order edge.
 fn is_order_edge<H: HugrView>(hugr: &H, node: Node, port: Port) -> bool {
     let op = hugr.get_optype(node);
-    op.other_port_index(port.direction()) == Some(port) && hugr.is_linked(node, port)
+    op.other_port(port.direction()) == Some(port) && hugr.is_linked(node, port)
 }
 
 /// Whether node has a non-df linked port in the given direction.
 fn has_other_edge<H: HugrView>(hugr: &H, node: Node, dir: Direction) -> bool {
     let op = hugr.get_optype(node);
-    op.other_port(dir).is_some() && hugr.is_linked(node, op.other_port_index(dir).unwrap())
+    op.other_port_kind(dir).is_some() && hugr.is_linked(node, op.other_port(dir).unwrap())
 }
 
 /// Errors that can occur while constructing a [`SimpleReplacement`].

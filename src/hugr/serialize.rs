@@ -246,7 +246,7 @@ impl TryFrom<SerHugrV0> for Hugr {
                 None => {
                     let op_type = hugr.get_optype(node);
                     op_type
-                        .other_port_index(dir)
+                        .other_port(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
                             op_type: op_type.clone(),
