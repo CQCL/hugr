@@ -1,7 +1,10 @@
 //! Conversions between integer and floating-point values.
 
 use crate::{
-    extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE},
+    extension::{
+        prelude::sum_with_error, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
+        PRELUDE,
+    },
     type_row,
     types::{FunctionType, PolyFuncType, Type},
     Extension,
@@ -17,13 +20,7 @@ fn ftoi_sig(
     int_type_var: Type,
     temp_reg: &ExtensionRegistry,
 ) -> Result<PolyFuncType, SignatureError> {
-    let body = FunctionType::new(
-        type_row![FLOAT64_TYPE],
-        vec![Type::new_sum(vec![
-            int_type_var,
-            crate::extension::prelude::ERROR_TYPE,
-        ])],
-    );
+    let body = FunctionType::new(type_row![FLOAT64_TYPE], vec![sum_with_error(int_type_var)]);
 
     PolyFuncType::new_validated(vec![LOG_WIDTH_TYPE_PARAM], body, temp_reg)
 }

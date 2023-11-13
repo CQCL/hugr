@@ -47,7 +47,7 @@ fn extension() -> Extension {
             "logical 'and'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
-                let TypeArg::BoundedNat { n } = arg_values.iter().exactly_one().unwrap() else {
+                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };
 
@@ -65,7 +65,7 @@ fn extension() -> Extension {
             "logical 'or'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
-                let TypeArg::BoundedNat { n } = arg_values.iter().exactly_one().unwrap() else {
+                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };
 

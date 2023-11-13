@@ -75,7 +75,7 @@ fn extension() -> Extension {
     let temp_reg: ExtensionRegistry = [extension.clone()].into();
     let list_type_def = extension.get_type(&LIST_TYPENAME).unwrap();
 
-    let (l, e) = list_types(list_type_def);
+    let (l, e) = list_and_elem_type(list_type_def);
     extension
         .add_op_type_scheme_simple(
             POP_NAME,
@@ -103,16 +103,6 @@ fn extension() -> Extension {
     extension
 }
 
-fn list_types(list_type_def: &TypeDef) -> (Type, Type) {
-    let elem_type = Type::new_var_use(0, TypeBound::Any);
-    let list_type = Type::new_extension(
-        list_type_def
-            .instantiate(vec![TypeArg::new_var_use(0, TP)])
-            .unwrap(),
-    );
-    (list_type, elem_type)
-}
-
 lazy_static! {
     /// Collections extension definition.
     pub static ref EXTENSION: Extension = extension();
@@ -122,6 +112,15 @@ fn get_type(name: &str) -> &TypeDef {
     EXTENSION.get_type(name).unwrap()
 }
 
+fn list_and_elem_type(list_type_def: &TypeDef) -> (Type, Type) {
+    let elem_type = Type::new_var_use(0, TypeBound::Any);
+    let list_type = Type::new_extension(
+        list_type_def
+            .instantiate(vec![TypeArg::new_var_use(0, TP)])
+            .unwrap(),
+    );
+    (list_type, elem_type)
+}
 #[cfg(test)]
 mod test {
     use crate::{

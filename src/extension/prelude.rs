@@ -136,6 +136,11 @@ pub const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
 /// The string name of the error type.
 pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
 
+/// Return a Sum type with the first variant as the given type and the second an Error.
+pub fn sum_with_error(ty: Type) -> Type {
+    Type::new_sum(vec![ty, ERROR_TYPE])
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
 pub struct ConstUsize(u64);

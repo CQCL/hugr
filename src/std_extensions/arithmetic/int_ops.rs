@@ -1,7 +1,7 @@
 //! Basic integer operations.
 
 use super::int_types::{get_log_width, int_type, int_type_var, INT_TYPE_ID, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{BOOL_T, ERROR_TYPE};
+use crate::extension::prelude::{sum_with_error, BOOL_T};
 use crate::extension::{ExtensionRegistry, PRELUDE};
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
@@ -37,7 +37,7 @@ fn inarrow_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
     }
     Ok(FunctionType::new(
         vec![int_type(arg0.clone())],
-        vec![Type::new_sum(vec![int_type(arg1.clone()), ERROR_TYPE])],
+        vec![sum_with_error(int_type(arg1.clone()))],
     ))
 }
 
@@ -103,7 +103,7 @@ fn idivmod_checked_sig(
     int_polytype(
         2,
         intpair.clone(),
-        vec![Type::new_sum(vec![Type::new_tuple(intpair), ERROR_TYPE])],
+        vec![sum_with_error(Type::new_tuple(intpair))],
         temp_reg,
     )
 }
@@ -125,7 +125,7 @@ fn idiv_checked_sig(
     int_polytype(
         2,
         vec![int_type_var_0.clone(), int_type_var_1],
-        vec![Type::new_sum(vec![int_type_var_0, ERROR_TYPE])],
+        vec![sum_with_error(int_type_var_0)],
         temp_reg,
     )
 }
@@ -151,7 +151,7 @@ fn imod_checked_sig(
     int_polytype(
         2,
         vec![int_type_var_0, int_type_var_1.clone()],
-        vec![Type::new_sum(vec![int_type_var_1, ERROR_TYPE])],
+        vec![sum_with_error(int_type_var_1)],
         temp_reg,
     )
 }
@@ -566,10 +566,7 @@ mod test {
         let sig = inarrow_sig(&[ta(2), ta(1)]).unwrap();
         assert_eq!(
             sig,
-            FunctionType::new(
-                vec![int_type(ta(2))],
-                vec![Type::new_sum(vec![int_type(ta(1)), ERROR_TYPE])],
-            )
+            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
         );
 
         inarrow_sig(&[ta(1), ta(2)]).unwrap_err();
