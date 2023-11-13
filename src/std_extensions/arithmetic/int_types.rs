@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionId, SignatureError, TypeDef},
+    extension::ExtensionId,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
@@ -198,11 +198,20 @@ pub fn extension() -> Extension {
     extension
 }
 
+lazy_static! {
+    /// Lazy reference to int types extension.
+    pub static ref EXTENSION: Extension = extension();
+}
+
 /// get an integer type variable, given the integer type definition
-pub(super) fn int_type_var(var_id: usize, int_type_def: &TypeDef) -> Result<Type, SignatureError> {
-    Ok(Type::new_extension(int_type_def.instantiate(vec![
-        TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM),
-    ])?))
+pub(super) fn int_type_var(var_id: usize) -> Type {
+    Type::new_extension(
+        EXTENSION
+            .get_type(&INT_TYPE_ID)
+            .unwrap()
+            .instantiate(vec![TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM)])
+            .unwrap(),
+    )
 }
 #[cfg(test)]
 mod test {
