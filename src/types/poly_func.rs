@@ -12,7 +12,7 @@ use super::{FunctionType, Substitution};
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
 ///
-/// [Graph]: crate::values::PrimValue::Function
+/// [Graph]: crate::values::Value::Function
 /// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
