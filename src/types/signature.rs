@@ -118,11 +118,25 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn port_type(&self, port: impl Into<Port>) -> Option<&Type> {
-        let port = port.into();
+        let port: Port = port.into();
         match port.direction() {
-            Direction::Incoming => self.input.get(port),
-            Direction::Outgoing => self.output.get(port),
+            Direction::Incoming => self.in_port_type(port.as_incoming().unwrap()),
+            Direction::Outgoing => self.out_port_type(port.as_outgoing().unwrap()),
         }
+    }
+
+    /// Returns the type of a value input [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
+        self.input.get(port.into())
+    }
+
+    /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
+        self.output.get(port.into())
     }
 
     /// Returns a mutable reference to the type of a value [`Port`].
