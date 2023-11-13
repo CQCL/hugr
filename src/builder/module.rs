@@ -8,13 +8,11 @@ use crate::{
     extension::ExtensionRegistry,
     hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
-    types::{Type, TypeBound},
+    types::{PolyFuncType, Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::ops::OpType;
-
-use crate::types::Signature;
 
 use crate::Node;
 use smol_str::SmolStr;
@@ -107,17 +105,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn declare(
         &mut self,
         name: impl Into<String>,
-        signature: Signature, // ALAN
+        signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let rs = signature.input_extensions.clone();
-        let declare_n = self.add_child_node(NodeType::new(
-            ops::FuncDecl {
-                signature: signature.signature.into(),
-                name: name.into(),
-            },
-            rs,
-        ))?;
+        let declare_n = self.add_child_node(NodeType::new_pure(ops::FuncDecl {
+            signature,
+            name: name.into(),
+        }))?;
 
         Ok(declare_n.into())
     }
@@ -188,7 +182,7 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;

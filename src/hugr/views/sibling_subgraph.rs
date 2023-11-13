@@ -724,7 +724,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_linear(type_row![QB_T, QB_T, QB_T]).pure(),
+            FunctionType::new_linear(type_row![QB_T, QB_T, QB_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -741,7 +741,7 @@ mod tests {
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
         let func =
-            mod_builder.declare("test", FunctionType::new_linear(type_row![BOOL_T]).pure())?;
+            mod_builder.declare("test", FunctionType::new_linear(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
@@ -760,7 +760,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).pure(),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
