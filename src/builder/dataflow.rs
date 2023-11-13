@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, Signature};
+use crate::types::{FunctionType, PolyFuncType};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;
@@ -146,22 +146,17 @@ impl FunctionBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
-        // ALAN this looks dodgy too
+    pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
+        let body = signature.body.clone();
         let op = ops::FuncDefn {
-            signature: signature.signature.clone().into(),
+            signature,
             name: name.into(),
         };
 
-        let base = Hugr::new(NodeType::new(op, signature.input_extensions.clone()));
+        let base = Hugr::new(NodeType::new_pure(op));
         let root = base.root();
 
-        let db = DFGBuilder::create_with_io(
-            base,
-            root,
-            signature.signature,
-            Some(signature.input_extensions),
-        )?;
+        let db = DFGBuilder::create_with_io(base, root, body, Some(ExtensionSet::new()))?;
         Ok(Self::from_dfg_builder(db))
     }
 }
@@ -341,7 +336,7 @@ pub(crate) mod test {
         let builder = || -> Result<Hugr, BuildError> {
             let mut f_build = FunctionBuilder::new(
                 "main",
-                FunctionType::new(type_row![BIT], type_row![BIT]).pure(),
+                FunctionType::new(type_row![BIT], type_row![BIT]).into(),
             )?;
 
             let [i1] = f_build.input_wires_arr();
@@ -365,7 +360,7 @@ pub(crate) mod test {
     fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
         let mut f_build = FunctionBuilder::new(
             "main",
-            FunctionType::new(type_row![QB], type_row![QB]).pure(),
+            FunctionType::new(type_row![QB], type_row![QB]).into(),
         )?;
 
         let [i1] = f_build.input_wires_arr();

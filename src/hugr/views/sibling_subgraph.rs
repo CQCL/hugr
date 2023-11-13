@@ -17,11 +17,9 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
-use crate::extension::ExtensionSet;
 use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
-use crate::types::Signature;
 use crate::types::{FunctionType, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
@@ -400,19 +398,14 @@ impl SiblingSubgraph {
 
     /// Create a new Hugr containing only the subgraph.
     ///
-    /// The new Hugr will contain a function root wth the same signature as the
-    /// subgraph and the specified `input_extensions`.
+    /// The new Hugr will contain a [FuncDefn] root wth the same signature as the
+    /// subgraph and the specified `name`
     pub fn extract_subgraph(
         &self,
         hugr: &impl HugrView,
         name: impl Into<String>,
-        input_extensions: ExtensionSet,
     ) -> Result<Hugr, HugrError> {
-        let signature = Signature {
-            signature: self.signature(hugr),
-            input_extensions,
-        };
-        let mut builder = FunctionBuilder::new(name, signature).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.signature(hugr).into()).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -971,7 +964,7 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region", ExtensionSet::new())?;
+        let extracted = subgraph.extract_subgraph(&hugr, "region")?;
 
         extracted.validate(&PRELUDE_REGISTRY).unwrap();
 
