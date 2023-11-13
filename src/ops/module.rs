@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, PolyFuncType};
 use crate::types::{Type, TypeBound};
 
 use super::StaticTag;
@@ -36,7 +36,7 @@ pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: FunctionType,
+    pub signature: PolyFuncType,
 }
 
 impl_op_name!(FuncDefn);
@@ -63,7 +63,7 @@ pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: FunctionType,
+    pub signature: PolyFuncType,
 }
 
 impl_op_name!(FuncDecl);

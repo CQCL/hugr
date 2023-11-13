@@ -65,7 +65,7 @@ impl PrimType {
                 Ok(())
             }
             (PrimType::Function(t), PrimValue::Function { hugr: v })
-                if v.get_function_type().is_some_and(|f| &**t == f) =>
+                if v.get_function_type().is_some_and(|f| **t == f) =>
             {
                 // exact signature equality, in future this may need to be
                 // relaxed to be compatibility checks between the signatures.

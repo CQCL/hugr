@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{Type, TypeRow};
+use crate::types::{FunctionType, Type, TypeRow};
 use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -97,12 +97,8 @@ impl ValidateOp for super::FuncDefn {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.signature.input,
-            &self.signature.output,
-            "function definition",
-            children,
-        )
+        let FunctionType { input, output, .. } = &self.signature.body;
+        validate_io_nodes(input, output, "function definition", children)
     }
 }
 

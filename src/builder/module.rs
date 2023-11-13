@@ -96,7 +96,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             }),
         )?;
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature.body, None)?; // ALAN
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -109,13 +109,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn declare(
         &mut self,
         name: impl Into<String>,
-        signature: Signature,
+        signature: Signature, // ALAN
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
         let rs = signature.input_extensions.clone();
         let declare_n = self.add_child_node(NodeType::new(
             ops::FuncDecl {
-                signature: signature.into(),
+                signature: signature.signature.into(),
                 name: name.into(),
             },
             rs,

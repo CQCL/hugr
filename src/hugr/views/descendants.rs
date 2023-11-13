@@ -261,12 +261,12 @@ pub(super) mod test {
 
         assert_eq!(
             region.get_function_type(),
-            Some(&FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
+            Some(FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into())
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.get_function_type(),
-            Some(&FunctionType::new(type_row![NAT], type_row![NAT]))
+            Some(FunctionType::new(type_row![NAT], type_row![NAT]).into())
         );
 
         Ok(())

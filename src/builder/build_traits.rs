@@ -95,7 +95,7 @@ pub trait Container {
         let f_node = self.add_child_node(NodeType::new(
             ops::FuncDefn {
                 name: name.into(),
-                signature: signature.signature.clone(),
+                signature: signature.signature.clone().into(),
             },
             signature.input_extensions.clone(),
         ))?;
@@ -602,7 +602,7 @@ pub trait Dataflow: Container {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
-        let signature = match def_op {
+        let type_scheme = match def_op {
             OpType::FuncDefn(ops::FuncDefn { signature, .. })
             | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
             _ => {
@@ -612,7 +612,9 @@ pub trait Dataflow: Container {
                 })
             }
         };
+        let signature = type_scheme.body;
         let const_in_port = signature.output.len();
+        // TODO ALAN this is totally broken for polymorphic functions. Need to TypeApply here.
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 

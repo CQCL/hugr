@@ -962,7 +962,7 @@ mod tests {
         let OpType::FuncDefn(func_defn) = hugr.get_optype(func_root) else {
             panic!()
         };
-        assert_eq!(func_defn.signature, func.signature(&func_graph))
+        assert_eq!(func_defn.signature, func.signature(&func_graph).into())
     }
 
     #[test]

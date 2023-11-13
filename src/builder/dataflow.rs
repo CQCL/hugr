@@ -147,8 +147,9 @@ impl FunctionBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: Signature) -> Result<Self, BuildError> {
+        // ALAN this looks dodgy too
         let op = ops::FuncDefn {
-            signature: signature.clone().into(),
+            signature: signature.signature.clone().into(),
             name: name.into(),
         };
 

@@ -27,7 +27,7 @@ const Q: Type = crate::extension::prelude::QB_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]),
+        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
     }
     .into();
 
@@ -173,7 +173,7 @@ fn children_restrictions() {
         .add_node_with_parent(
             root,
             ops::FuncDefn {
-                signature: def_sig,
+                signature: def_sig.into(),
                 name: "main".into(),
             },
         )
@@ -634,7 +634,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
             b.root(),
             ops::FuncDefn {
                 name: "main".into(),
-                signature: FunctionType::new(row.clone(), row.clone()),
+                signature: FunctionType::new(row.clone(), row.clone()).into(),
             },
         )
         .unwrap();
