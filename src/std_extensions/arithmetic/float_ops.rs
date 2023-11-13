@@ -12,22 +12,6 @@ use super::float_types::FLOAT64_TYPE;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 
-fn fcmp_sig() -> PolyFuncType {
-    FunctionType::new(
-        type_row![FLOAT64_TYPE; 2],
-        type_row![crate::extension::prelude::BOOL_T],
-    )
-    .into()
-}
-
-fn fbinop_sig() -> PolyFuncType {
-    FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE]).into()
-}
-
-fn funop_sig() -> PolyFuncType {
-    FunctionType::new(type_row![FLOAT64_TYPE], type_row![FLOAT64_TYPE]).into()
-}
-
 /// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
@@ -35,9 +19,15 @@ pub fn extension() -> Extension {
         ExtensionSet::singleton(&super::float_types::EXTENSION_ID),
     );
 
-    let fcmp_sig = fcmp_sig();
-    let fbinop_sig = fbinop_sig();
-    let funop_sig = funop_sig();
+    let fcmp_sig: PolyFuncType = FunctionType::new(
+        type_row![FLOAT64_TYPE; 2],
+        type_row![crate::extension::prelude::BOOL_T],
+    )
+    .into();
+    let fbinop_sig: PolyFuncType =
+        FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE]).into();
+    let funop_sig: PolyFuncType =
+        FunctionType::new(type_row![FLOAT64_TYPE], type_row![FLOAT64_TYPE]).into();
     extension
         .add_op_type_scheme_simple("feq".into(), "equality test".to_owned(), fcmp_sig.clone())
         .unwrap();
