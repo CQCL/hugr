@@ -27,6 +27,7 @@ use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::NodeType;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -166,6 +167,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
+        // Secondly that the node has correct children
+        self.validate_children(node, node_type)?;
+
         // If this is a container with I/O nodes, check that the extension they
         // define match the extensions of the container.
         if let Some([input, output]) = self.hugr.get_io(node) {
@@ -265,47 +269,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_subtree(
-        &mut self,
-        node: Node,
-        var_decls: &[TypeParam],
-    ) -> Result<(), ValidationError> {
-        let node_type = self.hugr.get_nodetype(node);
+    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
         let op_type = &node_type.op;
         let flags = op_type.validity_flags();
-
-        // TODO consider turning this match into a trait method?
-        match op_type {
-            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
-                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
-                for arg in b.args() {
-                    arg.validate(self.extension_registry, var_decls)
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                }
-                // Try to resolve serialized names to actual OpDefs in Extensions.
-                let e: Option<ExtensionOp>;
-                let ext_op = match &**b {
-                    ExternalOp::Opaque(op) => {
-                        // If resolve_extension_ops has been called first, this would always return Ok(None)
-                        e = resolve_opaque_op(node, op, self.extension_registry)?;
-                        e.as_ref()
-                    }
-                    ExternalOp::Extension(ext) => Some(ext),
-                };
-                // If successful, check TypeArgs are valid for the declared TypeParams
-                if let Some(ext_op) = ext_op {
-                    ext_op
-                        .def()
-                        .check_args(ext_op.args())
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                }
-            }
-            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
-                ta.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-            }
-            _ => (),
-        }
 
         if self.hugr.hierarchy.child_count(node.pg_index()) == 0 {
             return if flags.requires_children {
@@ -353,9 +319,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
         // Additional validations running over the full list of children optypes
-        let children_optypes = all_children
-            .clone()
-            .map(|c| (c.pg_index(), self.hugr.get_optype(c)));
+        let children_optypes = all_children.map(|c| (c.pg_index(), self.hugr.get_optype(c)));
         if let Err(source) = op_type.validate_op_children(children_optypes) {
             return Err(ValidationError::InvalidChildren {
                 parent: node,
@@ -400,20 +364,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             self.validate_children_dag(node, op_type)?;
         }
 
-        let mut v: Vec<TypeParam>;
-        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. })
-        | OpType::FuncDecl(FuncDecl { signature, .. }) = op_type
-        {
-            v = signature.params().to_owned();
-            v.extend(var_decls.iter().cloned());
-            v.as_ref()
-        } else {
-            var_decls
-        };
-
-        for node in all_children {
-            self.validate_subtree(node, var_decls)?;
-        }
         Ok(())
     }
 
@@ -577,6 +527,59 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             to_offset,
         }
         .into())
+    }
+
+    fn validate_subtree(&self, node: Node, var_decls: &[TypeParam]) -> Result<(), ValidationError> {
+        let op_type = self.hugr.get_optype(node);
+        // TODO consider turning this match into a trait method?
+        match op_type {
+            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
+                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
+                for arg in b.args() {
+                    arg.validate(self.extension_registry, var_decls)
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                }
+                // Try to resolve serialized names to actual OpDefs in Extensions.
+                let e: Option<ExtensionOp>;
+                let ext_op = match &**b {
+                    ExternalOp::Opaque(op) => {
+                        // If resolve_extension_ops has been called first, this would always return Ok(None)
+                        e = resolve_opaque_op(node, op, self.extension_registry)?;
+                        e.as_ref()
+                    }
+                    ExternalOp::Extension(ext) => Some(ext),
+                };
+                // If successful, check TypeArgs are valid for the declared TypeParams
+                if let Some(ext_op) = ext_op {
+                    ext_op
+                        .def()
+                        .check_args(ext_op.args())
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                }
+            }
+            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
+                ta.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+            _ => (),
+        }
+
+        let mut v: Vec<TypeParam>;
+        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. })
+        | OpType::FuncDecl(FuncDecl { signature, .. }) = op_type
+        {
+            v = signature.params().to_owned();
+            v.extend(var_decls.iter().cloned());
+            v.as_ref()
+        } else {
+            var_decls
+        };
+
+        for child in self.hugr.children(node) {
+            self.validate_subtree(child, var_decls)?;
+        }
+
+        Ok(())
     }
 }
 
