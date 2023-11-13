@@ -16,6 +16,7 @@ env:
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "--cfg=ci_run"
   MIRIFLAGS: '-Zmiri-permissive-provenance' # Required due to warnings in bitvec 1.0.1
+  CI: true # insta snapshots behave differently on ci
 
 jobs:
   check:
