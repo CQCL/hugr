@@ -131,10 +131,21 @@ mod test {
             let mut fbuild = module_builder.define_function(
                 "main",
                 FunctionType::new(type_row![BIT], type_row![NAT])
-                    .with_input_extensions(ExtensionSet::singleton(&PRELUDE_ID)),
+                    // ALAN note these were the input-extensions before
+                    .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID))
+                    .into(),
             )?;
             let _fdef = {
-                let [b1] = fbuild.input_wires_arr();
+                // ALAN added a lift here
+                let [b1] = fbuild
+                    .add_dataflow_op(
+                        ops::LeafOp::Lift {
+                            type_row: type_row![BIT],
+                            new_extension: PRELUDE_ID,
+                        },
+                        fbuild.input_wires(),
+                    )?
+                    .outputs_arr();
                 let loop_id = {
                     let mut loop_b =
                         fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;

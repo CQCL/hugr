@@ -443,7 +443,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
     let mut module_builder = ModuleBuilder::new();
     let mut main = module_builder.define_function(
         "main",
-        FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+        FunctionType::new(type_row![NAT], type_row![NAT]).into(),
     )?;
     let [main_input] = main.input_wires_arr();
 
@@ -479,7 +479,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
 fn too_many_extension() -> Result<(), BuildError> {
     let mut module_builder = ModuleBuilder::new();
 
-    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).pure();
+    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
 
     let mut main = module_builder.define_function("main", main_sig)?;
     let [main_input] = main.input_wires_arr();
@@ -519,7 +519,7 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let main_sig = FunctionType::new(type_row![], type_row![NAT])
         .with_extension_delta(&all_rs)
-        .with_input_extensions(ExtensionSet::new());
+        .into();
 
     let mut main = module_builder.define_function("main", main_sig)?;
 

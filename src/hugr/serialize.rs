@@ -364,7 +364,7 @@ pub mod test {
 
             let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
                 .unwrap();
 
             let outputs = f_build
@@ -399,7 +399,7 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             let t_row = vec![Type::new_sum(vec![NAT, QB])];
             let mut f_build = module_builder
-                .define_function("main", FunctionType::new(t_row.clone(), t_row).pure())
+                .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
                 .unwrap();
 
             let outputs = f_build

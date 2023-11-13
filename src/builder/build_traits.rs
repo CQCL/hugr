@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, Signature, Type, TypeRow};
+use crate::types::{FunctionType, PolyFuncType, Type, TypeRow};
 
 use itertools::Itertools;
 
@@ -90,22 +90,19 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: Signature,
+        signature: PolyFuncType,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let body = signature.body.clone();
         let f_node = self.add_child_node(NodeType::new(
             ops::FuncDefn {
                 name: name.into(),
-                signature: signature.signature.clone().into(),
+                signature: signature,
             },
-            signature.input_extensions.clone(),
+            ExtensionSet::new(),
         ))?;
 
-        let db = DFGBuilder::create_with_io(
-            self.hugr_mut(),
-            f_node,
-            signature.signature,
-            Some(signature.input_extensions),
-        )?;
+        let db =
+            DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, Some(ExtensionSet::new()))?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 

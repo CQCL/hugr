@@ -239,7 +239,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
             let tru_const = fbuild.add_constant(Const::true_val(), ExtensionSet::new())?;
             let _fdef = {

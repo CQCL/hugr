@@ -240,7 +240,7 @@ pub(crate) mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).pure(),
+                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
@@ -274,7 +274,7 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).pure(),
+                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
             )?;
 
             f(f_build)?;
@@ -324,7 +324,7 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![QB], type_row![QB, QB]).pure(),
+                FunctionType::new(type_row![QB], type_row![QB, QB]).into(),
             )?;
 
             let [q1] = f_build.input_wires_arr();
@@ -409,7 +409,7 @@ pub(crate) mod test {
         let (dfg_node, f_node) = {
             let mut f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BIT], type_row![BIT]).pure(),
+                FunctionType::new(type_row![BIT], type_row![BIT]).into(),
             )?;
 
             let [i1] = f_build.input_wires_arr();
