@@ -78,25 +78,23 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
+        let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
             self.hugr().get_optype(f_node)
-        {
-            (signature.clone(), name.clone())
-        } else {
+        else {
             return Err(BuildError::UnexpectedType {
                 node: f_node,
                 op_desc: "OpType::FuncDecl",
             });
         };
+        let signature = signature.clone();
+        let name = name.clone();
+        let body = signature.body.clone();
         self.hugr_mut().replace_op(
             f_node,
-            NodeType::new_pure(ops::FuncDefn {
-                name,
-                signature: signature.clone(),
-            }),
+            NodeType::new_pure(ops::FuncDefn { name, signature }),
         )?;
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature.body, None)?; // ALAN
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
