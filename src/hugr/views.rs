@@ -25,6 +25,8 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
+#[rustversion::since(1.75)] // uses impl in return position
+use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
@@ -354,6 +356,37 @@ pub trait HugrView: sealed::HugrInternals {
         self.linked_outputs(node, self.get_optype(node).static_input_port()?)
             .next()
             .map(|(n, _)| n)
+    }
+
+    /// Get the "signature" (incoming and outgoing types) of a node, non-Value
+    /// kind edges will be missing.
+    fn signature(&self, node: Node) -> FunctionType {
+        self.get_optype(node).signature()
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all ports in a given direction that have Value type, along
+    /// with corresponding types.
+    fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
+        let sig = self.signature(node);
+        self.node_ports(node, dir)
+            .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all incoming ports that have Value type, along
+    /// with corresponding types.
+    fn in_value_types(&self, node: Node) -> impl Iterator<Item = (IncomingPort, Type)> {
+        self.value_types(node, Direction::Incoming)
+            .map(|(p, t)| (p.as_incoming().unwrap(), t))
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all incoming ports that have Value type, along
+    /// with corresponding types.
+    fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
+        self.value_types(node, Direction::Outgoing)
+            .map(|(p, t)| (p.as_outgoing().unwrap(), t))
     }
 }
 

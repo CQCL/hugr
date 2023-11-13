@@ -117,3 +117,34 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
         ]
     );
 }
+
+#[rustversion::since(1.75)] // uses impl in return position
+#[test]
+fn value_types() {
+    use crate::builder::Container;
+    use crate::extension::prelude::BOOL_T;
+    use crate::std_extensions::logic::test::not_op;
+    use crate::utils::test_quantum_extension::h_gate;
+    use itertools::Itertools;
+    let mut dfg = DFGBuilder::new(FunctionType::new(
+        type_row![QB_T, BOOL_T],
+        type_row![BOOL_T, QB_T],
+    ))
+    .unwrap();
+
+    let [q, b] = dfg.input_wires_arr();
+    let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
+    let n2 = dfg.add_dataflow_op(not_op(), [b]).unwrap();
+    dfg.add_other_wire(n1.node(), n2.node()).unwrap();
+    let h = dfg
+        .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
+        .unwrap();
+
+    let [_, o] = h.get_io(h.root()).unwrap();
+    let n1_out_types = h.out_value_types(n1.node()).collect_vec();
+
+    assert_eq!(&n1_out_types[..], &[(0.into(), QB_T)]);
+    let out_types = h.in_value_types(o).collect_vec();
+
+    assert_eq!(&out_types[..], &[(0.into(), BOOL_T), (1.into(), QB_T)]);
+}
