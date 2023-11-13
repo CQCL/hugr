@@ -169,7 +169,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
-        extension::EMPTY_REG,
+        extension::{EMPTY_REG, PRELUDE_REGISTRY},
         type_row,
         types::FunctionType,
     };
@@ -186,7 +186,7 @@ mod test {
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
-            let call = f_build.call(&f_id, f_build.input_wires())?;
+            let call = f_build.call(&f_id, &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
 
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()
@@ -234,7 +234,8 @@ mod test {
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire])?;
 
-            let call = f_build.call(f_id.handle(), f_build.input_wires())?;
+            let call =
+                f_build.call(f_id.handle(), &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
 
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()

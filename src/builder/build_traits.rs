@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeRow};
+use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -595,7 +595,9 @@ pub trait Dataflow: Container {
     fn call<const DEFINED: bool>(
         &mut self,
         function: &FuncID<DEFINED>,
+        type_args: &[TypeArg],
         input_wires: impl IntoIterator<Item = Wire>,
+        exts: &ExtensionRegistry, // TODO remove?
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
@@ -609,9 +611,16 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let signature = type_scheme.body;
+        // TODO either some way of returning a SignatureError without a node (as its not
+        // constructed yet) - or, preferably, a way to "instantiate" the PolyFuncType without
+        // validating against an ExtensionRegistry.
+        let signature = type_scheme.instantiate(type_args, exts).map_err(|e| {
+            BuildError::InvalidHUGR(ValidationError::SignatureError {
+                node: function.node(),
+                cause: e,
+            })
+        })?;
         let const_in_port = signature.output.len();
-        // TODO ALAN this is totally broken for polymorphic functions. Need to TypeApply here.
         let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
