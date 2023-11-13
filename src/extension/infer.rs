@@ -702,8 +702,6 @@ impl UnificationContext {
                 solutions.insert(m, solution);
             }
         }
-        println!("{:?}", relations.node_map);
-        println!("{:?}", relations.graph);
 
         // Process the strongly-connected components. petgraph/sccs() returns these
         // depended-upon before dependant, as we need.
