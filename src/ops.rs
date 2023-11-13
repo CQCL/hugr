@@ -10,7 +10,7 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::types::{EdgeKind, FunctionType, Type};
-use crate::{Direction, Port};
+use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 
 use portgraph::NodeIndex;
@@ -140,6 +140,13 @@ impl OpType {
             }
             _ => None,
         }
+    }
+
+    /// If the op has a static output (Const, FuncDefn, FuncDecl), the port of that output.
+    pub fn static_output_port(&self) -> Option<OutgoingPort> {
+        OpTag::StaticOutput
+            .is_superset(self.tag())
+            .then_some(0.into())
     }
 
     /// Returns the number of ports for the given direction.

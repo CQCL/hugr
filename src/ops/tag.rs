@@ -48,6 +48,8 @@ pub enum OpTag {
     Output,
     /// Dataflow node that has a static input
     StaticInput,
+    /// Node that has a static output
+    StaticOutput,
     /// A function call.
     FnCall,
     /// A constant load operation.
@@ -106,14 +108,14 @@ impl OpTag {
             OpTag::DataflowChild => &[OpTag::Any],
             OpTag::Input => &[OpTag::DataflowChild],
             OpTag::Output => &[OpTag::DataflowChild],
-            OpTag::Function => &[OpTag::ModuleOp],
+            OpTag::Function => &[OpTag::ModuleOp, OpTag::StaticOutput],
             OpTag::Alias => &[OpTag::ScopedDefn],
             OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
             OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
-            OpTag::Const => &[OpTag::ScopedDefn],
+            OpTag::Const => &[OpTag::ScopedDefn, OpTag::StaticOutput],
             OpTag::Dfg => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Cfg => &[OpTag::DataflowChild],
             OpTag::ScopedDefn => &[
@@ -124,6 +126,7 @@ impl OpTag {
             OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
             OpTag::StaticInput => &[OpTag::DataflowChild],
+            OpTag::StaticOutput => &[OpTag::ModuleOp],
             OpTag::FnCall => &[OpTag::StaticInput],
             OpTag::LoadConst => &[OpTag::StaticInput],
             OpTag::Leaf => &[OpTag::DataflowChild],
@@ -154,6 +157,7 @@ impl OpTag {
             OpTag::TailLoop => "Tail-recursive loop",
             OpTag::Conditional => "Conditional operation",
             OpTag::StaticInput => "Dataflow child with static input (LoadConst or FnCall)",
+            OpTag::StaticOutput => "Node with static input (FuncDefn, FuncDecl, Const)",
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",

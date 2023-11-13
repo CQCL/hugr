@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
@@ -147,4 +148,26 @@ fn value_types() {
     let out_types = h.in_value_types(o).collect_vec();
 
     assert_eq!(&out_types[..], &[(0.into(), BOOL_T), (1.into(), QB_T)]);
+}
+
+#[rustversion::since(1.75)] // uses impl in return position
+#[test]
+fn static_targets() {
+    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![], type_row![USIZE_T])).unwrap();
+
+    let c = dfg.add_constant(ConstUsize::new(1).into(), None).unwrap();
+
+    let load = dfg.load_const(&c).unwrap();
+
+    let h = dfg
+        .finish_hugr_with_outputs([load], &crate::extension::PRELUDE_REGISTRY)
+        .unwrap();
+
+    assert_eq!(h.static_source(load.node()), Some(c.node()));
+
+    assert_eq!(
+        &h.static_targets(c.node()).unwrap().collect_vec()[..],
+        &[(load.node(), 0.into())]
+    )
 }

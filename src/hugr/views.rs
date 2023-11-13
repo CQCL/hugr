@@ -383,6 +383,12 @@ pub trait HugrView: sealed::HugrInternals {
             .map(|(n, _)| n)
     }
 
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// If a node has a static output, return the targets.
+    fn static_targets(&self, node: Node) -> Option<impl Iterator<Item = (Node, IncomingPort)>> {
+        Some(self.linked_inputs(node, self.get_optype(node).static_output_port()?))
+    }
+
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind edges will be missing.
     fn signature(&self, node: Node) -> FunctionType {
