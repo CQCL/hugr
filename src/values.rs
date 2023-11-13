@@ -9,7 +9,8 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
-use crate::{Hugr, HugrView};
+use crate::ops::OpType;
+use crate::{Hugr, HugrView, IncomingPort, OutgoingPort};
 
 use crate::types::{CustomCheckFailure, CustomType};
 
@@ -142,6 +143,16 @@ pub trait CustomConst:
     fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
         // false unless overloaded
         false
+    }
+
+    /// Attempt to evaluate an operation given some constant inputs - typically
+    /// involving instances of Self
+    fn fold(
+        &self,
+        _op: &OpType,
+        _consts: &[(IncomingPort, crate::ops::Const)],
+    ) -> Option<Vec<(OutgoingPort, crate::ops::Const)>> {
+        None
     }
 }
 
