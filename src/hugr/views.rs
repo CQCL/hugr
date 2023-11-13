@@ -590,6 +590,19 @@ impl<T: AsRef<Hugr>> HugrView for T {
     }
 }
 
+/// Filter an iterator of node-ports to only dataflow dependency specifying
+/// ports (Value and StateOrder)
+pub fn dataflow_ports_only<'i, 'a: 'i, P: Into<Port> + Copy>(
+    hugr: &'a impl HugrView,
+    it: impl Iterator<Item = (Node, P)> + 'i,
+) -> impl Iterator<Item = (Node, P)> + 'i {
+    it.filter(move |(n, p)| {
+        matches!(
+            hugr.get_optype(*n).port_kind(*p),
+            Some(EdgeKind::Value(_) | EdgeKind::StateOrder)
+        )
+    })
+}
 pub(crate) mod sealed {
     use super::*;
 
