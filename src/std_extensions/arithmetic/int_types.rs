@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 
 /// Identifier for the integer type.
-const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
+pub const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
 fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
@@ -198,6 +198,21 @@ pub fn extension() -> Extension {
     extension
 }
 
+lazy_static! {
+    /// Lazy reference to int types extension.
+    pub static ref EXTENSION: Extension = extension();
+}
+
+/// get an integer type variable, given the integer type definition
+pub(super) fn int_type_var(var_id: usize) -> Type {
+    Type::new_extension(
+        EXTENSION
+            .get_type(&INT_TYPE_ID)
+            .unwrap()
+            .instantiate(vec![TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM)])
+            .unwrap(),
+    )
+}
 #[cfg(test)]
 mod test {
     use cool_asserts::assert_matches;
@@ -232,6 +247,7 @@ mod test {
         assert_ne!(const_u32_7, const_u64_7);
         assert_ne!(const_u32_7, const_u32_8);
         assert_eq!(const_u32_7, ConstIntU::new(5, 7));
+
         assert_matches!(
             ConstIntU::new(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
@@ -244,6 +260,40 @@ mod test {
             ConstIntS::new(3, 128),
             Err(ConstTypeError::CustomCheckFail(_))
         );
-        assert_matches!(ConstIntS::new(3, -128), Ok(_));
+        assert!(ConstIntS::new(3, -128).is_ok());
+
+        let const_u32_7 = const_u32_7.unwrap();
+        assert!(const_u32_7.equal_consts(&ConstIntU::new(5, 7).unwrap()));
+        assert_eq!(const_u32_7.log_width(), 5);
+        assert_eq!(const_u32_7.value(), 7);
+        assert!(const_u32_7
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 5 }))
+            .is_ok());
+        assert!(const_u32_7
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 6 }))
+            .is_err());
+
+        assert_eq!(const_u32_7.name(), "u5(7)");
+        assert!(const_u32_7
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 19 }))
+            .is_err());
+
+        let const_i32_2 = ConstIntS::new(5, -2).unwrap();
+        assert!(const_i32_2.equal_consts(&ConstIntS::new(5, -2).unwrap()));
+        assert_eq!(const_i32_2.log_width(), 5);
+        assert_eq!(const_i32_2.value(), -2);
+        assert!(const_i32_2
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 5 }))
+            .is_ok());
+        assert!(const_i32_2
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 6 }))
+            .is_err());
+        assert!(const_i32_2
+            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 19 }))
+            .is_err());
+        assert_eq!(const_i32_2.name(), "i5(-2)");
+
+        ConstIntS::new(50, -2).unwrap_err();
+        ConstIntU::new(50, 2).unwrap_err();
     }
 }

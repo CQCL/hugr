@@ -13,7 +13,7 @@ use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, LeafOp, OpType};
 use crate::std_extensions::logic;
-use crate::std_extensions::logic::test::{and_op, not_op};
+use crate::std_extensions::logic::test::{and_op, not_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
 use crate::{type_row, Direction, IncomingPort, Node};
@@ -612,12 +612,12 @@ fn dfg_with_cycles() -> Result<(), HugrError> {
         type_row![BOOL_T],
     ));
     let [input, output] = h.get_io(h.root()).unwrap();
-    let and = h.add_node_with_parent(h.root(), and_op())?;
+    let or = h.add_node_with_parent(h.root(), or_op())?;
     let not1 = h.add_node_with_parent(h.root(), not_op())?;
     let not2 = h.add_node_with_parent(h.root(), not_op())?;
-    h.connect(input, 0, and, 0)?;
-    h.connect(and, 0, not1, 0)?;
-    h.connect(not1, 0, and, 1)?;
+    h.connect(input, 0, or, 0)?;
+    h.connect(or, 0, not1, 0)?;
+    h.connect(not1, 0, or, 1)?;
     h.connect(input, 1, not2, 0)?;
     h.connect(not2, 0, output, 0)?;
     // The graph contains a cycle:

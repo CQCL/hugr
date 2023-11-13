@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError, TypeDef, TypeDefBound},
+    extension::{ExtensionId, ExtensionRegistry, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow,
+        CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
     values::{CustomConst, Value},
     Extension,
@@ -59,6 +59,7 @@ impl CustomConst for ListValue {
         crate::values::downcast_equal_consts(self, other)
     }
 }
+const TP: TypeParam = TypeParam::Type(TypeBound::Any);
 
 fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_NAME);
@@ -66,43 +67,42 @@ fn extension() -> Extension {
     extension
         .add_type(
             LIST_TYPENAME,
-            vec![TypeParam::Type(TypeBound::Any)],
+            vec![TP],
             "Generic dynamically sized list of type T.".into(),
             TypeDefBound::FromParams(vec![0]),
         )
         .unwrap();
+    let temp_reg: ExtensionRegistry = [extension.clone()].into();
+    let list_type_def = extension.get_type(&LIST_TYPENAME).unwrap();
+
+    let (l, e) = list_and_elem_type(list_type_def);
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             POP_NAME,
             "Pop from back of list".into(),
-            vec![TypeParam::Type(TypeBound::Any)],
-            move |args: &[TypeArg]| {
-                let (list_type, element_type) = list_types(args)?;
-                Ok(FunctionType {
-                    input: TypeRow::from(vec![list_type.clone()]),
-                    output: TypeRow::from(vec![list_type, element_type]),
-                    extension_reqs: ExtensionSet::singleton(&EXTENSION_NAME),
-                })
-            },
+            PolyFuncType::new_validated(
+                vec![TP],
+                FunctionType::new(vec![l.clone()], vec![l.clone(), e.clone()]),
+                &temp_reg,
+            )
+            .unwrap(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             PUSH_NAME,
             "Push to back of list".into(),
-            vec![TypeParam::Type(TypeBound::Any)],
-            move |args: &[TypeArg]| {
-                let (list_type, element_type) = list_types(args)?;
-                Ok(FunctionType {
-                    output: TypeRow::from(vec![list_type.clone()]),
-                    input: TypeRow::from(vec![list_type, element_type]),
-                    extension_reqs: ExtensionSet::singleton(&EXTENSION_NAME),
-                })
-            },
+            PolyFuncType::new_validated(
+                vec![TP],
+                FunctionType::new(vec![l.clone(), e], vec![l]),
+                &temp_reg,
+            )
+            .unwrap(),
         )
         .unwrap();
     extension
 }
+
 lazy_static! {
     /// Collections extension definition.
     pub static ref EXTENSION: Extension = extension();
@@ -112,16 +112,15 @@ fn get_type(name: &str) -> &TypeDef {
     EXTENSION.get_type(name).unwrap()
 }
 
-fn list_types(args: &[TypeArg]) -> Result<(Type, Type), SignatureError> {
-    let list_custom_type = get_type(&LIST_TYPENAME).instantiate(args)?;
-    let [TypeArg::Type { ty: element_type }] = args else {
-        panic!("should be checked by def.")
-    };
-
-    let list_type: Type = Type::new_extension(list_custom_type);
-    Ok((list_type, element_type.clone()))
+fn list_and_elem_type(list_type_def: &TypeDef) -> (Type, Type) {
+    let elem_type = Type::new_var_use(0, TypeBound::Any);
+    let list_type = Type::new_extension(
+        list_type_def
+            .instantiate(vec![TypeArg::new_var_use(0, TP)])
+            .unwrap(),
+    );
+    (list_type, elem_type)
 }
-
 #[cfg(test)]
 mod test {
     use crate::{
@@ -130,7 +129,7 @@ mod test {
             OpDef, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
-        types::{type_param::TypeArg, Type},
+        types::{type_param::TypeArg, Type, TypeRow},
         Extension,
     };
 

@@ -7,7 +7,7 @@ use crate::{
     extension::{prelude::BOOL_T, ExtensionId},
     ops, type_row,
     types::{
-        type_param::{TypeArg, TypeArgError, TypeParam},
+        type_param::{TypeArg, TypeParam},
         FunctionType,
     },
     Extension,
@@ -34,11 +34,10 @@ fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
-            vec![],
-            |_arg_values: &[TypeArg]| Ok(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
         )
         .unwrap();
 
@@ -48,19 +47,12 @@ fn extension() -> Extension {
             "logical 'and'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
-                let a = arg_values.iter().exactly_one().unwrap();
-                let n: u64 = match a {
-                    TypeArg::BoundedNat { n } => *n,
-                    _ => {
-                        return Err(TypeArgError::TypeMismatch {
-                            arg: a.clone(),
-                            param: H_INT,
-                        }
-                        .into());
-                    }
+                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
+                    panic!("should be covered by validation.")
                 };
+
                 Ok(FunctionType::new(
-                    vec![BOOL_T; n as usize],
+                    vec![BOOL_T; *n as usize],
                     type_row![BOOL_T],
                 ))
             },
@@ -73,19 +65,12 @@ fn extension() -> Extension {
             "logical 'or'".into(),
             vec![H_INT],
             |arg_values: &[TypeArg]| {
-                let a = arg_values.iter().exactly_one().unwrap();
-                let n: u64 = match a {
-                    TypeArg::BoundedNat { n } => *n,
-                    _ => {
-                        return Err(TypeArgError::TypeMismatch {
-                            arg: a.clone(),
-                            param: H_INT,
-                        }
-                        .into());
-                    }
+                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
+                    panic!("should be covered by validation.")
                 };
+
                 Ok(FunctionType::new(
-                    vec![BOOL_T; n as usize],
+                    vec![BOOL_T; *n as usize],
                     type_row![BOOL_T],
                 ))
             },
@@ -115,7 +100,7 @@ pub(crate) mod test {
         Extension,
     };
 
-    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, NOT_NAME, TRUE_NAME};
+    use super::{extension, AND_NAME, EXTENSION, FALSE_NAME, NOT_NAME, OR_NAME, TRUE_NAME};
 
     #[test]
     fn test_logic_extension() {
@@ -140,6 +125,14 @@ pub(crate) mod test {
     pub(crate) fn and_op() -> LeafOp {
         EXTENSION
             .instantiate_extension_op(AND_NAME, [TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
+            .unwrap()
+            .into()
+    }
+
+    /// Generate a logic extension and "or" operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn or_op() -> LeafOp {
+        EXTENSION
+            .instantiate_extension_op(OR_NAME, [TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
             .unwrap()
             .into()
     }

@@ -1,9 +1,9 @@
 //! Basic floating-point operations.
 
 use crate::{
-    extension::{ExtensionId, ExtensionSet, SignatureError},
+    extension::{ExtensionId, ExtensionSet},
     type_row,
-    types::{type_param::TypeArg, FunctionType},
+    types::{FunctionType, PolyFuncType},
     Extension,
 };
 
@@ -12,27 +12,6 @@ use super::float_types::FLOAT64_TYPE;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 
-fn fcmp_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType::new(
-        type_row![FLOAT64_TYPE; 2],
-        type_row![crate::extension::prelude::BOOL_T],
-    ))
-}
-
-fn fbinop_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType::new(
-        type_row![FLOAT64_TYPE; 2],
-        type_row![FLOAT64_TYPE],
-    ))
-}
-
-fn funop_sig(_arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
-    Ok(FunctionType::new(
-        type_row![FLOAT64_TYPE],
-        type_row![FLOAT64_TYPE],
-    ))
-}
-
 /// Extension for basic arithmetic operations.
 pub fn extension() -> Extension {
     let mut extension = Extension::new_with_reqs(
@@ -40,78 +19,82 @@ pub fn extension() -> Extension {
         ExtensionSet::singleton(&super::float_types::EXTENSION_ID),
     );
 
+    let fcmp_sig: PolyFuncType = FunctionType::new(
+        type_row![FLOAT64_TYPE; 2],
+        type_row![crate::extension::prelude::BOOL_T],
+    )
+    .into();
+    let fbinop_sig: PolyFuncType =
+        FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE]).into();
+    let funop_sig: PolyFuncType =
+        FunctionType::new(type_row![FLOAT64_TYPE], type_row![FLOAT64_TYPE]).into();
     extension
-        .add_op_custom_sig_simple("feq".into(), "equality test".to_owned(), vec![], fcmp_sig)
+        .add_op_type_scheme_simple("feq".into(), "equality test".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fne".into(), "inequality test".to_owned(), vec![], fcmp_sig)
+        .add_op_type_scheme_simple("fne".into(), "inequality test".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("flt".into(), "\"less than\"".to_owned(), vec![], fcmp_sig)
+        .add_op_type_scheme_simple("flt".into(), "\"less than\"".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "fgt".into(),
             "\"greater than\"".to_owned(),
-            vec![],
-            fcmp_sig,
+            fcmp_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "fle".into(),
             "\"less than or equal\"".to_owned(),
-            vec![],
-            fcmp_sig,
+            fcmp_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "fge".into(),
             "\"greater than or equal\"".to_owned(),
-            vec![],
             fcmp_sig,
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fmax".into(), "maximum".to_owned(), vec![], fbinop_sig)
+        .add_op_type_scheme_simple("fmax".into(), "maximum".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fmin".into(), "minimum".to_owned(), vec![], fbinop_sig)
+        .add_op_type_scheme_simple("fmin".into(), "minimum".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fadd".into(), "addition".to_owned(), vec![], fbinop_sig)
+        .add_op_type_scheme_simple("fadd".into(), "addition".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fsub".into(), "subtraction".to_owned(), vec![], fbinop_sig)
+        .add_op_type_scheme_simple("fsub".into(), "subtraction".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fneg".into(), "negation".to_owned(), vec![], funop_sig)
+        .add_op_type_scheme_simple("fneg".into(), "negation".to_owned(), funop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "fabs".into(),
             "absolute value".to_owned(),
-            vec![],
-            funop_sig,
+            funop_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple(
+        .add_op_type_scheme_simple(
             "fmul".into(),
             "multiplication".to_owned(),
-            vec![],
-            fbinop_sig,
+            fbinop_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fdiv".into(), "division".to_owned(), vec![], fbinop_sig)
+        .add_op_type_scheme_simple("fdiv".into(), "division".to_owned(), fbinop_sig)
         .unwrap();
     extension
-        .add_op_custom_sig_simple("ffloor".into(), "floor".to_owned(), vec![], funop_sig)
+        .add_op_type_scheme_simple("ffloor".into(), "floor".to_owned(), funop_sig.clone())
         .unwrap();
     extension
-        .add_op_custom_sig_simple("fceil".into(), "ceiling".to_owned(), vec![], funop_sig)
+        .add_op_type_scheme_simple("fceil".into(), "ceiling".to_owned(), funop_sig)
         .unwrap();
 
     extension
