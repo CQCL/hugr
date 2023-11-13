@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::iter;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use petgraph::algo::dominators::{self, Dominators};
 use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
@@ -530,27 +530,30 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // TODO consider turning this match into a trait method?
         match op_type {
             OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
-                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
-                for arg in b.args() {
-                    arg.validate(self.extension_registry, var_decls)
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                }
                 // Try to resolve serialized names to actual OpDefs in Extensions.
                 let e: Option<ExtensionOp>;
-                let ext_op = match &**b {
+                let ext_or_opaq = match &**b {
                     ExternalOp::Opaque(op) => {
                         // If resolve_extension_ops has been called first, this would always return Ok(None)
                         e = resolve_opaque_op(node, op, self.extension_registry)?;
-                        e.as_ref()
+                        e.as_ref().map(Either::Left).unwrap_or(Either::Right(op))
                     }
-                    ExternalOp::Extension(ext) => Some(ext),
+                    ExternalOp::Extension(ext) => Either::Left(ext),
                 };
                 // If successful, check TypeArgs are valid for the declared TypeParams
-                if let Some(ext_op) = ext_op {
-                    ext_op
+                match ext_or_opaq {
+                    Either::Left(exten) => exten
                         .def()
-                        .check_args(ext_op.args())
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                        .validate_args(exten.args(), self.extension_registry, var_decls)
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+                    Either::Right(opaq) => {
+                        // Best effort. Just check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
+                        // and assuming none are binary params (all may contain type vars)
+                        for arg in opaq.args() {
+                            arg.validate(self.extension_registry, var_decls)
+                                .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                        }
+                    }
                 }
             }
             OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {

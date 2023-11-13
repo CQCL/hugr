@@ -160,9 +160,35 @@ impl TypeParametrised for OpDef {
 }
 
 impl OpDef {
-    /// Check provided type arguments are valid against parameters.
-    pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        self.check_args_impl(args)
+    /// Check provided type arguments are valid against [ExtensionRegistry],
+    /// against parameters, and that no type variables are used as static arguments
+    /// (to [compute_signature][CustomSignatureFunc::compute_signature])
+    pub fn validate_args(
+        &self,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        let temp: PolyFuncType; // to keep alive
+        let (pf, args) = match &self.signature_func {
+            SignatureFunc::TypeScheme(ts) => (ts, args),
+            SignatureFunc::CustomFunc {
+                static_params,
+                func,
+            } => {
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+                static_args
+                    .iter()
+                    .try_for_each(|ta| ta.validate(exts, &[]))?;
+                check_type_args(static_args, static_params)?;
+                temp = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
+                (&temp, other_args)
+            }
+        };
+        args.iter()
+            .try_for_each(|ta| ta.validate(exts, var_decls))?;
+        check_type_args(args, pf.params())?;
+        Ok(())
     }
 
     /// Computes the signature of a node, i.e. an instantiation of this
