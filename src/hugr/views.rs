@@ -195,6 +195,31 @@ pub trait HugrView: sealed::HugrInternals {
             .flat_map(move |port| self.linked_inputs(node, port))
     }
 
+    /// If there is exactly one OutgoingPort connected to this IncomingPort, return
+    /// it and its node.
+    fn single_source(
+        &self,
+        node: Node,
+        port: impl Into<IncomingPort>,
+    ) -> Option<(Node, OutgoingPort)> {
+        self.linked_ports(node, port.into())
+            .exactly_one()
+            .ok()
+            .map(|(n, p)| (n, p.as_outgoing().unwrap()))
+    }
+
+    /// If there is exactly one IncomingPort connected to this OutgoingPort, return
+    /// it and its node.
+    fn single_target(
+        &self,
+        node: Node,
+        port: impl Into<OutgoingPort>,
+    ) -> Option<(Node, IncomingPort)> {
+        self.linked_ports(node, port.into())
+            .exactly_one()
+            .ok()
+            .map(|(n, p)| (n, p.as_incoming().unwrap()))
+    }
     /// Iterator over the nodes and output ports connected to a given *input* port.
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
     /// that the linked ports are [OutgoingPort]s.

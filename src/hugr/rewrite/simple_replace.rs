@@ -4,8 +4,6 @@ use std::collections::{hash_map, HashMap};
 use std::iter::{self, Copied};
 use std::slice;
 
-use itertools::Itertools;
-
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
@@ -129,11 +127,8 @@ impl Rewrite for SimpleReplacement {
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
             if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
-                let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_outputs(*rem_inp_node, *rem_inp_port)
-                    .exactly_one()
-                    .ok() // PortLinks does not implement Debug
-                    .unwrap();
+                let (rem_inp_pred_node, rem_inp_pred_port) =
+                    h.single_source(*rem_inp_node, *rem_inp_port).unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
@@ -150,8 +145,7 @@ impl Rewrite for SimpleReplacement {
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
             let (rep_out_pred_node, rep_out_pred_port) = self
                 .replacement
-                .linked_outputs(replacement_output_node, *rep_out_port)
-                .exactly_one()
+                .single_source(replacement_output_node, *rep_out_port)
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
                 let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
@@ -171,11 +165,8 @@ impl Rewrite for SimpleReplacement {
             let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
                 // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
-                let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_outputs(*rem_inp_node, *rem_inp_port)
-                    .exactly_one()
-                    .ok() // PortLinks does not implement Debug
-                    .unwrap();
+                let (rem_inp_pred_node, rem_inp_pred_port) =
+                    h.single_source(*rem_inp_node, *rem_inp_port).unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
                 h.connect(
@@ -603,7 +594,7 @@ pub(in crate::hugr::rewrite) mod test {
                 if *tgt == out {
                     unimplemented!()
                 };
-                let (src, src_port) = h.linked_outputs(*r_n, *r_p).exactly_one().ok().unwrap();
+                let (src, src_port) = h.single_source(*r_n, *r_p).unwrap();
                 NewEdgeSpec {
                     src,
                     tgt: *tgt,
@@ -618,11 +609,7 @@ pub(in crate::hugr::rewrite) mod test {
             .nu_out
             .iter()
             .map(|((tgt, tgt_port), out_port)| {
-                let (src, src_port) = replacement
-                    .linked_outputs(out, *out_port)
-                    .exactly_one()
-                    .ok()
-                    .unwrap();
+                let (src, src_port) = replacement.single_source(out, *out_port).unwrap();
                 if src == in_ {
                     unimplemented!()
                 };

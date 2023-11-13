@@ -9,7 +9,6 @@ use crate::{HugrView, IncomingPort};
 
 use super::Rewrite;
 
-use itertools::Itertools;
 use thiserror::Error;
 
 /// Specification of a identity-insertion operation.
@@ -73,9 +72,7 @@ impl Rewrite for IdentityInsertion {
         };
 
         let (pre_node, pre_port) = h
-            .linked_outputs(self.post_node, self.post_port)
-            .exactly_one()
-            .ok()
+            .single_source(self.post_node, self.post_port)
             .expect("Value kind input can only have one connection.");
 
         h.disconnect(self.post_node, self.post_port).unwrap();

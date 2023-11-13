@@ -177,7 +177,7 @@ impl Rewrite for OutlineCfg {
         let exit_port = h
             .node_outputs(exit)
             .filter(|p| {
-                let (t, p2) = h.linked_ports(exit, *p).exactly_one().ok().unwrap();
+                let (t, p2) = h.single_target(exit, *p).unwrap();
                 assert!(p2.index() == 0);
                 t == outside
             })
