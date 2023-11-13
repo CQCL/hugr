@@ -505,7 +505,7 @@ pub(in crate::hugr::rewrite) mod test {
             .collect_vec();
         let inputs = h
             .node_outputs(input)
-            .filter(|&p| h.get_optype(input).signature().get(p).is_some())
+            .filter(|&p| h.get_optype(input).signature().port_type(p).is_some())
             .map(|p| {
                 let link = h.linked_inputs(input, p).next().unwrap();
                 (link, link)
@@ -513,7 +513,7 @@ pub(in crate::hugr::rewrite) mod test {
             .collect();
         let outputs = h
             .node_inputs(output)
-            .filter(|&p| h.get_optype(output).signature().get(p).is_some())
+            .filter(|&p| h.get_optype(output).signature().port_type(p).is_some())
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
@@ -565,7 +565,12 @@ pub(in crate::hugr::rewrite) mod test {
 
         let outputs = repl
             .node_inputs(repl_output)
-            .filter(|&p| repl.get_optype(repl_output).signature().get(p).is_some())
+            .filter(|&p| {
+                repl.get_optype(repl_output)
+                    .signature()
+                    .port_type(p)
+                    .is_some()
+            })
             .map(|p| ((repl_output, p), p))
             .collect();
 

@@ -299,7 +299,7 @@ impl SiblingSubgraph {
             .map(|part| {
                 let &(n, p) = part.iter().next().expect("is non-empty");
                 let sig = hugr.get_optype(n).signature();
-                sig.get(p).cloned().expect("must be dataflow edge")
+                sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
         let output = self
@@ -307,7 +307,7 @@ impl SiblingSubgraph {
             .iter()
             .map(|&(n, p)| {
                 let sig = hugr.get_optype(n).signature();
-                sig.get(p).cloned().expect("must be dataflow edge")
+                sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
         FunctionType::new(input, output)
@@ -356,10 +356,10 @@ impl SiblingSubgraph {
         // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) =
-            rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
-            rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
+        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) = rep_inputs
+            .partition(|&(n, p)| replacement.get_optype(n).signature().port_type(p).is_some());
+        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) = rep_outputs
+            .partition(|&(n, p)| replacement.get_optype(n).signature().port_type(p).is_some());
 
         if combine_in_out(&vec![out_order_ports], &in_order_ports)
             .any(|(n, p)| is_order_edge(&replacement, n, p))
@@ -467,10 +467,10 @@ impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
 /// If the array is empty or a port does not exist, returns `None`.
 fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(hugr: &H, ports: &[(Node, P)]) -> Option<Type> {
     let &(n, p) = ports.first()?;
-    let edge_t = hugr.get_optype(n).signature().get(p)?.clone();
+    let edge_t = hugr.get_optype(n).signature().port_type(p)?.clone();
     ports
         .iter()
-        .all(|&(n, p)| hugr.get_optype(n).signature().get(p) == Some(&edge_t))
+        .all(|&(n, p)| hugr.get_optype(n).signature().port_type(p) == Some(&edge_t))
         .then_some(edge_t)
 }
 

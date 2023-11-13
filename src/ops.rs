@@ -84,7 +84,7 @@ impl OpType {
         let port_count = signature.port_count(dir);
         let port_as_in = port.as_incoming().ok();
         if port.index() < port_count {
-            signature.get(port).cloned().map(EdgeKind::Value)
+            signature.port_type(port).cloned().map(EdgeKind::Value)
         } else if port_as_in.is_some() && port_as_in == self.static_input_port() {
             Some(EdgeKind::Static(static_in_type(self)))
         } else {

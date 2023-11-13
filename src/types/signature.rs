@@ -117,7 +117,7 @@ impl FunctionType {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
-    pub fn get(&self, port: impl Into<Port>) -> Option<&Type> {
+    pub fn port_type(&self, port: impl Into<Port>) -> Option<&Type> {
         let port = port.into();
         match port.direction() {
             Direction::Incoming => self.input.get(port),
@@ -128,7 +128,7 @@ impl FunctionType {
     /// Returns a mutable reference to the type of a value [`Port`].
     /// Returns `None` if the port is out of bounds.
     #[inline]
-    pub fn get_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
+    pub fn port_type_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
         let port = port.into();
         match port.direction() {
             Direction::Incoming => self.input.get_mut(port),
@@ -271,14 +271,14 @@ mod test {
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
 
         assert_eq!(
-            f_type.get(Port::new(Direction::Incoming, 0)),
+            f_type.port_type(Port::new(Direction::Incoming, 0)),
             Some(&Type::UNIT)
         );
 
         let out = Port::new(Direction::Outgoing, 0);
-        *(f_type.get_mut(out).unwrap()) = USIZE_T;
+        *(f_type.port_type_mut(out).unwrap()) = USIZE_T;
 
-        assert_eq!(f_type.get(out), Some(&USIZE_T));
+        assert_eq!(f_type.port_type(out), Some(&USIZE_T));
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
