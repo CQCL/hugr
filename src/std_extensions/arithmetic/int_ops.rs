@@ -139,12 +139,8 @@ pub fn extension() -> Extension {
         ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
     );
 
-    let temp_reg: ExtensionRegistry = [
-        extension.clone(),
-        super::int_types::EXTENSION.to_owned(),
-        PRELUDE.to_owned(),
-    ]
-    .into();
+    let temp_reg: ExtensionRegistry =
+        [super::int_types::EXTENSION.to_owned(), PRELUDE.to_owned()].into();
 
     extension
         .add_op_custom_sig_simple(
