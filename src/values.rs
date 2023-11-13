@@ -127,6 +127,18 @@ impl Value {
             val: PrimValue::Extension { c: (Box::new(c),) },
         }
     }
+
+    /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
+    pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
+        if let Value::Prim {
+            val: PrimValue::Extension { c: (custom,) },
+        } = self
+        {
+            custom.downcast_ref()
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: CustomConst> From<T> for Value {
