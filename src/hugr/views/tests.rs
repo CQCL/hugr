@@ -61,6 +61,7 @@ fn node_connections(
     Ok(())
 }
 
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 #[rstest]
 fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
     let (h, _, _) = sample_hugr;
