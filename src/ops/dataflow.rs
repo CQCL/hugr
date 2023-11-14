@@ -5,6 +5,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 use crate::extension::ExtensionSet;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::IncomingPort;
 
 pub(crate) trait DataflowOpTrait {
     const TAG: OpTag;
@@ -155,6 +156,12 @@ impl Call {
     pub fn called_function_type(&self) -> &FunctionType {
         &self.signature
     }
+
+    /// The IncomingPort which links to the function being called.
+    #[inline]
+    pub fn called_function_port(&self) -> IncomingPort {
+        self.called_function_type().input_count().into()
+    }
 }
 
 /// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
@@ -204,6 +211,12 @@ impl LoadConstant {
     /// The type of the constant loaded by this op.
     pub fn constant_type(&self) -> &Type {
         &self.datatype
+    }
+
+    /// The IncomingPort which links to the loaded constant.
+    #[inline]
+    pub fn constant_port(&self) -> IncomingPort {
+        0.into()
     }
 }
 

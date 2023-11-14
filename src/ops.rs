@@ -184,17 +184,8 @@ impl OpType {
     /// If the op has a static input (Call and LoadConstant), the port of that input.
     pub fn static_input_port(&self) -> Option<IncomingPort> {
         match self {
-            OpType::Call(call) => Some(
-                Port::new(
-                    Direction::Incoming,
-                    call.called_function_type().input_count(),
-                )
-                .as_incoming()
-                .unwrap(),
-            ),
-            OpType::LoadConstant(_) => {
-                Some(Port::new(Direction::Incoming, 0).as_incoming().unwrap())
-            }
+            OpType::Call(call) => Some(call.called_function_port()),
+            OpType::LoadConstant(l) => Some(l.constant_port()),
             _ => None,
         }
     }
