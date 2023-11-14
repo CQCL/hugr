@@ -563,7 +563,7 @@ fn extensions_mismatch() -> Result<(), BuildError> {
     assert_matches!(
         handle,
         Err(ValidationError::ExtensionError(
-            ExtensionError::ParentIOExtensionMismatch { .. }
+            ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
         ))
     );
     Ok(())
