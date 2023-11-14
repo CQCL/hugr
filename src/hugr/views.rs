@@ -608,19 +608,31 @@ impl<T: AsRef<Hugr>> HugrView for T {
     }
 }
 
-/// Filter an iterator of node-ports to only dataflow dependency specifying
-/// ports (Value and StateOrder)
-pub fn dataflow_ports_only<'i, 'a: 'i, P: Into<Port> + Copy>(
-    hugr: &'a impl HugrView,
-    it: impl Iterator<Item = (Node, P)> + 'i,
-) -> impl Iterator<Item = (Node, P)> + 'i {
-    it.filter(move |(n, p)| {
-        matches!(
-            hugr.get_optype(*n).port_kind(*p),
-            Some(EdgeKind::Value(_) | EdgeKind::StateOrder)
-        )
-    })
+#[rustversion::since(1.75)] // uses impl in return position
+/// Trait implementing methods on port iterators.
+pub trait PortIterator<P>: Iterator<Item = (Node, P)>
+where
+    P: Into<Port> + Copy,
+    Self: Sized,
+{
+    /// Filter an iterator of node-ports to only dataflow dependency specifying
+    /// ports (Value and StateOrder)
+    fn dataflow_ports_only(self, hugr: &impl HugrView) -> impl Iterator<Item = (Node, P)> {
+        self.filter(move |(n, p)| {
+            matches!(
+                hugr.get_optype(*n).port_kind(*p),
+                Some(EdgeKind::Value(_) | EdgeKind::StateOrder)
+            )
+        })
+    }
 }
+impl<I, P> PortIterator<P> for I
+where
+    I: Iterator<Item = (Node, P)>,
+    P: Into<Port> + Copy,
+{
+}
+
 pub(crate) mod sealed {
     use super::*;
 

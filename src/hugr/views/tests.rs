@@ -161,7 +161,7 @@ fn static_targets() {
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
     use crate::extension::prelude::BOOL_T;
-    use crate::hugr::views::dataflow_ports_only;
+    use crate::hugr::views::PortIterator;
     use crate::std_extensions::logic::test::not_op;
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
@@ -183,7 +183,10 @@ fn test_dataflow_ports_only() {
     let h = dfg
         .finish_hugr_with_outputs(not.outputs(), &crate::extension::PRELUDE_REGISTRY)
         .unwrap();
-    let filtered_ports = dataflow_ports_only(&h, h.all_linked_outputs(call.node())).collect_vec();
+    let filtered_ports = h
+        .all_linked_outputs(call.node())
+        .dataflow_ports_only(&h)
+        .collect_vec();
 
     // should ignore the static input in to call, but report the two value ports
     // and the order port.
