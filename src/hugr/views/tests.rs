@@ -1,3 +1,4 @@
+use itertools::Either;
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
@@ -72,8 +73,6 @@ fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflo
 #[rustversion::since(1.75)] // uses impl in return position
 #[rstest]
 fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
-    use crate::hugr::Direction;
-    use crate::Port;
     use itertools::Itertools;
     let (h, n1, n2) = sample_hugr;
 
@@ -82,38 +81,22 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
     assert_eq!(
         &all_output_ports[..],
         &[
-            (
-                n1.node(),
-                Port::new(Direction::Outgoing, 1).as_outgoing().unwrap()
-            ),
-            (
-                n1.node(),
-                Port::new(Direction::Outgoing, 0).as_outgoing().unwrap()
-            ),
-            (
-                n1.node(),
-                Port::new(Direction::Outgoing, 2).as_outgoing().unwrap()
-            ),
+            (n1.node(), 1.into()),
+            (n1.node(), 0.into()),
+            (n1.node(), 2.into()),
         ]
     );
 
-    let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
-
+    let all_linked_ports = h.all_linked_ports(n1.node()).collect_vec();
+    let [i, _] = h.get_io(h.root()).unwrap();
     assert_eq!(
-        &all_linked_inputs[..],
+        &all_linked_ports[..],
         &[
-            (
-                n2.node(),
-                Port::new(Direction::Incoming, 1).as_incoming().unwrap()
-            ),
-            (
-                n2.node(),
-                Port::new(Direction::Incoming, 0).as_incoming().unwrap()
-            ),
-            (
-                n2.node(),
-                Port::new(Direction::Incoming, 2).as_incoming().unwrap()
-            ),
+            (i, Either::Left(0.into())),
+            (i, Either::Left(1.into())),
+            (n2.node(), Either::Right(1.into())),
+            (n2.node(), Either::Right(0.into())),
+            (n2.node(), Either::Right(2.into())),
         ]
     );
 }
