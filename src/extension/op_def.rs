@@ -198,8 +198,8 @@ impl OpDef {
 
     pub(crate) fn should_serialize_signature(&self) -> bool {
         match self.signature_func {
-            SignatureFunc::TypeScheme { .. } => true,
-            SignatureFunc::CustomFunc { .. } => false,
+            SignatureFunc::TypeScheme { .. } => false,
+            SignatureFunc::CustomFunc { .. } => true,
         }
     }
 
