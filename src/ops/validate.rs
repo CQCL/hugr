@@ -135,9 +135,9 @@ impl ValidateOp for super::Conditional {
         // Each child must have its variant's row and the rest of `inputs` as input,
         // and matching output
         for (i, (child, optype)) in children.into_iter().enumerate() {
-            let OpType::Case(case_op) = optype else {
-                panic!("Child check should have already checked valid ops.")
-            };
+            let case_op = optype
+                .as_case()
+                .expect("Child check should have already checked valid ops.");
             let sig = &case_op.signature;
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
@@ -415,9 +415,9 @@ fn validate_io_nodes<'a>(
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
     let [source, target]: [&BasicBlock; 2] = [&edge.source_op, &edge.target_op].map(|op| {
-        let OpType::BasicBlock(block_op) = op else {
-            panic!("CFG sibling graphs can only contain basic block operations.")
-        };
+        let block_op = op
+            .as_basic_block()
+            .expect("CFG sibling graphs can only contain basic block operations.");
         block_op
     });
 

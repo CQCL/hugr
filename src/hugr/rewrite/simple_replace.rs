@@ -222,6 +222,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
+    use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
@@ -498,8 +499,9 @@ pub(in crate::hugr::rewrite) mod test {
             .node_outputs(input)
             .filter(|&p| {
                 h.get_optype(input)
-                    .signature()
+                    .as_input()
                     .unwrap()
+                    .dataflow_signature()
                     .port_type(p)
                     .is_some()
             })
@@ -512,8 +514,9 @@ pub(in crate::hugr::rewrite) mod test {
             .node_inputs(output)
             .filter(|&p| {
                 h.get_optype(output)
-                    .signature()
+                    .as_output()
                     .unwrap()
+                    .dataflow_signature()
                     .port_type(p)
                     .is_some()
             })

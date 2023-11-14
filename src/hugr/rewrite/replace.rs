@@ -588,8 +588,8 @@ mod test {
             let popp = h.get_parent(pop).unwrap();
             let pushp = h.get_parent(push).unwrap();
             assert_ne!(popp, pushp); // Two different DFGs
-            assert!(matches!(h.get_optype(popp), OpType::DFG(_)));
-            assert!(matches!(h.get_optype(pushp), OpType::DFG(_)));
+            assert!(h.get_optype(popp).is_dfg());
+            assert!(h.get_optype(pushp).is_dfg());
 
             let grandp = h.get_parent(popp).unwrap();
             assert_eq!(grandp, h.get_parent(pushp).unwrap());

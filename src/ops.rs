@@ -55,22 +55,27 @@ pub enum OpType {
 }
 
 macro_rules! impl_op_ref_try_into {
-    ($Op: ident, $sname:expr) => {
+    ($Op: tt, $sname:ident) => {
         paste! {
             impl OpType {
                 #[doc = "If is an instance of `" $Op "` return a reference to it."]
-                pub fn [<as_ $Op:snake>](&self) -> Option<&$Op> {
+                pub fn [<as_ $sname:snake>](&self) -> Option<&$Op> {
                     if let OpType::$Op(l) = self {
                         Some(l)
                     } else {
                         None
                     }
                 }
+
+                #[doc = "If is an instance of `" $Op "`."]
+                pub fn [<is_ $sname:snake>](&self) -> bool {
+                    self.[<as_ $sname:snake>]().is_some()
+                }
             }
         }
     };
-    ($name:tt) => {
-        impl_op_ref_try_into!($name, stringify!($name));
+    ($Op:tt) => {
+        impl_op_ref_try_into!($Op, $Op);
     };
 }
 
@@ -85,11 +90,11 @@ impl_op_ref_try_into!(Output);
 impl_op_ref_try_into!(Call);
 impl_op_ref_try_into!(CallIndirect);
 impl_op_ref_try_into!(LoadConstant);
-impl_op_ref_try_into!(DFG);
+impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(LeafOp);
 impl_op_ref_try_into!(BasicBlock);
 impl_op_ref_try_into!(TailLoop);
-impl_op_ref_try_into!(CFG);
+impl_op_ref_try_into!(CFG, cfg);
 impl_op_ref_try_into!(Conditional);
 impl_op_ref_try_into!(Case);
 

@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::builder::{Container, FunctionBuilder};
 use crate::extension::ExtensionSet;
 use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
+use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
 use crate::types::Signature;
@@ -578,16 +579,18 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
     }
     let dfg_inputs = hugr
         .get_optype(inp)
-        .signature()
-        .unwrap_or_default()
+        .as_input()
+        .unwrap()
+        .dataflow_signature()
         .output_ports();
     if has_other_edge(hugr, out, Direction::Incoming) {
         unimplemented!("Non-dataflow input not supported at output node")
     }
     let dfg_outputs = hugr
         .get_optype(out)
-        .signature()
-        .unwrap_or_default()
+        .as_output()
+        .unwrap()
+        .dataflow_signature()
         .input_ports();
 
     // Collect for each port in the input the set of target ports, filtering
@@ -710,10 +713,7 @@ mod tests {
         },
         hugr::views::{HierarchyView, SiblingGraph},
         hugr::HugrMut,
-        ops::{
-            handle::{DfgID, FuncID, NodeHandle},
-            OpType,
-        },
+        ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::{and_op, not_op},
         type_row,
     };
@@ -976,9 +976,7 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let OpType::FuncDefn(func_defn) = hugr.get_optype(func_root) else {
-            panic!()
-        };
+        let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
         assert_eq!(func_defn.signature, func.signature(&func_graph))
     }
 

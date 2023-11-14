@@ -12,7 +12,6 @@ use crate::{
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-use crate::ops::OpType;
 
 use crate::types::Signature;
 
@@ -78,16 +77,16 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let (signature, name) = if let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
-            self.hugr().get_optype(f_node)
-        {
-            (signature.clone(), name.clone())
-        } else {
-            return Err(BuildError::UnexpectedType {
+        let ops::FuncDecl { signature, name } = self
+            .hugr()
+            .get_optype(f_node)
+            .as_func_decl()
+            .ok_or(BuildError::UnexpectedType {
                 node: f_node,
                 op_desc: "OpType::FuncDecl",
-            });
-        };
+            })?
+            .clone();
+
         self.hugr_mut().replace_op(
             f_node,
             NodeType::new_pure(ops::FuncDefn {
