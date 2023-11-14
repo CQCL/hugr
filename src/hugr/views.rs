@@ -406,13 +406,13 @@ pub trait HugrView: sealed::HugrInternals {
     }
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
-    /// kind edges will be missing.
+    /// kind ports will be missing.
     fn signature(&self, node: Node) -> Option<FunctionType> {
         self.get_optype(node).signature()
     }
 
     #[rustversion::since(1.75)] // uses impl in return position
-    /// Iterator over all ports in a given direction that have Value type, along
+    /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
     fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
         let sig = self.signature(node).unwrap_or_default();

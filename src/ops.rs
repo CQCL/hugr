@@ -286,7 +286,7 @@ pub trait OpTrait {
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
     fn signature(&self) -> Option<FunctionType> {
-        Default::default()
+        None
     }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
