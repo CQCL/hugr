@@ -71,7 +71,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDefn`] node.
+    /// [`crate::ops::OpType::FuncDefn`] node.
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
@@ -83,7 +83,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             .as_func_decl()
             .ok_or(BuildError::UnexpectedType {
                 node: f_node,
-                op_desc: "OpType::FuncDecl",
+                op_desc: "crate::ops::OpType::FuncDecl",
             })?
             .clone();
 
@@ -104,7 +104,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDecl`] node.
+    /// [`crate::ops::OpType::FuncDecl`] node.
     pub fn declare(
         &mut self,
         name: impl Into<String>,
@@ -123,11 +123,11 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(declare_n.into())
     }
 
-    /// Add a [`OpType::AliasDefn`] node and return a handle to the Alias.
+    /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
     ///
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDefn`] child node.
+    /// Error in adding [`crate::ops::OpType::AliasDefn`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
@@ -148,10 +148,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(AliasID::new(node, name, bound))
     }
 
-    /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
+    /// Add a [`crate::ops::OpType::AliasDecl`] node and return a handle to the Alias.
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDecl`] child node.
+    /// Error in adding [`crate::ops::OpType::AliasDecl`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
