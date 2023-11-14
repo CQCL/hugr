@@ -178,12 +178,11 @@ impl OpTrait for BasicBlock {
         })
     }
 
-    fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
+    fn non_df_port_count(&self, dir: Direction) -> usize {
         match self {
-            Self::DFB { tuple_sum_rows, .. } if dir == Direction::Outgoing => {
-                Some(tuple_sum_rows.len())
-            }
-            _ => None,
+            Self::DFB { tuple_sum_rows, .. } if dir == Direction::Outgoing => tuple_sum_rows.len(),
+            Self::Exit { .. } if dir == Direction::Outgoing => 0,
+            _ => 1,
         }
     }
 }

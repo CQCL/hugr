@@ -142,7 +142,7 @@ impl OpType {
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
-        let non_df_count = self.non_df_port_count(dir).unwrap_or(1);
+        let non_df_count = self.non_df_port_count(dir);
         if self.other_port_kind(dir).is_some() && non_df_count == 1 {
             // if there is a static input it comes before the non_df_ports
             let static_input =
@@ -201,10 +201,7 @@ impl OpType {
 
     /// Returns the number of ports for the given direction.
     pub fn port_count(&self, dir: Direction) -> usize {
-        let has_other_ports = self.other_port_kind(dir).is_some();
-        let non_df_count = self
-            .non_df_port_count(dir)
-            .unwrap_or(has_other_ports as usize);
+        let non_df_count = self.non_df_port_count(dir);
         // if there is a static input it comes before the non_df_ports
         let static_input =
             (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
@@ -300,11 +297,12 @@ pub trait OpTrait {
     }
 
     /// Get the number of non-dataflow multiports.
-    ///
-    /// If None, the operation must have exactly one non-dataflow port
-    /// if the operation type has other_edges, or zero otherwise.
-    fn non_df_port_count(&self, _dir: Direction) -> Option<usize> {
-        None
+    fn non_df_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.other_input(),
+            Direction::Outgoing => self.other_output(),
+        }
+        .is_some() as usize
     }
 }
 
