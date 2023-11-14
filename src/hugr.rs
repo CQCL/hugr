@@ -113,7 +113,7 @@ impl NodeType {
     pub fn signature(&self) -> Option<Signature> {
         self.input_extensions.as_ref().map(|rs| {
             self.op
-                .signature()
+                .dataflow_signature()
                 .unwrap_or_default()
                 .with_input_extensions(rs.clone())
         })
@@ -121,7 +121,7 @@ impl NodeType {
 
     /// Get the function type from the embedded op
     pub fn op_signature(&self) -> Option<FunctionType> {
-        self.op.signature()
+        self.op.dataflow_signature()
     }
 
     /// The input extensions defined for this node.

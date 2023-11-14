@@ -349,7 +349,7 @@ impl SiblingSubgraph {
         let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
             return Err(InvalidReplacement::InvalidDataflowParent);
         };
-        if dfg_optype.signature() != Some(self.signature(hugr)) {
+        if dfg_optype.dataflow_signature() != Some(self.signature(hugr)) {
             return Err(InvalidReplacement::InvalidSignature);
         }
 
@@ -581,7 +581,7 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
         .get_optype(inp)
         .as_input()
         .unwrap()
-        .dataflow_signature()
+        .signature()
         .output_ports();
     if has_other_edge(hugr, out, Direction::Incoming) {
         unimplemented!("Non-dataflow input not supported at output node")
@@ -590,7 +590,7 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
         .get_optype(out)
         .as_output()
         .unwrap()
-        .dataflow_signature()
+        .signature()
         .input_ports();
 
     // Collect for each port in the input the set of target ports, filtering

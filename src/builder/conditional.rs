@@ -110,7 +110,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             .clone()
             .try_into()
             .expect("Parent node does not have Conditional optype.");
-        let extension_delta = cond.dataflow_signature().extension_reqs;
+        let extension_delta = cond.signature().extension_reqs;
         let inputs = cond
             .case_input_row(case)
             .ok_or(ConditionalBuildError::NotCase { conditional, case })?;

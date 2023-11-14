@@ -150,7 +150,7 @@ impl DataflowOpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         // Static signatures. The `TypeRow`s in the `FunctionType` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 

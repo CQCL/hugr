@@ -616,7 +616,7 @@ mod test {
         pred_const: &ConstID,
         entry: bool,
     ) -> Result<BasicBlockID, BuildError> {
-        let op_sig = op.dataflow_signature();
+        let op_sig = op.signature();
         let mut bb = if entry {
             assert_eq!(
                 match h.hugr().get_optype(h.container_node()) {

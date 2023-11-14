@@ -122,7 +122,7 @@ impl OpType {
 
     /// Returns the edge kind for the given port.
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.signature().unwrap_or_default();
+        let signature = self.dataflow_signature().unwrap_or_default();
         let port: Port = port.into();
         let port_as_in = port.as_incoming().ok();
         let dir = port.direction();
@@ -156,7 +156,9 @@ impl OpType {
 
     /// The number of Value ports in given direction.
     pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
-        self.signature().map(|sig| sig.port_count(dir)).unwrap_or(0)
+        self.dataflow_signature()
+            .map(|sig| sig.port_count(dir))
+            .unwrap_or(0)
     }
 
     /// The number of Value input ports.
@@ -276,7 +278,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
-    fn signature(&self) -> Option<FunctionType> {
+    fn dataflow_signature(&self) -> Option<FunctionType> {
         None
     }
     /// The edge kind for the non-dataflow or constant inputs of the operation,

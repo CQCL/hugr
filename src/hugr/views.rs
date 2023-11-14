@@ -418,7 +418,7 @@ pub trait HugrView: sealed::HugrInternals {
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
     fn signature(&self, node: Node) -> Option<FunctionType> {
-        self.get_optype(node).signature()
+        self.get_optype(node).dataflow_signature()
     }
 
     #[rustversion::since(1.75)] // uses impl in return position

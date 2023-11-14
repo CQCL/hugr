@@ -10,7 +10,7 @@ use crate::IncomingPort;
 pub(crate) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
-    fn dataflow_signature(&self) -> FunctionType;
+    fn signature(&self) -> FunctionType;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -82,7 +82,7 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), self.types.clone())
             .with_extension_delta(&ExtensionSet::new())
     }
@@ -96,7 +96,7 @@ impl DataflowOpTrait for Output {
 
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(self.types.clone(), TypeRow::new())
     }
 
@@ -112,8 +112,8 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn signature(&self) -> Option<FunctionType> {
-        Some(DataflowOpTrait::dataflow_signature(self))
+    fn dataflow_signature(&self) -> Option<FunctionType> {
+        Some(DataflowOpTrait::signature(self))
     }
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
@@ -146,7 +146,7 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -179,7 +179,7 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         let mut s = self.signature.clone();
         s.input
             .to_mut()
@@ -202,7 +202,7 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 }
@@ -235,7 +235,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
