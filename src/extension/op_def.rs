@@ -8,10 +8,8 @@ use smol_str::SmolStr;
 
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
-    TypeParametrised,
 };
 
-use crate::ops::custom::OpaqueOp;
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
@@ -141,22 +139,6 @@ pub struct OpDef {
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
-}
-
-impl TypeParametrised for OpDef {
-    type Concrete = OpaqueOp;
-
-    fn params(&self) -> &[TypeParam] {
-        self.params()
-    }
-
-    fn name(&self) -> &SmolStr {
-        self.name()
-    }
-
-    fn extension(&self) -> &ExtensionId {
-        self.extension()
-    }
 }
 
 impl OpDef {
