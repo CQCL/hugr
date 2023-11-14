@@ -12,6 +12,7 @@ pub mod validate;
 use crate::types::{EdgeKind, FunctionType, Type};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
+use paste::paste;
 
 use portgraph::NodeIndex;
 use smol_str::SmolStr;
@@ -52,6 +53,45 @@ pub enum OpType {
     Conditional,
     Case,
 }
+
+macro_rules! impl_op_ref_try_into {
+    ($Op: ident, $sname:expr) => {
+        paste! {
+            impl OpType {
+                #[doc = "If is an instance of `" $Op "` return a reference to it."]
+                pub fn [<as_ $Op:snake>](&self) -> Option<&$Op> {
+                    if let OpType::$Op(l) = self {
+                        Some(l)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    };
+    ($name:tt) => {
+        impl_op_ref_try_into!($name, stringify!($name));
+    };
+}
+
+impl_op_ref_try_into!(Module);
+impl_op_ref_try_into!(FuncDefn);
+impl_op_ref_try_into!(FuncDecl);
+impl_op_ref_try_into!(AliasDecl);
+impl_op_ref_try_into!(AliasDefn);
+impl_op_ref_try_into!(Const);
+impl_op_ref_try_into!(Input);
+impl_op_ref_try_into!(Output);
+impl_op_ref_try_into!(Call);
+impl_op_ref_try_into!(CallIndirect);
+impl_op_ref_try_into!(LoadConstant);
+impl_op_ref_try_into!(DFG);
+impl_op_ref_try_into!(LeafOp);
+impl_op_ref_try_into!(BasicBlock);
+impl_op_ref_try_into!(TailLoop);
+impl_op_ref_try_into!(CFG);
+impl_op_ref_try_into!(Conditional);
+impl_op_ref_try_into!(Case);
 
 /// The default OpType (as returned by [Default::default])
 pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module);
