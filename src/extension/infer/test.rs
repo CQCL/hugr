@@ -2,10 +2,15 @@ use std::error::Error;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
-use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use crate::builder::{
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+};
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
-use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
+use crate::extension::{
+    prelude::{ConstUsize, PRELUDE_REGISTRY, USIZE_T},
+    ExtensionSet,
+};
 use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
@@ -961,4 +966,74 @@ fn sccs() {
         ctx.get_solution(&m4),
         Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
     );
+}
+
+#[test]
+fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let mut func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    let lift = func_builder.add_dataflow_op(
+        ops::LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: A,
+        },
+        [w],
+    )?;
+    let [w] = lift.outputs_arr();
+    func_builder.finish_with_outputs([w])?;
+    builder.finish_hugr(&PRELUDE_REGISTRY)?;
+    Ok(())
+}
+
+#[test]
+// Define a function "g" inside "f", which defines a function which adds to
+// the graph. Tests that the resources of the graph of "g" aren't being
+// constrained to match those of the FuncDefn node.
+fn funcdefn() -> Result<(), Box<dyn Error>> {
+    use crate::builder::{Container, Dataflow};
+    use crate::values::Value;
+
+    let mut builder = ModuleBuilder::new();
+    let mut func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let mut nested_func_builder = func_builder.define_function(
+        "G",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = nested_func_builder.input_wires_arr();
+    let lift = nested_func_builder.add_dataflow_op(
+        ops::LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: A,
+        },
+        [w],
+    )?;
+    let [w] = lift.outputs_arr();
+    let g_id = nested_func_builder.finish_with_outputs([w])?;
+
+    let int_value: Value = ConstUsize::new(42).into();
+    let k_node = func_builder.add_constant(ops::Const::new(int_value, USIZE_T).unwrap(), None)?;
+    let k = func_builder.load_const(&k_node)?;
+    let call = func_builder.call(g_id.handle(), [k])?;
+    let [w] = call.outputs_arr();
+    func_builder.finish_with_outputs([w])?;
+
+    let hugr = builder.finish_hugr(&PRELUDE_REGISTRY)?;
+    infer_extensions(&hugr)?;
+    Ok(())
 }

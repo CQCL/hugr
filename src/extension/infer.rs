@@ -279,7 +279,13 @@ impl UnificationContext {
                     let m_input_node = self.make_or_get_meta(input, dir);
                     self.add_constraint(m_input_node, Constraint::Equal(m_input));
                     let m_output_node = self.make_or_get_meta(output, dir);
-                    self.add_constraint(m_output_node, Constraint::Equal(m_output));
+                    // If the parent node is a FuncDefn, it's input_resources
+                    // should always be empty, meaning if the function adds
+                    // resources, they shouldn't be equal to the parent's output
+                    // (which will also be empty.)
+                    if node_type.tag() != OpTag::FuncDefn {
+                        self.add_constraint(m_output_node, Constraint::Equal(m_output));
+                    }
                 }
             }
 
