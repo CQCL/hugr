@@ -398,8 +398,8 @@ impl SiblingSubgraph {
 
     /// Create a new Hugr containing only the subgraph.
     ///
-    /// The new Hugr will contain a [FuncDefn] root wth the same signature as the
-    /// subgraph and the specified `name`
+    /// The new Hugr will contain a [FuncDefn][crate::ops::FuncDefn] root
+    /// wth the same signature as the subgraph and the specified `name`
     pub fn extract_subgraph(
         &self,
         hugr: &impl HugrView,
