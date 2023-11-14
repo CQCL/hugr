@@ -252,7 +252,7 @@ impl SiblingSubgraph {
                 if !hugr.is_linked(n, p) {
                     return false;
                 }
-                let (out_n, _) = hugr.single_source(n, p).unwrap();
+                let (out_n, _) = hugr.single_linked_output(n, p).unwrap();
                 !nodes_set.contains(&out_n)
             })
             // Every incoming edge is its own input.
@@ -899,7 +899,7 @@ mod tests {
                 .collect(),
             hugr.node_inputs(out)
                 .take(2)
-                .filter_map(|p| hugr.single_source(out, p))
+                .filter_map(|p| hugr.single_linked_output(out, p))
                 .collect(),
             &func,
         )

@@ -139,7 +139,7 @@ impl NewEdgeSpec {
                 true
             };
             let found_incoming = h
-                .single_source(self.tgt, tgt_pos)
+                .single_linked_output(self.tgt, tgt_pos)
                 .is_some_and(|(src_n, _)| descends_from_legal(src_n));
             if !found_incoming {
                 return Err(ReplaceError::NoRemovedEdge(err_edge()));

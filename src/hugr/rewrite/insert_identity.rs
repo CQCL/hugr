@@ -72,7 +72,7 @@ impl Rewrite for IdentityInsertion {
         };
 
         let (pre_node, pre_port) = h
-            .single_source(self.post_node, self.post_port)
+            .single_linked_output(self.post_node, self.post_port)
             .expect("Value kind input can only have one connection.");
 
         h.disconnect(self.post_node, self.post_port).unwrap();
