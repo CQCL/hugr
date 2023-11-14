@@ -3,7 +3,6 @@
 mod check;
 pub mod custom;
 mod poly_func;
-mod primitive;
 mod serialize;
 mod signature;
 pub mod type_param;
@@ -26,7 +25,6 @@ use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
-pub use self::primitive::PrimType;
 use self::type_param::TypeParam;
 
 #[cfg(feature = "pyo3")]
@@ -153,10 +151,22 @@ impl From<SumType> for Type {
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
-/// Core types: primitive (leaf), tuple (product) or sum (co-product).
+/// Core types
 pub enum TypeEnum {
+    // TODO optimise with Box<CustomType> ?
+    // or some static version of this?
     #[allow(missing_docs)]
-    Prim(PrimType),
+    Extension(CustomType),
+    #[allow(missing_docs)]
+    #[display(fmt = "Alias({})", "_0.name()")]
+    Alias(AliasDecl),
+    #[allow(missing_docs)]
+    #[display(fmt = "Function({})", "_0")]
+    Function(Box<PolyFuncType>),
+    // DeBruijn index, and cache of TypeBound (checked in validation)
+    #[allow(missing_docs)]
+    #[display(fmt = "Variable({})", _0)]
+    Variable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
@@ -168,7 +178,10 @@ impl TypeEnum {
     /// The smallest type bound that covers the whole type.
     fn least_upper_bound(&self) -> TypeBound {
         match self {
-            TypeEnum::Prim(p) => p.bound(),
+            TypeEnum::Extension(c) => c.bound(),
+            TypeEnum::Alias(a) => a.bound,
+            TypeEnum::Function(_) => TypeBound::Copyable,
+            TypeEnum::Variable(_, b) => *b,
             TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { row }) => {
                 least_upper_bound(row.iter().map(Type::least_upper_bound))
@@ -216,7 +229,7 @@ impl Type {
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Function(Box::new(fun_ty.into()))))
+        Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -235,12 +248,12 @@ impl Type {
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Type(TypeEnum::Prim(PrimType::Extension(opaque)), bound)
+        Type(TypeEnum::Extension(opaque), bound)
     }
 
     /// Initialize a new alias.
     pub fn new_alias(alias: AliasDecl) -> Self {
-        Self::new(TypeEnum::Prim(PrimType::Alias(alias)))
+        Self::new(TypeEnum::Alias(alias))
     }
 
     fn new(type_e: TypeEnum) -> Self {
@@ -267,7 +280,7 @@ impl Type {
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::Prim(PrimType::Variable(idx, bound)), bound)
+        Self(TypeEnum::Variable(idx, bound), bound)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -307,12 +320,10 @@ impl Type {
                 .iter()
                 .try_for_each(|t| t.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
-            TypeEnum::Prim(PrimType::Alias(_)) => Ok(()),
-            TypeEnum::Prim(PrimType::Extension(custy)) => {
-                custy.validate(extension_registry, var_decls)
-            }
-            TypeEnum::Prim(PrimType::Function(ft)) => ft.validate(extension_registry, var_decls),
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => {
+            TypeEnum::Alias(_) => Ok(()),
+            TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
+            TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
+            TypeEnum::Variable(idx, bound) => {
                 check_typevar_decl(var_decls, *idx, &TypeParam::Type(*bound))
             }
         }
@@ -320,12 +331,10 @@ impl Type {
 
     pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
         match &self.0 {
-            TypeEnum::Prim(PrimType::Alias(_)) | TypeEnum::Sum(SumType::Unit { .. }) => {
-                self.clone()
-            }
-            TypeEnum::Prim(PrimType::Variable(idx, bound)) => t.apply_typevar(*idx, *bound),
-            TypeEnum::Prim(PrimType::Extension(cty)) => Type::new_extension(cty.substitute(t)),
-            TypeEnum::Prim(PrimType::Function(bf)) => Type::new_function(bf.substitute(t)),
+            TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
+            TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
+            TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
             TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, t)),
         }
