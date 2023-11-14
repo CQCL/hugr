@@ -153,13 +153,13 @@ impl OpTrait for LeafOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Option<FunctionType> {
         // Static signatures. The `TypeRow`s in the `FunctionType` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
-        match self {
+        Some(match self {
             LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
-            LeafOp::CustomOp(ext) => ext.signature(),
+            LeafOp::CustomOp(ext) => return ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
@@ -179,7 +179,7 @@ impl OpTrait for LeafOp {
                 vec![Type::new_function(ta.input.clone())],
                 vec![Type::new_function(ta.output.clone())],
             ),
-        }
+        })
     }
 
     fn other_input(&self) -> Option<EdgeKind> {

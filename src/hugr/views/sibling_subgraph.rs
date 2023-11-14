@@ -298,7 +298,7 @@ impl SiblingSubgraph {
             .iter()
             .map(|part| {
                 let &(n, p) = part.iter().next().expect("is non-empty");
-                let sig = hugr.signature(n);
+                let sig = hugr.signature(n).expect("must have dataflow signature");
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
@@ -306,7 +306,7 @@ impl SiblingSubgraph {
             .outputs
             .iter()
             .map(|&(n, p)| {
-                let sig = hugr.signature(n);
+                let sig = hugr.signature(n).expect("must have dataflow signature");
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
@@ -348,7 +348,7 @@ impl SiblingSubgraph {
         let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
             return Err(InvalidReplacement::InvalidDataflowParent);
         };
-        if dfg_optype.signature() != self.signature(hugr) {
+        if dfg_optype.signature() != Some(self.signature(hugr)) {
             return Err(InvalidReplacement::InvalidSignature);
         }
 
@@ -356,10 +356,16 @@ impl SiblingSubgraph {
         // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) =
-            rep_inputs.partition(|&(n, p)| replacement.signature(n).port_type(p).is_some());
-        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
-            rep_outputs.partition(|&(n, p)| replacement.signature(n).port_type(p).is_some());
+        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) = rep_inputs.partition(|&(n, p)| {
+            replacement
+                .signature(n)
+                .is_some_and(|s| s.port_type(p).is_some())
+        });
+        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) = rep_outputs.partition(|&(n, p)| {
+            replacement
+                .signature(n)
+                .is_some_and(|s| s.port_type(p).is_some())
+        });
 
         if combine_in_out(&vec![out_order_ports], &in_order_ports)
             .any(|(n, p)| is_order_edge(&replacement, n, p))
@@ -467,10 +473,13 @@ impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
 /// If the array is empty or a port does not exist, returns `None`.
 fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(hugr: &H, ports: &[(Node, P)]) -> Option<Type> {
     let &(n, p) = ports.first()?;
-    let edge_t = hugr.signature(n).port_type(p)?.clone();
+    let edge_t = hugr.signature(n)?.port_type(p)?.clone();
     ports
         .iter()
-        .all(|&(n, p)| hugr.signature(n).port_type(p) == Some(&edge_t))
+        .all(|&(n, p)| {
+            hugr.signature(n)
+                .is_some_and(|s| s.port_type(p) == Some(&edge_t))
+        })
         .then_some(edge_t)
 }
 
@@ -567,11 +576,19 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
     if has_other_edge(hugr, inp, Direction::Outgoing) {
         unimplemented!("Non-dataflow output not supported at input node")
     }
-    let dfg_inputs = hugr.get_optype(inp).signature().output_ports();
+    let dfg_inputs = hugr
+        .get_optype(inp)
+        .signature()
+        .unwrap_or_default()
+        .output_ports();
     if has_other_edge(hugr, out, Direction::Incoming) {
         unimplemented!("Non-dataflow input not supported at output node")
     }
-    let dfg_outputs = hugr.get_optype(out).signature().input_ports();
+    let dfg_outputs = hugr
+        .get_optype(out)
+        .signature()
+        .unwrap_or_default()
+        .input_ports();
 
     // Collect for each port in the input the set of target ports, filtering
     // direct wires to the output.

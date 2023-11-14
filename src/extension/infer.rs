@@ -305,11 +305,15 @@ impl UnificationContext {
             match node_type.signature() {
                 // Input extensions are open
                 None => {
-                    let delta = node_type.op_signature().extension_reqs;
-                    let c = if delta.is_empty() {
-                        Constraint::Equal(m_input)
+                    let c = if let Some(sig) = node_type.op_signature() {
+                        let delta = sig.extension_reqs;
+                        if delta.is_empty() {
+                            Constraint::Equal(m_input)
+                        } else {
+                            Constraint::Plus(delta, m_input)
+                        }
                     } else {
-                        Constraint::Plus(delta, m_input)
+                        Constraint::Equal(m_input)
                     };
                     self.add_constraint(m_output, c);
                 }
@@ -1063,7 +1067,7 @@ mod test {
                 hugr,
                 conditional_node,
                 op.clone(),
-                Into::<OpType>::into(op).signature(),
+                Into::<OpType>::into(op).signature().unwrap(),
             )?;
 
             let lift1 = hugr.add_node_with_parent(

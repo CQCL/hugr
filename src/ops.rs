@@ -77,12 +77,12 @@ impl OpType {
 
     /// Returns the edge kind for the given port.
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.signature();
+        let signature = self.signature().unwrap_or_default();
         let port: Port = port.into();
+        let port_as_in = port.as_incoming().ok();
         let dir = port.direction();
 
         let port_count = signature.port_count(dir);
-        let port_as_in = port.as_incoming().ok();
         if port.index() < port_count {
             signature.port_type(port).cloned().map(EdgeKind::Value)
         } else if port_as_in.is_some() && port_as_in == self.static_input_port() {
@@ -103,13 +103,25 @@ impl OpType {
             let static_input =
                 (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
 
-            Some(Port::new(
-                dir,
-                self.signature().port_count(dir) + static_input,
-            ))
+            Some(Port::new(dir, self.value_port_count(dir) + static_input))
         } else {
             None
         }
+    }
+
+    /// The number of Value ports in given direction.
+    pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
+        self.signature().map(|sig| sig.port_count(dir)).unwrap_or(0)
+    }
+
+    /// The number of Value input ports.
+    pub fn value_input_count(&self) -> usize {
+        self.value_port_count(Direction::Incoming)
+    }
+
+    /// The number of Value output ports.
+    pub fn value_output_count(&self) -> usize {
+        self.value_port_count(Direction::Outgoing)
     }
 
     /// The non-dataflow input port for the operation, not described by the signature.
@@ -151,7 +163,6 @@ impl OpType {
 
     /// Returns the number of ports for the given direction.
     pub fn port_count(&self, dir: Direction) -> usize {
-        let signature = self.signature();
         let has_other_ports = self.other_port_kind(dir).is_some();
         let non_df_count = self
             .non_df_port_count(dir)
@@ -159,7 +170,7 @@ impl OpType {
         // if there is a static input it comes before the non_df_ports
         let static_input =
             (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
-        signature.port_count(dir) + non_df_count + static_input
+        self.value_port_count(dir) + non_df_count + static_input
     }
 
     /// Returns the number of inputs ports for the operation.
@@ -228,8 +239,8 @@ pub trait OpTrait {
 
     /// The signature of the operation.
     ///
-    /// Only dataflow operations have a non-empty signature.
-    fn signature(&self) -> FunctionType {
+    /// Only dataflow operations have a signature, otherwise returns None.
+    fn signature(&self) -> Option<FunctionType> {
         Default::default()
     }
     /// The edge kind for the non-dataflow or constant inputs of the operation,

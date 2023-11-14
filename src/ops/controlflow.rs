@@ -30,7 +30,7 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn dataflow_signature(&self) -> FunctionType {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| tuple_sum_first(row, &self.rest));
         FunctionType::new(inputs, outputs)
@@ -74,7 +74,7 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn dataflow_signature(&self) -> FunctionType {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
@@ -109,7 +109,7 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn dataflow_signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -169,13 +169,13 @@ impl OpTrait for BasicBlock {
         Some(EdgeKind::ControlFlow)
     }
 
-    fn signature(&self) -> FunctionType {
-        match self {
+    fn signature(&self) -> Option<FunctionType> {
+        Some(match self {
             BasicBlock::DFB {
                 extension_delta, ..
             } => FunctionType::new(type_row![], type_row![]).with_extension_delta(extension_delta),
             BasicBlock::Exit { .. } => FunctionType::new(type_row![], type_row![]),
-        }
+        })
     }
 
     fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
@@ -233,8 +233,8 @@ impl OpTrait for Case {
         <Self as StaticTag>::TAG
     }
 
-    fn signature(&self) -> FunctionType {
-        self.signature.clone()
+    fn signature(&self) -> Option<FunctionType> {
+        Some(self.signature.clone())
     }
 }
 

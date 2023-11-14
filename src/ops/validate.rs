@@ -102,12 +102,8 @@ impl ValidateOp for super::DFG {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.signature().input,
-            &self.signature().output,
-            "nested graph",
-            children,
-        )
+        let sig = self.signature().unwrap_or_default();
+        validate_io_nodes(&sig.input, &sig.output, "nested graph", children)
     }
 }
 
@@ -371,19 +367,22 @@ fn validate_io_nodes<'a>(
     let (first, first_optype) = children.next().unwrap();
     let (second, second_optype) = children.next().unwrap();
 
-    if &first_optype.signature().output != expected_input {
+    let first_sig = first_optype.signature().unwrap_or_default();
+    if &first_sig.output != expected_input {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: first,
-            actual: first_optype.signature().output,
+            actual: first_sig.output,
             expected: expected_input.clone(),
             node_desc: "Input",
             container_desc,
         });
     }
-    if &second_optype.signature().input != expected_output {
+    let second_sig = second_optype.signature().unwrap_or_default();
+
+    if &second_sig.input != expected_output {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: second,
-            actual: second_optype.signature().input,
+            actual: second_sig.input,
             expected: expected_output.clone(),
             node_desc: "Output",
             container_desc,
