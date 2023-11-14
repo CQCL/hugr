@@ -1,5 +1,6 @@
 //! Abstract and concrete Signature types.
 
+use itertools::Either;
 #[cfg(feature = "pyo3")]
 use pyo3::{pyclass, pymethods};
 
@@ -119,9 +120,9 @@ impl FunctionType {
     #[inline]
     pub fn port_type(&self, port: impl Into<Port>) -> Option<&Type> {
         let port: Port = port.into();
-        match port.direction() {
-            Direction::Incoming => self.in_port_type(port.as_incoming().unwrap()),
-            Direction::Outgoing => self.out_port_type(port.as_outgoing().unwrap()),
+        match port.as_directed() {
+            Either::Left(port) => self.in_port_type(port),
+            Either::Right(port) => self.out_port_type(port),
         }
     }
 
@@ -139,14 +140,28 @@ impl FunctionType {
         self.output.get(port.into())
     }
 
+    /// Returns a mutable reference to the type of a value input [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
+        self.input.get_mut(port.into())
+    }
+
+    /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
+        self.output.get_mut(port.into())
+    }
+
     /// Returns a mutable reference to the type of a value [`Port`].
     /// Returns `None` if the port is out of bounds.
     #[inline]
     pub fn port_type_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
         let port = port.into();
-        match port.direction() {
-            Direction::Incoming => self.input.get_mut(port),
-            Direction::Outgoing => self.output.get_mut(port),
+        match port.as_directed() {
+            Either::Left(port) => self.in_port_type_mut(port),
+            Either::Right(port) => self.out_port_type_mut(port),
         }
     }
 
