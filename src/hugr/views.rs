@@ -18,7 +18,7 @@ pub use sibling::SiblingGraph;
 pub use sibling_subgraph::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
-use itertools::{Either, Itertools, MapInto};
+use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
@@ -29,6 +29,8 @@ use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
+#[rustversion::since(1.75)] // uses impl in return position
+use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -634,6 +636,7 @@ where
         })
     }
 }
+#[rustversion::since(1.75)] // uses impl in return position
 impl<I, P> PortIterator<P> for I
 where
     I: Iterator<Item = (Node, P)>,
