@@ -12,8 +12,9 @@ use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
+use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-use crate::ops::{BasicBlock, OpTrait, OpType};
+use crate::ops::{BasicBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
 
@@ -49,7 +50,7 @@ impl OutlineCfg {
             _ => return Err(OutlineCfgError::NotSiblings),
         };
         let o = h.get_optype(cfg_n);
-        if !matches!(o, OpType::CFG(_)) {
+        let OpType::CFG(o) = o else {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
         let cfg_entry = h.children(cfg_n).next().unwrap();
@@ -70,8 +71,7 @@ impl OutlineCfg {
                     }
                 }
             }
-            extension_delta = extension_delta
-                .union(&o.signature().expect("cfg missing signature").extension_reqs);
+            extension_delta = extension_delta.union(&o.dataflow_signature().extension_reqs);
             let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors

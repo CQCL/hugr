@@ -3,7 +3,8 @@
 use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
-use super::{OpName, OpTag, OpTrait, StaticTag};
+use super::dataflow::DataflowOpTrait;
+use super::{OpName, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::types::type_param::TypeArg;
@@ -128,11 +129,11 @@ impl OpName for LeafOp {
     }
 }
 
-impl StaticTag for LeafOp {
-    const TAG: OpTag = OpTag::Leaf;
-}
+// impl StaticTag for LeafOp {
+// }
 
-impl OpTrait for LeafOp {
+impl DataflowOpTrait for LeafOp {
+    const TAG: OpTag = OpTag::Leaf;
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
@@ -148,18 +149,14 @@ impl OpTrait for LeafOp {
         }
     }
 
-    fn tag(&self) -> OpTag {
-        <Self as StaticTag>::TAG
-    }
-
     /// The signature of the operation.
-    fn signature(&self) -> Option<FunctionType> {
+    fn dataflow_signature(&self) -> FunctionType {
         // Static signatures. The `TypeRow`s in the `FunctionType` use a
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
-        Some(match self {
+        match self {
             LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
-            LeafOp::CustomOp(ext) => return ext.signature(),
+            LeafOp::CustomOp(ext) => ext.signature().unwrap_or_default(),
             LeafOp::MakeTuple { tys: types } => {
                 FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
@@ -179,7 +176,7 @@ impl OpTrait for LeafOp {
                 vec![Type::new_function(ta.input.clone())],
                 vec![Type::new_function(ta.output.clone())],
             ),
-        })
+        }
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
