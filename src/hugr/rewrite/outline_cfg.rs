@@ -70,7 +70,8 @@ impl OutlineCfg {
                     }
                 }
             }
-            extension_delta = extension_delta.union(&o.signature().extension_reqs);
+            extension_delta = extension_delta
+                .union(&o.signature().expect("cfg missing signature").extension_reqs);
             let external_succs = h.output_neighbours(n).filter(|s| !self.blocks.contains(s));
             match external_succs.at_most_one() {
                 Ok(None) => (), // No external successors

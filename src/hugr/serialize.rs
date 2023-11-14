@@ -166,7 +166,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
-            let sig = hugr.signature(node);
+            let sig = hugr.signature(node).unwrap_or_default();
             let offset = match offset < sig.port_count(dir) {
                 true => Some(offset as u16),
                 false => None,

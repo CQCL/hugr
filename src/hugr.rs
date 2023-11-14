@@ -111,13 +111,16 @@ impl NodeType {
 
     /// Use the input extensions to calculate the concrete signature of the node
     pub fn signature(&self) -> Option<Signature> {
-        self.input_extensions
-            .as_ref()
-            .map(|rs| self.op.signature().with_input_extensions(rs.clone()))
+        self.input_extensions.as_ref().map(|rs| {
+            self.op
+                .signature()
+                .unwrap_or_default()
+                .with_input_extensions(rs.clone())
+        })
     }
 
     /// Get the function type from the embedded op
-    pub fn op_signature(&self) -> FunctionType {
+    pub fn op_signature(&self) -> Option<FunctionType> {
         self.op.signature()
     }
 

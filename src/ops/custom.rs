@@ -82,10 +82,10 @@ impl OpTrait for ExternalOp {
 
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Option<FunctionType> {
         match self {
-            Self::Opaque(op) => op.signature.clone().unwrap(),
-            Self::Extension(ExtensionOp { signature, .. }) => signature.clone(),
+            Self::Opaque(op) => op.signature.clone(),
+            Self::Extension(ExtensionOp { signature, .. }) => Some(signature.clone()),
         }
     }
 }
