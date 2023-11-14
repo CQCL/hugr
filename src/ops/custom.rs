@@ -11,7 +11,7 @@ use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{Hugr, Node};
 
 use super::tag::OpTag;
-use super::{LeafOp, OpName, OpTrait, OpType};
+use super::{LeafOp, OpTrait, OpType};
 
 /// An instantiation of an operation (declared by a extension) with values for the type arguments
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -58,8 +58,9 @@ impl From<ExternalOp> for LeafOp {
     }
 }
 
-impl OpName for ExternalOp {
-    fn name(&self) -> SmolStr {
+impl ExternalOp {
+    /// Name of the ExternalOp
+    pub fn name(&self) -> SmolStr {
         let (res_id, op_name) = match self {
             Self::Opaque(op) => (&op.extension, &op.op_name),
             Self::Extension(ExtensionOp { def, .. }) => (def.extension(), def.name()),
@@ -68,24 +69,24 @@ impl OpName for ExternalOp {
     }
 }
 
-impl OpTrait for ExternalOp {
-    fn description(&self) -> &str {
+impl ExternalOp {
+    /// A description of the external op.
+    pub fn description(&self) -> &str {
         match self {
             Self::Opaque(op) => op.description.as_str(),
             Self::Extension(ExtensionOp { def, .. }) => def.description(),
         }
     }
 
-    fn tag(&self) -> OpTag {
-        OpTag::Leaf
-    }
-
     /// Note the case of an OpaqueOp without a signature should already
     /// have been detected in [resolve_extension_ops]
-    fn signature(&self) -> Option<FunctionType> {
+    pub fn dataflow_signature(&self) -> FunctionType {
         match self {
-            Self::Opaque(op) => op.signature.clone(),
-            Self::Extension(ExtensionOp { signature, .. }) => Some(signature.clone()),
+            Self::Opaque(op) => op
+                .signature
+                .clone()
+                .expect("Op should have been serialized with signature."),
+            Self::Extension(ExtensionOp { signature, .. }) => signature.clone(),
         }
     }
 }

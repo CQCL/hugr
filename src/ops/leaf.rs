@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
 use super::dataflow::DataflowOpTrait;
-use super::{OpName, OpTag, OpTrait};
+use super::{OpName, OpTag};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::types::type_param::TypeArg;
@@ -156,7 +156,7 @@ impl DataflowOpTrait for LeafOp {
 
         match self {
             LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
-            LeafOp::CustomOp(ext) => ext.signature().unwrap_or_default(),
+            LeafOp::CustomOp(ext) => ext.dataflow_signature(),
             LeafOp::MakeTuple { tys: types } => {
                 FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
