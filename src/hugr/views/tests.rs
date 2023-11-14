@@ -1,4 +1,3 @@
-use itertools::Either;
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
@@ -87,16 +86,13 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
         ]
     );
 
-    let all_linked_ports = h.all_linked_ports(n1.node()).collect_vec();
-    let [i, _] = h.get_io(h.root()).unwrap();
+    let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
     assert_eq!(
-        &all_linked_ports[..],
+        &all_linked_inputs[..],
         &[
-            (i, Either::Left(0.into())),
-            (i, Either::Left(1.into())),
-            (n2.node(), Either::Right(1.into())),
-            (n2.node(), Either::Right(0.into())),
-            (n2.node(), Either::Right(2.into())),
+            (n2.node(), 1.into()),
+            (n2.node(), 0.into()),
+            (n2.node(), 2.into()),
         ]
     );
 }

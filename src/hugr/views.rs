@@ -182,33 +182,41 @@ pub trait HugrView: sealed::HugrInternals {
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
     #[rustversion::since(1.75)] // uses impl in return position
-    /// Iterator over all the nodes and ports connected to a node.
-    /// First the OutgoingPorts connected to the inputs of this node,
-    /// then the IncomingPorts connected to the outputs of this node.
+    /// Iterator over all the nodes and ports connected to a node in a given direction.
     fn all_linked_ports(
         &self,
         node: Node,
-    ) -> impl Iterator<Item = (Node, Either<OutgoingPort, IncomingPort>)> {
-        self.all_linked_outputs(node)
-            .map(|(n, p)| (n, Either::Left(p)))
-            .chain(
-                self.all_linked_inputs(node)
-                    .map(|(n, p)| (n, Either::Right(p))),
-            )
+        dir: Direction,
+    ) -> Either<
+        impl Iterator<Item = (Node, OutgoingPort)>,
+        impl Iterator<Item = (Node, IncomingPort)>,
+    > {
+        match dir {
+            Direction::Incoming => Either::Left(
+                self.node_inputs(node)
+                    .flat_map(move |port| self.linked_outputs(node, port)),
+            ),
+            Direction::Outgoing => Either::Right(
+                self.node_outputs(node)
+                    .flat_map(move |port| self.linked_inputs(node, port)),
+            ),
+        }
     }
 
     #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all the nodes and ports connected to a node's inputs.
     fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)> {
-        self.node_inputs(node)
-            .flat_map(move |port| self.linked_outputs(node, port))
+        self.all_linked_ports(node, Direction::Incoming)
+            .left()
+            .unwrap()
     }
 
     #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all the nodes and ports connected to a node's outputs.
     fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)> {
-        self.node_outputs(node)
-            .flat_map(move |port| self.linked_inputs(node, port))
+        self.all_linked_ports(node, Direction::Outgoing)
+            .right()
+            .unwrap()
     }
 
     /// If there is exactly one port connected to this port, return
