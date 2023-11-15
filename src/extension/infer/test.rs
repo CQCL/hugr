@@ -962,3 +962,37 @@ fn sccs() {
         Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
     );
 }
+
+#[test]
+// Test of #695
+// A FuncDefn (inner) is created with two call nodes.
+// Extension inference will try to match the extensions for one of the call
+// sites, meaning the other will be a mismatch and this will fail.
+fn call_bug() -> Result<(), Box<dyn Error>> {
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    use crate::values::Value;
+
+    let mut module = ModuleBuilder::new();
+    let mut outer = module.define_function("outer", FunctionType::new(vec![], vec![]).pure())?;
+
+    let inner =
+        outer.define_function("inner", FunctionType::new(vec![USIZE_T], vec![]).pure())?;
+    let [w] = inner.input_wires_arr();
+    let f_id = inner.finish_with_outputs([w])?;
+
+    let int_value: Value = ConstUsize::new(42).into();
+    let constant = ops::Const::new(int_value, USIZE_T).unwrap();
+    let const_x_id = outer.add_constant(constant.clone(), ExtensionSet::singleton(&A))?;
+    let const_x = outer.load_const(&const_x_id)?;
+    let const_y_id = outer.add_constant(constant, ExtensionSet::singleton(&B))?;
+    let const_y = outer.load_const(&const_y_id)?;
+
+    outer.call(f_id.handle(), [const_x])?.node();
+    outer.call(f_id.handle(), [const_y])?.node();
+
+    outer.finish_with_outputs([])?;
+    module.finish_prelude_hugr()?;
+
+    Ok(())
+}
