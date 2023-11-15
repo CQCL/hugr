@@ -996,27 +996,27 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
 // Define a function "g" inside "f", which defines a function which adds to
 // the graph. Tests that the resources of the graph of "g" aren't being
 // constrained to match those of the FuncDefn node.
-fn funcdefn() -> Result<(), Box<dyn Error>> {
+fn nested_funcdefn() -> Result<(), Box<dyn Error>> {
     use crate::builder::{Container, Dataflow};
     use crate::values::Value;
 
     let mut builder = ModuleBuilder::new();
-    let mut func_builder = builder.define_function(
-        "F",
+    let mut outer_func_builder = builder.define_function(
+        "outer",
         FunctionType::new(vec![NAT], vec![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&A))
             .pure(),
     )?;
 
-    let mut nested_func_builder = func_builder.define_function(
-        "G",
+    let mut inner_func_builder = outer_func_builder.define_function(
+        "inner",
         FunctionType::new(vec![NAT], vec![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&A))
             .pure(),
     )?;
 
-    let [w] = nested_func_builder.input_wires_arr();
-    let lift = nested_func_builder.add_dataflow_op(
+    let [w] = inner_func_builder.input_wires_arr();
+    let lift = inner_func_builder.add_dataflow_op(
         ops::LeafOp::Lift {
             type_row: type_row![NAT],
             new_extension: A,
@@ -1024,14 +1024,15 @@ fn funcdefn() -> Result<(), Box<dyn Error>> {
         [w],
     )?;
     let [w] = lift.outputs_arr();
-    let g_id = nested_func_builder.finish_with_outputs([w])?;
+    let g_id = inner_func_builder.finish_with_outputs([w])?;
 
     let int_value: Value = ConstUsize::new(42).into();
-    let k_node = func_builder.add_constant(ops::Const::new(int_value, USIZE_T).unwrap(), None)?;
-    let k = func_builder.load_const(&k_node)?;
-    let call = func_builder.call(g_id.handle(), [k])?;
+    let k_node =
+        outer_func_builder.add_constant(ops::Const::new(int_value, USIZE_T).unwrap(), None)?;
+    let k = outer_func_builder.load_const(&k_node)?;
+    let call = outer_func_builder.call(g_id.handle(), [k])?;
     let [w] = call.outputs_arr();
-    func_builder.finish_with_outputs([w])?;
+    outer_func_builder.finish_with_outputs([w])?;
 
     let hugr = builder.finish_hugr(&PRELUDE_REGISTRY)?;
     infer_extensions(&hugr)?;
