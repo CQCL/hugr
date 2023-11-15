@@ -328,9 +328,7 @@ impl UnificationContext {
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
                 matches!(
                     sig.port_kind(*src_port),
-                    Some(EdgeKind::Value(_))
-                        | Some(EdgeKind::Static(_))
-                        | Some(EdgeKind::ControlFlow)
+                    Some(EdgeKind::Value(_)) | Some(EdgeKind::ControlFlow)
                 )
             }) {
                 let m_tgt = *self
