@@ -883,7 +883,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     let ext = ExtensionId::new("unknown1").unwrap();
     let delta = ExtensionSet::singleton(&ext);
-    let ft = FunctionType::new_linear(type_row![QB_T, QB_T]).with_extension_delta(&delta);
+    let ft = FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(&delta);
     let mut dfg = DFGBuilder::new(ft.clone())?;
 
     // While https://github.com/CQCL-DEV/hugr/issues/388 is unsolved,
@@ -897,7 +897,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
         Some(ft),
     ))
     .into();
-    let unary_sig = FunctionType::new_linear(type_row![QB_T])
+    let unary_sig = FunctionType::new_endo(type_row![QB_T])
         .with_extension_delta(&ExtensionSet::singleton(&ext));
     let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
         ext,

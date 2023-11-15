@@ -731,7 +731,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_linear(type_row![QB_T, QB_T, QB_T]).pure(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).pure(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -747,8 +747,7 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func =
-            mod_builder.declare("test", FunctionType::new_linear(type_row![BOOL_T]).pure())?;
+        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).pure())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
@@ -806,7 +805,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -831,7 +830,7 @@ mod tests {
         // the first two qubits.
         assert_eq!(
             sub.signature(&func),
-            FunctionType::new_linear(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T])
         );
         Ok(())
     }
@@ -843,7 +842,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };

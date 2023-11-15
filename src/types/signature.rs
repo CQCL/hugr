@@ -109,7 +109,7 @@ impl FunctionType {
         }
     }
     /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self::new(linear.clone(), linear)
     }

@@ -266,7 +266,7 @@ pub(crate) mod test {
             hugr: Box::new(simple_dfg_hugr),
         };
 
-        let correct_type = Type::new_function(FunctionType::new_linear(type_row![
+        let correct_type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 
