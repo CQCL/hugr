@@ -49,8 +49,8 @@ impl PolyFuncType {
         &self.params
     }
 
-    /// Create a new PolyFuncType and validates it. (This will only succeed
-    /// for outermost PolyFuncTypes i.e. with no free type-variables.)
+    /// Create a new PolyFuncType and validates it, assuming it has no free
+    /// type variables (from any enclosing scope).
     /// The [ExtensionRegistry] should be the same (or a subset) of that which will later
     /// be used to validate the Hugr; at this point we only need the types.
     ///
@@ -62,12 +62,25 @@ impl PolyFuncType {
         body: FunctionType,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let params = params.into();
-        body.validate(extension_registry, &params)?;
-        Ok(Self { params, body })
+        let res = Self::new(params, body);
+        res.validate(extension_registry, &[])?;
+        Ok(res)
     }
 
-    pub(super) fn validate(
+    /// Create a new PolyFuncType given the kinds of the variables it declares
+    /// and the underlying [FunctionType].
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+        Self {
+            params: params.into(),
+            body,
+        }
+    }
+
+    /// Validates this instance against an ExtensionRegistry - checking that
+    /// all type bounds are wellformed instances of declared types -  and
+    /// that all variables are declared (perhaps including those from an
+    /// enclosing scope, whose kinds are provided).
+    pub fn validate(
         &self,
         reg: &ExtensionRegistry,
         external_var_decls: &[TypeParam],
