@@ -25,8 +25,12 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
+#[rustversion::since(1.75)] // uses impl in return position
+use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
+#[rustversion::since(1.75)] // uses impl in return position
+use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -179,6 +183,71 @@ pub trait HugrView: sealed::HugrInternals {
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all the nodes and ports connected to a node in a given direction.
+    fn all_linked_ports(
+        &self,
+        node: Node,
+        dir: Direction,
+    ) -> Either<
+        impl Iterator<Item = (Node, OutgoingPort)>,
+        impl Iterator<Item = (Node, IncomingPort)>,
+    > {
+        match dir {
+            Direction::Incoming => Either::Left(
+                self.node_inputs(node)
+                    .flat_map(move |port| self.linked_outputs(node, port)),
+            ),
+            Direction::Outgoing => Either::Right(
+                self.node_outputs(node)
+                    .flat_map(move |port| self.linked_inputs(node, port)),
+            ),
+        }
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all the nodes and ports connected to a node's inputs.
+    fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)> {
+        self.all_linked_ports(node, Direction::Incoming)
+            .left()
+            .unwrap()
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all the nodes and ports connected to a node's outputs.
+    fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)> {
+        self.all_linked_ports(node, Direction::Outgoing)
+            .right()
+            .unwrap()
+    }
+
+    /// If there is exactly one port connected to this port, return
+    /// it and its node.
+    fn single_linked_port(&self, node: Node, port: impl Into<Port>) -> Option<(Node, Port)> {
+        self.linked_ports(node, port).exactly_one().ok()
+    }
+
+    /// If there is exactly one OutgoingPort connected to this IncomingPort, return
+    /// it and its node.
+    fn single_linked_output(
+        &self,
+        node: Node,
+        port: impl Into<IncomingPort>,
+    ) -> Option<(Node, OutgoingPort)> {
+        self.single_linked_port(node, port.into())
+            .map(|(n, p)| (n, p.as_outgoing().unwrap()))
+    }
+
+    /// If there is exactly one IncomingPort connected to this OutgoingPort, return
+    /// it and its node.
+    fn single_linked_input(
+        &self,
+        node: Node,
+        port: impl Into<OutgoingPort>,
+    ) -> Option<(Node, IncomingPort)> {
+        self.single_linked_port(node, port.into())
+            .map(|(n, p)| (n, p.as_incoming().unwrap()))
+    }
     /// Iterator over the nodes and output ports connected to a given *input* port.
     /// Like [`linked_ports`][HugrView::linked_ports] but preserves knowledge
     /// that the linked ports are [OutgoingPort]s.
@@ -333,6 +402,50 @@ pub trait HugrView: sealed::HugrInternals {
                 }
             })
             .finish()
+    }
+
+    /// If a node has a static input, return the source node.
+    fn static_source(&self, node: Node) -> Option<Node> {
+        self.linked_outputs(node, self.get_optype(node).static_input_port()?)
+            .next()
+            .map(|(n, _)| n)
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// If a node has a static output, return the targets.
+    fn static_targets(&self, node: Node) -> Option<impl Iterator<Item = (Node, IncomingPort)>> {
+        Some(self.linked_inputs(node, self.get_optype(node).static_output_port()?))
+    }
+
+    /// Get the "signature" (incoming and outgoing types) of a node, non-Value
+    /// kind ports will be missing.
+    fn signature(&self, node: Node) -> Option<FunctionType> {
+        self.get_optype(node).dataflow_signature()
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all outgoing ports that have Value type, along
+    /// with corresponding types.
+    fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
+        let sig = self.signature(node).unwrap_or_default();
+        self.node_ports(node, dir)
+            .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all incoming ports that have Value type, along
+    /// with corresponding types.
+    fn in_value_types(&self, node: Node) -> impl Iterator<Item = (IncomingPort, Type)> {
+        self.value_types(node, Direction::Incoming)
+            .map(|(p, t)| (p.as_incoming().unwrap(), t))
+    }
+
+    #[rustversion::since(1.75)] // uses impl in return position
+    /// Iterator over all incoming ports that have Value type, along
+    /// with corresponding types.
+    fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
+        self.value_types(node, Direction::Outgoing)
+            .map(|(p, t)| (p.as_outgoing().unwrap(), t))
     }
 }
 
@@ -503,6 +616,32 @@ impl<T: AsRef<Hugr>> HugrView for T {
             .all_neighbours(node.pg_index())
             .map_into()
     }
+}
+
+#[rustversion::since(1.75)] // uses impl in return position
+/// Trait implementing methods on port iterators.
+pub trait PortIterator<P>: Iterator<Item = (Node, P)>
+where
+    P: Into<Port> + Copy,
+    Self: Sized,
+{
+    /// Filter an iterator of node-ports to only dataflow dependency specifying
+    /// ports (Value and StateOrder)
+    fn dataflow_ports_only(self, hugr: &impl HugrView) -> impl Iterator<Item = (Node, P)> {
+        self.filter(move |(n, p)| {
+            matches!(
+                hugr.get_optype(*n).port_kind(*p),
+                Some(EdgeKind::Value(_) | EdgeKind::StateOrder)
+            )
+        })
+    }
+}
+#[rustversion::since(1.75)] // uses impl in return position
+impl<I, P> PortIterator<P> for I
+where
+    I: Iterator<Item = (Node, P)>,
+    P: Into<Port> + Copy,
+{
 }
 
 pub(crate) mod sealed {

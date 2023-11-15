@@ -332,7 +332,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
             hugr,
             conditional_node,
             op.clone(),
-            Into::<OpType>::into(op).signature(),
+            Into::<OpType>::into(op).dataflow_signature().unwrap(),
         )?;
 
         let lift1 = hugr.add_node_with_parent(

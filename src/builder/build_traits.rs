@@ -236,7 +236,7 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
+        let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
         let node = self.add_hugr(hugr)?.new_root;
 
         let inputs = input_wires.into_iter().collect();
@@ -257,8 +257,8 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).signature().output_count();
         let node = self.add_hugr_view(hugr)?.new_root;
+        let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -612,8 +612,9 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let const_in_port = signature.output.len();
-        let op_id = self.add_dataflow_op(ops::Call { signature }, input_wires)?;
+        let op: OpType = ops::Call { signature }.into();
+        let const_in_port = op.static_input_port().unwrap();
+        let op_id = self.add_dataflow_op(op, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
@@ -633,13 +634,13 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     nodetype: impl Into<NodeType>,
     inputs: Vec<Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let nodetype = nodetype.into();
-    let sig = nodetype.op_signature();
+    let nodetype: NodeType = nodetype.into();
+    let num_outputs = nodetype.op().value_output_count();
     let op_node = data_builder.add_child_node(nodetype)?;
 
     wire_up_inputs(inputs, op_node, data_builder)?;
 
-    Ok((op_node, sig.output().len()))
+    Ok((op_node, num_outputs))
 }
 
 fn wire_up_inputs<T: Dataflow + ?Sized>(

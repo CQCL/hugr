@@ -1,5 +1,6 @@
 //! Abstract and concrete Signature types.
 
+use itertools::Either;
 #[cfg(feature = "pyo3")]
 use pyo3::{pyclass, pymethods};
 
@@ -117,22 +118,50 @@ impl FunctionType {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
-    pub fn get(&self, port: impl Into<Port>) -> Option<&Type> {
-        let port = port.into();
-        match port.direction() {
-            Direction::Incoming => self.input.get(port),
-            Direction::Outgoing => self.output.get(port),
+    pub fn port_type(&self, port: impl Into<Port>) -> Option<&Type> {
+        let port: Port = port.into();
+        match port.as_directed() {
+            Either::Left(port) => self.in_port_type(port),
+            Either::Right(port) => self.out_port_type(port),
         }
+    }
+
+    /// Returns the type of a value input [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
+        self.input.get(port.into())
+    }
+
+    /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
+        self.output.get(port.into())
+    }
+
+    /// Returns a mutable reference to the type of a value input [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
+        self.input.get_mut(port.into())
+    }
+
+    /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
+    /// of bounds.
+    #[inline]
+    pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
+        self.output.get_mut(port.into())
     }
 
     /// Returns a mutable reference to the type of a value [`Port`].
     /// Returns `None` if the port is out of bounds.
     #[inline]
-    pub fn get_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
+    pub fn port_type_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
         let port = port.into();
-        match port.direction() {
-            Direction::Incoming => self.input.get_mut(port),
-            Direction::Outgoing => self.output.get_mut(port),
+        match port.as_directed() {
+            Either::Left(port) => self.in_port_type_mut(port),
+            Either::Right(port) => self.out_port_type_mut(port),
         }
     }
 
@@ -271,14 +300,14 @@ mod test {
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
 
         assert_eq!(
-            f_type.get(Port::new(Direction::Incoming, 0)),
+            f_type.port_type(Port::new(Direction::Incoming, 0)),
             Some(&Type::UNIT)
         );
 
         let out = Port::new(Direction::Outgoing, 0);
-        *(f_type.get_mut(out).unwrap()) = USIZE_T;
+        *(f_type.port_type_mut(out).unwrap()) = USIZE_T;
 
-        assert_eq!(f_type.get(out), Some(&USIZE_T));
+        assert_eq!(f_type.port_type(out), Some(&USIZE_T));
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
