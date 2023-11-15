@@ -25,7 +25,7 @@
 //! # Example
 //!
 //! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
-//! a simple quantum extension and then use the [[DFGBuilder]] as follows:
+//! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
 //! use hugr::extension::prelude::{BOOL_T, QB_T};
