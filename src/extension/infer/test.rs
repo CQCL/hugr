@@ -253,26 +253,10 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
 
     let closure = hugr.infer_extensions()?;
     assert!(closure.is_empty());
+    assert_eq!(hugr.get_nodetype(src.node()).io_extensions().unwrap().1, rs);
     assert_eq!(
-        hugr.get_nodetype(src.node())
-            .signature()
-            .unwrap()
-            .output_extensions(),
-        rs
-    );
-    assert_eq!(
-        hugr.get_nodetype(mult.node())
-            .signature()
-            .unwrap()
-            .input_extensions,
-        rs
-    );
-    assert_eq!(
-        hugr.get_nodetype(mult.node())
-            .signature()
-            .unwrap()
-            .output_extensions(),
-        rs
+        hugr.get_nodetype(mult.node()).io_extensions().unwrap(),
+        (&rs.clone(), rs)
     );
     Ok(())
 }
@@ -385,18 +369,12 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
 
     for node in [case0_node, case1_node, conditional_node] {
         assert_eq!(
-            hugr.get_nodetype(node)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            ExtensionSet::new()
+            hugr.get_nodetype(node).io_extensions().unwrap().0,
+            &ExtensionSet::new()
         );
         assert_eq!(
-            hugr.get_nodetype(node)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            ExtensionSet::new()
+            hugr.get_nodetype(node).io_extensions().unwrap().0,
+            &ExtensionSet::new()
         );
     }
     Ok(())
