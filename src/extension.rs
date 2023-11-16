@@ -35,11 +35,6 @@ pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
 
 impl ExtensionRegistry {
-    /// Makes a new (empty) registry.
-    pub const fn new() -> Self {
-        Self(BTreeMap::new())
-    }
-
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Extension> {
         self.0.get(name)
@@ -47,18 +42,22 @@ impl ExtensionRegistry {
 }
 
 /// An Extension Registry containing no extensions.
-pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
+pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 
 impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
     fn from(value: T) -> Self {
-        let mut reg = Self::new();
+        let mut exts = BTreeMap::new();
         for ext in value.into_iter() {
-            let prev = reg.0.insert(ext.name.clone(), ext);
+            let prev = exts.insert(ext.name.clone(), ext);
             if let Some(prev) = prev {
                 panic!("Multiple extensions with same name: {}", prev.name)
             };
         }
-        reg
+        let res = ExtensionRegistry(exts);
+        for ext in res.0.values() {
+            ext.validate(&res).unwrap();
+        }
+        res
     }
 }
 
@@ -289,6 +288,16 @@ impl Extension {
     ) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.get_op(op_name).expect("Op not found.");
         ExtensionOp::new(op_def.clone(), args, ext_reg)
+    }
+
+    // Validates against a registry, which we can assume includes this extension itself.
+    // (TODO deal with the registry itself containing invalid extensions!)
+    fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+        // TODO we should validate TypeParams of TypeDefs too
+        for op_def in self.operations.values() {
+            op_def.validate(all_exts)?;
+        }
+        Ok(())
     }
 }
 

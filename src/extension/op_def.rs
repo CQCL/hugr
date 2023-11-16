@@ -245,6 +245,14 @@ impl OpDef {
             SignatureFunc::CustomFunc { static_params, .. } => static_params,
         }
     }
+
+    pub(super) fn validate(&self, exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+        // TODO validate declared TypeParams for both type scheme and custom binary
+        if let SignatureFunc::TypeScheme(ts) = &self.signature_func {
+            ts.validate(exts, &[])?;
+        }
+        Ok(())
+    }
 }
 
 impl Extension {
