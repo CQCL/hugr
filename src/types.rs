@@ -421,7 +421,7 @@ pub(crate) mod test {
     use crate::types::TypeBound;
 
     pub(crate) fn test_registry() -> ExtensionRegistry {
-        vec![PRELUDE.to_owned(), float_types::extension()].into()
+        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::extension()]).unwrap()
     }
 
     #[test]

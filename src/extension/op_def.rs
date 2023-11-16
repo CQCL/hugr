@@ -364,7 +364,7 @@ mod test {
 
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::PRELUDE;
+    use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
@@ -378,7 +378,7 @@ mod test {
 
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
-        let reg1 = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let reg1 = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let mut e = Extension::new(EXT_ID);
         const TP: TypeParam = TypeParam::Type(TypeBound::Any);
@@ -404,7 +404,7 @@ mod test {
         )?;
         dfg.finish_hugr_with_outputs(
             rev.outputs(),
-            &[PRELUDE.to_owned(), EXTENSION.to_owned(), e].into(),
+            &ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap(),
         )?;
 
         Ok(())

@@ -192,8 +192,8 @@ impl DataflowOpTrait for LeafOp {
 mod test {
     use crate::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::SignatureError;
     use crate::extension::{prelude::USIZE_T, PRELUDE};
+    use crate::extension::{ExtensionRegistry, SignatureError};
     use crate::hugr::ValidationError;
     use crate::ops::handle::NodeHandle;
     use crate::std_extensions::collections::EXTENSION;
@@ -206,7 +206,7 @@ mod test {
 
     #[test]
     fn hugr_with_type_apply() -> Result<(), Box<dyn std::error::Error>> {
-        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
         let pf_in = nested_func();
         let pf_out = pf_in.instantiate(&[USIZE_TA], &reg)?;
         let mut dfg = DFGBuilder::new(FunctionType::new(
@@ -225,7 +225,7 @@ mod test {
 
     #[test]
     fn bad_type_apply() -> Result<(), Box<dyn std::error::Error>> {
-        let reg = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
+        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
         let pf = nested_func();
         let pf_usz = pf.instantiate_poly(&[USIZE_TA], &reg)?;
         let pf_bool = pf.instantiate_poly(&[TypeArg::Type { ty: BOOL_T }], &reg)?;

@@ -458,7 +458,9 @@ mod test {
 
     #[test]
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
-        let reg: ExtensionRegistry = [PRELUDE.to_owned(), collections::EXTENSION.to_owned()].into();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
+                .unwrap();
         let listy = Type::new_extension(
             collections::EXTENSION
                 .get_type(collections::LIST_TYPENAME.as_str())

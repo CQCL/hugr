@@ -672,7 +672,7 @@ fn invalid_types() {
         TypeDefBound::Explicit(TypeBound::Any),
     )
     .unwrap();
-    let reg: ExtensionRegistry = [e, PRELUDE.to_owned()].into();
+    let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()]).unwrap();
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));

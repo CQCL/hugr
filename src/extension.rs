@@ -39,13 +39,11 @@ impl ExtensionRegistry {
     pub fn get(&self, name: &str) -> Option<&Extension> {
         self.0.get(name)
     }
-}
 
-/// An Extension Registry containing no extensions.
-pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
-
-impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
-    fn from(value: T) -> Self {
+    /// Makes a new ExtensionRegistry, validating all the extensions in it
+    pub fn try_new(
+        value: impl IntoIterator<Item = Extension>,
+    ) -> Result<Self, (ExtensionId, SignatureError)> {
         let mut exts = BTreeMap::new();
         for ext in value.into_iter() {
             let prev = exts.insert(ext.name.clone(), ext);
@@ -53,13 +51,20 @@ impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
                 panic!("Multiple extensions with same name: {}", prev.name)
             };
         }
+        // Note this potentially asks extensions to validate themselves against other extensions that
+        // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
+        // or (given parameterized types could be cyclically dependent) at least to validate types
+        // before ops, but since we are not even validating types yet, this is much simpler....TOOD!
         let res = ExtensionRegistry(exts);
         for ext in res.0.values() {
-            ext.validate(&res).unwrap();
+            ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
         }
-        res
+        Ok(res)
     }
 }
+
+/// An Extension Registry containing no extensions.
+pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes

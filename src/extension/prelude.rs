@@ -76,7 +76,8 @@ lazy_static! {
         prelude
     };
     /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = [PRELUDE_DEF.to_owned()].into();
+    pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
+        ExtensionRegistry::try_new([PRELUDE_DEF.to_owned()]).unwrap();
 
     /// Prelude extension
     pub static ref PRELUDE: &'static Extension = PRELUDE_REGISTRY.get(&PRELUDE_ID).unwrap();

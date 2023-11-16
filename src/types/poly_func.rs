@@ -218,6 +218,7 @@ impl<'a> Substitution for InsideBinders<'a> {
 pub(crate) mod test {
     use std::num::NonZeroU64;
 
+    use lazy_static::lazy_static;
     use smol_str::SmolStr;
 
     use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
@@ -230,6 +231,11 @@ pub(crate) mod test {
     use crate::Extension;
 
     use super::PolyFuncType;
+
+    lazy_static! {
+        static ref REGISTRY: ExtensionRegistry =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
+    }
 
     impl PolyFuncType {
         pub(crate) fn new_validated(
@@ -248,14 +254,13 @@ pub(crate) mod test {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Any));
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
-        let reg: ExtensionRegistry = [PRELUDE.to_owned(), EXTENSION.to_owned()].into();
         let list_len = PolyFuncType::new_validated(
             [TypeParam::Type(TypeBound::Any)],
             FunctionType::new(vec![list_of_var], vec![USIZE_T]),
-            &reg,
+            &REGISTRY,
         )?;
 
-        let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &reg)?;
+        let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &REGISTRY)?;
         assert_eq!(
             t,
             FunctionType::new(
@@ -336,14 +341,14 @@ pub(crate) mod test {
         let tv = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Copyable));
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
-        let reg = [EXTENSION.to_owned()].into();
         for decl in [
             TypeParam::Extensions,
             TypeParam::List(Box::new(TypeParam::max_nat())),
             TypeParam::Opaque(USIZE_CUSTOM_T),
             TypeParam::Tuple(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()]),
         ] {
-            let invalid_ts = PolyFuncType::new_validated([decl.clone()], body_type.clone(), &reg);
+            let invalid_ts =
+                PolyFuncType::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
@@ -353,7 +358,7 @@ pub(crate) mod test {
             );
         }
         // Variable not declared at all
-        let invalid_ts = PolyFuncType::new_validated([], body_type, &reg);
+        let invalid_ts = PolyFuncType::new_validated([], body_type, &REGISTRY);
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
@@ -382,7 +387,7 @@ pub(crate) mod test {
         )
         .unwrap();
 
-        let reg: ExtensionRegistry = [e].into();
+        let reg = ExtensionRegistry::try_new([e]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
             PolyFuncType::new_validated(
@@ -531,7 +536,7 @@ pub(crate) mod test {
                     ),
                 ))],
             ),
-            &[EXTENSION.to_owned()].into(),
+            &REGISTRY,
         )
         .unwrap()
     }
@@ -539,7 +544,6 @@ pub(crate) mod test {
     #[test]
     fn test_instantiate_nested() -> Result<(), SignatureError> {
         let outer = nested_func();
-        let reg: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
 
         let arg = new_array(USIZE_T, TypeArg::BoundedNat { n: 5 });
         // `arg` -> (forall C. C -> List(Tuple(C, `arg`)))
@@ -557,7 +561,7 @@ pub(crate) mod test {
             ))],
         );
 
-        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &reg)?;
+        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &REGISTRY)?;
         assert_eq!(res, outer_applied);
         Ok(())
     }
@@ -567,11 +571,10 @@ pub(crate) mod test {
         let outer = nested_func();
 
         // Now substitute in a free var from further outside
-        let reg = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
         const FREE: usize = 3;
         const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
         let res = outer
-            .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &reg)
+            .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &REGISTRY)
             .unwrap();
         assert_eq!(
             res,
@@ -604,7 +607,7 @@ pub(crate) mod test {
         };
 
         let res = outer
-            .instantiate(&[TypeArg::Type { ty: rhs(FREE) }], &reg)
+            .instantiate(&[TypeArg::Type { ty: rhs(FREE) }], &REGISTRY)
             .unwrap();
         assert_eq!(
             res,

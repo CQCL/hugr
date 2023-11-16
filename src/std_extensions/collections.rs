@@ -118,7 +118,7 @@ mod test {
     use crate::{
         extension::{
             prelude::{ConstUsize, QB_T, USIZE_T},
-            OpDef, PRELUDE,
+            ExtensionRegistry, OpDef, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         types::{type_param::TypeArg, Type, TypeRow},
@@ -161,14 +161,14 @@ mod test {
 
     #[test]
     fn test_list_ops() {
-        let reg = &[
+        let reg = ExtensionRegistry::try_new([
             EXTENSION.to_owned(),
             PRELUDE.to_owned(),
             float_types::extension(),
-        ]
-        .into();
+        ])
+        .unwrap();
         let pop_sig = get_op(&POP_NAME)
-            .compute_signature(&[TypeArg::Type { ty: QB_T }], reg)
+            .compute_signature(&[TypeArg::Type { ty: QB_T }], &reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
@@ -184,7 +184,7 @@ mod test {
         assert_eq!(pop_sig.output(), &both_row);
 
         let push_sig = get_op(&PUSH_NAME)
-            .compute_signature(&[TypeArg::Type { ty: FLOAT64_TYPE }], reg)
+            .compute_signature(&[TypeArg::Type { ty: FLOAT64_TYPE }], &reg)
             .unwrap();
 
         let list_type = Type::new_extension(CustomType::new(
