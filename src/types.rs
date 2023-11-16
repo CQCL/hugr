@@ -412,17 +412,9 @@ pub(crate) mod test {
     pub(crate) use poly_func::test::nested_func;
 
     use super::*;
-    use crate::{
-        extension::{prelude::USIZE_T, PRELUDE},
-        ops::AliasDecl,
-        std_extensions::arithmetic::float_types,
-    };
+    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     use crate::types::TypeBound;
-
-    pub(crate) fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::extension()]).unwrap()
-    }
 
     #[test]
     fn construct() {
