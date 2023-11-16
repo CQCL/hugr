@@ -139,9 +139,8 @@ impl NewEdgeSpec {
                 true
             };
             let found_incoming = h
-                .linked_ports(self.tgt, tgt_pos)
-                .exactly_one()
-                .is_ok_and(|(src_n, _)| descends_from_legal(src_n));
+                .single_linked_output(self.tgt, tgt_pos)
+                .is_some_and(|(src_n, _)| descends_from_legal(src_n));
             if !found_incoming {
                 return Err(ReplaceError::NoRemovedEdge(err_edge()));
             };
@@ -448,8 +447,9 @@ mod test {
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, NodeType, Rewrite};
     use crate::ops::custom::{ExternalOp, OpaqueOp};
+    use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpTrait, OpType, DFG};
+    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
@@ -479,7 +479,7 @@ mod test {
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
         let mut cfg = CFGBuilder::new(
-            FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
+            FunctionType::new_endo(just_list.clone()).with_extension_delta(&exset),
         )?;
 
         let pred_const = cfg.add_constant(ops::Const::unary_unit_sum(), None)?;
@@ -516,7 +516,7 @@ mod test {
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
         let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
-            signature: FunctionType::new_linear(just_list.clone()),
+            signature: FunctionType::new_endo(just_list.clone()),
         }));
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
@@ -588,8 +588,8 @@ mod test {
             let popp = h.get_parent(pop).unwrap();
             let pushp = h.get_parent(push).unwrap();
             assert_ne!(popp, pushp); // Two different DFGs
-            assert!(matches!(h.get_optype(popp), OpType::DFG(_)));
-            assert!(matches!(h.get_optype(pushp), OpType::DFG(_)));
+            assert!(h.get_optype(popp).is_dfg());
+            assert!(h.get_optype(pushp).is_dfg());
 
             let grandp = h.get_parent(popp).unwrap();
             assert_eq!(grandp, h.get_parent(pushp).unwrap());
@@ -610,13 +610,12 @@ mod test {
             .unwrap()
     }
 
-    fn single_node_block<T: AsRef<Hugr> + AsMut<Hugr>>(
+    fn single_node_block<T: AsRef<Hugr> + AsMut<Hugr>, O: DataflowOpTrait + Into<OpType>>(
         h: &mut CFGBuilder<T>,
-        op: impl Into<OpType>,
+        op: O,
         pred_const: &ConstID,
         entry: bool,
     ) -> Result<BasicBlockID, BuildError> {
-        let op: OpType = op.into();
         let op_sig = op.signature();
         let mut bb = if entry {
             assert_eq!(
@@ -630,7 +629,7 @@ mod test {
         } else {
             h.simple_block_builder(op_sig, 1)?
         };
-
+        let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;
         let load_pred = bb.load_const(pred_const)?;
         bb.finish_with_outputs(load_pred, op.outputs())
@@ -644,7 +643,7 @@ mod test {
 
     #[test]
     fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
-        let utou = FunctionType::new_linear(vec![USIZE_T]);
+        let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
             LeafOp::from(ExternalOp::Opaque(OpaqueOp::new(
                 ExtensionId::new("unknown_ext").unwrap(),

@@ -46,6 +46,10 @@ pub enum OpTag {
     Input,
     /// A dataflow output.
     Output,
+    /// Dataflow node that has a static input
+    StaticInput,
+    /// Node that has a static output
+    StaticOutput,
     /// A function call.
     FnCall,
     /// A constant load operation.
@@ -104,14 +108,14 @@ impl OpTag {
             OpTag::DataflowChild => &[OpTag::Any],
             OpTag::Input => &[OpTag::DataflowChild],
             OpTag::Output => &[OpTag::DataflowChild],
-            OpTag::Function => &[OpTag::ModuleOp],
+            OpTag::Function => &[OpTag::ModuleOp, OpTag::StaticOutput],
             OpTag::Alias => &[OpTag::ScopedDefn],
             OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
             OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
-            OpTag::Const => &[OpTag::ScopedDefn],
+            OpTag::Const => &[OpTag::ScopedDefn, OpTag::StaticOutput],
             OpTag::Dfg => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Cfg => &[OpTag::DataflowChild],
             OpTag::ScopedDefn => &[
@@ -121,8 +125,10 @@ impl OpTag {
             ],
             OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
-            OpTag::FnCall => &[OpTag::DataflowChild],
-            OpTag::LoadConst => &[OpTag::DataflowChild],
+            OpTag::StaticInput => &[OpTag::Any],
+            OpTag::StaticOutput => &[OpTag::Any],
+            OpTag::FnCall => &[OpTag::StaticInput, OpTag::DataflowChild],
+            OpTag::LoadConst => &[OpTag::StaticInput, OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
             OpTag::DataflowParent => &[OpTag::Any],
         }
@@ -150,6 +156,8 @@ impl OpTag {
             OpTag::Cfg => "Nested control-flow operation",
             OpTag::TailLoop => "Tail-recursive loop",
             OpTag::Conditional => "Conditional operation",
+            OpTag::StaticInput => "Node with static input (LoadConst or FnCall)",
+            OpTag::StaticOutput => "Node with static output (FuncDefn, FuncDecl, Const)",
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
             OpTag::Leaf => "Leaf operation",

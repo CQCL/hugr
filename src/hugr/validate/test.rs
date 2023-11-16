@@ -139,7 +139,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: FunctionType::new_linear(type_row![BOOL_T]),
+        signature: FunctionType::new_endo(type_row![BOOL_T]),
     }
     .into();
 
@@ -366,7 +366,7 @@ fn test_ext_edge() -> Result<(), HugrError> {
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_linear(type_row![BOOL_T]),
+            signature: FunctionType::new_endo(type_row![BOOL_T]),
         },
     )?;
     // this Xor has its 2nd input unconnected
@@ -428,8 +428,10 @@ fn test_local_const() -> Result<(), HugrError> {
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op)?;
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
+
     h.connect(cst, 0, lcst, 0)?;
     h.connect(lcst, 0, and, 1)?;
+    assert_eq!(h.static_source(lcst), Some(cst));
     // There is no edge from Input to LoadConstant, but that's OK:
     h.update_validate(&EMPTY_REG).unwrap();
     Ok(())

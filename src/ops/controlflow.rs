@@ -3,8 +3,8 @@
 use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
-use crate::type_row;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::{type_row, Direction};
 
 use super::dataflow::DataflowOpTrait;
 use super::OpTag;
@@ -169,12 +169,20 @@ impl OpTrait for BasicBlock {
         Some(EdgeKind::ControlFlow)
     }
 
-    fn signature(&self) -> FunctionType {
-        match self {
+    fn dataflow_signature(&self) -> Option<FunctionType> {
+        Some(match self {
             BasicBlock::DFB {
                 extension_delta, ..
             } => FunctionType::new(type_row![], type_row![]).with_extension_delta(extension_delta),
             BasicBlock::Exit { .. } => FunctionType::new(type_row![], type_row![]),
+        })
+    }
+
+    fn non_df_port_count(&self, dir: Direction) -> usize {
+        match self {
+            Self::DFB { tuple_sum_rows, .. } if dir == Direction::Outgoing => tuple_sum_rows.len(),
+            Self::Exit { .. } if dir == Direction::Outgoing => 0,
+            _ => 1,
         }
     }
 }
@@ -224,8 +232,8 @@ impl OpTrait for Case {
         <Self as StaticTag>::TAG
     }
 
-    fn signature(&self) -> FunctionType {
-        self.signature.clone()
+    fn dataflow_signature(&self) -> Option<FunctionType> {
+        Some(self.signature.clone())
     }
 }
 

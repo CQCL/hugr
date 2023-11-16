@@ -12,8 +12,9 @@ use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
+use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-use crate::ops::{BasicBlock, OpTrait, OpType};
+use crate::ops::{BasicBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
 
@@ -49,7 +50,7 @@ impl OutlineCfg {
             _ => return Err(OutlineCfgError::NotSiblings),
         };
         let o = h.get_optype(cfg_n);
-        if !matches!(o, OpType::CFG(_)) {
+        let OpType::CFG(o) = o else {
             return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
         };
         let cfg_entry = h.children(cfg_n).next().unwrap();
@@ -177,7 +178,7 @@ impl Rewrite for OutlineCfg {
         let exit_port = h
             .node_outputs(exit)
             .filter(|p| {
-                let (t, p2) = h.linked_ports(exit, *p).exactly_one().ok().unwrap();
+                let (t, p2) = h.single_linked_input(exit, *p).unwrap();
                 assert!(p2.index() == 0);
                 t == outside
             })

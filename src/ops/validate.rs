@@ -11,7 +11,6 @@ use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
 use crate::types::{Type, TypeRow};
-use crate::Direction;
 
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
@@ -32,28 +31,10 @@ pub struct OpValidityFlags {
     pub requires_children: bool,
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
-    /// A strict requirement on the number of non-dataflow multiports.
-    ///
-    /// If not specified, the operation must have exactly one non-dataflow port
-    /// if the operation type has other_edges, or zero otherwise.
-    pub non_df_ports: (Option<usize>, Option<usize>),
     /// A validation check for edges between children
     ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
-}
-
-impl OpValidityFlags {
-    /// Get the number of non-dataflow multiports.
-    ///
-    /// If None, the operation must have exactly one non-dataflow port
-    /// if the operation type has other_edges, or zero otherwise.
-    pub fn non_df_port_count(&self, dir: Direction) -> Option<usize> {
-        match dir {
-            Direction::Incoming => self.non_df_ports.0,
-            Direction::Outgoing => self.non_df_ports.1,
-        }
-    }
 }
 
 impl Default for OpValidityFlags {
@@ -65,7 +46,6 @@ impl Default for OpValidityFlags {
             allowed_second_child: OpTag::Any,
             requires_children: false,
             requires_dag: false,
-            non_df_ports: (None, None),
             edge_check: None,
         }
     }
@@ -122,12 +102,8 @@ impl ValidateOp for super::DFG {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.signature().input,
-            &self.signature().output,
-            "nested graph",
-            children,
-        )
+        let sig = self.dataflow_signature().unwrap_or_default();
+        validate_io_nodes(&sig.input, &sig.output, "nested graph", children)
     }
 }
 
@@ -159,9 +135,9 @@ impl ValidateOp for super::Conditional {
         // Each child must have its variant's row and the rest of `inputs` as input,
         // and matching output
         for (i, (child, optype)) in children.into_iter().enumerate() {
-            let OpType::Case(case_op) = optype else {
-                panic!("Child check should have already checked valid ops.")
-            };
+            let case_op = optype
+                .as_case()
+                .expect("Child check should have already checked valid ops.");
             let sig = &case_op.signature;
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
@@ -316,16 +292,12 @@ impl ValidateOp for BasicBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         match self {
-            BasicBlock::DFB {
-                tuple_sum_rows: tuple_sum_variants,
-                ..
-            } => OpValidityFlags {
+            BasicBlock::DFB { .. } => OpValidityFlags {
                 allowed_children: OpTag::DataflowChild,
                 allowed_first_child: OpTag::Input,
                 allowed_second_child: OpTag::Output,
                 requires_children: true,
                 requires_dag: true,
-                non_df_ports: (None, Some(tuple_sum_variants.len())),
                 ..Default::default()
             },
             // Default flags are valid for non-container operations
@@ -395,19 +367,22 @@ fn validate_io_nodes<'a>(
     let (first, first_optype) = children.next().unwrap();
     let (second, second_optype) = children.next().unwrap();
 
-    if &first_optype.signature().output != expected_input {
+    let first_sig = first_optype.dataflow_signature().unwrap_or_default();
+    if &first_sig.output != expected_input {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: first,
-            actual: first_optype.signature().output,
+            actual: first_sig.output,
             expected: expected_input.clone(),
             node_desc: "Input",
             container_desc,
         });
     }
-    if &second_optype.signature().input != expected_output {
+    let second_sig = second_optype.dataflow_signature().unwrap_or_default();
+
+    if &second_sig.input != expected_output {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: second,
-            actual: second_optype.signature().input,
+            actual: second_sig.input,
             expected: expected_output.clone(),
             node_desc: "Output",
             container_desc,
@@ -440,9 +415,9 @@ fn validate_io_nodes<'a>(
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
     let [source, target]: [&BasicBlock; 2] = [&edge.source_op, &edge.target_op].map(|op| {
-        let OpType::BasicBlock(block_op) = op else {
-            panic!("CFG sibling graphs can only contain basic block operations.")
-        };
+        let block_op = op
+            .as_basic_block()
+            .expect("CFG sibling graphs can only contain basic block operations.");
         block_op
     });
 

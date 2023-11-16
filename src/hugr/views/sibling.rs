@@ -472,7 +472,7 @@ mod test {
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
         let case_nodetype = NodeType::new_open(crate::ops::Case {
-            signature: simple_dfg_hugr.root_type().op_signature(),
+            signature: simple_dfg_hugr.root_type().op_signature().unwrap(),
         });
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         // As expected, we cannot replace the root with a Case

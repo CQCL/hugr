@@ -25,8 +25,13 @@ impl ExtensionValidator {
     pub fn new(hugr: &Hugr, closure: ExtensionSolution) -> Self {
         let mut extensions: HashMap<(Node, Direction), ExtensionSet> = HashMap::new();
         for (node, incoming_sol) in closure.into_iter() {
-            let op_signature = hugr.get_nodetype(node).op_signature();
-            let outgoing_sol = op_signature.extension_reqs.union(&incoming_sol);
+            let extension_reqs = hugr
+                .get_nodetype(node)
+                .op_signature()
+                .map(|s| s.extension_reqs)
+                .unwrap_or_default();
+
+            let outgoing_sol = extension_reqs.union(&incoming_sol);
 
             extensions.insert((node, Direction::Incoming), incoming_sol);
             extensions.insert((node, Direction::Outgoing), outgoing_sol);
