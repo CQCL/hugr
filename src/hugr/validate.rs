@@ -573,6 +573,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
+        // Compute cumulative TypeParams for nested FuncDefns, i.e. allow inner FuncDefns
+        // to refer to type parameters from outer FuncDefns.
         let mut v: Vec<TypeParam>;
         let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. })
         | OpType::FuncDecl(FuncDecl { signature, .. }) = op_type
