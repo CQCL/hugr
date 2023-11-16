@@ -91,6 +91,12 @@ impl TypeParam {
     }
 }
 
+impl From<TypeBound> for TypeParam {
+    fn from(bound: TypeBound) -> Self {
+        Self::Type(bound)
+    }
+}
+
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
