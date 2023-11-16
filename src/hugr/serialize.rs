@@ -10,7 +10,6 @@ use pyo3::{create_exception, exceptions::PyException, PyErr};
 use crate::core::NodeIndex;
 use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
-use crate::ops::OpTrait;
 use crate::ops::OpType;
 use crate::{Node, PortIndex};
 use portgraph::hierarchy::AttachError;
@@ -167,7 +166,7 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
-            let sig = hugr.get_optype(node).signature();
+            let sig = hugr.signature(node).unwrap_or_default();
             let offset = match offset < sig.port_count(dir) {
                 true => Some(offset as u16),
                 false => None,
@@ -246,7 +245,7 @@ impl TryFrom<SerHugrV0> for Hugr {
                 None => {
                     let op_type = hugr.get_optype(node);
                     op_type
-                        .other_port_index(dir)
+                        .other_port(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
                             op_type: op_type.clone(),

@@ -12,7 +12,6 @@ use crate::{
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-use crate::ops::OpType;
 
 use crate::Node;
 use smol_str::SmolStr;
@@ -70,22 +69,21 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDefn`] node.
+    /// [`crate::ops::OpType::FuncDefn`] node.
     pub fn define_declaration(
         &mut self,
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let OpType::FuncDecl(ops::FuncDecl { signature, name }) =
-            self.hugr().get_optype(f_node)
-        else {
-            return Err(BuildError::UnexpectedType {
+        let ops::FuncDecl { signature, name } = self
+            .hugr()
+            .get_optype(f_node)
+            .as_func_decl()
+            .ok_or(BuildError::UnexpectedType {
                 node: f_node,
-                op_desc: "OpType::FuncDecl",
-            });
-        };
-        let signature = signature.clone();
-        let name = name.clone();
+                op_desc: "crate::ops::OpType::FuncDecl",
+            })?
+            .clone();
         let body = signature.body.clone();
         self.hugr_mut().replace_op(
             f_node,
@@ -101,7 +99,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
-    /// [`OpType::FuncDecl`] node.
+    /// [`crate::ops::OpType::FuncDecl`] node.
     pub fn declare(
         &mut self,
         name: impl Into<String>,
@@ -116,11 +114,11 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(declare_n.into())
     }
 
-    /// Add a [`OpType::AliasDefn`] node and return a handle to the Alias.
+    /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
     ///
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDefn`] child node.
+    /// Error in adding [`crate::ops::OpType::AliasDefn`] child node.
     pub fn add_alias_def(
         &mut self,
         name: impl Into<SmolStr>,
@@ -141,10 +139,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(AliasID::new(node, name, bound))
     }
 
-    /// Add a [`OpType::AliasDecl`] node and return a handle to the Alias.
+    /// Add a [`crate::ops::OpType::AliasDecl`] node and return a handle to the Alias.
     /// # Errors
     ///
-    /// Error in adding [`OpType::AliasDecl`] child node.
+    /// Error in adding [`crate::ops::OpType::AliasDecl`] child node.
     pub fn add_alias_declare(
         &mut self,
         name: impl Into<SmolStr>,
@@ -225,14 +223,14 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let [wire] = local_build.input_wires_arr();
-            let f_id = local_build.finish_with_outputs([wire])?;
+            let f_id = local_build.finish_with_outputs([wire, wire])?;
 
             let call =
                 f_build.call(f_id.handle(), &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;

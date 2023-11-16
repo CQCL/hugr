@@ -3,7 +3,8 @@
 use smol_str::SmolStr;
 
 use super::custom::ExternalOp;
-use super::{OpName, OpTag, OpTrait, StaticTag};
+use super::dataflow::DataflowOpTrait;
+use super::{OpName, OpTag};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::types::type_param::TypeArg;
@@ -128,11 +129,11 @@ impl OpName for LeafOp {
     }
 }
 
-impl StaticTag for LeafOp {
-    const TAG: OpTag = OpTag::Leaf;
-}
+// impl StaticTag for LeafOp {
+// }
 
-impl OpTrait for LeafOp {
+impl DataflowOpTrait for LeafOp {
+    const TAG: OpTag = OpTag::Leaf;
     /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
@@ -148,10 +149,6 @@ impl OpTrait for LeafOp {
         }
     }
 
-    fn tag(&self) -> OpTag {
-        <Self as StaticTag>::TAG
-    }
-
     /// The signature of the operation.
     fn signature(&self) -> FunctionType {
         // Static signatures. The `TypeRow`s in the `FunctionType` use a
@@ -159,7 +156,7 @@ impl OpTrait for LeafOp {
 
         match self {
             LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
-            LeafOp::CustomOp(ext) => ext.signature(),
+            LeafOp::CustomOp(ext) => ext.dataflow_signature(),
             LeafOp::MakeTuple { tys: types } => {
                 FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }

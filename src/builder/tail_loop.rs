@@ -1,4 +1,4 @@
-use crate::ops::{self, OpType};
+use crate::ops;
 
 use crate::hugr::{views::HugrView, NodeType};
 use crate::types::{FunctionType, TypeRow};
@@ -38,14 +38,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     /// Get a reference to the [`ops::TailLoop`]
     /// that defines the signature of the [`ops::TailLoop`]
     pub fn loop_signature(&self) -> Result<&ops::TailLoop, BuildError> {
-        if let OpType::TailLoop(tail_loop) = self.hugr().get_optype(self.container_node()) {
-            Ok(tail_loop)
-        } else {
-            Err(BuildError::UnexpectedType {
+        self.hugr()
+            .get_optype(self.container_node())
+            .as_tail_loop()
+            .ok_or(BuildError::UnexpectedType {
                 node: self.container_node(),
                 op_desc: "crate::ops::TailLoop",
             })
-        }
     }
 
     /// The output types of the child graph, including the TupleSum as the first.

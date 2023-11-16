@@ -4,8 +4,6 @@ use std::collections::{hash_map, HashMap};
 use std::iter::{self, Copied};
 use std::slice;
 
-use itertools::Itertools;
-
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
@@ -130,9 +128,7 @@ impl Rewrite for SimpleReplacement {
             if self.replacement.get_optype(*rep_inp_node).tag() != OpTag::Output {
                 // add edge from predecessor of (s_inp_node, s_inp_port) to (new_inp_node, n_inp_port)
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_outputs(*rem_inp_node, *rem_inp_port)
-                    .exactly_one()
-                    .ok() // PortLinks does not implement Debug
+                    .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
@@ -150,8 +146,7 @@ impl Rewrite for SimpleReplacement {
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
             let (rep_out_pred_node, rep_out_pred_port) = self
                 .replacement
-                .linked_outputs(replacement_output_node, *rep_out_port)
-                .exactly_one()
+                .single_linked_output(replacement_output_node, *rep_out_port)
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
                 let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
@@ -172,9 +167,7 @@ impl Rewrite for SimpleReplacement {
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
                 // add edge from predecessor of (rem_inp_node, rem_inp_port) to (rem_out_node, rem_out_port):
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
-                    .linked_outputs(*rem_inp_node, *rem_inp_port)
-                    .exactly_one()
-                    .ok() // PortLinks does not implement Debug
+                    .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
                 h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
                 h.disconnect(*rem_out_node, *rem_out_port).unwrap();
@@ -231,6 +224,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
+    use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::OpTag;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
@@ -505,7 +499,14 @@ pub(in crate::hugr::rewrite) mod test {
             .collect_vec();
         let inputs = h
             .node_outputs(input)
-            .filter(|&p| h.get_optype(input).signature().get(p).is_some())
+            .filter(|&p| {
+                h.get_optype(input)
+                    .as_input()
+                    .unwrap()
+                    .signature()
+                    .port_type(p)
+                    .is_some()
+            })
             .map(|p| {
                 let link = h.linked_inputs(input, p).next().unwrap();
                 (link, link)
@@ -513,7 +514,14 @@ pub(in crate::hugr::rewrite) mod test {
             .collect();
         let outputs = h
             .node_inputs(output)
-            .filter(|&p| h.get_optype(output).signature().get(p).is_some())
+            .filter(|&p| {
+                h.get_optype(output)
+                    .as_output()
+                    .unwrap()
+                    .signature()
+                    .port_type(p)
+                    .is_some()
+            })
             .map(|p| ((output, p), p))
             .collect();
         h.apply_rewrite(SimpleReplacement::new(
@@ -565,7 +573,7 @@ pub(in crate::hugr::rewrite) mod test {
 
         let outputs = repl
             .node_inputs(repl_output)
-            .filter(|&p| repl.get_optype(repl_output).signature().get(p).is_some())
+            .filter(|&p| repl.signature(repl_output).unwrap().port_type(p).is_some())
             .map(|p| ((repl_output, p), p))
             .collect();
 
@@ -598,7 +606,7 @@ pub(in crate::hugr::rewrite) mod test {
                 if *tgt == out {
                     unimplemented!()
                 };
-                let (src, src_port) = h.linked_outputs(*r_n, *r_p).exactly_one().ok().unwrap();
+                let (src, src_port) = h.single_linked_output(*r_n, *r_p).unwrap();
                 NewEdgeSpec {
                     src,
                     tgt: *tgt,
@@ -613,11 +621,7 @@ pub(in crate::hugr::rewrite) mod test {
             .nu_out
             .iter()
             .map(|((tgt, tgt_port), out_port)| {
-                let (src, src_port) = replacement
-                    .linked_outputs(out, *out_port)
-                    .exactly_one()
-                    .ok()
-                    .unwrap();
+                let (src, src_port) = replacement.single_linked_output(out, *out_port).unwrap();
                 if src == in_ {
                     unimplemented!()
                 };

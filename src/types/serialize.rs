@@ -4,7 +4,6 @@ use super::custom::CustomType;
 
 use crate::extension::prelude::{array_type, QB_T, USIZE_T};
 use crate::ops::AliasDecl;
-use crate::types::primitive::PrimType;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -31,12 +30,10 @@ impl From<Type> for SerSimpleType {
         // TODO short circuiting for array.
         let Type(value, _) = value;
         match value {
-            TypeEnum::Prim(t) => match t {
-                PrimType::Extension(c) => SerSimpleType::Opaque(c),
-                PrimType::Alias(a) => SerSimpleType::Alias(a),
-                PrimType::Function(sig) => SerSimpleType::G(sig),
-                PrimType::Variable(i, b) => SerSimpleType::V { i, b },
-            },
+            TypeEnum::Extension(c) => SerSimpleType::Opaque(c),
+            TypeEnum::Alias(a) => SerSimpleType::Alias(a),
+            TypeEnum::Function(sig) => SerSimpleType::G(sig),
+            TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }
@@ -69,7 +66,7 @@ mod test {
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_function(FunctionType::new_linear(vec![]));
+        let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
 
         assert_eq!(ser_roundtrip(&g), g);
 

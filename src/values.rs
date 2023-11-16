@@ -13,10 +13,11 @@ use crate::{Hugr, HugrView};
 
 use crate::types::{CustomCheckFailure, CustomType};
 
-/// A constant value of a primitive (or leaf) type.
+/// A value that can be stored as a static constant. Representing core types and
+/// extension types.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "pv")]
-pub enum PrimValue {
+#[serde(tag = "v")]
+pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
@@ -29,32 +30,6 @@ pub enum PrimValue {
     Function {
         #[allow(missing_docs)]
         hugr: Box<Hugr>,
-    },
-}
-
-impl PrimValue {
-    fn name(&self) -> String {
-        match self {
-            PrimValue::Extension { c: e } => format!("const:custom:{}", e.0.name()),
-            PrimValue::Function { hugr: h } => {
-                let Some(t) = h.get_function_type() else {
-                    panic!("HUGR root node isn't a valid function parent.");
-                };
-                format!("const:function:[{}]", t)
-            }
-        }
-    }
-}
-
-/// A value that can be stored as a static constant. Representing core types and
-/// extension types.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "v")]
-pub enum Value {
-    /// A primitive (non-container) value.
-    Prim {
-        #[allow(missing_docs)]
-        val: PrimValue,
     },
     /// A tuple
     Tuple {
@@ -75,7 +50,13 @@ impl Value {
     /// Returns the name of this [`Value`].
     pub fn name(&self) -> String {
         match self {
-            Value::Prim { val: p } => p.name(),
+            Value::Extension { c: e } => format!("const:custom:{}", e.0.name()),
+            Value::Function { hugr: h } => {
+                let Some(t) = h.get_function_type() else {
+                    panic!("HUGR root node isn't a valid function parent.");
+                };
+                format!("const:function:[{}]", t)
+            }
             Value::Tuple { vs: vals } => {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
@@ -123,17 +104,12 @@ impl Value {
 
     /// New custom value (of type that implements [`CustomConst`]).
     pub fn custom<C: CustomConst>(c: C) -> Self {
-        Self::Prim {
-            val: PrimValue::Extension { c: (Box::new(c),) },
-        }
+        Self::Extension { c: (Box::new(c),) }
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
-        if let Value::Prim {
-            val: PrimValue::Extension { c: (custom,) },
-        } = self
-        {
+        if let Value::Extension { c: (custom,) } = self {
             custom.downcast_ref()
         } else {
             None
@@ -286,13 +262,11 @@ pub(crate) mod test {
 
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
-        let v = Value::Prim {
-            val: PrimValue::Function {
-                hugr: Box::new(simple_dfg_hugr),
-            },
+        let v = Value::Function {
+            hugr: Box::new(simple_dfg_hugr),
         };
 
-        let correct_type = Type::new_function(FunctionType::new_linear(type_row![
+        let correct_type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 

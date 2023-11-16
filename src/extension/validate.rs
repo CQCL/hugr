@@ -25,8 +25,13 @@ impl ExtensionValidator {
     pub fn new(hugr: &Hugr, closure: ExtensionSolution) -> Self {
         let mut extensions: HashMap<(Node, Direction), ExtensionSet> = HashMap::new();
         for (node, incoming_sol) in closure.into_iter() {
-            let op_signature = hugr.get_nodetype(node).op_signature();
-            let outgoing_sol = op_signature.extension_reqs.union(&incoming_sol);
+            let extension_reqs = hugr
+                .get_nodetype(node)
+                .op_signature()
+                .map(|s| s.extension_reqs)
+                .unwrap_or_default();
+
+            let outgoing_sol = extension_reqs.union(&incoming_sol);
 
             extensions.insert((node, Direction::Incoming), incoming_sol);
             extensions.insert((node, Direction::Outgoing), outgoing_sol);
@@ -45,13 +50,15 @@ impl ExtensionValidator {
     /// extension requirements for all of its input and output edges, then put
     /// those requirements in the extension validation context.
     fn gather_extensions(&mut self, node: &Node, node_type: &NodeType) {
-        if let Some(sig) = node_type.signature() {
-            for dir in Direction::BOTH {
-                assert!(self
-                    .extensions
-                    .insert((*node, dir), sig.get_extension(&dir))
-                    .is_none());
-            }
+        if let Some((input_exts, output_exts)) = node_type.io_extensions() {
+            let prev_i = self
+                .extensions
+                .insert((*node, Direction::Incoming), input_exts.clone());
+            assert!(prev_i.is_none());
+            let prev_o = self
+                .extensions
+                .insert((*node, Direction::Outgoing), output_exts);
+            assert!(prev_o.is_none());
         }
     }
 

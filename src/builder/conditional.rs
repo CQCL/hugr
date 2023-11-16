@@ -1,9 +1,10 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::HugrView;
+use crate::ops::dataflow::DataflowOpTrait;
 use crate::types::{FunctionType, TypeRow};
 
+use crate::ops;
 use crate::ops::handle::CaseID;
-use crate::ops::{self, OpTrait};
 
 use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
@@ -104,12 +105,12 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
     pub fn case_builder(&mut self, case: usize) -> Result<CaseBuilder<&mut Hugr>, BuildError> {
         let conditional = self.conditional_node;
         let control_op = self.hugr().get_optype(self.conditional_node);
-        let extension_delta = control_op.signature().extension_reqs;
 
         let cond: ops::Conditional = control_op
             .clone()
             .try_into()
             .expect("Parent node does not have Conditional optype.");
+        let extension_delta = cond.signature().extension_reqs;
         let inputs = cond
             .case_input_row(case)
             .ok_or(ConditionalBuildError::NotCase { conditional, case })?;

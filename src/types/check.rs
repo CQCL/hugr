@@ -1,12 +1,9 @@
 //! Logic for checking values against types.
 use thiserror::Error;
 
-use crate::{
-    values::{PrimValue, Value},
-    HugrView,
-};
+use crate::{values::Value, HugrView};
 
-use super::{primitive::PrimType, CustomType, Type, TypeEnum};
+use super::{CustomType, Type, TypeEnum};
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -48,37 +45,6 @@ pub enum ConstTypeError {
     CustomCheckFail(#[from] CustomCheckFailure),
 }
 
-impl PrimType {
-    /// Check that a [`PrimValue`] is a valid instance of this [`PrimType`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is a type check error.
-    pub fn check_type(&self, val: &PrimValue) -> Result<(), ConstTypeError> {
-        if let PrimType::Alias(alias) = self {
-            return Err(ConstTypeError::NoAliases(alias.name().to_string()));
-        }
-
-        match (self, val) {
-            (PrimType::Extension(e), PrimValue::Extension { c: e_val }) => {
-                e_val.0.check_custom_type(e)?;
-                Ok(())
-            }
-            (PrimType::Function(t), PrimValue::Function { hugr: v })
-                if v.get_function_type().is_some_and(|f| **t == f) =>
-            {
-                // exact signature equality, in future this may need to be
-                // relaxed to be compatibility checks between the signatures.
-                Ok(())
-            }
-            _ => Err(ConstTypeError::ValueCheckFail(
-                Type::new(TypeEnum::Prim(self.clone())),
-                Value::Prim { val: val.clone() },
-            )),
-        }
-    }
-}
-
 impl Type {
     /// Check that a [`Value`] is a valid instance of this [`Type`].
     ///
@@ -87,7 +53,17 @@ impl Type {
     /// This function will return an error if there is a type check error.
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
         match (&self.0, val) {
-            (TypeEnum::Prim(p), Value::Prim { val: p_v }) => p.check_type(p_v),
+            (TypeEnum::Extension(e), Value::Extension { c: e_val }) => {
+                e_val.0.check_custom_type(e)?;
+                Ok(())
+            }
+            (TypeEnum::Function(t), Value::Function { hugr: v })
+                if v.get_function_type().is_some_and(|f| **t == f) =>
+            {
+                // exact signature equality, in future this may need to be
+                // relaxed to be compatibility checks between the signatures.
+                Ok(())
+            }
             (TypeEnum::Tuple(t), Value::Tuple { vs: t_v }) => {
                 if t.len() != t_v.len() {
                     return Err(ConstTypeError::TupleWrongLength);

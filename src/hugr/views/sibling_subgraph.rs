@@ -18,6 +18,7 @@ use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
 use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
+use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
 use crate::types::{FunctionType, Type};
@@ -249,7 +250,7 @@ impl SiblingSubgraph {
                 if !hugr.is_linked(n, p) {
                     return false;
                 }
-                let (out_n, _) = hugr.linked_ports(n, p).exactly_one().ok().unwrap();
+                let (out_n, _) = hugr.single_linked_output(n, p).unwrap();
                 !nodes_set.contains(&out_n)
             })
             // Every incoming edge is its own input.
@@ -296,16 +297,16 @@ impl SiblingSubgraph {
             .iter()
             .map(|part| {
                 let &(n, p) = part.iter().next().expect("is non-empty");
-                let sig = hugr.get_optype(n).signature();
-                sig.get(p).cloned().expect("must be dataflow edge")
+                let sig = hugr.signature(n).expect("must have dataflow signature");
+                sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
         let output = self
             .outputs
             .iter()
             .map(|&(n, p)| {
-                let sig = hugr.get_optype(n).signature();
-                sig.get(p).cloned().expect("must be dataflow edge")
+                let sig = hugr.signature(n).expect("must have dataflow signature");
+                sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
         FunctionType::new(input, output)
@@ -346,7 +347,7 @@ impl SiblingSubgraph {
         let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
             return Err(InvalidReplacement::InvalidDataflowParent);
         };
-        if dfg_optype.signature() != self.signature(hugr) {
+        if dfg_optype.dataflow_signature() != Some(self.signature(hugr)) {
             return Err(InvalidReplacement::InvalidSignature);
         }
 
@@ -354,10 +355,16 @@ impl SiblingSubgraph {
         // See https://github.com/CQCL-DEV/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
-        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) =
-            rep_inputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
-        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) =
-            rep_outputs.partition(|&(n, p)| replacement.get_optype(n).signature().get(p).is_some());
+        let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) = rep_inputs.partition(|&(n, p)| {
+            replacement
+                .signature(n)
+                .is_some_and(|s| s.port_type(p).is_some())
+        });
+        let (rep_outputs, out_order_ports): (Vec<_>, Vec<_>) = rep_outputs.partition(|&(n, p)| {
+            replacement
+                .signature(n)
+                .is_some_and(|s| s.port_type(p).is_some())
+        });
 
         if combine_in_out(&vec![out_order_ports], &in_order_ports)
             .any(|(n, p)| is_order_edge(&replacement, n, p))
@@ -460,10 +467,13 @@ impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
 /// If the array is empty or a port does not exist, returns `None`.
 fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(hugr: &H, ports: &[(Node, P)]) -> Option<Type> {
     let &(n, p) = ports.first()?;
-    let edge_t = hugr.get_optype(n).signature().get(p)?.clone();
+    let edge_t = hugr.signature(n)?.port_type(p)?.clone();
     ports
         .iter()
-        .all(|&(n, p)| hugr.get_optype(n).signature().get(p) == Some(&edge_t))
+        .all(|&(n, p)| {
+            hugr.signature(n)
+                .is_some_and(|s| s.port_type(p) == Some(&edge_t))
+        })
         .then_some(edge_t)
 }
 
@@ -560,11 +570,21 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
     if has_other_edge(hugr, inp, Direction::Outgoing) {
         unimplemented!("Non-dataflow output not supported at input node")
     }
-    let dfg_inputs = hugr.get_optype(inp).signature().output_ports();
+    let dfg_inputs = hugr
+        .get_optype(inp)
+        .as_input()
+        .unwrap()
+        .signature()
+        .output_ports();
     if has_other_edge(hugr, out, Direction::Incoming) {
         unimplemented!("Non-dataflow input not supported at output node")
     }
-    let dfg_outputs = hugr.get_optype(out).signature().input_ports();
+    let dfg_outputs = hugr
+        .get_optype(out)
+        .as_output()
+        .unwrap()
+        .signature()
+        .input_ports();
 
     // Collect for each port in the input the set of target ports, filtering
     // direct wires to the output.
@@ -589,13 +609,13 @@ fn get_input_output_ports<H: HugrView>(hugr: &H) -> (IncomingPorts, OutgoingPort
 /// Whether a port is linked to a state order edge.
 fn is_order_edge<H: HugrView>(hugr: &H, node: Node, port: Port) -> bool {
     let op = hugr.get_optype(node);
-    op.other_port_index(port.direction()) == Some(port) && hugr.is_linked(node, port)
+    op.other_port(port.direction()) == Some(port) && hugr.is_linked(node, port)
 }
 
 /// Whether node has a non-df linked port in the given direction.
 fn has_other_edge<H: HugrView>(hugr: &H, node: Node, dir: Direction) -> bool {
     let op = hugr.get_optype(node);
-    op.other_port(dir).is_some() && hugr.is_linked(node, op.other_port_index(dir).unwrap())
+    op.other_port_kind(dir).is_some() && hugr.is_linked(node, op.other_port(dir).unwrap())
 }
 
 /// Errors that can occur while constructing a [`SimpleReplacement`].
@@ -686,10 +706,7 @@ mod tests {
         },
         hugr::views::{HierarchyView, SiblingGraph},
         hugr::HugrMut,
-        ops::{
-            handle::{DfgID, FuncID, NodeHandle},
-            OpType,
-        },
+        ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::test::{and_op, not_op},
         type_row,
     };
@@ -724,7 +741,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_linear(type_row![QB_T, QB_T, QB_T]).into(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -740,8 +757,7 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func =
-            mod_builder.declare("test", FunctionType::new_linear(type_row![BOOL_T]).into())?;
+        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
@@ -799,7 +815,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -824,7 +840,7 @@ mod tests {
         // the first two qubits.
         assert_eq!(
             sub.signature(&func),
-            FunctionType::new_linear(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T])
         );
         Ok(())
     }
@@ -836,7 +852,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_linear(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -875,7 +891,7 @@ mod tests {
                 .collect(),
             hugr.node_inputs(out)
                 .take(2)
-                .filter_map(|p| hugr.linked_outputs(out, p).exactly_one().ok())
+                .filter_map(|p| hugr.single_linked_output(out, p))
                 .collect(),
             &func,
         )
@@ -952,10 +968,8 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let OpType::FuncDefn(func_defn) = hugr.get_optype(func_root) else {
-            panic!()
-        };
-        assert_eq!(func_defn.signature, func.signature(&func_graph).into())
+        let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
+        assert_eq!(func_defn.signature, func.signature(&func_graph).into());
     }
 
     #[test]
