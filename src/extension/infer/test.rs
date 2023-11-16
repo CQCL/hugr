@@ -1038,3 +1038,33 @@ fn nested_funcdefn() -> Result<(), Box<dyn Error>> {
     infer_extensions(&hugr)?;
     Ok(())
 }
+
+#[test]
+fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let mut func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    let lift = func_builder.add_dataflow_op(
+        ops::LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: B,
+        },
+        [w],
+    )?;
+    let [w] = lift.outputs_arr();
+    func_builder.finish_with_outputs([w])?;
+    let result = builder.finish_prelude_hugr();
+    assert_matches!(
+        result,
+        Err(ValidationError::CantInfer(
+            InferExtensionError::MismatchedConcreteWithLocations { .. }
+        ))
+    );
+    Ok(())
+}
