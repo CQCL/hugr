@@ -988,7 +988,7 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
     )?;
     let [w] = lift.outputs_arr();
     func_builder.finish_with_outputs([w])?;
-    builder.finish_hugr(&PRELUDE_REGISTRY)?;
+    builder.finish_prelude_hugr()?;
     Ok(())
 }
 
@@ -1066,5 +1066,26 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
             InferExtensionError::MismatchedConcreteWithLocations { .. }
         ))
     );
+    Ok(())
+}
+
+#[test]
+// Test that the difference between a FuncDefn's input and output nodes is being
+// constrained to be the same as the extension delta in the FuncDefn signature.
+// The FuncDefn here is declared to add resource "A", but its body just wires
+// the input to the output.
+fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    func_builder.finish_with_outputs([w])?;
+    let result = builder.finish_prelude_hugr();
+    assert_matches!(result, Err(ValidationError::CantInfer(..)));
     Ok(())
 }

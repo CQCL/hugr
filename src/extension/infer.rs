@@ -285,6 +285,7 @@ impl UnificationContext {
                     // The function that it contains, however, may have an
                     // extension delta, so its output shouldn't be equal to the
                     // FuncDefn's output.
+                    if node_type.tag() != OpTag::FuncDefn {
                         self.add_constraint(m_output_node, Constraint::Equal(m_output));
                     }
                 }
