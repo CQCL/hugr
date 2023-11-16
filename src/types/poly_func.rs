@@ -58,10 +58,9 @@ impl PolyFuncType {
         }
     }
 
-    /// Validates this instance against an ExtensionRegistry - checking that
-    /// all type bounds are wellformed instances of declared types -  and
-    /// that all variables are declared (perhaps including those from an
-    /// enclosing scope, whose kinds are provided).
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and that all type variables
+    /// are declared (perhaps in an enclosing scope, kinds passed in).
     pub fn validate(
         &self,
         reg: &ExtensionRegistry,
