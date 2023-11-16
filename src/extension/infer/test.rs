@@ -1004,10 +1004,11 @@ fn nested_funcdefn() -> Result<(), Box<dyn Error>> {
     let mut outer_func_builder = builder.define_function(
         "outer",
         FunctionType::new(vec![NAT], vec![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .with_extension_delta(&ExtensionSet::from_iter([A, B]))
             .pure(),
     )?;
 
+    // The inner function is created with empty input_extensions
     let mut inner_func_builder = outer_func_builder.define_function(
         "inner",
         FunctionType::new(vec![NAT], vec![NAT])
@@ -1024,13 +1025,17 @@ fn nested_funcdefn() -> Result<(), Box<dyn Error>> {
         [w],
     )?;
     let [w] = lift.outputs_arr();
-    let g_id = inner_func_builder.finish_with_outputs([w])?;
+    let inner = inner_func_builder.finish_with_outputs([w])?;
 
     let int_value: Value = ConstUsize::new(42).into();
-    let k_node =
-        outer_func_builder.add_constant(ops::Const::new(int_value, USIZE_T).unwrap(), None)?;
+    let k_node = outer_func_builder.add_constant(
+        ops::Const::new(int_value, USIZE_T).unwrap(),
+        ExtensionSet::singleton(&B),
+    )?;
     let k = outer_func_builder.load_const(&k_node)?;
-    let call = outer_func_builder.call(g_id.handle(), [k])?;
+    // The input extensions for this call node will be solved to "B" to match
+    // the Const and LoadConst nodes. The "inner" graph is pure
+    let call = outer_func_builder.call(inner.handle(), [k])?;
     let [w] = call.outputs_arr();
     outer_func_builder.finish_with_outputs([w])?;
 
