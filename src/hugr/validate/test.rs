@@ -753,8 +753,8 @@ fn invalid_types() {
 
 #[test]
 fn parent_io_mismatch() {
-    // The DFG node doesn't declare that it has a non-empty extension delta,
-    // but it's child graph does, causing a mismatch.
+    // The DFG node declares that it has an empty extension delta,
+    // but it's child graph adds extension "XB", causing a mismatch.
     let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
         signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
     }));
