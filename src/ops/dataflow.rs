@@ -5,16 +5,13 @@ use super::{impl_op_name, OpTag, OpTrait};
 use crate::extension::ExtensionSet;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::IncomingPort;
 
-pub(super) trait DataflowOpTrait {
+pub(crate) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
     fn signature(&self) -> FunctionType;
 
-    /// Get the static input type of this operation if it has one.
-    fn static_input(&self) -> Option<Type> {
-        None
-    }
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///
@@ -115,8 +112,8 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn signature(&self) -> FunctionType {
-        DataflowOpTrait::signature(self)
+    fn dataflow_signature(&self) -> Option<FunctionType> {
+        Some(DataflowOpTrait::signature(self))
     }
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
@@ -124,10 +121,6 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
-    }
-
-    fn static_input(&self) -> Option<Type> {
-        DataflowOpTrait::static_input(self)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -156,10 +149,18 @@ impl DataflowOpTrait for Call {
     fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
-
+}
+impl Call {
     #[inline]
-    fn static_input(&self) -> Option<Type> {
-        Some(Type::new_function(self.signature.clone()))
+    /// Return the signature of the function called by this op.
+    pub fn called_function_type(&self) -> &FunctionType {
+        &self.signature
+    }
+
+    /// The IncomingPort which links to the function being called.
+    #[inline]
+    pub fn called_function_port(&self) -> IncomingPort {
+        self.called_function_type().input_count().into()
     }
 }
 
@@ -204,10 +205,18 @@ impl DataflowOpTrait for LoadConstant {
     fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
-
+}
+impl LoadConstant {
     #[inline]
-    fn static_input(&self) -> Option<Type> {
-        Some(self.datatype.clone())
+    /// The type of the constant loaded by this op.
+    pub fn constant_type(&self) -> &Type {
+        &self.datatype
+    }
+
+    /// The IncomingPort which links to the loaded constant.
+    #[inline]
+    pub fn constant_port(&self) -> IncomingPort {
+        0.into()
     }
 }
 
