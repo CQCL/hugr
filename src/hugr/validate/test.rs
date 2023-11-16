@@ -2,7 +2,10 @@ use cool_asserts::assert_matches;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
-use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+use crate::builder::{
+    BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    ModuleBuilder,
+};
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
     Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
@@ -15,7 +18,7 @@ use crate::ops::{self, LeafOp, OpType};
 use crate::std_extensions::logic;
 use crate::std_extensions::logic::test::{and_op, not_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
+use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -801,4 +804,39 @@ fn parent_io_mismatch() {
             ExtensionError::ParentIOExtensionMismatch { .. }
         ))
     );
+}
+
+#[test]
+fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
+    // Base case
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    f.finish_prelude_hugr_with_outputs([w])?;
+    // Type refers to undeclared variable
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    assert!(f.finish_prelude_hugr_with_outputs([w]).is_err());
+    // Variable declaration incorrectly copied to use site
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    assert!(f.finish_prelude_hugr_with_outputs([w]).is_err());
+    Ok(())
 }

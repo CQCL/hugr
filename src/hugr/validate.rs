@@ -116,7 +116,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// This includes:
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
-    fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
+    fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
         let node_type = self.hugr.get_nodetype(node);
         let op_type = &node_type.op;
 
@@ -158,12 +158,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         dir,
                     });
                 }
-
-                // Check port connections
-                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
-                    let port = Port::new(dir, i);
-                    self.validate_port(node, port, port_index, op_type)?;
-                }
             }
         }
 
@@ -193,6 +187,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         port: Port,
         port_index: portgraph::PortIndex,
         op_type: &OpType,
+        var_decls: &[TypeParam],
     ) -> Result<(), ValidationError> {
         let port_kind = op_type.port_kind(port).unwrap();
         let dir = port.direction();
@@ -224,7 +219,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         match &port_kind {
             EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
-                .validate(self.extension_registry, &[]) // no type vars inside the Hugr
+                .validate(self.extension_registry, var_decls)
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }
@@ -248,9 +243,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
-                // The number of ports in `other_node` does not match the operation definition.
-                // This should be caught by `validate_node`.
-                return Err(self.validate_node(other_node).unwrap_err());
+                panic!("The number of ports in {other_node} does not match the operation definition. This should have been caught by `validate_node`.");
             };
             // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
             if other_kind != port_kind {
@@ -529,8 +522,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         .into())
     }
 
-    fn validate_subtree(&self, node: Node, var_decls: &[TypeParam]) -> Result<(), ValidationError> {
+    fn validate_subtree(
+        &mut self,
+        node: Node,
+        var_decls: &[TypeParam],
+    ) -> Result<(), ValidationError> {
         let op_type = self.hugr.get_optype(node);
+        // The op_type must be defined only in terms of type variables defined outside the node
         // TODO consider turning this match into a trait method?
         match op_type {
             OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
@@ -565,6 +563,14 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
             _ => (),
+        }
+
+        // Check port connections.
+        for dir in Direction::BOTH {
+            for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
+                let port = Port::new(dir, i);
+                self.validate_port(node, port, port_index, op_type, var_decls)?;
+            }
         }
 
         let mut v: Vec<TypeParam>;
