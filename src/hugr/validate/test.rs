@@ -565,7 +565,7 @@ fn extensions_mismatch() -> Result<(), BuildError> {
     assert_matches!(
         handle,
         Err(ValidationError::ExtensionError(
-            ExtensionError::ParentIOExtensionMismatch { .. }
+            ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
         ))
     );
     Ok(())
@@ -750,5 +750,55 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(too_many_type_args),
         SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
+    );
+}
+
+#[test]
+fn parent_io_mismatch() {
+    // The DFG node declares that it has an empty extension delta,
+    // but it's child graph adds extension "XB", causing a mismatch.
+    let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
+        signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
+    }));
+
+    let input = hugr
+        .add_node_with_parent(
+            hugr.root(),
+            NodeType::new_pure(ops::Input {
+                types: type_row![USIZE_T],
+            }),
+        )
+        .unwrap();
+    let output = hugr
+        .add_node_with_parent(
+            hugr.root(),
+            NodeType::new(
+                ops::Output {
+                    types: type_row![USIZE_T],
+                },
+                ExtensionSet::singleton(&XB),
+            ),
+        )
+        .unwrap();
+
+    let lift = hugr
+        .add_node_with_parent(
+            hugr.root(),
+            NodeType::new_pure(ops::LeafOp::Lift {
+                type_row: type_row![USIZE_T],
+                new_extension: XB,
+            }),
+        )
+        .unwrap();
+
+    hugr.connect(input, 0, lift, 0).unwrap();
+    hugr.connect(lift, 0, output, 0).unwrap();
+
+    let result = hugr.validate(&PRELUDE_REGISTRY);
+    assert_matches!(
+        result,
+        Err(ValidationError::ExtensionError(
+            ExtensionError::ParentIOExtensionMismatch { .. }
+        ))
     );
 }

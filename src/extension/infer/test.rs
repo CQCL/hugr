@@ -2,7 +2,9 @@ use std::error::Error;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
-use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use crate::builder::{
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+};
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
 use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
@@ -939,4 +941,84 @@ fn sccs() {
         ctx.get_solution(&m4),
         Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
     );
+}
+
+#[test]
+/// Note: This test is relying on the builder's `define_function` doing the
+/// right thing: it takes input resources via a [`Signature`], which it passes
+/// to `create_with_io`, creating concrete resource sets.
+/// Inference can still fail for a valid FuncDefn hugr created without using
+/// the builder API.
+fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let mut func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    let lift = func_builder.add_dataflow_op(
+        ops::LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: A,
+        },
+        [w],
+    )?;
+    let [w] = lift.outputs_arr();
+    func_builder.finish_with_outputs([w])?;
+    builder.finish_prelude_hugr()?;
+    Ok(())
+}
+
+#[test]
+fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let mut func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    let lift = func_builder.add_dataflow_op(
+        ops::LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: B,
+        },
+        [w],
+    )?;
+    let [w] = lift.outputs_arr();
+    func_builder.finish_with_outputs([w])?;
+    let result = builder.finish_prelude_hugr();
+    assert_matches!(
+        result,
+        Err(ValidationError::CantInfer(
+            InferExtensionError::MismatchedConcreteWithLocations { .. }
+        ))
+    );
+    Ok(())
+}
+
+#[test]
+// Test that the difference between a FuncDefn's input and output nodes is being
+// constrained to be the same as the extension delta in the FuncDefn signature.
+// The FuncDefn here is declared to add resource "A", but its body just wires
+// the input to the output.
+fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
+    let mut builder = ModuleBuilder::new();
+    let func_builder = builder.define_function(
+        "F",
+        FunctionType::new(vec![NAT], vec![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .pure(),
+    )?;
+
+    let [w] = func_builder.input_wires_arr();
+    func_builder.finish_with_outputs([w])?;
+    let result = builder.finish_prelude_hugr();
+    assert_matches!(result, Err(ValidationError::CantInfer(..)));
+    Ok(())
 }
