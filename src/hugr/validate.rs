@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::iter;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
 use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
@@ -19,7 +19,7 @@ use crate::extension::{
 };
 
 use crate::ops::custom::CustomOpError;
-use crate::ops::custom::{resolve_opaque_op, ExtensionOp, ExternalOp};
+use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDecl, FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
@@ -533,24 +533,29 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         match op_type {
             OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
                 // Try to resolve serialized names to actual OpDefs in Extensions.
-                let e: Option<ExtensionOp>;
-                let ext_or_opaq = match &**b {
+                let temp: ExternalOp;
+                let resolved = match &**b {
                     ExternalOp::Opaque(op) => {
                         // If resolve_extension_ops has been called first, this would always return Ok(None)
-                        e = resolve_opaque_op(node, op, self.extension_registry)?;
-                        e.as_ref().map(Either::Left).unwrap_or(Either::Right(op))
+                        match resolve_opaque_op(node, op, self.extension_registry)? {
+                            Some(exten) => {
+                                temp = ExternalOp::Extension(exten);
+                                &temp
+                            }
+                            None => &**b,
+                        }
                     }
-                    ExternalOp::Extension(ext) => Either::Left(ext),
+                    ExternalOp::Extension(_) => &**b,
                 };
-                // If successful, check TypeArgs are valid for the declared TypeParams
-                match ext_or_opaq {
-                    Either::Left(exten) => exten
+                // Check TypeArgs are valid, and if we can, fit the declared TypeParams
+                match resolved {
+                    ExternalOp::Extension(exten) => exten
                         .def()
                         .validate_args(exten.args(), self.extension_registry, var_decls)
                         .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-                    Either::Right(opaq) => {
-                        // Best effort. Just check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
-                        // and assuming none are binary params (all may contain type vars)
+                    ExternalOp::Opaque(opaq) => {
+                        // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
+                        // to contain type vars (we don't know how many are binary params, so accept if in doubt)
                         for arg in opaq.args() {
                             arg.validate(self.extension_registry, var_decls)
                                 .map_err(|cause| ValidationError::SignatureError { node, cause })?;
