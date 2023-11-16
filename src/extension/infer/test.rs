@@ -966,6 +966,11 @@ fn sccs() {
 }
 
 #[test]
+/// Note: This test is relying on the builder's `define_function` doing the
+/// right thing: it takes input resources via a [`Signature`], which it passes
+/// to `create_with_io`, creating concrete resource sets.
+/// Inference can still fail for a valid FuncDefn hugr created without using
+/// the builder API.
 fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
     let mut builder = ModuleBuilder::new();
     let mut func_builder = builder.define_function(
