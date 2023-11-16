@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionId, ExtensionRegistry, TypeDef, TypeDefBound},
+    extension::{ExtensionId, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
@@ -72,7 +72,6 @@ fn extension() -> Extension {
             TypeDefBound::FromParams(vec![0]),
         )
         .unwrap();
-    let temp_reg: ExtensionRegistry = [extension.clone()].into();
     let list_type_def = extension.get_type(&LIST_TYPENAME).unwrap();
 
     let (l, e) = list_and_elem_type(list_type_def);
@@ -80,24 +79,20 @@ fn extension() -> Extension {
         .add_op_type_scheme_simple(
             POP_NAME,
             "Pop from back of list".into(),
-            PolyFuncType::new_validated(
+            PolyFuncType::new(
                 vec![TP],
                 FunctionType::new(vec![l.clone()], vec![l.clone(), e.clone()]),
-                &temp_reg,
-            )
-            .unwrap(),
+            ),
         )
         .unwrap();
     extension
         .add_op_type_scheme_simple(
             PUSH_NAME,
             "Push to back of list".into(),
-            PolyFuncType::new_validated(
+            PolyFuncType::new(
                 vec![TP],
                 FunctionType::new(vec![l.clone(), e], vec![l]),
-                &temp_reg,
-            )
-            .unwrap(),
+            ),
         )
         .unwrap();
     extension
