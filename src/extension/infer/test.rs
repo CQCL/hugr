@@ -993,9 +993,9 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-// Define a function "g" inside "f", which defines a function which adds to
-// the graph. Tests that the resources of the graph of "g" aren't being
-// constrained to match those of the FuncDefn node.
+// Define a function "inner" as a child of "outer", which defines a function
+// which adds an extension requirement. Tests that the resources of the graph
+// of "outer" aren't being constrained to match those of the FuncDefn node.
 fn nested_funcdefn() -> Result<(), Box<dyn Error>> {
     use crate::builder::{Container, Dataflow};
     use crate::values::Value;

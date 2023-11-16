@@ -279,11 +279,12 @@ impl UnificationContext {
                     let m_input_node = self.make_or_get_meta(input, dir);
                     self.add_constraint(m_input_node, Constraint::Equal(m_input));
                     let m_output_node = self.make_or_get_meta(output, dir);
-                    // If the parent node is a FuncDefn, it's input_extensions
-                    // should always be empty, meaning if the function adds
-                    // resources, they shouldn't be equal to the parent's output
-                    // (which will also be empty.)
-                    if node_type.tag() != OpTag::FuncDefn {
+                    // If the parent node is a FuncDefn, it will have no
+                    // op_signature, so the Incoming and Outgoing ports will
+                    // have equal extension requirements.
+                    // The function that it contains, however, may have an
+                    // extension delta, so its output shouldn't be equal to the
+                    // FuncDefn's output.
                         self.add_constraint(m_output_node, Constraint::Equal(m_output));
                     }
                 }
