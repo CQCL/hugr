@@ -378,34 +378,29 @@ mod test {
 
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
-        let reg1 = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let mut e = Extension::new(EXT_ID);
         const TP: TypeParam = TypeParam::Type(TypeBound::Any);
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
-        let type_scheme = PolyFuncType::new_validated(
-            vec![TP],
-            FunctionType::new_linear(vec![list_of_var]),
-            &reg1,
-        )?;
+        let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_linear(vec![list_of_var]));
         e.add_op_type_scheme(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
+        let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
         let mut dfg = DFGBuilder::new(FunctionType::new_linear(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             LeafOp::from(ExternalOp::Extension(
-                e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg1)
+                e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
                     .unwrap(),
             )),
             dfg.input_wires(),
         )?;
-        dfg.finish_hugr_with_outputs(
-            rev.outputs(),
-            &ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap(),
-        )?;
+        dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;
 
         Ok(())
     }

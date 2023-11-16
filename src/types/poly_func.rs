@@ -238,7 +238,7 @@ pub(crate) mod test {
     }
 
     impl PolyFuncType {
-        pub(crate) fn new_validated(
+        fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FunctionType,
             extension_registry: &ExtensionRegistry,
