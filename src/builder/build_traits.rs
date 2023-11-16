@@ -597,7 +597,8 @@ pub trait Dataflow: Container {
         function: &FuncID<DEFINED>,
         type_args: &[TypeArg],
         input_wires: impl IntoIterator<Item = Wire>,
-        exts: &ExtensionRegistry, // TODO remove?
+        // Sadly required as we substituting in type_args may result in recomputing bounds of types:
+        exts: &ExtensionRegistry,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let hugr = self.hugr();
         let def_op = hugr.get_optype(function.node());
@@ -611,11 +612,10 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        // TODO either some way of returning a SignatureError without a node (as its not
-        // constructed yet) - or, preferably, a way to "instantiate" the PolyFuncType without
-        // validating against an ExtensionRegistry.
         let signature = type_scheme.instantiate(type_args, exts).map_err(|e| {
             BuildError::InvalidHUGR(ValidationError::SignatureError {
+                // TODO this is rather a horrendous hack. Do we need some way of returning a SignatureError without a node
+                // (as the call node this refers to is not constructed yet)? Or, pass in an "instantiated" FuncID?
                 node: function.node(),
                 cause: e,
             })
