@@ -479,7 +479,7 @@ mod test {
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
         let mut cfg = CFGBuilder::new(
-            FunctionType::new_linear(just_list.clone()).with_extension_delta(&exset),
+            FunctionType::new_endo(just_list.clone()).with_extension_delta(&exset),
         )?;
 
         let pred_const = cfg.add_constant(ops::Const::unary_unit_sum(), None)?;
@@ -516,7 +516,7 @@ mod test {
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
         let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
-            signature: FunctionType::new_linear(just_list.clone()),
+            signature: FunctionType::new_endo(just_list.clone()),
         }));
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
@@ -643,7 +643,7 @@ mod test {
 
     #[test]
     fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
-        let utou = FunctionType::new_linear(vec![USIZE_T]);
+        let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
             LeafOp::from(ExternalOp::Opaque(OpaqueOp::new(
                 ExtensionId::new("unknown_ext").unwrap(),

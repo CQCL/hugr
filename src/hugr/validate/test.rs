@@ -139,7 +139,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: FunctionType::new_linear(type_row![BOOL_T]),
+        signature: FunctionType::new_endo(type_row![BOOL_T]),
     }
     .into();
 
@@ -366,7 +366,7 @@ fn test_ext_edge() -> Result<(), HugrError> {
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_linear(type_row![BOOL_T]),
+            signature: FunctionType::new_endo(type_row![BOOL_T]),
         },
     )?;
     // this Xor has its 2nd input unconnected

@@ -109,8 +109,9 @@ impl FunctionType {
             extension_reqs: ExtensionSet::new(),
         }
     }
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self::new(linear.clone(), linear)
     }
