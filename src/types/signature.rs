@@ -27,7 +27,7 @@ pub struct FunctionType {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// A concrete signature, which has been instantiated with a set of input extensions
+/// A combination of a FunctionType and a set of input extensions, used for declaring functions
 pub struct Signature {
     /// The underlying signature
     pub signature: FunctionType,
@@ -109,8 +109,9 @@ impl FunctionType {
             extension_reqs: ExtensionSet::new(),
         }
     }
-    /// Create a new signature with the same input and output types.
-    pub fn new_linear(linear: impl Into<TypeRow>) -> Self {
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
         let linear = linear.into();
         Self::new(linear.clone(), linear)
     }
@@ -243,15 +244,6 @@ impl FunctionType {
 }
 
 impl Signature {
-    /// Returns a reference to the extension set for the ports of the
-    /// signature in a given direction
-    pub fn get_extension(&self, dir: &Direction) -> ExtensionSet {
-        match dir {
-            Direction::Incoming => self.input_extensions.clone(),
-            Direction::Outgoing => self.output_extensions(),
-        }
-    }
-
     delegate! {
         to self.signature {
             /// Inputs of the function type

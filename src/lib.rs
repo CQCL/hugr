@@ -50,11 +50,11 @@
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncType {
-//!         FunctionType::new_linear(type_row![QB_T]).into()
+//!         FunctionType::new_endo(type_row![QB_T]).into()
 //!     }
 //!
 //!     fn two_qb_func() -> PolyFuncType {
-//!         FunctionType::new_linear(type_row![QB_T, QB_T]).into()
+//!         FunctionType::new_endo(type_row![QB_T, QB_T]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");

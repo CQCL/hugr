@@ -31,7 +31,7 @@ use crate::extension::{
 };
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
-use crate::types::{FunctionType, Signature};
+use crate::types::FunctionType;
 use crate::{Direction, Node};
 
 use delegate::delegate;
@@ -109,16 +109,6 @@ impl NodeType {
         }
     }
 
-    /// Use the input extensions to calculate the concrete signature of the node
-    pub fn signature(&self) -> Option<Signature> {
-        self.input_extensions.as_ref().map(|rs| {
-            self.op
-                .dataflow_signature()
-                .unwrap_or_default()
-                .with_input_extensions(rs.clone())
-        })
-    }
-
     /// Get the function type from the embedded op
     pub fn op_signature(&self) -> Option<FunctionType> {
         self.op.dataflow_signature()
@@ -132,6 +122,23 @@ impl NodeType {
     /// If the input extensions are not known, this will return None.
     pub fn input_extensions(&self) -> Option<&ExtensionSet> {
         self.input_extensions.as_ref()
+    }
+
+    /// The input and output extensions for this node, if set.
+    ///
+    /// `None`` if the [Self::input_extensions] is `None`.
+    /// Otherwise, will return Some, with the output extensions computed from the node's delta
+    pub fn io_extensions(&self) -> Option<(&ExtensionSet, ExtensionSet)> {
+        self.input_extensions.as_ref().map(|e| {
+            (
+                e,
+                self.op
+                    .dataflow_signature()
+                    .map(|ft| ft.extension_reqs)
+                    .unwrap_or_default()
+                    .union(e),
+            )
+        })
     }
 
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
@@ -411,19 +418,10 @@ mod test {
         hugr.infer_extensions()?;
 
         assert_eq!(
-            hugr.get_nodetype(lift)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            ExtensionSet::new()
+            hugr.get_nodetype(lift).input_extensions().unwrap(),
+            &ExtensionSet::new()
         );
-        assert_eq!(
-            hugr.get_nodetype(output)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            r
-        );
+        assert_eq!(hugr.get_nodetype(output).input_extensions().unwrap(), &r);
         Ok(())
     }
 }

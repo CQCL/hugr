@@ -253,26 +253,10 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
 
     let closure = hugr.infer_extensions()?;
     assert!(closure.is_empty());
+    assert_eq!(hugr.get_nodetype(src.node()).io_extensions().unwrap().1, rs);
     assert_eq!(
-        hugr.get_nodetype(src.node())
-            .signature()
-            .unwrap()
-            .output_extensions(),
-        rs
-    );
-    assert_eq!(
-        hugr.get_nodetype(mult.node())
-            .signature()
-            .unwrap()
-            .input_extensions,
-        rs
-    );
-    assert_eq!(
-        hugr.get_nodetype(mult.node())
-            .signature()
-            .unwrap()
-            .output_extensions(),
-        rs
+        hugr.get_nodetype(mult.node()).io_extensions().unwrap(),
+        (&rs.clone(), rs)
     );
     Ok(())
 }
@@ -385,18 +369,12 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
 
     for node in [case0_node, case1_node, conditional_node] {
         assert_eq!(
-            hugr.get_nodetype(node)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            ExtensionSet::new()
+            hugr.get_nodetype(node).io_extensions().unwrap().0,
+            &ExtensionSet::new()
         );
         assert_eq!(
-            hugr.get_nodetype(node)
-                .signature()
-                .unwrap()
-                .input_extensions,
-            ExtensionSet::new()
+            hugr.get_nodetype(node).io_extensions().unwrap().0,
+            &ExtensionSet::new()
         );
     }
     Ok(())
@@ -883,7 +861,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     let ext = ExtensionId::new("unknown1").unwrap();
     let delta = ExtensionSet::singleton(&ext);
-    let ft = FunctionType::new_linear(type_row![QB_T, QB_T]).with_extension_delta(&delta);
+    let ft = FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(&delta);
     let mut dfg = DFGBuilder::new(ft.clone())?;
 
     // While https://github.com/CQCL-DEV/hugr/issues/388 is unsolved,
@@ -897,7 +875,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
         Some(ft),
     ))
     .into();
-    let unary_sig = FunctionType::new_linear(type_row![QB_T])
+    let unary_sig = FunctionType::new_endo(type_row![QB_T])
         .with_extension_delta(&ExtensionSet::singleton(&ext));
     let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
         ext,

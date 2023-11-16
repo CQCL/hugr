@@ -385,7 +385,7 @@ mod test {
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
-        let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_linear(vec![list_of_var]));
+        let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
         e.add_op_type_scheme(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
@@ -393,7 +393,7 @@ mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(FunctionType::new_linear(vec![list_usize]))?;
+        let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             LeafOp::from(ExternalOp::Extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
