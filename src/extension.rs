@@ -298,7 +298,7 @@ impl Extension {
     // Validates against a registry, which we can assume includes this extension itself.
     // (TODO deal with the registry itself containing invalid extensions!)
     fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
-        // TODO we should validate TypeParams of TypeDefs too
+        // We should validate TypeParams of TypeDefs too - https://github.com/CQCL/hugr/issues/624
         for op_def in self.operations.values() {
             op_def.validate(all_exts)?;
         }

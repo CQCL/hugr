@@ -247,7 +247,8 @@ impl OpDef {
     }
 
     pub(super) fn validate(&self, exts: &ExtensionRegistry) -> Result<(), SignatureError> {
-        // TODO validate declared TypeParams for both type scheme and custom binary
+        // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
+        // for both type scheme and custom binary
         if let SignatureFunc::TypeScheme(ts) = &self.signature_func {
             ts.validate(exts, &[])?;
         }

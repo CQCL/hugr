@@ -66,6 +66,7 @@ impl PolyFuncType {
         reg: &ExtensionRegistry,
         external_var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
+        // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
         let mut v; // Declared here so live until end of scope
         let all_var_decls = if self.params.is_empty() {
             external_var_decls
