@@ -49,24 +49,6 @@ impl PolyFuncType {
         &self.params
     }
 
-    /// Create a new PolyFuncType and validates it, assuming it has no free
-    /// type variables (from any enclosing scope).
-    /// The [ExtensionRegistry] should be the same (or a subset) of that which will later
-    /// be used to validate the Hugr; at this point we only need the types.
-    ///
-    /// #Errors
-    /// Validates that all types in the schema are well-formed and all variables in the body
-    /// are declared with [TypeParam]s that guarantee they will fit.
-    pub fn new_validated(
-        params: impl Into<Vec<TypeParam>>,
-        body: FunctionType,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<Self, SignatureError> {
-        let res = Self::new(params, body);
-        res.validate(extension_registry, &[])?;
-        Ok(res)
-    }
-
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying [FunctionType].
     pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
@@ -249,6 +231,18 @@ pub(crate) mod test {
     use crate::Extension;
 
     use super::PolyFuncType;
+
+    impl PolyFuncType {
+        pub(crate) fn new_validated(
+            params: impl Into<Vec<TypeParam>>,
+            body: FunctionType,
+            extension_registry: &ExtensionRegistry,
+        ) -> Result<Self, SignatureError> {
+            let res = Self::new(params, body);
+            res.validate(extension_registry, &[])?;
+            Ok(res)
+        }
+    }
 
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {

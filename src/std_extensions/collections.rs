@@ -89,10 +89,7 @@ fn extension() -> Extension {
         .add_op_type_scheme_simple(
             PUSH_NAME,
             "Push to back of list".into(),
-            PolyFuncType::new(
-                vec![TP],
-                FunctionType::new(vec![l.clone(), e], vec![l]),
-            ),
+            PolyFuncType::new(vec![TP], FunctionType::new(vec![l.clone(), e], vec![l])),
         )
         .unwrap();
     extension
