@@ -37,7 +37,7 @@ pub(crate) mod test_quantum_extension {
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
         ops::LeafOp,
-        std_extensions::arithmetic::float_types::FLOAT64_TYPE,
+        std_extensions::arithmetic::float_types,
         type_row,
         types::{FunctionType, PolyFuncType},
         Extension,
@@ -64,7 +64,8 @@ pub(crate) mod test_quantum_extension {
             .add_op_type_scheme_simple(
                 SmolStr::new_inline("RzF64"),
                 "Rotation specified by float".into(),
-                FunctionType::new(type_row![QB_T, FLOAT64_TYPE], type_row![QB_T]).into(),
+                FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T])
+                    .into(),
             )
             .unwrap();
 
@@ -86,7 +87,7 @@ pub(crate) mod test_quantum_extension {
     lazy_static! {
         /// Quantum extension definition.
         pub static ref EXTENSION: Extension = extension();
-        static ref REG: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
+        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::extension()]).unwrap();
 
     }
     fn get_gate(gate_name: &str) -> LeafOp {

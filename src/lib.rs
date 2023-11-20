@@ -83,7 +83,8 @@
 //!     lazy_static! {
 //!         /// Quantum extension definition.
 //!         pub static ref EXTENSION: Extension = extension();
-//!         static ref REG: ExtensionRegistry = [EXTENSION.to_owned(), PRELUDE.to_owned()].into();
+//!         static ref REG: ExtensionRegistry =
+//!             ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
 //!
 //!     }
 //!     fn get_gate(gate_name: &str) -> LeafOp {

@@ -35,32 +35,37 @@ pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
 
 impl ExtensionRegistry {
-    /// Makes a new (empty) registry.
-    pub const fn new() -> Self {
-        Self(BTreeMap::new())
-    }
-
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Extension> {
         self.0.get(name)
     }
-}
 
-/// An Extension Registry containing no extensions.
-pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry::new();
-
-impl<T: IntoIterator<Item = Extension>> From<T> for ExtensionRegistry {
-    fn from(value: T) -> Self {
-        let mut reg = Self::new();
+    /// Makes a new ExtensionRegistry, validating all the extensions in it
+    pub fn try_new(
+        value: impl IntoIterator<Item = Extension>,
+    ) -> Result<Self, (ExtensionId, SignatureError)> {
+        let mut exts = BTreeMap::new();
         for ext in value.into_iter() {
-            let prev = reg.0.insert(ext.name.clone(), ext);
+            let prev = exts.insert(ext.name.clone(), ext);
             if let Some(prev) = prev {
                 panic!("Multiple extensions with same name: {}", prev.name)
             };
         }
-        reg
+        // Note this potentially asks extensions to validate themselves against other extensions that
+        // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
+        // or at least to validate the types first - which we don't do at all yet:
+        // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
+        // cyclically dependent, so there is no perfect solution, and this is at least simple.
+        let res = ExtensionRegistry(exts);
+        for ext in res.0.values() {
+            ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
+        }
+        Ok(res)
     }
 }
+
+/// An Extension Registry containing no extensions.
+pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
@@ -289,6 +294,16 @@ impl Extension {
     ) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.get_op(op_name).expect("Op not found.");
         ExtensionOp::new(op_def.clone(), args, ext_reg)
+    }
+
+    // Validates against a registry, which we can assume includes this extension itself.
+    // (TODO deal with the registry itself containing invalid extensions!)
+    fn validate(&self, all_exts: &ExtensionRegistry) -> Result<(), SignatureError> {
+        // We should validate TypeParams of TypeDefs too - https://github.com/CQCL/hugr/issues/624
+        for op_def in self.operations.values() {
+            op_def.validate(all_exts)?;
+        }
+        Ok(())
     }
 }
 

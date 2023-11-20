@@ -126,11 +126,10 @@ mod test {
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
             prelude::{ConstUsize, USIZE_T},
-            ExtensionId, ExtensionSet,
+            ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE,
         },
-        std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         type_row,
-        types::test::test_registry,
         types::type_param::TypeArg,
         types::{CustomCheckFailure, CustomType, FunctionType, Type, TypeBound, TypeRow},
         values::{
@@ -142,6 +141,10 @@ mod test {
     use serde_yaml::Value as YamlValue;
 
     use super::*;
+
+    fn test_registry() -> ExtensionRegistry {
+        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::extension()]).unwrap()
+    }
 
     #[test]
     fn test_tuple_sum() -> Result<(), BuildError> {
