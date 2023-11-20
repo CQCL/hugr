@@ -22,7 +22,7 @@ mod infer;
 pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
 
 mod op_def;
-pub use op_def::{CustomFunc, CustomSignatureFunc, OpDef};
+pub use op_def::{CustomFunc, OpDef};
 mod type_def;
 pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
