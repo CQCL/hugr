@@ -612,14 +612,7 @@ pub trait Dataflow: Container {
                 })
             }
         };
-        let signature = type_scheme.instantiate(type_args, exts).map_err(|e| {
-            BuildError::InvalidHUGR(ValidationError::SignatureError {
-                // TODO this is rather a horrendous hack. Do we need some way of returning a SignatureError without a node
-                // (as the call node this refers to is not constructed yet)? Or, pass in an "instantiated" FuncID?
-                node: function.node(),
-                cause: e,
-            })
-        })?;
+        let signature = type_scheme.instantiate(type_args, exts)?;
         let op: OpType = ops::Call { signature }.into();
         let const_in_port = op.static_input_port().unwrap();
         let op_id = self.add_dataflow_op(op, input_wires)?;

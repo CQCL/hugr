@@ -5,6 +5,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
 
+use crate::extension::SignatureError;
 use crate::hugr::{HugrError, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::ConstTypeError;
@@ -43,6 +44,10 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
+    /// SignatureError in trying to construct a node (differs from
+    /// [ValidationError::SignatureError] in that we could not construct a node to report about)
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
     /// Tried to add a malformed [Const]
     ///
     /// [Const]: crate::ops::constant::Const
