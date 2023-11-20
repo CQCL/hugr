@@ -200,11 +200,15 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // Secondly that the node has correct children
         self.validate_children(node, node_type)?;
 
-        // If this is a container with I/O nodes, check that the extension they
-        // define match the extensions of the container.
-        if let Some([input, output]) = self.hugr.get_io(node) {
-            self.extension_validator
-                .validate_io_extensions(node, input, output)?;
+        // FuncDefns have no resources since they're static nodes, but the
+        // functions they define can have any extension delta.
+        if node_type.tag() != OpTag::FuncDefn {
+            // If this is a container with I/O nodes, check that the extension they
+            // define match the extensions of the container.
+            if let Some([input, output]) = self.hugr.get_io(node) {
+                self.extension_validator
+                    .validate_io_extensions(node, input, output)?;
+            }
         }
 
         Ok(())
