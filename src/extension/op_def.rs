@@ -89,7 +89,7 @@ impl CustomFunc {
 
 /// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
-pub(super) enum SignatureFunc {
+pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
@@ -97,6 +97,24 @@ pub(super) enum SignatureFunc {
     TypeScheme(PolyFuncType),
     #[serde(skip)]
     CustomFunc(CustomFunc),
+}
+
+impl<T: Into<CustomFunc>> From<T> for SignatureFunc {
+    fn from(v: T) -> Self {
+        Self::new_custom(v.into())
+    }
+}
+
+impl From<PolyFuncType> for SignatureFunc {
+    fn from(v: PolyFuncType) -> Self {
+        Self::new_type_scheme(v)
+    }
+}
+
+impl From<FunctionType> for SignatureFunc {
+    fn from(v: FunctionType) -> Self {
+        Self::new_type_scheme(v.into())
+    }
 }
 
 impl SignatureFunc {
@@ -306,20 +324,20 @@ impl OpDef {
 
 impl Extension {
     /// Add an operation definition to the extension.
-    fn add_op(
+    pub fn add_op(
         &mut self,
         name: SmolStr,
         description: String,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
-        signature_func: SignatureFunc,
+        signature_func: impl Into<SignatureFunc>,
     ) -> Result<&OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
             name,
             description,
             misc,
-            signature_func,
+            signature_func: signature_func.into(),
             lower_funcs,
         };
 
@@ -329,74 +347,20 @@ impl Extension {
         }
     }
 
-    /// Create an OpDef with custom binary code to compute the signature
-    pub fn add_op_custom_sig(
-        &mut self,
-        name: SmolStr,
-        description: String,
-        misc: HashMap<String, serde_yaml::Value>,
-        lower_funcs: Vec<LowerFunc>,
-        signature_func: impl Into<CustomFunc>,
-    ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op(
-            name,
-            description,
-            misc,
-            lower_funcs,
-            SignatureFunc::CustomFunc(signature_func.into()),
-        )
-    }
-
     /// Create an OpDef with custom binary code to compute the type scheme
     /// (which may be polymorphic); and no "misc" or "lowering functions" defined.
-    pub fn add_op_custom_sig_simple(
+    pub fn add_op_simple(
         &mut self,
         name: SmolStr,
         description: String,
-        signature_func: impl Into<CustomFunc>,
+        signature_func: impl Into<SignatureFunc>,
     ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op_custom_sig(
+        self.add_op(
             name,
             description,
             HashMap::default(),
             Vec::new(),
             signature_func,
-        )
-    }
-
-    /// Create an OpDef with a signature (inputs+outputs) read from e.g.
-    /// declarative YAML
-    pub fn add_op_type_scheme(
-        &mut self,
-        name: SmolStr,
-        description: String,
-        misc: HashMap<String, serde_yaml::Value>,
-        lower_funcs: Vec<LowerFunc>,
-        type_scheme: PolyFuncType,
-    ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op(
-            name,
-            description,
-            misc,
-            lower_funcs,
-            SignatureFunc::TypeScheme(type_scheme),
-        )
-    }
-
-    /// Create an OpDef with a signature (inputs+outputs) read from e.g.
-    /// declarative YAML; and no "misc" or "lowering functions" defined.
-    pub fn add_op_type_scheme_simple(
-        &mut self,
-        name: SmolStr,
-        description: String,
-        type_scheme: PolyFuncType,
-    ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op(
-            name,
-            description,
-            Default::default(),
-            vec![],
-            SignatureFunc::TypeScheme(type_scheme),
         )
     }
 }
@@ -428,7 +392,7 @@ mod test {
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
         let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
-        e.add_op_type_scheme(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
+        e.add_op(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
         let e = reg.get(&EXT_ID).unwrap();

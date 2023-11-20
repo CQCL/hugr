@@ -34,15 +34,15 @@ fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
-        .add_op_type_scheme_simple(
+        .add_op_simple(
             SmolStr::new_inline(NOT_NAME),
             "logical 'not'".into(),
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
         )
         .unwrap();
 
     extension
-        .add_op_custom_sig_simple(
+        .add_op_simple(
             SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
             CustomFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
@@ -59,7 +59,7 @@ fn extension() -> Extension {
         .unwrap();
 
     extension
-        .add_op_custom_sig_simple(
+        .add_op_simple(
             SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
             CustomFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
