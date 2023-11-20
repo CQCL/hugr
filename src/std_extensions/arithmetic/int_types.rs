@@ -6,13 +6,12 @@ use smol_str::SmolStr;
 
 use crate::{
     extension::ExtensionId,
-    ops::OpType,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
     },
     values::CustomConst,
-    Extension, IncomingPort, OutgoingPort,
+    Extension,
 };
 use lazy_static::lazy_static;
 /// The extension identifier.
@@ -161,14 +160,6 @@ impl CustomConst for ConstIntU {
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
-    }
-
-    fn fold(
-        &self,
-        _op: &OpType,
-        _consts: &[(IncomingPort, crate::ops::Const)],
-    ) -> Option<Vec<(OutgoingPort, crate::ops::Const)>> {
-        None
     }
 }
 

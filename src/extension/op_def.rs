@@ -245,6 +245,44 @@ impl Debug for LowerFunc {
     }
 }
 
+type ConstFoldResult = Option<Vec<(crate::OutgoingPort, crate::ops::Const)>>;
+pub trait GenericConstFold: Send + Sync {
+    fn fold(
+        &self,
+        type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, crate::ops::Const)],
+    ) -> ConstFoldResult;
+}
+
+impl Debug for Box<dyn GenericConstFold> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<custom constant folding>")
+    }
+}
+
+impl Default for Box<dyn GenericConstFold> {
+    fn default() -> Self {
+        Box::new(|&_: &_| None)
+    }
+}
+
+impl<T> GenericConstFold for T
+where
+    T: Fn(
+            &[(crate::IncomingPort, crate::ops::Const)],
+        ) -> Option<Vec<(crate::OutgoingPort, crate::ops::Const)>>
+        + Send
+        + Sync,
+{
+    fn fold(
+        &self,
+        _type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, crate::ops::Const)],
+    ) -> ConstFoldResult {
+        self(consts)
+    }
+}
+
 /// Serializable definition for dynamically loaded operations.
 ///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
@@ -267,6 +305,9 @@ pub struct OpDef {
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
+
+    #[serde(skip)]
+    constant_fold: Box<dyn GenericConstFold>,
 }
 
 impl OpDef {
@@ -399,6 +440,10 @@ impl OpDef {
     ) -> Option<serde_yaml::Value> {
         self.misc.insert(k.to_string(), v)
     }
+
+    pub fn add_constant_folding(&mut self, fold: impl GenericConstFold + 'static) {
+        self.constant_fold = Box::new(fold)
+    }
 }
 
 impl Extension {
@@ -419,6 +464,7 @@ impl Extension {
             signature_func: signature_func.into(),
             misc: Default::default(),
             lower_funcs: Default::default(),
+            constant_fold: Default::default(),
         };
 
         match self.operations.entry(op.name.clone()) {
