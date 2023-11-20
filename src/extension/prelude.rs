@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionId, TypeDefBound},
+    extension::{op_def::CustomFunc, ExtensionId, TypeDefBound},
     ops::LeafOp,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -44,7 +44,7 @@ lazy_static! {
             .add_op_custom_sig_simple(
                 SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
-                vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+                CustomFunc::from_closure(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 |args: &[TypeArg]| {
                     let [TypeArg::Type { ty }, TypeArg::BoundedNat { n }] = args else {
                         panic!("should have been checked already.")
@@ -53,7 +53,7 @@ lazy_static! {
                         vec![ty.clone(); *n as usize],
                         vec![array_type(ty.clone(), *n)],
                     ))
-                },
+                }),
             )
             .unwrap();
 

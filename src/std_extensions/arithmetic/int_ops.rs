@@ -2,6 +2,7 @@
 
 use super::int_types::{get_log_width, int_type, int_type_var, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
+use crate::extension::CustomFunc;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -115,16 +116,15 @@ pub fn extension() -> Extension {
         .add_op_custom_sig_simple(
             "iwiden_u".into(),
             "widen an unsigned integer to a wider one with the same value".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            iwiden_sig,
+            CustomFunc::from_closure(vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM], iwiden_sig),
         )
         .unwrap();
+
     extension
         .add_op_custom_sig_simple(
             "iwiden_s".into(),
             "widen a signed integer to a wider one with the same value".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            iwiden_sig,
+            CustomFunc::from_closure(vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM], iwiden_sig),
         )
         .unwrap();
     extension
@@ -132,16 +132,20 @@ pub fn extension() -> Extension {
             "inarrow_u".into(),
             "narrow an unsigned integer to a narrower one with the same value if possible"
                 .to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            inarrow_sig,
+            CustomFunc::from_closure(
+                vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+                inarrow_sig,
+            ),
         )
         .unwrap();
     extension
         .add_op_custom_sig_simple(
             "inarrow_s".into(),
             "narrow a signed integer to a narrower one with the same value if possible".to_owned(),
-            vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-            inarrow_sig,
+            CustomFunc::from_closure(
+                vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
+                inarrow_sig,
+            ),
         )
         .unwrap();
     extension

@@ -26,11 +26,26 @@ pub trait CustomSignatureFunc: Send + Sync {
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncType, SignatureError>;
+
+    fn static_params(&self) -> &[TypeParam];
+}
+
+trait CustomComputeSig: Send + Sync {
+    /// Compute signature of node given the operation name,
+    /// values for the type parameters,
+    /// and 'misc' data from the extension definition YAML
+    fn compute_signature(
+        &self,
+        name: &SmolStr,
+        arg_values: &[TypeArg],
+        misc: &HashMap<String, serde_yaml::Value>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<PolyFuncType, SignatureError>;
 }
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F, R: Into<PolyFuncType>> CustomSignatureFunc for F
+impl<F, R: Into<PolyFuncType>> CustomComputeSig for F
 where
     F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync,
 {
@@ -68,6 +83,42 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
+pub struct CustomFunc {
+    /// Type parameters passed to [func]. (The returned [PolyFuncType]
+    /// may require further type parameters, not declared here.)
+    static_params: Vec<TypeParam>,
+    func: Box<dyn CustomComputeSig>,
+}
+
+impl CustomFunc {
+    pub fn from_closure<F, R>(static_params: impl Into<Vec<TypeParam>>, func: F) -> Self
+    where
+        R: Into<PolyFuncType>,
+        F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync + 'static,
+    {
+        Self {
+            static_params: static_params.into(),
+            func: Box::new(func),
+        }
+    }
+}
+
+impl CustomSignatureFunc for CustomFunc {
+    fn compute_signature(
+        &self,
+        name: &SmolStr,
+        arg_values: &[TypeArg],
+        misc: &HashMap<String, serde_yaml::Value>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<PolyFuncType, SignatureError> {
+        self.func
+            .compute_signature(name, arg_values, misc, extension_registry)
+    }
+
+    fn static_params(&self) -> &[TypeParam] {
+        &self.static_params
+    }
+}
 /// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(super) enum SignatureFunc {
@@ -80,7 +131,6 @@ pub(super) enum SignatureFunc {
     CustomFunc {
         /// Type parameters passed to [func]. (The returned [PolyFuncType]
         /// may require further type parameters, not declared here.)
-        static_params: Vec<TypeParam>,
         func: Box<dyn CustomSignatureFunc>,
     },
 }
@@ -186,10 +236,8 @@ impl OpDef {
         let temp: PolyFuncType; // to keep alive
         let (pf, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (ts, args),
-            SignatureFunc::CustomFunc {
-                static_params,
-                func,
-            } => {
+            SignatureFunc::CustomFunc { func } => {
+                let static_params = func.static_params();
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
                 check_type_args(static_args, static_params)?;
                 temp = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
@@ -250,7 +298,7 @@ impl OpDef {
     pub fn params(&self) -> &[TypeParam] {
         match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => ts.params(),
-            SignatureFunc::CustomFunc { static_params, .. } => static_params,
+            SignatureFunc::CustomFunc { func } => func.static_params(),
         }
     }
 
@@ -294,7 +342,6 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        static_params: Vec<TypeParam>,
         misc: HashMap<String, serde_yaml::Value>,
         lower_funcs: Vec<LowerFunc>,
         signature_func: impl CustomSignatureFunc + 'static,
@@ -305,7 +352,6 @@ impl Extension {
             misc,
             lower_funcs,
             SignatureFunc::CustomFunc {
-                static_params,
                 func: Box::new(signature_func),
             },
         )
@@ -317,13 +363,11 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        static_params: Vec<TypeParam>,
         signature_func: impl CustomSignatureFunc + 'static,
     ) -> Result<&OpDef, ExtensionBuildError> {
         self.add_op_custom_sig(
             name,
             description,
-            static_params,
             HashMap::default(),
             Vec::new(),
             signature_func,
