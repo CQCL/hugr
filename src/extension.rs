@@ -53,8 +53,9 @@ impl ExtensionRegistry {
         }
         // Note this potentially asks extensions to validate themselves against other extensions that
         // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
-        // or (given parameterized types could be cyclically dependent) at least to validate types
-        // before ops, but since we are not even validating types yet, this is much simpler....TOOD!
+        // or at least to validate the types first - which we don't do at all yet:
+        // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
+        // cyclically dependent, so there is no perfect solution, and this is at least simple.
         let res = ExtensionRegistry(exts);
         for ext in res.0.values() {
             ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
