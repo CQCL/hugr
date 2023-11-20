@@ -77,6 +77,8 @@ impl ValidateOp for super::FuncDefn {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
+        // We check type-variables are declared in `validate_subtree`, so here
+        // we can just assume all type variables are valid regardless of binders.
         let FunctionType { input, output, .. } = &self.signature.body;
         validate_io_nodes(input, output, "function definition", children)
     }
