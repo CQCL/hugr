@@ -44,6 +44,36 @@ where
     }
 }
 
+trait CustomValidateFunc: Send + Sync {
+    /// Compute signature of node given the operation name,
+    /// values for the type parameters,
+    /// and 'misc' data from the extension definition YAML
+    fn validate_signature(
+        &self,
+        name: &SmolStr,
+        arg_values: &[TypeArg],
+        misc: &HashMap<String, serde_yaml::Value>,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError>;
+}
+
+// Note this is very much a utility, rather than definitive;
+// one can only do so much without the ExtensionRegistry!
+impl<F> CustomValidateFunc for F
+where
+    F: Fn(&[TypeArg]) -> Result<(), SignatureError> + Send + Sync,
+{
+    fn validate_signature(
+        &self,
+        _name: &SmolStr,
+        arg_values: &[TypeArg],
+        _misc: &HashMap<String, serde_yaml::Value>,
+        _extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        self(arg_values)
+    }
+}
+
 /// Trait for Extensions to provide custom binary code that can lower an operation to
 /// a Hugr using only a limited set of other extensions. That is, trait
 /// implementations can return a Hugr that implements the operation using only
@@ -87,6 +117,32 @@ impl CustomFunc {
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct CustomValidate {
+    #[serde(flatten)]
+    poly_func: PolyFuncType,
+    #[serde(skip)]
+    validate: Box<dyn CustomValidateFunc>,
+}
+
+impl CustomValidate {
+    pub fn from_polyfunc(poly_func: impl Into<PolyFuncType>) -> Self {
+        Self {
+            poly_func: poly_func.into(),
+            validate: Default::default(),
+        }
+    }
+    pub fn new_with_validator(
+        poly_func: impl Into<PolyFuncType>,
+        validate: impl CustomValidateFunc + 'static,
+    ) -> Self {
+        Self {
+            poly_func: poly_func.into(),
+            validate: Box::new(validate),
+        }
+    }
+}
+
 /// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
@@ -94,26 +150,38 @@ pub enum SignatureFunc {
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
     #[serde(rename = "signature")]
-    TypeScheme(PolyFuncType),
+    TypeScheme(CustomValidate),
     #[serde(skip)]
     CustomFunc(CustomFunc),
 }
 
+impl Default for Box<dyn CustomValidateFunc> {
+    fn default() -> Self {
+        Box::new(|&_: &_| Ok(()))
+    }
+}
+
 impl<T: Into<CustomFunc>> From<T> for SignatureFunc {
     fn from(v: T) -> Self {
-        Self::new_custom(v.into())
+        Self::CustomFunc(v.into())
     }
 }
 
 impl From<PolyFuncType> for SignatureFunc {
     fn from(v: PolyFuncType) -> Self {
-        Self::new_type_scheme(v)
+        Self::TypeScheme(CustomValidate::from_polyfunc(v))
     }
 }
 
 impl From<FunctionType> for SignatureFunc {
     fn from(v: FunctionType) -> Self {
-        Self::new_type_scheme(v.into())
+        Self::TypeScheme(CustomValidate::from_polyfunc(v))
+    }
+}
+
+impl From<CustomValidate> for SignatureFunc {
+    fn from(v: CustomValidate) -> Self {
+        Self::TypeScheme(v)
     }
 }
 
@@ -126,7 +194,12 @@ impl SignatureFunc {
         extension_registry: &ExtensionRegistry,
     ) -> Result<(PolyFuncType, &'a [TypeArg]), SignatureError> {
         Ok(match self {
-            SignatureFunc::TypeScheme(ts) => (ts.clone(), arg_values),
+            SignatureFunc::TypeScheme(custom) => {
+                custom
+                    .validate
+                    .validate_signature(name, arg_values, misc, extension_registry)?;
+                (custom.poly_func.clone(), arg_values)
+            }
             SignatureFunc::CustomFunc(func) => {
                 let static_params = self.static_params();
                 let (static_args, other_args) =
@@ -142,24 +215,16 @@ impl SignatureFunc {
 
     fn static_params(&self) -> &[TypeParam] {
         match self {
-            SignatureFunc::TypeScheme(ts) => ts.params(),
+            SignatureFunc::TypeScheme(ts) => ts.poly_func.params(),
             SignatureFunc::CustomFunc(func) => &func.static_params,
         }
-    }
-
-    fn new_type_scheme(ts: PolyFuncType) -> Self {
-        Self::TypeScheme(ts)
-    }
-
-    fn new_custom(custom: CustomFunc) -> Self {
-        Self::CustomFunc(custom)
     }
 }
 
 impl Debug for SignatureFunc {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::TypeScheme(scheme) => scheme.fmt(f),
+            Self::TypeScheme(ts) => ts.poly_func.fmt(f),
             Self::CustomFunc { .. } => f.write_str("<custom sig>"),
         }
     }
@@ -316,7 +381,7 @@ impl OpDef {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
         if let SignatureFunc::TypeScheme(ts) = &self.signature_func {
-            ts.validate(exts, &[])?;
+            ts.poly_func.validate(exts, &[])?;
         }
         Ok(())
     }

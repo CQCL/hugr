@@ -1,8 +1,8 @@
 //! Basic integer operations.
 
-use super::int_types::{get_log_width, int_type, int_type_var, LOG_WIDTH_TYPE_PARAM};
+use super::int_types::{get_log_width, int_type_var, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
-use crate::extension::CustomFunc;
+use crate::extension::CustomValidate;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -15,30 +15,24 @@ use crate::{
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
-fn iwiden_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn iwiden_sig_validate(arg_values: &[TypeArg]) -> Result<(), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_log_width(arg0)?;
     let n: u8 = get_log_width(arg1)?;
     if m > n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok(FunctionType::new(
-        vec![int_type(arg0.clone())],
-        vec![int_type(arg1.clone())],
-    ))
+    Ok(())
 }
 
-fn inarrow_sig(arg_values: &[TypeArg]) -> Result<FunctionType, SignatureError> {
+fn inarrow_sig_validate(arg_values: &[TypeArg]) -> Result<(), SignatureError> {
     let [arg0, arg1] = collect_array(arg_values);
     let m: u8 = get_log_width(arg0)?;
     let n: u8 = get_log_width(arg1)?;
     if m < n {
         return Err(SignatureError::InvalidTypeArgs);
     }
-    Ok(FunctionType::new(
-        vec![int_type(arg0.clone())],
-        vec![sum_with_error(int_type(arg1.clone()))],
-    ))
+    Ok(())
 }
 
 fn int_polytype(
@@ -107,6 +101,12 @@ pub fn extension() -> Extension {
 
     let ish_sig = int_polytype(2, vec![int_type_var(1)], vec![int_type_var(0)]);
 
+    let widen_poly = int_polytype(2, vec![int_type_var(0)], vec![int_type_var(1)]);
+    let narrow_poly = int_polytype(
+        2,
+        vec![int_type_var(0)],
+        vec![sum_with_error(int_type_var(1))],
+    );
     let mut extension = Extension::new_with_reqs(
         EXTENSION_ID,
         ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
@@ -116,7 +116,7 @@ pub fn extension() -> Extension {
         .add_op_simple(
             "iwiden_u".into(),
             "widen an unsigned integer to a wider one with the same value".to_owned(),
-            CustomFunc::from_closure(vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM], iwiden_sig),
+            CustomValidate::new_with_validator(widen_poly.clone(), iwiden_sig_validate),
         )
         .unwrap();
 
@@ -124,7 +124,7 @@ pub fn extension() -> Extension {
         .add_op_simple(
             "iwiden_s".into(),
             "widen a signed integer to a wider one with the same value".to_owned(),
-            CustomFunc::from_closure(vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM], iwiden_sig),
+            CustomValidate::new_with_validator(widen_poly, iwiden_sig_validate),
         )
         .unwrap();
     extension
@@ -132,20 +132,14 @@ pub fn extension() -> Extension {
             "inarrow_u".into(),
             "narrow an unsigned integer to a narrower one with the same value if possible"
                 .to_owned(),
-            CustomFunc::from_closure(
-                vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-                inarrow_sig,
-            ),
+            CustomValidate::new_with_validator(narrow_poly.clone(), inarrow_sig_validate),
         )
         .unwrap();
     extension
         .add_op_simple(
             "inarrow_s".into(),
             "narrow a signed integer to a narrower one with the same value if possible".to_owned(),
-            CustomFunc::from_closure(
-                vec![LOG_WIDTH_TYPE_PARAM, LOG_WIDTH_TYPE_PARAM],
-                inarrow_sig,
-            ),
+            CustomValidate::new_with_validator(narrow_poly, inarrow_sig_validate),
         )
         .unwrap();
     extension
@@ -450,20 +444,13 @@ mod test {
     }
     #[test]
     fn test_binary_signatures() {
-        let sig = iwiden_sig(&[ta(3), ta(4)]).unwrap();
-        assert_eq!(
-            sig,
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
-        );
+        //TODO validate using opdef in extension, lazy_static
+        iwiden_sig_validate(&[ta(3), ta(4)]).unwrap();
 
-        iwiden_sig(&[ta(4), ta(3)]).unwrap_err();
+        iwiden_sig_validate(&[ta(4), ta(3)]).unwrap_err();
 
-        let sig = inarrow_sig(&[ta(2), ta(1)]).unwrap();
-        assert_eq!(
-            sig,
-            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
-        );
+        inarrow_sig_validate(&[ta(2), ta(1)]).unwrap();
 
-        inarrow_sig(&[ta(1), ta(2)]).unwrap_err();
+        inarrow_sig_validate(&[ta(1), ta(2)]).unwrap_err();
     }
 }
