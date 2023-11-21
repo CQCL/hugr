@@ -15,7 +15,7 @@ use super::{FunctionType, Substitution};
 /// [Graph]: crate::values::Value::Function
 /// [OpDef]: crate::extension::OpDef
 #[derive(
-    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(
     fmt = "forall {}. {}",
@@ -31,7 +31,7 @@ pub struct PolyFuncType {
     /// [TypeArg]: super::type_param::TypeArg
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    pub(super) body: FunctionType,
+    pub(crate) body: FunctionType,
 }
 
 impl From<FunctionType> for PolyFuncType {
@@ -138,12 +138,6 @@ impl PolyFuncType {
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
         Ok(self.body.substitute(&SubstValues(args, ext_reg)))
-    }
-}
-
-impl PartialEq<FunctionType> for PolyFuncType {
-    fn eq(&self, other: &FunctionType) -> bool {
-        self.params.is_empty() && &self.body == other
     }
 }
 
@@ -491,7 +485,7 @@ pub(crate) mod test {
         let actual = array_max
             .instantiate_poly(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
 
-        assert_eq!(actual, concrete);
+        assert_eq!(actual, concrete.into());
 
         // forall N.(Array<usize,N> -> usize)
         let partial = PolyFuncType::new_validated(

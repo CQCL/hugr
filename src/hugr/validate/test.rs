@@ -2,7 +2,10 @@ use cool_asserts::assert_matches;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
-use crate::builder::{BuildError, Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+use crate::builder::{
+    BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    ModuleBuilder,
+};
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
     Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
@@ -11,11 +14,12 @@ use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, LeafOp, OpType};
+use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic;
 use crate::std_extensions::logic::test::{and_op, not_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeRow};
+use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::values::Value;
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -27,7 +31,7 @@ const Q: Type = crate::extension::prelude::QB_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]),
+        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
     }
     .into();
 
@@ -173,7 +177,7 @@ fn children_restrictions() {
         .add_node_with_parent(
             root,
             ops::FuncDefn {
-                signature: def_sig,
+                signature: def_sig.into(),
                 name: "main".into(),
             },
         )
@@ -445,7 +449,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
     let mut module_builder = ModuleBuilder::new();
     let mut main = module_builder.define_function(
         "main",
-        FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+        FunctionType::new(type_row![NAT], type_row![NAT]).into(),
     )?;
     let [main_input] = main.input_wires_arr();
 
@@ -481,7 +485,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
 fn too_many_extension() -> Result<(), BuildError> {
     let mut module_builder = ModuleBuilder::new();
 
-    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).pure();
+    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
 
     let mut main = module_builder.define_function("main", main_sig)?;
     let [main_input] = main.input_wires_arr();
@@ -521,7 +525,7 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let main_sig = FunctionType::new(type_row![], type_row![NAT])
         .with_extension_delta(&all_rs)
-        .with_input_extensions(ExtensionSet::new());
+        .into();
 
     let mut main = module_builder.define_function("main", main_sig)?;
 
@@ -636,7 +640,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
             b.root(),
             ops::FuncDefn {
                 name: "main".into(),
-                signature: FunctionType::new(row.clone(), row.clone()),
+                signature: FunctionType::new(row.clone(), row.clone()).into(),
             },
         )
         .unwrap();
@@ -801,4 +805,115 @@ fn parent_io_mismatch() {
             ExtensionError::ParentIOExtensionMismatch { .. }
         ))
     );
+}
+
+#[test]
+fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
+    // Base case
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    f.finish_prelude_hugr_with_outputs([w])?;
+    // Type refers to undeclared variable
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    assert!(f.finish_prelude_hugr_with_outputs([w]).is_err());
+    // Variable declaration incorrectly copied to use site
+    let f = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [TypeParam::Type(TypeBound::Any)],
+            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
+        ),
+    )?;
+    let [w] = f.input_wires_arr();
+    assert!(f.finish_prelude_hugr_with_outputs([w]).is_err());
+    Ok(())
+}
+
+/// Test that nested FuncDefns cannot use Type Variables declared by enclosing FuncDefns
+#[test]
+fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
+    const OUTER_BOUND: TypeBound = TypeBound::Any;
+    const INNER_BOUND: TypeBound = TypeBound::Copyable;
+    fn build(t: Type) -> Result<Hugr, BuildError> {
+        let mut outer = FunctionBuilder::new(
+            "outer",
+            PolyFuncType::new(
+                [OUTER_BOUND.into()],
+                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            ),
+        )?;
+        let inner = outer.define_function(
+            "inner",
+            PolyFuncType::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
+        )?;
+        let [w] = inner.input_wires_arr();
+        inner.finish_with_outputs([w])?;
+        let [w] = outer.input_wires_arr();
+        outer.finish_prelude_hugr_with_outputs([w])
+    }
+    assert!(build(Type::new_var_use(0, INNER_BOUND)).is_ok());
+    assert_matches!(
+        build(Type::new_var_use(1, OUTER_BOUND)).unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError {
+            cause: SignatureError::FreeTypeVar {
+                idx: 1,
+                num_decls: 1
+            },
+            ..
+        })
+    );
+    assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
+        actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
+    Ok(())
+}
+
+#[test]
+fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::std_extensions::collections;
+    const BOUND: TypeParam = TypeParam::Type(TypeBound::Copyable);
+    let list_of_var = Type::new_extension(
+        collections::EXTENSION
+            .get_type(&collections::LIST_TYPENAME)
+            .unwrap()
+            .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
+    );
+    let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
+    let just_colns = ExtensionSet::singleton(&collections::EXTENSION_NAME);
+    let mut def = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [BOUND],
+            FunctionType::new(vec![], vec![list_of_var.clone()]).with_extension_delta(&just_colns),
+        ),
+    )?;
+    let empty_list = Value::Extension {
+        c: (Box::new(collections::ListValue::new(vec![])),),
+    };
+    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?, just_colns)?;
+    let res = def.finish_hugr_with_outputs([cst], &reg);
+    assert_matches!(
+        res.unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError {
+            cause: SignatureError::FreeTypeVar {
+                idx: 0,
+                num_decls: 0
+            },
+            ..
+        })
+    );
+    Ok(())
 }

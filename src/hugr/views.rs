@@ -27,7 +27,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
 #[rustversion::since(1.75)] // uses impl in return position
 use crate::types::Type;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 #[rustversion::since(1.75)] // uses impl in return position
 use itertools::Either;
@@ -336,12 +336,12 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self) -> Option<&FunctionType> {
+    fn get_function_type(&self) -> Option<PolyFuncType> {
         let op = self.get_nodetype(self.root());
         match &op.op {
-            OpType::DFG(DFG { signature })
-            | OpType::FuncDecl(FuncDecl { signature, .. })
-            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature),
+            OpType::DFG(DFG { signature }) => Some(signature.clone().into()),
+            OpType::FuncDecl(FuncDecl { signature, .. })
+            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature.clone()),
             _ => None,
         }
     }

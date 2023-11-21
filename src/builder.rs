@@ -5,6 +5,7 @@ use thiserror::Error;
 #[cfg(feature = "pyo3")]
 use pyo3::{create_exception, exceptions::PyException, PyErr};
 
+use crate::extension::SignatureError;
 use crate::hugr::{HugrError, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::ConstTypeError;
@@ -43,6 +44,10 @@ pub enum BuildError {
     /// The constructed HUGR is invalid.
     #[error("The constructed HUGR is invalid: {0}.")]
     InvalidHUGR(#[from] ValidationError),
+    /// SignatureError in trying to construct a node (differs from
+    /// [ValidationError::SignatureError] in that we could not construct a node to report about)
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
     /// Tried to add a malformed [Const]
     ///
     /// [Const]: crate::ops::constant::Const
@@ -100,7 +105,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
-    use crate::types::{FunctionType, Signature, Type};
+    use crate::types::{FunctionType, PolyFuncType, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -123,7 +128,7 @@ pub(crate) mod test {
     }
 
     pub(super) fn build_main(
-        signature: Signature,
+        signature: PolyFuncType,
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();

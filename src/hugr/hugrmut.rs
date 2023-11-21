@@ -636,7 +636,7 @@ mod test {
                 module,
                 ops::FuncDefn {
                     name: "main".into(),
-                    signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
+                    signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
                 },
             )
             .expect("Failed to add function definition node");

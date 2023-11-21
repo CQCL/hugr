@@ -27,6 +27,14 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 /// Dynamically sized list of values, all of the same type.
 pub struct ListValue(Vec<Value>);
 
+impl ListValue {
+    /// Create a new [CustomConst] for a list of values.
+    /// (The caller will need these to all be of the same type, but that is not checked here.)
+    pub fn new(contents: Vec<Value>) -> Self {
+        Self(contents)
+    }
+}
+
 #[typetag::serde]
 impl CustomConst for ListValue {
     fn name(&self) -> SmolStr {

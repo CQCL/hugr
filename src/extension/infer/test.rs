@@ -955,7 +955,7 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
         "F",
         FunctionType::new(vec![NAT], vec![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&A))
-            .pure(),
+            .into(),
     )?;
 
     let [w] = func_builder.input_wires_arr();
@@ -979,7 +979,7 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
         "F",
         FunctionType::new(vec![NAT], vec![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&A))
-            .pure(),
+            .into(),
     )?;
 
     let [w] = func_builder.input_wires_arr();
@@ -1013,7 +1013,7 @@ fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
         "F",
         FunctionType::new(vec![NAT], vec![NAT])
             .with_extension_delta(&ExtensionSet::singleton(&A))
-            .pure(),
+            .into(),
     )?;
 
     let [w] = func_builder.input_wires_arr();

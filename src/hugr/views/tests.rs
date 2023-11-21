@@ -156,7 +156,7 @@ fn static_targets() {
 #[test]
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
     use crate::hugr::views::PortIterator;
     use crate::std_extensions::logic::test::not_op;
     use itertools::Itertools;
@@ -165,7 +165,7 @@ fn test_dataflow_ports_only() {
         let local_and = dfg
             .define_function(
                 "and",
-                FunctionType::new(type_row![BOOL_T; 2], type_row![BOOL_T]).pure(),
+                FunctionType::new(type_row![BOOL_T; 2], type_row![BOOL_T]).into(),
             )
             .unwrap();
         let first_input = local_and.input().out_wire(0);
@@ -174,10 +174,17 @@ fn test_dataflow_ports_only() {
     let [in_bool] = dfg.input_wires_arr();
 
     let not = dfg.add_dataflow_op(not_op(), [in_bool]).unwrap();
-    let call = dfg.call(local_and.handle(), [not.out_wire(0); 2]).unwrap();
+    let call = dfg
+        .call(
+            local_and.handle(),
+            &[],
+            [not.out_wire(0); 2],
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap();
     dfg.add_other_wire(not.node(), call.node()).unwrap();
     let h = dfg
-        .finish_hugr_with_outputs(not.outputs(), &crate::extension::PRELUDE_REGISTRY)
+        .finish_hugr_with_outputs(not.outputs(), &PRELUDE_REGISTRY)
         .unwrap();
     let filtered_ports = h
         .all_linked_outputs(call.node())

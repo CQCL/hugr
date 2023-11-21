@@ -251,7 +251,7 @@ pub(in crate::hugr::rewrite) mod test {
         let _f_id = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![QB, QB, QB], type_row![QB, QB, QB]).pure(),
+                FunctionType::new(type_row![QB, QB, QB], type_row![QB, QB, QB]).into(),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();

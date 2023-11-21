@@ -8,12 +8,10 @@ use crate::{
     extension::ExtensionRegistry,
     hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
-    types::{Type, TypeBound},
+    types::{PolyFuncType, Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-
-use crate::types::Signature;
 
 use crate::Node;
 use smol_str::SmolStr;
@@ -86,16 +84,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                 op_desc: "crate::ops::OpType::FuncDecl",
             })?
             .clone();
-
+        let body = signature.body.clone();
         self.hugr_mut().replace_op(
             f_node,
-            NodeType::new_pure(ops::FuncDefn {
-                name,
-                signature: signature.clone(),
-            }),
+            NodeType::new_pure(ops::FuncDefn { name, signature }),
         )?;
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, signature, None)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, None)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -108,17 +103,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn declare(
         &mut self,
         name: impl Into<String>,
-        signature: Signature,
+        signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let rs = signature.input_extensions.clone();
-        let declare_n = self.add_child_node(NodeType::new(
-            ops::FuncDecl {
-                signature: signature.into(),
-                name: name.into(),
-            },
-            rs,
-        ))?;
+        let declare_n = self.add_child_node(NodeType::new_pure(ops::FuncDecl {
+            signature,
+            name: name.into(),
+        }))?;
 
         Ok(declare_n.into())
     }
@@ -176,7 +167,7 @@ mod test {
             test::{n_identity, NAT},
             Dataflow, DataflowSubContainer,
         },
-        extension::EMPTY_REG,
+        extension::{EMPTY_REG, PRELUDE_REGISTRY},
         type_row,
         types::FunctionType,
     };
@@ -189,11 +180,11 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
-            let call = f_build.call(&f_id, f_build.input_wires())?;
+            let call = f_build.call(&f_id, &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
 
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()
@@ -216,7 +207,7 @@ mod test {
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
                 )
-                .pure(),
+                .into(),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr(&EMPTY_REG)
@@ -232,16 +223,17 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).pure(),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire, wire])?;
 
-            let call = f_build.call(f_id.handle(), f_build.input_wires())?;
+            let call =
+                f_build.call(f_id.handle(), &[], f_build.input_wires(), &PRELUDE_REGISTRY)?;
 
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()

@@ -401,7 +401,7 @@ mod test {
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
         let fty = FunctionType::new(type_row![NAT], type_row![NAT]);
-        let mut fbuild = module_builder.define_function("main", fty.clone().pure())?;
+        let mut fbuild = module_builder.define_function("main", fty.clone().into())?;
         let dfg = fbuild.dfg_builder(fty, None, fbuild.input_wires())?;
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
@@ -442,7 +442,11 @@ mod test {
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
         simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.get_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr
+            .get_function_type()
+            .unwrap()
+            .instantiate(&[], &PRELUDE_REGISTRY)
+            .unwrap();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(

@@ -147,7 +147,7 @@ mod test {
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).pure(),
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
             |mut f_build| {
                 let wires = f_build.input_wires().collect();
 
@@ -184,7 +184,7 @@ mod test {
             .into(),
         );
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).pure(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 

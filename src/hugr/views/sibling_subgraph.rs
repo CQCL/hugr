@@ -17,12 +17,10 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
-use crate::extension::ExtensionSet;
 use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
-use crate::types::Signature;
 use crate::types::{FunctionType, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
@@ -407,19 +405,14 @@ impl SiblingSubgraph {
 
     /// Create a new Hugr containing only the subgraph.
     ///
-    /// The new Hugr will contain a function root wth the same signature as the
-    /// subgraph and the specified `input_extensions`.
+    /// The new Hugr will contain a [FuncDefn][crate::ops::FuncDefn] root
+    /// with the same signature as the subgraph and the specified `name`
     pub fn extract_subgraph(
         &self,
         hugr: &impl HugrView,
         name: impl Into<String>,
-        input_extensions: ExtensionSet,
     ) -> Result<Hugr, HugrError> {
-        let signature = Signature {
-            signature: self.signature(hugr),
-            input_extensions,
-        };
-        let mut builder = FunctionBuilder::new(name, signature).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.signature(hugr).into()).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -748,7 +741,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).pure(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -764,7 +757,7 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).pure())?;
+        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
@@ -783,7 +776,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).pure(),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -976,7 +969,7 @@ mod tests {
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
-        assert_eq!(func_defn.signature, func.signature(&func_graph))
+        assert_eq!(func_defn.signature, func.signature(&func_graph).into());
     }
 
     #[test]
@@ -985,7 +978,7 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region", ExtensionSet::new())?;
+        let extracted = subgraph.extract_subgraph(&hugr, "region")?;
 
         extracted.validate(&PRELUDE_REGISTRY).unwrap();
 

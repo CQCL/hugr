@@ -19,9 +19,10 @@ use crate::extension::{
 };
 
 use crate::ops::custom::CustomOpError;
-use crate::ops::custom::{resolve_opaque_op, ExtensionOp, ExternalOp};
+use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
+use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
 
@@ -93,6 +94,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             self.validate_node(node)?;
         }
 
+        // Hierarchy and children. No type variables declared outside the root.
+        self.validate_subtree(self.hugr.root(), &[])?;
+
         Ok(())
     }
 
@@ -112,7 +116,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// This includes:
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
-    fn validate_node(&mut self, node: Node) -> Result<(), ValidationError> {
+    fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
         let node_type = self.hugr.get_nodetype(node);
         let op_type = &node_type.op;
 
@@ -154,49 +158,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         dir,
                     });
                 }
-
-                // Check port connections
-                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
-                    let port = Port::new(dir, i);
-                    self.validate_port(node, port, port_index, op_type)?;
-                }
             }
         }
 
-        // Check operation-specific constraints.
-        // TODO make a separate method for this (perhaps producing Result<(), SignatureError>)
-        match op_type {
-            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
-                // Check TypeArgs are valid (in themselves, not necessarily wrt the TypeParams)
-                for arg in b.args() {
-                    // Hugrs are monomorphic, so no type variables in scope
-                    arg.validate(self.extension_registry, &[])
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                }
-                // Try to resolve serialized names to actual OpDefs in Extensions.
-                let e: Option<ExtensionOp>;
-                let ext_op = match &**b {
-                    ExternalOp::Opaque(op) => {
-                        // If resolve_extension_ops has been called first, this would always return Ok(None)
-                        e = resolve_opaque_op(node, op, self.extension_registry)?;
-                        e.as_ref()
-                    }
-                    ExternalOp::Extension(ext) => Some(ext),
-                };
-                // If successful, check TypeArgs are valid for the declared TypeParams
-                if let Some(ext_op) = ext_op {
-                    ext_op
-                        .def()
-                        .check_args(ext_op.args())
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                }
-            }
-            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
-                ta.validate(self.extension_registry)
-                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-            }
-            _ => (),
-        }
         // Secondly that the node has correct children
         self.validate_children(node, node_type)?;
 
@@ -223,6 +187,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         port: Port,
         port_index: portgraph::PortIndex,
         op_type: &OpType,
+        var_decls: &[TypeParam],
     ) -> Result<(), ValidationError> {
         let port_kind = op_type.port_kind(port).unwrap();
         let dir = port.direction();
@@ -253,8 +218,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         match &port_kind {
-            EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
-                .validate(self.extension_registry, &[]) // no type vars inside the Hugr
+            EdgeKind::Value(ty) => ty
+                .validate(self.extension_registry, var_decls)
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
+            // as these are only types at runtime.
+            EdgeKind::Static(ty) => ty
+                .validate(self.extension_registry, &[])
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }
@@ -278,9 +248,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
-                // The number of ports in `other_node` does not match the operation definition.
-                // This should be caught by `validate_node`.
-                return Err(self.validate_node(other_node).unwrap_err());
+                panic!("The number of ports in {other_node} does not match the operation definition. This should have been caught by `validate_node`.");
             };
             // TODO: We will require some "unifiable" comparison instead of strict equality, to allow for pre-type inference hugrs.
             if other_kind != port_kind {
@@ -557,6 +525,79 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             to_offset,
         }
         .into())
+    }
+
+    /// Validates that TypeArgs are valid wrt the [ExtensionRegistry] and that nodes
+    /// only refer to type variables declared by the closest enclosing FuncDefn.
+    fn validate_subtree(
+        &mut self,
+        node: Node,
+        var_decls: &[TypeParam],
+    ) -> Result<(), ValidationError> {
+        let op_type = self.hugr.get_optype(node);
+        // The op_type must be defined only in terms of type variables defined outside the node
+        // TODO consider turning this match into a trait method?
+        match op_type {
+            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
+                // Try to resolve serialized names to actual OpDefs in Extensions.
+                let temp: ExternalOp;
+                let resolved = match &**b {
+                    ExternalOp::Opaque(op) => {
+                        // If resolve_extension_ops has been called first, this would always return Ok(None)
+                        match resolve_opaque_op(node, op, self.extension_registry)? {
+                            Some(exten) => {
+                                temp = ExternalOp::Extension(exten);
+                                &temp
+                            }
+                            None => &**b,
+                        }
+                    }
+                    ExternalOp::Extension(_) => &**b,
+                };
+                // Check TypeArgs are valid, and if we can, fit the declared TypeParams
+                match resolved {
+                    ExternalOp::Extension(exten) => exten
+                        .def()
+                        .validate_args(exten.args(), self.extension_registry, var_decls)
+                        .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+                    ExternalOp::Opaque(opaq) => {
+                        // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
+                        // to contain type vars (we don't know how many are binary params, so accept if in doubt)
+                        for arg in opaq.args() {
+                            arg.validate(self.extension_registry, var_decls)
+                                .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+                        }
+                    }
+                }
+            }
+            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
+                ta.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
+            _ => (),
+        }
+
+        // Check port connections.
+        for dir in Direction::BOTH {
+            for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
+                let port = Port::new(dir, i);
+                self.validate_port(node, port, port_index, op_type, var_decls)?;
+            }
+        }
+
+        // For FuncDefn's, only the type variables declared by the FuncDefn can be referred to by nodes
+        // inside the function. (The same would be true for FuncDecl's, but they have no child nodes.)
+        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. }) = op_type {
+            signature.params()
+        } else {
+            var_decls
+        };
+
+        for child in self.hugr.children(node) {
+            self.validate_subtree(child, var_decls)?;
+        }
+
+        Ok(())
     }
 }
 
