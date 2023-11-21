@@ -14,11 +14,12 @@ use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, LeafOp, OpType};
+use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic;
 use crate::std_extensions::logic::test::{and_op, not_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::values::Value;
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -877,5 +878,42 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
         actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
+    Ok(())
+}
+
+#[test]
+fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::std_extensions::collections;
+    const BOUND: TypeParam = TypeParam::Type(TypeBound::Copyable);
+    let list_of_var = Type::new_extension(
+        collections::EXTENSION
+            .get_type(&collections::LIST_TYPENAME)
+            .unwrap()
+            .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
+    );
+    let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
+    let just_colns = ExtensionSet::singleton(&collections::EXTENSION_NAME);
+    let mut def = FunctionBuilder::new(
+        "myfunc",
+        PolyFuncType::new(
+            [BOUND],
+            FunctionType::new(vec![], vec![list_of_var.clone()]).with_extension_delta(&just_colns),
+        ),
+    )?;
+    let empty_list = Value::Extension {
+        c: (Box::new(collections::ListValue::new(vec![])),),
+    };
+    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?, just_colns)?;
+    let res = def.finish_hugr_with_outputs([cst], &reg);
+    assert_matches!(
+        res.unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError {
+            cause: SignatureError::FreeTypeVar {
+                idx: 0,
+                num_decls: 0
+            },
+            ..
+        })
+    );
     Ok(())
 }

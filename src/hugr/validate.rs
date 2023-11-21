@@ -218,8 +218,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         match &port_kind {
-            EdgeKind::Value(ty) | EdgeKind::Static(ty) => ty
+            EdgeKind::Value(ty) => ty
                 .validate(self.extension_registry, var_decls)
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
+            // as these are only types at runtime.
+            EdgeKind::Static(ty) => ty
+                .validate(self.extension_registry, &[])
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }
