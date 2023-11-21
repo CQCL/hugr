@@ -41,7 +41,7 @@ serde_yaml = "0.9.19"
 typetag = "0.2.7"
 smol_str = { version = "0.2.0", features = ["serde"] }
 derive_more = "0.99.17"
-itertools = "0.11.0"
+itertools = "0.12.0"
 html-escape = "0.2.13"
 bitvec = { version = "1.0.1", features = ["serde"] }
 enum_dispatch = "0.3.11"
