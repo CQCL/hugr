@@ -45,7 +45,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
-            CustomSignatureFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
+            CustomSignatureFunc::from_function(vec![H_INT], |arg_values: &[TypeArg]| {
                 let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };
@@ -62,7 +62,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
-            CustomSignatureFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
+            CustomSignatureFunc::from_function(vec![H_INT], |arg_values: &[TypeArg]| {
                 let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };

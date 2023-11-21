@@ -14,7 +14,7 @@ use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
 
-trait ComputeSignature: Send + Sync {
+pub trait ComputeSignature: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML
@@ -44,11 +44,11 @@ where
     }
 }
 
-trait ValidateSignature: Send + Sync {
-    /// Compute signature of node given the operation name,
+pub trait ValidateTypeArgs: Send + Sync {
+    /// Validate the type arguments of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML
-    fn validate_signature(
+    fn validate_type_args(
         &self,
         name: &SmolStr,
         arg_values: &[TypeArg],
@@ -59,11 +59,11 @@ trait ValidateSignature: Send + Sync {
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F> ValidateSignature for F
+impl<F> ValidateTypeArgs for F
 where
     F: Fn(&[TypeArg]) -> Result<(), SignatureError> + Send + Sync,
 {
-    fn validate_signature(
+    fn validate_type_args(
         &self,
         _name: &SmolStr,
         arg_values: &[TypeArg],
@@ -97,6 +97,8 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
+/// Compute a signature by recording the type parameters and a custom function
+/// for computing the signature.
 pub struct CustomSignatureFunc {
     /// Type parameters passed to [func]. (The returned [PolyFuncType]
     /// may require further type parameters, not declared here.)
@@ -105,7 +107,9 @@ pub struct CustomSignatureFunc {
 }
 
 impl CustomSignatureFunc {
-    pub fn from_closure<F, R>(static_params: impl Into<Vec<TypeParam>>, func: F) -> Self
+    /// Build custom computation from a function that takes in type arguments
+    /// and returns a signature.
+    pub fn from_function<F, R>(static_params: impl Into<Vec<TypeParam>>, func: F) -> Self
     where
         R: Into<PolyFuncType>,
         F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync + 'static,
@@ -117,24 +121,30 @@ impl CustomSignatureFunc {
     }
 }
 
+/// Encode a signature as `PolyFuncType` but optionally allow validating type
+/// arguments via a custom binary.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct CustomValidator {
     #[serde(flatten)]
     poly_func: PolyFuncType,
     #[serde(skip)]
-    validate: Box<dyn ValidateSignature>,
+    validate: Box<dyn ValidateTypeArgs>,
 }
 
 impl CustomValidator {
+    /// Encode a signature using a `PolyFuncType`
     pub fn from_polyfunc(poly_func: impl Into<PolyFuncType>) -> Self {
         Self {
             poly_func: poly_func.into(),
             validate: Default::default(),
         }
     }
+
+    /// Encode a signature using a `PolyFuncType`, with a custom function for
+    /// validating type arguments before returning the signature.
     pub fn new_with_validator(
         poly_func: impl Into<PolyFuncType>,
-        validate: impl ValidateSignature + 'static,
+        validate: impl ValidateTypeArgs + 'static,
     ) -> Self {
         Self {
             poly_func: poly_func.into(),
@@ -155,7 +165,7 @@ pub enum SignatureFunc {
     CustomFunc(CustomSignatureFunc),
 }
 
-impl Default for Box<dyn ValidateSignature> {
+impl Default for Box<dyn ValidateTypeArgs> {
     fn default() -> Self {
         Box::new(|&_: &_| Ok(()))
     }
@@ -197,7 +207,7 @@ impl SignatureFunc {
             SignatureFunc::TypeScheme(custom) => {
                 custom
                     .validate
-                    .validate_signature(name, arg_values, misc, extension_registry)?;
+                    .validate_type_args(name, arg_values, misc, extension_registry)?;
                 (custom.poly_func.clone(), arg_values)
             }
             SignatureFunc::CustomFunc(func) => {

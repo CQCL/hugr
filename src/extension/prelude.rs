@@ -44,7 +44,7 @@ lazy_static! {
             .add_op_simple(
                 SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
-                CustomSignatureFunc::from_closure(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+                CustomSignatureFunc::from_function(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
                 |args: &[TypeArg]| {
                     let [TypeArg::Type { ty }, TypeArg::BoundedNat { n }] = args else {
                         panic!("should have been checked already.")
