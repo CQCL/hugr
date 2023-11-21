@@ -428,7 +428,9 @@ mod test {
                 _exts: &ExtensionRegistry,
             ) -> Result<PolyFuncType, SignatureError> {
                 const TP: TypeParam = TypeParam::Type(TypeBound::Any);
-                let [TypeArg::BoundedNat {n}] = arg_values else { return Err(SignatureError::InvalidTypeArgs) };
+                let [TypeArg::BoundedNat {n}] = arg_values else {
+                    return Err(SignatureError::InvalidTypeArgs)
+                };
                 let n = *n as usize;
                 let tvs: Vec<Type> = (0..n)
                     .map(|_| Type::new_var_use(0, TypeBound::Any))
