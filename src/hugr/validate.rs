@@ -21,7 +21,7 @@ use crate::extension::{
 use crate::ops::custom::CustomOpError;
 use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDecl, FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, Type};
 use crate::{Direction, Hugr, Node, Port};
@@ -522,6 +522,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         .into())
     }
 
+    /// Validates that TypeArgs are valid wrt the [ExtensionRegistry] and that nodes
+    /// only refer to type variables declared by the closest enclosing FuncDefn.
     fn validate_subtree(
         &mut self,
         node: Node,
@@ -578,15 +580,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Compute cumulative TypeParams for nested FuncDefns, i.e. allow inner FuncDefns
-        // to refer to type parameters from outer FuncDefns.
-        let mut v: Vec<TypeParam>;
-        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. })
-        | OpType::FuncDecl(FuncDecl { signature, .. }) = op_type
-        {
-            v = signature.params().to_owned();
-            v.extend(var_decls.iter().cloned());
-            v.as_ref()
+        // For FuncDefn's, only the type variables declared by the FuncDefn can be referred to by nodes
+        // inside the function. (The same would be true for FuncDecl's, but they have no child nodes.)
+        let var_decls = if let OpType::FuncDefn(FuncDefn { signature, .. }) = op_type {
+            signature.params()
         } else {
             var_decls
         };

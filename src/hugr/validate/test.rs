@@ -841,7 +841,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test that nested FuncDefns can use Type Variables declared by enclosing FuncDefns
+/// Test that nested FuncDefns cannot use Type Variables declared by enclosing FuncDefns
 #[test]
 fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     const OUTER_BOUND: TypeBound = TypeBound::Any;
@@ -864,19 +864,18 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
         outer.finish_prelude_hugr_with_outputs([w])
     }
     assert!(build(Type::new_var_use(0, INNER_BOUND)).is_ok());
-    assert!(build(Type::new_var_use(1, OUTER_BOUND)).is_ok());
-    assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
-        BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
-        actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
     assert_matches!(
-        build(Type::new_var_use(2, OUTER_BOUND)).unwrap_err(),
+        build(Type::new_var_use(1, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError {
             cause: SignatureError::FreeTypeVar {
-                idx: 2,
-                num_decls: 2
+                idx: 1,
+                num_decls: 1
             },
             ..
         })
     );
+    assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
+        actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
     Ok(())
 }
