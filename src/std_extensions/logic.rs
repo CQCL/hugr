@@ -1,6 +1,5 @@
 //! Basic logical operations.
 
-use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
@@ -28,9 +27,33 @@ pub const OR_NAME: &str = "Or";
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 
+fn logic_op_sig() -> impl CustomSignatureFunc {
+    struct LogicOpCustom;
+
+    const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
+    impl CustomSignatureFunc for LogicOpCustom {
+        fn compute_signature(
+            &self,
+            _name: &SmolStr,
+            arg_values: &[TypeArg],
+            _misc: &std::collections::HashMap<String, serde_yaml::Value>,
+            _extension_registry: &crate::extension::ExtensionRegistry,
+        ) -> Result<crate::types::PolyFuncType, crate::extension::SignatureError> {
+            let [TypeArg::BoundedNat { n }] = *arg_values else {
+                panic!("Should have been checked already.")
+            };
+            let var_arg_row = vec![BOOL_T; n as usize];
+            Ok(FunctionType::new(var_arg_row, vec![BOOL_T]).into())
+        }
+
+        fn static_params(&self) -> &[TypeParam] {
+            MAX
+        }
+    }
+    LogicOpCustom
+}
 /// Extension for basic logical operations.
 fn extension() -> Extension {
-    const H_INT: TypeParam = TypeParam::max_nat();
     let mut extension = Extension::new(EXTENSION_ID);
 
     extension
@@ -45,16 +68,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
-            CustomSignatureFunc::from_function(vec![H_INT], |arg_values: &[TypeArg]| {
-                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
-                    panic!("should be covered by validation.")
-                };
-
-                Ok(FunctionType::new(
-                    vec![BOOL_T; *n as usize],
-                    type_row![BOOL_T],
-                ))
-            }),
+            logic_op_sig(),
         )
         .unwrap();
 
@@ -62,16 +76,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
-            CustomSignatureFunc::from_function(vec![H_INT], |arg_values: &[TypeArg]| {
-                let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
-                    panic!("should be covered by validation.")
-                };
-
-                Ok(FunctionType::new(
-                    vec![BOOL_T; *n as usize],
-                    type_row![BOOL_T],
-                ))
-            }),
+            logic_op_sig(),
         )
         .unwrap();
 

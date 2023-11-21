@@ -278,7 +278,7 @@ pub(crate) mod test {
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
-        let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
+        let typarams = [TypeParam::max_nat(), TypeParam::Type(TypeBound::Any)];
         let [tyvar, szvar] =
             [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));
 
@@ -289,12 +289,12 @@ pub(crate) mod test {
 
         // Sanity check (good args)
         good_ts.instantiate(
-            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
+            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &PRELUDE_REGISTRY,
         )?;
 
         let wrong_args = good_ts.instantiate(
-            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
+            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &PRELUDE_REGISTRY,
         );
         assert_eq!(
@@ -302,7 +302,7 @@ pub(crate) mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     param: typarams[0].clone(),
-                    arg: TypeArg::BoundedNat { n: 5 }
+                    arg: TypeArg::Type { ty: USIZE_T }
                 }
             ))
         );
@@ -453,12 +453,7 @@ pub(crate) mod test {
 
     // The standard library new_array does not allow passing in a variable for size.
     fn new_array(ty: Type, s: TypeArg) -> Type {
-        let array_def = PRELUDE.get_type("array").unwrap();
-        Type::new_extension(
-            array_def
-                .instantiate(vec![TypeArg::Type { ty }, s])
-                .unwrap(),
-        )
+        crate::extension::prelude::array_type(ty, s)
     }
 
     const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };

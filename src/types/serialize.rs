@@ -1,4 +1,4 @@
-use super::{PolyFuncType, SumType, Type, TypeBound, TypeEnum, TypeRow};
+use super::{PolyFuncType, SumType, Type, TypeArg, TypeBound, TypeEnum, TypeRow};
 
 use super::custom::CustomType;
 
@@ -48,7 +48,9 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
             SerSimpleType::Sum(sum) => sum.into(),
-            SerSimpleType::Array { inner, len } => array_type((*inner).into(), len),
+            SerSimpleType::Array { inner, len } => {
+                array_type((*inner).into(), TypeArg::BoundedNat { n: len })
+            }
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),

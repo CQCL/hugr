@@ -4,17 +4,46 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{op_def::CustomSignatureFunc, ExtensionId, TypeDefBound},
+    extension::{ExtensionId, TypeDefBound},
     ops::LeafOp,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FunctionType, Type, TypeBound,
+        CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
     values::{CustomConst, KnownTypeConst},
     Extension,
 };
 
-use super::ExtensionRegistry;
+use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
+struct ArrayOpCustom;
+
+const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
+impl CustomSignatureFunc for ArrayOpCustom {
+    fn compute_signature(
+        &self,
+        _name: &SmolStr,
+        arg_values: &[TypeArg],
+        _misc: &std::collections::HashMap<String, serde_yaml::Value>,
+        _extension_registry: &ExtensionRegistry,
+    ) -> Result<PolyFuncType, SignatureError> {
+        let [TypeArg::BoundedNat { n }] = *arg_values else {
+            panic!("Should have been checked already.")
+        };
+        let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
+
+        let var_arg_row = vec![elem_ty_var.clone(); n as usize];
+        let other_row = vec![array_type(elem_ty_var.clone(), TypeArg::BoundedNat { n })];
+
+        Ok(PolyFuncType::new(
+            vec![TypeParam::Type(TypeBound::Any)],
+            FunctionType::new(var_arg_row, other_row),
+        ))
+    }
+
+    fn static_params(&self) -> &[TypeParam] {
+        MAX
+    }
+}
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
@@ -34,26 +63,16 @@ lazy_static! {
         prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+                vec![ TypeParam::max_nat(),TypeParam::Type(TypeBound::Any)],
                 "array".into(),
-                TypeDefBound::FromParams(vec![0]),
+                TypeDefBound::FromParams(vec![1]),
             )
             .unwrap();
-
         prelude
             .add_op_simple(
                 SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
-                CustomSignatureFunc::from_function(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
-                |args: &[TypeArg]| {
-                    let [TypeArg::Type { ty }, TypeArg::BoundedNat { n }] = args else {
-                        panic!("should have been checked already.")
-                    };
-                    Ok(FunctionType::new(
-                        vec![ty.clone(); *n as usize],
-                        vec![array_type(ty.clone(), *n)],
-                    ))
-                }),
+                ArrayOpCustom,
             )
             .unwrap();
 
@@ -98,13 +117,10 @@ pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
-pub fn array_type(element_ty: Type, size: u64) -> Type {
+pub fn array_type(element_ty: Type, size: TypeArg) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
-        .instantiate(vec![
-            TypeArg::Type { ty: element_ty },
-            TypeArg::BoundedNat { n: size },
-        ])
+        .instantiate(vec![size, TypeArg::Type { ty: element_ty }])
         .unwrap();
     Type::new_extension(custom_t)
 }
@@ -118,8 +134,8 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
         .instantiate_extension_op(
             NEW_ARRAY_OP_ID,
             vec![
-                TypeArg::Type { ty: element_ty },
                 TypeArg::BoundedNat { n: size },
+                TypeArg::Type { ty: element_ty },
             ],
             &PRELUDE_REGISTRY,
         )
@@ -179,7 +195,10 @@ impl KnownTypeConst for ConstUsize {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::{
+        builder::{DFGBuilder, Dataflow, DataflowHugr},
+        types::FunctionType,
+    };
 
     use super::*;
 
@@ -188,7 +207,7 @@ mod test {
     fn test_new_array() {
         let mut b = DFGBuilder::new(FunctionType::new(
             vec![QB_T, QB_T],
-            vec![array_type(QB_T, 2)],
+            vec![array_type(QB_T, TypeArg::BoundedNat { n: 2 })],
         ))
         .unwrap();
 

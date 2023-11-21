@@ -14,7 +14,8 @@ use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
 
-pub trait ComputeSignature: Send + Sync {
+/// Trait necessary for binary computations of OpDef signature
+pub trait CustomSignatureFunc: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML
@@ -25,23 +26,9 @@ pub trait ComputeSignature: Send + Sync {
         misc: &HashMap<String, serde_yaml::Value>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncType, SignatureError>;
-}
-
-// Note this is very much a utility, rather than definitive;
-// one can only do so much without the ExtensionRegistry!
-impl<F, R: Into<PolyFuncType>> ComputeSignature for F
-where
-    F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync,
-{
-    fn compute_signature(
-        &self,
-        _name: &SmolStr,
-        arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-        _extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncType, SignatureError> {
-        Ok(self(arg_values)?.into())
-    }
+    /// The declared type parameters which require values in order for signature to
+    /// be computed.
+    fn static_params(&self) -> &[TypeParam];
 }
 
 pub trait ValidateTypeArgs: Send + Sync {
@@ -97,30 +84,6 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-/// Compute a signature by recording the type parameters and a custom function
-/// for computing the signature.
-pub struct CustomSignatureFunc {
-    /// Type parameters passed to [func]. (The returned [PolyFuncType]
-    /// may require further type parameters, not declared here.)
-    static_params: Vec<TypeParam>,
-    func: Box<dyn ComputeSignature>,
-}
-
-impl CustomSignatureFunc {
-    /// Build custom computation from a function that takes in type arguments
-    /// and returns a signature.
-    pub fn from_function<F, R>(static_params: impl Into<Vec<TypeParam>>, func: F) -> Self
-    where
-        R: Into<PolyFuncType>,
-        F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync + 'static,
-    {
-        Self {
-            static_params: static_params.into(),
-            func: Box::new(func),
-        }
-    }
-}
-
 /// Encode a signature as `PolyFuncType` but optionally allow validating type
 /// arguments via a custom binary.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -162,7 +125,7 @@ pub enum SignatureFunc {
     #[serde(rename = "signature")]
     TypeScheme(CustomValidator),
     #[serde(skip)]
-    CustomFunc(CustomSignatureFunc),
+    CustomFunc(Box<dyn CustomSignatureFunc>),
 }
 
 impl Default for Box<dyn ValidateTypeArgs> {
@@ -171,9 +134,9 @@ impl Default for Box<dyn ValidateTypeArgs> {
     }
 }
 
-impl<T: Into<CustomSignatureFunc>> From<T> for SignatureFunc {
+impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
     fn from(v: T) -> Self {
-        Self::CustomFunc(v.into())
+        Self::CustomFunc(Box::new(v))
     }
 }
 
@@ -214,10 +177,11 @@ impl SignatureFunc {
                 let static_params = self.static_params();
                 let (static_args, other_args) =
                     arg_values.split_at(min(static_params.len(), arg_values.len()));
+
+                dbg!(&static_args, &other_args);
                 check_type_args(static_args, static_params)?;
-                let pf =
-                    func.func
-                        .compute_signature(name, static_args, misc, extension_registry)?;
+                let pf = func.compute_signature(name, static_args, misc, extension_registry)?;
+                dbg!(pf.params());
                 (pf, other_args)
             }
         })
@@ -226,7 +190,7 @@ impl SignatureFunc {
     fn static_params(&self) -> &[TypeParam] {
         match self {
             SignatureFunc::TypeScheme(ts) => ts.poly_func.params(),
-            SignatureFunc::CustomFunc(func) => &func.static_params,
+            SignatureFunc::CustomFunc(func) => func.static_params(),
         }
     }
 }
@@ -422,7 +386,7 @@ impl Extension {
         }
     }
 
-    /// Create an OpDef with `PolyFuncType`, `CustomSignatureFunc` or `CustomValidator`
+    /// Create an OpDef with `PolyFuncType`, `impl CustomSignatureFunc` or `CustomValidator`
     /// ; and no "misc" or "lowering functions" defined.
     pub fn add_op_simple(
         &mut self,
