@@ -12,6 +12,8 @@ use crate::{
     Extension,
 };
 
+use lazy_static::lazy_static;
+
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
@@ -72,7 +74,7 @@ fn idivmod_sig() -> PolyFuncType {
 }
 
 /// Extension for basic integer operations.
-pub fn extension() -> Extension {
+fn extension() -> Extension {
     let itob_sig = int_polytype(1, vec![int_type_var(0)], type_row![BOOL_T]);
 
     let btoi_sig = int_polytype(1, type_row![BOOL_T], vec![int_type_var(0)]);
@@ -425,16 +427,25 @@ pub fn extension() -> Extension {
     extension
 }
 
+lazy_static! {
+    /// Extension for basic integer operations.
+    pub static ref EXTENSION: Extension = extension();
+}
+
 #[cfg(test)]
 mod test {
+    use crate::{
+        extension::{ExtensionRegistry, PRELUDE},
+        std_extensions::arithmetic::int_types::int_type,
+    };
+
     use super::*;
 
     #[test]
     fn test_int_ops_extension() {
-        let r = extension();
-        assert_eq!(r.name() as &str, "arithmetic.int");
-        assert_eq!(r.types().count(), 0);
-        for (name, _) in r.operations() {
+        assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
+        assert_eq!(EXTENSION.types().count(), 0);
+        for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
     }
@@ -444,13 +455,33 @@ mod test {
     }
     #[test]
     fn test_binary_signatures() {
-        //TODO validate using opdef in extension, lazy_static
-        iwiden_sig_validate(&[ta(3), ta(4)]).unwrap();
+        let iwiden_s = EXTENSION.get_op("iwiden_s").unwrap();
+        let reg = ExtensionRegistry::try_new([
+            EXTENSION.to_owned(),
+            super::super::int_types::EXTENSION.to_owned(),
+            PRELUDE.to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(
+            iwiden_s.compute_signature(&[ta(3), ta(4)], &reg).unwrap(),
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+        );
 
-        iwiden_sig_validate(&[ta(4), ta(3)]).unwrap_err();
+        let iwiden_u = EXTENSION.get_op("iwiden_u").unwrap();
+        iwiden_u
+            .compute_signature(&[ta(4), ta(3)], &reg)
+            .unwrap_err();
 
-        inarrow_sig_validate(&[ta(2), ta(1)]).unwrap();
+        let inarrow_s = EXTENSION.get_op("inarrow_s").unwrap();
 
-        inarrow_sig_validate(&[ta(1), ta(2)]).unwrap_err();
+        assert_eq!(
+            inarrow_s.compute_signature(&[ta(2), ta(1)], &reg).unwrap(),
+            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
+        );
+
+        let inarrow_u = EXTENSION.get_op("inarrow_u").unwrap();
+        inarrow_u
+            .compute_signature(&[ta(1), ta(2)], &reg)
+            .unwrap_err();
     }
 }
