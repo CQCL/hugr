@@ -178,10 +178,8 @@ impl SignatureFunc {
                 let (static_args, other_args) =
                     arg_values.split_at(min(static_params.len(), arg_values.len()));
 
-                dbg!(&static_args, &other_args);
                 check_type_args(static_args, static_params)?;
                 let pf = func.compute_signature(name, static_args, misc, extension_registry)?;
-                dbg!(pf.params());
                 (pf, other_args)
             }
         })
@@ -263,17 +261,15 @@ impl OpDef {
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncType; // to keep alive
         let (pf, args) = match &self.signature_func {
-            SignatureFunc::TypeScheme(ts) => (ts, args),
-            SignatureFunc::CustomFunc {
-                static_params,
-                func,
-            } => {
-                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+            SignatureFunc::TypeScheme(ts) => (&ts.poly_func, args),
+            SignatureFunc::CustomFunc(custom) => {
+                let (static_args, other_args) =
+                    args.split_at(min(custom.static_params().len(), args.len()));
                 static_args
                     .iter()
                     .try_for_each(|ta| ta.validate(exts, &[]))?;
-                check_type_args(static_args, static_params)?;
-                temp = func.compute_signature(&self.name, static_args, &self.misc, exts)?;
+                check_type_args(static_args, custom.static_params())?;
+                temp = custom.compute_signature(&self.name, static_args, &self.misc, exts)?;
                 (&temp, other_args)
             }
         };
