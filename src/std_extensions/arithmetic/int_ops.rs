@@ -2,7 +2,7 @@
 
 use super::int_types::{get_log_width, int_type_var, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
-use crate::extension::CustomValidate;
+use crate::extension::CustomValidator;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -118,7 +118,7 @@ fn extension() -> Extension {
         .add_op_simple(
             "iwiden_u".into(),
             "widen an unsigned integer to a wider one with the same value".to_owned(),
-            CustomValidate::new_with_validator(widen_poly.clone(), iwiden_sig_validate),
+            CustomValidator::new_with_validator(widen_poly.clone(), iwiden_sig_validate),
         )
         .unwrap();
 
@@ -126,7 +126,7 @@ fn extension() -> Extension {
         .add_op_simple(
             "iwiden_s".into(),
             "widen a signed integer to a wider one with the same value".to_owned(),
-            CustomValidate::new_with_validator(widen_poly, iwiden_sig_validate),
+            CustomValidator::new_with_validator(widen_poly, iwiden_sig_validate),
         )
         .unwrap();
     extension
@@ -134,14 +134,14 @@ fn extension() -> Extension {
             "inarrow_u".into(),
             "narrow an unsigned integer to a narrower one with the same value if possible"
                 .to_owned(),
-            CustomValidate::new_with_validator(narrow_poly.clone(), inarrow_sig_validate),
+            CustomValidator::new_with_validator(narrow_poly.clone(), inarrow_sig_validate),
         )
         .unwrap();
     extension
         .add_op_simple(
             "inarrow_s".into(),
             "narrow a signed integer to a narrower one with the same value if possible".to_owned(),
-            CustomValidate::new_with_validator(narrow_poly, inarrow_sig_validate),
+            CustomValidator::new_with_validator(narrow_poly, inarrow_sig_validate),
         )
         .unwrap();
     extension

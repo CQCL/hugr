@@ -4,7 +4,7 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, CustomFunc, ExtensionId},
+    extension::{prelude::BOOL_T, CustomSignatureFunc, ExtensionId},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -45,7 +45,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(AND_NAME),
             "logical 'and'".into(),
-            CustomFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
+            CustomSignatureFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
                 let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };
@@ -62,7 +62,7 @@ fn extension() -> Extension {
         .add_op_simple(
             SmolStr::new_inline(OR_NAME),
             "logical 'or'".into(),
-            CustomFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
+            CustomSignatureFunc::from_closure(vec![H_INT], |arg_values: &[TypeArg]| {
                 let Ok(TypeArg::BoundedNat { n }) = arg_values.iter().exactly_one() else {
                     panic!("should be covered by validation.")
                 };

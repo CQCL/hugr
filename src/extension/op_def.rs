@@ -14,7 +14,7 @@ use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
 
-trait CustomSignatureFunc: Send + Sync {
+trait ComputeSignature: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML
@@ -29,7 +29,7 @@ trait CustomSignatureFunc: Send + Sync {
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F, R: Into<PolyFuncType>> CustomSignatureFunc for F
+impl<F, R: Into<PolyFuncType>> ComputeSignature for F
 where
     F: Fn(&[TypeArg]) -> Result<R, SignatureError> + Send + Sync,
 {
@@ -44,7 +44,7 @@ where
     }
 }
 
-trait CustomValidateFunc: Send + Sync {
+trait ValidateSignature: Send + Sync {
     /// Compute signature of node given the operation name,
     /// values for the type parameters,
     /// and 'misc' data from the extension definition YAML
@@ -59,7 +59,7 @@ trait CustomValidateFunc: Send + Sync {
 
 // Note this is very much a utility, rather than definitive;
 // one can only do so much without the ExtensionRegistry!
-impl<F> CustomValidateFunc for F
+impl<F> ValidateSignature for F
 where
     F: Fn(&[TypeArg]) -> Result<(), SignatureError> + Send + Sync,
 {
@@ -97,14 +97,14 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-pub struct CustomFunc {
+pub struct CustomSignatureFunc {
     /// Type parameters passed to [func]. (The returned [PolyFuncType]
     /// may require further type parameters, not declared here.)
     static_params: Vec<TypeParam>,
-    func: Box<dyn CustomSignatureFunc>,
+    func: Box<dyn ComputeSignature>,
 }
 
-impl CustomFunc {
+impl CustomSignatureFunc {
     pub fn from_closure<F, R>(static_params: impl Into<Vec<TypeParam>>, func: F) -> Self
     where
         R: Into<PolyFuncType>,
@@ -118,14 +118,14 @@ impl CustomFunc {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-pub struct CustomValidate {
+pub struct CustomValidator {
     #[serde(flatten)]
     poly_func: PolyFuncType,
     #[serde(skip)]
-    validate: Box<dyn CustomValidateFunc>,
+    validate: Box<dyn ValidateSignature>,
 }
 
-impl CustomValidate {
+impl CustomValidator {
     pub fn from_polyfunc(poly_func: impl Into<PolyFuncType>) -> Self {
         Self {
             poly_func: poly_func.into(),
@@ -134,7 +134,7 @@ impl CustomValidate {
     }
     pub fn new_with_validator(
         poly_func: impl Into<PolyFuncType>,
-        validate: impl CustomValidateFunc + 'static,
+        validate: impl ValidateSignature + 'static,
     ) -> Self {
         Self {
             poly_func: poly_func.into(),
@@ -150,18 +150,18 @@ pub enum SignatureFunc {
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
     #[serde(rename = "signature")]
-    TypeScheme(CustomValidate),
+    TypeScheme(CustomValidator),
     #[serde(skip)]
-    CustomFunc(CustomFunc),
+    CustomFunc(CustomSignatureFunc),
 }
 
-impl Default for Box<dyn CustomValidateFunc> {
+impl Default for Box<dyn ValidateSignature> {
     fn default() -> Self {
         Box::new(|&_: &_| Ok(()))
     }
 }
 
-impl<T: Into<CustomFunc>> From<T> for SignatureFunc {
+impl<T: Into<CustomSignatureFunc>> From<T> for SignatureFunc {
     fn from(v: T) -> Self {
         Self::CustomFunc(v.into())
     }
@@ -169,18 +169,18 @@ impl<T: Into<CustomFunc>> From<T> for SignatureFunc {
 
 impl From<PolyFuncType> for SignatureFunc {
     fn from(v: PolyFuncType) -> Self {
-        Self::TypeScheme(CustomValidate::from_polyfunc(v))
+        Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
 
 impl From<FunctionType> for SignatureFunc {
     fn from(v: FunctionType) -> Self {
-        Self::TypeScheme(CustomValidate::from_polyfunc(v))
+        Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
 
-impl From<CustomValidate> for SignatureFunc {
-    fn from(v: CustomValidate) -> Self {
+impl From<CustomValidator> for SignatureFunc {
+    fn from(v: CustomValidator) -> Self {
         Self::TypeScheme(v)
     }
 }
@@ -412,8 +412,8 @@ impl Extension {
         }
     }
 
-    /// Create an OpDef with custom binary code to compute the type scheme
-    /// (which may be polymorphic); and no "misc" or "lowering functions" defined.
+    /// Create an OpDef with `PolyFuncType`, `CustomSignatureFunc` or `CustomValidator`
+    /// ; and no "misc" or "lowering functions" defined.
     pub fn add_op_simple(
         &mut self,
         name: SmolStr,
