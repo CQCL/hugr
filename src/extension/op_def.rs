@@ -373,7 +373,8 @@ mod test {
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{
-        CustomSignatureFunc, ExtensionRegistry, SignatureError, PRELUDE, PRELUDE_REGISTRY,
+        CustomSignatureFunc, ExtensionRegistry, SignatureError, EMPTY_REG, PRELUDE,
+        PRELUDE_REGISTRY,
     };
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
@@ -497,6 +498,28 @@ mod test {
             })
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn type_scheme_instantiate_var() -> Result<(), Box<dyn std::error::Error>> {
+        let mut e = Extension::new(EXT_ID);
+        let def = e.add_op_type_scheme_simple(
+            "SimpleOp".into(),
+            "".into(),
+            PolyFuncType::new(
+                vec![TypeParam::Type(TypeBound::Any)],
+                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            ),
+        )?;
+        let tv = Type::new_var_use(1, TypeBound::Eq);
+        let args = [TypeArg::Type { ty: tv.clone() }];
+        let decls = [TypeParam::Extensions, TypeBound::Eq.into()];
+        def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
+        assert_eq!(
+            def.compute_signature(&args, &EMPTY_REG),
+            Ok(FunctionType::new_endo(vec![tv]))
+        );
         Ok(())
     }
 }
