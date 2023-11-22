@@ -4,7 +4,6 @@ use itertools::Either;
 #[cfg(feature = "pyo3")]
 use pyo3::{pyclass, pymethods};
 
-use delegate::delegate;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
@@ -26,33 +25,11 @@ pub struct FunctionType {
     pub extension_reqs: ExtensionSet,
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// A combination of a FunctionType and a set of input extensions, used for declaring functions
-pub struct Signature {
-    /// The underlying signature
-    pub signature: FunctionType,
-    /// The extensions which are associated with all the inputs and carried through
-    pub input_extensions: ExtensionSet,
-}
-
 impl FunctionType {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: &ExtensionSet) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs);
         self
-    }
-
-    /// Instantiate an FunctionType, converting it to a concrete one
-    pub fn with_input_extensions(self, es: ExtensionSet) -> Signature {
-        Signature {
-            signature: self,
-            input_extensions: es,
-        }
-    }
-
-    /// Instantiate a signature with the empty set of extensions
-    pub fn pure(self) -> Signature {
-        self.with_input_extensions(ExtensionSet::new())
     }
 
     pub(crate) fn validate(
@@ -73,21 +50,6 @@ impl FunctionType {
             output: subst_row(&self.output, tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
-    }
-}
-
-impl From<Signature> for FunctionType {
-    fn from(sig: Signature) -> Self {
-        sig.signature
-    }
-}
-
-impl Signature {
-    /// Calculate the extension requirements of the output wires
-    pub fn output_extensions(&self) -> ExtensionSet {
-        self.input_extensions
-            .clone()
-            .union(&self.signature.extension_reqs)
     }
 }
 
@@ -243,17 +205,6 @@ impl FunctionType {
     }
 }
 
-impl Signature {
-    delegate! {
-        to self.signature {
-            /// Inputs of the function type
-            pub fn input(&self) -> &TypeRow;
-            /// Outputs of the function type
-            pub fn output(&self) -> &TypeRow;
-        }
-    }
-}
-
 impl Display for FunctionType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
@@ -267,20 +218,9 @@ impl Display for FunctionType {
     }
 }
 
-impl Display for Signature {
-    delegate! {
-        to self.signature {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result;
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::{
-        extension::{prelude::USIZE_T, ExtensionId},
-        type_row,
-    };
+    use crate::{extension::prelude::USIZE_T, type_row};
 
     use super::*;
     #[test]
@@ -303,25 +243,5 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
-    }
-
-    #[test]
-    fn test_signature() {
-        let f_type = FunctionType::new(type_row![Type::UNIT], type_row![USIZE_T]);
-
-        let sig: Signature = f_type.pure();
-
-        assert_eq!(sig.input(), &type_row![Type::UNIT]);
-        assert_eq!(sig.output(), &type_row![USIZE_T]);
-    }
-
-    #[test]
-    fn test_display() {
-        let f_type = FunctionType::new(type_row![Type::UNIT], type_row![USIZE_T]);
-        assert_eq!(f_type.to_string(), "[Tuple([])] -> [[]][usize([])]");
-        let sig: Signature = f_type.with_input_extensions(ExtensionSet::singleton(
-            &ExtensionId::new("Example").unwrap(),
-        ));
-        assert_eq!(sig.to_string(), "[Tuple([])] -> [[]][usize([])]");
     }
 }

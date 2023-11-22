@@ -11,7 +11,7 @@ pub mod type_row;
 pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::{FunctionType, Signature};
+pub use signature::FunctionType;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 

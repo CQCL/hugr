@@ -453,13 +453,9 @@ fn missing_lift_node() -> Result<(), BuildError> {
     )?;
     let [main_input] = main.input_wires_arr();
 
-    let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        // Inner DFG has extension requirements that the wire wont satisfy
-        .with_input_extensions(ExtensionSet::from_iter([XA, XB]));
-
     let f_builder = main.dfg_builder(
-        inner_sig.signature,
-        Some(inner_sig.input_extensions),
+        FunctionType::new(type_row![NAT], type_row![NAT]),
+        Some(ExtensionSet::from_iter([XA, XB])),
         [main_input],
     )?;
     let f_inputs = f_builder.input_wires();
@@ -491,14 +487,9 @@ fn too_many_extension() -> Result<(), BuildError> {
     let [main_input] = main.input_wires_arr();
 
     let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        .with_extension_delta(&ExtensionSet::singleton(&XA))
-        .with_input_extensions(ExtensionSet::new());
+        .with_extension_delta(&ExtensionSet::singleton(&XA));
 
-    let f_builder = main.dfg_builder(
-        inner_sig.signature,
-        Some(inner_sig.input_extensions),
-        [main_input],
-    )?;
+    let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
     let f_inputs = f_builder.input_wires();
     let f_handle = f_builder.finish_with_outputs(f_inputs)?;
     let [f_output] = f_handle.outputs_arr();
@@ -529,19 +520,10 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let mut main = module_builder.define_function("main", main_sig)?;
 
-    let inner_left_sig = FunctionType::new(type_row![], type_row![NAT])
-        .with_input_extensions(ExtensionSet::singleton(&XA));
-
-    let inner_right_sig = FunctionType::new(type_row![], type_row![NAT])
-        .with_input_extensions(ExtensionSet::singleton(&XB));
-
-    let inner_mult_sig =
-        FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_input_extensions(all_rs);
-
     let [left_wire] = main
         .dfg_builder(
-            inner_left_sig.signature,
-            Some(inner_left_sig.input_extensions),
+            FunctionType::new(type_row![], type_row![NAT]),
+            Some(ExtensionSet::singleton(&XA)),
             [],
         )?
         .finish_with_outputs([])?
@@ -549,16 +531,16 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let [right_wire] = main
         .dfg_builder(
-            inner_right_sig.signature,
-            Some(inner_right_sig.input_extensions),
+            FunctionType::new(type_row![], type_row![NAT]),
+            Some(ExtensionSet::singleton(&XB)),
             [],
         )?
         .finish_with_outputs([])?
         .outputs_arr();
 
     let builder = main.dfg_builder(
-        inner_mult_sig.signature,
-        Some(inner_mult_sig.input_extensions),
+        FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+        Some(all_rs),
         [left_wire, right_wire],
     )?;
     let [_left, _right] = builder.input_wires_arr();
