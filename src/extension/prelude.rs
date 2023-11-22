@@ -63,7 +63,7 @@ lazy_static! {
             )
             .unwrap();
         prelude
-            .add_op_simple(
+            .add_op(
                 SmolStr::new_inline(NEW_ARRAY_OP_ID),
                 "Create a new array from elements".to_string(),
                 ArrayOpCustom,
