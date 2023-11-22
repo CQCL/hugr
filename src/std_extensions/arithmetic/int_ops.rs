@@ -23,7 +23,7 @@ struct IOValidator {
 }
 
 impl ValidateJustArgs for IOValidator {
-    fn validate<'o, 'a: 'o>(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+    fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
         let [arg0, arg1] = collect_array(arg_values);
         let i: u8 = get_log_width(arg0)?;
         let o: u8 = get_log_width(arg1)?;

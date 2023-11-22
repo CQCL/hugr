@@ -19,10 +19,7 @@ struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl SignatureFromArgs for ArrayOpCustom {
-    fn compute_signature<'o, 'a: 'o>(
-        &'a self,
-        arg_values: &[TypeArg],
-    ) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             panic!("Should have been checked already.")
         };
