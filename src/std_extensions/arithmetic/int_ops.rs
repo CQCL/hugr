@@ -2,7 +2,7 @@
 
 use super::int_types::{get_log_width, int_type_var, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
-use crate::extension::{CustomValidator, ValidateTypeArgs};
+use crate::extension::{CustomValidator, ValidateJustArgs};
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -22,13 +22,8 @@ struct IOValidator {
     f_gt_s: bool,
 }
 
-impl ValidateTypeArgs for IOValidator {
-    fn validate<'o, 'a: 'o>(
-        &self,
-        arg_values: &[TypeArg],
-        _def: &'o crate::extension::OpDef,
-        _extension_registry: &crate::extension::ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
+impl ValidateJustArgs for IOValidator {
+    fn validate<'o, 'a: 'o>(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
         let [arg0, arg1] = collect_array(arg_values);
         let i: u8 = get_log_width(arg0)?;
         let o: u8 = get_log_width(arg1)?;

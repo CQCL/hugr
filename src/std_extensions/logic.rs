@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, CustomSignatureFunc, ExtensionId, ExtensionRegistry, OpDef},
+    extension::{prelude::BOOL_T, ExtensionId, SignatureFromArgs},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -27,16 +27,14 @@ pub const OR_NAME: &str = "Or";
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 
-fn logic_op_sig() -> impl CustomSignatureFunc {
+fn logic_op_sig() -> impl SignatureFromArgs {
     struct LogicOpCustom;
 
     const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
-    impl CustomSignatureFunc for LogicOpCustom {
+    impl SignatureFromArgs for LogicOpCustom {
         fn compute_signature<'o, 'a: 'o>(
             &'a self,
             arg_values: &[TypeArg],
-            _def: &'o OpDef,
-            _extension_registry: &ExtensionRegistry,
         ) -> Result<crate::types::PolyFuncType, crate::extension::SignatureError> {
             let [TypeArg::BoundedNat { n }] = *arg_values else {
                 panic!("Should have been checked already.")

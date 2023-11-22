@@ -24,12 +24,40 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
-        // name: &SmolStr,
-        // misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<PolyFuncType, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
+}
+
+/// Compute signature of `OpDef` given type arguments.
+pub trait SignatureFromArgs: Send + Sync {
+    /// Compute signature of node given
+    /// values for the type parameters.
+    fn compute_signature<'o, 'a: 'o>(
+        &'a self,
+        arg_values: &[TypeArg],
+    ) -> Result<PolyFuncType, SignatureError>;
+    /// The declared type parameters which require values in order for signature to
+    /// be computed.
+    fn static_params(&self) -> &[TypeParam];
+}
+
+impl<T: SignatureFromArgs> CustomSignatureFunc for T {
+    #[inline]
+    fn compute_signature<'o, 'a: 'o>(
+        &'a self,
+        arg_values: &[TypeArg],
+        _def: &'o OpDef,
+        _extension_registry: &ExtensionRegistry,
+    ) -> Result<PolyFuncType, SignatureError> {
+        SignatureFromArgs::compute_signature(self, arg_values)
+    }
+
+    #[inline]
+    fn static_params(&self) -> &[TypeParam] {
+        SignatureFromArgs::static_params(self)
+    }
 }
 
 /// Trait for validating type arguments to a PolyFuncType beyond conformation to
@@ -44,6 +72,26 @@ pub trait ValidateTypeArgs: Send + Sync {
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError>;
+}
+
+/// Trait for validating type arguments to a PolyFuncType beyond conformation to
+/// declared type parameter, given just the arguments.
+pub trait ValidateJustArgs: Send + Sync {
+    /// Validate the type arguments of node given
+    /// values for the type parameters.
+    fn validate<'o, 'a: 'o>(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError>;
+}
+
+impl<T: ValidateJustArgs> ValidateTypeArgs for T {
+    #[inline]
+    fn validate<'o, 'a: 'o>(
+        &self,
+        arg_values: &[TypeArg],
+        _def: &'o OpDef,
+        _extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        ValidateJustArgs::validate(self, arg_values)
+    }
 }
 
 /// Trait for Extensions to provide custom binary code that can lower an operation to
