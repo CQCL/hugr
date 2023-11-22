@@ -455,6 +455,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
 
     let f_builder = main.dfg_builder(
         FunctionType::new(type_row![NAT], type_row![NAT]),
+        // Inner DFG has extension requirements that the wire wont satisfy
         Some(ExtensionSet::from_iter([XA, XB])),
         [main_input],
     )?;
