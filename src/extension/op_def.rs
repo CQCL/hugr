@@ -462,7 +462,7 @@ mod test {
 
         // Second arg may be a variable (substitutable)
         let tyvar = Type::new_var_use(0, TypeBound::Eq);
-        let tyvars: Vec<Type> = (0..3).map(|_| tyvar.clone()).collect();
+        let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
