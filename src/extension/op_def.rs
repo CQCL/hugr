@@ -418,6 +418,10 @@ mod test {
 
     #[test]
     fn binary_polyfunc() -> Result<(), Box<dyn std::error::Error>> {
+        // Test a custom binary `compute_signature` that returns a PolyFuncType
+        // where the latter declares more type params itself. In particular,
+        // we should be able to substitute (external) type variables into the latter,
+        // but not pass them into the former (custom binary function).
         struct SigFun();
         impl CustomSignatureFunc for SigFun {
             fn compute_signature(
@@ -505,6 +509,8 @@ mod test {
 
     #[test]
     fn type_scheme_instantiate_var() -> Result<(), Box<dyn std::error::Error>> {
+        // Check that we can instantiate a PolyFuncType-scheme with an (external)
+        // type variable
         let mut e = Extension::new(EXT_ID);
         let def = e.add_op_type_scheme_simple(
             "SimpleOp".into(),
