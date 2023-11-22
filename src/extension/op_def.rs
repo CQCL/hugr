@@ -16,49 +16,34 @@ use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
 pub trait CustomSignatureFunc: Send + Sync {
-    /// Compute signature of node given the operation name,
+    /// Compute signature of node given
     /// values for the type parameters,
-    /// and 'misc' data from the extension definition YAML
-    fn compute_signature(
-        &self,
-        name: &SmolStr,
+    /// the operation definition and the extension registry.
+    fn compute_signature<'o, 'a: 'o>(
+        &'a self,
         arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
+        def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
+        // name: &SmolStr,
+        // misc: &HashMap<String, serde_yaml::Value>,
     ) -> Result<PolyFuncType, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
 }
 
+/// Trait for validating type arguments to a PolyFuncType beyond conformation to
+/// declared type parameter.
 pub trait ValidateTypeArgs: Send + Sync {
-    /// Validate the type arguments of node given the operation name,
+    /// Validate the type arguments of node given
     /// values for the type parameters,
-    /// and 'misc' data from the extension definition YAML
-    fn validate_type_args(
+    /// the operation definition and the extension registry.
+    fn validate<'o, 'a: 'o>(
         &self,
-        name: &SmolStr,
         arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
+        def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), SignatureError>;
-}
-
-// Note this is very much a utility, rather than definitive;
-// one can only do so much without the ExtensionRegistry!
-impl<F> ValidateTypeArgs for F
-where
-    F: Fn(&[TypeArg]) -> Result<(), SignatureError> + Send + Sync,
-{
-    fn validate_type_args(
-        &self,
-        _name: &SmolStr,
-        arg_values: &[TypeArg],
-        _misc: &HashMap<String, serde_yaml::Value>,
-        _extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        self(arg_values)
-    }
 }
 
 /// Trait for Extensions to provide custom binary code that can lower an operation to
@@ -127,10 +112,21 @@ pub enum SignatureFunc {
     #[serde(skip)]
     CustomFunc(Box<dyn CustomSignatureFunc>),
 }
+struct NoValidate;
+impl ValidateTypeArgs for NoValidate {
+    fn validate<'o, 'a: 'o>(
+        &self,
+        _arg_values: &[TypeArg],
+        _def: &'o OpDef,
+        _extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        Ok(())
+    }
+}
 
 impl Default for Box<dyn ValidateTypeArgs> {
     fn default() -> Self {
-        Box::new(|&_: &_| Ok(()))
+        Box::new(NoValidate)
     }
 }
 
@@ -159,18 +155,17 @@ impl From<CustomValidator> for SignatureFunc {
 }
 
 impl SignatureFunc {
-    fn compute_signature<'a>(
+    fn compute_signature<'o, 'a: 'o>(
         &self,
-        name: &SmolStr,
         arg_values: &'a [TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
+        def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
     ) -> Result<(PolyFuncType, &'a [TypeArg]), SignatureError> {
         Ok(match self {
             SignatureFunc::TypeScheme(custom) => {
                 custom
                     .validate
-                    .validate_type_args(name, arg_values, misc, extension_registry)?;
+                    .validate(arg_values, def, extension_registry)?;
                 (custom.poly_func.clone(), arg_values)
             }
             SignatureFunc::CustomFunc(func) => {
@@ -179,7 +174,7 @@ impl SignatureFunc {
                     arg_values.split_at(min(static_params.len(), arg_values.len()));
 
                 check_type_args(static_args, static_params)?;
-                let pf = func.compute_signature(name, static_args, misc, extension_registry)?;
+                let pf = func.compute_signature(static_args, def, extension_registry)?;
                 (pf, other_args)
             }
         })
@@ -269,7 +264,7 @@ impl OpDef {
                     .iter()
                     .try_for_each(|ta| ta.validate(exts, &[]))?;
                 check_type_args(static_args, custom.static_params())?;
-                temp = custom.compute_signature(&self.name, static_args, &self.misc, exts)?;
+                temp = custom.compute_signature(static_args, self, exts)?;
                 (&temp, other_args)
             }
         };
@@ -289,9 +284,7 @@ impl OpDef {
         // Hugr's are monomorphic, so check the args have no free variables
         args.iter().try_for_each(|ta| ta.validate(exts, &[]))?;
 
-        let (pf, args) = self
-            .signature_func
-            .compute_signature(&self.name, args, &self.misc, exts)?;
+        let (pf, args) = self.signature_func.compute_signature(args, self, exts)?;
 
         let res = pf.instantiate(args, exts)?;
         // TODO bring this assert back once resource inference is done?

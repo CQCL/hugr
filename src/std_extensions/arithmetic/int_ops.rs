@@ -2,7 +2,7 @@
 
 use super::int_types::{get_log_width, int_type_var, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
-use crate::extension::CustomValidator;
+use crate::extension::{CustomValidator, ValidateTypeArgs};
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -17,24 +17,27 @@ use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
-fn iwiden_sig_validate(arg_values: &[TypeArg]) -> Result<(), SignatureError> {
-    let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_log_width(arg0)?;
-    let n: u8 = get_log_width(arg1)?;
-    if m > n {
-        return Err(SignatureError::InvalidTypeArgs);
-    }
-    Ok(())
+struct IOValidator {
+    // whether the first type argument should be greater than the second
+    f_gt_s: bool,
 }
 
-fn inarrow_sig_validate(arg_values: &[TypeArg]) -> Result<(), SignatureError> {
-    let [arg0, arg1] = collect_array(arg_values);
-    let m: u8 = get_log_width(arg0)?;
-    let n: u8 = get_log_width(arg1)?;
-    if m < n {
-        return Err(SignatureError::InvalidTypeArgs);
+impl ValidateTypeArgs for IOValidator {
+    fn validate<'o, 'a: 'o>(
+        &self,
+        arg_values: &[TypeArg],
+        _def: &'o crate::extension::OpDef,
+        _extension_registry: &crate::extension::ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let [arg0, arg1] = collect_array(arg_values);
+        let i: u8 = get_log_width(arg0)?;
+        let o: u8 = get_log_width(arg1)?;
+        let cmp = if self.f_gt_s { i > o } else { i < o };
+        if !cmp {
+            return Err(SignatureError::InvalidTypeArgs);
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 fn int_polytype(
@@ -118,7 +121,7 @@ fn extension() -> Extension {
         .add_op_simple(
             "iwiden_u".into(),
             "widen an unsigned integer to a wider one with the same value".to_owned(),
-            CustomValidator::new_with_validator(widen_poly.clone(), iwiden_sig_validate),
+            CustomValidator::new_with_validator(widen_poly.clone(), IOValidator { f_gt_s: false }),
         )
         .unwrap();
 
@@ -126,7 +129,7 @@ fn extension() -> Extension {
         .add_op_simple(
             "iwiden_s".into(),
             "widen a signed integer to a wider one with the same value".to_owned(),
-            CustomValidator::new_with_validator(widen_poly, iwiden_sig_validate),
+            CustomValidator::new_with_validator(widen_poly, IOValidator { f_gt_s: false }),
         )
         .unwrap();
     extension
@@ -134,14 +137,14 @@ fn extension() -> Extension {
             "inarrow_u".into(),
             "narrow an unsigned integer to a narrower one with the same value if possible"
                 .to_owned(),
-            CustomValidator::new_with_validator(narrow_poly.clone(), inarrow_sig_validate),
+            CustomValidator::new_with_validator(narrow_poly.clone(), IOValidator { f_gt_s: true }),
         )
         .unwrap();
     extension
         .add_op_simple(
             "inarrow_s".into(),
             "narrow a signed integer to a narrower one with the same value if possible".to_owned(),
-            CustomValidator::new_with_validator(narrow_poly, inarrow_sig_validate),
+            CustomValidator::new_with_validator(narrow_poly, IOValidator { f_gt_s: true }),
         )
         .unwrap();
     extension

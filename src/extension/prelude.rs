@@ -14,16 +14,15 @@ use crate::{
     Extension,
 };
 
-use super::{CustomSignatureFunc, ExtensionRegistry, SignatureError};
+use super::{CustomSignatureFunc, ExtensionRegistry, OpDef, SignatureError};
 struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl CustomSignatureFunc for ArrayOpCustom {
-    fn compute_signature(
-        &self,
-        _name: &SmolStr,
+    fn compute_signature<'o, 'a: 'o>(
+        &'a self,
         arg_values: &[TypeArg],
-        _misc: &std::collections::HashMap<String, serde_yaml::Value>,
+        _def: &'o OpDef,
         _extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncType, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {

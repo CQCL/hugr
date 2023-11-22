@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, CustomSignatureFunc, ExtensionId},
+    extension::{prelude::BOOL_T, CustomSignatureFunc, ExtensionId, ExtensionRegistry, OpDef},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -32,12 +32,11 @@ fn logic_op_sig() -> impl CustomSignatureFunc {
 
     const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
     impl CustomSignatureFunc for LogicOpCustom {
-        fn compute_signature(
-            &self,
-            _name: &SmolStr,
+        fn compute_signature<'o, 'a: 'o>(
+            &'a self,
             arg_values: &[TypeArg],
-            _misc: &std::collections::HashMap<String, serde_yaml::Value>,
-            _extension_registry: &crate::extension::ExtensionRegistry,
+            _def: &'o OpDef,
+            _extension_registry: &ExtensionRegistry,
         ) -> Result<crate::types::PolyFuncType, crate::extension::SignatureError> {
             let [TypeArg::BoundedNat { n }] = *arg_values else {
                 panic!("Should have been checked already.")
