@@ -29,72 +29,72 @@ pub fn extension() -> Extension {
     let funop_sig: PolyFuncType =
         FunctionType::new(type_row![FLOAT64_TYPE], type_row![FLOAT64_TYPE]).into();
     extension
-        .add_op_simple("feq".into(), "equality test".to_owned(), fcmp_sig.clone())
+        .add_op("feq".into(), "equality test".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fne".into(), "inequality test".to_owned(), fcmp_sig.clone())
+        .add_op("fne".into(), "inequality test".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("flt".into(), "\"less than\"".to_owned(), fcmp_sig.clone())
+        .add_op("flt".into(), "\"less than\"".to_owned(), fcmp_sig.clone())
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "fgt".into(),
             "\"greater than\"".to_owned(),
             fcmp_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "fle".into(),
             "\"less than or equal\"".to_owned(),
             fcmp_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "fge".into(),
             "\"greater than or equal\"".to_owned(),
             fcmp_sig,
         )
         .unwrap();
     extension
-        .add_op_simple("fmax".into(), "maximum".to_owned(), fbinop_sig.clone())
+        .add_op("fmax".into(), "maximum".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fmin".into(), "minimum".to_owned(), fbinop_sig.clone())
+        .add_op("fmin".into(), "minimum".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fadd".into(), "addition".to_owned(), fbinop_sig.clone())
+        .add_op("fadd".into(), "addition".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fsub".into(), "subtraction".to_owned(), fbinop_sig.clone())
+        .add_op("fsub".into(), "subtraction".to_owned(), fbinop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fneg".into(), "negation".to_owned(), funop_sig.clone())
+        .add_op("fneg".into(), "negation".to_owned(), funop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "fabs".into(),
             "absolute value".to_owned(),
             funop_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "fmul".into(),
             "multiplication".to_owned(),
             fbinop_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple("fdiv".into(), "division".to_owned(), fbinop_sig)
+        .add_op("fdiv".into(), "division".to_owned(), fbinop_sig)
         .unwrap();
     extension
-        .add_op_simple("ffloor".into(), "floor".to_owned(), funop_sig.clone())
+        .add_op("ffloor".into(), "floor".to_owned(), funop_sig.clone())
         .unwrap();
     extension
-        .add_op_simple("fceil".into(), "ceiling".to_owned(), funop_sig)
+        .add_op("fceil".into(), "ceiling".to_owned(), funop_sig)
         .unwrap();
 
     extension

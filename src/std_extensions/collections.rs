@@ -84,7 +84,7 @@ fn extension() -> Extension {
 
     let (l, e) = list_and_elem_type(list_type_def);
     extension
-        .add_op_simple(
+        .add_op(
             POP_NAME,
             "Pop from back of list".into(),
             PolyFuncType::new(
@@ -94,7 +94,7 @@ fn extension() -> Extension {
         )
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             PUSH_NAME,
             "Push to back of list".into(),
             PolyFuncType::new(vec![TP], FunctionType::new(vec![l.clone(), e], vec![l])),

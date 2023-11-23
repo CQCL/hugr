@@ -339,6 +339,7 @@ impl OpDef {
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available extensions that may be used in the Hugr.
     pub fn try_lower(&self, args: &[TypeArg], available_extensions: &ExtensionSet) -> Option<Hugr> {
+        // TODO test this
         self.lower_funcs
             .iter()
             .flat_map(|f| match f {
@@ -384,6 +385,20 @@ impl OpDef {
         }
         Ok(())
     }
+
+    /// Add a lowering function to the [OpDef]
+    pub fn add_lower_func(&mut self, lower: LowerFunc) {
+        self.lower_funcs.push(lower);
+    }
+
+    /// Insert miscellaneous data `v` to the [OpDef], keyed by `k`.
+    pub fn add_misc(
+        &mut self,
+        k: impl ToString,
+        v: serde_yaml::Value,
+    ) -> Option<serde_yaml::Value> {
+        self.misc.insert(k.to_string(), v)
+    }
 }
 
 impl Extension {
@@ -395,40 +410,22 @@ impl Extension {
         &mut self,
         name: SmolStr,
         description: String,
-        misc: HashMap<String, serde_yaml::Value>,
-        lower_funcs: Vec<LowerFunc>,
         signature_func: impl Into<SignatureFunc>,
-    ) -> Result<&OpDef, ExtensionBuildError> {
+    ) -> Result<&mut OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
             name,
             description,
-            misc,
             signature_func: signature_func.into(),
-            lower_funcs,
+            misc: Default::default(),
+            lower_funcs: Default::default(),
         };
 
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(op.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(Arc::new(op))),
+            // Just made the arc so should only be one reference to it, can get_mut,
+            Entry::Vacant(ve) => Ok(Arc::get_mut(ve.insert(Arc::new(op))).unwrap()),
         }
-    }
-
-    /// Create an OpDef with `PolyFuncType`, `impl CustomSignatureFunc` or `CustomValidator`
-    /// ; and no "misc" or "lowering functions" defined.
-    pub fn add_op_simple(
-        &mut self,
-        name: SmolStr,
-        description: String,
-        signature_func: impl Into<SignatureFunc>,
-    ) -> Result<&OpDef, ExtensionBuildError> {
-        self.add_op(
-            name,
-            description,
-            HashMap::default(),
-            Vec::new(),
-            signature_func,
-        )
     }
 }
 
@@ -440,16 +437,18 @@ mod test {
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::extension::op_def::LowerFunc;
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::{
-        ExtensionRegistry, SignatureError, EMPTY_REG, PRELUDE, PRELUDE_REGISTRY,
-    };
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
+    use crate::Hugr;
     use crate::{const_extension_ids, Extension};
+
     const_extension_ids! {
         const EXT_ID: ExtensionId = "MyExt";
     }
@@ -463,7 +462,14 @@ mod test {
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
         let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
-        e.add_op(OP_NAME, "".into(), Default::default(), vec![], type_scheme)?;
+
+        let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
+        def.add_lower_func(LowerFunc::FixedHugr(ExtensionSet::new(), Hugr::default()));
+        def.add_misc("key", Default::default());
+        assert_eq!(def.description(), "desc");
+        assert_eq!(def.lower_funcs.len(), 1);
+        assert_eq!(def.misc.len(), 1);
+
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
         let e = reg.get(&EXT_ID).unwrap();
@@ -515,7 +521,8 @@ mod test {
             }
         }
         let mut e = Extension::new(EXT_ID);
-        let def = e.add_op_simple("MyOp".into(), "".to_string(), SigFun())?;
+        let def: &mut crate::extension::OpDef =
+            e.add_op("MyOp".into(), "".to_string(), SigFun())?;
 
         // Base case, no type variables:
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
@@ -576,7 +583,7 @@ mod test {
         // Check that we can instantiate a PolyFuncType-scheme with an (external)
         // type variable
         let mut e = Extension::new(EXT_ID);
-        let def = e.add_op_simple(
+        let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
             PolyFuncType::new(

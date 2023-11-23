@@ -36,24 +36,24 @@ pub fn extension() -> Extension {
         ]),
     );
     extension
-        .add_op_simple(
+        .add_op(
             "trunc_u".into(),
             "float to unsigned int".to_owned(),
             ftoi_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple("trunc_s".into(), "float to signed int".to_owned(), ftoi_sig)
+        .add_op("trunc_s".into(), "float to signed int".to_owned(), ftoi_sig)
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "convert_u".into(),
             "unsigned int to float".to_owned(),
             itof_sig.clone(),
         )
         .unwrap();
     extension
-        .add_op_simple(
+        .add_op(
             "convert_s".into(),
             "signed int to float".to_owned(),
             itof_sig,
