@@ -21,7 +21,7 @@ const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl SignatureFromArgs for ArrayOpCustom {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
-            panic!("Should have been checked already.")
+            return Err(SignatureError::InvalidTypeArgs);
         };
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
 

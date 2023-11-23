@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{prelude::BOOL_T, ExtensionId, SignatureFromArgs},
+    extension::{prelude::BOOL_T, ExtensionId, SignatureError, SignatureFromArgs},
     ops, type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -35,9 +35,10 @@ fn logic_op_sig() -> impl SignatureFromArgs {
         fn compute_signature(
             &self,
             arg_values: &[TypeArg],
-        ) -> Result<crate::types::PolyFuncType, crate::extension::SignatureError> {
+        ) -> Result<crate::types::PolyFuncType, SignatureError> {
+            // get the number of input booleans.
             let [TypeArg::BoundedNat { n }] = *arg_values else {
-                panic!("Should have been checked already.")
+                return Err(SignatureError::InvalidTypeArgs);
             };
             let var_arg_row = vec![BOOL_T; n as usize];
             Ok(FunctionType::new(var_arg_row, vec![BOOL_T]).into())
