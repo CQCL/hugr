@@ -205,31 +205,6 @@ impl From<CustomValidator> for SignatureFunc {
 }
 
 impl SignatureFunc {
-    fn compute_signature<'o, 'a: 'o>(
-        &self,
-        arg_values: &'a [TypeArg],
-        def: &'o OpDef,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(PolyFuncType, &'a [TypeArg]), SignatureError> {
-        Ok(match self {
-            SignatureFunc::TypeScheme(custom) => {
-                custom
-                    .validate
-                    .validate(arg_values, def, extension_registry)?;
-                (custom.poly_func.clone(), arg_values)
-            }
-            SignatureFunc::CustomFunc(func) => {
-                let static_params = self.static_params();
-                let (static_args, other_args) =
-                    arg_values.split_at(min(static_params.len(), arg_values.len()));
-
-                check_type_args(static_args, static_params)?;
-                let pf = func.compute_signature(static_args, def, extension_registry)?;
-                (pf, other_args)
-            }
-        })
-    }
-
     fn static_params(&self) -> &[TypeParam] {
         match self {
             SignatureFunc::TypeScheme(ts) => ts.poly_func.params(),
@@ -331,7 +306,21 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let (pf, args) = self.signature_func.compute_signature(args, self, exts)?;
+        let temp: PolyFuncType;
+        let (pf, args) = match &self.signature_func {
+            SignatureFunc::TypeScheme(custom) => {
+                custom.validate.validate(args, self, exts)?;
+                (&custom.poly_func, args)
+            }
+            SignatureFunc::CustomFunc(func) => {
+                let static_params = func.static_params();
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+
+                check_type_args(static_args, static_params)?;
+                temp = func.compute_signature(static_args, self, exts)?;
+                (&temp, other_args)
+            }
+        };
 
         let res = pf.instantiate(args, exts)?;
         // TODO bring this assert back once resource inference is done?
