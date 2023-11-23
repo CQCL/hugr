@@ -15,7 +15,6 @@ pub use signature::{FunctionType, Signature};
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
-use derive_more::{From, Into};
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -26,9 +25,6 @@ use crate::type_row;
 use std::fmt::Debug;
 
 use self::type_param::TypeParam;
-
-#[cfg(feature = "pyo3")]
-use pyo3::pyclass;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -50,12 +46,6 @@ impl EdgeKind {
         matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 }
-
-/// Python representation for [`EdgeKind`], the kinds of edges in a HUGR.
-#[cfg_attr(feature = "pyo3", pyclass)]
-#[repr(transparent)]
-#[derive(Clone, PartialEq, Eq, Debug, From, Into)]
-pub struct PyEdgeKind(EdgeKind);
 
 #[derive(
     Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
@@ -196,7 +186,6 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
-#[cfg_attr(feature = "pyo3", pyclass)]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid

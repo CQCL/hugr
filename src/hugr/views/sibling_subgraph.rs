@@ -24,9 +24,6 @@ use crate::ops::{OpTag, OpTrait};
 use crate::types::{FunctionType, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
-#[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, PyErr};
-
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
 /// A HUGR region in which all nodes share the same parent. Unlike
@@ -633,21 +630,6 @@ pub enum InvalidReplacement {
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
     NonConvexSubgraph,
-}
-
-#[cfg(feature = "pyo3")]
-create_exception!(
-    pyrs,
-    PyInvalidReplacementError,
-    PyException,
-    "Errors that can occur while constructing a SimpleReplacement"
-);
-
-#[cfg(feature = "pyo3")]
-impl From<InvalidReplacement> for PyErr {
-    fn from(err: InvalidReplacement) -> Self {
-        PyInvalidReplacementError::new_err(err.to_string())
-    }
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].

@@ -21,9 +21,6 @@ use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
-#[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, pyclass, PyErr};
-
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
 use crate::extension::{
@@ -38,7 +35,6 @@ use delegate::delegate;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
     graph: MultiPortGraph,
@@ -351,21 +347,6 @@ pub enum HugrError {
     /// An invalid port was specified.
     #[error("Invalid port direction {0:?}.")]
     InvalidPortDirection(Direction),
-}
-
-#[cfg(feature = "pyo3")]
-create_exception!(
-    pyrs,
-    PyHugrError,
-    PyException,
-    "Errors that can occur while manipulating a Hugr"
-);
-
-#[cfg(feature = "pyo3")]
-impl From<HugrError> for PyErr {
-    fn from(err: HugrError) -> Self {
-        PyHugrError::new_err(err.to_string())
-    }
 }
 
 #[cfg(test)]

@@ -7,9 +7,6 @@ pub use itertools::Either;
 use derive_more::From;
 use itertools::Either::{Left, Right};
 
-#[cfg(feature = "pyo3")]
-use pyo3::pyclass;
-
 use crate::hugr::HugrError;
 
 /// A handle to a node in the HUGR.
@@ -17,7 +14,6 @@ use crate::hugr::HugrError;
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, serde::Serialize, serde::Deserialize,
 )]
 #[serde(transparent)]
-#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Node {
     index: portgraph::NodeIndex,
 }
@@ -37,7 +33,6 @@ pub struct Node {
     serde::Deserialize,
 )]
 #[serde(transparent)]
-#[cfg_attr(feature = "pyo3", pyclass)]
 pub struct Port {
     offset: portgraph::PortOffset,
 }

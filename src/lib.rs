@@ -132,10 +132,6 @@
 //! println!("{}", serialized);
 //! ```
 //!
-//! # Optional feature flags
-//!
-//! - `pyo3`: Enable Python bindings via [pyo3](https://docs.rs/pyo3).
-//!
 
 #![warn(missing_docs)]
 // Unstable check, may cause false positives.

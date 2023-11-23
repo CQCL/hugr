@@ -12,12 +12,8 @@ use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
 
-#[cfg(feature = "pyo3")]
-use pyo3::pyclass;
-
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "pyo3", pyclass)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow {
@@ -33,8 +29,6 @@ impl Display for TypeRow {
     }
 }
 
-// TODO some of these, but not all, will probably want exposing via
-// pyo3 wrappers eventually.
 impl TypeRow {
     /// Create a new empty row.
     pub const fn new() -> Self {
