@@ -1,16 +1,17 @@
 //! Basic integer operations.
 
-use super::int_types::{get_log_width, int_type_var, LOG_WIDTH_TYPE_PARAM};
+use super::int_types::{get_log_width, int_type_var, ConstIntU, INT_TYPES, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
-use crate::extension::{CustomValidator, ValidateJustArgs};
-use crate::type_row;
+use crate::extension::{ConstFoldResult, CustomValidator, FoldOutput, ValidateJustArgs};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
+use crate::values::Value;
 use crate::{
     extension::{ExtensionId, ExtensionSet, SignatureError},
     types::{type_param::TypeArg, Type, TypeRow},
     Extension,
 };
+use crate::{ops, type_row, IncomingPort};
 
 use lazy_static::lazy_static;
 
@@ -69,6 +70,42 @@ fn idivmod_checked_sig() -> PolyFuncType {
 fn idivmod_sig() -> PolyFuncType {
     let intpair: TypeRow = vec![int_type_var(0), int_type_var(1)].into();
     int_polytype(2, intpair.clone(), vec![Type::new_tuple(intpair)])
+}
+
+fn zero(width: u8) -> ops::Const {
+    ops::Const::new(
+        ConstIntU::new(width, 0).unwrap().into(),
+        INT_TYPES[5].to_owned(),
+    )
+    .unwrap()
+}
+
+fn iadd_fold(consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
+    // TODO get width from const
+    let width = 5;
+    match consts {
+        [(p, c)] if c == &zero(width) => {
+            let other_port: IncomingPort = if &IncomingPort::from(0) == p { 1 } else { 0 }.into();
+            Some(vec![(0.into(), other_port.into())])
+        }
+        [(_, c1), (_, c2)] => {
+            let [c1, c2]: [&ConstIntU; 2] = [c1, c2].map(|c| c.get_custom_value().unwrap());
+
+            Some(vec![(
+                0.into(),
+                ops::Const::new(
+                    ConstIntU::new(width, c1.value() + c2.value())
+                        .unwrap()
+                        .into(),
+                    INT_TYPES[5].to_owned(),
+                )
+                .unwrap()
+                .into(),
+            )])
+        }
+
+        _ => None,
+    }
 }
 
 /// Extension for basic integer operations.
@@ -246,13 +283,14 @@ fn extension() -> Extension {
             ibinop_sig(),
         )
         .unwrap();
-    extension
+    let iadd = extension
         .add_op(
             "iadd".into(),
             "addition modulo 2^N (signed and unsigned versions are the same op)".to_owned(),
             ibinop_sig(),
         )
         .unwrap();
+    iadd.set_constant_folder(iadd_fold);
     extension
         .add_op(
             "isub".into(),

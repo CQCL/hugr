@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
+use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
@@ -128,10 +128,7 @@ impl ExtensionOp {
         self.def.as_ref()
     }
 
-    pub fn constant_fold(
-        &self,
-        consts: &[(IncomingPort, ops::Const)],
-    ) -> Option<Vec<(OutgoingPort, ops::Const)>> {
+    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }
 }

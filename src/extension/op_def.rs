@@ -7,12 +7,13 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 
 use super::{
-    Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
+    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
+    ExtensionSet, SignatureError,
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
-use crate::Hugr;
+use crate::{ops, Hugr, IncomingPort};
 
 /// Trait necessary for binary computations of OpDef signature
 pub trait CustomSignatureFunc: Send + Sync {
@@ -245,44 +246,6 @@ impl Debug for LowerFunc {
     }
 }
 
-type ConstFoldResult = Option<Vec<(crate::OutgoingPort, crate::ops::Const)>>;
-pub trait ConstFold: Send + Sync {
-    fn fold(
-        &self,
-        type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Const)],
-    ) -> ConstFoldResult;
-}
-
-impl Debug for Box<dyn ConstFold> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<custom constant folding>")
-    }
-}
-
-impl Default for Box<dyn ConstFold> {
-    fn default() -> Self {
-        Box::new(|&_: &_| None)
-    }
-}
-
-impl<T> ConstFold for T
-where
-    T: Fn(
-            &[(crate::IncomingPort, crate::ops::Const)],
-        ) -> Option<Vec<(crate::OutgoingPort, crate::ops::Const)>>
-        + Send
-        + Sync,
-{
-    fn fold(
-        &self,
-        _type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Const)],
-    ) -> ConstFoldResult {
-        self(consts)
-    }
-}
-
 /// Serializable definition for dynamically loaded operations.
 ///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
@@ -441,7 +404,7 @@ impl OpDef {
         self.misc.insert(k.to_string(), v)
     }
 
-    pub fn add_constant_folding(&mut self, fold: impl ConstFold + 'static) {
+    pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
         self.constant_folder = Box::new(fold)
     }
 
