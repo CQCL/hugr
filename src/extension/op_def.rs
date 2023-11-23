@@ -58,7 +58,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
 }
 
 /// Trait for validating type arguments to a PolyFuncType beyond conformation to
-/// declared type parameter.
+/// declared type parameter (which should have been checked beforehand).
 pub trait ValidateTypeArgs: Send + Sync {
     /// Validate the type arguments of node given
     /// values for the type parameters,
@@ -72,7 +72,7 @@ pub trait ValidateTypeArgs: Send + Sync {
 }
 
 /// Trait for validating type arguments to a PolyFuncType beyond conformation to
-/// declared type parameter, given just the arguments.
+/// declared type parameter (which should have been checked beforehand), given just the arguments.
 pub trait ValidateJustArgs: Send + Sync {
     /// Validate the type arguments of node given
     /// values for the type parameters.
@@ -115,7 +115,8 @@ pub trait CustomLowerFunc: Send + Sync {
 }
 
 /// Encode a signature as `PolyFuncType` but optionally allow validating type
-/// arguments via a custom binary.
+/// arguments via a custom binary. The binary cannot be serialized so will be
+/// lost over a serialization round-trip.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct CustomValidator {
     #[serde(flatten)]
@@ -147,8 +148,12 @@ impl CustomValidator {
 }
 
 /// The two ways in which an OpDef may compute the Signature of each operation node.
+/// Either as a TypeScheme (polymorphic function type), with optional custom
+/// validation for provided type arguments,
+/// or a custom binary which computes a polymorphic function type given values
+/// for its static type parameters.
 #[derive(serde::Deserialize, serde::Serialize)]
-pub enum SignatureFunc {
+enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
@@ -393,7 +398,11 @@ impl OpDef {
 }
 
 impl Extension {
-    /// Add an operation definition to the extension.
+    /// Add an operation definition to the extension. Must be a type scheme
+    /// (defined by a [`PolyFuncType`]), a type scheme along with binary
+    /// validation for type arguments ([`CustomValidator`]), or a custom binary
+    /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
+    #[allow(private_bounds)] // docstring outlines all valid inputs.
     pub fn add_op(
         &mut self,
         name: SmolStr,
@@ -419,6 +428,7 @@ impl Extension {
 
     /// Create an OpDef with `PolyFuncType`, `impl CustomSignatureFunc` or `CustomValidator`
     /// ; and no "misc" or "lowering functions" defined.
+    #[allow(private_bounds)] // docstring outlines all valid inputs.
     pub fn add_op_simple(
         &mut self,
         name: SmolStr,
