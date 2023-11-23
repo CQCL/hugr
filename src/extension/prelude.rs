@@ -26,7 +26,7 @@ impl SignatureFromArgs for ArrayOpCustom {
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
 
         let var_arg_row = vec![elem_ty_var.clone(); n as usize];
-        let other_row = vec![array_type(elem_ty_var.clone(), TypeArg::BoundedNat { n })];
+        let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
         Ok(PolyFuncType::new(
             vec![TypeParam::Type(TypeBound::Any)],
@@ -111,7 +111,7 @@ pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
-pub fn array_type(element_ty: Type, size: TypeArg) -> Type {
+pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
         .instantiate(vec![size, TypeArg::Type { ty: element_ty }])
@@ -201,7 +201,7 @@ mod test {
     fn test_new_array() {
         let mut b = DFGBuilder::new(FunctionType::new(
             vec![QB_T, QB_T],
-            vec![array_type(QB_T, TypeArg::BoundedNat { n: 2 })],
+            vec![array_type(TypeArg::BoundedNat { n: 2 }, QB_T)],
         ))
         .unwrap();
 

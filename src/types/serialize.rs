@@ -49,7 +49,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Tuple { inner } => Type::new_tuple(inner),
             SerSimpleType::Sum(sum) => sum.into(),
             SerSimpleType::Array { inner, len } => {
-                array_type((*inner).into(), TypeArg::BoundedNat { n: len })
+                array_type(TypeArg::BoundedNat { n: len }, (*inner).into())
             }
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
