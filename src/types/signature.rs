@@ -1,8 +1,6 @@
 //! Abstract and concrete Signature types.
 
 use itertools::Either;
-#[cfg(feature = "pyo3")]
-use pyo3::{pyclass, pymethods};
 
 use delegate::delegate;
 use std::fmt::{self, Display, Write};
@@ -13,7 +11,6 @@ use super::{subst_row, Substitution, Type, TypeRow};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-#[cfg_attr(feature = "pyo3", pyclass)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
@@ -91,7 +88,6 @@ impl Signature {
     }
 }
 
-#[cfg_attr(feature = "pyo3", pymethods)]
 impl FunctionType {
     /// The number of wires in the signature.
     #[inline(always)]

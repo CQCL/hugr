@@ -4,9 +4,6 @@
 use std::collections::HashMap;
 use thiserror::Error;
 
-#[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, PyErr};
-
 use crate::core::NodeIndex;
 use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
@@ -89,21 +86,6 @@ pub enum HUGRSerializationError {
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
-}
-
-#[cfg(feature = "pyo3")]
-create_exception!(
-    pyrs,
-    PyHUGRSerializationError,
-    PyException,
-    "Errors that can occur while serializing a Hugr"
-);
-
-#[cfg(feature = "pyo3")]
-impl From<HUGRSerializationError> for PyErr {
-    fn from(err: HUGRSerializationError) -> Self {
-        PyHUGRSerializationError::new_err(err.to_string())
-    }
 }
 
 impl Serialize for Hugr {

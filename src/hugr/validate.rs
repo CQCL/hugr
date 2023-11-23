@@ -9,9 +9,6 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-#[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, PyErr};
-
 use crate::extension::SignatureError;
 use crate::extension::{
     validate::{ExtensionError, ExtensionValidator},
@@ -714,21 +711,6 @@ pub enum ValidationError {
     /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
-}
-
-#[cfg(feature = "pyo3")]
-create_exception!(
-    pyrs,
-    PyValidationError,
-    PyException,
-    "Errors that can occur while validating a Hugr"
-);
-
-#[cfg(feature = "pyo3")]
-impl From<ValidationError> for PyErr {
-    fn from(err: ValidationError) -> Self {
-        PyValidationError::new_err(err.to_string())
-    }
 }
 
 /// Errors related to the inter-graph edge validations.

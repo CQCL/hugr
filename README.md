@@ -14,10 +14,6 @@ compilation and encodes runnable programs.
 
 The HUGR specification is [here](specification/hugr.md).
 
-## Features
-
--   `pyo3`: Enable Python bindings via pyo3.
-
 ## Usage
 
 Add this to your `Cargo.toml`:
