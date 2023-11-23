@@ -423,8 +423,8 @@ impl Extension {
 
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(op.name)),
-            Entry::Vacant(ve) => Ok(Arc::get_mut(ve.insert(Arc::new(op)))
-                .expect("Just made the arc so should only be one reference to it, can get_mut")),
+            // Just made the arc so should only be one reference to it, can get_mut,
+            Entry::Vacant(ve) => Ok(Arc::get_mut(ve.insert(Arc::new(op))).unwrap()),
         }
     }
 }
