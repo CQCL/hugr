@@ -62,18 +62,18 @@
 //!         let mut extension = Extension::new(EXTENSION_ID);
 //!
 //!         extension
-//!             .add_op_type_scheme_simple(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
+//!             .add_op_simple(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
 //!             .unwrap();
 //!
 //!         extension
-//!             .add_op_type_scheme_simple(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
+//!             .add_op_simple(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
 //!             .unwrap();
 //!
 //!         extension
-//!             .add_op_type_scheme_simple(
+//!             .add_op_simple(
 //!                 SmolStr::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]).into(),
+//!                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
 //!             )
 //!             .unwrap();
 //!

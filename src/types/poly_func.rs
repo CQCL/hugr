@@ -216,7 +216,7 @@ pub(crate) mod test {
     use lazy_static::lazy_static;
     use smol_str::SmolStr;
 
-    use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
+    use crate::extension::prelude::{array_type, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
     };
@@ -278,7 +278,7 @@ pub(crate) mod test {
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
-        let typarams = [TypeParam::Type(TypeBound::Any), TypeParam::max_nat()];
+        let typarams = [TypeParam::max_nat(), TypeParam::Type(TypeBound::Any)];
         let [tyvar, szvar] =
             [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));
 
@@ -289,12 +289,12 @@ pub(crate) mod test {
 
         // Sanity check (good args)
         good_ts.instantiate(
-            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
+            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
             &PRELUDE_REGISTRY,
         )?;
 
         let wrong_args = good_ts.instantiate(
-            &[TypeArg::BoundedNat { n: 5 }, TypeArg::Type { ty: USIZE_T }],
+            &[TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 5 }],
             &PRELUDE_REGISTRY,
         );
         assert_eq!(
@@ -302,7 +302,7 @@ pub(crate) mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     param: typarams[0].clone(),
-                    arg: TypeArg::BoundedNat { n: 5 }
+                    arg: TypeArg::Type { ty: USIZE_T }
                 }
             ))
         );
@@ -451,16 +451,6 @@ pub(crate) mod test {
         }
     }
 
-    // The standard library new_array does not allow passing in a variable for size.
-    fn new_array(ty: Type, s: TypeArg) -> Type {
-        let array_def = PRELUDE.get_type("array").unwrap();
-        Type::new_extension(
-            array_def
-                .instantiate(vec![TypeArg::Type { ty }, s])
-                .unwrap(),
-        )
-    }
-
     const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
 
     #[test]
@@ -469,9 +459,9 @@ pub(crate) mod test {
         let array_max = PolyFuncType::new_validated(
             vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
             FunctionType::new(
-                vec![new_array(
-                    Type::new_var_use(0, TypeBound::Any),
+                vec![array_type(
                     TypeArg::new_var_use(1, TypeParam::max_nat()),
+                    Type::new_var_use(0, TypeBound::Any),
                 )],
                 vec![Type::new_var_use(0, TypeBound::Any)],
             ),
@@ -479,7 +469,7 @@ pub(crate) mod test {
         )?;
 
         let concrete = FunctionType::new(
-            vec![new_array(USIZE_T, TypeArg::BoundedNat { n: 3 })],
+            vec![array_type(TypeArg::BoundedNat { n: 3 }, USIZE_T)],
             vec![USIZE_T],
         );
         let actual = array_max
@@ -491,9 +481,9 @@ pub(crate) mod test {
         let partial = PolyFuncType::new_validated(
             vec![TypeParam::max_nat()],
             FunctionType::new(
-                vec![new_array(
-                    USIZE_T,
+                vec![array_type(
                     TypeArg::new_var_use(0, TypeParam::max_nat()),
+                    USIZE_T,
                 )],
                 vec![USIZE_T],
             ),
@@ -540,7 +530,7 @@ pub(crate) mod test {
     fn test_instantiate_nested() -> Result<(), SignatureError> {
         let outer = nested_func();
 
-        let arg = new_array(USIZE_T, TypeArg::BoundedNat { n: 5 });
+        let arg = array_type(TypeArg::BoundedNat { n: 5 }, USIZE_T);
         // `arg` -> (forall C. C -> List(Tuple(C, `arg`)))
         let outer_applied = FunctionType::new(
             vec![arg.clone()], // This had index 0, but is replaced
@@ -594,9 +584,9 @@ pub(crate) mod test {
             Type::new_function(new_pf1(
                 TP_EQ,
                 Type::new_var_use(0, TypeBound::Eq),
-                new_array(
-                    Type::new_var_use(0, TypeBound::Eq),
+                array_type(
                     TypeArg::new_var_use(i, TypeParam::max_nat()),
+                    Type::new_var_use(0, TypeBound::Eq),
                 ),
             ))
         };
