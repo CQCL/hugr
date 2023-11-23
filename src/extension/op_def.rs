@@ -246,7 +246,7 @@ impl Debug for LowerFunc {
 }
 
 type ConstFoldResult = Option<Vec<(crate::OutgoingPort, crate::ops::Const)>>;
-pub trait GenericConstFold: Send + Sync {
+pub trait ConstFold: Send + Sync {
     fn fold(
         &self,
         type_args: &[TypeArg],
@@ -254,19 +254,19 @@ pub trait GenericConstFold: Send + Sync {
     ) -> ConstFoldResult;
 }
 
-impl Debug for Box<dyn GenericConstFold> {
+impl Debug for Box<dyn ConstFold> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "<custom constant folding>")
     }
 }
 
-impl Default for Box<dyn GenericConstFold> {
+impl Default for Box<dyn ConstFold> {
     fn default() -> Self {
         Box::new(|&_: &_| None)
     }
 }
 
-impl<T> GenericConstFold for T
+impl<T> ConstFold for T
 where
     T: Fn(
             &[(crate::IncomingPort, crate::ops::Const)],
@@ -307,7 +307,7 @@ pub struct OpDef {
     lower_funcs: Vec<LowerFunc>,
 
     #[serde(skip)]
-    constant_fold: Box<dyn GenericConstFold>,
+    constant_folder: Box<dyn ConstFold>,
 }
 
 impl OpDef {
@@ -441,8 +441,16 @@ impl OpDef {
         self.misc.insert(k.to_string(), v)
     }
 
-    pub fn add_constant_folding(&mut self, fold: impl GenericConstFold + 'static) {
-        self.constant_fold = Box::new(fold)
+    pub fn add_constant_folding(&mut self, fold: impl ConstFold + 'static) {
+        self.constant_folder = Box::new(fold)
+    }
+
+    pub fn constant_fold(
+        &self,
+        type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, crate::ops::Const)],
+    ) -> ConstFoldResult {
+        self.constant_folder.fold(type_args, consts)
     }
 }
 
@@ -464,7 +472,7 @@ impl Extension {
             signature_func: signature_func.into(),
             misc: Default::default(),
             lower_funcs: Default::default(),
-            constant_fold: Default::default(),
+            constant_folder: Default::default(),
         };
 
         match self.operations.entry(op.name.clone()) {

@@ -144,16 +144,6 @@ pub trait CustomConst:
         // false unless overloaded
         false
     }
-
-    /// Attempt to evaluate an operation given some constant inputs - typically
-    /// involving instances of Self
-    fn fold(
-        &self,
-        _op: &OpType,
-        _consts: &[(IncomingPort, crate::ops::Const)],
-    ) -> Option<Vec<(OutgoingPort, crate::ops::Const)>> {
-        None
-    }
 }
 
 /// Const equality for types that have PartialEq

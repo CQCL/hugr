@@ -8,7 +8,7 @@ use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
-use crate::{Hugr, Node};
+use crate::{ops, Hugr, IncomingPort, Node, OutgoingPort};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpTrait, OpType};
@@ -126,6 +126,13 @@ impl ExtensionOp {
     /// Returns a reference to the [`OpDef`] of this [`ExtensionOp`].
     pub fn def(&self) -> &OpDef {
         self.def.as_ref()
+    }
+
+    pub fn constant_fold(
+        &self,
+        consts: &[(IncomingPort, ops::Const)],
+    ) -> Option<Vec<(OutgoingPort, ops::Const)>> {
+        self.def().constant_fold(self.args(), consts)
     }
 }
 

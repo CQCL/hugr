@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use super::custom::ExternalOp;
+use super::custom::{ExtensionOp, ExternalOp};
 use super::dataflow::DataflowOpTrait;
 use super::{OpName, OpTag};
 
@@ -60,6 +60,20 @@ pub enum LeafOp {
         /// The type and args, plus a cache of the resulting type
         ta: TypeApplication,
     },
+}
+
+impl LeafOp {
+    /// If instance of [ExtensionOp] return a reference to it.
+    pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
+        let LeafOp::CustomOp(ext) = self else {
+            return None;
+        };
+
+        match ext.as_ref() {
+            ExternalOp::Extension(e) => Some(e),
+            ExternalOp::Opaque(_) => None,
+        }
+    }
 }
 
 /// Records details of an application of a [PolyFuncType] to some [TypeArg]s

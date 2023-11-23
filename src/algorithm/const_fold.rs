@@ -1,7 +1,7 @@
 //! Constant folding routines.
 
 use crate::{
-    ops::{Const, OpType},
+    ops::{custom::ExternalOp, Const, LeafOp, OpType},
     values::Value,
     IncomingPort, OutgoingPort,
 };
@@ -11,18 +11,16 @@ pub fn fold_const(
     op: &OpType,
     consts: &[(IncomingPort, Const)],
 ) -> Option<Vec<(OutgoingPort, Const)>> {
-    consts.iter().find_map(|(_, cnst)| match cnst.value() {
-        Value::Extension { c: (c,) } => c.fold(op, consts),
-        Value::Tuple { .. } => todo!(),
-        Value::Sum { .. } => todo!(),
-        Value::Function { .. } => None,
-    })
+    let op = op.as_leaf_op()?;
+    let ext_op = op.as_extension_op()?;
+
+    ext_op.constant_fold(consts)
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        extension::PRELUDE_REGISTRY,
+        extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY},
         ops::LeafOp,
         std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES},
         types::TypeArg,
@@ -40,8 +38,14 @@ mod test {
     }
 
     fn u64_add() -> LeafOp {
-        crate::std_extensions::arithmetic::int_types::EXTENSION
-            .instantiate_extension_op("iadd", [TypeArg::BoundedNat { n: 5 }], &PRELUDE_REGISTRY)
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            crate::std_extensions::arithmetic::int_ops::EXTENSION.to_owned(),
+            crate::std_extensions::arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        crate::std_extensions::arithmetic::int_ops::EXTENSION
+            .instantiate_extension_op("iadd", [TypeArg::BoundedNat { n: 5 }], &reg)
             .unwrap()
             .into()
     }
