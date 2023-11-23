@@ -153,7 +153,7 @@ impl CustomValidator {
 /// or a custom binary which computes a polymorphic function type given values
 /// for its static type parameters.
 #[derive(serde::Deserialize, serde::Serialize)]
-enum SignatureFunc {
+pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
@@ -402,7 +402,6 @@ impl Extension {
     /// (defined by a [`PolyFuncType`]), a type scheme along with binary
     /// validation for type arguments ([`CustomValidator`]), or a custom binary
     /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
-    #[allow(private_bounds)] // docstring outlines all valid inputs.
     pub fn add_op(
         &mut self,
         name: SmolStr,
@@ -428,7 +427,6 @@ impl Extension {
 
     /// Create an OpDef with `PolyFuncType`, `impl CustomSignatureFunc` or `CustomValidator`
     /// ; and no "misc" or "lowering functions" defined.
-    #[allow(private_bounds)] // docstring outlines all valid inputs.
     pub fn add_op_simple(
         &mut self,
         name: SmolStr,
