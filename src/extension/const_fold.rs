@@ -6,26 +6,9 @@ use crate::types::TypeArg;
 
 use crate::OutgoingPort;
 
-use crate::IncomingPort;
-
 use crate::ops;
-use derive_more::From;
 
-#[derive(From, Clone, PartialEq, Debug)]
-pub enum FoldOutput {
-    /// Value from port can be replaced with a constant
-    Value(Box<ops::Const>),
-    /// Value from port corresponds to one of the incoming values.
-    Input(IncomingPort),
-}
-
-impl From<ops::Const> for FoldOutput {
-    fn from(value: ops::Const) -> Self {
-        Self::Value(Box::new(value))
-    }
-}
-
-pub type ConstFoldResult = Option<Vec<(OutgoingPort, FoldOutput)>>;
+pub type ConstFoldResult = Option<Vec<(OutgoingPort, ops::Const)>>;
 
 pub trait ConstFold: Send + Sync {
     fn fold(

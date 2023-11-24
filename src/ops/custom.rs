@@ -8,7 +8,7 @@ use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, S
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
-use crate::{ops, Hugr, IncomingPort, Node, OutgoingPort};
+use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::tag::OpTag;
 use super::{LeafOp, OpTrait, OpType};

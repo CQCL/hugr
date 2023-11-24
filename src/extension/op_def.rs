@@ -13,7 +13,7 @@ use super::{
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
-use crate::{ops, Hugr, IncomingPort};
+use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
 pub trait CustomSignatureFunc: Send + Sync {

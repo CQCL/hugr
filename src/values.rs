@@ -9,8 +9,8 @@ use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
 use crate::macros::impl_box_clone;
-use crate::ops::OpType;
-use crate::{Hugr, HugrView, IncomingPort, OutgoingPort};
+
+use crate::{Hugr, HugrView};
 
 use crate::types::{CustomCheckFailure, CustomType};
 

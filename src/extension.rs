@@ -31,7 +31,7 @@ pub use type_def::{TypeDef, TypeDefBound};
 mod const_fold;
 pub mod prelude;
 pub mod validate;
-pub use const_fold::{ConstFold, ConstFoldResult, FoldOutput};
+pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.

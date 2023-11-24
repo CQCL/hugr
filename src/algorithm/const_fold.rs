@@ -2,9 +2,8 @@
 
 use crate::{
     extension::ConstFoldResult,
-    ops::{custom::ExternalOp, Const, LeafOp, OpType},
-    values::Value,
-    IncomingPort, OutgoingPort,
+    ops::{Const, OpType},
+    IncomingPort,
 };
 
 /// For a given op and consts, attempt to evaluate the op.
@@ -18,7 +17,7 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
 #[cfg(test)]
 mod test {
     use crate::{
-        extension::{ExtensionRegistry, FoldOutput, PRELUDE, PRELUDE_REGISTRY},
+        extension::{ExtensionRegistry, PRELUDE},
         ops::LeafOp,
         std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES},
         types::TypeArg,
@@ -57,18 +56,6 @@ mod test {
         let add_op: OpType = u64_add().into();
         let out = fold_const(&add_op, &consts).unwrap();
 
-        assert_eq!(&out[..], &[(0.into(), FoldOutput::Value(Box::new(i2c(c))))]);
-    }
-
-    #[test]
-    // a = a + 0
-    fn test_zero_add() {
-        for in_port in [0, 1] {
-            let other_in = 1 - in_port;
-            let consts = vec![(in_port.into(), i2c(0))];
-            let add_op: OpType = u64_add().into();
-            let out = fold_const(&add_op, &consts).unwrap();
-            assert_eq!(&out[..], &[(0.into(), FoldOutput::Input(other_in.into()))]);
-        }
+        assert_eq!(&out[..], &[(0.into(), i2c(c))]);
     }
 }
