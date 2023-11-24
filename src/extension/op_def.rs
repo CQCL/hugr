@@ -148,18 +148,18 @@ impl CustomValidator {
 }
 
 /// The two ways in which an OpDef may compute the Signature of each operation node.
-/// Either as a TypeScheme (polymorphic function type), with optional custom
-/// validation for provided type arguments,
-/// or a custom binary which computes a polymorphic function type given values
-/// for its static type parameters.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
+    /// A TypeScheme (polymorphic function type), with optional custom
+    /// validation for provided type arguments,
     #[serde(rename = "signature")]
     TypeScheme(CustomValidator),
     #[serde(skip)]
+    /// A custom binary which computes a polymorphic function type given values
+    /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
 }
 struct NoValidate;
