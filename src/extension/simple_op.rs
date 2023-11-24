@@ -3,9 +3,13 @@ use std::str::FromStr;
 
 use strum::IntoEnumIterator;
 
-use crate::Extension;
+use crate::{
+    ops::{custom::ExtensionOp, LeafOp, OpType},
+    types::TypeArg,
+    Extension,
+};
 
-use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, OpDef};
+use super::{op_def::SignatureFunc, ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef};
 use thiserror::Error;
 
 /// Error when definition extension does not match that of the [OpEnum]
@@ -95,11 +99,32 @@ pub trait OpEnum: Into<&'static str> + FromStr + Copy + IntoEnumIterator {
         }
         Ok(())
     }
+
+    /// Generate an [OpType].
+    fn to_optype(
+        &self,
+        extension: &Extension,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+    ) -> Option<OpType> {
+        let leaf: LeafOp = ExtensionOp::new(extension.get_op(self.name())?.clone(), args, exts)
+            .ok()?
+            .into();
+
+        Some(leaf.into())
+    }
+
+    /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
+    /// an [ExtensionOp] and loads from the name.
+    fn from_optype(op: &OpType) -> Option<Self> {
+        let ext: &ExtensionOp = op.as_leaf_op()?.as_extension_op()?;
+        Self::try_from_op_def(ext.def()).ok()
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{type_row, types::FunctionType};
+    use crate::{extension::EMPTY_REG, type_row, types::FunctionType};
 
     use super::*;
     use strum_macros::{EnumIter, EnumString, IntoStaticStr};
@@ -144,6 +169,10 @@ mod test {
             o
         );
 
+        assert_eq!(
+            DummyEnum::from_optype(&o.to_optype(&e, &[], &EMPTY_REG).unwrap()).unwrap(),
+            o
+        );
         let bad_name = ExtensionId::new("not_dummy").unwrap();
         let mut e = Extension::new(bad_name.clone());
 

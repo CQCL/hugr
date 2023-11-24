@@ -109,7 +109,7 @@ lazy_static! {
 pub(crate) mod test {
     use crate::{
         extension::{prelude::BOOL_T, simple_op::OpEnum, EMPTY_REG},
-        ops::LeafOp,
+        ops::OpType,
         types::type_param::TypeArg,
         Extension,
     };
@@ -143,34 +143,21 @@ pub(crate) mod test {
     }
 
     /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn and_op() -> LeafOp {
-        EXTENSION
-            .instantiate_extension_op(
-                LogicOp::And.name(),
-                [TypeArg::BoundedNat { n: 2 }],
-                &EMPTY_REG,
-            )
+    pub(crate) fn and_op() -> OpType {
+        LogicOp::And
+            .to_optype(&EXTENSION, &[TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
             .unwrap()
-            .into()
     }
 
     /// Generate a logic extension and "or" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn or_op() -> LeafOp {
-        EXTENSION
-            .instantiate_extension_op(
-                LogicOp::Or.name(),
-                [TypeArg::BoundedNat { n: 2 }],
-                &EMPTY_REG,
-            )
+    pub(crate) fn or_op() -> OpType {
+        LogicOp::Or
+            .to_optype(&EXTENSION, &[TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
             .unwrap()
-            .into()
     }
 
     /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn not_op() -> LeafOp {
-        EXTENSION
-            .instantiate_extension_op(LogicOp::Not.name(), [], &EMPTY_REG)
-            .unwrap()
-            .into()
+    pub(crate) fn not_op() -> OpType {
+        LogicOp::Not.to_optype(&EXTENSION, &[], &EMPTY_REG).unwrap()
     }
 }
