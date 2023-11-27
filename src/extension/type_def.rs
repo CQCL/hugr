@@ -202,9 +202,7 @@ mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     arg: TypeArg::Type { ty: QB_T },
-                    param: TypeParam::Type {
-                        b: TypeBound::Copyable
-                    }
+                    param: TypeBound::Copyable.into()
                 }
             ))
         );

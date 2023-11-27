@@ -546,20 +546,12 @@ mod test {
                 vec![Type::new_tuple(tyvars)]
             ))
         );
-        def.validate_args(
-            &args,
-            &PRELUDE_REGISTRY,
-            &[TypeParam::Type { b: TypeBound::Eq }],
-        )
-        .unwrap();
+        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
+            .unwrap();
 
         // quick sanity check that we are validating the args - note changed bound:
         assert_eq!(
-            def.validate_args(
-                &args,
-                &PRELUDE_REGISTRY,
-                &[TypeParam::Type { b: TypeBound::Any }]
-            ),
+            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
             Err(SignatureError::TypeVarDoesNotMatchDeclaration {
                 actual: TypeBound::Any.into(),
                 cached: TypeBound::Eq.into()
@@ -595,7 +587,7 @@ mod test {
             "SimpleOp".into(),
             "".into(),
             PolyFuncType::new(
-                vec![TypeParam::Type { b: TypeBound::Any }],
+                vec![TypeBound::Any.into()],
                 FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
