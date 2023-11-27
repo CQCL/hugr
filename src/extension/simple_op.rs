@@ -1,5 +1,4 @@
 //! A trait that enum for op definitions that gathers up some shared functionality.
-use std::str::FromStr;
 
 use strum::IntoEnumIterator;
 
@@ -32,22 +31,22 @@ pub enum OpLoadError<T> {
     LoadError(T),
 }
 
-trait IntoStaticSt {
-    fn to_static_str(&self) -> &str;
+pub trait OpEnumName {
+    fn name(&self) -> &str;
 }
 
-impl<T> IntoStaticSt for T
+impl<T> OpEnumName for T
 where
     for<'a> &'a T: Into<&'static str>,
 {
-    fn to_static_str(&self) -> &str {
+    fn name(&self) -> &str {
         self.into()
     }
 }
 /// A trait that operation sets defined by simple (C-style) enums can implement
 /// to simplify interactions with the extension.
 /// Relies on `strum_macros::{EnumIter, EnumString, IntoStaticStr}`
-pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
+pub trait OpEnum: OpEnumName {
     // TODO can be removed after rust 1.75
     /// Error thrown when loading from string fails.
     type LoadError: std::error::Error;
@@ -68,23 +67,17 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
     /// Edit the opdef before finalising. By default does nothing.
     fn post_opdef(&self, _def: &mut OpDef) {}
 
-    /// Name of the operation - derived from strum serialization.
-    fn name(&self) -> &str {
-        self.to_static_str()
-    }
-
     /// Try to load one of the operations of this set from an [OpDef].
-    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError>;
-
-    /// Iterator over all operations in the set. Non-trivial variants will have
-    /// default values used for the members.
-    fn all_variants() -> <Self as IntoEnumIterator>::Iterator {
-        <Self as IntoEnumIterator>::iter()
-    }
+    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError>
+    where
+        Self: Sized;
 
     /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
     /// an [ExtensionOp] and loads from the name.
-    fn from_optype(op: &OpType) -> Option<Self> {
+    fn from_optype(op: &OpType) -> Option<Self>
+    where
+        Self: Sized,
+    {
         let ext: &ExtensionOp = op.as_leaf_op()?.as_extension_op()?;
         Self::from_op_def(ext.def(), ext.args()).ok()
     }
@@ -93,7 +86,10 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
         self,
         extension_id: ExtensionId,
         registry: &'r ExtensionRegistry,
-    ) -> RegisteredEnum<'r, Self> {
+    ) -> RegisteredEnum<'r, Self>
+    where
+        Self: Sized,
+    {
         RegisteredEnum {
             extension_id,
             registry,
@@ -101,8 +97,20 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
         }
     }
 
+    /// Iterator over all operations in the set. Non-trivial variants will have
+    /// default values used for the members.
+    fn all_variants() -> <Self as IntoEnumIterator>::Iterator
+    where
+        Self: IntoEnumIterator,
+    {
+        <Self as IntoEnumIterator>::iter()
+    }
+
     /// load all variants of a [OpEnum] in to an extension as op defs.
-    fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError> {
+    fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError>
+    where
+        Self: IntoEnumIterator,
+    {
         for op in Self::all_variants() {
             extension.add_op_enum(&op)?;
         }

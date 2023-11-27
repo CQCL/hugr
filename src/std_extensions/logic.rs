@@ -129,7 +129,11 @@ lazy_static! {
 pub(crate) mod test {
     use super::{extension, LogicOp, EXTENSION, EXTENSION_ID, FALSE_NAME, TRUE_NAME};
     use crate::{
-        extension::{prelude::BOOL_T, simple_op::OpEnum, ExtensionRegistry},
+        extension::{
+            prelude::BOOL_T,
+            simple_op::{OpEnum, OpEnumName},
+            ExtensionRegistry,
+        },
         ops::OpType,
         types::TypeArg,
         Extension,

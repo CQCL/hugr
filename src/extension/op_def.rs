@@ -438,7 +438,7 @@ impl Extension {
 
     pub fn add_op_enum(
         &mut self,
-        op: &impl super::simple_op::OpEnum,
+        op: &(impl super::simple_op::OpEnum + super::simple_op::OpEnumName),
     ) -> Result<&mut OpDef, ExtensionBuildError> {
         let def = self.add_op(
             op.name().into(),
