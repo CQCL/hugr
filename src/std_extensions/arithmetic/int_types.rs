@@ -204,7 +204,7 @@ lazy_static! {
 }
 
 /// get an integer type variable, given the integer type definition
-pub(super) fn int_type_var(var_id: usize) -> Type {
+pub(super) fn int_tv(var_id: usize) -> Type {
     Type::new_extension(
         EXTENSION
             .get_type(&INT_TYPE_ID)
