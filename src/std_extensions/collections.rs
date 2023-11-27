@@ -67,7 +67,7 @@ impl CustomConst for ListValue {
         crate::values::downcast_equal_consts(self, other)
     }
 }
-const TP: TypeParam = TypeParam::Type(TypeBound::Any);
+const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
 fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_NAME);

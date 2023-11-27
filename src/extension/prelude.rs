@@ -29,7 +29,7 @@ impl SignatureFromArgs for ArrayOpCustom {
         let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
         Ok(PolyFuncType::new(
-            vec![TypeParam::Type(TypeBound::Any)],
+            vec![TypeParam::Type { b: TypeBound::Any }],
             FunctionType::new(var_arg_row, other_row),
         ))
     }
@@ -57,7 +57,7 @@ lazy_static! {
         prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![ TypeParam::max_nat(),TypeParam::Type(TypeBound::Any)],
+                vec![ TypeParam::max_nat(),TypeParam::Type { b: TypeBound::Any }],
                 "array".into(),
                 TypeDefBound::FromParams(vec![1]),
             )

@@ -179,7 +179,9 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::Type(TypeBound::Copyable)],
+            params: vec![TypeParam::Type {
+                b: TypeBound::Copyable,
+            }],
             extension: "MyRsrc".try_into().unwrap(),
             description: "Some parameterised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
@@ -200,7 +202,9 @@ mod test {
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
                     arg: TypeArg::Type { ty: QB_T },
-                    param: TypeParam::Type(TypeBound::Copyable)
+                    param: TypeParam::Type {
+                        b: TypeBound::Copyable
+                    }
                 }
             ))
         );
