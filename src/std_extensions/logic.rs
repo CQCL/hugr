@@ -4,8 +4,9 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::{
     extension::{
-        prelude::BOOL_T, simple_op::OpEnum, ExtensionId, OpDef, SignatureError, SignatureFromArgs,
-        SignatureFunc,
+        prelude::BOOL_T,
+        simple_op::{try_from_name, OpEnum, OpLoadError},
+        ExtensionId, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
     },
     ops, type_row,
     types::{
@@ -15,8 +16,6 @@ use crate::{
     Extension,
 };
 use lazy_static::lazy_static;
-use std::str::FromStr;
-use thiserror::Error;
 /// Name of extension false value.
 pub const FALSE_NAME: &str = "FALSE";
 /// Name of extension true value.
@@ -31,21 +30,11 @@ pub enum LogicOp {
     Not,
 }
 
-/// Error in trying to load logic operation.
-#[derive(Debug, Error)]
-pub enum LogicOpLoadError {
-    #[error("Not a logic extension operation.")]
-    NotLogicOp,
-    #[error("Type args invalid: {0}.")]
-    InvalidArgs(#[from] SignatureError),
-}
-
 impl OpEnum for LogicOp {
-    type LoadError = LogicOpLoadError;
     type Description = &'static str;
 
-    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError> {
-        let mut out = Self::from_str(op_def.name()).map_err(|_| LogicOpLoadError::NotLogicOp)?;
+    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError> {
+        let mut out: LogicOp = try_from_name(op_def.name())?;
         match &mut out {
             LogicOp::And(i) | LogicOp::Or(i) => {
                 let [TypeArg::BoundedNat { n }] = *args else {

@@ -26,9 +26,12 @@ pub struct WrongExtension {
 #[derive(Debug, Error, PartialEq)]
 #[error("{0}")]
 #[allow(missing_docs)]
-pub enum OpLoadError<T> {
+pub enum OpLoadError {
     WrongExtension(#[from] WrongExtension),
-    LoadError(T),
+    #[error("Op with name {0} is not a member of this enum.")]
+    NotEnumMember(String),
+    #[error("Type args invalid: {0}.")]
+    InvalidArgs(#[from] SignatureError),
 }
 
 pub trait OpEnumName {
@@ -47,9 +50,6 @@ where
 /// to simplify interactions with the extension.
 /// Relies on `strum_macros::{EnumIter, EnumString, IntoStaticStr}`
 pub trait OpEnum: OpEnumName {
-    // TODO can be removed after rust 1.75
-    /// Error thrown when loading from string fails.
-    type LoadError: std::error::Error;
     /// Description type.
     type Description: ToString;
 
@@ -68,7 +68,7 @@ pub trait OpEnum: OpEnumName {
     fn post_opdef(&self, _def: &mut OpDef) {}
 
     /// Try to load one of the operations of this set from an [OpDef].
-    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError>
+    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError>
     where
         Self: Sized;
 
@@ -116,6 +116,16 @@ pub trait OpEnum: OpEnumName {
         }
         Ok(())
     }
+}
+
+/// Load an [OpEnum] from its name. Works best for C-style enums where each
+/// variant corresponds to an [OpDef] and an [OpType], i,e, there are no type parameters.
+/// See [strum_macros::EnumString].
+pub fn try_from_name<T>(name: &str) -> Result<T, OpLoadError>
+where
+    T: std::str::FromStr + OpEnum,
+{
+    T::from_str(name).map_err(|_| OpLoadError::NotEnumMember(name.to_string()))
 }
 
 /// Wrap an [OpEnum] with an extension registry to allow type computation.
@@ -184,8 +194,6 @@ mod test {
     #[error("Dummy")]
     struct DummyError;
     impl OpEnum for DummyEnum {
-        type LoadError = DummyError;
-
         type Description = &'static str;
 
         fn def_signature(&self) -> SignatureFunc {
@@ -196,7 +204,7 @@ mod test {
             "dummy"
         }
 
-        fn from_op_def(_op_def: &OpDef, _args: &[TypeArg]) -> Result<Self, Self::LoadError> {
+        fn from_op_def(_op_def: &OpDef, _args: &[TypeArg]) -> Result<Self, OpLoadError> {
             Ok(Self::Dumb)
         }
     }
