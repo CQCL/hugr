@@ -1,9 +1,10 @@
 //! A trait that enum for op definitions that gathers up some shared functionality.
 
+use smol_str::SmolStr;
 use strum::IntoEnumIterator;
 
 use crate::{
-    ops::{custom::ExtensionOp, LeafOp, OpType},
+    ops::{custom::ExtensionOp, LeafOp, OpName, OpType},
     types::{FunctionType, TypeArg},
     Extension,
 };
@@ -34,22 +35,19 @@ pub enum OpLoadError {
     InvalidArgs(#[from] SignatureError),
 }
 
-pub trait OpEnumName {
-    fn name(&self) -> &str;
-}
-
-impl<T> OpEnumName for T
+impl<T> OpName for T
 where
     for<'a> &'a T: Into<&'static str>,
 {
-    fn name(&self) -> &str {
-        self.into()
+    fn name(&self) -> SmolStr {
+        let s = self.into();
+        s.into()
     }
 }
 /// A trait that operation sets defined by simple (C-style) enums can implement
 /// to simplify interactions with the extension.
 /// Relies on `strum_macros::{EnumIter, EnumString, IntoStaticStr}`
-pub trait OpEnum: OpEnumName {
+pub trait OpEnum: OpName {
     /// Description type.
     type Description: ToString;
 
@@ -145,7 +143,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
         let leaf: LeafOp = ExtensionOp::new(
             self.registry
                 .get(&self.extension_id)?
-                .get_op(self.name())?
+                .get_op(&self.name())?
                 .clone(),
             self.type_args(),
             self.registry,
@@ -162,7 +160,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
             self.registry
                 .get(&self.extension_id)
                 .expect("should return 'Extension not in registry' error here.")
-                .get_op(self.name())
+                .get_op(&self.name())
                 .expect("should return 'Op not in extension' error here."),
             &self.type_args(),
             self.registry,
@@ -171,7 +169,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
     delegate! {
         to self.op_enum {
             /// Name of the operation - derived from strum serialization.
-            pub fn name(&self) -> &str;
+            pub fn name(&self) -> SmolStr;
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
             /// Description of the operation.
@@ -219,7 +217,7 @@ mod test {
         e.add_op_enum(&o).unwrap();
 
         assert_eq!(
-            DummyEnum::from_op_def(e.get_op(o.name()).unwrap(), &[]).unwrap(),
+            DummyEnum::from_op_def(e.get_op(&o.name()).unwrap(), &[]).unwrap(),
             o
         );
 

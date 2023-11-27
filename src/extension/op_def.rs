@@ -10,6 +10,7 @@ use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
 };
 
+use crate::ops::OpName;
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
@@ -438,13 +439,9 @@ impl Extension {
 
     pub fn add_op_enum(
         &mut self,
-        op: &(impl super::simple_op::OpEnum + super::simple_op::OpEnumName),
+        op: &(impl super::simple_op::OpEnum + OpName),
     ) -> Result<&mut OpDef, ExtensionBuildError> {
-        let def = self.add_op(
-            op.name().into(),
-            op.description().to_string(),
-            op.def_signature(),
-        )?;
+        let def = self.add_op(op.name(), op.description().to_string(), op.def_signature())?;
 
         op.post_opdef(def);
 

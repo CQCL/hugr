@@ -118,12 +118,8 @@ lazy_static! {
 pub(crate) mod test {
     use super::{extension, LogicOp, EXTENSION, EXTENSION_ID, FALSE_NAME, TRUE_NAME};
     use crate::{
-        extension::{
-            prelude::BOOL_T,
-            simple_op::{OpEnum, OpEnumName},
-            ExtensionRegistry,
-        },
-        ops::OpType,
+        extension::{prelude::BOOL_T, simple_op::OpEnum, ExtensionRegistry},
+        ops::{OpName, OpType},
         types::TypeArg,
         Extension,
     };
@@ -141,7 +137,7 @@ pub(crate) mod test {
         for op in LogicOp::all_variants() {
             assert_eq!(
                 LogicOp::from_op_def(
-                    r.get_op(op.name()).unwrap(),
+                    r.get_op(&op.name()).unwrap(),
                     // `all_variants` will set default type arg values.
                     &[TypeArg::BoundedNat { n: 0 }]
                 )
