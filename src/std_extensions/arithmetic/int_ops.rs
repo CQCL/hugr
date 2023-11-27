@@ -81,11 +81,15 @@ fn extension() -> Extension {
 
     let idiv_checked_sig = int_polytype(
         2,
-        vec![int_type_var(1)],
+        vec![int_type_var(0), int_type_var(1)],
         vec![sum_with_error(int_type_var(0))],
     );
 
-    let idiv_sig = int_polytype(2, vec![int_type_var(1)], vec![int_type_var(0)]);
+    let idiv_sig = int_polytype(
+        2,
+        vec![int_type_var(1), int_type_var(1)],
+        vec![int_type_var(0)],
+    );
 
     let imod_checked_sig = int_polytype(
         2,
