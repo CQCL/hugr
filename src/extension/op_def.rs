@@ -435,6 +435,21 @@ impl Extension {
             Entry::Vacant(ve) => Ok(Arc::get_mut(ve.insert(Arc::new(op))).unwrap()),
         }
     }
+
+    pub fn add_op_enum(
+        &mut self,
+        op: &impl super::simple_op::OpEnum,
+    ) -> Result<&mut OpDef, ExtensionBuildError> {
+        let def = self.add_op(
+            op.name().into(),
+            op.description().to_string(),
+            op.def_signature(),
+        )?;
+
+        op.post_opdef(def);
+
+        Ok(def)
+    }
 }
 
 #[cfg(test)]

@@ -76,34 +76,10 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError>;
 
-    /// Add an operation to an extension.
-    fn add_to_extension<'e>(
-        &self,
-        ext: &'e mut Extension,
-    ) -> Result<&'e OpDef, ExtensionBuildError> {
-        let def = ext.add_op(
-            self.name().into(),
-            self.description().to_string(),
-            self.def_signature(),
-        )?;
-
-        self.post_opdef(def);
-
-        Ok(def)
-    }
-
     /// Iterator over all operations in the set. Non-trivial variants will have
     /// default values used for the members.
     fn all_variants() -> <Self as IntoEnumIterator>::Iterator {
         <Self as IntoEnumIterator>::iter()
-    }
-
-    /// load all variants of a `SimpleOpEnum` in to an extension as op defs.
-    fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError> {
-        for op in Self::all_variants() {
-            op.add_to_extension(extension)?;
-        }
-        Ok(())
     }
 
     /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
@@ -123,6 +99,14 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
             registry,
             op_enum: self,
         }
+    }
+
+    /// load all variants of a [OpEnum] in to an extension as op defs.
+    fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError> {
+        for op in Self::all_variants() {
+            extension.add_op_enum(&op)?;
+        }
+        Ok(())
     }
 }
 
@@ -176,7 +160,7 @@ mod test {
 
     use super::*;
     use strum_macros::{EnumIter, EnumString, IntoStaticStr};
-    #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
     enum DummyEnum {
         Dumb,
     }
@@ -196,7 +180,7 @@ mod test {
             "dummy"
         }
 
-        fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError> {
+        fn from_op_def(_op_def: &OpDef, _args: &[TypeArg]) -> Result<Self, Self::LoadError> {
             Ok(Self::Dumb)
         }
     }
@@ -208,7 +192,7 @@ mod test {
         let ext_name = ExtensionId::new("dummy").unwrap();
         let mut e = Extension::new(ext_name.clone());
 
-        o.add_to_extension(&mut e).unwrap();
+        e.add_op_enum(&o).unwrap();
 
         assert_eq!(
             DummyEnum::from_op_def(e.get_op(o.name()).unwrap(), &[]).unwrap(),
