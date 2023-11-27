@@ -47,7 +47,7 @@ impl UpperBound {
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
-#[serde(tag = "typ")]
+#[serde(tag = "tp")]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
     Type(TypeBound),
@@ -56,7 +56,10 @@ pub enum TypeParam {
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
     Opaque(CustomType),
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
-    List(Box<TypeParam>),
+    List {
+        #[allow(missing_docs)]
+        param: Box<TypeParam>,
+    },
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
     #[display(fmt = "Tuple({})", "_0.iter().map(|t|t.to_string()).join(\", \")")]
     Tuple(Vec<TypeParam>),
@@ -82,7 +85,7 @@ impl TypeParam {
             (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
             (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => b1.contains(b2),
             (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
-            (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
+            (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
             (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
             }
@@ -262,7 +265,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-        (TypeArg::Sequence { elems }, TypeParam::List(param)) => {
+        (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
             elems.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple(types)) => {

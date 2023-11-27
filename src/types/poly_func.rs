@@ -338,7 +338,9 @@ pub(crate) mod test {
         let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::Extensions,
-            TypeParam::List(Box::new(TypeParam::max_nat())),
+            TypeParam::List {
+                param: Box::new(TypeParam::max_nat()),
+            },
             TypeParam::Opaque(USIZE_CUSTOM_T),
             TypeParam::Tuple(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()]),
         ] {
@@ -424,7 +426,9 @@ pub(crate) mod test {
             &[TypeParam::Type(TypeBound::Any)],
         )?;
 
-        let list_of_tys = |b| TypeParam::List(Box::new(TypeParam::Type(b)));
+        let list_of_tys = |b| TypeParam::List {
+            param: Box::new(TypeParam::Type(b)),
+        };
         decl_accepts_rejects_var(
             list_of_tys(TypeBound::Copyable),
             &[list_of_tys(TypeBound::Copyable), list_of_tys(TypeBound::Eq)],
