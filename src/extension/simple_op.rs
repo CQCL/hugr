@@ -66,7 +66,8 @@ pub trait MakeOpDef: OpName {
         Ok(())
     }
 
-    /// load all variants of a [OpEnum] in to an extension as op defs.
+    /// Load all variants of an enum of op definitions in to an extension as op defs.
+    /// See [strum::IntoEnumIterator].
     fn load_all_ops(extension: &mut Extension) -> Result<(), ExtensionBuildError>
     where
         Self: IntoEnumIterator,
@@ -99,7 +100,7 @@ pub trait MakeExtensionOp: OpName {
     fn type_args(&self) -> Vec<TypeArg>;
 
     /// Given the ID of the extension this operation is defined in, and a
-    /// registry containing that extension, return a [RegisteredEnum].
+    /// registry containing that extension, return a [RegisteredOp].
     fn to_registered(
         self,
         extension_id: ExtensionId,
@@ -132,8 +133,7 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
     }
 }
 
-/// Load an [OpEnum] from its name. Works best for C-style enums where each
-/// variant corresponds to an [OpDef] and an [OpType], i,e, there are no type parameters.
+/// Load an [MakeOpDef] from its name.
 /// See [strum_macros::EnumString].
 pub fn try_from_name<T>(name: &str) -> Result<T, OpLoadError>
 where
@@ -142,14 +142,15 @@ where
     T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))
 }
 
-/// Wrap an [OpEnum] with an extension registry to allow type computation.
-/// Generate from [OpEnum::to_registered]
+/// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.
+/// Generate from [MakeExtensionOp::to_registered]
+#[derive(Clone, Debug)]
 pub struct RegisteredOp<'r, T> {
     /// The name of the extension these ops belong to.
     extension_id: ExtensionId,
     /// A registry of all extensions, used for type computation.
     registry: &'r ExtensionRegistry,
-    /// The inner [OpEnum]
+    /// The inner [MakeExtensionOp]
     op: T,
 }
 

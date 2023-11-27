@@ -216,7 +216,7 @@ impl SignatureFunc {
     ///
     /// # Panics
     ///
-    /// Panics if is [SignatureFunc::CustomFunc] and there are not enough type
+    /// Panics if `self` is a [SignatureFunc::CustomFunc] and there are not enough type
     /// arguments provided to match the number of static parameters.
     ///
     /// # Errors
