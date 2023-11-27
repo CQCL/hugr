@@ -31,8 +31,6 @@ pub enum LogicOp {
 }
 
 impl OpEnum for LogicOp {
-    type Description = &'static str;
-
     fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError> {
         let mut out: LogicOp = try_from_name(op_def.name())?;
         match &mut out {
@@ -55,12 +53,13 @@ impl OpEnum for LogicOp {
         }
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> String {
         match self {
             LogicOp::And(_) => "logical 'and'",
             LogicOp::Or(_) => "logical 'or'",
             LogicOp::Not => "logical 'not'",
         }
+        .to_string()
     }
     fn type_args(&self) -> Vec<TypeArg> {
         match self {

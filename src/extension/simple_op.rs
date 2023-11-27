@@ -15,20 +15,12 @@ use super::{
 };
 use delegate::delegate;
 use thiserror::Error;
-/// Error when definition extension does not match that of the [OpEnum]
-#[derive(Debug, Error, PartialEq)]
-#[error("Expected extension ID {expected} but found {provided}.")]
-pub struct WrongExtension {
-    expected: ExtensionId,
-    provided: ExtensionId,
-}
 
 /// Error loading [OpEnum]
 #[derive(Debug, Error, PartialEq)]
 #[error("{0}")]
 #[allow(missing_docs)]
 pub enum OpLoadError {
-    WrongExtension(#[from] WrongExtension),
     #[error("Op with name {0} is not a member of this enum.")]
     NotEnumMember(String),
     #[error("Type args invalid: {0}.")]
@@ -48,14 +40,18 @@ where
 /// to simplify interactions with the extension.
 /// Relies on `strum_macros::{EnumIter, EnumString, IntoStaticStr}`
 pub trait OpEnum: OpName {
-    /// Description type.
-    type Description: ToString;
+    /// Try to load one of the operations of this set from an [OpDef].
+    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError>
+    where
+        Self: Sized;
 
     /// Return the signature (polymorphic function type) of the operation.
     fn def_signature(&self) -> SignatureFunc;
 
-    /// Description of the operation.
-    fn description(&self) -> Self::Description;
+    /// Description of the operation. By default, the same as `self.name()`.
+    fn description(&self) -> String {
+        self.name().to_string()
+    }
 
     /// Any type args which define this operation. Default is no type arguments.
     fn type_args(&self) -> Vec<TypeArg> {
@@ -64,11 +60,6 @@ pub trait OpEnum: OpName {
 
     /// Edit the opdef before finalising. By default does nothing.
     fn post_opdef(&self, _def: &mut OpDef) {}
-
-    /// Try to load one of the operations of this set from an [OpDef].
-    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError>
-    where
-        Self: Sized;
 
     /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
     /// an [ExtensionOp] and loads from the name.
@@ -80,11 +71,11 @@ pub trait OpEnum: OpName {
         Self::from_op_def(ext.def(), ext.args()).ok()
     }
 
-    fn to_registered<'r>(
+    fn to_registered(
         self,
         extension_id: ExtensionId,
-        registry: &'r ExtensionRegistry,
-    ) -> RegisteredEnum<'r, Self>
+        registry: &ExtensionRegistry,
+    ) -> RegisteredEnum<'_, Self>
     where
         Self: Sized,
     {
@@ -137,7 +128,14 @@ pub struct RegisteredEnum<'r, T> {
     op_enum: T,
 }
 
-impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
+impl<T> RegisteredEnum<'_, T> {
+    /// Extract the inner wrapped value
+    pub fn to_inner(self) -> T {
+        self.op_enum
+    }
+}
+
+impl<T: OpEnum> RegisteredEnum<'_, T> {
     /// Generate an [OpType].
     pub fn to_optype(&self) -> Option<OpType> {
         let leaf: LeafOp = ExtensionOp::new(
@@ -166,6 +164,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
             self.registry,
         )
     }
+
     delegate! {
         to self.op_enum {
             /// Name of the operation - derived from strum serialization.
@@ -173,7 +172,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
             /// Description of the operation.
-            pub fn description(&self) -> T::Description;
+            pub fn description(&self) -> String;
         }
     }
 }
@@ -188,18 +187,10 @@ mod test {
     enum DummyEnum {
         Dumb,
     }
-    #[derive(Debug, thiserror::Error, PartialEq)]
-    #[error("Dummy")]
-    struct DummyError;
-    impl OpEnum for DummyEnum {
-        type Description = &'static str;
 
+    impl OpEnum for DummyEnum {
         fn def_signature(&self) -> SignatureFunc {
             FunctionType::new_endo(type_row![]).into()
-        }
-
-        fn description(&self) -> Self::Description {
-            "dummy"
         }
 
         fn from_op_def(_op_def: &OpDef, _args: &[TypeArg]) -> Result<Self, OpLoadError> {
@@ -221,18 +212,19 @@ mod test {
             o
         );
 
+        let registry = ExtensionRegistry::try_new([e.to_owned()]).unwrap();
+        let registered = o.clone().to_registered(ext_name, &registry);
         assert_eq!(
-            DummyEnum::from_optype(
-                &o.clone()
-                    .to_registered(
-                        ext_name,
-                        &ExtensionRegistry::try_new([e.to_owned()]).unwrap()
-                    )
-                    .to_optype()
-                    .unwrap()
-            )
-            .unwrap(),
+            DummyEnum::from_optype(&registered.to_optype().unwrap()).unwrap(),
             o
         );
+        assert_eq!(
+            registered.function_type().unwrap(),
+            FunctionType::new_endo(type_row![])
+        );
+
+        assert_eq!(registered.description(), "Dumb");
+
+        assert_eq!(registered.to_inner(), o);
     }
 }

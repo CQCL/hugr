@@ -441,7 +441,7 @@ impl Extension {
         &mut self,
         op: &(impl super::simple_op::OpEnum + OpName),
     ) -> Result<&mut OpDef, ExtensionBuildError> {
-        let def = self.add_op(op.name(), op.description().to_string(), op.def_signature())?;
+        let def = self.add_op(op.name(), op.description(), op.def_signature())?;
 
         op.post_opdef(def);
 
