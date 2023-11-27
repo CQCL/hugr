@@ -211,6 +211,34 @@ impl SignatureFunc {
             SignatureFunc::CustomFunc(func) => func.static_params(),
         }
     }
+    pub fn compute_signature(
+        &self,
+        def: &OpDef,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+    ) -> Result<FunctionType, SignatureError> {
+        let temp: PolyFuncType;
+        let (pf, args) = match &self {
+            SignatureFunc::TypeScheme(custom) => {
+                custom.validate.validate(args, def, exts)?;
+                (&custom.poly_func, args)
+            }
+            SignatureFunc::CustomFunc(func) => {
+                let static_params = func.static_params();
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+
+                check_type_args(static_args, static_params)?;
+                temp = func.compute_signature(static_args, def, exts)?;
+                (&temp, other_args)
+            }
+        };
+
+        let res = pf.instantiate(args, exts)?;
+        // TODO bring this assert back once resource inference is done?
+        // https://github.com/CQCL-DEV/hugr/issues/425
+        // assert!(res.contains(self.extension()));
+        Ok(res)
+    }
 }
 
 impl Debug for SignatureFunc {
@@ -306,27 +334,7 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let temp: PolyFuncType;
-        let (pf, args) = match &self.signature_func {
-            SignatureFunc::TypeScheme(custom) => {
-                custom.validate.validate(args, self, exts)?;
-                (&custom.poly_func, args)
-            }
-            SignatureFunc::CustomFunc(func) => {
-                let static_params = func.static_params();
-                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
-
-                check_type_args(static_args, static_params)?;
-                temp = func.compute_signature(static_args, self, exts)?;
-                (&temp, other_args)
-            }
-        };
-
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL-DEV/hugr/issues/425
-        // assert!(res.contains(self.extension()));
-        Ok(res)
+        self.signature_func.compute_signature(self, args, exts)
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {

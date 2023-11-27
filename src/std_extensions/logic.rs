@@ -4,7 +4,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::{
     extension::{
-        prelude::BOOL_T, simple_op::OpEnum, ExtensionId, SignatureError, SignatureFromArgs,
+        prelude::BOOL_T, simple_op::OpEnum, ExtensionId, OpDef, SignatureError, SignatureFromArgs,
         SignatureFunc,
     },
     ops, type_row,
@@ -23,40 +23,60 @@ pub const FALSE_NAME: &str = "FALSE";
 pub const TRUE_NAME: &str = "TRUE";
 
 /// Logic extension operations.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
 pub enum LogicOp {
-    And,
-    Or,
+    And(u64),
+    Or(u64),
     Not,
 }
 
 /// Error in trying to load logic operation.
 #[derive(Debug, Error)]
-#[error("Not a logic extension operation.")]
-pub struct NotLogicOp;
+pub enum LogicOpLoadError {
+    #[error("Not a logic extension operation.")]
+    NotLogicOp,
+    #[error("Type args invalid: {0}.")]
+    InvalidArgs(#[from] SignatureError),
+}
 
 impl OpEnum for LogicOp {
-    const EXTENSION_ID: ExtensionId = EXTENSION_ID;
-    type LoadError = NotLogicOp;
+    type LoadError = LogicOpLoadError;
     type Description = &'static str;
 
-    fn from_extension_name(op_name: &str) -> Result<Self, NotLogicOp> {
-        Self::from_str(op_name).map_err(|_| NotLogicOp)
+    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, Self::LoadError> {
+        let mut out = Self::from_str(op_def.name()).map_err(|_| LogicOpLoadError::NotLogicOp)?;
+        match &mut out {
+            LogicOp::And(i) | LogicOp::Or(i) => {
+                let [TypeArg::BoundedNat { n }] = *args else {
+                    return Err(SignatureError::InvalidTypeArgs.into());
+                };
+                *i = n;
+            }
+            LogicOp::Not => (),
+        }
+
+        Ok(out)
     }
 
-    fn signature(&self) -> SignatureFunc {
+    fn def_signature(&self) -> SignatureFunc {
         match self {
-            LogicOp::Or | LogicOp::And => logic_op_sig().into(),
+            LogicOp::Or(_) | LogicOp::And(_) => logic_op_sig().into(),
             LogicOp::Not => FunctionType::new_endo(type_row![BOOL_T]).into(),
         }
     }
 
     fn description(&self) -> &'static str {
         match self {
-            LogicOp::And => "logical 'and'",
-            LogicOp::Or => "logical 'or'",
+            LogicOp::And(_) => "logical 'and'",
+            LogicOp::Or(_) => "logical 'or'",
             LogicOp::Not => "logical 'not'",
+        }
+    }
+    fn type_args(&self) -> Vec<TypeArg> {
+        match self {
+            LogicOp::And(n) | LogicOp::Or(n) => vec![TypeArg::BoundedNat { n: *n }],
+            LogicOp::Not => vec![],
         }
     }
 }
@@ -107,15 +127,18 @@ lazy_static! {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use super::{extension, LogicOp, EXTENSION, EXTENSION_ID, FALSE_NAME, TRUE_NAME};
     use crate::{
-        extension::{prelude::BOOL_T, simple_op::OpEnum, EMPTY_REG},
+        extension::{prelude::BOOL_T, simple_op::OpEnum, ExtensionRegistry},
         ops::OpType,
-        types::type_param::TypeArg,
+        types::TypeArg,
         Extension,
     };
-
-    use super::{extension, LogicOp, EXTENSION, FALSE_NAME, TRUE_NAME};
-
+    use lazy_static::lazy_static;
+    lazy_static! {
+        pub(crate) static ref LOGIC_REG: ExtensionRegistry =
+            ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+    }
     #[test]
     fn test_logic_extension() {
         let r: Extension = extension();
@@ -124,7 +147,12 @@ pub(crate) mod test {
 
         for op in LogicOp::all_variants() {
             assert_eq!(
-                LogicOp::try_from_op_def(r.get_op(op.name()).unwrap()).unwrap(),
+                LogicOp::from_op_def(
+                    r.get_op(op.name()).unwrap(),
+                    // `all_variants` will set default type arg values.
+                    &[TypeArg::BoundedNat { n: 0 }]
+                )
+                .unwrap(),
                 op
             );
         }
@@ -144,20 +172,25 @@ pub(crate) mod test {
 
     /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> OpType {
-        LogicOp::And
-            .to_optype(&EXTENSION, &[TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
+        LogicOp::And(2)
+            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
+            .to_optype()
             .unwrap()
     }
 
     /// Generate a logic extension and "or" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn or_op() -> OpType {
-        LogicOp::Or
-            .to_optype(&EXTENSION, &[TypeArg::BoundedNat { n: 2 }], &EMPTY_REG)
+        LogicOp::Or(2)
+            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
+            .to_optype()
             .unwrap()
     }
 
     /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn not_op() -> OpType {
-        LogicOp::Not.to_optype(&EXTENSION, &[], &EMPTY_REG).unwrap()
+        LogicOp::Not
+            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
+            .to_optype()
+            .unwrap()
     }
 }
