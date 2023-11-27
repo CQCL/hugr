@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use smol_str::SmolStr;
 
+use super::simple_op::OpEnum;
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
 };
@@ -212,6 +213,18 @@ impl SignatureFunc {
             SignatureFunc::CustomFunc(func) => func.static_params(),
         }
     }
+
+    /// Compute the concrete signature ([FunctionType]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if is [SignatureFunc::CustomFunc] and there are not enough type
+    /// arguments provided to match the number of static parameters.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type arguments are invalid or
+    /// there is some error in type computation.
     pub fn compute_signature(
         &self,
         def: &OpDef,
@@ -437,9 +450,11 @@ impl Extension {
         }
     }
 
+    /// Add an operation implemented as an [OpEnum], which can provide the data
+    /// required to define an [OpDef].
     pub fn add_op_enum(
         &mut self,
-        op: &(impl super::simple_op::OpEnum + OpName),
+        op: &(impl OpEnum + OpName),
     ) -> Result<&mut OpDef, ExtensionBuildError> {
         let def = self.add_op(op.name(), op.description(), op.def_signature())?;
 

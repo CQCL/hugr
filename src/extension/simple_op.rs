@@ -71,6 +71,8 @@ pub trait OpEnum: OpName {
         Self::from_op_def(ext.def(), ext.args()).ok()
     }
 
+    /// Given the ID of the extension this operation is defined in, and a
+    /// registry containing that extension, return a [RegisteredEnum].
     fn to_registered(
         self,
         extension_id: ExtensionId,
