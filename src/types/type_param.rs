@@ -34,6 +34,7 @@ impl UpperBound {
 /// that must be provided by each operation node.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
+#[serde(tag = "typ")]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
     Type(TypeBound),
