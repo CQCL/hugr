@@ -247,10 +247,10 @@ pub(crate) mod test {
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let tyvar = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Any));
+        let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncType::new_validated(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new(vec![list_of_var], vec![USIZE_T]),
             &REGISTRY,
         )?;
@@ -278,7 +278,7 @@ pub(crate) mod test {
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
-        let typarams = [TypeParam::max_nat(), TypeParam::Type(TypeBound::Any)];
+        let typarams = [TypeParam::max_nat(), TypeBound::Any.into()];
         let [tyvar, szvar] =
             [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));
 
@@ -333,21 +333,25 @@ pub(crate) mod test {
     #[test]
     fn test_misused_variables() -> Result<(), SignatureError> {
         // Variables in args have different bounds from variable declaration
-        let tv = TypeArg::new_var_use(0, TypeParam::Type(TypeBound::Copyable));
+        let tv = TypeArg::new_var_use(0, TypeBound::Copyable.into());
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::Extensions,
-            TypeParam::List(Box::new(TypeParam::max_nat())),
-            TypeParam::Opaque(USIZE_CUSTOM_T),
-            TypeParam::Tuple(vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()]),
+            TypeParam::List {
+                param: Box::new(TypeParam::max_nat()),
+            },
+            TypeParam::Opaque { ty: USIZE_CUSTOM_T },
+            TypeParam::Tuple {
+                params: vec![TypeBound::Any.into(), TypeParam::max_nat()],
+            },
         ] {
             let invalid_ts =
                 PolyFuncType::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: TypeParam::Type(TypeBound::Copyable),
+                    cached: TypeBound::Copyable.into(),
                     actual: decl
                 })
             );
@@ -416,15 +420,14 @@ pub(crate) mod test {
     #[test]
     fn test_bound_covariance() -> Result<(), SignatureError> {
         decl_accepts_rejects_var(
-            TypeParam::Type(TypeBound::Copyable),
-            &[
-                TypeParam::Type(TypeBound::Copyable),
-                TypeParam::Type(TypeBound::Eq),
-            ],
-            &[TypeParam::Type(TypeBound::Any)],
+            TypeBound::Copyable.into(),
+            &[TypeBound::Copyable.into(), TypeBound::Eq.into()],
+            &[TypeBound::Any.into()],
         )?;
 
-        let list_of_tys = |b| TypeParam::List(Box::new(TypeParam::Type(b)));
+        let list_of_tys = |b: TypeBound| TypeParam::List {
+            param: Box::new(b.into()),
+        };
         decl_accepts_rejects_var(
             list_of_tys(TypeBound::Copyable),
             &[list_of_tys(TypeBound::Copyable), list_of_tys(TypeBound::Eq)],
@@ -457,7 +460,7 @@ pub(crate) mod test {
     fn partial_instantiate() -> Result<(), SignatureError> {
         // forall A,N.(Array<A,N> -> A)
         let array_max = PolyFuncType::new_validated(
-            vec![TypeParam::Type(TypeBound::Any), TypeParam::max_nat()],
+            vec![TypeBound::Any.into(), TypeParam::max_nat()],
             FunctionType::new(
                 vec![array_type(
                     TypeArg::new_var_use(1, TypeParam::max_nat()),
@@ -509,11 +512,11 @@ pub(crate) mod test {
     // forall A. A -> (forall C. C -> List(Tuple(C, A))
     pub(crate) fn nested_func() -> PolyFuncType {
         PolyFuncType::new_validated(
-            vec![TypeParam::Type(TypeBound::Any)],
+            vec![TypeBound::Any.into()],
             FunctionType::new(
                 vec![Type::new_var_use(0, TypeBound::Any)],
                 vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
+                    TypeBound::Copyable.into(),
                     Type::new_var_use(0, TypeBound::Copyable),
                     list_of_tup(
                         Type::new_var_use(0, TypeBound::Copyable),
@@ -535,7 +538,7 @@ pub(crate) mod test {
         let outer_applied = FunctionType::new(
             vec![arg.clone()], // This had index 0, but is replaced
             vec![Type::new_function(new_pf1(
-                TypeParam::Type(TypeBound::Copyable),
+                TypeBound::Copyable.into(),
                 // We are checking that the substitution has been applied to the right var
                 // - NOT to the inner_var which has index 0 here
                 Type::new_var_use(0, TypeBound::Copyable),
@@ -557,7 +560,7 @@ pub(crate) mod test {
 
         // Now substitute in a free var from further outside
         const FREE: usize = 3;
-        const TP_EQ: TypeParam = TypeParam::Type(TypeBound::Eq);
+        const TP_EQ: TypeParam = TypeParam::Type { b: TypeBound::Eq };
         let res = outer
             .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &REGISTRY)
             .unwrap();
@@ -567,7 +570,7 @@ pub(crate) mod test {
             FunctionType::new(
                 vec![Type::new_var_use(FREE, TypeBound::Eq)],
                 vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
+                    TypeBound::Copyable.into(),
                     Type::new_var_use(0, TypeBound::Copyable), // unchanged
                     list_of_tup(
                         Type::new_var_use(0, TypeBound::Copyable),
@@ -600,7 +603,7 @@ pub(crate) mod test {
                 vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
                 // Output: forall C. C -> List(Tuple(C, Input))
                 vec![Type::new_function(new_pf1(
-                    TypeParam::Type(TypeBound::Copyable),
+                    TypeBound::Copyable.into(),
                     Type::new_var_use(0, TypeBound::Copyable),
                     list_of_tup(
                         Type::new_var_use(0, TypeBound::Copyable), // not renumbered...

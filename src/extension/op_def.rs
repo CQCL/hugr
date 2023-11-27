@@ -457,7 +457,7 @@ mod test {
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let mut e = Extension::new(EXT_ID);
-        const TP: TypeParam = TypeParam::Type(TypeBound::Any);
+        const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
@@ -501,7 +501,7 @@ mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncType, SignatureError> {
-                const TP: TypeParam = TypeParam::Type(TypeBound::Any);
+                const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
                 let [TypeArg::BoundedNat { n }] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
@@ -546,12 +546,12 @@ mod test {
                 vec![Type::new_tuple(tyvars)]
             ))
         );
-        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeParam::Type(TypeBound::Eq)])
+        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
             .unwrap();
 
         // quick sanity check that we are validating the args - note changed bound:
         assert_eq!(
-            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeParam::Type(TypeBound::Any)]),
+            def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
             Err(SignatureError::TypeVarDoesNotMatchDeclaration {
                 actual: TypeBound::Any.into(),
                 cached: TypeBound::Eq.into()
@@ -587,7 +587,7 @@ mod test {
             "SimpleOp".into(),
             "".into(),
             PolyFuncType::new(
-                vec![TypeParam::Type(TypeBound::Any)],
+                vec![TypeBound::Any.into()],
                 FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;

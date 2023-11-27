@@ -312,9 +312,7 @@ impl Type {
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
             TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
-            TypeEnum::Variable(idx, bound) => {
-                check_typevar_decl(var_decls, *idx, &TypeParam::Type(*bound))
-            }
+            TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
         }
     }
 
@@ -337,7 +335,7 @@ impl Type {
 pub(crate) trait Substitution {
     /// Apply to a variable of kind [TypeParam::Type]
     fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type(bound)) else {
+        let TypeArg::Type { ty } = self.apply_var(idx, &bound.into()) else {
             panic!("Variable was not a type - try validate() first")
         };
         ty
