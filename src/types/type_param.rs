@@ -47,6 +47,7 @@ impl UpperBound {
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
+#[serde(tag = "typ")]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
     Type(TypeBound),
