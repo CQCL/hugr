@@ -157,6 +157,13 @@ impl From<ExtensionOp> for LeafOp {
     }
 }
 
+impl From<ExtensionOp> for OpType {
+    fn from(value: ExtensionOp) -> Self {
+        let leaf: LeafOp = value.into();
+        leaf.into()
+    }
+}
+
 impl PartialEq for ExtensionOp {
     fn eq(&self, other: &Self) -> bool {
         Arc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args

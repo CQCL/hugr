@@ -6,12 +6,10 @@ use std::sync::Arc;
 
 use smol_str::SmolStr;
 
-use super::simple_op::OpEnum;
 use super::{
     Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
 };
 
-use crate::ops::OpName;
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
@@ -448,19 +446,6 @@ impl Extension {
             // Just made the arc so should only be one reference to it, can get_mut,
             Entry::Vacant(ve) => Ok(Arc::get_mut(ve.insert(Arc::new(op))).unwrap()),
         }
-    }
-
-    /// Add an operation implemented as an [OpEnum], which can provide the data
-    /// required to define an [OpDef].
-    pub fn add_op_enum(
-        &mut self,
-        op: &(impl OpEnum + OpName),
-    ) -> Result<&mut OpDef, ExtensionBuildError> {
-        let def = self.add_op(op.name(), op.description(), op.def_signature())?;
-
-        op.post_opdef(def);
-
-        Ok(def)
     }
 }
 

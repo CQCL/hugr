@@ -4,8 +4,8 @@ use smol_str::SmolStr;
 use strum::IntoEnumIterator;
 
 use crate::{
-    ops::{custom::ExtensionOp, LeafOp, OpName, OpType},
-    types::{FunctionType, TypeArg},
+    ops::{custom::ExtensionOp, OpName, OpType},
+    types::TypeArg,
     Extension,
 };
 
@@ -16,13 +16,13 @@ use super::{
 use delegate::delegate;
 use thiserror::Error;
 
-/// Error loading [OpEnum]
+/// Error loading operation.
 #[derive(Debug, Error, PartialEq)]
 #[error("{0}")]
 #[allow(missing_docs)]
 pub enum OpLoadError {
-    #[error("Op with name {0} is not a member of this enum.")]
-    NotEnumMember(String),
+    #[error("Op with name {0} is not a member of this set.")]
+    NotMember(String),
     #[error("Type args invalid: {0}.")]
     InvalidArgs(#[from] SignatureError),
 }
@@ -36,65 +36,34 @@ where
         s.into()
     }
 }
-/// A trait that operation sets defined by simple (C-style) enums can implement
-/// to simplify interactions with the extension.
-/// Relies on `strum_macros::{EnumIter, EnumString, IntoStaticStr}`
-pub trait OpEnum: OpName {
+
+/// Traits implemented by types which can add themselves to [`Extension`]s as
+/// [`OpDef`]s or load themselves from an [`OpDef`]
+pub trait MakeOpDef: OpName {
     /// Try to load one of the operations of this set from an [OpDef].
-    fn from_op_def(op_def: &OpDef, args: &[TypeArg]) -> Result<Self, OpLoadError>
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
         Self: Sized;
 
     /// Return the signature (polymorphic function type) of the operation.
-    fn def_signature(&self) -> SignatureFunc;
+    fn signature(&self) -> SignatureFunc;
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
         self.name().to_string()
     }
 
-    /// Any type args which define this operation. Default is no type arguments.
-    fn type_args(&self) -> Vec<TypeArg> {
-        vec![]
-    }
-
     /// Edit the opdef before finalising. By default does nothing.
     fn post_opdef(&self, _def: &mut OpDef) {}
 
-    /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
-    /// an [ExtensionOp] and loads from the name.
-    fn from_optype(op: &OpType) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        let ext: &ExtensionOp = op.as_leaf_op()?.as_extension_op()?;
-        Self::from_op_def(ext.def(), ext.args()).ok()
-    }
+    /// Add an operation implemented as an [MakeOpDef], which can provide the data
+    /// required to define an [OpDef], to an extension.
+    fn add_to_extension(&self, extension: &mut Extension) -> Result<(), ExtensionBuildError> {
+        let def = extension.add_op(self.name(), self.description(), self.signature())?;
 
-    /// Given the ID of the extension this operation is defined in, and a
-    /// registry containing that extension, return a [RegisteredEnum].
-    fn to_registered(
-        self,
-        extension_id: ExtensionId,
-        registry: &ExtensionRegistry,
-    ) -> RegisteredEnum<'_, Self>
-    where
-        Self: Sized,
-    {
-        RegisteredEnum {
-            extension_id,
-            registry,
-            op_enum: self,
-        }
-    }
+        self.post_opdef(def);
 
-    /// Iterator over all operations in the set. Non-trivial variants will have
-    /// default values used for the members.
-    fn all_variants() -> <Self as IntoEnumIterator>::Iterator
-    where
-        Self: IntoEnumIterator,
-    {
-        <Self as IntoEnumIterator>::iter()
+        Ok(())
     }
 
     /// load all variants of a [OpEnum] in to an extension as op defs.
@@ -102,10 +71,64 @@ pub trait OpEnum: OpName {
     where
         Self: IntoEnumIterator,
     {
-        for op in Self::all_variants() {
-            extension.add_op_enum(&op)?;
+        for op in Self::iter() {
+            op.add_to_extension(extension)?;
         }
         Ok(())
+    }
+}
+
+/// Traits implemented by types which can be loaded from [`ExtensionOp`]s,
+/// i.e. concrete instances of [`OpDef`]s, with defined type arguments.
+pub trait MakeExtensionOp: OpName {
+    /// Try to load one of the operations of this set from an [OpDef].
+    fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized;
+    /// Try to instantiate a variant from an [OpType]. Default behaviour assumes
+    /// an [ExtensionOp] and loads from the name.
+    fn from_optype(op: &OpType) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        let ext: &ExtensionOp = op.as_leaf_op()?.as_extension_op()?;
+        Self::from_extension_op(ext).ok()
+    }
+
+    /// Any type args which define this operation.
+    fn type_args(&self) -> Vec<TypeArg>;
+
+    /// Given the ID of the extension this operation is defined in, and a
+    /// registry containing that extension, return a [RegisteredEnum].
+    fn to_registered(
+        self,
+        extension_id: ExtensionId,
+        registry: &ExtensionRegistry,
+    ) -> RegisteredOp<'_, Self>
+    where
+        Self: Sized,
+    {
+        RegisteredOp {
+            extension_id,
+            registry,
+            op: self,
+        }
+    }
+}
+
+/// Blanket implementation for non-polymorphic operations - no type parameters.
+impl<T: MakeOpDef> MakeExtensionOp for T {
+    #[inline]
+    fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        Self::from_def(ext_op.def())
+    }
+
+    #[inline]
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![]
     }
 }
 
@@ -114,33 +137,33 @@ pub trait OpEnum: OpName {
 /// See [strum_macros::EnumString].
 pub fn try_from_name<T>(name: &str) -> Result<T, OpLoadError>
 where
-    T: std::str::FromStr + OpEnum,
+    T: std::str::FromStr + MakeOpDef,
 {
-    T::from_str(name).map_err(|_| OpLoadError::NotEnumMember(name.to_string()))
+    T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))
 }
 
 /// Wrap an [OpEnum] with an extension registry to allow type computation.
 /// Generate from [OpEnum::to_registered]
-pub struct RegisteredEnum<'r, T> {
+pub struct RegisteredOp<'r, T> {
     /// The name of the extension these ops belong to.
     extension_id: ExtensionId,
     /// A registry of all extensions, used for type computation.
     registry: &'r ExtensionRegistry,
     /// The inner [OpEnum]
-    op_enum: T,
+    op: T,
 }
 
-impl<T> RegisteredEnum<'_, T> {
+impl<T> RegisteredOp<'_, T> {
     /// Extract the inner wrapped value
     pub fn to_inner(self) -> T {
-        self.op_enum
+        self.op
     }
 }
 
-impl<T: OpEnum> RegisteredEnum<'_, T> {
+impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
     /// Generate an [OpType].
-    pub fn to_optype(&self) -> Option<OpType> {
-        let leaf: LeafOp = ExtensionOp::new(
+    pub fn to_extension_op(&self) -> Option<ExtensionOp> {
+        ExtensionOp::new(
             self.registry
                 .get(&self.extension_id)?
                 .get_op(&self.name())?
@@ -148,33 +171,15 @@ impl<T: OpEnum> RegisteredEnum<'_, T> {
             self.type_args(),
             self.registry,
         )
-        .ok()?
-        .into();
-
-        Some(leaf.into())
-    }
-
-    /// Compute the [FunctionType] for this operation, instantiating with type arguments.
-    pub fn function_type(&self) -> Result<FunctionType, SignatureError> {
-        self.op_enum.def_signature().compute_signature(
-            self.registry
-                .get(&self.extension_id)
-                .expect("should return 'Extension not in registry' error here.")
-                .get_op(&self.name())
-                .expect("should return 'Op not in extension' error here."),
-            &self.type_args(),
-            self.registry,
-        )
+        .ok()
     }
 
     delegate! {
-        to self.op_enum {
+        to self.op {
             /// Name of the operation - derived from strum serialization.
             pub fn name(&self) -> SmolStr;
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
-            /// Description of the operation.
-            pub fn description(&self) -> String;
         }
     }
 }
@@ -190,12 +195,12 @@ mod test {
         Dumb,
     }
 
-    impl OpEnum for DummyEnum {
-        fn def_signature(&self) -> SignatureFunc {
+    impl MakeOpDef for DummyEnum {
+        fn signature(&self) -> SignatureFunc {
             FunctionType::new_endo(type_row![]).into()
         }
 
-        fn from_op_def(_op_def: &OpDef, _args: &[TypeArg]) -> Result<Self, OpLoadError> {
+        fn from_def(_op_def: &OpDef) -> Result<Self, OpLoadError> {
             Ok(Self::Dumb)
         }
     }
@@ -207,25 +212,18 @@ mod test {
         let ext_name = ExtensionId::new("dummy").unwrap();
         let mut e = Extension::new(ext_name.clone());
 
-        e.add_op_enum(&o).unwrap();
-
+        o.add_to_extension(&mut e).unwrap();
         assert_eq!(
-            DummyEnum::from_op_def(e.get_op(&o.name()).unwrap(), &[]).unwrap(),
+            DummyEnum::from_def(e.get_op(&o.name()).unwrap()).unwrap(),
             o
         );
 
         let registry = ExtensionRegistry::try_new([e.to_owned()]).unwrap();
         let registered = o.clone().to_registered(ext_name, &registry);
         assert_eq!(
-            DummyEnum::from_optype(&registered.to_optype().unwrap()).unwrap(),
+            DummyEnum::from_optype(&registered.to_extension_op().unwrap().into()).unwrap(),
             o
         );
-        assert_eq!(
-            registered.function_type().unwrap(),
-            FunctionType::new_endo(type_row![])
-        );
-
-        assert_eq!(registered.description(), "Dumb");
 
         assert_eq!(registered.to_inner(), o);
     }
