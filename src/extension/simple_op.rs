@@ -110,10 +110,14 @@ pub trait OpEnum: FromStr + IntoEnumIterator + IntoStaticSt {
     }
 }
 
+/// Wrap an [OpEnum] with an extension registry to allow type computation.
+/// Generate from [OpEnum::to_registered]
 pub struct RegisteredEnum<'r, T> {
     /// The name of the extension these ops belong to.
     extension_id: ExtensionId,
+    /// A registry of all extensions, used for type computation.
     registry: &'r ExtensionRegistry,
+    /// The inner [OpEnum]
     op_enum: T,
 }
 
@@ -134,6 +138,7 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
         Some(leaf.into())
     }
 
+    /// Compute the [FunctionType] for this operation, instantiating with type arguments.
     pub fn function_type(&self) -> Result<FunctionType, SignatureError> {
         self.op_enum.def_signature().compute_signature(
             self.registry
@@ -147,8 +152,11 @@ impl<'a, T: OpEnum> RegisteredEnum<'a, T> {
     }
     delegate! {
         to self.op_enum {
+            /// Name of the operation - derived from strum serialization.
             pub fn name(&self) -> &str;
+            /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
+            /// Description of the operation.
             pub fn description(&self) -> T::Description;
         }
     }
