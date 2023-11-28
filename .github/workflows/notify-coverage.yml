@@ -103,7 +103,7 @@ jobs:
         if: steps.get_coverage.outputs.should_notify == 'true'
         run: |
           prev=`cat coverage-prev.txt`
-          current=`cat coverage-prev.txt`
+          current=`cat coverage.txt`
           change=`printf "%.2f%% --> %.2f%%" $prev $current`
           codecov="https://codecov.io/gh/${{ github.repository }}?search=&trend=7%20days"
           if (( $(echo "$prev < $current + 0.04" | bc -l) ))

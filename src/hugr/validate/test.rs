@@ -654,7 +654,7 @@ fn invalid_types() {
     let mut e = Extension::new(name.clone());
     e.add_type(
         "MyContainer".into(),
-        vec![TypeParam::Type(TypeBound::Copyable)],
+        vec![TypeBound::Copyable.into()],
         "".into(),
         TypeDefBound::Explicit(TypeBound::Any),
     )
@@ -692,7 +692,7 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
-            param: TypeParam::Type(TypeBound::Copyable),
+            param: TypeBound::Copyable.into(),
             arg: TypeArg::Type { ty: valid }
         })
     );
@@ -796,7 +796,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
@@ -806,7 +806,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
     )?;
@@ -816,7 +816,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
@@ -867,7 +867,9 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections;
-    const BOUND: TypeParam = TypeParam::Type(TypeBound::Copyable);
+    const BOUND: TypeParam = TypeParam::Type {
+        b: TypeBound::Copyable,
+    };
     let list_of_var = Type::new_extension(
         collections::EXTENSION
             .get_type(&collections::LIST_TYPENAME)

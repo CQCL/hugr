@@ -47,18 +47,34 @@ impl UpperBound {
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
+#[serde(tag = "tp")]
 pub enum TypeParam {
     /// Argument is a [TypeArg::Type].
-    Type(TypeBound),
+    Type {
+        /// Bound for the type parameter.
+        b: TypeBound,
+    },
     /// Argument is a [TypeArg::BoundedNat] that is less than the upper bound.
-    BoundedNat(UpperBound),
+    BoundedNat {
+        /// Upper bound for the Nat parameter.
+        bound: UpperBound,
+    },
     /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
-    Opaque(CustomType),
+    Opaque {
+        /// The [CustomType] defining the parameter.
+        ty: CustomType,
+    },
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
-    List(Box<TypeParam>),
+    List {
+        /// The [TypeParam] contained in the list.
+        param: Box<TypeParam>,
+    },
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
-    #[display(fmt = "Tuple({})", "_0.iter().map(|t|t.to_string()).join(\", \")")]
-    Tuple(Vec<TypeParam>),
+    #[display(fmt = "Tuple({})", "params.iter().map(|t|t.to_string()).join(\", \")")]
+    Tuple {
+        /// The [TypeParam]s contained in the tuple.
+        params: Vec<TypeParam>,
+    },
     /// Argument is a [TypeArg::Extensions]. A set of [ExtensionId]s.
     ///
     /// [ExtensionId]: crate::extension::ExtensionId
@@ -68,21 +84,27 @@ pub enum TypeParam {
 impl TypeParam {
     /// [`TypeParam::BoundedNat`] with the maximum bound (`u64::MAX` + 1)
     pub const fn max_nat() -> Self {
-        Self::BoundedNat(UpperBound(None))
+        Self::BoundedNat {
+            bound: UpperBound(None),
+        }
     }
 
     /// [`TypeParam::BoundedNat`] with the stated upper bound (non-exclusive)
     pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
-        Self::BoundedNat(UpperBound(Some(upper_bound)))
+        Self::BoundedNat {
+            bound: UpperBound(Some(upper_bound)),
+        }
     }
 
     fn contains(&self, other: &TypeParam) -> bool {
         match (self, other) {
-            (TypeParam::Type(b1), TypeParam::Type(b2)) => b1.contains(*b2),
-            (TypeParam::BoundedNat(b1), TypeParam::BoundedNat(b2)) => b1.contains(b2),
-            (TypeParam::Opaque(c1), TypeParam::Opaque(c2)) => c1 == c2,
-            (TypeParam::List(e1), TypeParam::List(e2)) => e1.contains(e2),
-            (TypeParam::Tuple(es1), TypeParam::Tuple(es2)) => {
+            (TypeParam::Type { b: b1 }, TypeParam::Type { b: b2 }) => b1.contains(*b2),
+            (TypeParam::BoundedNat { bound: b1 }, TypeParam::BoundedNat { bound: b2 }) => {
+                b1.contains(b2)
+            }
+            (TypeParam::Opaque { ty: c1 }, TypeParam::Opaque { ty: c2 }) => c1 == c2,
+            (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
+            (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
             }
             (TypeParam::Extensions, TypeParam::Extensions) => true,
@@ -93,7 +115,13 @@ impl TypeParam {
 
 impl From<TypeBound> for TypeParam {
     fn from(bound: TypeBound) -> Self {
-        Self::Type(bound)
+        Self::Type { b: bound }
+    }
+}
+
+impl From<Type> for TypeArg {
+    fn from(ty: Type) -> Self {
+        Self::Type { ty }
     }
 }
 
@@ -149,7 +177,7 @@ impl TypeArg {
     /// `bound` must match that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
-            TypeParam::Type(b) => TypeArg::Type {
+            TypeParam::Type { b } => TypeArg::Type {
                 ty: Type::new_var_use(idx, b),
             },
             TypeParam::Extensions => TypeArg::Extensions {
@@ -250,15 +278,15 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             },
             _,
         ) if param.contains(cached_decl) => Ok(()),
-        (TypeArg::Type { ty }, TypeParam::Type(bound))
+        (TypeArg::Type { ty }, TypeParam::Type { b: bound })
             if bound.contains(ty.least_upper_bound()) =>
         {
             Ok(())
         }
-        (TypeArg::Sequence { elems }, TypeParam::List(param)) => {
+        (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
             elems.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
-        (TypeArg::Sequence { elems: items }, TypeParam::Tuple(types)) => {
+        (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
             } else {
@@ -268,13 +296,13 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                     .try_for_each(|(arg, param)| check_type_arg(arg, param))
             }
         }
-        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat(bound))
+        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat { bound })
             if bound.valid_value(*val) =>
         {
             Ok(())
         }
 
-        (TypeArg::Opaque { arg }, TypeParam::Opaque(param))
+        (TypeArg::Opaque { arg }, TypeParam::Opaque { ty: param })
             if param.bound() == TypeBound::Eq && &arg.typ == param =>
         {
             Ok(())

@@ -58,26 +58,25 @@ pub(crate) mod test_quantum_extension {
         let mut extension = Extension::new(EXTENSION_ID);
 
         extension
-            .add_op_type_scheme_simple(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
+            .add_op(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
             .unwrap();
         extension
-            .add_op_type_scheme_simple(
+            .add_op(
                 SmolStr::new_inline("RzF64"),
                 "Rotation specified by float".into(),
-                FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T])
-                    .into(),
+                FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
             )
             .unwrap();
 
         extension
-            .add_op_type_scheme_simple(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
+            .add_op(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
             .unwrap();
 
         extension
-            .add_op_type_scheme_simple(
+            .add_op(
                 SmolStr::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-                FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]).into(),
+                FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
             )
             .unwrap();
 

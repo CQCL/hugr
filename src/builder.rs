@@ -2,9 +2,6 @@
 //!
 use thiserror::Error;
 
-#[cfg(feature = "pyo3")]
-use pyo3::{create_exception, exceptions::PyException, PyErr};
-
 use crate::extension::SignatureError;
 use crate::hugr::{HugrError, ValidationError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
@@ -82,21 +79,6 @@ pub enum BuildError {
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
-}
-
-#[cfg(feature = "pyo3")]
-create_exception!(
-    pyrs,
-    PyBuildError,
-    PyException,
-    "Errors that can occur while building a Hugr"
-);
-
-#[cfg(feature = "pyo3")]
-impl From<BuildError> for PyErr {
-    fn from(err: BuildError) -> Self {
-        PyBuildError::new_err(err.to_string())
-    }
 }
 
 #[cfg(test)]

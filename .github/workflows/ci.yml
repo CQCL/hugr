@@ -17,19 +17,19 @@ env:
   RUSTFLAGS: "--cfg=ci_run"
   MIRIFLAGS: '-Zmiri-permissive-provenance' # Required due to warnings in bitvec 1.0.1
   CI: true # insta snapshots behave differently on ci
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v0
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
@@ -44,11 +44,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v0
       - name: Build benchmarks with no features
         run: cargo bench --verbose --no-run --no-default-features
       - name: Build benchmarks with all features
@@ -73,15 +71,13 @@ jobs:
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v0-rust-${{ matrix.rust }}
       - name: Build with no features
         run: cargo test --verbose --no-default-features --no-run
       - name: Tests with no features
