@@ -38,7 +38,9 @@ where
 }
 
 /// Traits implemented by types which can add themselves to [`Extension`]s as
-/// [`OpDef`]s or load themselves from an [`OpDef`]
+/// [`OpDef`]s or load themselves from an [`OpDef`].
+/// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
+/// as then all definitions can be added to an extension at once.
 pub trait MakeOpDef: OpName {
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
