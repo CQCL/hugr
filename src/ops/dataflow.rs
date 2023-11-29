@@ -3,7 +3,7 @@
 use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::ExtensionSet;
-use crate::ops::StaticTag;
+use crate::ops::{Const, StaticTag};
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 use crate::IncomingPort;
 
@@ -193,6 +193,8 @@ impl DataflowOpTrait for CallIndirect {
 pub struct LoadConstant {
     /// Constant type
     pub datatype: Type,
+    /// The extension this constant comes from
+    pub extensions: ExtensionSet,
 }
 impl_op_name!(LoadConstant);
 impl DataflowOpTrait for LoadConstant {
@@ -204,6 +206,7 @@ impl DataflowOpTrait for LoadConstant {
 
     fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
+            .with_extension_delta(&self.extensions)
     }
 }
 impl LoadConstant {
@@ -217,6 +220,15 @@ impl LoadConstant {
     #[inline]
     pub fn constant_port(&self) -> IncomingPort {
         0.into()
+    }
+
+    /// Create a LoadConstant from a Const op
+    #[inline]
+    pub fn from_const(cst: Const) -> Self {
+        LoadConstant {
+            datatype: cst.const_type().clone(),
+            extensions: cst.extensions().clone(),
+        }
     }
 }
 

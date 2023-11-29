@@ -1022,3 +1022,47 @@ fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
     assert_matches!(result, Err(ValidationError::CantInfer(..)));
     Ok(())
 }
+
+#[test]
+// Test of #695
+// A FuncDefn (inner) is created with two call nodes.
+// Extension inference will try to match the extensions for one of the call
+// sites, meaning the other will be a mismatch and this will fail.
+fn call_bug() -> Result<(), Box<dyn Error>> {
+    use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T};
+    use crate::values::Value;
+
+    let mut module = ModuleBuilder::new();
+    let mut outer = module.define_function("outer", FunctionType::new(vec![], vec![]).into())?;
+
+    let inner = outer.define_function("inner", FunctionType::new(vec![USIZE_T], vec![]).into())?;
+    let [w] = inner.input_wires_arr();
+    let f_id = inner.finish_with_outputs([w])?;
+
+    let int_value: Value = ConstUsize::new(42).into();
+    let constant_x = ops::Const::new(
+        int_value.clone(),
+        USIZE_T,
+        ExtensionSet::from_iter([PRELUDE_ID, A]),
+    )
+    .unwrap();
+    let constant_y =
+        ops::Const::new(int_value, USIZE_T, ExtensionSet::from_iter([PRELUDE_ID, B])).unwrap();
+    let const_x_id = outer.add_constant(constant_x)?;
+    let const_x = outer.load_const(&const_x_id)?;
+    let const_y_id = outer.add_constant(constant_y)?;
+    let const_y = outer.load_const(&const_y_id)?;
+
+    outer
+        .call(f_id.handle(), &[], [const_x], &PRELUDE_REGISTRY)?
+        .node();
+    outer
+        .call(f_id.handle(), &[], [const_y], &PRELUDE_REGISTRY)?
+        .node();
+
+    outer.finish_with_outputs([])?;
+    module.finish_prelude_hugr()?;
+
+    Ok(())
+}

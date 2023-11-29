@@ -6,6 +6,7 @@ use std::iter;
 use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
 use petgraph::visit::{Topo, Walker};
+use portgraph::portgraph::NodePorts;
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 

@@ -70,12 +70,9 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(
-        &mut self,
-        constant: ops::Const,
-        extensions: impl Into<Option<ExtensionSet>>,
-    ) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant, extensions.into()))?;
+    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
+        let exts = constant.extensions().clone();
+        let const_n = self.add_child_node(NodeType::new_pure(constant))?;
 
         Ok(const_n.into())
     }
@@ -364,12 +361,7 @@ pub trait Dataflow: Container {
             .expect("ConstID does not refer to Const op.");
 
         let load_n = self.add_dataflow_node(
-            NodeType::new(
-                ops::LoadConstant {
-                    datatype: op.const_type().clone(),
-                },
-                input_extensions,
-            ),
+            NodeType::new(ops::LoadConstant::from_const(op.clone()), input_extensions),
             // Constant wire from the constant value node
             vec![Wire::new(const_node, OutgoingPort::from(0))],
         )?;
@@ -382,12 +374,8 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(
-        &mut self,
-        constant: ops::Const,
-        extensions: ExtensionSet,
-    ) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant, extensions)?;
+    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
+        let cid = self.add_constant(constant)?;
         self.load_const(&cid)
     }
 

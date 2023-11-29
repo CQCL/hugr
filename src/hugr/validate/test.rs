@@ -85,9 +85,9 @@ fn add_block_children(
     let output = b
         .add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
         .unwrap();
-    let tag_def = b.add_node_with_parent(b.root(), const_op).unwrap();
+    let tag_def = b.add_node_with_parent(b.root(), const_op.clone()).unwrap();
     let tag = b
-        .add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type })
+        .add_node_with_parent(parent, ops::LoadConstant::from_const(const_op))
         .unwrap();
 
     b.connect(tag_def, 0, tag, 0).unwrap();
@@ -430,8 +430,8 @@ fn test_local_const() -> Result<(), HugrError> {
         .typed_value()
         .clone();
     // Second input of Xor from a constant
-    let cst = h.add_node_with_parent(h.root(), const_op)?;
-    let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T })?;
+    let cst = h.add_node_with_parent(h.root(), const_op.clone())?;
+    let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant::from_const(const_op))?;
 
     h.connect(cst, 0, lcst, 0)?;
     h.connect(lcst, 0, and, 1)?;
@@ -903,7 +903,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     let empty_list = Value::Extension {
         c: (Box::new(collections::ListValue::new(vec![])),),
     };
-    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?, just_colns)?;
+    let cst = def.add_load_const(Const::new(empty_list, list_of_var, just_colns.clone())?)?;
     let res = def.finish_hugr_with_outputs([cst], &reg);
     assert_matches!(
         res.unwrap_err(),

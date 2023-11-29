@@ -440,3 +440,9 @@ impl FromIterator<ExtensionId> for ExtensionSet {
         Self(BTreeSet::from_iter(iter))
     }
 }
+
+impl From<ExtensionId> for ExtensionSet {
+    fn from(id: ExtensionId) -> ExtensionSet {
+        ExtensionSet::singleton(&id)
+    }
+}

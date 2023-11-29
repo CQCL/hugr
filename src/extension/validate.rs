@@ -59,6 +59,7 @@ impl ExtensionValidator {
                 .extensions
                 .insert((*node, Direction::Outgoing), output_exts);
             assert!(prev_o.is_none());
+            // TODO: ELSE
         }
     }
 

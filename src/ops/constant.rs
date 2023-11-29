@@ -1,6 +1,7 @@
 //! Constant value definitions.
 
 use crate::{
+    extension::ExtensionSet,
     types::{ConstTypeError, EdgeKind, Type, TypeRow},
     values::{CustomConst, KnownTypeConst, Value},
 };
@@ -15,13 +16,21 @@ use super::{OpName, OpTrait, StaticTag};
 pub struct Const {
     value: Value,
     typ: Type,
+    /// The extension that the Const comes from
+    /// For tuples there might be multiple extensions, for example prelude + another
+    extensions: ExtensionSet,
 }
 
 impl Const {
     /// Creates a new Const, type-checking the value.
-    pub fn new(value: Value, typ: Type) -> Result<Self, ConstTypeError> {
+    /// TODO: Should we validate against extension registries here?
+    pub fn new(value: Value, typ: Type, extensions: ExtensionSet) -> Result<Self, ConstTypeError> {
         typ.check_type(&value)?;
-        Ok(Self { value, typ })
+        Ok(Self {
+            value,
+            typ,
+            extensions,
+        })
     }
 
     /// Returns a reference to the value of this [`Const`].
@@ -40,9 +49,10 @@ impl Const {
         tag: usize,
         value: Value,
         variant_rows: impl IntoIterator<Item = TypeRow>,
+        extensions: ExtensionSet,
     ) -> Result<Self, ConstTypeError> {
         let typ = Type::new_tuple_sum(variant_rows);
-        Self::new(Value::sum(tag, value), typ)
+        Self::new(Value::sum(tag, value), typ, extensions)
     }
 
     /// Constant Sum over units, used as branching values.
@@ -50,6 +60,7 @@ impl Const {
         Self {
             value: Value::unit_sum(tag),
             typ: Type::new_unit_sum(size),
+            extensions: ExtensionSet::new(),
         }
     }
 
@@ -70,16 +81,30 @@ impl Const {
 
     /// Tuple of values
     pub fn new_tuple(items: impl IntoIterator<Item = Const>) -> Self {
-        let (values, types): (Vec<Value>, Vec<Type>) = items
+        let (values_types, exts): (Vec<(Value, Type)>, Vec<ExtensionSet>) = items
             .into_iter()
-            .map(|Const { value, typ }| (value, typ))
+            .map(
+                |Const {
+                     value,
+                     typ,
+                     extensions,
+                 }| ((value, typ), extensions),
+            )
             .unzip();
-        Self::new(Value::tuple(values), Type::new_tuple(types)).unwrap()
+        let exts = exts.iter().fold(ExtensionSet::new(), |a, b| a.union(b));
+        // TODO: Unnecessary second pass over the list?
+        let (values, types): (Vec<Value>, Vec<Type>) = values_types.into_iter().unzip();
+        Self::new(Value::tuple(values), Type::new_tuple(types), exts).unwrap()
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         self.value().get_custom_value()
+    }
+
+    /// Getter for the extensions associated with the const type
+    pub fn extensions(&self) -> &ExtensionSet {
+        &self.extensions
     }
 }
 
@@ -115,6 +140,7 @@ where
         Const {
             value: Value::custom(value),
             typ: Type::new_extension(T::TYPE),
+            extensions: ExtensionSet::singleton(&T::TYPE.extension()),
         }
     }
 }
@@ -125,7 +151,7 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
-            prelude::{ConstUsize, USIZE_T},
+            prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
             ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
@@ -156,22 +182,22 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
-        let c = b.add_constant(
-            Const::tuple_sum(
-                0,
-                Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
-                pred_rows.clone(),
-            )?,
+        let c = b.add_constant(Const::tuple_sum(
+            0,
+            Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
+            pred_rows.clone(),
             ExtensionSet::new(),
-        )?;
+        )?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
-        let c = b.add_constant(
-            Const::tuple_sum(1, Value::unit(), pred_rows)?,
-            ExtensionSet::new(),
-        )?;
+        let c = b.add_constant(Const::tuple_sum(
+            1,
+            Value::unit(),
+            pred_rows,
+            PRELUDE_ID.into(),
+        )?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
@@ -182,7 +208,7 @@ mod test {
     fn test_bad_tuple_sum() {
         let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
 
-        let res = Const::tuple_sum(0, Value::tuple([]), pred_rows);
+        let res = Const::tuple_sum(0, Value::tuple([]), pred_rows, PRELUDE_ID.into());
         assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
     }
 
@@ -215,7 +241,7 @@ mod test {
             Err(ConstTypeError::TupleWrongLength)
         );
 
-        let op = Const::new(int_value, USIZE_T).unwrap();
+        let op = Const::new(int_value, USIZE_T, PRELUDE_ID.into()).unwrap();
 
         assert_eq!(op.get_custom_value(), Some(&ConstUsize::new(257)));
         let try_float: Option<&ConstF64> = op.get_custom_value();

@@ -345,7 +345,7 @@ impl UnificationContext {
                 matches!(
                     sig.port_kind(*src_port),
                     Some(EdgeKind::Value(_))
-                        | Some(EdgeKind::Static(_))
+                        //| Some(EdgeKind::Static(_))
                         | Some(EdgeKind::ControlFlow)
                 )
             }) {

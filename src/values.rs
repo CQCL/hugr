@@ -11,6 +11,7 @@ use smol_str::SmolStr;
 use crate::macros::impl_box_clone;
 use crate::{Hugr, HugrView};
 
+use crate::extension::ExtensionSet;
 use crate::types::{CustomCheckFailure, CustomType};
 
 /// A value that can be stored as a static constant. Representing core types and
