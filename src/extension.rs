@@ -23,14 +23,14 @@ pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{
-    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, ValidateJustArgs,
-    ValidateTypeArgs,
+    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, SignatureFunc,
+    ValidateJustArgs, ValidateTypeArgs,
 };
 mod type_def;
 pub use type_def::{TypeDef, TypeDefBound};
 pub mod prelude;
+pub mod simple_op;
 pub mod validate;
-
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 /// Extension Registries store extensions to be looked up e.g. during validation.

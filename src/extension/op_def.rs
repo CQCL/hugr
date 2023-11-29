@@ -148,18 +148,18 @@ impl CustomValidator {
 }
 
 /// The two ways in which an OpDef may compute the Signature of each operation node.
-/// Either as a TypeScheme (polymorphic function type), with optional custom
-/// validation for provided type arguments,
-/// or a custom binary which computes a polymorphic function type given values
-/// for its static type parameters.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
+    /// A TypeScheme (polymorphic function type), with optional custom
+    /// validation for provided type arguments,
     #[serde(rename = "signature")]
     TypeScheme(CustomValidator),
     #[serde(skip)]
+    /// A custom binary which computes a polymorphic function type given values
+    /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
 }
 struct NoValidate;
@@ -210,6 +210,46 @@ impl SignatureFunc {
             SignatureFunc::TypeScheme(ts) => ts.poly_func.params(),
             SignatureFunc::CustomFunc(func) => func.static_params(),
         }
+    }
+
+    /// Compute the concrete signature ([FunctionType]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is a [SignatureFunc::CustomFunc] and there are not enough type
+    /// arguments provided to match the number of static parameters.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the type arguments are invalid or
+    /// there is some error in type computation.
+    pub fn compute_signature(
+        &self,
+        def: &OpDef,
+        args: &[TypeArg],
+        exts: &ExtensionRegistry,
+    ) -> Result<FunctionType, SignatureError> {
+        let temp: PolyFuncType;
+        let (pf, args) = match &self {
+            SignatureFunc::TypeScheme(custom) => {
+                custom.validate.validate(args, def, exts)?;
+                (&custom.poly_func, args)
+            }
+            SignatureFunc::CustomFunc(func) => {
+                let static_params = func.static_params();
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+
+                check_type_args(static_args, static_params)?;
+                temp = func.compute_signature(static_args, def, exts)?;
+                (&temp, other_args)
+            }
+        };
+
+        let res = pf.instantiate(args, exts)?;
+        // TODO bring this assert back once resource inference is done?
+        // https://github.com/CQCL/hugr/issues/388
+        // debug_assert!(res.extension_reqs.contains(def.extension()));
+        Ok(res)
     }
 }
 
@@ -306,27 +346,7 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let temp: PolyFuncType;
-        let (pf, args) = match &self.signature_func {
-            SignatureFunc::TypeScheme(custom) => {
-                custom.validate.validate(args, self, exts)?;
-                (&custom.poly_func, args)
-            }
-            SignatureFunc::CustomFunc(func) => {
-                let static_params = func.static_params();
-                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
-
-                check_type_args(static_args, static_params)?;
-                temp = func.compute_signature(static_args, self, exts)?;
-                (&temp, other_args)
-            }
-        };
-
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL-DEV/hugr/issues/425
-        // assert!(res.contains(self.extension()));
-        Ok(res)
+        self.signature_func.compute_signature(self, args, exts)
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {
