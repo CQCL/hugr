@@ -357,10 +357,13 @@ mod test {
                 .signature(),
             FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
         );
-        assert!(IntOpDef::iwiden_u
-            .with_two_widths(4, 3)
-            .to_extension_op()
-            .is_none());
+        assert!(
+            IntOpDef::iwiden_u
+                .with_two_widths(4, 3)
+                .to_extension_op()
+                .is_none(),
+            "type arguments invalid"
+        );
 
         assert_eq!(
             IntOpDef::inarrow_s
@@ -380,10 +383,13 @@ mod test {
     #[test]
     fn test_conversions() {
         let o = IntOpDef::itobool.with_width(5);
-        assert!(IntOpDef::itobool
-            .with_two_widths(1, 2)
-            .to_extension_op()
-            .is_none());
+        assert!(
+            IntOpDef::itobool
+                .with_two_widths(1, 2)
+                .to_extension_op()
+                .is_none(),
+            "type arguments invalid"
+        );
         let ext_op = o.clone().to_extension_op().unwrap();
 
         assert_eq!(IntOpType::from_extension_op(&ext_op).unwrap(), o);
