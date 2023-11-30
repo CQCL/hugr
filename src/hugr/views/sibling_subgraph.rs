@@ -689,7 +689,7 @@ mod tests {
         hugr::views::{HierarchyView, SiblingGraph},
         hugr::HugrMut,
         ops::handle::{DfgID, FuncID, NodeHandle},
-        std_extensions::logic::test::{and_op, not_op},
+        std_extensions::logic::{test::and_op, NotOp},
         type_row,
     };
 
@@ -742,9 +742,9 @@ mod tests {
         let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
-            let outs2 = dfg.add_dataflow_op(not_op(), outs1.outputs())?;
-            let outs3 = dfg.add_dataflow_op(not_op(), outs2.outputs())?;
+            let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
+            let outs2 = dfg.add_dataflow_op(NotOp, outs1.outputs())?;
+            let outs3 = dfg.add_dataflow_op(NotOp, outs2.outputs())?;
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
@@ -976,10 +976,7 @@ mod tests {
         let mut builder =
             DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
-        let outw1 = builder
-            .add_dataflow_op(not_op(), [inw])
-            .unwrap()
-            .out_wire(0);
+        let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder
             .add_dataflow_op(and_op(), [inw, outw1])
             .unwrap()
