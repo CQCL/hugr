@@ -10,6 +10,7 @@ use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{Hugr, Node};
 
+use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
 use super::{LeafOp, OpTrait, OpType};
 
@@ -74,7 +75,7 @@ impl ExternalOp {
     pub fn description(&self) -> &str {
         match self {
             Self::Opaque(op) => op.description.as_str(),
-            Self::Extension(ExtensionOp { def, .. }) => def.description(),
+            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op),
         }
     }
 
@@ -86,7 +87,7 @@ impl ExternalOp {
                 .signature
                 .clone()
                 .expect("Op should have been serialized with signature."),
-            Self::Extension(ExtensionOp { signature, .. }) => signature.clone(),
+            Self::Extension(ext_op) => ext_op.signature(),
         }
     }
 }
@@ -167,6 +168,18 @@ impl From<ExtensionOp> for OpType {
 impl PartialEq for ExtensionOp {
     fn eq(&self, other: &Self) -> bool {
         Arc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
+    }
+}
+
+impl DataflowOpTrait for ExtensionOp {
+    const TAG: OpTag = OpTag::Leaf;
+
+    fn description(&self) -> &str {
+        self.def().description()
+    }
+
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
     }
 }
 
