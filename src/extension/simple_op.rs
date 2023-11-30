@@ -216,7 +216,7 @@ impl<T: MakeRegisteredOp> From<T> for RegisteredOp<'_, T> {
     }
 }
 
-impl<T: MakeRegisteredOp + MakeExtensionOp> From<T> for OpType {
+impl<T: MakeRegisteredOp> From<T> for OpType {
     /// Convert
     fn from(ext_op: T) -> Self {
         ext_op.to_extension_op().unwrap().into()

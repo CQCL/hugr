@@ -138,7 +138,8 @@ fn extension() -> Extension {
 lazy_static! {
     /// Reference to the logic Extension.
     pub static ref EXTENSION: Extension = extension();
-    static ref LOGIC_REG: ExtensionRegistry =
+    /// Registry required to validate logic extension.
+    pub static ref LOGIC_REG: ExtensionRegistry =
         ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
 }
 
