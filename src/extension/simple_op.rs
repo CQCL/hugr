@@ -119,7 +119,7 @@ pub trait MakeExtensionOp: OpName {
     }
 }
 
-/// Blanket implementation for non-polymorphic operations - no type parameters.
+/// Blanket implementation for non-polymorphic operations - [OpDef]s with no type parameters.
 impl<T: MakeOpDef> MakeExtensionOp for T {
     #[inline]
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
@@ -187,12 +187,50 @@ impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
     }
 }
 
+/// Trait for operations that can self report the extension ID they belong to
+/// and the registry required to compute their types.
+/// Allows conversion to [`ExtensionOp`]
+pub trait MakeRegisteredOp: MakeExtensionOp {
+    /// The ID of the extension this op belongs to.
+    fn extension_id(&self) -> ExtensionId;
+    /// A reference to an [ExtensionRegistry] which is sufficient to generate
+    /// the signature of this op.
+    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry;
+
+    /// Convert this operation in to an [ExtensionOp]. Returns None if the type
+    /// cannot be computed.
+    fn to_extension_op(self) -> Option<ExtensionOp>
+    where
+        Self: Sized,
+    {
+        let registered: RegisteredOp<_> = self.into();
+        registered.to_extension_op()
+    }
+}
+
+impl<T: MakeRegisteredOp> From<T> for RegisteredOp<'_, T> {
+    fn from(ext_op: T) -> Self {
+        let extension_id = ext_op.extension_id();
+        let registry = ext_op.registry();
+        ext_op.to_registered(extension_id, registry)
+    }
+}
+
+impl<T: MakeRegisteredOp + MakeExtensionOp> From<T> for OpType {
+    /// Convert
+    fn from(ext_op: T) -> Self {
+        ext_op.to_extension_op().unwrap().into()
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use crate::{type_row, types::FunctionType};
+    use crate::{const_extension_ids, type_row, types::FunctionType};
 
     use super::*;
+    use lazy_static::lazy_static;
     use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+
     #[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
     enum DummyEnum {
         Dumb,
@@ -207,27 +245,43 @@ mod test {
             Ok(Self::Dumb)
         }
     }
+    const_extension_ids! {
+        const EXT_ID: ExtensionId = "DummyExt";
+    }
+
+    lazy_static! {
+        static ref EXT: Extension = {
+            let mut e = Extension::new(EXT_ID.clone());
+            DummyEnum::Dumb.add_to_extension(&mut e).unwrap();
+            e
+        };
+        static ref DUMMY_REG: ExtensionRegistry =
+            ExtensionRegistry::try_new([EXT.to_owned()]).unwrap();
+    }
+    impl MakeRegisteredOp for DummyEnum {
+        fn extension_id(&self) -> ExtensionId {
+            EXT_ID.to_owned()
+        }
+
+        fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
+            &DUMMY_REG
+        }
+    }
 
     #[test]
     fn test_dummy_enum() {
         let o = DummyEnum::Dumb;
 
-        let ext_name = ExtensionId::new("dummy").unwrap();
-        let mut e = Extension::new(ext_name.clone());
-
-        o.add_to_extension(&mut e).unwrap();
         assert_eq!(
-            DummyEnum::from_def(e.get_op(&o.name()).unwrap()).unwrap(),
+            DummyEnum::from_def(EXT.get_op(&o.name()).unwrap()).unwrap(),
             o
         );
 
-        let registry = ExtensionRegistry::try_new([e.to_owned()]).unwrap();
-        let registered = o.clone().to_registered(ext_name, &registry);
         assert_eq!(
-            DummyEnum::from_optype(&registered.to_extension_op().unwrap().into()).unwrap(),
+            DummyEnum::from_optype(&o.clone().to_extension_op().unwrap().into()).unwrap(),
             o
         );
-
+        let registered: RegisteredOp<_> = o.clone().into();
         assert_eq!(registered.to_inner(), o);
     }
 }

@@ -5,8 +5,8 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::{
     extension::{
         prelude::BOOL_T,
-        simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, OpLoadError},
-        ExtensionId, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
+        simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
+        ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
     },
     ops::{self, custom::ExtensionOp, OpName},
     type_row,
@@ -138,29 +138,41 @@ fn extension() -> Extension {
 lazy_static! {
     /// Reference to the logic Extension.
     pub static ref EXTENSION: Extension = extension();
+    static ref LOGIC_REG: ExtensionRegistry =
+        ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+}
+
+impl MakeRegisteredOp for ConcreteLogicOp {
+    fn extension_id(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
+        &LOGIC_REG
+    }
+}
+
+impl MakeRegisteredOp for NotOp {
+    fn extension_id(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
+        &LOGIC_REG
+    }
 }
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::{
-        extension, ConcreteLogicOp, NaryLogic, NotOp, EXTENSION, EXTENSION_ID, FALSE_NAME,
-        TRUE_NAME,
-    };
+    use super::{extension, ConcreteLogicOp, NaryLogic, FALSE_NAME, TRUE_NAME};
     use crate::{
-        extension::{
-            prelude::BOOL_T,
-            simple_op::{MakeExtensionOp, MakeOpDef},
-            ExtensionRegistry,
-        },
-        ops::{custom::ExtensionOp, OpName},
+        extension::{prelude::BOOL_T, simple_op::MakeOpDef},
+        ops::OpName,
         Extension,
     };
-    use lazy_static::lazy_static;
+
     use strum::IntoEnumIterator;
-    lazy_static! {
-        pub(crate) static ref LOGIC_REG: ExtensionRegistry =
-            ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
-    }
+
     #[test]
     fn test_logic_extension() {
         let r: Extension = extension();
@@ -187,27 +199,13 @@ pub(crate) mod test {
         }
     }
 
-    /// Generate a logic extension and "and" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn and_op() -> ExtensionOp {
+    /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn and_op() -> ConcreteLogicOp {
         ConcreteLogicOp(NaryLogic::And, 2)
-            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
-            .to_extension_op()
-            .unwrap()
     }
 
-    /// Generate a logic extension and "or" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn or_op() -> ExtensionOp {
+    /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
+    pub(crate) fn or_op() -> ConcreteLogicOp {
         ConcreteLogicOp(NaryLogic::Or, 2)
-            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
-            .to_extension_op()
-            .unwrap()
-    }
-
-    /// Generate a logic extension and "not" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn not_op() -> ExtensionOp {
-        NotOp
-            .to_registered(EXTENSION_ID.to_owned(), &LOGIC_REG)
-            .to_extension_op()
-            .unwrap()
     }
 }
