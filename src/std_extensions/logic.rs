@@ -55,7 +55,7 @@ pub struct ConcreteLogicOp(pub NaryLogic, u64);
 impl NaryLogic {
     /// Initialise a [ConcreteLogicOp] by setting the number of inputs to this
     /// logic operation.
-    pub fn set_n_inputs(self, n: u64) -> ConcreteLogicOp {
+    pub fn with_n_inputs(self, n: u64) -> ConcreteLogicOp {
         ConcreteLogicOp(self, n)
     }
 }
@@ -202,7 +202,7 @@ pub(crate) mod test {
     #[test]
     fn test_conversions() {
         for def in [NaryLogic::And, NaryLogic::Or] {
-            let o = def.set_n_inputs(3);
+            let o = def.with_n_inputs(3);
             let ext_op = o.clone().to_extension_op().unwrap();
             assert_eq!(ConcreteLogicOp::from_extension_op(&ext_op).unwrap(), o);
         }
@@ -224,11 +224,11 @@ pub(crate) mod test {
 
     /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> ConcreteLogicOp {
-        NaryLogic::And.set_n_inputs(2)
+        NaryLogic::And.with_n_inputs(2)
     }
 
     /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn or_op() -> ConcreteLogicOp {
-        NaryLogic::Or.set_n_inputs(2)
+        NaryLogic::Or.with_n_inputs(2)
     }
 }
