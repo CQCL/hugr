@@ -310,7 +310,7 @@ impl MakeRegisteredOp for IntOpType {
 impl IntOpDef {
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
     /// integer width set.
-    pub fn one_width(self, width: u64) -> IntOpType {
+    pub fn with_width(self, width: u64) -> IntOpType {
         IntOpType {
             def: self,
             first_width: width,
@@ -319,7 +319,7 @@ impl IntOpDef {
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
     /// integer widths set.
-    pub fn two_widths(self, first_width: u64, second_width: u64) -> IntOpType {
+    pub fn with_two_widths(self, first_width: u64, second_width: u64) -> IntOpType {
         IntOpType {
             def: self,
             first_width,
@@ -350,30 +350,21 @@ mod test {
     #[test]
     fn test_binary_signatures() {
         assert_eq!(
-            // iwiden_s
-            //     .compute_signature(&[ta(3), ta(4)], &INT_OPS_REGISTRY)
-            //     .unwrap(),
             IntOpDef::iwiden_s
-                .two_widths(3, 4)
+                .with_two_widths(3, 4)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
             FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
         );
-
-        // let iwiden_u = EXTENSION.get_op("iwiden_u").unwrap();
-        // iwiden_u
-        //     .compute_signature(&[ta(4), ta(3)], &INT_OPS_REGISTRY)
-        //     .unwrap_err();
-
         assert!(IntOpDef::iwiden_u
-            .two_widths(4, 3)
+            .with_two_widths(4, 3)
             .to_extension_op()
             .is_none());
 
         assert_eq!(
             IntOpDef::inarrow_s
-                .two_widths(2, 1)
+                .with_two_widths(2, 1)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
@@ -381,16 +372,16 @@ mod test {
         );
 
         assert!(IntOpDef::inarrow_u
-            .two_widths(1, 2)
+            .with_two_widths(1, 2)
             .to_extension_op()
             .is_none());
     }
 
     #[test]
     fn test_conversions() {
-        let o = IntOpDef::itobool.one_width(5);
+        let o = IntOpDef::itobool.with_width(5);
         assert!(IntOpDef::itobool
-            .two_widths(1, 2)
+            .with_two_widths(1, 2)
             .to_extension_op()
             .is_none());
         let ext_op = o.clone().to_extension_op().unwrap();
