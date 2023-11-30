@@ -59,14 +59,10 @@ impl OpName for ConcreteLogicOp {
 impl MakeExtensionOp for ConcreteLogicOp {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def: NaryLogic = NaryLogic::from_def(ext_op.def())?;
-        Ok(match def {
-            NaryLogic::And | NaryLogic::Or => {
-                let [TypeArg::BoundedNat { n }] = *ext_op.args() else {
-                    return Err(SignatureError::InvalidTypeArgs.into());
-                };
-                Self(def, n)
-            }
-        })
+        let [TypeArg::BoundedNat { n }] = *ext_op.args() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+        Ok(Self(def, n))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
