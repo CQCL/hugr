@@ -49,8 +49,16 @@ impl MakeOpDef for NaryLogic {
 }
 
 /// Make a [NaryLogic] operation concrete by setting the type argument.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConcreteLogicOp(pub NaryLogic, u64);
 
+impl NaryLogic {
+    /// Initialise a [ConcreteLogicOp] by setting the number of inputs to this
+    /// logic operation.
+    pub fn set_n_inputs(self, n: u64) -> ConcreteLogicOp {
+        ConcreteLogicOp(self, n)
+    }
+}
 impl OpName for ConcreteLogicOp {
     fn name(&self) -> smol_str::SmolStr {
         self.0.name()
@@ -165,9 +173,12 @@ impl MakeRegisteredOp for NotOp {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::{extension, ConcreteLogicOp, NaryLogic, FALSE_NAME, TRUE_NAME};
+    use super::{extension, ConcreteLogicOp, NaryLogic, NotOp, FALSE_NAME, TRUE_NAME};
     use crate::{
-        extension::{prelude::BOOL_T, simple_op::MakeOpDef},
+        extension::{
+            prelude::BOOL_T,
+            simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
+        },
         ops::OpName,
         Extension,
     };
@@ -189,6 +200,17 @@ pub(crate) mod test {
     }
 
     #[test]
+    fn test_conversions() {
+        for def in [NaryLogic::And, NaryLogic::Or] {
+            let o = def.set_n_inputs(3);
+            let ext_op = o.clone().to_extension_op().unwrap();
+            assert_eq!(ConcreteLogicOp::from_extension_op(&ext_op).unwrap(), o);
+        }
+
+        NotOp::from_extension_op(&NotOp.to_extension_op().unwrap()).unwrap();
+    }
+
+    #[test]
     fn test_values() {
         let r: Extension = extension();
         let false_val = r.get_value(FALSE_NAME).unwrap();
@@ -202,11 +224,11 @@ pub(crate) mod test {
 
     /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn and_op() -> ConcreteLogicOp {
-        ConcreteLogicOp(NaryLogic::And, 2)
+        NaryLogic::And.set_n_inputs(2)
     }
 
     /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn or_op() -> ConcreteLogicOp {
-        ConcreteLogicOp(NaryLogic::Or, 2)
+        NaryLogic::Or.set_n_inputs(2)
     }
 }
