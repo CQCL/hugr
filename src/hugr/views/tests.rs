@@ -3,7 +3,10 @@ use rstest::{fixture, rstest};
 
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
-    extension::prelude::QB_T,
+    extension::{
+        prelude::{PRELUDE_ID, QB_T},
+        ExtensionSet,
+    },
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
     types::FunctionType,
@@ -134,16 +137,19 @@ fn value_types() {
 fn static_targets() {
     use crate::extension::prelude::{ConstUsize, USIZE_T};
     use itertools::Itertools;
+    let mut dfg = DFGBuilder::new(
+        FunctionType::new(type_row![], type_row![USIZE_T])
+            .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID)),
+    )
+    .unwrap();
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![], type_row![USIZE_T])).unwrap();
-
-    let c = dfg.add_constant(ConstUsize::new(1).into(), None).unwrap();
+    let c = dfg
+        .add_constant(ConstUsize::new(1).into(), ExtensionSet::new())
+        .unwrap();
 
     let load = dfg.load_const(&c).unwrap();
 
-    let h = dfg
-        .finish_hugr_with_outputs([load], &crate::extension::PRELUDE_REGISTRY)
-        .unwrap();
+    let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
 
     assert_eq!(h.static_source(load.node()), Some(c.node()));
 
