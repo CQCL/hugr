@@ -3,7 +3,7 @@
 use smol_str::SmolStr;
 
 use crate::{
-    extension::ExtensionId,
+    extension::{ExtensionId, ExtensionSet},
     types::{CustomCheckFailure, CustomType, Type, TypeBound},
     values::{CustomConst, KnownTypeConst},
     Extension,
@@ -65,6 +65,10 @@ impl CustomConst for ConstF64 {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&EXTENSION_ID)
     }
 }
 

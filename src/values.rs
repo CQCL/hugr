@@ -8,6 +8,7 @@ use std::any::Any;
 use downcast_rs::{impl_downcast, Downcast};
 use smol_str::SmolStr;
 
+use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 use crate::{Hugr, HugrView};
 
@@ -115,6 +116,19 @@ impl Value {
             None
         }
     }
+
+    /// The Extensions that must be supported to handle the value at runtime
+    pub fn extension_reqs(&self) -> ExtensionSet {
+        match self {
+            Value::Extension { c } => c.0.extension_reqs().clone(),
+            Value::Function { .. } => ExtensionSet::new(), // no extensions reqd to load Hugr (only to run)
+            Value::Tuple { vs } => vs
+                .iter()
+                .map(Value::extension_reqs)
+                .fold(ExtensionSet::new(), |a, b| a.union(&b)),
+            Value::Sum { value, .. } => value.extension_reqs(),
+        }
+    }
 }
 
 impl<T: CustomConst> From<T> for Value {
@@ -133,6 +147,13 @@ pub trait CustomConst:
 {
     /// An identifier for the constant.
     fn name(&self) -> SmolStr;
+
+    /// The extension(s) defining the custom value
+    /// (a set to allow, say, a [List] of [USize])
+    ///
+    /// [List]: crate::std_extensions::collections::LIST_TYPENAME
+    /// [USize]: crate::extension::prelude::USIZE_T
+    fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value is a valid instance of the provided type.
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
@@ -184,12 +205,17 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 pub struct CustomSerialized {
     typ: CustomType,
     value: serde_yaml::Value,
+    extensions: ExtensionSet,
 }
 
 impl CustomSerialized {
     /// Creates a new [`CustomSerialized`].
-    pub fn new(typ: CustomType, value: serde_yaml::Value) -> Self {
-        Self { typ, value }
+    pub fn new(typ: CustomType, value: serde_yaml::Value, extensions: ExtensionSet) -> Self {
+        Self {
+            typ,
+            value,
+            extensions,
+        }
     }
 }
 
@@ -213,6 +239,10 @@ impl CustomConst for CustomSerialized {
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         Some(self) == other.downcast_ref()
     }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        self.extensions.clone()
+    }
 }
 
 impl PartialEq for dyn CustomConst {
@@ -227,7 +257,7 @@ pub(crate) mod test {
 
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
-    use crate::std_extensions::arithmetic::float_types::FLOAT64_CUSTOM_TYPE;
+    use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
     use crate::type_row;
     use crate::types::{FunctionType, Type, TypeBound};
 
@@ -235,7 +265,7 @@ pub(crate) mod test {
 
     /// A custom constant value used in testing that purports to be an instance
     /// of a custom type with a specific type bound.
-    pub(crate) struct CustomTestValue(pub TypeBound);
+    pub(crate) struct CustomTestValue(pub TypeBound, pub ExtensionSet);
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
         fn name(&self) -> SmolStr {
@@ -251,12 +281,17 @@ pub(crate) mod test {
                 ))
             }
         }
+
+        fn extension_reqs(&self) -> ExtensionSet {
+            self.1.clone()
+        }
     }
 
     pub(crate) fn serialized_float(f: f64) -> Value {
         Value::custom(CustomSerialized {
             typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
+            extensions: ExtensionSet::singleton(&float_types::EXTENSION_ID),
         })
     }
 

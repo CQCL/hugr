@@ -159,10 +159,13 @@ mod test {
         let c = b.add_constant(
             Const::tuple_sum(
                 0,
-                Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
+                Value::tuple([
+                    CustomTestValue(TypeBound::Eq, ExtensionSet::new()).into(),
+                    serialized_float(5.1),
+                ]),
                 pred_rows.clone(),
             )?,
-            ExtensionSet::new(),
+            ExtensionSet::new(), // ALAN remove given above?
         )?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
@@ -233,7 +236,12 @@ mod test {
             ex_id.clone(),
             TypeBound::Eq,
         );
-        let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
+        let val: Value = CustomSerialized::new(
+            typ_int.clone(),
+            YamlValue::Number(6.into()),
+            ExtensionSet::singleton(&ex_id),
+        )
+        .into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();
