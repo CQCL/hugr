@@ -7,7 +7,7 @@ use crate::{
     Extension,
 };
 
-use super::int_types::int_type_var;
+use super::int_types::int_tv;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 
 /// The extension identifier.
@@ -17,15 +17,12 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.con
 pub fn extension() -> Extension {
     let ftoi_sig = PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM],
-        FunctionType::new(
-            type_row![FLOAT64_TYPE],
-            vec![sum_with_error(int_type_var(0))],
-        ),
+        FunctionType::new(type_row![FLOAT64_TYPE], vec![sum_with_error(int_tv(0))]),
     );
 
     let itof_sig = PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM],
-        FunctionType::new(vec![int_type_var(0)], type_row![FLOAT64_TYPE]),
+        FunctionType::new(vec![int_tv(0)], type_row![FLOAT64_TYPE]),
     );
 
     let mut extension = Extension::new_with_reqs(
