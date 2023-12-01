@@ -195,10 +195,20 @@ mod test {
             .into(),
         );
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
+                .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID))
+                .into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
-
+                let [angle] = f_build
+                    .add_dataflow_op(
+                        LeafOp::Lift {
+                            type_row: vec![NAT].into(),
+                            new_extension: EXTENSION_ID,
+                        },
+                        [angle],
+                    )?
+                    .outputs_arr();
                 let mut linear = f_build.as_circuit(vec![q0, q1]);
 
                 let measure_out = linear
