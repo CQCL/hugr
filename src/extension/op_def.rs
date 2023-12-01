@@ -223,7 +223,7 @@ impl SignatureFunc {
     ///
     /// This function will return an error if the type arguments are invalid or
     /// there is some error in type computation.
-    pub fn compute_signature(
+    fn compute_signature(
         &self,
         def: &OpDef,
         args: &[TypeArg],
@@ -246,9 +246,6 @@ impl SignatureFunc {
         };
 
         let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL/hugr/issues/388
-        // debug_assert!(res.extension_reqs.contains(def.extension()));
         Ok(res)
     }
 }
@@ -346,7 +343,11 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        self.signature_func.compute_signature(self, args, exts)
+        let mut functy = self.signature_func.compute_signature(self, args, exts)?;
+        functy.extension_reqs = functy
+            .extension_reqs
+            .union(&ExtensionSet::singleton(&self.extension));
+        Ok(functy)
     }
 
     pub(crate) fn should_serialize_signature(&self) -> bool {
