@@ -46,23 +46,6 @@ impl ExternalOp {
         qualify_name(res_id, op_name)
     }
 
-    /// A description of the external op.
-    pub fn description(&self) -> &str {
-        match self {
-            Self::Opaque(op) => op.description.as_str(),
-            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op),
-        }
-    }
-
-    /// Note the case of an OpaqueOp without a signature should already
-    /// have been detected in [resolve_extension_ops]
-    pub fn dataflow_signature(&self) -> FunctionType {
-        match self {
-            Self::Opaque(op) => op.signature.clone(),
-            Self::Extension(ext_op) => ext_op.signature(),
-        }
-    }
-
     /// Downgrades this ExternalOp into an OpaqueOp
     pub fn as_opaque(self) -> OpaqueOp {
         match self {
@@ -97,6 +80,24 @@ impl From<ExternalOp> for OpType {
     fn from(value: ExternalOp) -> Self {
         let leaf: LeafOp = value.into();
         leaf.into()
+    }
+}
+
+impl DataflowOpTrait for ExternalOp {
+    const TAG: OpTag = OpTag::Leaf;
+
+    fn description(&self) -> &str {
+        match self {
+            Self::Opaque(op) => DataflowOpTrait::description(op),
+            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op),
+        }
+    }
+
+    fn signature(&self) -> FunctionType {
+        match self {
+            Self::Opaque(op) => op.signature.clone(),
+            Self::Extension(ext_op) => ext_op.signature(),
+        }
     }
 }
 
@@ -251,6 +252,18 @@ impl From<OpaqueOp> for OpType {
     }
 }
 
+impl DataflowOpTrait for OpaqueOp {
+    const TAG: OpTag = OpTag::Leaf;
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+}
+
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
@@ -352,8 +365,8 @@ mod test {
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
-        assert_eq!(op.description(), "desc");
+        assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
-        assert_eq!(op.dataflow_signature(), sig);
+        assert_eq!(op.signature(), sig);
     }
 }
