@@ -423,7 +423,7 @@ pub mod test {
     }
 
     #[test]
-    fn canonicalisation() {
+    fn hierarchy_order() {
         let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
         let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
         hugr.connect(old_in, 0, out, 0).unwrap();
