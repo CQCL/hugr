@@ -36,6 +36,23 @@ impl ExternalOp {
             Self::Extension(op) => op.args(),
         }
     }
+
+    /// Name of the ExternalOp
+    pub fn name(&self) -> SmolStr {
+        let (res_id, op_name) = match self {
+            Self::Opaque(op) => (&op.extension, &op.op_name),
+            Self::Extension(ExtensionOp { def, .. }) => (def.extension(), def.name()),
+        };
+        qualify_name(res_id, op_name)
+    }
+
+    /// Downgrades this ExternalOp into an OpaqueOp
+    pub fn as_opaque(self) -> OpaqueOp {
+        match self {
+            Self::Opaque(op) => op,
+            Self::Extension(op) => op.into(),
+        }
+    }
 }
 
 impl From<ExternalOp> for OpaqueOp {
@@ -66,34 +83,19 @@ impl From<ExternalOp> for OpType {
     }
 }
 
-impl ExternalOp {
-    /// Name of the ExternalOp
-    pub fn name(&self) -> SmolStr {
-        let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.extension, &op.op_name),
-            Self::Extension(ExtensionOp { def, .. }) => (def.extension(), def.name()),
-        };
-        qualify_name(res_id, op_name)
-    }
-}
+impl DataflowOpTrait for ExternalOp {
+    const TAG: OpTag = OpTag::Leaf;
 
-impl ExternalOp {
-    /// A description of the external op.
-    pub fn description(&self) -> &str {
+    fn description(&self) -> &str {
         match self {
-            Self::Opaque(op) => op.description.as_str(),
+            Self::Opaque(op) => DataflowOpTrait::description(op),
             Self::Extension(ext_op) => DataflowOpTrait::description(ext_op),
         }
     }
 
-    /// Note the case of an OpaqueOp without a signature should already
-    /// have been detected in [resolve_extension_ops]
-    pub fn dataflow_signature(&self) -> FunctionType {
+    fn signature(&self) -> FunctionType {
         match self {
-            Self::Opaque(op) => op
-                .signature
-                .clone()
-                .expect("Op should have been serialized with signature."),
+            Self::Opaque(op) => op.signature.clone(),
             Self::Extension(ext_op) => ext_op.signature(),
         }
     }
@@ -144,17 +146,12 @@ impl From<ExtensionOp> for OpaqueOp {
             args,
             signature,
         } = op;
-        let opt_sig = if def.should_serialize_signature() {
-            Some(signature)
-        } else {
-            None
-        };
         OpaqueOp {
             extension: def.extension().clone(),
             op_name: def.name().clone(),
             description: def.description().into(),
             args,
-            signature: opt_sig,
+            signature,
         }
     }
 }
@@ -199,7 +196,7 @@ pub struct OpaqueOp {
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Option<FunctionType>,
+    signature: FunctionType,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
@@ -213,7 +210,7 @@ impl OpaqueOp {
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Option<FunctionType>,
+        signature: FunctionType,
     ) -> Self {
         Self {
             extension,
@@ -255,6 +252,18 @@ impl From<OpaqueOp> for OpType {
     }
 }
 
+impl DataflowOpTrait for OpaqueOp {
+    const TAG: OpTag = OpTag::Leaf;
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+}
+
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
 #[allow(dead_code)]
 pub fn resolve_extension_ops(
@@ -291,7 +300,7 @@ pub fn resolve_extension_ops(
 /// # Errors
 /// If the serialized opaque resolves to a definition that conflicts with what was serialized
 pub fn resolve_opaque_op(
-    n: Node,
+    _n: Node,
     opaque: &OpaqueOp,
     extension_registry: &ExtensionRegistry,
 ) -> Result<Option<ExtensionOp>, CustomOpError> {
@@ -305,22 +314,15 @@ pub fn resolve_opaque_op(
         };
         let ext_op =
             ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry).unwrap();
-        if let Some(stored_sig) = &opaque.signature {
-            if stored_sig != &ext_op.signature {
-                return Err(CustomOpError::SignatureMismatch {
-                    extension: opaque.extension.clone(),
-                    op: def.name().clone(),
-                    computed: ext_op.signature.clone(),
-                    stored: stored_sig.clone(),
-                });
-            };
-        }
+        if opaque.signature != ext_op.signature {
+            return Err(CustomOpError::SignatureMismatch {
+                extension: opaque.extension.clone(),
+                op: def.name().clone(),
+                computed: ext_op.signature.clone(),
+                stored: opaque.signature.clone(),
+            });
+        };
         Ok(Some(ext_op))
-    } else if opaque.signature.is_none() {
-        Err(CustomOpError::NoStoredSignature(
-            ExternalOp::Opaque(opaque.clone()).name(),
-            n,
-        ))
     } else {
         Ok(None)
     }
@@ -330,9 +332,6 @@ pub fn resolve_opaque_op(
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum CustomOpError {
-    /// Extension not found, and no signature
-    #[error("Unable to resolve operation {0} for node {1:?} with no saved signature")]
-    NoStoredSignature(SmolStr, Node),
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]
     OpNotFoundInExtension(SmolStr, ExtensionId),
@@ -350,22 +349,24 @@ pub enum CustomOpError {
 #[cfg(test)]
 mod test {
 
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::{QB_T, USIZE_T};
 
     use super::*;
 
     #[test]
     fn new_opaque_op() {
+        let sig = FunctionType::new_endo(vec![QB_T]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
-            None,
+            sig.clone(),
         );
         let op: ExternalOp = op.into();
         assert_eq!(op.name(), "res.op");
-        assert_eq!(op.description(), "desc");
+        assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
+        assert_eq!(op.signature(), sig);
     }
 }
