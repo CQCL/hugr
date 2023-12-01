@@ -59,6 +59,13 @@ impl From<ExternalOp> for LeafOp {
     }
 }
 
+impl From<ExternalOp> for OpType {
+    fn from(value: ExternalOp) -> Self {
+        let leaf: LeafOp = value.into();
+        leaf.into()
+    }
+}
+
 impl ExternalOp {
     /// Name of the ExternalOp
     pub fn name(&self) -> SmolStr {
@@ -232,6 +239,19 @@ impl OpaqueOp {
     /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
+    }
+}
+
+impl From<OpaqueOp> for LeafOp {
+    fn from(value: OpaqueOp) -> Self {
+        LeafOp::CustomOp(Box::new(ExternalOp::Opaque(value)))
+    }
+}
+
+impl From<OpaqueOp> for OpType {
+    fn from(value: OpaqueOp) -> Self {
+        let leaf: LeafOp = value.into();
+        leaf.into()
     }
 }
 
