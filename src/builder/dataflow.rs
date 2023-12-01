@@ -213,9 +213,9 @@ pub(crate) mod test {
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
-    use crate::std_extensions::logic::test::and_op;
+    use crate::std_extensions::logic::{self, test::and_op};
     use crate::types::Type;
-    use crate::utils::test_quantum_extension::h_gate;
+    use crate::utils::test_quantum_extension::{self, h_gate};
     use crate::{
         builder::{
             test::{n_identity, BIT, NAT, QB},
@@ -235,13 +235,25 @@ pub(crate) mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
+                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB])
+                        .with_extension_delta(&ExtensionSet::singleton(
+                            &test_quantum_extension::EXTENSION_ID,
+                        ))
+                        .into(),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
 
                 let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
-
+                let [int] = func_builder
+                    .add_dataflow_op(
+                        LeafOp::Lift {
+                            type_row: vec![NAT].into(),
+                            new_extension: test_quantum_extension::EXTENSION_ID,
+                        },
+                        [int],
+                    )?
+                    .outputs_arr();
                 let inner_builder = func_builder.dfg_builder(
                     FunctionType::new(type_row![NAT], type_row![NAT]),
                     None,
@@ -260,7 +272,7 @@ pub(crate) mod test {
     }
 
     // Scaffolding for copy insertion tests
-    fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
+    fn copy_scaffold<F>(f: F, delta: &ExtensionSet, msg: &'static str) -> Result<(), BuildError>
     where
         F: FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     {
@@ -269,7 +281,9 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
+                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])
+                    .with_extension_delta(delta)
+                    .into(),
             )?;
 
             f(f_build)?;
@@ -287,15 +301,27 @@ pub(crate) mod test {
                 let [b1] = f_build.input_wires_arr();
                 f_build.finish_with_outputs([b1, b1])
             },
+            &ExtensionSet::new(),
             "Copy input and output",
         )?;
 
+        let es = ExtensionSet::singleton(&logic::EXTENSION_ID);
         copy_scaffold(
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
                 let xor = f_build.add_dataflow_op(and_op(), [b1, b1])?;
+                let [b1] = f_build
+                    .add_dataflow_op(
+                        LeafOp::Lift {
+                            type_row: vec![BOOL_T].into(),
+                            new_extension: logic::EXTENSION_ID,
+                        },
+                        [b1],
+                    )?
+                    .outputs_arr();
                 f_build.finish_with_outputs([xor.out_wire(0), b1])
             },
+            &es,
             "Copy input and use with binary function",
         )?;
 
@@ -303,9 +329,19 @@ pub(crate) mod test {
             |mut f_build| {
                 let [b1] = f_build.input_wires_arr();
                 let xor1 = f_build.add_dataflow_op(and_op(), [b1, b1])?;
+                let [b1] = f_build
+                    .add_dataflow_op(
+                        LeafOp::Lift {
+                            type_row: vec![BOOL_T].into(),
+                            new_extension: logic::EXTENSION_ID,
+                        },
+                        [b1],
+                    )?
+                    .outputs_arr();
                 let xor2 = f_build.add_dataflow_op(and_op(), [b1, xor1.out_wire(0)])?;
                 f_build.finish_with_outputs([xor2.out_wire(0), b1])
             },
+            &es,
             "Copy multiple times",
         )?;
 
