@@ -228,6 +228,10 @@ impl OpTrait for Case {
         "A case node inside a conditional"
     }
 
+    fn extension_delta(&self) -> ExtensionSet {
+        self.signature.extension_reqs.clone()
+    }
+
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
