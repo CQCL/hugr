@@ -137,22 +137,33 @@ mod test {
             test::{build_main, NAT, QB},
             Dataflow, DataflowSubContainer, Wire,
         },
-        extension::prelude::BOOL_T,
+        extension::{prelude::BOOL_T, ExtensionSet},
         ops::{custom::OpaqueOp, LeafOp},
         type_row,
         types::FunctionType,
-        utils::test_quantum_extension::{cx_gate, h_gate, measure},
+        utils::test_quantum_extension::{cx_gate, h_gate, measure, EXTENSION_ID},
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
+            FunctionType::new_endo(type_row![QB, QB])
+                .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID))
+                .into(),
             |mut f_build| {
-                let wires = f_build.input_wires().collect();
+                let mut wires: [Wire; 2] = f_build.input_wires_arr();
+                [wires[1]] = f_build
+                    .add_dataflow_op(
+                        LeafOp::Lift {
+                            type_row: vec![QB].into(),
+                            new_extension: EXTENSION_ID,
+                        },
+                        [wires[1]],
+                    )?
+                    .outputs_arr();
 
                 let mut linear = CircuitBuilder {
-                    wires,
+                    wires: Vec::from(wires),
                     builder: &mut f_build,
                 };
 
